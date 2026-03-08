@@ -1,0 +1,8 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json,yaml,yml",
+  "exec": "yarn local:start",
+  "env": {
+    "NODE_ENV": "local"
+  }
+}

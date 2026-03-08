@@ -1,0 +1,33 @@
+@startuml
+
+actor User
+
+participant "Web UI"
+participant "SendMessage"
+participant "Encrypt"
+participant "CRDT Log"
+participant "IPFS"
+participant "GossipSub"
+participant "Remote Peer"
+
+User -> "Web UI" : write message
+
+"Web UI" -> "SendMessage" : send(chat,text)
+
+"SendMessage" -> "Encrypt" : encrypt payload
+
+"Encrypt" --> "SendMessage" : ciphertext
+
+"SendMessage" -> "CRDT Log" : append entry
+
+"CRDT Log" -> "IPFS" : store entry object
+
+"CRDT Log" --> "SendMessage" : new HEAD CID
+
+"SendMessage" -> "GossipSub" : broadcast HEAD
+
+"GossipSub" -> "Remote Peer" : HEAD CID
+
+"Remote Peer" -> "IPFS" : fetch missing entries
+
+@enduml

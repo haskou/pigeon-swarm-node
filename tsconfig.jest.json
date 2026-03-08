@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "typeAcquisition": {
+    "include": [
+      "jest"
+    ]
+  },
+  "compilerOptions": {
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "types": [
+      "node",
+      "jest"
+    ],
+    "baseUrl": "./",
+    "paths": {
+      "@app/*": [
+        "src/*"
+      ],
+      "@tests/*": [
+        "tests/*"
+      ],
+    }
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "config/**/*",
+  ]
+}
