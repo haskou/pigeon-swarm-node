@@ -42,8 +42,8 @@ export default class Kernel {
     return Kernel._di;
   }
 
-  public runServer(): void {
-    this._server.run();
+  public runServer(): Promise<void> {
+    return this._server.run();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

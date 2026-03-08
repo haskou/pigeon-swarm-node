@@ -25,39 +25,43 @@ export default class Server {
     return this._server;
   }
 
-  public run(): void {
-    this._app = createExpressServer({
-      routePrefix: `${process.env.ROUTE_PREFIX}`,
-      cors: true,
-      controllers: [HealthRoute, ConsumeDlxRoute, GetExampleRoute],
-      defaultErrorHandler: false,
-      middlewares: [HttpErrorHandler],
-    });
-    this._server = this.app.listen(process.env.API_PORT || 8080);
-
-    if (process.env.GENERATE_API_DOCS === 'true') {
-      // Generate Swagger
-      const schemas = validationMetadatasToSchemas({
-        refPointerPrefix: '#/components/schemas/',
+  public run(): Promise<void> {
+    return new Promise((resolve) => {
+      this._app = createExpressServer({
+        routePrefix: `${process.env.ROUTE_PREFIX}`,
+        cors: true,
+        controllers: [HealthRoute, ConsumeDlxRoute, GetExampleRoute],
+        defaultErrorHandler: false,
+        middlewares: [HttpErrorHandler],
+      });
+      this._server = this.app.listen(process.env.API_PORT || 8080, () => {
+        resolve();
       });
 
-      const storage = getMetadataArgsStorage();
-      const spec = routingControllersToSpec(
-        storage,
-        {},
-        {
-          components: {
-            ...schemas,
-            securitySchemes: {
-              bearerAuth: {
-                scheme: 'bearer',
-                type: 'http',
+      if (process.env.GENERATE_API_DOCS === 'true') {
+        // Generate Swagger
+        const schemas = validationMetadatasToSchemas({
+          refPointerPrefix: '#/components/schemas/',
+        });
+
+        const storage = getMetadataArgsStorage();
+        const spec = routingControllersToSpec(
+          storage,
+          {},
+          {
+            components: {
+              ...schemas,
+              securitySchemes: {
+                bearerAuth: {
+                  scheme: 'bearer',
+                  type: 'http',
+                },
               },
             },
           },
-        },
-      );
-      fs.writeFileSync('./open-api.json', JSON.stringify(spec), 'utf-8');
-    }
+        );
+        fs.writeFileSync('./open-api.json', JSON.stringify(spec), 'utf-8');
+      }
+    });
   }
 }

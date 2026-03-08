@@ -17,7 +17,7 @@ async function init() {
   console.timeEnd('Dependency Injection');
 
   console.time('Run server');
-  kernel.runServer();
+  await kernel.runServer();
   console.timeEnd('Run server');
 
   console.time('Run consumers');
