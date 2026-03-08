@@ -1,4 +1,4 @@
-import { createExpressServer, Get } from 'routing-controllers';
+import { createExpressServer } from 'routing-controllers';
 import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
 import { HttpErrorHandler } from './HttpErrorHandler';

@@ -50,6 +50,7 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
     return formattedErrors;
   }
 
+  // eslint-disable-next-line complexity
   public error(
     error: Error,
     _request: Request,

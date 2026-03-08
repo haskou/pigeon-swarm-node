@@ -10,6 +10,7 @@ export class GetExampleRoute extends Route {
   //   this.get<ApplicationViewModel>(ApplicationViewModel);
 
   @Get('/hewo')
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async getExample(@Res() response: Response): Promise<Response> {
     return response.status(HttpRouteStatusEnum.OK).send('Hello World');
   }

@@ -13,6 +13,7 @@ export default abstract class Scheduler {
     return Kernel.di.getService<T>(service);
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async init(): Promise<void> {
     let parsedCronExpression: string;
     try {
