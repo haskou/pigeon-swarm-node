@@ -1,5 +1,6 @@
-<img src=./logo.png style="text-align: center">
-
+<p align="center">
+  <img src="./logo.png">
+</p>
 A weird little experiment in building a **fully decentralized chat**.
 
 No central servers.
