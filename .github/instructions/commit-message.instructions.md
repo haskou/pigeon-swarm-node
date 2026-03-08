@@ -12,7 +12,7 @@ Formato general:
 
 Ejemplos:
 
-- feat(ALL-6025): ✨ Remove createdBy and companyId from issuer body on invoice create and update
+- feat(ALL-6025): ✨ Remove createdBy and exampleId from issuer body on invoice create and update
 - refactor: ♻️ Adjust input formatting
 - fix(BE-3453): 🐛 Fix issue with invoice creation
 

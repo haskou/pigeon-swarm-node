@@ -1,5 +1,5 @@
 ---
-applyTo: "**/*.ts"
+applyTo: '**/*.ts'
 ---
 
 # Guía Detallada de Generación de Código
@@ -7,6 +7,7 @@ applyTo: "**/*.ts"
 ## Habla siempre en español
 
 ## Utiliza siempre que puedas @app en vez de .. durante los imports
+
 Los imports dentro de la carpeta de /tests si que tienen que ser relativos al path.
 No puede usar @app.
 
@@ -22,30 +23,29 @@ Asegúrate de que tu proyecto sigue una arquitectura clara como:
 
 src/
 ├── apps/
-│   └── <nombre-app-api>/
-│       ├── bodies/
-│       ├── requests/
-│       ├── routes/
-│       ├── voters/
-│       ├── resources/
-│       └── view-models/
-│   └── <nombre-app-consumers>/
-│       ├── events/
-│       ├── consumers/
+│ └── <nombre-app-api>/
+│ ├── bodies/
+│ ├── requests/
+│ ├── routes/
+│ ├── voters/
+│ ├── resources/
+│ └── view-models/
+│ └── <nombre-app-consumers>/
+│ ├── events/
+│ ├── consumers/
 ├── contexts/
-│   └── <nombre-contexto>/
-│       ├── application/
-│       ├── domain/
-│       └── infrastructure/
-│   └── <shared-contexto>/
-│       ├── application/
-│       ├── domain/
-│       └── infrastructure/
+│ └── <nombre-contexto>/
+│ ├── application/
+│ ├── domain/
+│ └── infrastructure/
+│ └── <shared-contexto>/
+│ ├── application/
+│ ├── domain/
+│ └── infrastructure/
 ├── shared/
-│   ├── application/
-│   ├── domain/
-│   ├── infrastructure/
-
+│ ├── application/
+│ ├── domain/
+│ ├── infrastructure/
 
 🧱 Ejemplos por Tipo de Archivo
 
@@ -57,7 +57,7 @@ import { Type } from 'class-transformer';
 import { AccountingServiceRequestBody } from './AccountingServiceRequestBody';
 import { LaborServiceRequestBody } from './LaborServiceRequestBody';
 
-export class PatchCompanyBody {
+export class PatchexampleBody {
   @IsOptional()
   @ValidateNested()
   @Type(() => AccountingServiceRequestBody)
@@ -75,14 +75,14 @@ export class PatchCompanyBody {
 ### requests/ – Objetos de solicitud de alto nivel (command/query) para luego generar los mensajes de los casos de uso
 
 ```ts
-export class DeleteCompanyFeaturesRequest {
+export class DeleteexampleFeaturesRequest {
   constructor(
-    private readonly companyId: string,
+    private readonly exampleId: string,
     private readonly featureName: string,
   ) {}
 
   public getFeaturesRemoverMessage(): FeaturesRemoverMessage {
-    return new FeaturesRemoverMessage(this.companyId, this.featureName);
+    return new FeaturesRemoverMessage(this.exampleId, this.featureName);
   }
 }
 ```
@@ -104,11 +104,11 @@ import {
   UseBefore,
 } from 'routing-controllers';
 import { Response } from 'express';
-import { DeleteCompanyFeaturesRequest } from '../requests/DeleteCompanyFeaturesRequest';
-import FeaturesRemover from '@app/contexts/company/application/features-remover/FeaturesRemover';
+import { DeleteexampleFeaturesRequest } from '../requests/DeleteexampleFeaturesRequest';
+import FeaturesRemover from '@app/contexts/example/application/features-remover/FeaturesRemover';
 
 @JsonController('/features')
-export class DeleteCompanyFeaturesRoute extends Route {
+export class DeleteexampleFeaturesRoute extends Route {
   private readonly featuresRemover = this.get<FeaturesRemover>(FeaturesRemover);
 
   @Delete('/:featureName')
@@ -119,8 +119,8 @@ export class DeleteCompanyFeaturesRoute extends Route {
     @Param('featureName') featureName: string,
   ): Promise<Response> {
     try {
-      const request = new DeleteCompanyFeaturesRequest(
-        user.companyId,
+      const request = new DeleteexampleFeaturesRequest(
+        user.exampleId,
         featureName,
       );
       const message = request.getFeaturesRemoverMessage();
@@ -218,32 +218,32 @@ export class ExpenseViewModel {
 
 ```ts
 import Kernel from '@app/Kernel';
-import { CompanyWasCreatedEvent } from '../events/CompanyWasCreatedEvent';
-import FeaturesFromSourceAdder from '@app/contexts/company/application/features-adder/FeaturesFromSourceAdder';
-import { FeaturesFromSourceAdderMessage } from '@app/contexts/company/application/features-adder/FeaturesFromSourceAdderMessage';
+import { exampleWasCreatedEvent } from '../events/exampleWasCreatedEvent';
+import FeaturesFromSourceAdder from '@app/contexts/example/application/features-adder/FeaturesFromSourceAdder';
+import { FeaturesFromSourceAdderMessage } from '@app/contexts/example/application/features-adder/FeaturesFromSourceAdderMessage';
 import Consumer from '@app/shared/infrastructure/UI/consumers/Consumer';
 
-export default class EnableFeaturesOnCompanyCreated extends Consumer {
+export default class EnableFeaturesOnexampleCreated extends Consumer {
   private readonly adder: FeaturesFromSourceAdder =
     this.get<FeaturesFromSourceAdder>(FeaturesFromSourceAdder);
 
-  public get domainEvent(): typeof CompanyWasCreatedEvent {
-    return CompanyWasCreatedEvent;
+  public get domainEvent(): typeof exampleWasCreatedEvent {
+    return exampleWasCreatedEvent;
   }
 
   public get queueName(): string {
-    return 'companies.v1.enable_features_on_company_created';
+    return 'examples.v1.example_was_created';
   }
 
   public get eventName(): string {
-    return CompanyWasCreatedEvent.eventName;
+    return exampleWasCreatedEvent.eventName;
   }
 
   public get exchange(): string {
-    return 'ms_legacy';
+    return 'example_exchange';
   }
 
-  public async handler(event: CompanyWasCreatedEvent): Promise<void> {
+  public async handler(event: exampleWasCreatedEvent): Promise<void> {
     try {
       const message = new FeaturesFromSourceAdderMessage(event.aggregateId);
       await this.adder.add(message);
@@ -273,7 +273,7 @@ export class ExpenseNotes {
 ```
 
 ```ts
-import { PrimitiveOf } from '@tacliatech/domain';
+import { PrimitiveOf } from '@haskou/value-objects';
 import {
   CampaignChannelEnum,
   CampaignSourceChannel,
@@ -336,7 +336,7 @@ export class CampaignSource {
 ```
 
 ```ts
-import { EnumValueObject } from '@tacliatech/domain';
+import { EnumValueObject } from '@haskou/value-objects';
 
 export enum CampaignSourceNameEnum {
   BUDGETS_AND_INVOICES = 'budgets_and_invoices',
@@ -372,7 +372,7 @@ export class CampaignSourceName extends EnumValueObject<CampaignSourceNameEnum> 
 ```
 
 ```ts
-import { EnumValueObject } from '@tacliatech/domain';
+import { EnumValueObject } from '@haskou/value-objects';
 
 export enum CampaignChannelEnum {
   GOOGLE = 'google', // adwords,google
@@ -389,11 +389,10 @@ export class CampaignSourceChannel extends EnumValueObject<CampaignChannelEnum> 
 ```
 
 ```ts
-import { StringValueObject } from '@tacliatech/domain';
+import { StringValueObject } from '@haskou/value-objects';
 
 export class LaborServiceRequestName extends StringValueObject {}
 ```
-
 
 ### domain/errors/ – Errores personalizados
 
@@ -410,13 +409,12 @@ export class ExpenseNotFoundError extends BaseError {
 ```ts
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-export class CompanyEmailWasChangedEvent extends DomainEvent {
+export class exampleEmailWasChangedEvent extends DomainEvent {
   public eventName(): string {
-    return 'companies.v1.company.email_was_changed';
+    return 'examples.v1.example.email_was_changed';
   }
 }
 ```
-
 
 ### application/{caso-de-uso}/ – Casos de uso
 
@@ -431,10 +429,10 @@ export class ExpenseCreator {
 }
 ```
 
-### application/{caso-de-uso}/  - Mensaje del caso de uso
+### application/{caso-de-uso}/ - Mensaje del caso de uso
 
 ```ts
-import { ShortId } from '@tacliatech/domain';
+import { ShortId } from '@haskou/value-objects';
 
 export class ExpenseCreatorMessage {
   public readonly userId: ShortId;
@@ -490,25 +488,26 @@ Usa MessageBuilder o Message como nombre para los comandos que representen accio
 Este archivo puede ser incluido en tu repositorio o en la documentación interna para asegurar consistencia al usar GitHub Copilot Chat en entornos profesionales de desarrollo.
 
 ## Normas Específicas
+
 - Prohibidos métodos setters (`set`). Usa métodos explícitos (ej: `expense.updateAmount()`)
 - Constructores con máximo 3 parámetros.
 
 ## Convenciones estrictas de naming
+
 - Sigue Google's TypeScript Style Guide.
 - Servicios: `ExpenseCreator.ts`
 - Value Objects: Ejemplos específicos como `ExpenseAmount.ts`, `ExpenseDetails.ts`, `ExpenseCategorization.ts`
 - Repositorios: Ejemplos concretos como `ExpenseRepository.ts`
 - Eventos (MessageBus): `contexto.version.entidad.acción`, ej.: `expenses.v1.expense.was_created`
 
-
 # Instrucciones de Generación de Tests
 
-## !IMPORTANTE: Todo el codigo de los tests tiene que estar en ingles. 
-
+## !IMPORTANTE: Todo el codigo de los tests tiene que estar en ingles.
 
 ç## !IMPORTANTE: Los titles de los tests tienen que estar en ingles
 
 ## Tipos de Test
+
 - **Unitarios** (Jest):
   - Siempre usa .spec.ts en los archivos generados para testing unitario
   - Usa nombres `ClaseEspecifica.spec.ts`.
@@ -526,92 +525,92 @@ Este archivo puede ser incluido en tu repositorio o en la documentación interna
 
   Ejemplos scenarios de API
 
-Feature: Patch Company API
-  As a user of the API
-  I want to update company information
-  So that I can modify the accounting service request details
+Feature: Patch example API
+As a user of the API
+I want to update example information
+So that I can modify the accounting service request details
 
-  Background:
-    Given I have the following "companies"
-      | id                       | name      |
-      | 660186caafbed95dddbf3bb2 | Company A |
-    And I have the following "users"
-      | id                       | email       | company                  |
-      | 657880b79c5cfe0b0d3b0c2d | foo@bar.com | 660186caafbed95dddbf3bb2 |
+Background:
+Given I have the following "examples"
+| id | name |
+| 660186caafbed95dddbf3bb2 | example A |
+And I have the following "users"
+| id | email | example |
+| 657880b79c5cfe0b0d3b0c2d | foo@bar.com | 660186caafbed95dddbf3bb2 |
 
-  Scenario: Successfully patch company with labor service request as admin
-    Given I am authenticated as admin
-    And I set json body
-      """
-      {
-        "laborServiceRequest": {
-          "contactName": "John Doe",
-          "contactPhone": {
-            "prefix": "+41",
-            "number": "123456789"
-          },
-          "planType": "labor"
-        }
-      }
-      """
-    When I PATCH "/companies"
-    Then response status code is equal to 204
-    And response body should be empty
+Scenario: Successfully patch example with labor service request as admin
+Given I am authenticated as admin
+And I set json body
+"""
+{
+"laborServiceRequest": {
+"contactName": "John Doe",
+"contactPhone": {
+"prefix": "+41",
+"number": "123456789"
+},
+"planType": "labor"
+}
+}
+"""
+When I PATCH "/examples"
+Then response status code is equal to 204
+And response body should be empty
 
-  Scenario: Successfully patch company with labor service request as non-admin user
-    Given I am authenticated as non admin "660186caafbed95dddbf3bb2"
-    And I set json body
-      """
-      {
-        "laborServiceRequest": {
-          "contactName": "Jane Smith",
-          "contactPhone": {
-            "prefix": "+41",
-            "number": "987654321"
-          },
-          "planType": "labor"
-        }
-      }
-      """
-    When I PATCH "/companies"
-    Then response status code is equal to 204
-    And response body should be empty
+Scenario: Successfully patch example with labor service request as non-admin user
+Given I am authenticated as non admin "660186caafbed95dddbf3bb2"
+And I set json body
+"""
+{
+"laborServiceRequest": {
+"contactName": "Jane Smith",
+"contactPhone": {
+"prefix": "+41",
+"number": "987654321"
+},
+"planType": "labor"
+}
+}
+"""
+When I PATCH "/examples"
+Then response status code is equal to 204
+And response body should be empty
 
 --- Ejemplo consumers
 
-Feature: Enable features on company creation
+Feature: Enable features on example creation
 
-  Scenario: Successfully enable features when company is created
-    And I have the following "companies"
-      | _id                      | email              |
-      | 63861da054d8fa4a02a6f4fa | company@taclia.com |
-    When I publish to exchange "ms_legacy" event "companies.v1.company.was_created" with payload
-      """
-      {
-        "aggregate_id": "63861da054d8fa4a02a6f4fa",
-        "attributes": {}
-      }
-      """
-    Then I wait for 1 seconds
-    And ensure message was properly consumed
-    And execution has no errors in "companies.v1.enable_features_on_company_created"
+Scenario: Successfully enable features when example is created
+And I have the following "examples"
+| \_id | email |
+| 63861da054d8fa4a02a6f4fa | example@gmail.com |
+When I publish to exchange "example_exchange" event "examples.v1.example_was_created" with payload
+"""
+{
+"aggregate_id": "63861da054d8fa4a02a6f4fa",
+"attributes": {}
+}
+"""
+Then I wait for 1 seconds
+And ensure message was properly consumed
+And execution has no errors in "examples.v1.enable_features_on_example_created"
 
-  Scenario: Handle errors when enabling features on company creation
-    And I have the following "companies"
-      | _id                      | email              |
-      | 63861da054d8fa4a02a6ffff | company@taclia.com |
-    When I publish to exchange "ms_legacy" event "companies.v1.company.was_created" with payload
-      """
-      {
-        "aggregate_id": "63861da054d8fa4a02a6fff0",
-        "attributes": {}
-      }
-      """
-    Then I wait for 1 seconds
-    And I wait error to be thrown with message "Company with id 63861da054d8fa4a02a6fff0 not exists" in "companies.v1.enable_features_on_company_created"
-
+Scenario: Handle errors when enabling features on example creation
+And I have the following "examples"
+| \_id | email |
+| 63861da054d8fa4a02a6ffff | example@gmail.com |
+When I publish to exchange "example_exchange" event "examples.v1.example_was_created" with payload
+"""
+{
+"aggregate_id": "63861da054d8fa4a02a6fff0",
+"attributes": {}
+}
+"""
+Then I wait for 1 seconds
+And I wait error to be thrown with message "example with id 63861da054d8fa4a02a6fff0 not exists" in "examples.v1.enable_features_on_example_created"
 
 ## Buenas prácticas
+
 - Cobertura mínima de test unitarios del 100% en application y domain.
 - Incluye casos felices, negativos y excepciones.
 - Sigue patrones establecidos en ejemplos del repositorio real.

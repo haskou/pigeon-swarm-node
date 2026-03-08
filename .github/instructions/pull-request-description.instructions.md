@@ -10,7 +10,7 @@ Sigue la convención de [Conventional Commits](https://www.conventionalcommits.o
 
 **Ejemplos:**
 
-- `feat(ALL-6025): ✨ Remove createdBy and companyId from issuer body`
+- `feat(ALL-6025): ✨ Remove createdBy and exampleId from issuer body`
 - `refactor(ALL-5896): ♲️ Serial number generation`
 
 🧠 _Emojis de la guía oficial:_ [https://gitmoji.dev](https://gitmoji.dev)

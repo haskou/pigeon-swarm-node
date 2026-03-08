@@ -341,7 +341,7 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
 
     if (!this._channel) {
       await this.connect();
-      this._exchange = `ms_${process.env.SERVICE_NAME}`;
+      this._exchange = `${process.env.SERVICE_NAME}`;
       await this._channel.assertExchange(this._exchange, 'topic', {
         durable: true,
       });

@@ -88,7 +88,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
           MemoryMessageBusAdapter.memoryMessages[queue].push({
             routingKey: domainEvent.eventName(),
             event: domainEvent.decode(),
-            exchange: exchange || `ms_${process.env.SERVICE_NAME}`,
+            exchange: exchange || `${process.env.SERVICE_NAME}`,
           });
         }
       }
