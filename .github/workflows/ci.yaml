@@ -1,0 +1,62 @@
+name: Node.js CI
+
+on:
+  pull_request:
+    branches: ['main']
+  push:
+    branches: ['main']
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  Checks:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-engines
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Test
+        run: yarn run test:coverage:all
+
+      - name: Push Coverage Comment
+        uses: MishaKav/jest-coverage-comment@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          title: Unit | Api | Command |
+          coverage-title: All files coverage
+          coverage-path: ./coverage/coverage-summary.txt
+          summary-title: Summary
+          coverage-summary-path: ./coverage/coverage-summary.json
+          badge-title: Coverage
+          hide-comment: false
+          hide-summary: false
+
+      - name: Push Coverage Comment
+        uses: MishaKav/jest-coverage-comment@main
+        with:
+          github-token: ${{ github.token }}
+          title: Unit | Api | Command |
+          coverage-title: All files coverage
+          coverage-path: ./coverage/coverage-summary.txt
+          summary-title: Summary
+          coverage-summary-path: ./coverage/coverage-summary.json
+          badge-title: Coverage
+          hide-comment: false
+          hide-summary: false
