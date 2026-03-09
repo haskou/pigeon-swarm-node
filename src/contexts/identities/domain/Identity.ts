@@ -6,12 +6,10 @@ import {
   KeyPair,
   PrimitiveOf,
   Signature,
-  StringValueObject,
   Timestamp,
 } from '@haskou/value-objects';
 import { Profile } from './Profile';
 import { ProfileName } from './value-objects/ProfileName';
-import { ProfileBiography } from './value-objects/ProfileBiography';
 import { Password } from '@app/contexts/shared/domain/Password';
 import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
 
