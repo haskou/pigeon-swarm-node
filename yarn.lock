@@ -495,11 +495,12 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/value-objects@^2.1.0":
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.1.0.tgz#5ba04ebb0eae1209a961bbb29817cf65be64c779"
-  integrity sha512-CZzVDifOlcmP81On/QHZs6NxE5gbHahhnk2JbnbuN7hjwsgU/Adfd2bwAgrGl7w9pCV6EhSVuYviLV6n6L7Adg==
+"@haskou/value-objects@^2.2.0":
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.2.0.tgz#55df68c9eac4c10ac5fc54c913409fa4861ff331"
+  integrity sha512-eJwkv/zROpI5N0WEsqUnZ9VciY4AhCuhgwv3IofNWEEs4lV9quu2QERqNwhTYWS407ptEy7ZYdOZVKGLzSnUdw==
   dependencies:
+    "@noble/curves" "^2.0.1"
     bson-objectid "^2.0.4"
     uuid "8"
 
@@ -891,6 +892,18 @@
     "@emnapi/core" "^1.4.3"
     "@emnapi/runtime" "^1.4.3"
     "@tybys/wasm-util" "^0.10.0"
+
+"@noble/curves@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.0.1.tgz#64ba8bd5e8564a02942655602515646df1cdb3ad"
+  integrity sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw==
+  dependencies:
+    "@noble/hashes" "2.0.1"
+
+"@noble/hashes@2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.0.1.tgz#fc1a928061d1232b0a52bb754393c37a5216c89e"
+  integrity sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
