@@ -495,10 +495,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/value-objects@^1.1.4":
-  version "1.1.4"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-1.1.4.tgz#c43b31d757200f20893c1a2ea5582b745ee53290"
-  integrity sha512-r+vCyuUIQltqqxuOZVBfUbvKIBZNxrfNDeZBriYh5O6nusDvulHERpvSw0KMOup5tQETRsUpzXffY+XWCcst0Q==
+"@haskou/value-objects@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.1.0.tgz#5ba04ebb0eae1209a961bbb29817cf65be64c779"
+  integrity sha512-CZzVDifOlcmP81On/QHZs6NxE5gbHahhnk2JbnbuN7hjwsgU/Adfd2bwAgrGl7w9pCV6EhSVuYviLV6n6L7Adg==
   dependencies:
     bson-objectid "^2.0.4"
     uuid "8"

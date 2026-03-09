@@ -10,9 +10,19 @@ participant "IPFS"
 participant "GossipSub"
 participant "Remote Peer"
 
-User -> "Web UI" : write message
+User -> "Web UI" : Login
+"Web UI" -> "IPFS" : Retrieve User Identity
+"IPFS" -> "Web UI" : Return (or not) user identity
 
-"Web UI" -> "SendMessage" : send(chat,text)
+"Web UI" -> "User" : Ask for password
+
+User -> "Web UI" : Give password
+
+"Web UI" -> "Web UI" : Decrypt private key
+
+User -> "Web UI" : Send message
+
+"Web UI" -> "SendMessage" : Send message
 
 "SendMessage" -> "Encrypt" : encrypt payload
 

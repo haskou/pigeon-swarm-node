@@ -18,73 +18,15 @@ package "shared" {
       -id: MessageId
       -senderId: identityId
       -timestamp: Timestamp
-      -payload?: StringValueObject
       -media: List<Media>
-    }
-    class EncryptedMessage extends Message{
-      -publicKey: Key
+      -text?: StringValueObject
     }
 
     Message *--> MessageId
     Message *--> identityId
     Media *--> Hash
-    EncryptedMessage *--> Key
+    Message o--> Media
   }
-}
-
-package "profiles" {
-   package "domain" {
-
-    class Profile {
-      -id: identityId
-      -name: StringValueObject
-      -biography: StringValueObject
-      -profilePicture: StringValueObject
-      -timestamp: Timestamp
-      -signature: Hash
-    }
-
-    note left of Profile
-      Profiles are optional public data of an Identity,
-      signed by the Identity's private key.
-
-      They can be updated without changing the
-      Identity, but they need to be signed by the Identity
-
-      This information is published publically,
-      so it can be used by other users to display information about the Identity
-      and makes an identity publicly through a searcher.
-    end note
-
-    class ProfileRepositoryService {}
-
-    interface ProfileRepository {
-      +save(profile: Profile): void
-      +findById(identityId: identityId): Profile
-    }
-    ProfileRepositoryService ..> ProfileRepository
-    ProfileRepositoryService --> Profile
-  }
-
-   package "application" {
-    class ProfileGetter {
-      +getProfile(identityId: identityId): Profile
-    }
-    class ProfileQRGenerator {
-      +generateQR(identityId: identityId): Image
-    }
-    class ProfileProfilePictureUpdater {
-      +updateProfilePicture(identityId: identityId, profilePicture: StringValueObject): void
-    }
-    class ProfileBiographyUpdater {
-      +updateBiography(identityId: identityId, biography: StringValueObject): void
-    }
-  }
-
-  ProfileGetter ..> ProfileRepositoryService
-  ProfileQRGenerator ..> ProfileRepositoryService  
-  ProfileProfilePictureUpdater ..> ProfileRepositoryService
-  ProfileBiographyUpdater ..> ProfileRepositoryService
 }
 
 package "identities" {
@@ -94,12 +36,13 @@ package "identities" {
       -id: identityId
       -publicKey: Key
       -privateEncryptedKey: Key
+      -timestamp: Timestamp
       -signature: Hash
     }
 
     note left of Identity
       privateEncryptedKey = AES(password_derived_key, private_key)
-      
+
       generate random private key
       encrypt private key with password↓
       store encrypted key
@@ -111,6 +54,12 @@ package "identities" {
 
       signature = sign(private_key, profile_data)
     end note
+
+     class Profile {
+      -name: StringValueObject
+      -biography?: StringValueObject
+      -profilePicture?: Image
+    }
 
     class IdentityRepositoryService {}
 
@@ -127,16 +76,26 @@ package "identities" {
       +save(Identity: Identity): void
       +findById(identityId: identityId): Identity
     }
-    
+    interface CryptoService {
+      +encrypt(data: String, key: Key): String
+      +decrypt(data: String, key: Key): String
+      +validate(data: String, key: Key): String
+    }
 
+
+    Identity ..> CryptoService
+    Identity *--> Profile
     IdentityRepositoryService ..> IdentityRepository
-    IdentityRepositoryService --> Identity
+    IdentityRepositoryService o--> Identity
 
   }
 
   package "application" {
-    class IdentityGetter {
-      +getIdentity(identityId: identityId): Identity
+    class IdentityFinder {
+      +findById(identityId: identityId): Identity
+    }
+    class IdentityCreator {
+      +createIdentity(identity: Identity): void
     }
     class IdentityPasswordUpdater {
       +updatePassword(identityId: identityId, newPassword: String): void
@@ -146,22 +105,31 @@ package "identities" {
     }
   }
 
-    IdentityGetter ..> IdentityRepositoryService
+    IdentityFinder ..> IdentityRepositoryService
+    IdentityCreator ..> IdentityRepositoryService
     IdentityPasswordUpdater ..> IdentityRepositoryService
-    IdentityQRGenerator ..> IdentityRepositoryService  
+    IdentityQRGenerator ..> IdentityRepositoryService
 }
 
-package "contactLists" {
+package "KeyRing" {
   package "domain" {
-    class ContactList {
+    class KeyRing {
       -id: identityId
       -contacts: List<identityId>
+      -conversations: Record<conversationId, Key?>
+      -Signature: Hash
     }
 
-    note left of ContactList
-      ContactList is a list of contacts of an Identity, 
+    note left of KeyRing
+      ContactList is a list of contacts of an Identity,
       this should be encrypted with the Identity's private key
     end note
+  }
+
+  package "application" {
+    class ConversationKeySaver {
+      +saveConversationKey(conversationId: conversationId, key: Key): void
+    }
   }
 }
 
@@ -171,18 +139,23 @@ package "nodes" {
       -id: NodeId
       -ownerId: identityId
       -name: String
-      -description: String
       -publicAddress: Address
       -publicKey: Key
+      -signature: Hash
     }
 
     class Peer extends Node {
       -lastSeen: Timestamp
+      -thrustScore: Int
     }
 
     class LocalNode extends Node {
       -peers: List<Peer>
       -privateKey: Key
+      -peerWhitelist: List<Peer>
+      -peerBlacklist: List<Peer>
+      -identityWhitelist: List<identityId>
+      -identityBlacklist: List<identityId>
     }
 
     LocalNode --> Peer
@@ -192,34 +165,70 @@ package "nodes" {
 package "conversations" {
   package "domain" {
 
-    class Conversation {
-      -id: GroupId
+    abstract class Conversation {
+      -id: ConversationId
       -participants: List<UserId>
     }
+
+    class OneToOneConversation extends Conversation {
+    }
+
+    class GroupConversation extends Conversation {
+       -publicKey: Key
+    }
+
+    note left of OneToOneConversation
+      Limited to 2 participants, hast to be encrypted
+      with both users exchanging public keys.
+    end note
+
+    class ConversationRepositoryService {}
+
+    interface ConversationRepository {
+      +save(Conversation: Conversation): void
+      +findById(ConversationId: ConversationId): Conversation
+      +remove(ConversationId: ConversationId): void
+    }
+
+    Conversation o--> Message
+    ConversationRepositoryService ..> ConversationRepository
+    ConversationRepositoryService o--> Conversation
   }
-  note left of Conversation
-   TODO: Add EncryptedMessages
-   TODO: Voicechat and videochat? Which keys?
-  end note
+
+  package "application" {
+    class ConversationFinder {
+      +findById(conversationId: ConversationId): Conversation
+    }
+    class ConversationCreator {
+      +createConversation(participants: List<identityId>): Conversation
+    }
+    class ConversationRemover {
+      +removeConversation(conversationId: ConversationId): void
+    }
+  }
+
+    ConversationFinder ..> ConversationRepositoryService
+    ConversationCreator ..> ConversationRepositoryService
+    ConversationRemover ..> ConversationRepositoryService
 }
 
-package "groups" {
+package "communities" {
   package "domain" {
 
-    class Group {
+    class Community {
       -id: GroupId
-      -participants: List<UserId>
       -name: StringValueObject
       -isEncrypted: Boolean
       -privateKey?: Key
       -publicKey?: Key
     }
   }
-  note left of Group
+  note left of Community
    TODO: Add EncryptedMessages
-   TODO: All groups should be encrypted?
+   TODO: All communities should be encrypted?
    TODO: How users know private keys?
    TODO: Voicechat and videochat?
+   TODO: It has channels?
   end note
 }
 

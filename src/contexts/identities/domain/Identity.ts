@@ -1,0 +1,86 @@
+import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
+import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import {
+  assert,
+  EncryptedKeyPair,
+  KeyPair,
+  PrimitiveOf,
+  Signature,
+  StringValueObject,
+  Timestamp,
+} from '@haskou/value-objects';
+import { Profile } from './Profile';
+import { ProfileName } from './value-objects/ProfileName';
+import { ProfileBiography } from './value-objects/ProfileBiography';
+import { Password } from '@app/contexts/shared/domain/Password';
+import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
+
+// TODO: Test
+export class Identity extends AggregateRoot {
+  public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
+    return new Identity(
+      new IdentityId(primitives.id),
+      EncryptedKeyPair.fromPrimitives(primitives.encryptedKeyPair),
+      Profile.fromPrimitives(primitives.profile),
+      new Timestamp(primitives.timestamp),
+      new Signature(primitives.signature),
+    );
+  }
+
+  public static async create(
+    name: ProfileName,
+    password: Password,
+  ): Promise<Identity> {
+    const keyPair = await KeyPair.generate();
+    const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const primitives = {
+      id: IdentityId.generate().valueOf(),
+      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      profile: new Profile(name).toPrimitives(),
+      timestamp: Timestamp.now().valueOf(),
+      signature: '',
+    };
+    const signature =
+      await new IdentitySignatureDomainService().generateSignature(
+        primitives,
+        encryptedKeyPair,
+        password,
+      );
+    primitives.signature = signature.valueOf();
+
+    const identity = Identity.fromPrimitives(primitives);
+
+    // TODO: Add event
+    return identity;
+  }
+
+  constructor(
+    private readonly id: IdentityId,
+    private encryptedKeyPair: EncryptedKeyPair,
+    private profile: Profile,
+    private timestamp: Timestamp,
+    private signature: Signature,
+  ) {
+    super();
+
+    // TODO: Add error
+    assert(
+      new IdentitySignatureDomainService().isValidSignature(
+        this.encryptedKeyPair,
+        this.toPrimitives(),
+        this.signature,
+      ),
+      'Invalid signature for the provided identity data.',
+    );
+  }
+
+  public toPrimitives() {
+    return {
+      id: this.id.valueOf(),
+      encryptedKeyPair: this.encryptedKeyPair.toPrimitives(),
+      profile: this.profile.toPrimitives(),
+      timestamp: this.timestamp.valueOf(),
+      signature: this.signature.valueOf(),
+    };
+  }
+}
