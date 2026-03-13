@@ -1,160 +1,206 @@
 services:
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19LZXJuZWxfX0tlcm5lbA==:
+  X192YXJfX3d3d19fc3JjX19LZXJuZWxfX0tlcm5lbA==:
     class: /Kernel
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fQWdncmVnYXRlUm9vdF9fQWdncmVnYXRlUm9vdA==:
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb0lkZW50aXR5TWFwcGVyX19Nb25nb0lkZW50aXR5TWFwcGVy:
+    class: /contexts/identities/infrastructure/mongo/mappers/MongoIdentityMapper
+    arguments: []
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2RvbWFpbl9fQWdncmVnYXRlUm9vdF9fQWdncmVnYXRlUm9vdA==:
     class: /shared/domain/AggregateRoot
     arguments: []
     abstract: true
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19kZXBlbmRlbmN5SW5qZWN0aW9uX19EZXBlbmRlbmN5SW5qZWN0aW9uX19EZXBlbmRlbmN5SW5qZWN0aW9u:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19kZXBlbmRlbmN5SW5qZWN0aW9uX19EZXBlbmRlbmN5SW5qZWN0aW9uX19EZXBlbmRlbmN5SW5qZWN0aW9u:
     class: /shared/infrastructure/dependencyInjection/DependencyInjection
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19leHByZXNzX19TZXJ2ZXJfX1NlcnZlcg==:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19leHByZXNzX19TZXJ2ZXJfX1NlcnZlcg==:
     class: /shared/infrastructure/express/Server
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==:
     class: /shared/infrastructure/messageBus/amqp/AmqpMessageBusAdapter
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19tZW1vcnlfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVyX19NZW1vcnlNZXNzYWdlQnVzQWRhcHRlcg==:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19tZW1vcnlfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVyX19NZW1vcnlNZXNzYWdlQnVzQWRhcHRlcg==:
     class: /shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19zY2hlZHVsZXJfX1NjaGVkdWxlcl9fU2NoZWR1bGVy:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wZXJzaXN0ZW5jZV9fRGF0YWJhc2VfX0RhdGFiYXNl:
+    class: /shared/infrastructure/persistence/Database
+    arguments: []
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19zY2hlZHVsZXJfX1NjaGVkdWxlcl9fU2NoZWR1bGVy:
     class: /shared/infrastructure/scheduler/Scheduler
     arguments: []
     abstract: true
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=:
     class: /shared/infrastructure/ui/routes/Route
     arguments: []
     abstract: true
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NjaGVkdWxlcl9fQ2Fubm90SW5zdGFudGlhdGVTY2hlZHVsZWRQcm9jZXNzRXJyb3JfX0Nhbm5vdEluc3RhbnRpYXRlU2NoZWR1bGVkUHJvY2Vzc0Vycm9y:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NjaGVkdWxlcl9fQ2Fubm90SW5zdGFudGlhdGVTY2hlZHVsZWRQcm9jZXNzRXJyb3JfX0Nhbm5vdEluc3RhbnRpYXRlU2NoZWR1bGVkUHJvY2Vzc0Vycm9y:
     class: >-
       /shared/infrastructure/errors/scheduler/CannotInstantiateScheduledProcessError
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NjaGVkdWxlcl9fSW52YWxpZFBhcnNlQ3JvbkV4cHJlc3Npb25FcnJvcl9fSW52YWxpZFBhcnNlQ3JvbkV4cHJlc3Npb25FcnJvcg==:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NjaGVkdWxlcl9fSW52YWxpZFBhcnNlQ3JvbkV4cHJlc3Npb25FcnJvcl9fSW52YWxpZFBhcnNlQ3JvbkV4cHJlc3Npb25FcnJvcg==:
     class: /shared/infrastructure/errors/scheduler/InvalidParseCronExpressionError
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NjaGVkdWxlcl9fU2NoZWR1bGVkRXhlY3V0aW9uRXJyb3JfX1NjaGVkdWxlZEV4ZWN1dGlvbkVycm9y:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NjaGVkdWxlcl9fU2NoZWR1bGVkRXhlY3V0aW9uRXJyb3JfX1NjaGVkdWxlZEV4ZWN1dGlvbkVycm9y:
     class: /shared/infrastructure/errors/scheduler/ScheduledExecutionError
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Eb21haW5Eb2VzTm90RXhpc3RFcnJvcl9fRG9tYWluRG9lc05vdEV4aXN0RXJyb3I=:
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlGaW5kZXJTZXJ2aWNlX19JZGVudGl0eUZpbmRlclNlcnZpY2U=:
+    class: /contexts/identities/domain/services/IdentityFinderService
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UmVwb3NpdG9yeV9fSWRlbnRpdHlSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlTYXZlclNlcnZpY2VfX0lkZW50aXR5U2F2ZXJTZXJ2aWNl:
+    class: /contexts/identities/domain/services/IdentitySaverService
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UmVwb3NpdG9yeV9fSWRlbnRpdHlSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Eb21haW5Eb2VzTm90RXhpc3RFcnJvcl9fRG9tYWluRG9lc05vdEV4aXN0RXJyb3I=:
     class: /shared/infrastructure/errors/security/DomainDoesNotExistError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkQXV0aG9yaXphdGlvbkhlYWRlckVycm9yX19JbnZhbGlkQXV0aG9yaXphdGlvbkhlYWRlckVycm9y:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkQXV0aG9yaXphdGlvbkhlYWRlckVycm9yX19JbnZhbGlkQXV0aG9yaXphdGlvbkhlYWRlckVycm9y:
     class: /shared/infrastructure/errors/security/InvalidAuthorizationHeaderError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkUmVxdWVzdE9uVXNlckxvZ0Vycm9yX19JbnZhbGlkUmVxdWVzdE9uVXNlckxvZ0Vycm9y:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkUmVxdWVzdE9uVXNlckxvZ0Vycm9yX19JbnZhbGlkUmVxdWVzdE9uVXNlckxvZ0Vycm9y:
     class: /shared/infrastructure/errors/security/InvalidRequestOnUserLogError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkVG9rZW5FcnJvcl9fSW52YWxpZFRva2VuRXJyb3I=:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkVG9rZW5FcnJvcl9fSW52YWxpZFRva2VuRXJyb3I=:
     class: /shared/infrastructure/errors/security/InvalidTokenError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkVXNlcm5hbWVPclBhc3N3b3JkRXJyb3JfX0ludmFsaWRVc2VybmFtZU9yUGFzc3dvcmRFcnJvcg==:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19JbnZhbGlkVXNlcm5hbWVPclBhc3N3b3JkRXJyb3JfX0ludmFsaWRVc2VybmFtZU9yUGFzc3dvcmRFcnJvcg==:
     class: /shared/infrastructure/errors/security/InvalidUsernameOrPasswordError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19NaXNzaW5nQXV0aG9yaXphdGlvbkhlYWRlckVycm9yX19NaXNzaW5nQXV0aG9yaXphdGlvbkhlYWRlckVycm9y:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19NaXNzaW5nQXV0aG9yaXphdGlvbkhlYWRlckVycm9yX19NaXNzaW5nQXV0aG9yaXphdGlvbkhlYWRlckVycm9y:
     class: /shared/infrastructure/errors/security/MissingAuthorizationHeaderError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Ub2tlbkV4cGlyZWRFcnJvcl9fVG9rZW5FeHBpcmVkRXJyb3I=:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Ub2tlbkV4cGlyZWRFcnJvcl9fVG9rZW5FeHBpcmVkRXJyb3I=:
     class: /shared/infrastructure/errors/security/TokenExpiredError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19VbnBhaWREb21haW5FcnJvcl9fVW5wYWlkRG9tYWluRXJyb3I=:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19VbnBhaWREb21haW5FcnJvcl9fVW5wYWlkRG9tYWluRXJyb3I=:
     class: /shared/infrastructure/errors/security/UnpaidDomainError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Vc2VyRG9lc05vdEV4aXN0RXJyb3JfX1VzZXJEb2VzTm90RXhpc3RFcnJvcg==:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Vc2VyRG9lc05vdEV4aXN0RXJyb3JfX1VzZXJEb2VzTm90RXhpc3RFcnJvcg==:
     class: /shared/infrastructure/errors/security/UserDoesNotExistError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Vc2VyRG9lc05vdEhhdmVMb2dpbkVuYWJsZWRFcnJvcl9fVXNlckRvZXNOb3RIYXZlTG9naW5FbmFibGVkRXJyb3I=:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Vc2VyRG9lc05vdEhhdmVMb2dpbkVuYWJsZWRFcnJvcl9fVXNlckRvZXNOb3RIYXZlTG9naW5FbmFibGVkRXJyb3I=:
     class: /shared/infrastructure/errors/security/UserDoesNotHaveLoginEnabledError
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2dzX19XaW5zdG9uTG9nZ2VyX19XaW5zdG9uTG9nZ2Vy:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0N1c3RvbUh0dHBFcnJvcl9fQ3VzdG9tSHR0cEVycm9y
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2dzX19XaW5zdG9uTG9nZ2VyX19XaW5zdG9uTG9nZ2Vy:
     class: /shared/infrastructure/logs/WinstonLogger
     arguments:
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19leHByZXNzX19TZXJ2ZXJfX1NlcnZlcg==
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19leHByZXNzX19TZXJ2ZXJfX1NlcnZlcg==
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fY29uc3VtZXJzX19Db25zdW1lcl9fQ29uc3VtZXI=:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fY29uc3VtZXJzX19Db25zdW1lcl9fQ29uc3VtZXI=:
     class: /shared/infrastructure/ui/consumers/Consumer
     arguments:
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudENvbnN1bWVyX19Eb21haW5FdmVudENvbnN1bWVy
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudENvbnN1bWVyX19Eb21haW5FdmVudENvbnN1bWVy
     abstract: true
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Db25zdW1lRGx4Um91dGVfX0NvbnN1bWVEbHhSb3V0ZQ==:
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Db25zdW1lRGx4Um91dGVfX0NvbnN1bWVEbHhSb3V0ZQ==:
     class: /shared/infrastructure/ui/routes/ConsumeDlxRoute
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19IZWFsdGhSb3V0ZV9fSGVhbHRoUm91dGU=:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19IZWFsdGhSb3V0ZV9fSGVhbHRoUm91dGU=:
     class: /shared/infrastructure/ui/routes/HealthRoute
     arguments: []
     abstract: false
     parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz:
+      X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fYXBwbGljYXRpb25fX2NyZWF0b3JfX0lkZW50aXR5Q3JlYXRvcl9fSWRlbnRpdHlDcmVhdG9y:
+    class: /contexts/identities/application/creator/IdentityCreator
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlTYXZlclNlcnZpY2VfX0lkZW50aXR5U2F2ZXJTZXJ2aWNl
+      - >-
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0lkZW50aXR5UmVwb3NpdG9yeV9fTW9uZ29JZGVudGl0eVJlcG9zaXRvcnk=:
+    class: /contexts/identities/infrastructure/mongo/MongoIdentityRepository
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wZXJzaXN0ZW5jZV9fRGF0YWJhc2VfX0RhdGFiYXNl
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb0lkZW50aXR5TWFwcGVyX19Nb25nb0lkZW50aXR5TWFwcGVy
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz:
     class: /shared/infrastructure/messageBus/MessageBus
     arguments:
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19tZW1vcnlfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVyX19NZW1vcnlNZXNzYWdlQnVzQWRhcHRlcg==
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19tZW1vcnlfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVyX19NZW1vcnlNZXNzYWdlQnVzQWRhcHRlcg==
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzQWRhcHRlcl9fTWVzc2FnZUJ1c0FkYXB0ZXI=: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2dzX19Mb2dfX0xvZw==: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2dzX19XaW5zdG9uTG9nZ2VyX19XaW5zdG9uTG9nZ2Vy
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudENvbnN1bWVyX19Eb21haW5FdmVudENvbnN1bWVy: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzQWRhcHRlcl9fTWVzc2FnZUJ1c0FkYXB0ZXI=: >-
+    @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wZXJzaXN0ZW5jZV9fUGVyc2lzdGVuY2VfX1BlcnNpc3RlbmNl: >-
+    @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wZXJzaXN0ZW5jZV9fRGF0YWJhc2VfX0RhdGFiYXNl
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2dzX19Mb2dfX0xvZw==: >-
+    @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2dzX19XaW5zdG9uTG9nZ2VyX19XaW5zdG9uTG9nZ2Vy
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UmVwb3NpdG9yeV9fSWRlbnRpdHlSZXBvc2l0b3J5: >-
+    @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0lkZW50aXR5UmVwb3NpdG9yeV9fTW9uZ29JZGVudGl0eVJlcG9zaXRvcnk=
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudENvbnN1bWVyX19Eb21haW5FdmVudENvbnN1bWVy: >-
+    @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz
+  X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=: >-
+    @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz
