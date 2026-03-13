@@ -1,5 +1,6 @@
-import * as https from 'https';
 import axios from 'axios';
+import * as https from 'https';
+
 import { Requester } from './Requester';
 
 export interface BaseResponse<R> {
@@ -9,13 +10,13 @@ export interface BaseResponse<R> {
 }
 
 export const HttpMethod = {
+  DELETE: 'DELETE',
   GET: 'GET',
+  HEAD: 'HEAD',
+  OPTIONS: 'OPTIONS',
+  PATCH: 'PATCH',
   POST: 'POST',
   PUT: 'PUT',
-  DELETE: 'DELETE',
-  PATCH: 'PATCH',
-  OPTIONS: 'OPTIONS',
-  HEAD: 'HEAD',
 } as const;
 
 export type HttpMethod = (typeof HttpMethod)[keyof typeof HttpMethod];
@@ -32,8 +33,8 @@ export const responses = {
   ARRAYBUFFER: 'arraybuffer',
   DOCUMENT: 'document',
   JSON: 'json',
-  TEXT: 'text',
   STREAM: 'stream',
+  TEXT: 'text',
 } as const;
 
 export type ResponseType = (typeof responses)[keyof typeof responses];
@@ -72,14 +73,14 @@ export class BaseRequester implements Requester {
     routeUrl = routeUrl.replace(/\/\//g, '/');
     const url = `${this.url}${routeUrl}`;
     const requestConfig: BaseOptions = {
-      url,
-      method,
-      headers,
       data: body,
+      headers,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+      method,
       params: qs,
       responseType: this.responseType,
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
+      url,
     };
 
     if (this.debug) {

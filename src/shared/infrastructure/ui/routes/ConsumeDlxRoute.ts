@@ -1,3 +1,4 @@
+import Kernel from '@app/Kernel';
 import {
   Post,
   JsonController,
@@ -9,13 +10,13 @@ import {
   BadRequestError,
   NotFoundError,
 } from 'routing-controllers';
-import MessageBusAdapter from '../../messageBus/MessageBusAdapter';
-import AmqpMessageBusAdapter from '../../messageBus/amqp/AmqpMessageBusAdapter';
+
 import HandlerNotFoundError from '../../errors/HandlerNotFoundError';
 import NoFailedMessagesError from '../../errors/NoFailedMessagesError';
-import Route from './Route';
-import Kernel from '@app/Kernel';
+import AmqpMessageBusAdapter from '../../messageBus/amqp/AmqpMessageBusAdapter';
+import MessageBusAdapter from '../../messageBus/MessageBusAdapter';
 import Consumer from '../consumers/Consumer';
+import Route from './Route';
 
 @JsonController()
 export default class ConsumeDlxRoute extends Route {

@@ -8,7 +8,9 @@
   "plugins": [
     "@typescript-eslint",
     "prettier",
-    "unused-imports"
+    "unused-imports",
+    "sonarjs",
+    "perfectionist"
   ],
   "extends": [
     "eslint:recommended",
@@ -101,11 +103,9 @@
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/prefer-for-of": "error",
     "@typescript-eslint/member-delimiter-style": "off",
-    "@typescript-eslint/no-unsafe-return": "warn",
-    // "@typescript-eslint/no-unsafe-assignment": "warn",
+    "@typescript-eslint/no-unsafe-return": "error",
     "@typescript-eslint/no-unsafe-call": "warn",
     "@typescript-eslint/no-unsafe-argument": "warn",
-    // "@typescript-eslint/no-unsafe-member-access": "warn",
     "max-classes-per-file": [
       "error",
       1
@@ -168,7 +168,101 @@
     "valid-typeof": "off",
     "complexity": [
       "error",
+      8
+    ],
+    "@typescript-eslint/member-ordering": [
+      "error",
+      {
+        "default": [
+          "field",
+          "static-field",
+          "private-static-field",
+          "public-static-field",
+          "private-instance-field",
+          "public-instance-field",
+          "private-static-method",
+          "public-static-method",
+          "constructor",
+          "private-method",
+          "public-method"
+        ]
+      }
+    ],
+    "max-params": [
+      "warn",
+      7
+    ],
+    "max-nested-callbacks": [
+      "warn",
+      2
+    ],
+    "max-depth": [
+      "warn",
+      3
+    ],
+    "sonarjs/prefer-single-boolean-return": "error",
+    "sonarjs/no-collapsible-if": "error",
+    "sonarjs/no-duplicated-branches": "error",
+    "sonarjs/no-identical-expressions": "warn",
+    "sonarjs/no-nested-switch": "warn",
+    "perfectionist/sort-objects": [
+      "warn",
+      {
+        "type": "natural",
+        "order": "asc"
+      }
+    ],
+    "perfectionist/sort-imports": [
+      "error",
+      {
+        "type": "natural",
+        "order": "asc"
+      }
+    ],
+    "sonarjs/cognitive-complexity": [
+      "error",
       10
+    ],
+    "@typescript-eslint/explicit-module-boundary-types": [
+      "error",
+      {
+        "allowedNames": [
+          "toPrimitives"
+        ]
+      }
+    ],
+    "no-param-reassign": [
+      "warn",
+      {
+        "props": true
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "../infrastructure",
+            "message": "Domain layer cannot import infrastructure."
+          }
+        ]
+      }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "*.spec.ts"
+      ],
+      "rules": {
+        "no-unsafe-argument": "off",
+        "max-statements": "off",
+        "max-lines-per-function": "off",
+        "max-nested-callbacks": [
+          "warn",
+          4
+        ]
+      }
+    }
+  ]
 }

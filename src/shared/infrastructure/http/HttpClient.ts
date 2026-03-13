@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+
 import { HttpConfig } from './AxiosHttpClient';
 
 abstract class HttpClient {

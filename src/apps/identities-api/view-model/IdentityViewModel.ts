@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+
 import { IdentityResource } from '../resources/IdentityResource';
 
 export class IdentityViewModel {

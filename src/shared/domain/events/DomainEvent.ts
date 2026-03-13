@@ -22,13 +22,13 @@ export default abstract class DomainEvent implements Event {
 
   public decode(): string {
     const data = {
-      event_id: this.eventId,
       aggregate_id: this.aggregateId,
-      type: this.eventName(),
-      occurred_on: this.occurredOn.getTime(),
       attributes: this.attributes,
-      correlation_id: this.correlationId,
       causation_id: this.causationId,
+      correlation_id: this.correlationId,
+      event_id: this.eventId,
+      occurred_on: this.occurredOn.getTime(),
+      type: this.eventName(),
     };
 
     return JSON.stringify(data);

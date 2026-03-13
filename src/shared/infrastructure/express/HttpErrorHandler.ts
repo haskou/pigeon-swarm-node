@@ -1,13 +1,14 @@
+import Kernel from '@app/Kernel';
+import { DomainError } from '@haskou/value-objects';
 import { Request, Response, NextFunction } from 'express';
 import {
   HttpError,
   ExpressErrorMiddlewareInterface,
   Middleware,
 } from 'routing-controllers';
+
 import CustomHttpError from '../errors/CustomHttpError';
 import { HttpRouteStatusEnum } from '../ui/routes/HttpRouteStatusEnum';
-import Kernel from '@app/Kernel';
-import { DomainError } from '@haskou/value-objects';
 
 type ValidationError = {
   property: string;
@@ -40,9 +41,9 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
         formattedErrors.push(...this.formatValidationErrors(error.children));
       } else {
         formattedErrors.push({
+          details: error.constraints,
           property: error.property,
           value: error.value,
-          details: error.constraints,
         });
       }
     });
@@ -76,18 +77,18 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
     } else if (error instanceof CustomHttpError) {
       response.status(error.httpCode).json({
         code: error.code,
-        message: error.message,
         httpStatus: error.httpCode,
+        message: error.message,
       });
 
       return;
     } else if (error instanceof HttpError) {
       response.status(error.httpCode).json({
         code: error.name,
-        message: error.message,
         errors: this.formatValidationErrors(
           (error as ErrorExplanation).errors || [],
         ),
+        message: error.message,
       });
 
       return;

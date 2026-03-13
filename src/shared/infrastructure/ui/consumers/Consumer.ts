@@ -3,13 +3,13 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 
 export default abstract class Consumer {
+  constructor(private readonly consumer: DomainEventConsumer) {}
+
   public abstract get queueName(): string;
   public abstract get eventName(): string;
   public abstract get domainEvent(): typeof DomainEvent;
   public abstract get exchange(): string;
   public abstract handler(event: DomainEvent): Promise<void>;
-
-  constructor(private readonly consumer: DomainEventConsumer) {}
 
   public async init(): Promise<void> {
     await this.consumer.consume(

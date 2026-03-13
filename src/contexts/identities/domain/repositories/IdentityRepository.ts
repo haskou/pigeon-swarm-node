@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
+
 import { Identity } from '../Identity';
 
 export interface IdentityRepository {

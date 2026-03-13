@@ -1,8 +1,9 @@
-import { Body, JsonController, Post, Res } from 'routing-controllers';
-import { Response } from 'express';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import IdentityCreator from '@app/contexts/identities/application/creator/IdentityCreator';
+import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Response } from 'express';
+import { Body, JsonController, Post, Res } from 'routing-controllers';
+
 import { PostIdentityBody } from '../bodies/PostIdentityBody';
 import { PostIdentityRequest } from '../requests/PostIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';

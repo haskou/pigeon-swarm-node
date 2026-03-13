@@ -1,20 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Kernel from '@app/Kernel';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import MessageBusAdapter from '../MessageBusAdapter';
 import { Constructor } from '@app/shared/domain/Constructor';
+import DomainEvent from '@app/shared/domain/events/DomainEvent';
+
 import { Message } from '../Message';
+import MessageBusAdapter from '../MessageBusAdapter';
 
 export default class MemoryMessageBusAdapter implements MessageBusAdapter {
-  public consumeDlx(
-    _queueName: string,
-    _DomainEventInstance: Constructor<DomainEvent>,
-    _handler: (event: DomainEvent) => Promise<void>,
-    _messagesToRetry?: number,
-  ): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-
   public static memoryMessages: {
     [key: string]: {
       routingKey: string;
@@ -25,6 +17,33 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
 
   public static errorMemoryMessages: { [key: string]: string[] } = {};
 
+  private getQueueNameFromDomainEvent(
+    domainEvent: DomainEvent,
+    exchange: string,
+  ): string[] {
+    const consumers = Kernel.consumers;
+    const queues = [];
+    for (const consumer of consumers) {
+      if (
+        consumer.eventName === domainEvent.eventName() &&
+        consumer.exchange === exchange
+      ) {
+        queues.push(consumer.queueName);
+      }
+    }
+
+    return queues;
+  }
+
+  public consumeDlx(
+    _queueName: string,
+    _DomainEventInstance: Constructor<DomainEvent>,
+    _handler: (event: DomainEvent) => Promise<void>,
+    _messagesToRetry?: number,
+  ): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+
   public async consume(
     queueName: string,
     bindingKey: string,
@@ -33,6 +52,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
     await Promise.resolve(
+      // eslint-disable-next-line sonarjs/cognitive-complexity
       setInterval(async () => {
         if (MemoryMessageBusAdapter.memoryMessages[queueName]) {
           const msg = MemoryMessageBusAdapter.memoryMessages[queueName].pop();
@@ -55,6 +75,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
             } catch (error: unknown) {
               Kernel.logger.error((error as Error).message);
 
+              // eslint-disable-next-line max-depth
               if (!MemoryMessageBusAdapter.errorMemoryMessages[queueName]) {
                 MemoryMessageBusAdapter.errorMemoryMessages[queueName] = [];
               }
@@ -86,9 +107,9 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
           }
 
           MemoryMessageBusAdapter.memoryMessages[queue].push({
-            routingKey: domainEvent.eventName(),
             event: domainEvent.decode(),
             exchange: exchange || `${process.env.SERVICE_NAME}`,
+            routingKey: domainEvent.eventName(),
           });
         }
       }
@@ -107,23 +128,5 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     }
 
     return messages;
-  }
-
-  private getQueueNameFromDomainEvent(
-    domainEvent: DomainEvent,
-    exchange: string,
-  ): string[] {
-    const consumers = Kernel.consumers;
-    const queues = [];
-    for (const consumer of consumers) {
-      if (
-        consumer.eventName === domainEvent.eventName() &&
-        consumer.exchange === exchange
-      ) {
-        queues.push(consumer.queueName);
-      }
-    }
-
-    return queues;
   }
 }

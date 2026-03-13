@@ -1,14 +1,15 @@
+import { GetExampleRoute } from '@app/apps/example-api/routes/GetExampleRoute';
+import { validationMetadatasToSchemas } from 'class-validator-jsonschema';
+import * as express from 'express';
+import fs from 'fs';
+import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
+import { getMetadataArgsStorage } from 'routing-controllers';
+import { routingControllersToSpec } from 'routing-controllers-openapi';
+
 import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
 import { HttpErrorHandler } from './HttpErrorHandler';
-import { getMetadataArgsStorage } from 'routing-controllers';
-import { routingControllersToSpec } from 'routing-controllers-openapi';
-import fs from 'fs';
-import { validationMetadatasToSchemas } from 'class-validator-jsonschema';
-import * as express from 'express';
-import * as shttp from 'http';
-import { GetExampleRoute } from '@app/apps/example-api/routes/GetExampleRoute';
 
 type HttpApp = express.Application;
 type HttpServer = shttp.Server;
@@ -28,11 +29,11 @@ export default class Server {
   public run(): Promise<void> {
     return new Promise((resolve) => {
       this._app = createExpressServer({
-        routePrefix: `${process.env.ROUTE_PREFIX}`,
-        cors: true,
         controllers: [HealthRoute, ConsumeDlxRoute, GetExampleRoute],
+        cors: true,
         defaultErrorHandler: false,
         middlewares: [HttpErrorHandler],
+        routePrefix: `${process.env.ROUTE_PREFIX}`,
       });
       this._server = this.app.listen(process.env.API_PORT || 8080, () => {
         resolve();

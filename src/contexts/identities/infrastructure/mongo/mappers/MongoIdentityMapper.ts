@@ -1,14 +1,15 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+
 import { IdentityDocument } from '../documents/IdentityDocument';
 
 export default class MongoIdentityMapper {
   public toDomain(document: IdentityDocument): Identity {
     return Identity.fromPrimitives({
-      id: document._id,
       encryptedKeyPair: document.encryptedKeyPair,
+      id: document._id,
       profile: document.profile,
-      timestamp: document.timestamp,
       signature: document.signature,
+      timestamp: document.timestamp,
     });
   }
 
@@ -19,8 +20,8 @@ export default class MongoIdentityMapper {
       _id: primitives.id,
       encryptedKeyPair: primitives.encryptedKeyPair,
       profile: primitives.profile,
-      timestamp: primitives.timestamp,
       signature: primitives.signature,
+      timestamp: primitives.timestamp,
     };
   }
 }

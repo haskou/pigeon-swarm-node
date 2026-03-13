@@ -1,42 +1,18 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+
+import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
 import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
 import MessageBusAdapter from './MessageBusAdapter';
-import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 export default class MessageBus
   implements DomainEventConsumer, DomainEventPublisher
 {
-  private adapter: MessageBusAdapter;
   private static sourceEventContext = new Map<string, DomainEvent>();
   private static activeContextIds: string[] = [];
-
-  constructor(
-    private readonly amqpAdapter: AmqpMessageBusAdapter,
-    private readonly memoryAdapter: MemoryMessageBusAdapter,
-  ) {
-    this.adapter = this.chooseAdapterFromDsn(process.env.TRANSPORT_DSN);
-  }
-
-  private chooseAdapterFromDsn(dsn: string): MessageBusAdapter {
-    this.ensureDSNIsValid(process.env.TRANSPORT_DSN);
-
-    if (dsn.startsWith('amqp')) {
-      return this.amqpAdapter;
-    }
-
-    if (dsn.startsWith('in-memory')) {
-      return this.memoryAdapter;
-    }
-  }
-
-  private ensureDSNIsValid(dsn: string): void {
-    if (!dsn.startsWith('amqp') && !dsn.startsWith('in-memory')) {
-      throw new InvalidMessageBusAdapterError(dsn);
-    }
-  }
+  private adapter: MessageBusAdapter;
 
   private static setSourceEvent(event: DomainEvent): void {
     if (!event.eventId) {
@@ -64,6 +40,33 @@ export default class MessageBus
     }
 
     return MessageBus.sourceEventContext.get(currentEventId);
+  }
+
+  constructor(
+    private readonly amqpAdapter: AmqpMessageBusAdapter,
+    private readonly memoryAdapter: MemoryMessageBusAdapter,
+  ) {
+    this.adapter = this.chooseAdapterFromDsn(process.env.TRANSPORT_DSN || '');
+  }
+
+  private chooseAdapterFromDsn(dsn: string): MessageBusAdapter {
+    this.ensureDSNIsValid(process.env.TRANSPORT_DSN || '');
+
+    if (dsn.startsWith('amqp')) {
+      return this.amqpAdapter;
+    }
+
+    if (dsn.startsWith('in-memory')) {
+      return this.memoryAdapter;
+    }
+
+    throw new InvalidMessageBusAdapterError(dsn);
+  }
+
+  private ensureDSNIsValid(dsn: string): void {
+    if (!dsn.startsWith('amqp') && !dsn.startsWith('in-memory')) {
+      throw new InvalidMessageBusAdapterError(dsn);
+    }
   }
 
   private getCorrelationId(event: DomainEvent): string | undefined {

@@ -1,12 +1,13 @@
+import Kernel from '@app/Kernel';
+import { Response } from 'express';
 import {
   Get as get,
   JsonController as jsonController,
   Res,
 } from 'routing-controllers';
-import { Response } from 'express';
-import MessageBus from '../../messageBus/MessageBus';
-import Kernel from '@app/Kernel';
+
 import AmqpMessageBusAdapter from '../../messageBus/amqp/AmqpMessageBusAdapter';
+import MessageBus from '../../messageBus/MessageBus';
 import Route from './Route';
 
 @jsonController()

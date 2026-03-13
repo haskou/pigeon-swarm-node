@@ -1,7 +1,8 @@
-import { ProfileBiography } from './value-objects/ProfileBiography';
-import { ProfileName } from './value-objects/ProfileName';
 import { PrimitiveOf } from '@haskou/value-objects';
+
+import { ProfileBiography } from './value-objects/ProfileBiography';
 import { ProfileImage } from './value-objects/ProfileImage';
+import { ProfileName } from './value-objects/ProfileName';
 
 export class Profile {
   public static fromPrimitives(primitives: PrimitiveOf<Profile>): Profile {
@@ -22,8 +23,8 @@ export class Profile {
 
   public toPrimitives() {
     return {
-      name: this.name.valueOf(),
       biography: this.biography?.valueOf(),
+      name: this.name.valueOf(),
       picture: this.picture?.valueOf(),
     };
   }

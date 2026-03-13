@@ -1,11 +1,12 @@
-import { ObjectId } from 'mongodb';
-import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
-import { Identity } from '../../domain/Identity';
-import { IdentityDocument } from './documents/IdentityDocument';
-import MongoIdentityMapper from './mappers/MongoIdentityMapper';
 import Database from '@app/shared/infrastructure/persistence/Database';
 import { NullObject } from '@haskou/value-objects';
+import { ObjectId } from 'mongodb';
+
+import { Identity } from '../../domain/Identity';
+import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
+import { IdentityDocument } from './documents/IdentityDocument';
+import MongoIdentityMapper from './mappers/MongoIdentityMapper';
 
 export default class MongoIdentityRepository implements IdentityRepository {
   private readonly collectionName = 'identities';

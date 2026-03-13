@@ -1,10 +1,25 @@
-import cron from 'node-cron';
 import Kernel from '@app/Kernel';
-import { CronExpression } from './SchedulerCronExpression';
+import cron from 'node-cron';
+
 import InvalidParseCronExpressionError from '../errors/scheduler/InvalidParseCronExpressionError';
 import ScheduledExecutionError from '../errors/scheduler/ScheduledExecutionError';
+import { CronExpression } from './SchedulerCronExpression';
 
 export default abstract class Scheduler {
+  private parseCronExpression(): string {
+    const expression = this.getCronExpression();
+
+    return (
+      '' +
+      `${expression.second ?? '*'} ` +
+      `${expression.minute ?? '*'} ` +
+      `${expression.hour ?? '*'} ` +
+      `${expression.dayOfMonth ?? '*'} ` +
+      `${expression.month ?? '*'} ` +
+      `${expression.dayOfWeek ?? '*'}`
+    );
+  }
+
   public abstract execute(): Promise<void>;
   public abstract getProcessName(): string;
   public abstract getCronExpression(): CronExpression;
@@ -32,19 +47,5 @@ export default abstract class Scheduler {
         );
       }
     });
-  }
-
-  private parseCronExpression(): string {
-    const expression = this.getCronExpression();
-
-    return (
-      '' +
-      `${expression.second ?? '*'} ` +
-      `${expression.minute ?? '*'} ` +
-      `${expression.hour ?? '*'} ` +
-      `${expression.dayOfMonth ?? '*'} ` +
-      `${expression.month ?? '*'} ` +
-      `${expression.dayOfWeek ?? '*'}`
-    );
   }
 }

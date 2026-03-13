@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
-import HttpClient from './HttpClient';
 import https from 'https';
+
+import HttpClient from './HttpClient';
 
 export type HttpConfig = Record<string, unknown>;
 
@@ -24,10 +25,10 @@ export default class AxiosHttpClient implements HttpClient {
       baseURL: `${this.baseUrl}`,
       data,
       headers: this.headers,
-      responseType: 'json',
       httpsAgent: new https.Agent({
         rejectUnauthorized: false,
       }),
+      responseType: 'json',
     });
   }
 }

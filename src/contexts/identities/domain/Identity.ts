@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
+import { Password } from '@app/contexts/shared/domain/Password';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import {
   assert,
@@ -8,10 +9,10 @@ import {
   Signature,
   Timestamp,
 } from '@haskou/value-objects';
+
+import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
 import { Profile } from './Profile';
 import { ProfileName } from './value-objects/ProfileName';
-import { Password } from '@app/contexts/shared/domain/Password';
-import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
 
 // TODO: Test
 export class Identity extends AggregateRoot {
@@ -32,11 +33,11 @@ export class Identity extends AggregateRoot {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
     const primitives = {
-      id: IdentityId.generate().valueOf(),
       encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      id: IdentityId.generate().valueOf(),
       profile: new Profile(name).toPrimitives(),
-      timestamp: Timestamp.now().valueOf(),
       signature: '',
+      timestamp: Timestamp.now().valueOf(),
     };
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
@@ -74,11 +75,11 @@ export class Identity extends AggregateRoot {
 
   public toPrimitives() {
     return {
-      id: this.id.valueOf(),
       encryptedKeyPair: this.encryptedKeyPair.toPrimitives(),
+      id: this.id.valueOf(),
       profile: this.profile.toPrimitives(),
-      timestamp: this.timestamp.valueOf(),
       signature: this.signature.valueOf(),
+      timestamp: this.timestamp.valueOf(),
     };
   }
 }

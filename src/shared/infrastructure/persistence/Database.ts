@@ -1,5 +1,6 @@
-import { Db, MongoClient } from 'mongodb';
 import Kernel from '@app/Kernel';
+import { Db, MongoClient } from 'mongodb';
+
 import Persistence from './Persistence';
 
 export default class Database implements Persistence {
@@ -7,6 +8,15 @@ export default class Database implements Persistence {
   private readonly protocol: string;
   private mongoClient: MongoClient | undefined;
   private globalDb: Db | undefined;
+
+  public static getInstance(): Database {
+    if (this.instance) {
+      return this.instance;
+    }
+    this.instance = new Database();
+
+    return this.instance;
+  }
 
   constructor() {
     this.protocol = process.env.MONGO_URI || '';
@@ -52,15 +62,6 @@ export default class Database implements Persistence {
     }
 
     return this.globalDb;
-  }
-
-  public static getInstance(): Database {
-    if (this.instance) {
-      return this.instance;
-    }
-    this.instance = new Database();
-
-    return this.instance;
   }
 
   public async authenticate(): Promise<void> {

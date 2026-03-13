@@ -1,4 +1,5 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+
 import { Identity } from '../../domain/Identity';
 import IdentitySaverService from '../../domain/services/IdentitySaverService';
 import { IdentityCreateMessage } from './messages/IdentityCreateMessage';

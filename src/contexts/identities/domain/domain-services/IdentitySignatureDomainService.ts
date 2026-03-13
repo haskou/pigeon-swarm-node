@@ -4,6 +4,7 @@ import {
   PrimitiveOf,
   Signature,
 } from '@haskou/value-objects';
+
 import { Identity } from '../Identity';
 
 type IdentitySignature = Omit<PrimitiveOf<Identity>, 'signature'>;
@@ -16,8 +17,8 @@ export class IdentitySignatureDomainService {
   ): Promise<Signature> {
     return encryptedKeyPair.sign(
       JSON.stringify({
-        id: payload.id,
         encryptedKeyPair: payload.encryptedKeyPair,
+        id: payload.id,
         timestamp: payload.timestamp,
       }),
       password,
@@ -31,8 +32,8 @@ export class IdentitySignatureDomainService {
   ): boolean {
     return encryptedKeyPair.isValidSignature(
       JSON.stringify({
-        id: payload.id,
         encryptedKeyPair: payload.encryptedKeyPair,
+        id: payload.id,
         profile: payload.profile,
         timestamp: payload.timestamp,
       }),

@@ -1,26 +1,27 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import winston, { Logger, format } from 'winston';
-import expressWinston from 'express-winston';
 import Kernel from '@app/Kernel';
-import Log from './Log';
+import expressWinston from 'express-winston';
+import winston, { Logger, format } from 'winston';
+
 import Server from '../express/Server';
+import Log from './Log';
 
 export default class WinstonLogger implements Log {
   private prefix: string = '';
   private readonly opts = {
-    level: process.env.LOG_LEVEL,
     format: format.combine(
       format.timestamp({
         format: 'YYYY-MM-DD HH:mm:ss',
       }),
       format.json(),
     ),
+    level: process.env.LOG_LEVEL,
     transports: [
       new winston.transports.Console({ level: process.env.LOG_LEVEL }),
       new winston.transports.File({
-        level: process.env.LOG_LEVEL,
         // eslint-disable-next-line max-len
         filename: `${Kernel.rootDirectory}/${process.env.LOG_URL || 'logs'}/${process.env.SERVICE_NAME || 'service'}.log`,
+        level: process.env.LOG_LEVEL,
       }),
     ],
   };

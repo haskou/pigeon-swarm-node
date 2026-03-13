@@ -1,7 +1,7 @@
-import { Get, JsonController, Res } from 'routing-controllers';
-import { Response } from 'express';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Response } from 'express';
+import { Get, JsonController, Res } from 'routing-controllers';
 
 @JsonController()
 export class GetExampleRoute extends Route {
