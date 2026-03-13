@@ -1,3 +1,0 @@
-import { ShortId } from '@haskou/value-objects';
-
-export class IdentityId extends ShortId {}

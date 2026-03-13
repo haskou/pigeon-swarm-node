@@ -1,5 +1,5 @@
-import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
-import { Password } from '@app/contexts/shared/domain/Password';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import {
   assert,
@@ -34,7 +34,7 @@ export class Identity extends AggregateRoot {
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
     const primitives = {
       encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      id: IdentityId.generate().valueOf(),
+      id: encryptedKeyPair.toPrimitives().publicKey,
       profile: new Profile(name).toPrimitives(),
       signature: '',
       timestamp: Timestamp.now().valueOf(),

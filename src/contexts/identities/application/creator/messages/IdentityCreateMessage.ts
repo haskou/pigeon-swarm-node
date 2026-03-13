@@ -1,5 +1,5 @@
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
-import { Password } from '@app/contexts/shared/domain/Password';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 
 export class IdentityCreateMessage {
   public readonly name: ProfileName;

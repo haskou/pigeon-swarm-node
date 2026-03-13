@@ -1,9 +1,9 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 
-import { IdentityDocument } from '../documents/IdentityDocument';
+import { HeliaIdentityDocument } from '../documents/HeliaIdentityDocument';
 
-export default class MongoIdentityMapper {
-  public toDomain(document: IdentityDocument): Identity {
+export default class HeliaIdentityMapper {
+  public toDomain(document: HeliaIdentityDocument): Identity {
     return Identity.fromPrimitives({
       encryptedKeyPair: document.encryptedKeyPair,
       id: document._id,
@@ -13,7 +13,7 @@ export default class MongoIdentityMapper {
     });
   }
 
-  public toDocument(identity: Identity): IdentityDocument {
+  public toDocument(identity: Identity): HeliaIdentityDocument {
     const primitives = identity.toPrimitives();
 
     return {

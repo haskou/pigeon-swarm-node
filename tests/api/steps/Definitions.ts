@@ -1,19 +1,17 @@
 /* eslint-disable no-case-declarations */
-import { binding, given, then, when, before, after } from 'cucumber-tsflow';
-import RestClient from './RestClient';
-import { expect } from 'chai';
 import Kernel from '@app/Kernel';
-import jwt from 'jsonwebtoken';
-import FormData from 'form-data';
 import { DataTable } from '@cucumber/cucumber';
-import MongoMock from 'tests/resources/MongoMock';
-import { ObjectId } from 'mongodb';
-import chaiSubset from 'chai-subset';
+import { expect } from 'chai';
 import * as chai from 'chai';
+import chaiSubset from 'chai-subset';
+import { binding, given, then, when, before } from 'cucumber-tsflow';
+import FormData from 'form-data';
+import { ObjectId } from 'mongodb';
+
+import RestClient from './RestClient';
 
 chai.use(chaiSubset);
 
-let mongoMock: MongoMock;
 let kernel: Kernel = null;
 
 @binding()
@@ -33,52 +31,6 @@ export default class Definitions {
       await kernel.dependencyInjection();
       await kernel.runServer();
       kernel.logs();
-    }
-  }
-
-  @before()
-  public async startMongoMock(): Promise<void> {
-    if (!mongoMock) {
-      mongoMock = new MongoMock();
-      await mongoMock.init();
-    }
-  }
-
-  @after()
-  public async restartMongoMock(): Promise<void> {
-    if (mongoMock) {
-      await mongoMock.restart();
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/require-await
-  private async setToken(userId?: string): Promise<void> {
-    const userTokenId = userId ? userId : '657880b79c5cfe0b0d3b0c2d';
-    const signedToken = jwt.sign(
-      {
-        payload: {
-          sub: userTokenId,
-        },
-      },
-      process.env.JWT_SECRET || '',
-    );
-    this.restClient.bearerToken = signedToken;
-  }
-
-  @given('I have the following {string}')
-  // eslint-disable-next-line complexity
-  public async iHaveTheFollowingCollectionItems(
-    collectionName: string,
-    data: DataTable,
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const rows: Record<string, unknown>[] = data.hashes();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const dbGlobal = await mongoMock.getDomainDb('dev');
-
-    switch (collectionName) {
-      default:
-        throw new Error(`Collection ${collectionName} not found`);
     }
   }
 

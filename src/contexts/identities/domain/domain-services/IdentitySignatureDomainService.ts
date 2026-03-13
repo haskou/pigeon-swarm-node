@@ -1,4 +1,4 @@
-import { Password } from '@app/contexts/shared/domain/Password';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
   EncryptedKeyPair,
   PrimitiveOf,
