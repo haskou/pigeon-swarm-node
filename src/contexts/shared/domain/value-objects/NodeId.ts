@@ -1,3 +1,3 @@
-import { ValueObject } from '@haskou/value-objects';
+import { ShortId } from '@haskou/value-objects';
 
-export class NodeId extends ValueObject<string> {}
+export class NodeId extends ShortId {}

@@ -1,4 +1,4 @@
-import IdentityCreator from '@app/contexts/identities/application/creator/IdentityCreator';
+import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Response } from 'express';

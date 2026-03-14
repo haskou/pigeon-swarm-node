@@ -1,25 +1,29 @@
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { NetworkKey } from './value-objects/NetworkKey';
 import { NetworkName } from './value-objects/NetworkName';
-import { NetworkType } from './value-objects/NetworkType';
 
 export class Network {
   public static fromPrimitives(primitives: PrimitiveOf<Network>): Network {
     return new Network(
       new NetworkName(primitives.name),
-      new NetworkType(primitives.type),
+      primitives.key ? new NetworkKey(primitives.key) : undefined,
     );
   }
 
   constructor(
-    public readonly name: NetworkName,
-    public readonly type: NetworkType,
+    private readonly name: NetworkName,
+    private readonly key?: NetworkKey,
   ) {}
+
+  public getName(): NetworkName {
+    return this.name;
+  }
 
   public toPrimitives() {
     return {
+      key: this.key?.valueOf(),
       name: this.name.valueOf(),
-      type: this.type.valueOf(),
     };
   }
 }

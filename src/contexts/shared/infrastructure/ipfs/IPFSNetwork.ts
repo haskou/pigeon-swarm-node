@@ -57,4 +57,8 @@ export class IPFSNetwork {
   public getPeers(): string[] {
     return this.connection.getPeers();
   }
+
+  public toPrimitives() {
+    return this.config.toPrimitives();
+  }
 }

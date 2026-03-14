@@ -27,3 +27,6 @@ dist/*
 coverage/
 
 .npmrc
+
+
+/ipfs_storage

@@ -28,6 +28,11 @@ export class Node extends AggregateRoot {
     super();
   }
 
+  public addNetwork(network: Network): void {
+    this.networks.set(network.getName(), network);
+    // TODO: Add domain event
+  }
+
   public toPrimitives() {
     return {
       id: this.id.valueOf(),

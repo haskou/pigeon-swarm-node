@@ -3,6 +3,8 @@ import 'module-alias/register';
 import 'reflect-metadata';
 import Kernel from '@app/Kernel';
 
+import { NodeRuntime } from './apps/node-runtime/NodeRuntime';
+
 async function init() {
   console.time('Kernel');
   const kernel = new Kernel();
@@ -33,6 +35,11 @@ async function init() {
   console.time('Logs');
   kernel.logs();
   console.timeEnd('Logs');
+
+  console.time('Node Runtime');
+  const nodeRuntime = new NodeRuntime();
+  await nodeRuntime.run();
+  console.timeEnd('Node Runtime');
 
   console.info('Ready!');
 }

@@ -1,4 +1,4 @@
-import { IdentityCreateMessage } from '@app/contexts/identities/application/creator/messages/IdentityCreateMessage';
+import { IdentityCreateMessage } from '@app/contexts/identities/application/create/messages/IdentityCreateMessage';
 
 import { PostIdentityBody } from '../bodies/PostIdentityBody';
 
