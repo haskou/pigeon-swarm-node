@@ -32,7 +32,7 @@ package "shared" {
 package "identities" {
   package "domain" {
 
-    class Identity {
+    class Identity <AggregateRoot> {
       -id: identityId
       -publicKey: Key
       -privateEncryptedKey: Key
@@ -135,37 +135,41 @@ package "KeyRing" {
 
 package "nodes" {
   package "domain" {
-    abstract class Node {
+    class Node <AggregateRoot>{
       -id: NodeId
-      -ownerId: identityId
-      -name: String
-      -publicAddress: Address
-      -publicKey: Key
-      -signature: Hash
+      -networks: Map<NetworkName, Network>
+      -owner?: IdentityId
+    }
+    class Network {
+      -name: NetworkName
+      -type: NetworkType
+    }
+    class PublicNetwork extends Network {}
+    class PrivateNetwork extends Network {
+      -key: PrivateKey
     }
 
-    class Peer extends Node {
-      -lastSeen: Timestamp
-      -thrustScore: Int
-    }
+    Node o--> Network
 
-    class LocalNode extends Node {
-      -peers: List<Peer>
-      -privateKey: Key
-      -peerWhitelist: List<Peer>
-      -peerBlacklist: List<Peer>
-      -identityWhitelist: List<identityId>
-      -identityBlacklist: List<identityId>
-    }
+    interface NodeRepository {}
 
-    LocalNode --> Peer
+    NodeRepository o--> Node
   }
+
+  package "application" {
+    class NetworkAdder {
+      +addNetwork(network: Network): void
+    }
+  }
+
+  NetworkAdder ..> NodeRepository
+
 }
 
 package "conversations" {
   package "domain" {
 
-    abstract class Conversation {
+    abstract class Conversation <AggregateRoot>{
       -id: ConversationId
       -participants: List<UserId>
     }

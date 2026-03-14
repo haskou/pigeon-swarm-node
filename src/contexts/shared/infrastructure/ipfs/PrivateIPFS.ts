@@ -1,9 +1,9 @@
-import { Password } from '@app/contexts/shared/domain/value-objects/Password.js';
-import Kernel from '@app/Kernel.js';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
+import Kernel from '@app/Kernel';
 import { preSharedKey } from '@libp2p/pnet';
 import * as HeliaCore from 'helia';
 
-import { IPFSOptions, AbstractIPFS } from './AbstractIPFS.js';
+import { IPFSOptions, AbstractIPFS } from './AbstractIPFS';
 
 export type PrivateIPFSOptions = IPFSOptions & {
   key: Password;

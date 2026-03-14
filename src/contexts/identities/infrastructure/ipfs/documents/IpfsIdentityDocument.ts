@@ -1,4 +1,4 @@
-export interface HeliaIdentityDocument {
+export interface IpfsIdentityDocument {
   _id: string;
   encryptedKeyPair: {
     publicKey: string;

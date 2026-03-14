@@ -6,9 +6,10 @@ import { FsDatastore } from 'datastore-fs';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as HeliaCore from 'helia';
+import { Key } from 'interface-datastore';
 import { CID } from 'multiformats/cid';
 
-import { IPFSId } from './IPFSId.js';
+import { IPFSId } from './IPFSId';
 
 export type IPFSOptions = {
   storageLocation: 'memory' | string;
@@ -100,6 +101,10 @@ export abstract class AbstractIPFS {
     private readonly options: IPFSOptions,
   ) {}
 
+  private hasPeers(): boolean {
+    return this.getPeers().length > 0;
+  }
+
   public async blockPeer(peerId: string): Promise<void> {
     AbstractIPFS.blockedPeers.push(peerId);
 
@@ -111,36 +116,76 @@ export abstract class AbstractIPFS {
     }
   }
 
-  public async addJSON(data: unknown): Promise<IPFSId> {
+  public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
     const heliaJSONClient = HeliaJSONClient(this.heliaCore);
 
-    const cid = await heliaJSONClient.add(data);
+    const cid = await heliaJSONClient.add(data, { signal });
 
     return new IPFSId(cid.toString());
   }
 
-  public async getJSON<T>(cid: IPFSId): Promise<T> {
+  public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
     const heliaJSONClient = HeliaJSONClient(this.heliaCore);
 
-    const json: T = await heliaJSONClient.get(CID.parse(cid.valueOf()));
+    const json: T = await heliaJSONClient.get(CID.parse(cid.valueOf()), {
+      signal,
+    });
 
-    await this.addJSON(json);
+    await this.addJSON(json, signal);
 
     return json;
   }
 
-  public async putByKeyRecord(key: string, cid: string): Promise<void> {
-    const encoder = new TextEncoder();
-
-    await this.heliaCore.routing.put(encoder.encode(key), encoder.encode(cid));
+  public getPeers(): string[] {
+    return this.heliaCore.libp2p.getPeers().map((peer) => peer.toString());
   }
 
-  public async getByKeyRecord(key: string): Promise<string | undefined> {
+  public async putRecord(
+    key: string,
+    value: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
     const encoder = new TextEncoder();
+    const datastoreKey = new Key(`/records/${key}`);
+
+    await this.heliaCore.datastore.put(datastoreKey, encoder.encode(value), {
+      signal,
+    });
+
+    if (this.hasPeers()) {
+      await this.heliaCore.routing.put(
+        encoder.encode(key),
+        encoder.encode(value),
+        { signal },
+      );
+    }
+  }
+
+  public async getRecord(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
     const decoder = new TextDecoder();
 
+    if (this.hasPeers()) {
+      try {
+        const value = await this.heliaCore.routing.get(
+          new TextEncoder().encode(key),
+          { signal },
+        );
+
+        return decoder.decode(value);
+      } catch {
+        // Fallback to local datastore
+      }
+    }
+
+    const datastoreKey = new Key(`/records/${key}`);
+
     try {
-      const value = await this.heliaCore.routing.get(encoder.encode(key));
+      const value = await this.heliaCore.datastore.get(datastoreKey, {
+        signal,
+      });
 
       return decoder.decode(value);
     } catch {

@@ -9,7 +9,7 @@
     "start": "pm2-runtime start dist/index.js",
     "stop": "pm2-runtime stop node",
     "local": "nodemon",
-    "local:start": "node --inspect=0.0.0.0:9229 -r ts-node/register -r tsconfig-paths/register src/index.ts",
+    "local:start": "node --conditions=import --inspect=0.0.0.0:9229 -r ts-node/register -r tsconfig-paths/register src/index.ts",
     "test": "npm-run-all lint test:unit test:api test:consumer test:scheduler",
     "test:unit": "jest --passWithNoTests",
     "test:api": "NODE_ENV=test cucumber-js -p api --publish-quiet",
@@ -100,6 +100,7 @@
     "ts-patch": "^3.3.0",
     "ts-transform-paths": "^3.0.0",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-transform-paths": "^3.5.6"
   }

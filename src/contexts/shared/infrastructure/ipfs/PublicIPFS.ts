@@ -1,7 +1,7 @@
-import Kernel from '@app/Kernel.js';
+import Kernel from '@app/Kernel';
 import * as HeliaCore from 'helia';
 
-import { IPFSOptions, AbstractIPFS } from './AbstractIPFS.js';
+import { IPFSOptions, AbstractIPFS } from './AbstractIPFS';
 
 // TODO: Tests
 export class PublicIPFS extends AbstractIPFS {

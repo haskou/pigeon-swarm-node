@@ -14,6 +14,7 @@ import { IdentitySignatureDomainService } from './domain-services/IdentitySignat
 import { Profile } from './Profile';
 import { ProfileName } from './value-objects/ProfileName';
 
+// TODO: Identities should pertain to 1 or N networks
 // TODO: Test
 export class Identity extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {

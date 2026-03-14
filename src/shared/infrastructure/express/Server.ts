@@ -1,4 +1,5 @@
 import { GetExampleRoute } from '@app/apps/example-api/routes/GetExampleRoute';
+import { GetIPFSContentRoute } from '@app/apps/ipfs-api/routes/GetIPFSContentRoute';
 import { validationMetadatasToSchemas } from 'class-validator-jsonschema';
 import * as express from 'express';
 import fs from 'fs';
@@ -15,21 +16,36 @@ type HttpApp = express.Application;
 type HttpServer = shttp.Server;
 
 export default class Server {
-  private _app: HttpApp;
-  private _server: HttpServer;
+  private _app: HttpApp | undefined;
+  private _server: HttpServer | undefined;
 
   public get app(): HttpApp {
+    if (!this._app) {
+      // TODO: replace with error
+      throw new Error('Server is not running');
+    }
+
     return this._app;
   }
 
   public get server(): HttpServer {
+    if (!this._server) {
+      // TODO: replace with error
+      throw new Error('Server is not running');
+    }
+
     return this._server;
   }
 
   public run(): Promise<void> {
     return new Promise((resolve) => {
       this._app = createExpressServer({
-        controllers: [HealthRoute, ConsumeDlxRoute, GetExampleRoute],
+        controllers: [
+          HealthRoute,
+          ConsumeDlxRoute,
+          GetExampleRoute,
+          GetIPFSContentRoute,
+        ],
         cors: true,
         defaultErrorHandler: false,
         middlewares: [HttpErrorHandler],
