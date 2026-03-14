@@ -21,9 +21,9 @@ export class Node extends AggregateRoot {
   }
 
   constructor(
-    public readonly id: NodeId,
-    public readonly networks: Map<NetworkName, Network> = new Map(),
-    public owner?: IdentityId,
+    private readonly id: NodeId,
+    private readonly networks: Map<NetworkName, Network> = new Map(),
+    private owner?: IdentityId,
   ) {
     super();
   }

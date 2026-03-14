@@ -16,9 +16,9 @@ export class Profile {
   }
 
   constructor(
-    public readonly name: ProfileName,
-    public readonly biography?: ProfileBiography,
-    public readonly picture?: ProfileImage,
+    private readonly name: ProfileName,
+    private readonly biography?: ProfileBiography,
+    private readonly picture?: ProfileImage,
   ) {}
 
   public toPrimitives() {
