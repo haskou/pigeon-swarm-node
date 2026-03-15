@@ -8,6 +8,7 @@ import { createExpressServer } from 'routing-controllers';
 import { getMetadataArgsStorage } from 'routing-controllers';
 import { routingControllersToSpec } from 'routing-controllers-openapi';
 
+import { ServerNotRunningError } from '../errors/ServerNotRunningError';
 import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
 import { HttpErrorHandler } from './HttpErrorHandler';
@@ -21,8 +22,7 @@ export default class Server {
 
   public get app(): HttpApp {
     if (!this._app) {
-      // TODO: replace with error
-      throw new Error('Server is not running');
+      throw new ServerNotRunningError();
     }
 
     return this._app;
@@ -30,8 +30,7 @@ export default class Server {
 
   public get server(): HttpServer {
     if (!this._server) {
-      // TODO: replace with error
-      throw new Error('Server is not running');
+      throw new ServerNotRunningError();
     }
 
     return this._server;
