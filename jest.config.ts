@@ -15,7 +15,6 @@ const config: Config.InitialOptions = {
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
     '<rootDir>/src/Shared/',
-    '/infrastructure/',
     '/apps/migrations',
   ],
   verbose: true,
@@ -31,10 +30,10 @@ const config: Config.InitialOptions = {
   collectCoverageFrom: ['<rootDir>/src/**/*.ts'],
   coveragePathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/src/Shared',
+    '<rootDir>/src/shared',
     'src/index.ts',
     'src/Kernel.ts',
-    '/infrastructure/',
+    'src/shared/infrastructure/',
     '/apps/migrations',
   ],
 };

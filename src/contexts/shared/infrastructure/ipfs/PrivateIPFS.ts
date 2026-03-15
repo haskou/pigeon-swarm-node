@@ -10,7 +10,6 @@ export type PrivateIPFSOptions = IPFSOptions & {
   name: string;
 };
 
-// TODO: Tests
 export class PrivateIPFS extends AbstractIPFS {
   private static connectionPool: Record<string, HeliaCore.Helia> = {};
 

@@ -3,7 +3,6 @@ import * as HeliaCore from 'helia';
 
 import { IPFSOptions, AbstractIPFS } from './AbstractIPFS';
 
-// TODO: Tests
 export class PublicIPFS extends AbstractIPFS {
   private static connectionPool: Record<string, HeliaCore.Helia> = {};
 
