@@ -1,11 +1,11 @@
+import { mock, MockProxy } from 'jest-mock-extended';
+
+import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
-import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSId';
-import { mock, MockProxy } from 'jest-mock-extended';
-
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {

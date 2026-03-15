@@ -1,12 +1,12 @@
-import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
 import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
+import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
 
 describe('IPFSNetworkConfig', () => {
   describe('fromPrimitives', () => {
     it('should create a private config when key is provided', () => {
       const config = IPFSNetworkConfig.fromPrimitives({
-        name: 'my-network',
         key: 'my-secret-key-12345',
+        name: 'my-network',
       });
 
       expect(config.getName()).toBe('my-network');
@@ -16,8 +16,8 @@ describe('IPFSNetworkConfig', () => {
 
     it('should create a public config when key is undefined', () => {
       const config = IPFSNetworkConfig.fromPrimitives({
-        name: 'public-net',
         key: undefined,
+        name: 'public-net',
       });
 
       expect(config.getName()).toBe('public-net');
