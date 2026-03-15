@@ -7,6 +7,7 @@ import { IPFSOptions, AbstractIPFS } from './AbstractIPFS';
 
 export type PrivateIPFSOptions = IPFSOptions & {
   key: Password;
+  name: string;
 };
 
 // TODO: Tests
@@ -35,7 +36,7 @@ export class PrivateIPFS extends AbstractIPFS {
     );
     this.connectionPool[optionKey] = heliaCore;
     Kernel.logger.info(
-      `Started private node with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
+      `Started private network "${options.name}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
 
     return new PrivateIPFS(heliaCore, options);

@@ -1,3 +1,5 @@
+/* eslint-disable sonarjs/cognitive-complexity */
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable no-case-declarations */
 import Kernel from '@app/Kernel';
 import { DataTable } from '@cucumber/cucumber';
@@ -6,18 +8,17 @@ import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
 import { binding, given, then, when, before } from 'cucumber-tsflow';
 import FormData from 'form-data';
-import { ObjectId } from 'mongodb';
 
 import RestClient from './RestClient';
 
 chai.use(chaiSubset);
 
-let kernel: Kernel = null;
+let kernel: Kernel | null = null;
 
 @binding()
 export default class Definitions {
-  private body: string;
-  private formData: FormData;
+  private body: string | undefined;
+  private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private response: any = null;
@@ -55,18 +56,24 @@ export default class Definitions {
     this.response = await this.restClient.post(
       path,
       isFormData ? this.formData : this.body && JSON.parse(this.body),
-      isFormData ? { headers: this.formData.getHeaders() } : this.headers,
+      isFormData ? { headers: this.formData?.getHeaders() } : this.headers,
     );
   }
 
   @when('I PUT {string}')
   public async iPUT(path: string) {
-    this.response = await this.restClient.put(path, this.body);
+    this.response = await this.restClient.put(
+      path,
+      this.body && JSON.parse(this.body),
+    );
   }
 
   @when('I PATCH {string}')
   public async iPATCH(path: string) {
-    this.response = await this.restClient.patch(path, this.body);
+    this.response = await this.restClient.patch(
+      path,
+      this.body && JSON.parse(this.body),
+    );
   }
 
   @when('I GET {string}')
@@ -212,49 +219,5 @@ export default class Definitions {
   @then('response does not contain property {string}')
   public responseDoesNotContainProperty(property: string) {
     expect(this.response.data).to.not.have.property(property);
-  }
-
-  @then('the document {string} from {string} has')
-  public async documentHas(id: string, collection: string, table: DataTable) {
-    const dbGlobal = await mongoMock.getDomainDb('dev');
-    const document = await dbGlobal.collection(collection).findOne({
-      _id: new ObjectId(id),
-    });
-    const rows = table.rows();
-    for (const row of rows) {
-      const fieldPath = row[0];
-      const expectedValue = row[1];
-
-      const pathParts = fieldPath.split('.');
-      let actualValue = document;
-
-      for (const part of pathParts) {
-        if (part.includes('[') && part.includes(']')) {
-          const index = parseInt(
-            part.substring(part.indexOf('[') + 1, part.indexOf(']')),
-            10,
-          );
-
-          // Handle case where path starts with [index] (direct array access)
-          if (part.startsWith('[')) {
-            actualValue = actualValue[index];
-          } else {
-            // Handle case where path is arrayName[index]
-            const arrayName = part.substring(0, part.indexOf('['));
-            actualValue = actualValue[arrayName][index];
-          }
-        } else {
-          actualValue = actualValue[part];
-        }
-      }
-
-      // Convert to string for comparison to handle type differences
-      const actualValueStr = String(actualValue);
-
-      expect(actualValueStr).to.equal(
-        expectedValue,
-        `Field ${fieldPath} does not match expected value`,
-      );
-    }
   }
 }

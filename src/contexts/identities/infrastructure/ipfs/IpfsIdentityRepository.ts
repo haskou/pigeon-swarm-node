@@ -2,6 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/IPFSId';
 
+import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
 import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
@@ -17,8 +18,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     const cidString = await this.ipfsManager.getRecord(id.valueOf());
 
     if (!cidString) {
-      // TODO: Replace with error
-      throw new Error(`Identity with id ${id.valueOf()} not found`);
+      throw new IdentityNotFoundError(id.valueOf());
     }
 
     const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(

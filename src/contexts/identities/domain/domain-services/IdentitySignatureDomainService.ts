@@ -34,7 +34,6 @@ export class IdentitySignatureDomainService {
       JSON.stringify({
         encryptedKeyPair: payload.encryptedKeyPair,
         id: payload.id,
-        profile: payload.profile,
         timestamp: payload.timestamp,
       }),
       signature,

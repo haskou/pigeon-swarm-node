@@ -6,8 +6,9 @@ const config: Config.InitialOptions = {
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   transform: {
-    '^.+\\.ts': 'ts-jest',
+    '^.+\\.[tj]s$': 'ts-jest',
   },
+  transformIgnorePatterns: ['node_modules/(?!(@noble|@haskou|@faker-js)/)'],
   moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/src/$1',
   },

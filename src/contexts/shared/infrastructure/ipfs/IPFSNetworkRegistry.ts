@@ -79,6 +79,7 @@ export default class IPFSNetworkRegistry {
     if (key) {
       const connection = await PrivateIPFS.create({
         key,
+        name: config.getName(),
         storageLocation: `${this.storagePath}/${config.getName()}`,
       });
 

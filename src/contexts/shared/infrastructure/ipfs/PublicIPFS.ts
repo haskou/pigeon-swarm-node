@@ -18,7 +18,7 @@ export class PublicIPFS extends AbstractIPFS {
     this.connectionPool[optionKey] = heliaCore;
 
     Kernel.logger.info(
-      `Started public node with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
+      `Started public network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
 
     return new PublicIPFS(heliaCore, options);

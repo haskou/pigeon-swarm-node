@@ -1,0 +1,42 @@
+import { Network } from '@app/contexts/nodes/domain/Network';
+import { Node } from '@app/contexts/nodes/domain/Node';
+import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
+
+export class NodeMother {
+  public id: NodeId = NodeId.generate();
+  public networks: Map<NetworkName, Network> = new Map();
+  public owner?: IdentityId = undefined;
+
+  public withId(id: NodeId): this {
+    this.id = id;
+
+    return this;
+  }
+
+  public withNetwork(name: NetworkName, network: Network): this {
+    this.networks.set(name, network);
+
+    return this;
+  }
+
+  public withOwner(owner: IdentityId): this {
+    this.owner = owner;
+
+    return this;
+  }
+
+  public build(): Node {
+    return Node.fromPrimitives({
+      id: this.id.valueOf(),
+      networks: Object.fromEntries(
+        Array.from(this.networks.entries()).map(([key, network]) => [
+          key.valueOf(),
+          network.toPrimitives(),
+        ]),
+      ),
+      owner: this.owner?.valueOf(),
+    });
+  }
+}

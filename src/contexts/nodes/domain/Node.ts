@@ -3,6 +3,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { Network } from './Network';
 import { NetworkName } from './value-objects/NetworkName';
 
@@ -30,7 +31,7 @@ export class Node extends AggregateRoot {
 
   public addNetwork(network: Network): void {
     this.networks.set(network.getName(), network);
-    // TODO: Add domain event
+    this.record(new NodeNetworkWasAdded(this.id.valueOf()));
   }
 
   public toPrimitives() {
