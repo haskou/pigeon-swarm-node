@@ -14,7 +14,7 @@ export class GetIPFSContentRoute extends Route {
     @Param('cid') cid: string,
     @Res() response: Response,
   ): Promise<Response> {
-    const content = await await this.ipfs.getJSON(new IPFSId(cid));
+    const content = await this.ipfs.getJSON(new IPFSId(cid));
 
     return content
       ? response.status(HttpRouteStatusEnum.OK).json(content)
