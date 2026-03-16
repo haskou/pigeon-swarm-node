@@ -63,9 +63,17 @@ export abstract class AbstractIPFS {
     const storageLocation = options.storageLocation;
 
     if (storageLocation !== 'memory') {
-      AbstractIPFS.blockedPeers.push(
-        ...AbstractIPFS.readBlockedPeersFromStorage(options.storageLocation),
+      const peersFromStorage = AbstractIPFS.readBlockedPeersFromStorage(
+        options.storageLocation,
       );
+      const existingSet = new Set(AbstractIPFS.blockedPeers);
+
+      for (const peerId of peersFromStorage) {
+        if (!existingSet.has(peerId)) {
+          AbstractIPFS.blockedPeers.push(peerId);
+          existingSet.add(peerId);
+        }
+      }
     }
 
     return {
