@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/IPFSId';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';

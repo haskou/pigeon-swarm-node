@@ -1,9 +1,9 @@
 import { mock } from 'jest-mock-extended';
 
-import { IPFSContentNotFoundError } from '../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
-import IPFSContentRacer from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSContentRacer';
-import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSId';
-import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetwork';
+import { IPFSContentNotFoundError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
+import IPFSContentRacer from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
+import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 
 describe('IPFSContentRacer', () => {
   let racer: IPFSContentRacer;

@@ -1,8 +1,8 @@
-import IPFSContentRacer from './IPFSContentRacer';
-import { IPFSId } from './IPFSId';
-import { IPFSNetwork } from './IPFSNetwork';
-import { IPFSNetworkConfig } from './IPFSNetworkConfig';
-import IPFSNetworkRegistry from './IPFSNetworkRegistry';
+import IPFSContentRacer from './helia/IPFSContentRacer';
+import { IPFSId } from './helia/IPFSId';
+import { IPFSNetwork } from './networks/IPFSNetwork';
+import { IPFSNetworkConfig } from './networks/IPFSNetworkConfig';
+import IPFSNetworkRegistry from './networks/IPFSNetworkRegistry';
 
 export default class IPFS {
   constructor(

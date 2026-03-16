@@ -10,7 +10,7 @@ import { createPrivateKey } from 'crypto';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 
-import { IPFSNetworkNotFoundError } from './errors/IPFSNetworkNotFoundError';
+import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
 import { IPFSNetwork } from './IPFSNetwork';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { PrivateIPFS } from './PrivateIPFS';

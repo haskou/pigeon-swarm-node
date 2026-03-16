@@ -1,6 +1,6 @@
-import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/IPFSNetwork';
-import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
-import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/IPFSNetworkRegistry';
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';

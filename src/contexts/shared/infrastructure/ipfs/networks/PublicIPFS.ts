@@ -1,24 +1,20 @@
-import Kernel from '@app/Kernel';
 import * as HeliaCore from 'helia';
 
-import { IPFSOptions, AbstractIPFS } from './AbstractIPFS';
+import { createPublicHeliaIPFS, HeliaIPFS } from '../helia/HeliaIPFS';
+import { IPFSConnection, IPFSOptions } from '../helia/IPFSConnection';
 
-export class PublicIPFS extends AbstractIPFS {
+export class PublicIPFS extends HeliaIPFS {
   private static connectionPool: Record<string, HeliaCore.Helia> = {};
 
-  public static async create(options: IPFSOptions): Promise<AbstractIPFS> {
+  public static async create(options: IPFSOptions): Promise<IPFSConnection> {
     const optionKey = JSON.stringify(options);
 
     if (this.connectionPool[optionKey]) {
       return new PublicIPFS(this.connectionPool[optionKey], options);
     }
-    const heliaCore = await HeliaCore.createHelia(this.parseOptions(options));
+    const heliaCore = await createPublicHeliaIPFS(options);
 
     this.connectionPool[optionKey] = heliaCore;
-
-    Kernel.logger.info(
-      `Started public network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
-    );
 
     return new PublicIPFS(heliaCore, options);
   }

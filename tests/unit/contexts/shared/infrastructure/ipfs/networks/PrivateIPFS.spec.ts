@@ -2,6 +2,7 @@ const mockHeliaNode = {
   datastore: { get: jest.fn(), put: jest.fn() },
   libp2p: {
     addEventListener: jest.fn(),
+    dial: jest.fn().mockResolvedValue(undefined),
     getPeers: jest.fn().mockReturnValue([]),
     peerId: { toString: () => 'mock-peer-id' },
   },
@@ -10,11 +11,38 @@ const mockHeliaNode = {
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
+const mockLibp2pDefaults = jest.fn().mockReturnValue({
+  connectionEncrypters: [],
+  services: {},
+  streamMuxers: [],
+  transports: [],
+});
+const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
+const mockMultiaddr = jest
+  .fn()
+  .mockImplementation((address: string) => `mock-multiaddr:${address}`);
 
 jest.mock(
   'helia',
   () => ({
     createHelia: mockCreateHelia,
+    libp2pDefaults: mockLibp2pDefaults,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  'libp2p',
+  () => ({
+    createLibp2p: mockCreateLibp2p,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@multiformats/multiaddr',
+  () => ({
+    multiaddr: mockMultiaddr,
   }),
   { virtual: true },
 );
@@ -91,7 +119,7 @@ jest.mock(
 jest.mock('@app/Kernel', () => ({
   __esModule: true,
   default: {
-    logger: { error: jest.fn(), info: jest.fn() },
+    logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
   },
 }));
 
@@ -101,7 +129,7 @@ import { createHash, createPrivateKey, generateKeyPairSync } from 'crypto';
 import {
   PrivateIPFS,
   PrivateIPFSOptions,
-} from '../../../../../../src/contexts/shared/infrastructure/ipfs/PrivateIPFS';
+} from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
 
 describe('PrivateIPFS', () => {
   const { privateKey: nodeKey } = generateKeyPairSync('ed25519');
@@ -117,6 +145,7 @@ describe('PrivateIPFS', () => {
     (
       PrivateIPFS as unknown as { connectionPool: Record<string, unknown> }
     ).connectionPool = {};
+    delete process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS;
     jest.clearAllMocks();
   });
 
@@ -141,14 +170,24 @@ describe('PrivateIPFS', () => {
       expect(mockPreSharedKey).toHaveBeenCalledWith({ psk: expectedPsk });
     });
 
-    it('should pass connectionProtector to createHelia', async () => {
+    it('should pass connectionProtector to createLibp2p', async () => {
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockCreateLibp2p).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionProtector: 'mock-connection-protector',
+        }),
+      );
+
+      expect(mockLibp2pDefaults).toHaveBeenCalled();
+    });
+
+    it('should pass created libp2p instance to createHelia', async () => {
       await PrivateIPFS.create(defaultOptions);
 
       expect(mockCreateHelia).toHaveBeenCalledWith(
         expect.objectContaining({
-          libp2p: expect.objectContaining({
-            connectionProtector: 'mock-connection-protector',
-          }),
+          libp2p: mockHeliaNode.libp2p,
         }),
       );
     });
@@ -186,6 +225,36 @@ describe('PrivateIPFS', () => {
       );
       expect(Kernel.logger.info).toHaveBeenCalledWith(
         expect.stringContaining('mock-peer-id'),
+      );
+    });
+
+    it('should dial bootstrap peers from environment variable', async () => {
+      process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS =
+        '/ip4/127.0.0.1/tcp/4001/p2p/12D3KooW111,/ip4/127.0.0.1/tcp/4002/p2p/12D3KooW222';
+
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockHeliaNode.libp2p.dial).toHaveBeenCalledTimes(2);
+      expect(mockHeliaNode.libp2p.dial).toHaveBeenNthCalledWith(1, [
+        'mock-multiaddr:/ip4/127.0.0.1/tcp/4001/p2p/12D3KooW111',
+      ]);
+      expect(mockHeliaNode.libp2p.dial).toHaveBeenNthCalledWith(2, [
+        'mock-multiaddr:/ip4/127.0.0.1/tcp/4002/p2p/12D3KooW222',
+      ]);
+
+      expect(mockMultiaddr).toHaveBeenCalledTimes(2);
+    });
+
+    it('should skip self bootstrap dial', async () => {
+      const Kernel = (await import('@app/Kernel')).default;
+      process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS =
+        '/ip4/127.0.0.1/tcp/4001/p2p/mock-peer-id';
+
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockHeliaNode.libp2p.dial).not.toHaveBeenCalled();
+      expect(Kernel.logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping bootstrap self-dial'),
       );
     });
   });

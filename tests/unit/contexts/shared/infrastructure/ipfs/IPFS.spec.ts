@@ -1,11 +1,11 @@
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
-import IPFSContentRacer from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSContentRacer';
-import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSId';
-import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetwork';
-import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
-import IPFSNetworkRegistry from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkRegistry';
+import IPFSContentRacer from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
+import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import IPFSNetworkRegistry from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 
 describe('IPFS', () => {
   let registry: MockProxy<IPFSNetworkRegistry>;

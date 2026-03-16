@@ -2,11 +2,11 @@ import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import { AbstractIPFS } from '../../../../../../src/contexts/shared/infrastructure/ipfs/AbstractIPFS';
-import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSId';
-import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetwork';
-import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
-import { IPFSNetworkType } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkType';
+import { IPFSConnection } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
+import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import { IPFSNetworkType } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkType';
 
 describe('IPFSNetwork', () => {
   const { privateKey } = generateKeyPairSync('ed25519');
@@ -14,10 +14,10 @@ describe('IPFSNetwork', () => {
     .export({ format: 'pem', type: 'pkcs8' })
     .toString();
 
-  let connection: MockProxy<AbstractIPFS>;
+  let connection: MockProxy<IPFSConnection>;
 
   beforeEach(() => {
-    connection = mock<AbstractIPFS>();
+    connection = mock<IPFSConnection>();
   });
 
   describe('getName', () => {

@@ -1,8 +1,8 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
-import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/IPFSNetworkRegistry';
+import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 
 export default class LocalNodeRepository implements NodeRepository {
   constructor(private readonly networkRegistry: IPFSNetworkRegistry) {}

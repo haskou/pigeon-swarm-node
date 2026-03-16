@@ -8,6 +8,11 @@ const mockHeliaNode = {
 };
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
+const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
+const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
+const mockMultiaddr = jest
+  .fn()
+  .mockImplementation((address: string) => `mock-multiaddr:${address}`);
 
 jest.mock(
   'helia',
@@ -24,6 +29,30 @@ jest.mock(
       add: jest.fn().mockResolvedValue({ toString: () => 'bafymockcid' }),
       get: jest.fn().mockResolvedValue({ test: true }),
     }),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@multiformats/multiaddr',
+  () => ({
+    multiaddr: mockMultiaddr,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  'libp2p',
+  () => ({
+    createLibp2p: mockCreateLibp2p,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@libp2p/pnet',
+  () => ({
+    preSharedKey: mockPreSharedKey,
   }),
   { virtual: true },
 );
@@ -85,7 +114,7 @@ jest.mock('@app/Kernel', () => ({
   },
 }));
 
-import { PublicIPFS } from '../../../../../../src/contexts/shared/infrastructure/ipfs/PublicIPFS';
+import { PublicIPFS } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 
 describe('PublicIPFS', () => {
   beforeEach(() => {

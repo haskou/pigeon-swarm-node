@@ -1,6 +1,6 @@
-import { IPFSContentNotFoundError } from './errors/IPFSContentNotFoundError';
+import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
+import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
-import { IPFSNetwork } from './IPFSNetwork';
 
 export default class IPFSContentRacer {
   public async raceGetJSON<T>(

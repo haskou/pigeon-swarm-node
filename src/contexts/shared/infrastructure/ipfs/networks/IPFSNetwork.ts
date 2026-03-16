@@ -1,12 +1,12 @@
-import { AbstractIPFS } from './AbstractIPFS';
-import { IPFSId } from './IPFSId';
+import { IPFSConnection } from '../helia/IPFSConnection';
+import { IPFSId } from '../helia/IPFSId';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { IPFSNetworkType } from './IPFSNetworkType';
 
 export class IPFSNetwork {
   constructor(
     private readonly config: IPFSNetworkConfig,
-    private readonly connection: AbstractIPFS,
+    private readonly connection: IPFSConnection,
   ) {}
 
   public getName(): string {

@@ -9,13 +9,13 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSVBGU0NvbnRlbnRSYWNlcl9fSVBGU0NvbnRlbnRSYWNlcg==:
-    class: /contexts/shared/infrastructure/ipfs/IPFSContentRacer
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19faGVsaWFfX0lQRlNDb250ZW50UmFjZXJfX0lQRlNDb250ZW50UmFjZXI=:
+    class: /contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==:
-    class: /contexts/shared/infrastructure/ipfs/IPFSNetworkRegistry
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fbmV0d29ya3NfX0lQRlNOZXR3b3JrUmVnaXN0cnlfX0lQRlNOZXR3b3JrUmVnaXN0cnk=:
+    class: /contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry
     arguments: []
     abstract: false
     parent: null
@@ -116,7 +116,7 @@ services:
     class: /contexts/nodes/infrastructure/local/LocalNodeRepository
     arguments:
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fbmV0d29ya3NfX0lQRlNOZXR3b3JrUmVnaXN0cnlfX0lQRlNOZXR3b3JrUmVnaXN0cnk=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX3NlY3VyaXR5X19Eb21haW5Eb2VzTm90RXhpc3RFcnJvcl9fRG9tYWluRG9lc05vdEV4aXN0RXJyb3I=:
@@ -227,9 +227,9 @@ services:
     class: /contexts/shared/infrastructure/ipfs/IPFS
     arguments:
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fbmV0d29ya3NfX0lQRlNOZXR3b3JrUmVnaXN0cnlfX0lQRlNOZXR3b3JrUmVnaXN0cnk=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSVBGU0NvbnRlbnRSYWNlcl9fSVBGU0NvbnRlbnRSYWNlcg==
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19faGVsaWFfX0lQRlNDb250ZW50UmFjZXJfX0lQRlNDb250ZW50UmFjZXI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzX19NZXNzYWdlQnVz:

@@ -1,7 +1,7 @@
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 
-import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
+import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 
 describe('IPFSNetworkConfig', () => {
   const { privateKey } = generateKeyPairSync('ed25519');

@@ -5,7 +5,7 @@ import IpfsIdentityRepository from '../../../../../../src/contexts/identities/in
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
-import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSId';
+import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
