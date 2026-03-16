@@ -31,7 +31,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@haskou/value-objects": "^2.2.0",
+    "@haskou/value-objects": "^2.3.0",
     "@helia/json": "^5.0.7",
     "@helia/strings": "^5.0.7",
     "@helia/unixfs": "^7.0.4",
