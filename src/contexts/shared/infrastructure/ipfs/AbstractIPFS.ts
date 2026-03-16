@@ -1,3 +1,4 @@
+import Kernel from '@app/Kernel';
 import { json as HeliaJSONClient } from '@helia/json';
 import { MemoryBlockstore } from 'blockstore-core';
 import { FsBlockstore } from 'blockstore-fs';
@@ -17,6 +18,8 @@ export type IPFSOptions = {
 
 type PeerId = { toString(): string };
 
+// TODO: Add stat method and/with local network searching to prevent
+// TODO: duplicated local pinnings
 export abstract class AbstractIPFS {
   private static readonly blockedPeers: string[] = [];
 
@@ -139,6 +142,12 @@ export abstract class AbstractIPFS {
       signal,
     });
 
+    // TODO: Apply logic from it's own context after signature validation
+    Kernel.logger.warn(
+      `Repining to ensure local node availability: ${cid.valueOf()}. \
+      This is a temporary measure until we implement a more robust pinning strategy \
+      on each context.`,
+    );
     await this.addJSON(json, signal);
 
     return json;
