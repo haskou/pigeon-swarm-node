@@ -17,7 +17,7 @@ export class PrivateIPFS extends AbstractIPFS {
     return {
       ...this.parseOptions(options),
       connectionProtector: preSharedKey({
-        psk: new TextEncoder().encode(options.key.valueOf()),
+        psk: Uint8Array.from(options.key.valueOf()),
       }),
     };
   }
