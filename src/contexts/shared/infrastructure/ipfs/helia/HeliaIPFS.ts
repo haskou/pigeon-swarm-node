@@ -16,6 +16,46 @@ type PeerIdLike = { toString(): string };
 type CreateLibp2pConfig = Parameters<typeof createLibp2p>[0];
 
 export class HeliaIPFS implements IPFSConnection {
+  private static extractRemotePeerFromEvent(event: unknown): PeerIdLike | null {
+    const detail = (event as { detail?: unknown })?.detail;
+
+    if (!detail || typeof detail !== 'object') {
+      return null;
+    }
+
+    const maybeRemotePeer = (detail as { remotePeer?: unknown }).remotePeer;
+
+    if (
+      maybeRemotePeer &&
+      typeof maybeRemotePeer === 'object' &&
+      typeof (maybeRemotePeer as { toString?: unknown }).toString === 'function'
+    ) {
+      return maybeRemotePeer as PeerIdLike;
+    }
+
+    return null;
+  }
+
+  private static registerPrivateConnectionLogs(
+    heliaCore: HeliaCore.Helia,
+    networkName: string,
+  ): void {
+    const onConnectionEvent = (evt: unknown): void => {
+      const connectedPeer = HeliaIPFS.extractRemotePeerFromEvent(evt);
+
+      if (!connectedPeer) {
+        return;
+      }
+
+      Kernel.logger.info(
+        `Connected to Node (${connectedPeer.toString()}) on private network "${networkName}".`,
+      );
+    };
+
+    heliaCore.libp2p.addEventListener('peer:connect', onConnectionEvent);
+    heliaCore.libp2p.addEventListener('connection:open', onConnectionEvent);
+  }
+
   private static extractPeerIdFromBootstrapAddress(
     address: string,
   ): string | undefined {
@@ -89,20 +129,7 @@ export class HeliaIPFS implements IPFSConnection {
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
 
-    heliaCore.libp2p.addEventListener('peer:connect', (evt) => {
-      const connectEvent = evt as {
-        detail?: { remotePeer?: PeerIdLike };
-      };
-      const connectedPeer = connectEvent.detail?.remotePeer;
-
-      if (!connectedPeer) {
-        return;
-      }
-
-      Kernel.logger.info(
-        `Connected to Node (${connectedPeer.toString()}) on private network "${networkName}".`,
-      );
-    });
+    HeliaIPFS.registerPrivateConnectionLogs(heliaCore, networkName);
 
     await HeliaIPFS.dialPrivateBootstrapPeers(heliaCore, networkName);
 

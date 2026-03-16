@@ -3,13 +3,20 @@ import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/netw
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
+import * as fs from 'fs/promises';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { Node } from '../../../../../../src/contexts/nodes/domain/Node';
 import LocalNodeRepository from '../../../../../../src/contexts/nodes/infrastructure/local/LocalNodeRepository';
 
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn(),
+  readFile: jest.fn(),
+  writeFile: jest.fn(),
+}));
+
 describe('LocalNodeRepository', () => {
-  const canonicalPeerId = '12D3Koo123456789ABCDEFGHJKLMNPQRSTUVWXYZab';
+  const canonicalNodeId = '8dc7e4dd-d164-4f0c-b9ed-36bc6e0c4f6a';
 
   let repository: LocalNodeRepository;
   let networkRegistry: MockProxy<IPFSNetworkRegistry>;
@@ -17,14 +24,19 @@ describe('LocalNodeRepository', () => {
   beforeEach(() => {
     networkRegistry = mock<IPFSNetworkRegistry>();
     repository = new LocalNodeRepository(networkRegistry);
+    jest.clearAllMocks();
   });
 
   describe('loadLocalNode', () => {
-    it('should load a node using canonical peer id as node id', async () => {
-      const { privateKey } = generateKeyPairSync('ed25519');
+    it('should load a node using persisted node id', async () => {
+      const { privateKey, publicKey } = generateKeyPairSync('ed25519');
       const networkKey = privateKey.export({
         format: 'pem',
         type: 'pkcs8',
+      });
+      const owner = publicKey.export({
+        format: 'pem',
+        type: 'spki',
       });
       const privateNetwork = mock<IPFSNetwork>();
       const publicNetwork = mock<IPFSNetwork>();
@@ -38,13 +50,18 @@ describe('LocalNodeRepository', () => {
         name: 'public',
       });
 
-      networkRegistry.getSharedPeerId.mockResolvedValue(canonicalPeerId);
+      (fs.readFile as jest.Mock).mockResolvedValue(
+        JSON.stringify({
+          nodeId: canonicalNodeId,
+          owner: owner.toString(),
+        }),
+      );
       networkRegistry.getAll.mockReturnValue([privateNetwork, publicNetwork]);
 
       const localNode = await repository.loadLocalNode();
 
       expect(localNode.toPrimitives()).toEqual({
-        id: canonicalPeerId,
+        id: canonicalNodeId,
         networks: {
           private_0: {
             key: networkKey.toString(),
@@ -55,21 +72,30 @@ describe('LocalNodeRepository', () => {
             name: 'public',
           },
         },
-        owner: undefined,
+        owner: owner.toString(),
       });
     });
 
-    it('should load node id from shared peer id when no networks are available', async () => {
+    it('should create and persist a uuid node id when no node id file exists', async () => {
       networkRegistry.getAll.mockReturnValue([]);
-      networkRegistry.getSharedPeerId.mockResolvedValue(canonicalPeerId);
+      (fs.readFile as jest.Mock).mockRejectedValue(new Error('not found'));
 
       const localNode = await repository.loadLocalNode();
+      const primitives = localNode.toPrimitives();
 
-      expect(localNode.toPrimitives()).toEqual({
-        id: canonicalPeerId,
-        networks: {},
-        owner: undefined,
-      });
+      expect(primitives.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      expect(fs.mkdir).toHaveBeenCalled();
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        './ipfs_storage/node-metadata.json',
+        JSON.stringify({
+          nodeId: primitives.id,
+        }),
+      );
+
+      expect(primitives.networks).toEqual({});
+      expect(primitives.owner).toBeUndefined();
     });
   });
 
@@ -83,7 +109,7 @@ describe('LocalNodeRepository', () => {
       const currentPublic = mock<IPFSNetwork>();
       const obsoletePrivate = mock<IPFSNetwork>();
       const node = Node.fromPrimitives({
-        id: canonicalPeerId,
+        id: canonicalNodeId,
         networks: {
           private_0: {
             key: desiredKey.toString(),
@@ -108,6 +134,13 @@ describe('LocalNodeRepository', () => {
 
       await repository.saveLocalNode(node);
 
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        './ipfs_storage/node-metadata.json',
+        JSON.stringify({
+          nodeId: canonicalNodeId,
+        }),
+      );
+
       expect(networkRegistry.initialize).toHaveBeenCalled();
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
         'private_legacy',
@@ -129,7 +162,7 @@ describe('LocalNodeRepository', () => {
       const { privateKey: desiredPrivateKey } = generateKeyPairSync('ed25519');
       const currentNetwork = mock<IPFSNetwork>();
       const node = Node.fromPrimitives({
-        id: canonicalPeerId,
+        id: canonicalNodeId,
         networks: {
           private_0: {
             key: desiredPrivateKey
@@ -168,6 +201,12 @@ describe('LocalNodeRepository', () => {
           .toString(),
         name: 'private_0',
       });
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        './ipfs_storage/node-metadata.json',
+        JSON.stringify({
+          nodeId: canonicalNodeId,
+        }),
+      );
     });
 
     it('should do nothing when helia is already synchronized with node networks', async () => {
@@ -178,7 +217,7 @@ describe('LocalNodeRepository', () => {
       });
       const currentNetwork = mock<IPFSNetwork>();
       const node = Node.fromPrimitives({
-        id: canonicalPeerId,
+        id: canonicalNodeId,
         networks: {
           private_0: {
             key: privateKeyPem.toString(),
@@ -202,6 +241,12 @@ describe('LocalNodeRepository', () => {
 
       expect(networkRegistry.removeNetwork).not.toHaveBeenCalled();
       expect(networkRegistry.register).not.toHaveBeenCalled();
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        './ipfs_storage/node-metadata.json',
+        JSON.stringify({
+          nodeId: canonicalNodeId,
+        }),
+      );
     });
   });
 });

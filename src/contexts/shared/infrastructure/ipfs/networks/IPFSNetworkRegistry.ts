@@ -5,12 +5,12 @@ import {
   privateKeyToProtobuf,
 } from '@libp2p/crypto/keys';
 import { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
-import { peerIdFromPrivateKey } from '@libp2p/peer-id';
 import { createPrivateKey } from 'crypto';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
+import { IPFSPeerIdDuplicatedError } from '../errors/IPFSPeerIdDuplicatedError';
 import { IPFSNetwork } from './IPFSNetwork';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { PrivateIPFS } from './PrivateIPFS';
@@ -141,9 +141,23 @@ export default class IPFSNetworkRegistry {
       );
     }
 
-    configs.push(new IPFSNetworkConfig('public'));
-
     return configs;
+  }
+
+  private ensurePeerIdIsUnique(candidate: IPFSNetwork): void {
+    const duplicatedNetwork = this.networks.find(
+      (network) => network.getPeerId() === candidate.getPeerId(),
+    );
+
+    if (!duplicatedNetwork) {
+      return;
+    }
+
+    throw new IPFSPeerIdDuplicatedError(
+      candidate.getPeerId(),
+      duplicatedNetwork.getName(),
+      candidate.getName(),
+    );
   }
 
   private async createNetworkFromConfig(
@@ -177,12 +191,6 @@ export default class IPFSNetworkRegistry {
     return Promise.resolve(this.exportSharedPeerPrivateKeyPem(privateKey));
   }
 
-  public async getSharedPeerId(): Promise<string> {
-    const privateKey = await this.loadOrCreateSharedPeerPrivateKey();
-
-    return peerIdFromPrivateKey(privateKey).toString();
-  }
-
   public async initialize(): Promise<void> {
     if (this.initialized) {
       return;
@@ -203,6 +211,7 @@ export default class IPFSNetworkRegistry {
           config,
           sharedPrivateKey,
         );
+        this.ensurePeerIdIsUnique(network);
         this.networks.push(network);
       }
     }
@@ -224,6 +233,7 @@ export default class IPFSNetworkRegistry {
       config,
       sharedPrivateKey,
     );
+    this.ensurePeerIdIsUnique(network);
     this.networks.push(network);
     await this.persistConfigs();
 
