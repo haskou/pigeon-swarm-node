@@ -1,5 +1,6 @@
 import Kernel from '@app/Kernel';
 import { json as HeliaJSONClient } from '@helia/json';
+import { PrivateKey } from '@libp2p/interface';
 import { MemoryBlockstore } from 'blockstore-core';
 import { FsBlockstore } from 'blockstore-fs';
 import { MemoryDatastore } from 'datastore-core';
@@ -14,9 +15,15 @@ import { IPFSId } from './IPFSId';
 
 export type IPFSOptions = {
   storageLocation: 'memory' | string;
+  privateKey?: PrivateKey;
 };
 
 type PeerId = { toString(): string };
+type ConnectionGater = {
+  denyDialPeer: (peerId: PeerId) => Promise<boolean>;
+  denyInboundEncryptedConnection: (peerId: PeerId) => Promise<boolean>;
+  denyOutboundConnection: (peerId: PeerId) => Promise<boolean>;
+};
 
 // TODO: Add stat method and/with local network searching to prevent
 // TODO: duplicated local pinnings
@@ -79,31 +86,40 @@ export abstract class AbstractIPFS {
       }
     }
 
-    return {
-      connectionGater: {
-        // eslint-disable-next-line @typescript-eslint/require-await
-        denyDialPeer: async (peerId: PeerId) => {
-          return AbstractIPFS.blockedPeers.includes(peerId.toString());
-        },
+    const connectionGater: ConnectionGater = {
+      // eslint-disable-next-line @typescript-eslint/require-await
+      denyDialPeer: async (peerId: PeerId) => {
+        return AbstractIPFS.blockedPeers.includes(peerId.toString());
+      },
 
-        // eslint-disable-next-line @typescript-eslint/require-await
-        denyInboundEncryptedConnection: async (peerId: PeerId) => {
-          return AbstractIPFS.blockedPeers.includes(peerId.toString());
-        },
+      // eslint-disable-next-line @typescript-eslint/require-await
+      denyInboundEncryptedConnection: async (peerId: PeerId) => {
+        return AbstractIPFS.blockedPeers.includes(peerId.toString());
+      },
 
-        // eslint-disable-next-line @typescript-eslint/require-await
-        denyOutboundConnection: async (peerId: PeerId) => {
-          return AbstractIPFS.blockedPeers.includes(peerId.toString());
-        },
+      // eslint-disable-next-line @typescript-eslint/require-await
+      denyOutboundConnection: async (peerId: PeerId) => {
+        return AbstractIPFS.blockedPeers.includes(peerId.toString());
       },
     };
+
+    return { connectionGater };
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   protected static parseOptions(options: IPFSOptions) {
+    const { connectionGater } = AbstractIPFS.parseBlockedPeers(options);
+    const libp2p: {
+      connectionGater: ConnectionGater;
+      privateKey?: PrivateKey;
+    } = {
+      connectionGater,
+      ...(options.privateKey ? { privateKey: options.privateKey } : {}),
+    };
+
     return {
       ...AbstractIPFS.parseStorageLocationOptions(options),
-      ...AbstractIPFS.parseBlockedPeers(options),
+      libp2p,
     };
   }
 
@@ -155,6 +171,10 @@ export abstract class AbstractIPFS {
 
   public getPeers(): string[] {
     return this.heliaCore.libp2p.getPeers().map((peer) => peer.toString());
+  }
+
+  public getPeerId(): string {
+    return this.heliaCore.libp2p.peerId.toString();
   }
 
   public async putRecord(

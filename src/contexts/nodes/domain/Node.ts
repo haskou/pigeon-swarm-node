@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
-import { PrimitiveOf } from '@haskou/value-objects';
+import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { Network } from './Network';
@@ -29,8 +29,21 @@ export class Node extends AggregateRoot {
     super();
   }
 
+  private hasMaximumOnePublicNetwork(): boolean {
+    const publicNetworks = Array.from(this.networks.values()).filter(
+      (network) => network.isPublic(),
+    );
+
+    return publicNetworks.length <= 1;
+  }
+
   public addNetwork(network: Network): void {
     this.networks.set(network.getName(), network);
+    assert(
+      this.hasMaximumOnePublicNetwork(),
+      // TODO: Create error
+      'A node cannot have more than one public network.',
+    );
     this.record(new NodeNetworkWasAdded(this.id.valueOf()));
   }
 

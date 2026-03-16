@@ -1,10 +1,10 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import NodeLoaderService from '../../domain/services/NodeLoaderService';
-import { NodeSaverService } from '../../domain/services/NodeSaverService';
+import NodeSaverService from '../../domain/services/NodeSaverService';
 import { NodeNetworkAdderMessage } from './messages/NodeNetworkAdderMessage';
 
-export class NodeNetworkAdder {
+export default class NodeNetworkAdder {
   constructor(
     private readonly loader: NodeLoaderService,
     private readonly saver: NodeSaverService,

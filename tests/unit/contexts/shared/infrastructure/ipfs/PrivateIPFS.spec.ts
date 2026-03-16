@@ -1,10 +1,11 @@
 const mockHeliaNode = {
+  datastore: { get: jest.fn(), put: jest.fn() },
   libp2p: {
-    peerId: { toString: () => 'mock-peer-id' },
+    addEventListener: jest.fn(),
     getPeers: jest.fn().mockReturnValue([]),
+    peerId: { toString: () => 'mock-peer-id' },
   },
-  datastore: { put: jest.fn(), get: jest.fn() },
-  routing: { put: jest.fn(), get: jest.fn() },
+  routing: { get: jest.fn(), put: jest.fn() },
 };
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
@@ -90,21 +91,26 @@ jest.mock(
 jest.mock('@app/Kernel', () => ({
   __esModule: true,
   default: {
-    logger: { info: jest.fn(), error: jest.fn() },
+    logger: { error: jest.fn(), info: jest.fn() },
   },
 }));
 
-import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
+import { PrivateKey } from '@haskou/value-objects';
+import { createHash, createPrivateKey, generateKeyPairSync } from 'crypto';
+
 import {
   PrivateIPFS,
   PrivateIPFSOptions,
 } from '../../../../../../src/contexts/shared/infrastructure/ipfs/PrivateIPFS';
 
 describe('PrivateIPFS', () => {
+  const { privateKey: nodeKey } = generateKeyPairSync('ed25519');
+  const validPem = nodeKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+
   const defaultOptions: PrivateIPFSOptions = {
-    storageLocation: 'memory',
-    key: new Password('my-secret-key-12345'),
+    key: new PrivateKey(validPem),
     name: 'test-network',
+    storageLocation: 'memory',
   };
 
   beforeEach(() => {
@@ -124,9 +130,15 @@ describe('PrivateIPFS', () => {
     it('should use preSharedKey with the provided key', async () => {
       await PrivateIPFS.create(defaultOptions);
 
-      expect(mockPreSharedKey).toHaveBeenCalledWith({
-        psk: Uint8Array.from(defaultOptions.key.valueOf()),
-      });
+      const keyObject = createPrivateKey(defaultOptions.key.valueOf());
+      const jwk = keyObject.export({ format: 'jwk' }) as { d: string };
+      const pskSeed = new Uint8Array(Buffer.from(jwk.d, 'base64url'));
+      const pskHex = createHash('sha256').update(pskSeed).digest('hex');
+      const expectedPsk = new Uint8Array(
+        Buffer.from(`/key/swarm/psk/1.0.0/\n/base16/\n${pskHex}`),
+      );
+
+      expect(mockPreSharedKey).toHaveBeenCalledWith({ psk: expectedPsk });
     });
 
     it('should pass connectionProtector to createHelia', async () => {
@@ -134,8 +146,19 @@ describe('PrivateIPFS', () => {
 
       expect(mockCreateHelia).toHaveBeenCalledWith(
         expect.objectContaining({
-          connectionProtector: 'mock-connection-protector',
+          libp2p: expect.objectContaining({
+            connectionProtector: 'mock-connection-protector',
+          }),
         }),
+      );
+    });
+
+    it('should register peer:connect listener', async () => {
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockHeliaNode.libp2p.addEventListener).toHaveBeenCalledWith(
+        'peer:connect',
+        expect.any(Function),
       );
     });
 

@@ -1,7 +1,7 @@
 import { Node } from '../Node';
 import { NodeRepository } from '../repositories/NodeRepository';
 
-export class NodeSaverService {
+export default class NodeSaverService {
   constructor(private readonly repository: NodeRepository) {}
 
   public async saveNode(node: Node): Promise<void> {

@@ -7996,6 +7996,11 @@ pkg-dir@^4.1.0, pkg-dir@^4.2.0:
   dependencies:
     find-up "^4.0.0"
 
+pm2-runtime@^5.4.1:
+  version "5.4.1"
+  resolved "https://registry.yarnpkg.com/pm2-runtime/-/pm2-runtime-5.4.1.tgz#18a904ccb2889efc45b44ec517d9691ae5af1e69"
+  integrity sha512-ywzOFlwf1KJHRRq2aqHEid/Qy3YptDlkOAo5dTC1oBo4H5OyDK7CAk3cBMN1AjOdKRSHkHP5DrmWIOeRc7IHPw==
+
 portfinder@^1.0.32:
   version "1.0.38"
   resolved "https://registry.yarnpkg.com/portfinder/-/portfinder-1.0.38.tgz#e4fb3a2d888b20d2977da050e48ab5e1f57a185e"

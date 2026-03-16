@@ -58,6 +58,10 @@ export class IPFSNetwork {
     return this.connection.getPeers();
   }
 
+  public getPeerId(): string {
+    return this.connection.getPeerId();
+  }
+
   public toPrimitives() {
     return this.config.toPrimitives();
   }

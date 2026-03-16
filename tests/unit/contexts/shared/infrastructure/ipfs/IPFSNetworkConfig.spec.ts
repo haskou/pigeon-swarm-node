@@ -1,17 +1,24 @@
-import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
+import { PrivateKey } from '@haskou/value-objects';
+import { generateKeyPairSync } from 'crypto';
+
 import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkConfig';
 
 describe('IPFSNetworkConfig', () => {
+  const { privateKey } = generateKeyPairSync('ed25519');
+  const validPem = privateKey
+    .export({ format: 'pem', type: 'pkcs8' })
+    .toString();
+
   describe('fromPrimitives', () => {
     it('should create a private config when key is provided', () => {
       const config = IPFSNetworkConfig.fromPrimitives({
-        key: 'my-secret-key-12345',
+        key: validPem,
         name: 'my-network',
       });
 
       expect(config.getName()).toBe('my-network');
       expect(config.isPrivate()).toBe(true);
-      expect(config.getKey()).toBeInstanceOf(Password);
+      expect(config.getKey()).toBeInstanceOf(PrivateKey);
     });
 
     it('should create a public config when key is undefined', () => {
@@ -30,13 +37,13 @@ describe('IPFSNetworkConfig', () => {
     it('should return correct primitives for a private config', () => {
       const config = new IPFSNetworkConfig(
         'test-net',
-        new Password('secret-key-12345'),
+        new PrivateKey(validPem),
       );
 
       const primitives = config.toPrimitives();
 
       expect(primitives.name).toBe('test-net');
-      expect(primitives.key).toBe('secret-key-12345');
+      expect(primitives.key).toBe(validPem);
     });
 
     it('should return undefined key for a public config', () => {

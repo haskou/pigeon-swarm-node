@@ -55,6 +55,7 @@
     "node-cron": "^4.2.1",
     "node-dependency-injection": "^3.2.6",
     "path": "^0.12.7",
+    "pm2-runtime": "^5.4.1",
     "reflect-metadata": "^0.2.2",
     "routing-controllers": "^0.11.3",
     "routing-controllers-openapi": "^5.0.1",

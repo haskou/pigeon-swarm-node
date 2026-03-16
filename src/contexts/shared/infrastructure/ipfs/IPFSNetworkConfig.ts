@@ -1,4 +1,4 @@
-import { Password } from '@app/contexts/shared/domain/value-objects/Password';
+import { PrivateKey } from '@haskou/value-objects';
 
 export class IPFSNetworkConfig {
   public static fromPrimitives(primitives: {
@@ -7,20 +7,20 @@ export class IPFSNetworkConfig {
   }): IPFSNetworkConfig {
     return new IPFSNetworkConfig(
       primitives.name,
-      primitives.key ? new Password(primitives.key) : undefined,
+      primitives.key ? new PrivateKey(primitives.key) : undefined,
     );
   }
 
   constructor(
     private readonly name: string,
-    private readonly key?: Password,
+    private readonly key?: PrivateKey,
   ) {}
 
   public getName(): string {
     return this.name;
   }
 
-  public getKey(): Password | undefined {
+  public getKey(): PrivateKey | undefined {
     return this.key;
   }
 

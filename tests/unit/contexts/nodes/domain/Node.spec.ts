@@ -61,5 +61,21 @@ describe('Node', () => {
         expect.any(NodeNetworkWasAdded),
       ]);
     });
+
+    it('should throw when adding a second public network', () => {
+      const firstPublic = Network.fromPrimitives({
+        key: undefined,
+        name: 'public',
+      });
+      const secondPublic = Network.fromPrimitives({
+        key: undefined,
+        name: 'public_2',
+      });
+      node.addNetwork(firstPublic);
+
+      expect(() => node.addNetwork(secondPublic)).toThrow(
+        'A node cannot have more than one public network.',
+      );
+    });
   });
 });

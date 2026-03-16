@@ -1,6 +1,7 @@
+import { PrivateKey } from '@haskou/value-objects';
+import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
 import { AbstractIPFS } from '../../../../../../src/contexts/shared/infrastructure/ipfs/AbstractIPFS';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSId';
 import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetwork';
@@ -8,6 +9,11 @@ import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrast
 import { IPFSNetworkType } from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFSNetworkType';
 
 describe('IPFSNetwork', () => {
+  const { privateKey } = generateKeyPairSync('ed25519');
+  const validPem = privateKey
+    .export({ format: 'pem', type: 'pkcs8' })
+    .toString();
+
   let connection: MockProxy<AbstractIPFS>;
 
   beforeEach(() => {
@@ -25,10 +31,7 @@ describe('IPFSNetwork', () => {
 
   describe('getType', () => {
     it('should return PRIVATE when config has a key', () => {
-      const config = new IPFSNetworkConfig(
-        'net',
-        new Password('secret-key-12345'),
-      );
+      const config = new IPFSNetworkConfig('net', new PrivateKey(validPem));
       const network = new IPFSNetwork(config, connection);
 
       expect(network.getType()).toBe(IPFSNetworkType.PRIVATE);
@@ -44,10 +47,7 @@ describe('IPFSNetwork', () => {
 
   describe('isPrivate', () => {
     it('should return true for private networks', () => {
-      const config = new IPFSNetworkConfig(
-        'net',
-        new Password('secret-key-12345'),
-      );
+      const config = new IPFSNetworkConfig('net', new PrivateKey(validPem));
       const network = new IPFSNetwork(config, connection);
 
       expect(network.isPrivate()).toBe(true);
@@ -133,16 +133,24 @@ describe('IPFSNetwork', () => {
     });
   });
 
+  describe('getPeerId', () => {
+    it('should delegate to connection.getPeerId', () => {
+      const config = new IPFSNetworkConfig('net');
+      const network = new IPFSNetwork(config, connection);
+
+      connection.getPeerId.mockReturnValue('12D3KooWtestPeerId');
+
+      expect(network.getPeerId()).toBe('12D3KooWtestPeerId');
+    });
+  });
+
   describe('toPrimitives', () => {
     it('should return config primitives', () => {
-      const config = new IPFSNetworkConfig(
-        'my-net',
-        new Password('key-12345678'),
-      );
+      const config = new IPFSNetworkConfig('my-net', new PrivateKey(validPem));
       const network = new IPFSNetwork(config, connection);
 
       expect(network.toPrimitives()).toEqual({
-        key: 'key-12345678',
+        key: validPem,
         name: 'my-net',
       });
     });

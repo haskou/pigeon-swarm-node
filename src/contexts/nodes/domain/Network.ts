@@ -16,6 +16,10 @@ export class Network {
     private readonly key?: NetworkKey,
   ) {}
 
+  public isPublic(): boolean {
+    return this.key === undefined;
+  }
+
   public getName(): NetworkName {
     return this.name;
   }

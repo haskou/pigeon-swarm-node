@@ -70,6 +70,13 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fYXBwbGljYXRpb25fX2ZpbmRfX0lkZW50aXR5RmluZGVyX19JZGVudGl0eUZpbmRlcg==:
+    class: /contexts/identities/application/find/IdentityFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlGaW5kZXJTZXJ2aWNlX19JZGVudGl0eUZpbmRlclNlcnZpY2U=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlGaW5kZXJTZXJ2aWNlX19JZGVudGl0eUZpbmRlclNlcnZpY2U=:
     class: /contexts/identities/domain/services/IdentityFinderService
     arguments:
@@ -93,6 +100,13 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVMb2FkZXJTZXJ2aWNlX19Ob2RlTG9hZGVyU2VydmljZQ==:
     class: /contexts/nodes/domain/services/NodeLoaderService
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob2RlUmVwb3NpdG9yeV9fTm9kZVJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVTYXZlclNlcnZpY2VfX05vZGVTYXZlclNlcnZpY2U=:
+    class: /contexts/nodes/domain/services/NodeSaverService
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob2RlUmVwb3NpdG9yeV9fTm9kZVJlcG9zaXRvcnk=
@@ -225,6 +239,17 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19tZW1vcnlfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVyX19NZW1vcnlNZXNzYWdlQnVzQWRhcHRlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2FwcGxpY2F0aW9uX19hZGQtbmV0d29ya19fTm9kZU5ldHdvcmtBZGRlcl9fTm9kZU5ldHdvcmtBZGRlcg==:
+    class: /contexts/nodes/application/add-network/NodeNetworkAdder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVMb2FkZXJTZXJ2aWNlX19Ob2RlTG9hZGVyU2VydmljZQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVTYXZlclNlcnZpY2VfX05vZGVTYXZlclNlcnZpY2U=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzQWRhcHRlcl9fTWVzc2FnZUJ1c0FkYXB0ZXI=: >-

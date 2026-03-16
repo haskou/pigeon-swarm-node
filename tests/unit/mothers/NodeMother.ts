@@ -5,7 +5,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 
 export class NodeMother {
-  public id: NodeId = NodeId.generate();
+  public id: NodeId = new NodeId('12D3Koo123456789ABCDEFGHJKLMNPQRSTUVWXYZab');
+
   public networks: Map<NetworkName, Network> = new Map();
   public owner?: IdentityId = undefined;
 
