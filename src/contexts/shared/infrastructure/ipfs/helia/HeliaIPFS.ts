@@ -1,19 +1,18 @@
 import Kernel from '@app/Kernel';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
-import { json as HeliaJSONClient } from '@helia/json';
-import { multiaddr } from '@multiformats/multiaddr';
 import * as fs from 'fs/promises';
-import * as HeliaCore from 'helia';
-import { Key } from 'interface-datastore';
-import { createLibp2p } from 'libp2p';
-import { CID } from 'multiformats/cid';
 
+import heliaRuntimeAdapter, {
+  DatastoreKeyLike,
+  HeliaInstance,
+  HeliaLibp2pConfig,
+  ParsedCidLike,
+} from './adapters/HeliaRuntimeAdapter';
 import { HeliaIPFSParser, ParsedHeliaIPFSOptions } from './HeliaIPFSParser';
 import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 type PeerIdLike = { toString(): string };
-type CreateLibp2pConfig = Parameters<typeof createLibp2p>[0];
 
 export class HeliaIPFS implements IPFSConnection {
   private static extractRemotePeerFromEvent(event: unknown): PeerIdLike | null {
@@ -37,7 +36,7 @@ export class HeliaIPFS implements IPFSConnection {
   }
 
   private static registerPrivateConnectionLogs(
-    heliaCore: HeliaCore.Helia,
+    heliaCore: HeliaInstance,
     networkName: string,
   ): void {
     const onConnectionEvent = (evt: unknown): void => {
@@ -65,7 +64,7 @@ export class HeliaIPFS implements IPFSConnection {
   }
 
   private static async dialPrivateBootstrapPeers(
-    heliaCore: HeliaCore.Helia,
+    heliaCore: HeliaInstance,
     networkName: string,
   ): Promise<void> {
     const bootstrapPeers = HeliaIPFSParser.getPrivateBootstrapPeers();
@@ -82,7 +81,10 @@ export class HeliaIPFS implements IPFSConnection {
       }
 
       try {
-        await heliaCore.libp2p.dial([multiaddr(bootstrapAddress)]);
+        const bootstrapMultiaddr =
+          await heliaRuntimeAdapter.createMultiaddr(bootstrapAddress);
+
+        await heliaCore.libp2p.dial([bootstrapMultiaddr]);
       } catch (error: unknown) {
         Kernel.logger.warn(
           `Could not dial bootstrap peer ${bootstrapAddress} on private network "${networkName}": ${(error as Error).message}`,
@@ -93,9 +95,9 @@ export class HeliaIPFS implements IPFSConnection {
 
   public static async createPublicHeliaCore(
     options: IPFSOptions,
-  ): Promise<HeliaCore.Helia> {
-    const parsedOptions = HeliaIPFSParser.parseOptions(options);
-    const heliaCore = await HeliaCore.createHelia(parsedOptions);
+  ): Promise<HeliaInstance> {
+    const parsedOptions = await HeliaIPFSParser.parseOptions(options);
+    const heliaCore = await heliaRuntimeAdapter.createHelia(parsedOptions);
 
     Kernel.logger.info(
       `Started public network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
@@ -108,22 +110,22 @@ export class HeliaIPFS implements IPFSConnection {
     options: IPFSOptions,
     networkKey: NetworkPrivateKey,
     networkName: string,
-  ): Promise<HeliaCore.Helia> {
+  ): Promise<HeliaInstance> {
     const baseOptions: ParsedHeliaIPFSOptions =
-      HeliaIPFSParser.parseOptions(options);
-    const libp2pConfig = HeliaIPFSParser.parsePrivateLibp2pConfig(
+      await HeliaIPFSParser.parseOptions(options);
+    const libp2pConfig = await HeliaIPFSParser.parsePrivateLibp2pConfig(
       options,
       networkKey,
     );
 
-    const libp2p = await createLibp2p(
-      libp2pConfig as unknown as CreateLibp2pConfig,
+    const libp2p = await heliaRuntimeAdapter.createLibp2p(
+      libp2pConfig as unknown as HeliaLibp2pConfig,
     );
-    const heliaCore = await HeliaCore.createHelia({
+    const heliaCore = await heliaRuntimeAdapter.createHelia({
       blockstore: baseOptions.blockstore,
       datastore: baseOptions.datastore,
       libp2p,
-    });
+    } as unknown as Parameters<typeof heliaRuntimeAdapter.createHelia>[0]);
 
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
@@ -137,7 +139,7 @@ export class HeliaIPFS implements IPFSConnection {
   }
 
   constructor(
-    private readonly heliaCore: HeliaCore.Helia,
+    private readonly heliaCore: HeliaInstance,
     private readonly options: IPFSOptions,
   ) {}
 
@@ -146,15 +148,22 @@ export class HeliaIPFS implements IPFSConnection {
   }
 
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
-    const heliaJSONClient = HeliaJSONClient(this.heliaCore);
+    const heliaJSONClient = await heliaRuntimeAdapter.createJSONClient(
+      this.heliaCore,
+    );
     const cid = await heliaJSONClient.add(data, { signal });
 
     return new IPFSId(cid.toString());
   }
 
   public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
-    const heliaJSONClient = HeliaJSONClient(this.heliaCore);
-    const json: T = await heliaJSONClient.get(CID.parse(cid.valueOf()), {
+    const heliaJSONClient = await heliaRuntimeAdapter.createJSONClient(
+      this.heliaCore,
+    );
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+    const json: T = await heliaJSONClient.get(parsedCid, {
       signal,
     });
 
@@ -172,7 +181,8 @@ export class HeliaIPFS implements IPFSConnection {
     signal?: AbortSignal,
   ): Promise<void> {
     const encoder = new TextEncoder();
-    const datastoreKey = new Key(`/records/${key}`);
+    const datastoreKey: DatastoreKeyLike =
+      await heliaRuntimeAdapter.createDatastoreKey(`/records/${key}`);
 
     await this.heliaCore.datastore.put(datastoreKey, encoder.encode(value), {
       signal,
@@ -207,12 +217,12 @@ export class HeliaIPFS implements IPFSConnection {
     }
 
     try {
-      const value = await this.heliaCore.datastore.get(
-        new Key(`/records/${key}`),
-        {
-          signal,
-        },
-      );
+      const datastoreKey: DatastoreKeyLike =
+        await heliaRuntimeAdapter.createDatastoreKey(`/records/${key}`);
+
+      const value = await this.heliaCore.datastore.get(datastoreKey, {
+        signal,
+      });
 
       return decoder.decode(value);
     } catch {
@@ -244,12 +254,12 @@ export async function createPrivateHeliaIPFS(
   options: IPFSOptions,
   networkKey: NetworkPrivateKey,
   networkName: string,
-): Promise<HeliaCore.Helia> {
+): Promise<HeliaInstance> {
   return HeliaIPFS.createPrivateHeliaCore(options, networkKey, networkName);
 }
 
 export async function createPublicHeliaIPFS(
   options: IPFSOptions,
-): Promise<HeliaCore.Helia> {
+): Promise<HeliaInstance> {
   return HeliaIPFS.createPublicHeliaCore(options);
 }

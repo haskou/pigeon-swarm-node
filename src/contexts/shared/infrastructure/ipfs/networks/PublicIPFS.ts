@@ -1,10 +1,10 @@
-import * as HeliaCore from 'helia';
+import { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 
 import { createPublicHeliaIPFS, HeliaIPFS } from '../helia/HeliaIPFS';
 import { IPFSConnection, IPFSOptions } from '../helia/IPFSConnection';
 
 export class PublicIPFS extends HeliaIPFS {
-  private static connectionPool: Record<string, HeliaCore.Helia> = {};
+  private static connectionPool: Record<string, HeliaInstance> = {};
 
   public static async create(options: IPFSOptions): Promise<IPFSConnection> {
     const optionKey = JSON.stringify(options);
@@ -19,7 +19,7 @@ export class PublicIPFS extends HeliaIPFS {
     return new PublicIPFS(heliaCore, options);
   }
 
-  constructor(core: HeliaCore.Helia, options: IPFSOptions) {
+  constructor(core: HeliaInstance, options: IPFSOptions) {
     super(core, options);
   }
 }

@@ -101,7 +101,7 @@ jest.mock(
 );
 
 jest.mock(
-  'interface-datastore',
+  'interface-datastore/key',
   () => ({
     Key: jest.fn(),
   }),

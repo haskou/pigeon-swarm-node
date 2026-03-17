@@ -1,16 +1,13 @@
 import { PrivateKey } from '@haskou/value-objects';
-import {
-  generateKeyPair,
-  privateKeyFromProtobuf,
-  privateKeyToProtobuf,
-} from '@libp2p/crypto/keys';
-import { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 import { createPrivateKey } from 'crypto';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
 import { IPFSPeerIdDuplicatedError } from '../errors/IPFSPeerIdDuplicatedError';
+import libp2pKeyAdapter, {
+  Libp2pPrivateKeyLike,
+} from './adapters/Libp2pKeyAdapter';
 import { IPFSNetwork } from './IPFSNetwork';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { PrivateIPFS } from './PrivateIPFS';
@@ -22,7 +19,7 @@ export default class IPFSNetworkRegistry {
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
-  private sharedPeerPrivateKey?: Libp2pPrivateKey;
+  private sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
   private sharedPeerPrivateKeyPem?: string;
 
   private get configFilePath(): string {
@@ -33,23 +30,26 @@ export default class IPFSNetworkRegistry {
     return `${this.storagePath}/shared-peer-private-key.pb`;
   }
 
-  private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKey> {
+  // eslint-disable-next-line max-len
+  private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
     if (this.sharedPeerPrivateKey) {
       return this.sharedPeerPrivateKey;
     }
 
     try {
       const persistedPrivateKey = await fs.readFile(this.sharedPeerKeyFilePath);
-      this.sharedPeerPrivateKey = privateKeyFromProtobuf(persistedPrivateKey);
+      this.sharedPeerPrivateKey =
+        await libp2pKeyAdapter.privateKeyFromProtobuf(persistedPrivateKey);
 
       return this.sharedPeerPrivateKey;
     } catch {
-      const generatedPrivateKey = await generateKeyPair('Ed25519');
+      const generatedPrivateKey =
+        await libp2pKeyAdapter.generateEd25519KeyPair();
 
       await fs.mkdir(this.storagePath, { recursive: true });
       await fs.writeFile(
         this.sharedPeerKeyFilePath,
-        privateKeyToProtobuf(generatedPrivateKey),
+        await libp2pKeyAdapter.privateKeyToProtobuf(generatedPrivateKey),
       );
 
       this.sharedPeerPrivateKey = generatedPrivateKey;
@@ -58,7 +58,9 @@ export default class IPFSNetworkRegistry {
     }
   }
 
-  private exportSharedPeerPrivateKeyPem(privateKey: Libp2pPrivateKey): string {
+  private exportSharedPeerPrivateKeyPem(
+    privateKey: Libp2pPrivateKeyLike,
+  ): string {
     if (this.sharedPeerPrivateKeyPem) {
       return this.sharedPeerPrivateKeyPem;
     }
@@ -162,7 +164,7 @@ export default class IPFSNetworkRegistry {
 
   private async createNetworkFromConfig(
     config: IPFSNetworkConfig,
-    sharedPrivateKey: Libp2pPrivateKey,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<IPFSNetwork> {
     const key = config.getKey();
 

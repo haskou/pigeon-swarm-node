@@ -1,10 +1,10 @@
-import type { PrivateKey } from '@libp2p/interface';
+import type { Libp2pPrivateKeyLike } from '../networks/adapters/Libp2pKeyAdapter';
 
 import { IPFSId } from './IPFSId';
 
 export type IPFSOptions = {
   storageLocation: 'memory' | string;
-  privateKey?: PrivateKey;
+  privateKey?: Libp2pPrivateKeyLike;
 };
 
 export interface IPFSConnection {

@@ -1,3 +1,4 @@
+import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local/mappers/LocalNodeMetadataMapper';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -20,10 +21,12 @@ describe('LocalNodeRepository', () => {
 
   let repository: LocalNodeRepository;
   let networkRegistry: MockProxy<IPFSNetworkRegistry>;
+  let mapper: LocalNodeMetadataMapper;
 
   beforeEach(() => {
+    mapper = new LocalNodeMetadataMapper();
     networkRegistry = mock<IPFSNetworkRegistry>();
-    repository = new LocalNodeRepository(networkRegistry);
+    repository = new LocalNodeRepository(networkRegistry, mapper);
     jest.clearAllMocks();
   });
 
@@ -76,7 +79,7 @@ describe('LocalNodeRepository', () => {
       });
     });
 
-    it('should create and persist a uuid node id when no node id file exists', async () => {
+    it('should create and persist a uuid node id when no metadata exists', async () => {
       networkRegistry.getAll.mockReturnValue([]);
       (fs.readFile as jest.Mock).mockRejectedValue(new Error('not found'));
 

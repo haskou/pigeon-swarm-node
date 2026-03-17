@@ -1,15 +1,14 @@
-import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
-
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
-import { preSharedKey } from '@libp2p/pnet';
-import { MemoryBlockstore } from 'blockstore-core';
-import { FsBlockstore } from 'blockstore-fs';
-import { MemoryDatastore } from 'datastore-core';
-import { FsDatastore } from 'datastore-fs';
 import * as fsSync from 'fs';
-import * as HeliaCore from 'helia';
 import { createHash, createPrivateKey } from 'node:crypto';
 
+import type { Libp2pPrivateKeyLike } from '../networks/adapters/Libp2pKeyAdapter';
+
+import heliaRuntimeAdapter, {
+  Libp2pDefaults,
+  RuntimeBlockstore,
+  RuntimeDatastore,
+} from './adapters/HeliaRuntimeAdapter';
 import { IPFSOptions } from './IPFSConnection';
 
 type PeerId = { toString(): string };
@@ -21,31 +20,37 @@ export type ConnectionGater = {
 };
 
 export type ParsedHeliaIPFSOptions = {
-  blockstore: FsBlockstore | MemoryBlockstore;
-  datastore: FsDatastore | MemoryDatastore;
+  blockstore: RuntimeBlockstore;
+  datastore: RuntimeDatastore;
   libp2p: {
     connectionGater: ConnectionGater;
-    privateKey?: Libp2pPrivateKey;
+    privateKey?: Libp2pPrivateKeyLike;
   };
 };
 
 export class HeliaIPFSParser {
   private static readonly blockedPeers: string[] = [];
 
-  private static parseStorageLocationOptions(options: IPFSOptions): {
-    blockstore: FsBlockstore | MemoryBlockstore;
-    datastore: FsDatastore | MemoryDatastore;
-  } {
+  private static async parseStorageLocationOptions(
+    options: IPFSOptions,
+  ): Promise<{
+    blockstore: RuntimeBlockstore;
+    datastore: RuntimeDatastore;
+  }> {
     if (options.storageLocation === 'memory') {
       return {
-        blockstore: new MemoryBlockstore(),
-        datastore: new MemoryDatastore(),
+        blockstore: await heliaRuntimeAdapter.createMemoryBlockstore(),
+        datastore: await heliaRuntimeAdapter.createMemoryDatastore(),
       };
     }
 
     return {
-      blockstore: new FsBlockstore(`${options.storageLocation}/blockstore`),
-      datastore: new FsDatastore(`${options.storageLocation}/datastore`),
+      blockstore: await heliaRuntimeAdapter.createFsBlockstore(
+        `${options.storageLocation}/blockstore`,
+      ),
+      datastore: await heliaRuntimeAdapter.createFsDatastore(
+        `${options.storageLocation}/datastore`,
+      ),
     };
   }
 
@@ -132,11 +137,13 @@ export class HeliaIPFSParser {
     return [...HeliaIPFSParser.blockedPeers];
   }
 
-  public static parseOptions(options: IPFSOptions): ParsedHeliaIPFSOptions {
+  public static async parseOptions(
+    options: IPFSOptions,
+  ): Promise<ParsedHeliaIPFSOptions> {
     const { connectionGater } = HeliaIPFSParser.parseBlockedPeers(options);
 
     return {
-      ...HeliaIPFSParser.parseStorageLocationOptions(options),
+      ...(await HeliaIPFSParser.parseStorageLocationOptions(options)),
       libp2p: {
         connectionGater,
         ...(options.privateKey ? { privateKey: options.privateKey } : {}),
@@ -147,26 +154,32 @@ export class HeliaIPFSParser {
   public static parsePrivateLibp2pConfig(
     options: IPFSOptions,
     networkKey: NetworkPrivateKey,
-  ): HeliaCore.DefaultLibp2pServices extends never
-    ? never
-    : ReturnType<typeof HeliaCore.libp2pDefaults> {
-    const parsedOptions = HeliaIPFSParser.parseOptions(options);
-    const libp2pConfig = HeliaCore.libp2pDefaults();
-    const privateLibp2pConfig = libp2pConfig as unknown as {
-      connectionGater?: unknown;
-      connectionProtector?: (components: unknown) => unknown;
-      privateKey?: unknown;
-    };
+  ): Promise<Libp2pDefaults> {
+    return HeliaIPFSParser.parseOptions(options).then((parsedOptions) =>
+      heliaRuntimeAdapter.getLibp2pDefaults().then((libp2pConfig) => {
+        const privateLibp2pConfig = libp2pConfig as unknown as {
+          connectionGater?: unknown;
+          connectionProtector?: (components: unknown) => unknown;
+          privateKey?: unknown;
+        };
 
-    privateLibp2pConfig.connectionGater = parsedOptions.libp2p.connectionGater;
-    privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
-    privateLibp2pConfig.connectionProtector = preSharedKey({
-      psk: HeliaIPFSParser.toSwarmPsk(
-        HeliaIPFSParser.extractPskSeed(networkKey),
-      ),
-    });
+        privateLibp2pConfig.connectionGater =
+          parsedOptions.libp2p.connectionGater;
+        privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
 
-    return libp2pConfig;
+        return heliaRuntimeAdapter
+          .createPreSharedKey({
+            psk: HeliaIPFSParser.toSwarmPsk(
+              HeliaIPFSParser.extractPskSeed(networkKey),
+            ),
+          })
+          .then((connectionProtector) => {
+            privateLibp2pConfig.connectionProtector = connectionProtector;
+
+            return libp2pConfig;
+          });
+      }),
+    );
   }
 
   public static getPrivateBootstrapPeers(): string[] {
