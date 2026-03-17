@@ -29,4 +29,5 @@ coverage/
 .npmrc
 
 
-/ipfs_storage
+/ipfs_storage/*
+/tmp/*

@@ -192,13 +192,10 @@ describe('PrivateIPFS', () => {
       );
     });
 
-    it('should register peer:connect listener', async () => {
+    it('should not register connection event listeners', async () => {
       await PrivateIPFS.create(defaultOptions);
 
-      expect(mockHeliaNode.libp2p.addEventListener).toHaveBeenCalledWith(
-        'peer:connect',
-        expect.any(Function),
-      );
+      expect(mockHeliaNode.libp2p.addEventListener).not.toHaveBeenCalled();
     });
 
     it('should reuse connection from pool on second call with same options', async () => {
