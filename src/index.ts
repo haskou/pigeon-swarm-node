@@ -3,7 +3,7 @@ import 'module-alias/register';
 import 'reflect-metadata';
 import Kernel from '@app/Kernel';
 
-import { NodeRuntime } from './apps/node-runtime/NodeRuntime';
+import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
 
 async function init() {
   console.time('Kernel');
@@ -36,10 +36,10 @@ async function init() {
   kernel.logs();
   console.timeEnd('Logs');
 
-  console.time('Node Runtime');
-  const nodeRuntime = new NodeRuntime();
-  await nodeRuntime.run();
-  console.timeEnd('Node Runtime');
+  console.time('IPFS Runtime');
+  const ipfsRuntime = new IPFSRuntime();
+  await ipfsRuntime.run();
+  console.timeEnd('IPFS Runtime');
 
   console.info('Ready!');
 }
