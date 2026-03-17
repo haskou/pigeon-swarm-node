@@ -1,5 +1,6 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import * as fs from 'fs/promises';
@@ -32,13 +33,13 @@ export default class LocalNodeRepository implements NodeRepository {
         throw new Error('Invalid local node metadata.');
       }
 
-      return this.metadataMapper.toDomain({
-        nodeId: parsedMetadata.nodeId,
+      return {
+        nodeId: new NodeId(parsedMetadata.nodeId).valueOf(),
         owner:
           typeof parsedMetadata.owner === 'string'
             ? parsedMetadata.owner
             : undefined,
-      });
+      };
     } catch {
       const metadata = this.metadataMapper.generate();
 

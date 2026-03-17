@@ -4,15 +4,6 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { LocalNodeMetadataDocument } from '../documents/LocalNodeMetadataDocument';
 
 export default class LocalNodeMetadataMapper {
-  public toDomain(
-    document: LocalNodeMetadataDocument,
-  ): LocalNodeMetadataDocument {
-    return {
-      nodeId: new NodeId(document.nodeId).valueOf(),
-      owner: document.owner,
-    };
-  }
-
   public toDocument(node: Node): LocalNodeMetadataDocument {
     const primitives = node.toPrimitives();
 
