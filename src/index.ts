@@ -3,6 +3,8 @@ import 'module-alias/register';
 import 'reflect-metadata';
 import Kernel from '@app/Kernel';
 
+import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
+
 async function init() {
   console.time('Kernel');
   const kernel = new Kernel();
@@ -33,6 +35,11 @@ async function init() {
   console.time('Logs');
   kernel.logs();
   console.timeEnd('Logs');
+
+  console.time('IPFS Runtime');
+  const ipfsRuntime = new IPFSRuntime();
+  await ipfsRuntime.run();
+  console.timeEnd('IPFS Runtime');
 
   console.info('Ready!');
 }

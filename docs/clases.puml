@@ -6,11 +6,12 @@ package "shared" {
   package "domain" {
     class Key extends StringValueObject{}
     class Hash extends StringValueObject{}
-    class identityId extends Hash {}
+    class identityId extends PublicKey {}
     class MessageId extends Hash {}
     class GroupId extends Hash {}
     class BoardId extends Hash {}
-    class NodeId extends Hash {}
+    class NodeId extends UUID {}
+    class NetworkId extends UUID {}
     class Address extends StringValueObject {}
     class Media {}
     class Image extends Media{}
@@ -27,88 +28,6 @@ package "shared" {
     Media *--> Hash
     Message o--> Media
   }
-}
-
-package "identities" {
-  package "domain" {
-
-    class Identity {
-      -id: identityId
-      -publicKey: Key
-      -privateEncryptedKey: Key
-      -timestamp: Timestamp
-      -signature: Hash
-    }
-
-    note left of Identity
-      privateEncryptedKey = AES(password_derived_key, private_key)
-
-      generate random private key
-      encrypt private key with password↓
-      store encrypted key
-
-      Login:
-        password
-        derive key (argon2)
-        decrypt private_key
-
-      signature = sign(private_key, profile_data)
-    end note
-
-     class Profile {
-      -name: StringValueObject
-      -biography?: StringValueObject
-      -profilePicture?: Image
-    }
-
-    class IdentityRepositoryService {}
-
-    note left of IdentityRepositoryService
-      Ideally, multiple services for different actions, Solid and KISS.
-      To be able to update an Identity, we need to:
-        -get profile by id
-        -check signature
-        -update fields
-        -save Identity
-    end note
-
-    interface IdentityRepository {
-      +save(Identity: Identity): void
-      +findById(identityId: identityId): Identity
-    }
-    interface CryptoService {
-      +encrypt(data: String, key: Key): String
-      +decrypt(data: String, key: Key): String
-      +validate(data: String, key: Key): String
-    }
-
-
-    Identity ..> CryptoService
-    Identity *--> Profile
-    IdentityRepositoryService ..> IdentityRepository
-    IdentityRepositoryService o--> Identity
-
-  }
-
-  package "application" {
-    class IdentityFinder {
-      +findById(identityId: identityId): Identity
-    }
-    class IdentityCreator {
-      +createIdentity(identity: Identity): void
-    }
-    class IdentityPasswordUpdater {
-      +updatePassword(identityId: identityId, newPassword: String): void
-    }
-    class IdentityQRGenerator {
-      +generateQR(identityId: identityId): Image
-    }
-  }
-
-    IdentityFinder ..> IdentityRepositoryService
-    IdentityCreator ..> IdentityRepositoryService
-    IdentityPasswordUpdater ..> IdentityRepositoryService
-    IdentityQRGenerator ..> IdentityRepositoryService
 }
 
 package "KeyRing" {
@@ -133,41 +52,12 @@ package "KeyRing" {
   }
 }
 
-package "nodes" {
-  package "domain" {
-    abstract class Node {
-      -id: NodeId
-      -ownerId: identityId
-      -name: String
-      -publicAddress: Address
-      -publicKey: Key
-      -signature: Hash
-    }
-
-    class Peer extends Node {
-      -lastSeen: Timestamp
-      -thrustScore: Int
-    }
-
-    class LocalNode extends Node {
-      -peers: List<Peer>
-      -privateKey: Key
-      -peerWhitelist: List<Peer>
-      -peerBlacklist: List<Peer>
-      -identityWhitelist: List<identityId>
-      -identityBlacklist: List<identityId>
-    }
-
-    LocalNode --> Peer
-  }
-}
-
 package "conversations" {
   package "domain" {
 
-    abstract class Conversation {
+    abstract class Conversation <AggregateRoot>{
       -id: ConversationId
-      -participants: List<UserId>
+      -participants: List<IdentityId>
     }
 
     class OneToOneConversation extends Conversation {

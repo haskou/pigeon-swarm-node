@@ -6,15 +6,15 @@ const config: Config.InitialOptions = {
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   transform: {
-    '^.+\\.ts': 'ts-jest',
+    '^.+\\.[tj]s$': 'ts-jest',
   },
+  transformIgnorePatterns: ['node_modules/(?!(@noble|@haskou|@faker-js)/)'],
   moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/src/$1',
   },
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
     '<rootDir>/src/Shared/',
-    '/infrastructure/',
     '/apps/migrations',
   ],
   verbose: true,
@@ -30,10 +30,10 @@ const config: Config.InitialOptions = {
   collectCoverageFrom: ['<rootDir>/src/**/*.ts'],
   coveragePathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/src/Shared',
+    '<rootDir>/src/shared',
     'src/index.ts',
     'src/Kernel.ts',
-    '/infrastructure/',
+    'src/shared/infrastructure/',
     '/apps/migrations',
   ],
 };

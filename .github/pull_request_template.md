@@ -1,4 +1,4 @@
-### **🛠 Cambios realizados**
+### **🛠 Changes**
 
 Here provide examples of the changes you’ve made in this *pull request*. Include a detailed list if possible.
  This will help the reviewer.

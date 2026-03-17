@@ -1,9 +1,8 @@
-import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Identity } from '../Identity';
 import { IdentityRepository } from '../repositories/IdentityRepository';
 
-// TODO: Test
 export default class IdentityFinderService {
   constructor(private readonly repository: IdentityRepository) {}
 

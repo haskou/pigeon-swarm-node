@@ -1,4 +1,4 @@
-import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Identity } from '../Identity';
 

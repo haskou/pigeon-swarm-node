@@ -1,0 +1,64 @@
+import { PrivateKey } from '@haskou/value-objects';
+import { generateKeyPairSync } from 'crypto';
+
+import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+
+describe('IPFSNetworkConfig', () => {
+  const { privateKey } = generateKeyPairSync('ed25519');
+  const validPem = privateKey
+    .export({ format: 'pem', type: 'pkcs8' })
+    .toString();
+
+  describe('fromPrimitives', () => {
+    it('should create a private config when key is provided', () => {
+      const config = IPFSNetworkConfig.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        key: validPem,
+        name: 'my-network',
+      });
+
+      expect(config.getName()).toBe('my-network');
+      expect(config.isPrivate()).toBe(true);
+      expect(config.getKey()).toBeInstanceOf(PrivateKey);
+    });
+
+    it('should create a public config when key is undefined', () => {
+      const config = IPFSNetworkConfig.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        key: undefined,
+        name: 'public-net',
+      });
+
+      expect(config.getName()).toBe('public-net');
+      expect(config.isPrivate()).toBe(false);
+      expect(config.getKey()).toBeUndefined();
+    });
+  });
+
+  describe('toPrimitives', () => {
+    it('should return correct primitives for a private config', () => {
+      const config = new IPFSNetworkConfig(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'test-net',
+        new PrivateKey(validPem),
+      );
+
+      const primitives = config.toPrimitives();
+
+      expect(primitives.name).toBe('test-net');
+      expect(primitives.key).toBe(validPem);
+    });
+
+    it('should return undefined key for a public config', () => {
+      const config = new IPFSNetworkConfig(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'public',
+      );
+
+      const primitives = config.toPrimitives();
+
+      expect(primitives.name).toBe('public');
+      expect(primitives.key).toBeUndefined();
+    });
+  });
+});

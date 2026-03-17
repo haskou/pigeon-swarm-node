@@ -31,23 +31,32 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@haskou/value-objects": "^2.2.0",
+    "@haskou/value-objects": "^2.3.0",
+    "@helia/json": "^5.0.7",
+    "@helia/strings": "^5.0.7",
+    "@helia/unixfs": "^7.0.4",
+    "@libp2p/pnet": "^3.0.13",
+    "@multiformats/multiaddr": "^13.0.1",
     "amqplib": "^0.10.9",
     "axios": "^1.6.7",
+    "blockstore-core": "^6.1.2",
+    "blockstore-fs": "^3.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "class-validator-jsonschema": "^5.1.0",
     "cors": "^2.8.6",
+    "datastore-fs": "^11.0.2",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-winston": "^4.2.0",
     "fs-extra": "^11.3.4",
+    "helia": "^6.0.21",
     "jsonwebtoken": "^9.0.3",
     "module-alias": "^2.3.4",
-    "mongodb": "^7.1.0",
     "node-cron": "^4.2.1",
     "node-dependency-injection": "^3.2.6",
     "path": "^0.12.7",
+    "pm2-runtime": "^5.4.1",
     "reflect-metadata": "^0.2.2",
     "routing-controllers": "^0.11.3",
     "routing-controllers-openapi": "^5.0.1",
@@ -56,11 +65,6 @@
   "resolutions": {
     "wrap-ansi": "7.0.0",
     "string-width": "4.1.0"
-  },
-  "config": {
-    "mongodbMemoryServer": {
-      "downloadDir": "/tmp/mongodbMemoryServer"
-    }
   },
   "devDependencies": {
     "@cucumber/cucumber": "7.3.2",
@@ -88,7 +92,6 @@
     "jest-mock-extended": "^4.0.0",
     "jest-runner-tsc": "^1.6.0",
     "mockttp": "^4.2.2",
-    "mongodb-memory-server": "^11.0.1",
     "nodemon": "^3.1.14",
     "npm-run-all": "^4.1.5",
     "nyc": "^18.0.0",
@@ -99,6 +102,7 @@
     "ts-patch": "^3.3.0",
     "ts-transform-paths": "^3.0.0",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-transform-paths": "^3.5.6"
   }

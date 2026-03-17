@@ -1,0 +1,79 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Identities API
+  version: 1.0.0
+  description: Endpoints for creating identities.
+tags:
+  - name: identities
+paths:
+  /identities/:
+    post:
+      tags:
+        - identities
+      summary: Create identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostIdentityBody'
+      responses:
+        '200':
+          description: Identity created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityResource'
+components:
+  schemas:
+    PostIdentityBody:
+      type: object
+      required:
+        - name
+        - password
+      properties:
+        name:
+          type: string
+          example: Alice
+        password:
+          type: string
+          example: super-secret-password
+    IdentityResource:
+      type: object
+      required:
+        - id
+        - encryptedKeyPair
+        - profile
+        - timestamp
+        - signature
+      properties:
+        id:
+          type: string
+          format: uuid
+        encryptedKeyPair:
+          type: object
+          required:
+            - encryptedPrivateKey
+            - publicKey
+          properties:
+            encryptedPrivateKey:
+              type: string
+            publicKey:
+              type: string
+        profile:
+          type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+            biography:
+              type: string
+              nullable: true
+            picture:
+              type: string
+              nullable: true
+        timestamp:
+          type: number
+        signature:
+          type: string

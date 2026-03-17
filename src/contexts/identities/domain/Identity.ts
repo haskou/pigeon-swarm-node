@@ -1,5 +1,5 @@
-import { IdentityId } from '@app/contexts/shared/domain/IdentityId';
-import { Password } from '@app/contexts/shared/domain/Password';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import {
   assert,
@@ -11,10 +11,12 @@ import {
 } from '@haskou/value-objects';
 
 import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
+import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignatureError';
+import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { Profile } from './Profile';
 import { ProfileName } from './value-objects/ProfileName';
 
-// TODO: Test
+// TODO: Identities should pertain to 1 or N networks
 export class Identity extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
@@ -34,7 +36,7 @@ export class Identity extends AggregateRoot {
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
     const primitives = {
       encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      id: IdentityId.generate().valueOf(),
+      id: encryptedKeyPair.toPrimitives().publicKey,
       profile: new Profile(name).toPrimitives(),
       signature: '',
       timestamp: Timestamp.now().valueOf(),
@@ -49,7 +51,8 @@ export class Identity extends AggregateRoot {
 
     const identity = Identity.fromPrimitives(primitives);
 
-    // TODO: Add event
+    identity.record(new IdentityWasCreatedEvent(primitives.id));
+
     return identity;
   }
 
@@ -62,14 +65,13 @@ export class Identity extends AggregateRoot {
   ) {
     super();
 
-    // TODO: Add error
     assert(
       new IdentitySignatureDomainService().isValidSignature(
         this.encryptedKeyPair,
         this.toPrimitives(),
         this.signature,
       ),
-      'Invalid signature for the provided identity data.',
+      new InvalidIdentitySignatureError(),
     );
   }
 

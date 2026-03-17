@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm IPFS API
+  version: 1.0.0
+  description: Endpoints for reading JSON content from IPFS.
+tags:
+  - name: ipfs
+paths:
+  /ipfs/{cid}:
+    get:
+      tags:
+        - ipfs
+      summary: Get IPFS content by CID
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JSON content found.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: CID not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpfsContentNotFoundError'
+components:
+  schemas:
+    IpfsContentNotFoundError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: CID not found in any network

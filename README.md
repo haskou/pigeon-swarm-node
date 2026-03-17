@@ -67,6 +67,14 @@ The name will probably change too.
 
 ---
 
+## Installation
+
+Setup instructions and environment variables are documented in:
+
+- `docs/INSTALLATION.md`
+
+---
+
 ## Who is behind this?
 
 Four nerds who thought this sounded like a fun idea.

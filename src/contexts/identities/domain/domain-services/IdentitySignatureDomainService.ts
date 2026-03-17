@@ -1,4 +1,4 @@
-import { Password } from '@app/contexts/shared/domain/Password';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
   EncryptedKeyPair,
   PrimitiveOf,
@@ -34,7 +34,6 @@ export class IdentitySignatureDomainService {
       JSON.stringify({
         encryptedKeyPair: payload.encryptedKeyPair,
         id: payload.id,
-        profile: payload.profile,
         timestamp: payload.timestamp,
       }),
       signature,

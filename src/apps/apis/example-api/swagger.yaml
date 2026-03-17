@@ -1,0 +1,21 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Example API
+  version: 1.0.0
+  description: Example endpoints for validating the API runtime.
+tags:
+  - name: example
+paths:
+  /hewo:
+    get:
+      tags:
+        - example
+      summary: Example endpoint
+      responses:
+        '200':
+          description: Example text response.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Hello World
