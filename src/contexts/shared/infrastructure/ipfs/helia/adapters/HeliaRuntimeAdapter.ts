@@ -42,26 +42,45 @@ export class HeliaRuntimeAdapter {
 
   private datastoreFsModulePromise?: Promise<typeof import('datastore-fs')>;
 
+  private isJestRuntime(): boolean {
+    return process.env.JEST_WORKER_ID !== undefined;
+  }
+
+  private async nativeImport<TModule>(modulePath: string): Promise<TModule> {
+    if (this.isJestRuntime()) {
+      return require(modulePath) as TModule;
+    }
+
+    const importer = new Function('path', 'return import(path)') as (
+      path: string,
+    ) => Promise<TModule>;
+
+    return importer(modulePath);
+  }
+
   private loadHeliaModule(): Promise<typeof HeliaCore> {
-    this.heliaModulePromise ??= import('helia');
+    this.heliaModulePromise ??= this.nativeImport<typeof HeliaCore>('helia');
 
     return this.heliaModulePromise;
   }
 
   private loadHeliaJsonModule(): Promise<typeof import('@helia/json')> {
-    this.heliaJsonModulePromise ??= import('@helia/json');
+    this.heliaJsonModulePromise ??=
+      this.nativeImport<typeof import('@helia/json')>('@helia/json');
 
     return this.heliaJsonModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
-    this.libp2pModulePromise ??= import('libp2p');
+    this.libp2pModulePromise ??=
+      this.nativeImport<typeof import('libp2p')>('libp2p');
 
     return this.libp2pModulePromise;
   }
 
   private loadPnetModule(): Promise<typeof import('@libp2p/pnet')> {
-    this.pnetModulePromise ??= import('@libp2p/pnet');
+    this.pnetModulePromise ??=
+      this.nativeImport<typeof import('@libp2p/pnet')>('@libp2p/pnet');
 
     return this.pnetModulePromise;
   }
@@ -69,7 +88,9 @@ export class HeliaRuntimeAdapter {
   private loadMultiaddrModule(): Promise<
     typeof import('@multiformats/multiaddr')
   > {
-    this.multiaddrModulePromise ??= import('@multiformats/multiaddr');
+    this.multiaddrModulePromise ??= this.nativeImport<
+      typeof import('@multiformats/multiaddr')
+    >('@multiformats/multiaddr');
 
     return this.multiaddrModulePromise;
   }
@@ -77,13 +98,16 @@ export class HeliaRuntimeAdapter {
   private loadDatastoreKeyModule(): Promise<
     typeof import('interface-datastore/key')
   > {
-    this.datastoreKeyModulePromise ??= import('interface-datastore/key');
+    this.datastoreKeyModulePromise ??= this.nativeImport<
+      typeof import('interface-datastore/key')
+    >('interface-datastore/key');
 
     return this.datastoreKeyModulePromise;
   }
 
   private loadCidModule(): Promise<typeof import('multiformats/cid')> {
-    this.cidModulePromise ??= import('multiformats/cid');
+    this.cidModulePromise ??=
+      this.nativeImport<typeof import('multiformats/cid')>('multiformats/cid');
 
     return this.cidModulePromise;
   }
@@ -91,25 +115,29 @@ export class HeliaRuntimeAdapter {
   private loadBlockstoreCoreModule(): Promise<
     typeof import('blockstore-core')
   > {
-    this.blockstoreCoreModulePromise ??= import('blockstore-core');
+    this.blockstoreCoreModulePromise ??=
+      this.nativeImport<typeof import('blockstore-core')>('blockstore-core');
 
     return this.blockstoreCoreModulePromise;
   }
 
   private loadBlockstoreFsModule(): Promise<typeof import('blockstore-fs')> {
-    this.blockstoreFsModulePromise ??= import('blockstore-fs');
+    this.blockstoreFsModulePromise ??=
+      this.nativeImport<typeof import('blockstore-fs')>('blockstore-fs');
 
     return this.blockstoreFsModulePromise;
   }
 
   private loadDatastoreCoreModule(): Promise<typeof import('datastore-core')> {
-    this.datastoreCoreModulePromise ??= import('datastore-core');
+    this.datastoreCoreModulePromise ??=
+      this.nativeImport<typeof import('datastore-core')>('datastore-core');
 
     return this.datastoreCoreModulePromise;
   }
 
   private loadDatastoreFsModule(): Promise<typeof import('datastore-fs')> {
-    this.datastoreFsModulePromise ??= import('datastore-fs');
+    this.datastoreFsModulePromise ??=
+      this.nativeImport<typeof import('datastore-fs')>('datastore-fs');
 
     return this.datastoreFsModulePromise;
   }

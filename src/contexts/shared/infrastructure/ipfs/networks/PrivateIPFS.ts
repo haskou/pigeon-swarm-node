@@ -1,7 +1,7 @@
 import { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { PrivateKey } from '@haskou/value-objects';
 
-import { createPrivateHeliaIPFS, HeliaIPFS } from '../helia/HeliaIPFS';
+import { HeliaIPFS } from '../helia/HeliaIPFS';
 import { IPFSConnection, IPFSOptions } from '../helia/IPFSConnection';
 
 export type PrivateIPFSOptions = IPFSOptions & {
@@ -15,7 +15,7 @@ export class PrivateIPFS extends HeliaIPFS {
   private static createHeliaCore(
     options: PrivateIPFSOptions,
   ): Promise<HeliaInstance> {
-    return createPrivateHeliaIPFS(options, options.key, options.name);
+    return HeliaIPFS.createPrivateHeliaCore(options, options.key, options.name);
   }
 
   public static async create(

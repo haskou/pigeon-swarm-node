@@ -1,12 +1,31 @@
 import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 
 export type Libp2pPrivateKeyLike = Libp2pPrivateKey;
+type Libp2pKeysModule = typeof import('@libp2p/crypto/keys');
 
 export class Libp2pKeyAdapter {
-  private keysModulePromise?: Promise<typeof import('@libp2p/crypto/keys')>;
+  private keysModulePromise?: Promise<Libp2pKeysModule>;
 
-  private loadKeysModule(): Promise<typeof import('@libp2p/crypto/keys')> {
-    this.keysModulePromise ??= import('@libp2p/crypto/keys');
+  private isJestRuntime(): boolean {
+    return process.env.JEST_WORKER_ID !== undefined;
+  }
+
+  private async nativeImport<TModule>(modulePath: string): Promise<TModule> {
+    if (this.isJestRuntime()) {
+      return require(modulePath) as TModule;
+    }
+
+    const importer = new Function('path', 'return import(path)') as (
+      path: string,
+    ) => Promise<TModule>;
+
+    return importer(modulePath);
+  }
+
+  private loadKeysModule(): Promise<Libp2pKeysModule> {
+    this.keysModulePromise ??= this.nativeImport<Libp2pKeysModule>(
+      '@libp2p/crypto/keys',
+    );
 
     return this.keysModulePromise;
   }

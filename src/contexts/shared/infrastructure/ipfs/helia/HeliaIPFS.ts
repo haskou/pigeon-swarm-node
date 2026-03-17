@@ -12,7 +12,7 @@ import { HeliaIPFSParser, ParsedHeliaIPFSOptions } from './HeliaIPFSParser';
 import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
-export class HeliaIPFS implements IPFSConnection {
+export abstract class HeliaIPFS implements IPFSConnection {
   private static extractPeerIdFromBootstrapAddress(
     address: string,
   ): string | undefined {
@@ -204,18 +204,4 @@ export class HeliaIPFS implements IPFSConnection {
   public getPeerId(): string {
     return this.heliaCore.libp2p.peerId.toString();
   }
-}
-
-export async function createPrivateHeliaIPFS(
-  options: IPFSOptions,
-  networkKey: NetworkPrivateKey,
-  networkName: string,
-): Promise<HeliaInstance> {
-  return HeliaIPFS.createPrivateHeliaCore(options, networkKey, networkName);
-}
-
-export async function createPublicHeliaIPFS(
-  options: IPFSOptions,
-): Promise<HeliaInstance> {
-  return HeliaIPFS.createPublicHeliaCore(options);
 }

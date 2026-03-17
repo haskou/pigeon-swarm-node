@@ -1,6 +1,6 @@
 import { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 
-import { createPublicHeliaIPFS, HeliaIPFS } from '../helia/HeliaIPFS';
+import { HeliaIPFS } from '../helia/HeliaIPFS';
 import { IPFSConnection, IPFSOptions } from '../helia/IPFSConnection';
 
 export class PublicIPFS extends HeliaIPFS {
@@ -12,7 +12,7 @@ export class PublicIPFS extends HeliaIPFS {
     if (this.connectionPool[optionKey]) {
       return new PublicIPFS(this.connectionPool[optionKey], options);
     }
-    const heliaCore = await createPublicHeliaIPFS(options);
+    const heliaCore = await HeliaIPFS.createPublicHeliaCore(options);
 
     this.connectionPool[optionKey] = heliaCore;
 
