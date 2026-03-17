@@ -134,27 +134,6 @@ describe('IPFSNetworkRegistry', () => {
     .export({ format: 'pem', type: 'pkcs8' })
     .toString();
 
-  beforeEach(() => {
-    delete process.env.IPFS_PRIVATE_KEY;
-    delete process.env.IPFS_PRIVATE_KEY_0;
-    delete process.env.IPFS_PRIVATE_KEY_1;
-  });
-
-  describe('parseEnvConfigs', () => {
-    it('should not auto-register public network from env', () => {
-      process.env.IPFS_PRIVATE_KEY = validPem;
-      const registry = new IPFSNetworkRegistry();
-
-      const configs = (
-        registry as unknown as {
-          parseEnvConfigs: () => IPFSNetworkConfig[];
-        }
-      ).parseEnvConfigs();
-
-      expect(configs.map((config) => config.getName())).toEqual(['private_0']);
-    });
-  });
-
   describe('register', () => {
     it('should throw when trying to register a duplicated peer id', async () => {
       const registry = new IPFSNetworkRegistry();

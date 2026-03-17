@@ -1,4 +1,5 @@
 // timeout 90s tsx "scripts/private-connectivity-using-classes.ts"
+// TODO: Create cucumber test like this
 import { PrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
@@ -6,6 +7,7 @@ import Kernel from '../src/Kernel';
 import IPFS from '../src/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSContentRacer from '../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
 import { IPFSConnection } from '../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
+import { IPFSNetworkConfig } from '../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { PrivateIPFS } from '../src/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
 import { PublicIPFS } from '../src/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
@@ -34,26 +36,6 @@ async function waitForPeerConnection(
 
   while (Date.now() - startAt < timeoutMs) {
     if (node.getPeers().length > 0) {
-      return true;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  return false;
-}
-
-async function waitForNetworkConnection(
-  ipfs: IPFS,
-  networkName: string,
-  timeoutMs: number,
-): Promise<boolean> {
-  const startAt = Date.now();
-
-  while (Date.now() - startAt < timeoutMs) {
-    const network = await ipfs.getNetwork(networkName);
-
-    if (network.getPeers().length > 0) {
       return true;
     }
 
@@ -166,13 +148,7 @@ async function main(): Promise<void> {
     '-----END PRIVATE KEY-----\n';
   const networkKey = PrivateKey.fromPEM(networkPem);
 
-  const previousPrivateBootstrapPeers =
-    process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS;
   const previousStoragePath = process.env.IPFS_STORAGE_PATH;
-  const previousPrivateKey = process.env.IPFS_PRIVATE_KEY;
-  const previousDisablePublicNetwork = process.env.IPFS_DISABLE_PUBLIC_NETWORK;
-
-  delete process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS;
 
   let node1: IPFSConnection | undefined;
   let node2: IPFSConnection | undefined;
@@ -186,21 +162,6 @@ async function main(): Promise<void> {
       storageLocation: node2Path,
     });
 
-    const node2Internal = node2 as InternalHeliaIPFSConnection;
-
-    if (!node2Internal.heliaCore) {
-      throw new Error(
-        'Cannot access node2 Helia core for bootstrap addresses.',
-      );
-    }
-
-    const bootstrapPeers = node2Internal.heliaCore.libp2p
-      .getMultiaddrs()
-      .map((address: { toString(): string }) => address.toString())
-      .join(',');
-
-    process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS = bootstrapPeers;
-
     node1 = await PrivateIPFS.create({
       key: networkKey,
       name: 'local-private-check',
@@ -208,8 +169,6 @@ async function main(): Promise<void> {
     });
 
     process.env.IPFS_STORAGE_PATH = node3Path;
-    process.env.IPFS_PRIVATE_KEY = networkPem;
-    process.env.IPFS_DISABLE_PUBLIC_NETWORK = 'true';
 
     publicNode = await PublicIPFS.create({
       storageLocation: publicNodePath,
@@ -217,21 +176,23 @@ async function main(): Promise<void> {
 
     const ipfs = new IPFS(new IPFSNetworkRegistry(), new IPFSContentRacer());
     await ipfs.initialize();
-
-    const ipfsNetworkName = 'private_0';
-    const node3Connected = await waitForNetworkConnection(
-      ipfs,
-      ipfsNetworkName,
-      15000,
+    await ipfs.registerNetwork(
+      new IPFSNetworkConfig('local-private-check', networkKey),
     );
+
+    const ipfsNetworkName = 'local-private-check';
 
     const ipfsPrivateNetwork = await ipfs.getNetwork(ipfsNetworkName);
     node3 = (ipfsPrivateNetwork as unknown as InternalIPFSNetwork)
       .connection as IPFSConnection;
 
+    await connectNodes(node1, node2);
     await connectNodes(node3, node1);
+    await connectNodes(node2, node3);
 
     const connected = await waitForPeerConnection(node1, 15000);
+    const node2Connected = await waitForPeerConnection(node2, 15000);
+    const node3Connected = await waitForPeerConnection(node3, 15000);
 
     console.log('node1 peerId:', node1.getPeerId());
     console.log('node2 peerId:', node2.getPeerId());
@@ -249,6 +210,12 @@ async function main(): Promise<void> {
     if (!node3Connected) {
       throw new Error(
         'IPFS class network did not connect in private network within timeout.',
+      );
+    }
+
+    if (!node2Connected) {
+      throw new Error(
+        'Node2 did not connect in private network within timeout.',
       );
     }
 
@@ -340,28 +307,10 @@ async function main(): Promise<void> {
   } finally {
     console.log('Checkpoint: cleanup starting...');
 
-    if (previousPrivateBootstrapPeers !== undefined) {
-      process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS = previousPrivateBootstrapPeers;
-    } else {
-      delete process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS;
-    }
-
     if (previousStoragePath !== undefined) {
       process.env.IPFS_STORAGE_PATH = previousStoragePath;
     } else {
       delete process.env.IPFS_STORAGE_PATH;
-    }
-
-    if (previousPrivateKey !== undefined) {
-      process.env.IPFS_PRIVATE_KEY = previousPrivateKey;
-    } else {
-      delete process.env.IPFS_PRIVATE_KEY;
-    }
-
-    if (previousDisablePublicNetwork !== undefined) {
-      process.env.IPFS_DISABLE_PUBLIC_NETWORK = previousDisablePublicNetwork;
-    } else {
-      delete process.env.IPFS_DISABLE_PUBLIC_NETWORK;
     }
 
     if (node1) {

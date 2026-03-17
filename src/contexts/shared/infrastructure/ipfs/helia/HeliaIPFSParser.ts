@@ -184,17 +184,4 @@ export class HeliaIPFSParser {
       }),
     );
   }
-
-  public static getPrivateBootstrapPeers(): string[] {
-    const rawBootstrapPeers = process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS;
-
-    if (!rawBootstrapPeers) {
-      return [];
-    }
-
-    return rawBootstrapPeers
-      .split(',')
-      .map((peer) => peer.trim())
-      .filter((peer) => peer.length > 0);
-  }
 }

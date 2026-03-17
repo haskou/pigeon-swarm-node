@@ -18,9 +18,6 @@ const mockLibp2pDefaults = jest.fn().mockReturnValue({
   transports: [],
 });
 const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
-const mockMultiaddr = jest
-  .fn()
-  .mockImplementation((address: string) => `mock-multiaddr:${address}`);
 
 jest.mock(
   'helia',
@@ -35,14 +32,6 @@ jest.mock(
   'libp2p',
   () => ({
     createLibp2p: mockCreateLibp2p,
-  }),
-  { virtual: true },
-);
-
-jest.mock(
-  '@multiformats/multiaddr',
-  () => ({
-    multiaddr: mockMultiaddr,
   }),
   { virtual: true },
 );
@@ -145,7 +134,6 @@ describe('PrivateIPFS', () => {
     (
       PrivateIPFS as unknown as { connectionPool: Record<string, unknown> }
     ).connectionPool = {};
-    delete process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS;
     jest.clearAllMocks();
   });
 
@@ -222,36 +210,6 @@ describe('PrivateIPFS', () => {
       );
       expect(Kernel.logger.info).toHaveBeenCalledWith(
         expect.stringContaining('mock-peer-id'),
-      );
-    });
-
-    it('should dial bootstrap peers from environment variable', async () => {
-      process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS =
-        '/ip4/127.0.0.1/tcp/4001/p2p/12D3KooW111,/ip4/127.0.0.1/tcp/4002/p2p/12D3KooW222';
-
-      await PrivateIPFS.create(defaultOptions);
-
-      expect(mockHeliaNode.libp2p.dial).toHaveBeenCalledTimes(2);
-      expect(mockHeliaNode.libp2p.dial).toHaveBeenNthCalledWith(1, [
-        'mock-multiaddr:/ip4/127.0.0.1/tcp/4001/p2p/12D3KooW111',
-      ]);
-      expect(mockHeliaNode.libp2p.dial).toHaveBeenNthCalledWith(2, [
-        'mock-multiaddr:/ip4/127.0.0.1/tcp/4002/p2p/12D3KooW222',
-      ]);
-
-      expect(mockMultiaddr).toHaveBeenCalledTimes(2);
-    });
-
-    it('should skip self bootstrap dial', async () => {
-      const Kernel = (await import('@app/Kernel')).default;
-      process.env.IPFS_PRIVATE_BOOTSTRAP_PEERS =
-        '/ip4/127.0.0.1/tcp/4001/p2p/mock-peer-id';
-
-      await PrivateIPFS.create(defaultOptions);
-
-      expect(mockHeliaNode.libp2p.dial).not.toHaveBeenCalled();
-      expect(Kernel.logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping bootstrap self-dial'),
       );
     });
   });

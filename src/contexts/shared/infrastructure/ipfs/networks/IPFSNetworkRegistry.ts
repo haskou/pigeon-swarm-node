@@ -1,4 +1,3 @@
-import { PrivateKey } from '@haskou/value-objects';
 import { createPrivateKey } from 'crypto';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
@@ -122,30 +121,6 @@ export default class IPFSNetworkRegistry {
     );
   }
 
-  private parseEnvConfigs(): IPFSNetworkConfig[] {
-    const configs: IPFSNetworkConfig[] = [];
-
-    for (let i = 0; ; i++) {
-      const key = process.env[`IPFS_PRIVATE_KEY_${i}`];
-
-      if (!key) {
-        break;
-      }
-
-      configs.push(new IPFSNetworkConfig(`private_${i}`, new PrivateKey(key)));
-    }
-
-    const singleKey = process.env.IPFS_PRIVATE_KEY;
-
-    if (singleKey && configs.length === 0) {
-      configs.push(
-        new IPFSNetworkConfig('private_0', new PrivateKey(singleKey)),
-      );
-    }
-
-    return configs;
-  }
-
   private ensurePeerIdIsUnique(candidate: IPFSNetwork): void {
     const duplicatedNetwork = this.networks.find(
       (network) => network.getPeerId() === candidate.getPeerId(),
@@ -198,9 +173,7 @@ export default class IPFSNetworkRegistry {
       return;
     }
 
-    const persistedConfigs = this.readPersistedConfigs();
-    const configs =
-      persistedConfigs.length > 0 ? persistedConfigs : this.parseEnvConfigs();
+    const configs = this.readPersistedConfigs();
     const sharedPrivateKey = await this.loadOrCreateSharedPeerPrivateKey();
 
     for (const config of configs) {

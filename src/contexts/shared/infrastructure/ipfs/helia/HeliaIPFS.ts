@@ -13,44 +13,6 @@ import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 export abstract class HeliaIPFS implements IPFSConnection {
-  private static extractPeerIdFromBootstrapAddress(
-    address: string,
-  ): string | undefined {
-    const match = /\/p2p\/([^/]+)$/.exec(address);
-
-    return match?.[1];
-  }
-
-  private static async dialPrivateBootstrapPeers(
-    heliaCore: HeliaInstance,
-    networkName: string,
-  ): Promise<void> {
-    const bootstrapPeers = HeliaIPFSParser.getPrivateBootstrapPeers();
-
-    for (const bootstrapAddress of bootstrapPeers) {
-      const peerId =
-        HeliaIPFS.extractPeerIdFromBootstrapAddress(bootstrapAddress);
-
-      if (peerId === heliaCore.libp2p.peerId.toString()) {
-        Kernel.logger.warn(
-          `Skipping bootstrap self-dial for peer ${peerId} on private network "${networkName}".`,
-        );
-        continue;
-      }
-
-      try {
-        const bootstrapMultiaddr =
-          await heliaRuntimeAdapter.createMultiaddr(bootstrapAddress);
-
-        await heliaCore.libp2p.dial([bootstrapMultiaddr]);
-      } catch (error: unknown) {
-        Kernel.logger.warn(
-          `Could not dial bootstrap peer ${bootstrapAddress} on private network "${networkName}": ${(error as Error).message}`,
-        );
-      }
-    }
-  }
-
   public static async createPublicHeliaCore(
     options: IPFSOptions,
   ): Promise<HeliaInstance> {
@@ -88,8 +50,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
-
-    await HeliaIPFS.dialPrivateBootstrapPeers(heliaCore, networkName);
 
     return heliaCore;
   }
