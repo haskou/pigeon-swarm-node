@@ -172,7 +172,11 @@ describe('IPFSNetworkRegistry', () => {
 
       await expect(
         registry.register(
-          new IPFSNetworkConfig('private_1', new PrivateKey(validPem)),
+          new IPFSNetworkConfig(
+            '550e8400-e29b-41d4-a716-446655440000',
+            'private_1',
+            new PrivateKey(validPem),
+          ),
         ),
       ).rejects.toThrow(IPFSPeerIdDuplicatedError);
     });

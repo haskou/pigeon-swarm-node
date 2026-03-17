@@ -12,6 +12,7 @@ describe('IPFSNetworkConfig', () => {
   describe('fromPrimitives', () => {
     it('should create a private config when key is provided', () => {
       const config = IPFSNetworkConfig.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440000',
         key: validPem,
         name: 'my-network',
       });
@@ -23,6 +24,7 @@ describe('IPFSNetworkConfig', () => {
 
     it('should create a public config when key is undefined', () => {
       const config = IPFSNetworkConfig.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440000',
         key: undefined,
         name: 'public-net',
       });
@@ -36,6 +38,7 @@ describe('IPFSNetworkConfig', () => {
   describe('toPrimitives', () => {
     it('should return correct primitives for a private config', () => {
       const config = new IPFSNetworkConfig(
+        '550e8400-e29b-41d4-a716-446655440000',
         'test-net',
         new PrivateKey(validPem),
       );
@@ -47,7 +50,10 @@ describe('IPFSNetworkConfig', () => {
     });
 
     it('should return undefined key for a public config', () => {
-      const config = new IPFSNetworkConfig('public');
+      const config = new IPFSNetworkConfig(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'public',
+      );
 
       const primitives = config.toPrimitives();
 

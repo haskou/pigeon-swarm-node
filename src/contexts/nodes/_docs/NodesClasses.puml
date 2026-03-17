@@ -1,0 +1,82 @@
+@startuml
+
+title Pigeon-swarm - Nodes Context
+
+package "nodes" {
+  package "domain" {
+    class Node <AggregateRoot> {
+      -id: NodeId
+      -networks: Map<NetworkId, Network>
+      -owner?: IdentityId
+      +addNetwork(network: Network): void
+      +toPrimitives(): object
+    }
+
+    class Network {
+      -id: NetworkId
+      -name: NetworkName
+      -key?: NetworkKey
+      +isPublic(): boolean
+      +getName(): NetworkName
+      +toPrimitives(): object
+    }
+
+    class NodeNetworkWasAdded <DomainEvent> {
+      +eventName(): string
+    }
+
+    class NetworkId
+    class NetworkName
+    class NetworkKey
+
+    Node o--> "0..N" Network
+    Node ..> NodeNetworkWasAdded
+    Network *--> NetworkId
+    Network *--> NetworkName
+    Network --> NetworkKey
+
+    class NodeRepository <interface> {
+      +loadLocalNode(): Promise<Node>
+      +saveLocalNode(node: Node): Promise<void>
+    }
+
+    class NodeLoaderService {
+      -repository: NodeRepository
+      +loadNode(): Promise<Node>
+    }
+
+    class NodeSaverService {
+      -repository: NodeRepository
+      +saveNode(node: Node): Promise<void>
+    }
+
+    NodeRepository o--> Node
+    NodeLoaderService --> NodeRepository
+    NodeSaverService --> NodeRepository
+  }
+
+  package "application" {
+    class NodeNetworkAdder {
+      -loader: NodeLoaderService
+      -saver: NodeSaverService
+      -eventPublisher: DomainEventPublisher
+      +addNetwork(message: NodeNetworkAdderMessage): Promise<void>
+    }
+
+    class NodeNetworkAdderMessage {
+      -network: Network
+    }
+
+    class NodeLoader {
+      -nodeLoaderService: NodeLoaderService
+      +loadNode(): Promise<Node>
+    }
+
+    NodeNetworkAdder --> NodeLoaderService
+    NodeNetworkAdder --> NodeSaverService
+    NodeNetworkAdder --> NodeNetworkAdderMessage
+    NodeLoader --> NodeLoaderService
+  }
+}
+
+@enduml

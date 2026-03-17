@@ -18,6 +18,8 @@ jest.mock('fs/promises', () => ({
 
 describe('LocalNodeRepository', () => {
   const canonicalNodeId = '8dc7e4dd-d164-4f0c-b9ed-36bc6e0c4f6a';
+  const privateNetworkId = '550e8400-e29b-41d4-a716-446655440000';
+  const publicNetworkId = '550e8400-e29b-41d4-a716-446655440001';
 
   let repository: LocalNodeRepository;
   let networkRegistry: MockProxy<IPFSNetworkRegistry>;
@@ -41,14 +43,18 @@ describe('LocalNodeRepository', () => {
         format: 'pem',
         type: 'spki',
       });
+      const privateNetworkId = '550e8400-e29b-41d4-a716-446655440000';
+      const publicNetworkId = '550e8400-e29b-41d4-a716-446655440001';
       const privateNetwork = mock<IPFSNetwork>();
       const publicNetwork = mock<IPFSNetwork>();
 
       privateNetwork.toPrimitives.mockReturnValue({
+        id: privateNetworkId,
         key: networkKey.toString(),
         name: 'private_0',
       });
       publicNetwork.toPrimitives.mockReturnValue({
+        id: publicNetworkId,
         key: undefined,
         name: 'public',
       });
@@ -66,11 +72,13 @@ describe('LocalNodeRepository', () => {
       expect(localNode.toPrimitives()).toEqual({
         id: canonicalNodeId,
         networks: {
-          private_0: {
+          [privateNetworkId]: {
+            id: privateNetworkId,
             key: networkKey.toString(),
             name: 'private_0',
           },
-          public: {
+          [publicNetworkId]: {
+            id: publicNetworkId,
             key: undefined,
             name: 'public',
           },
@@ -114,11 +122,13 @@ describe('LocalNodeRepository', () => {
       const node = Node.fromPrimitives({
         id: canonicalNodeId,
         networks: {
-          private_0: {
+          [privateNetworkId]: {
+            id: privateNetworkId,
             key: desiredKey.toString(),
             name: 'private_0',
           },
-          public: {
+          [publicNetworkId]: {
+            id: publicNetworkId,
             key: undefined,
             name: 'public',
           },
@@ -127,10 +137,15 @@ describe('LocalNodeRepository', () => {
       });
 
       currentPublic.getName.mockReturnValue('public');
-      currentPublic.getConfig.mockReturnValue(new IPFSNetworkConfig('public'));
+      currentPublic.getConfig.mockReturnValue(
+        new IPFSNetworkConfig(publicNetworkId, 'public'),
+      );
       obsoletePrivate.getName.mockReturnValue('private_legacy');
       obsoletePrivate.getConfig.mockReturnValue(
-        new IPFSNetworkConfig('private_legacy'),
+        new IPFSNetworkConfig(
+          '550e8400-e29b-41d4-a716-446655440002',
+          'private_legacy',
+        ),
       );
 
       networkRegistry.getAll.mockReturnValue([currentPublic, obsoletePrivate]);
@@ -155,6 +170,7 @@ describe('LocalNodeRepository', () => {
         }),
       );
       expect(networkRegistry.register.mock.calls[0][0].toPrimitives()).toEqual({
+        id: privateNetworkId,
         key: desiredKey.toString(),
         name: 'private_0',
       });
@@ -167,7 +183,8 @@ describe('LocalNodeRepository', () => {
       const node = Node.fromPrimitives({
         id: canonicalNodeId,
         networks: {
-          private_0: {
+          [privateNetworkId]: {
+            id: privateNetworkId,
             key: desiredPrivateKey
               .export({ format: 'pem', type: 'pkcs8' })
               .toString(),
@@ -180,6 +197,7 @@ describe('LocalNodeRepository', () => {
       currentNetwork.getName.mockReturnValue('private_0');
       currentNetwork.getConfig.mockReturnValue(
         new IPFSNetworkConfig(
+          privateNetworkId,
           'private_0',
           new PrivateKey(
             currentPrivateKey
@@ -199,6 +217,7 @@ describe('LocalNodeRepository', () => {
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith('private_0');
       expect(networkRegistry.register).toHaveBeenCalledTimes(1);
       expect(networkRegistry.register.mock.calls[0][0].toPrimitives()).toEqual({
+        id: privateNetworkId,
         key: desiredPrivateKey
           .export({ format: 'pem', type: 'pkcs8' })
           .toString(),
@@ -222,7 +241,8 @@ describe('LocalNodeRepository', () => {
       const node = Node.fromPrimitives({
         id: canonicalNodeId,
         networks: {
-          private_0: {
+          [privateNetworkId]: {
+            id: privateNetworkId,
             key: privateKeyPem.toString(),
             name: 'private_0',
           },
@@ -233,6 +253,7 @@ describe('LocalNodeRepository', () => {
       currentNetwork.getName.mockReturnValue('private_0');
       currentNetwork.getConfig.mockReturnValue(
         new IPFSNetworkConfig(
+          privateNetworkId,
           'private_0',
           new PrivateKey(privateKeyPem.toString()),
         ),

@@ -13,6 +13,8 @@ describe('IPFSNetwork', () => {
   const validPem = privateKey
     .export({ format: 'pem', type: 'pkcs8' })
     .toString();
+  const networkId = '550e8400-e29b-41d4-a716-446655440000';
+  const anotherNetworkId = '550e8400-e29b-41d4-a716-446655440001';
 
   let connection: MockProxy<IPFSConnection>;
 
@@ -22,7 +24,7 @@ describe('IPFSNetwork', () => {
 
   describe('getName', () => {
     it('should return the network name from config', () => {
-      const config = new IPFSNetworkConfig('my-network');
+      const config = new IPFSNetworkConfig(networkId, 'my-network');
       const network = new IPFSNetwork(config, connection);
 
       expect(network.getName()).toBe('my-network');
@@ -31,14 +33,18 @@ describe('IPFSNetwork', () => {
 
   describe('getType', () => {
     it('should return PRIVATE when config has a key', () => {
-      const config = new IPFSNetworkConfig('net', new PrivateKey(validPem));
+      const config = new IPFSNetworkConfig(
+        networkId,
+        'net',
+        new PrivateKey(validPem),
+      );
       const network = new IPFSNetwork(config, connection);
 
       expect(network.getType()).toBe(IPFSNetworkType.PRIVATE);
     });
 
     it('should return PUBLIC when config has no key', () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
 
       expect(network.getType()).toBe(IPFSNetworkType.PUBLIC);
@@ -47,14 +53,18 @@ describe('IPFSNetwork', () => {
 
   describe('isPrivate', () => {
     it('should return true for private networks', () => {
-      const config = new IPFSNetworkConfig('net', new PrivateKey(validPem));
+      const config = new IPFSNetworkConfig(
+        networkId,
+        'net',
+        new PrivateKey(validPem),
+      );
       const network = new IPFSNetwork(config, connection);
 
       expect(network.isPrivate()).toBe(true);
     });
 
     it('should return false for public networks', () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
 
       expect(network.isPrivate()).toBe(false);
@@ -63,7 +73,7 @@ describe('IPFSNetwork', () => {
 
   describe('getJSON', () => {
     it('should delegate to connection.getJSON', async () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
       const cid = new IPFSId('bafytest');
       const expected = { data: 'value' };
@@ -79,7 +89,7 @@ describe('IPFSNetwork', () => {
 
   describe('addJSON', () => {
     it('should delegate to connection.addJSON', async () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
       const data = { key: 'value' };
       const expectedCid = new IPFSId('bafyresult');
@@ -95,7 +105,7 @@ describe('IPFSNetwork', () => {
 
   describe('putRecord', () => {
     it('should delegate to connection.putRecord', async () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
 
       await network.putRecord('key', 'value');
@@ -110,7 +120,7 @@ describe('IPFSNetwork', () => {
 
   describe('getRecord', () => {
     it('should delegate to connection.getRecord', async () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
 
       connection.getRecord.mockResolvedValue('some-cid');
@@ -124,7 +134,7 @@ describe('IPFSNetwork', () => {
 
   describe('getPeers', () => {
     it('should delegate to connection.getPeers', () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
 
       connection.getPeers.mockReturnValue(['peer1', 'peer2']);
@@ -135,7 +145,7 @@ describe('IPFSNetwork', () => {
 
   describe('getPeerId', () => {
     it('should delegate to connection.getPeerId', () => {
-      const config = new IPFSNetworkConfig('net');
+      const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
 
       connection.getPeerId.mockReturnValue('12D3KooWtestPeerId');
@@ -146,10 +156,15 @@ describe('IPFSNetwork', () => {
 
   describe('toPrimitives', () => {
     it('should return config primitives', () => {
-      const config = new IPFSNetworkConfig('my-net', new PrivateKey(validPem));
+      const config = new IPFSNetworkConfig(
+        anotherNetworkId,
+        'my-net',
+        new PrivateKey(validPem),
+      );
       const network = new IPFSNetwork(config, connection);
 
       expect(network.toPrimitives()).toEqual({
+        id: anotherNetworkId,
         key: validPem,
         name: 'my-net',
       });

@@ -1,11 +1,12 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
+import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { Network } from './Network';
-import { NetworkName } from './value-objects/NetworkName';
 
 export class Node extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Node>): Node {
@@ -13,7 +14,7 @@ export class Node extends AggregateRoot {
       new NodeId(primitives.id),
       new Map(
         Object.entries(primitives.networks).map(([key, network]) => [
-          new NetworkName(key),
+          new NetworkId(key),
           Network.fromPrimitives(network),
         ]),
       ),
@@ -23,7 +24,7 @@ export class Node extends AggregateRoot {
 
   constructor(
     private readonly id: NodeId,
-    private readonly networks: Map<NetworkName, Network> = new Map(),
+    private readonly networks: Map<NetworkId, Network> = new Map(),
     private owner?: IdentityId,
   ) {
     super();
@@ -38,12 +39,13 @@ export class Node extends AggregateRoot {
   }
 
   public addNetwork(network: Network): void {
-    this.networks.set(network.getName(), network);
+    this.networks.set(network.getId(), network);
+
     assert(
       this.hasMaximumOnePublicNetwork(),
-      // TODO: Create error
-      'A node cannot have more than one public network.',
+      new NodeCannotHaveMoreThanOnePublicNetworkError(),
     );
+
     this.record(new NodeNetworkWasAdded(this.id.valueOf()));
   }
 
@@ -51,8 +53,8 @@ export class Node extends AggregateRoot {
     return {
       id: this.id.valueOf(),
       networks: Object.fromEntries(
-        Array.from(this.networks.entries()).map(([key, network]) => [
-          key.valueOf(),
+        Array.from(this.networks.entries()).map(([networkId, network]) => [
+          networkId.valueOf(),
           network.toPrimitives(),
         ]),
       ),

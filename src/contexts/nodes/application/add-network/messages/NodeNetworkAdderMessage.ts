@@ -2,10 +2,11 @@ import { Network } from '@app/contexts/nodes/domain/Network';
 
 export class NodeNetworkAdderMessage {
   public readonly network: Network;
-  constructor(nodeName: string, nodeKey?: string) {
+  constructor(id: string, name: string, key?: string) {
     this.network = Network.fromPrimitives({
-      key: nodeKey,
-      name: nodeName,
+      id,
+      key,
+      name,
     });
   }
 }

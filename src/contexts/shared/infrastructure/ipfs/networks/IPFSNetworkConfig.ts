@@ -2,19 +2,26 @@ import { PrivateKey } from '@haskou/value-objects';
 
 export class IPFSNetworkConfig {
   public static fromPrimitives(primitives: {
+    id: string;
     name: string;
     key: string | undefined;
   }): IPFSNetworkConfig {
     return new IPFSNetworkConfig(
+      primitives.id,
       primitives.name,
       primitives.key ? new PrivateKey(primitives.key) : undefined,
     );
   }
 
   constructor(
+    private readonly id: string,
     private readonly name: string,
     private readonly key?: PrivateKey,
   ) {}
+
+  public getId(): string {
+    return this.id;
+  }
 
   public getName(): string {
     return this.name;
@@ -28,8 +35,9 @@ export class IPFSNetworkConfig {
     return this.key !== undefined;
   }
 
-  public toPrimitives(): { name: string; key: string | undefined } {
+  public toPrimitives() {
     return {
+      id: this.id,
       key: this.key?.valueOf(),
       name: this.name,
     };

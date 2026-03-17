@@ -1,3 +1,4 @@
+import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { NodeNetworkAdderMessage } from '../../../../../../src/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
@@ -26,7 +27,10 @@ describe('NodeNetworkAdder', () => {
   describe('addNetwork', () => {
     it('should load node, add network, save and publish events', async () => {
       // Arrange
-      const message = new NodeNetworkAdderMessage('private_0');
+      const message = new NodeNetworkAdderMessage(
+        UUID.generate().toString(),
+        'private_0',
+      );
       const events = [mock<DomainEvent>()];
 
       loader.loadNode.mockResolvedValue(node);
@@ -44,7 +48,10 @@ describe('NodeNetworkAdder', () => {
 
     it('should not save or publish when adding network fails', async () => {
       // Arrange
-      const message = new NodeNetworkAdderMessage('public');
+      const message = new NodeNetworkAdderMessage(
+        UUID.generate().toString(),
+        'public',
+      );
       const expectedError = new Error('network constraint failed');
 
       loader.loadNode.mockResolvedValue(node);

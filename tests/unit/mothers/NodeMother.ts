@@ -1,13 +1,13 @@
 import { Network } from '@app/contexts/nodes/domain/Network';
 import { Node } from '@app/contexts/nodes/domain/Node';
-import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 
 export class NodeMother {
   public id: NodeId = new NodeId('b4ce3ab9-c709-4d3a-af0a-84fefe52f0d7');
 
-  public networks: Map<NetworkName, Network> = new Map();
+  public networks: Map<NetworkId, Network> = new Map();
   public owner?: IdentityId = undefined;
 
   public withId(id: NodeId): this {
@@ -16,8 +16,8 @@ export class NodeMother {
     return this;
   }
 
-  public withNetwork(name: NetworkName, network: Network): this {
-    this.networks.set(name, network);
+  public withNetwork(networkId: NetworkId, network: Network): this {
+    this.networks.set(networkId, network);
 
     return this;
   }
@@ -32,8 +32,8 @@ export class NodeMother {
     return Node.fromPrimitives({
       id: this.id.valueOf(),
       networks: Object.fromEntries(
-        Array.from(this.networks.entries()).map(([key, network]) => [
-          key.valueOf(),
+        Array.from(this.networks.entries()).map(([networkId, network]) => [
+          networkId.valueOf(),
           network.toPrimitives(),
         ]),
       ),

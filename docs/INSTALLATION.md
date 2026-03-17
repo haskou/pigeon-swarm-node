@@ -30,7 +30,6 @@ SERVICE_NAME=pigeon-swarm
 | `NODE_ENV` | `development` behavior in several modules | No | Runtime mode. Affects error/log verbosity. |
 | `API_PORT` | App internal default | No | HTTP port for API server. |
 | `ROUTE_PREFIX` | App internal default | No | Route prefix for API endpoints. |
-| `GENERATE_API_DOCS` | `false` | No | Enables API docs generation when supported. |
 | `CONTAINER_BUILD` | unset | No | Used during DI/container build logic. |
 
 ## Logging Variables

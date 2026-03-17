@@ -101,8 +101,9 @@ export default class IPFSNetworkRegistry {
         return [];
       }
 
-      return parsed.map((entry: { name: string; key: string | undefined }) =>
-        IPFSNetworkConfig.fromPrimitives(entry),
+      return parsed.map(
+        (entry: { id: string; name: string; key: string | undefined }) =>
+          IPFSNetworkConfig.fromPrimitives(entry),
       );
     } catch {
       return [];

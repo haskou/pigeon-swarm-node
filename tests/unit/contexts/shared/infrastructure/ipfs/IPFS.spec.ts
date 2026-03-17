@@ -1,8 +1,9 @@
+import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSContentRacer from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -110,7 +111,10 @@ describe('IPFS', () => {
 
   describe('registerNetwork', () => {
     it('should delegate to registry.register', async () => {
-      const config = new IPFSNetworkConfig('new-net');
+      const config = new IPFSNetworkConfig(
+        UUID.generate().toString(),
+        'new-net',
+      );
 
       registry.register.mockResolvedValue(mockNetwork);
 

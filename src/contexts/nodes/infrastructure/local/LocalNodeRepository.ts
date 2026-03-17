@@ -80,8 +80,9 @@ export default class LocalNodeRepository implements NodeRepository {
           const primitives = network.toPrimitives();
 
           return [
-            primitives.name,
+            primitives.id,
             {
+              id: primitives.id,
               key: primitives.key,
               name: primitives.name,
             },

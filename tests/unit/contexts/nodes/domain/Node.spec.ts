@@ -1,8 +1,8 @@
+import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
 import { Network } from '@app/contexts/nodes/domain/Network';
 import { Node } from '@app/contexts/nodes/domain/Node';
-import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
-import { faker } from '@faker-js/faker';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeMother } from '../../../mothers/NodeMother';
@@ -45,16 +45,17 @@ describe('Node', () => {
 
   describe('addNetwork', () => {
     it('should add a network and record a NodeNetworkWasAdded event', () => {
-      const networkName = new NetworkName(faker.word.noun());
+      const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
       const network = Network.fromPrimitives({
+        id: networkId.valueOf(),
         key: undefined,
-        name: networkName.valueOf(),
+        name: 'public',
       });
 
       node.addNetwork(network);
 
       const result = node.toPrimitives();
-      expect(result.networks[networkName.valueOf()]).toEqual(
+      expect(result.networks[networkId.valueOf()]).toEqual(
         network.toPrimitives(),
       );
       expect(node.pullDomainEvents()).toEqual([
@@ -64,17 +65,19 @@ describe('Node', () => {
 
     it('should throw when adding a second public network', () => {
       const firstPublic = Network.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440000',
         key: undefined,
         name: 'public',
       });
       const secondPublic = Network.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440001',
         key: undefined,
         name: 'public_2',
       });
       node.addNetwork(firstPublic);
 
       expect(() => node.addNetwork(secondPublic)).toThrow(
-        'A node cannot have more than one public network.',
+        NodeCannotHaveMoreThanOnePublicNetworkError,
       );
     });
   });
