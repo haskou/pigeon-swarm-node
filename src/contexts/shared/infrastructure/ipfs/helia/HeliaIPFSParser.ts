@@ -167,17 +167,20 @@ export class HeliaIPFSParser {
           parsedOptions.libp2p.connectionGater;
         privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
 
-        return heliaRuntimeAdapter
-          .createPreSharedKey({
-            psk: HeliaIPFSParser.toSwarmPsk(
-              HeliaIPFSParser.extractPskSeed(networkKey),
-            ),
-          })
-          .then((connectionProtector) => {
-            privateLibp2pConfig.connectionProtector = connectionProtector;
+        return (
+          heliaRuntimeAdapter
+            .createPreSharedKey({
+              psk: HeliaIPFSParser.toSwarmPsk(
+                HeliaIPFSParser.extractPskSeed(networkKey),
+              ),
+            })
+            // eslint-disable-next-line max-nested-callbacks
+            .then((connectionProtector) => {
+              privateLibp2pConfig.connectionProtector = connectionProtector;
 
-            return libp2pConfig;
-          });
+              return libp2pConfig;
+            })
+        );
       }),
     );
   }

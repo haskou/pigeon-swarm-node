@@ -12,7 +12,7 @@ export class Libp2pKeyAdapter {
 
   private async nativeImport<TModule>(modulePath: string): Promise<TModule> {
     if (this.isJestRuntime()) {
-      return require(modulePath) as TModule;
+      return import(modulePath) as TModule;
     }
 
     const importer = new Function('path', 'return import(path)') as (
