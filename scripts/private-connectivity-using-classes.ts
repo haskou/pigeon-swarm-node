@@ -1,4 +1,4 @@
-// timeout 90s tsx "scripts/private-connectivity-using-classes copy.ts"
+// timeout 90s tsx "scripts/private-connectivity-using-classes.ts"
 import { PrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
