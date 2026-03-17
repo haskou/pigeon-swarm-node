@@ -3,11 +3,20 @@ import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
 
 export default class IPFSContentRacer {
+  private readonly TIMEOUT_MS = 3000;
+
+  private startTimeout(
+    controller: AbortController,
+  ): ReturnType<typeof setTimeout> {
+    return setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+  }
+
   public async raceGetJSON<T>(
     networks: IPFSNetwork[],
     cid: IPFSId,
   ): Promise<T> {
     const controller = new AbortController();
+    const timeout = this.startTimeout(controller);
 
     try {
       const result = await Promise.any(
@@ -19,6 +28,8 @@ export default class IPFSContentRacer {
       return result;
     } catch {
       throw new IPFSContentNotFoundError(cid.valueOf());
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -27,6 +38,7 @@ export default class IPFSContentRacer {
     key: string,
   ): Promise<string | undefined> {
     const controller = new AbortController();
+    const timeout = this.startTimeout(controller);
 
     try {
       const result = await Promise.any(
@@ -46,6 +58,8 @@ export default class IPFSContentRacer {
       return result;
     } catch {
       return undefined;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }
