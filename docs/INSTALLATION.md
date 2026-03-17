@@ -4,7 +4,7 @@ This document explains how to run `pigeon-swarm` locally and how environment var
 
 ## Quick Start
 
-1. Install dependencies:
+1. Install dependencies (if you don't use docker):
 
 ```bash
 yarn
@@ -21,7 +21,7 @@ TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
 ```
 
-3. Start the app with your usual project command.
+3. Start the app with `yarn local` or `docker compose up`
 
 ## Core Variables
 
