@@ -37,7 +37,7 @@ describe('IpfsIdentityRepository', () => {
         primitives.networks,
       );
       expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
-        primitives.id,
+        'pigeon-swarm_identity-' + primitives.id,
         expectedCid.valueOf(),
         primitives.networks,
       );
@@ -63,7 +63,9 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecord).toHaveBeenCalledWith(primitives.id);
+      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+      );
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(result.toPrimitives()).toEqual(primitives);
     });
