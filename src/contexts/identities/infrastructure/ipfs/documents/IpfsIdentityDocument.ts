@@ -4,6 +4,7 @@ export interface IpfsIdentityDocument {
     publicKey: string;
     encryptedPrivateKey: string;
   };
+  networks: string[];
   profile: {
     name: string;
     biography: string | undefined;

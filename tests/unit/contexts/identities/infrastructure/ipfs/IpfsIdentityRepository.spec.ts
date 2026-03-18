@@ -4,8 +4,8 @@ import { IdentityNotFoundError } from '../../../../../../src/contexts/identities
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
-import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
@@ -53,6 +53,7 @@ describe('IpfsIdentityRepository', () => {
       ipfsManager.getJSON.mockResolvedValue({
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
+        networks: primitives.networks,
         profile: primitives.profile,
         signature: primitives.signature,
         timestamp: primitives.timestamp,

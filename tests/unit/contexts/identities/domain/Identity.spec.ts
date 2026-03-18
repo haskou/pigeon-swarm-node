@@ -1,6 +1,9 @@
+import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { faker } from '@faker-js/faker';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
@@ -32,6 +35,36 @@ describe('Identity', () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]).toBeInstanceOf(IdentityWasCreatedEvent);
+    });
+
+    it('should create an identity with multiple networks', async () => {
+      const networks = [
+        new NetworkId(faker.string.uuid()),
+        new NetworkId(faker.string.uuid()),
+      ];
+      const identity = await mother.withNetworks(networks).build();
+      const primitives = identity.toPrimitives();
+
+      expect(primitives.networks).toHaveLength(2);
+      expect(primitives.networks).toEqual(
+        networks.map((network) => network.valueOf()),
+      );
+    });
+
+    it('should throw IdentityMustHaveAtLeastOneNetworkError when networks is empty', async () => {
+      const emptyNetworks: NetworkId[] = [];
+      const identity = await mother
+        .withNetworks([new NetworkId(faker.string.uuid())])
+        .build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        networks: emptyNetworks.map((network) => network.valueOf()),
+      };
+
+      expect(() => mother.buildFromPrimitives(tampered)).toThrow(
+        IdentityMustHaveAtLeastOneNetworkError,
+      );
     });
   });
 
@@ -70,6 +103,7 @@ describe('Identity', () => {
           publicKey: expect.any(String),
         }),
         id: primitives.encryptedKeyPair.publicKey,
+        networks: expect.arrayContaining([expect.any(String)]),
         profile: {
           biography: undefined,
           name: mother.name.valueOf(),
@@ -78,6 +112,21 @@ describe('Identity', () => {
         signature: expect.any(String),
         timestamp: expect.any(Number),
       });
+    });
+
+    it('should include all network ids in primitives', async () => {
+      const networks = [
+        new NetworkId(faker.string.uuid()),
+        new NetworkId(faker.string.uuid()),
+        new NetworkId(faker.string.uuid()),
+      ];
+      const identity = await mother.withNetworks(networks).build();
+      const primitives = identity.toPrimitives();
+
+      expect(primitives.networks).toHaveLength(3);
+      expect(primitives.networks).toEqual(
+        networks.map((network) => network.valueOf()),
+      );
     });
   });
 });

@@ -1,73 +1,85 @@
 @startuml
 
-title Pigeon-swarm
+title Pigeon Swarm - Identities Context
 
 package "identities" {
   package "domain" {
 
     class Identity <AggregateRoot> {
-      -id: identityId
-      -publicKey: Key
-      -privateEncryptedKey: Key
+      -id: IdentityId
+      -encryptedKeyPair: EncryptedKeyPair
+      -networks: UniqueObjectArray<NetworkId>
+      -profile: Profile
       -timestamp: Timestamp
-      -signature: Hash
+      -signature: Signature
+      +create(name, password): Identity
+      +addNetwork(networkId): void
     }
 
-     class Profile {
-      -name: StringValueObject
-      -biography?: StringValueObject
-      -profilePicture?: Image
+    class Profile {
+      -name: ProfileName
+      -biography?: ProfileBiography
+      -picture?: ProfileImage
     }
 
-    class IdentityRepositoryService {}
+    class ProfileName {
+    }
 
-    note left of IdentityRepositoryService
-      Ideally, multiple services for different actions, Solid and KISS.
-      To be able to update an Identity, we need to:
-        -get profile by id
-        -check signature
-        -update fields
-        -save Identity
-    end note
+    class ProfileBiography {
+    }
 
+    class ProfileImage {
+    }
+
+    ' Domain Services
+    class IdentitySignatureDomainService {
+      +generate(identity): Signature
+      +validate(identity): boolean
+    }
+
+    class IdentitySaverService {
+      +save(identity): Promise<void>
+    }
+
+    class IdentityFinderService {
+      +findById(identityId): Promise<Identity>
+    }
+
+    ' Repository
     interface IdentityRepository {
-      +save(Identity: Identity): void
-      +findById(identityId: identityId): Identity
-    }
-    interface CryptoService {
-      +encrypt(data: String, key: Key): String
-      +decrypt(data: String, key: Key): String
-      +validate(data: String, key: Key): String
+      +save(identity: Identity): Promise<void>
+      +findById(id: IdentityId): Promise<Identity>
     }
 
-
-    Identity ..> CryptoService
-    Identity *--> Profile
-    IdentityRepositoryService ..> IdentityRepository
-    IdentityRepositoryService o--> Identity
+    ' Relationships in domain
+    Identity *--> Profile : contains
+    Profile *--> ProfileName
+    Profile *--> ProfileBiography
+    Profile *--> ProfileImage
+    Identity ..> IdentitySignatureDomainService
+    IdentitySaverService --> Identity
+    IdentitySaverService --> IdentityRepository
+    IdentityFinderService --> IdentityRepository
 
   }
 
   package "application" {
-    class IdentityFinder {
-      +findById(identityId: identityId): Identity
-    }
+    ' Use Cases
     class IdentityCreator {
-      +createIdentity(identity: Identity): void
-    }
-    class IdentityPasswordUpdater {
-      +updatePassword(identityId: identityId, newPassword: String): void
+      -saverService: IdentitySaverService
+      +create(message: IdentityCreateMessage): Promise<Identity>
     }
 
-    note right of IdentityPasswordUpdater
-      It s should be updated by backend or frontend?
-    end note
+    class IdentityFinder {
+      -finderService: IdentityFinderService
+      +find(message: IdentityFinderMessage): Promise<Identity>
+    }
   }
 
-    IdentityFinder ..> IdentityRepositoryService
-    IdentityCreator ..> IdentityRepositoryService
-    IdentityPasswordUpdater ..> IdentityRepositoryService
+  IdentityCreator --> IdentitySaverService
+  IdentityFinder --> IdentityFinderService
 }
+
 
 
 @enduml

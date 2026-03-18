@@ -15,7 +15,6 @@ export class PostIdentityRoute extends Route {
     this.get<IdentityCreator>(IdentityCreator);
 
   @Post('/')
-  // eslint-disable-next-line @typescript-eslint/require-await
   public async createIdentity(
     @Body() body: PostIdentityBody,
     @Res() response: Response,

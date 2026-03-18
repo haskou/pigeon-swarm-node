@@ -4,6 +4,7 @@ export interface IdentityResource {
     encryptedPrivateKey: string;
     publicKey: string;
   };
+  networks: string[];
   profile: {
     name: string;
     biography: string | undefined;

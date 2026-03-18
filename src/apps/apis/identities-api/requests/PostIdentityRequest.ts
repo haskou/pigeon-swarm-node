@@ -6,6 +6,10 @@ export class PostIdentityRequest {
   constructor(private readonly body: PostIdentityBody) {}
 
   public getIdentityCreateMessage(): IdentityCreateMessage {
-    return new IdentityCreateMessage(this.body.name, this.body.password);
+    return new IdentityCreateMessage(
+      this.body.name,
+      this.body.password,
+      this.body.networks,
+    );
   }
 }

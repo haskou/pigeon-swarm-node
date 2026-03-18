@@ -22,6 +22,7 @@ describe('IdentityCreator', () => {
       const message = new IdentityCreateMessage(
         faker.person.firstName().substring(0, 20),
         faker.internet.password({ length: 12 }),
+        [faker.string.uuid()],
       );
 
       saver.save.mockResolvedValue(undefined);
@@ -41,6 +42,7 @@ describe('IdentityCreator', () => {
       const message = new IdentityCreateMessage(
         faker.person.firstName().substring(0, 20),
         faker.internet.password({ length: 12 }),
+        [faker.string.uuid()],
       );
       const error = new Error('save failed');
 

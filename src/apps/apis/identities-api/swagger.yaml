@@ -60,6 +60,11 @@ components:
               type: string
             publicKey:
               type: string
+        networks:
+          type: array
+          items:
+            type: string
+            format: uuid
         profile:
           type: object
           required:

@@ -7,6 +7,7 @@ export default class IpfsIdentityMapper {
     return Identity.fromPrimitives({
       encryptedKeyPair: document.encryptedKeyPair,
       id: document._id,
+      networks: document.networks,
       profile: document.profile,
       signature: document.signature,
       timestamp: document.timestamp,
@@ -19,6 +20,7 @@ export default class IpfsIdentityMapper {
     return {
       _id: primitives.id,
       encryptedKeyPair: primitives.encryptedKeyPair,
+      networks: primitives.networks,
       profile: primitives.profile,
       signature: primitives.signature,
       timestamp: primitives.timestamp,
