@@ -1,10 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
-export class InvalidIdentitySignatureError extends BaseError {
+export class InvalidIdentitySignatureError extends DomainError {
   constructor() {
-    super(
-      'Invalid signature for the provided identity data.',
-      InvalidIdentitySignatureError.prototype,
-    );
+    super('Invalid signature for the provided identity data.');
   }
 }

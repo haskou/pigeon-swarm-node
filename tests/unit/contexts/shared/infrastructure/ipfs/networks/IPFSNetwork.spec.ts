@@ -22,6 +22,15 @@ describe('IPFSNetwork', () => {
     connection = mock<IPFSConnection>();
   });
 
+  describe('getId', () => {
+    it('should return the network id from config', () => {
+      const config = new IPFSNetworkConfig(networkId, 'my-network');
+      const network = new IPFSNetwork(config, connection);
+
+      expect(network.getId()).toBe(networkId);
+    });
+  });
+
   describe('getName', () => {
     it('should return the network name from config', () => {
       const config = new IPFSNetworkConfig(networkId, 'my-network');

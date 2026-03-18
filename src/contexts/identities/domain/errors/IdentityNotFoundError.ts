@@ -1,7 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
-export class IdentityNotFoundError extends BaseError {
+export class IdentityNotFoundError extends DomainError {
   constructor(id: string) {
-    super(`Identity with id ${id} not found`, IdentityNotFoundError.prototype);
+    super(`Identity with id ${id} not found`);
   }
 }

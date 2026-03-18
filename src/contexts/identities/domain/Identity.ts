@@ -40,9 +40,11 @@ export class Identity extends AggregateRoot {
   ): Promise<Identity> {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const primitiveEncryptedKeyPair = encryptedKeyPair.toPrimitives();
+    const identityId = new IdentityId(primitiveEncryptedKeyPair.publicKey);
     const primitives = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      id: encryptedKeyPair.toPrimitives().publicKey,
+      encryptedKeyPair: primitiveEncryptedKeyPair,
+      id: identityId.valueOf(),
       networks: networks.map((networkId) => networkId.valueOf()),
       profile: new Profile(name).toPrimitives(),
       signature: '',

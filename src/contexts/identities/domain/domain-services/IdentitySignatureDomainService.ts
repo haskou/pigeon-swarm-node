@@ -7,35 +7,39 @@ import {
 
 import { Identity } from '../Identity';
 
-type IdentitySignature = Omit<PrimitiveOf<Identity>, 'signature'>;
+type IdentitySignaturePayload = Omit<PrimitiveOf<Identity>, 'signature'>;
 
 export class IdentitySignatureDomainService {
+  private getCanonicalPayload(
+    payload: IdentitySignaturePayload,
+  ): IdentitySignaturePayload {
+    return {
+      encryptedKeyPair: payload.encryptedKeyPair,
+      id: payload.id,
+      networks: payload.networks,
+      profile: payload.profile,
+      timestamp: payload.timestamp,
+    };
+  }
+
   public async generateSignature(
-    payload: IdentitySignature,
+    payload: IdentitySignaturePayload,
     encryptedKeyPair: EncryptedKeyPair,
     password: Password,
   ): Promise<Signature> {
     return encryptedKeyPair.sign(
-      JSON.stringify({
-        encryptedKeyPair: payload.encryptedKeyPair,
-        id: payload.id,
-        timestamp: payload.timestamp,
-      }),
+      JSON.stringify(this.getCanonicalPayload(payload)),
       password,
     );
   }
 
   public isValidSignature(
     encryptedKeyPair: EncryptedKeyPair,
-    payload: PrimitiveOf<Identity>,
+    payload: IdentitySignaturePayload,
     signature: Signature,
   ): boolean {
     return encryptedKeyPair.isValidSignature(
-      JSON.stringify({
-        encryptedKeyPair: payload.encryptedKeyPair,
-        id: payload.id,
-        timestamp: payload.timestamp,
-      }),
+      JSON.stringify(this.getCanonicalPayload(payload)),
       signature,
     );
   }

@@ -1,3 +1,4 @@
+import { IPFSNetworksNotFoundByIdsError } from './errors/IPFSNetworksNotFoundByIdsError';
 import IPFSContentRacer from './helia/IPFSContentRacer';
 import { IPFSId } from './helia/IPFSId';
 import { IPFSNetwork } from './networks/IPFSNetwork';
@@ -72,6 +73,26 @@ export default class IPFS {
     return results[0];
   }
 
+  public async addJSONToNetworks(
+    data: unknown,
+    networkIds: string[],
+  ): Promise<IPFSId> {
+    await this.initialize();
+
+    const results = await Promise.all(
+      this.registry
+        .getAll()
+        .filter((network) => networkIds.includes(network.getId()))
+        .map((network) => network.addJSON(data)),
+    );
+
+    if (results.length === 0) {
+      throw new IPFSNetworksNotFoundByIdsError(networkIds);
+    }
+
+    return results[0];
+  }
+
   public async putRecord(
     key: string,
     value: string,
@@ -82,6 +103,24 @@ export default class IPFS {
     const network = this.registry.find(networkName);
 
     await network.putRecord(key, value);
+  }
+
+  public async putRecordToNetworks(
+    key: string,
+    value: string,
+    networkIds: string[],
+  ): Promise<void> {
+    await this.initialize();
+
+    const networks = this.registry
+      .getAll()
+      .filter((network) => networkIds.includes(network.getId()));
+
+    if (networks.length === 0) {
+      throw new IPFSNetworksNotFoundByIdsError(networkIds);
+    }
+
+    await Promise.all(networks.map((network) => network.putRecord(key, value)));
   }
 
   public async putRecordToAll(key: string, value: string): Promise<void> {

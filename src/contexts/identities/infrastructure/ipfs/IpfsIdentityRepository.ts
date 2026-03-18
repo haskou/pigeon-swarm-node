@@ -30,8 +30,15 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   public async save(identity: Identity): Promise<void> {
     const document = this.mapper.toDocument(identity);
-    const cid = await this.ipfsManager.addJSONToAll(document);
+    const cid = await this.ipfsManager.addJSONToNetworks(
+      document,
+      document.networks,
+    );
 
-    await this.ipfsManager.putRecordToAll(document._id, cid.valueOf());
+    await this.ipfsManager.putRecordToNetworks(
+      document._id,
+      cid.valueOf(),
+      document.networks,
+    );
   }
 }

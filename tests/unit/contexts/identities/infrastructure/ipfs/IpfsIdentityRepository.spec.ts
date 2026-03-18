@@ -27,17 +27,19 @@ describe('IpfsIdentityRepository', () => {
       const primitives = identity.toPrimitives();
       const expectedCid = new IPFSId('bafyresultcid');
 
-      ipfsManager.addJSONToAll.mockResolvedValue(expectedCid);
-      ipfsManager.putRecordToAll.mockResolvedValue(undefined);
+      ipfsManager.addJSONToNetworks.mockResolvedValue(expectedCid);
+      ipfsManager.putRecordToNetworks.mockResolvedValue(undefined);
 
       await repository.save(identity);
 
-      expect(ipfsManager.addJSONToAll).toHaveBeenCalledWith(
+      expect(ipfsManager.addJSONToNetworks).toHaveBeenCalledWith(
         expect.objectContaining({ _id: primitives.id }),
+        primitives.networks,
       );
-      expect(ipfsManager.putRecordToAll).toHaveBeenCalledWith(
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
         primitives.id,
         expectedCid.valueOf(),
+        primitives.networks,
       );
     });
   });
