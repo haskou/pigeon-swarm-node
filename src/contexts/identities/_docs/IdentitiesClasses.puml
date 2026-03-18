@@ -12,8 +12,7 @@ package "identities" {
       -profile: Profile
       -timestamp: Timestamp
       -signature: Signature
-      +create(name, password): Identity
-      +addNetwork(networkId): void
+      +create(name, password, networks): Identity
     }
 
     class Profile {
