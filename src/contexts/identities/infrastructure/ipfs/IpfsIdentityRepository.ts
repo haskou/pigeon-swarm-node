@@ -9,13 +9,16 @@ import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
 export default class IpfsIdentityRepository implements IdentityRepository {
+  private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsIdentityMapper,
   ) {}
 
   public async findById(id: IdentityId): Promise<Identity> {
-    const cidString = await this.ipfsManager.getRecord(id.valueOf());
+    const cidString = await this.ipfsManager.getRecord(
+      this.ROUTING_KEY_PREFIX + id.valueOf(),
+    );
 
     if (!cidString) {
       throw new IdentityNotFoundError(id.valueOf());
@@ -30,15 +33,13 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   public async save(identity: Identity): Promise<void> {
     const document = this.mapper.toDocument(identity);
-    const cid = await this.ipfsManager.addJSONToNetworks(
-      document,
-      document.networks,
-    );
+    const networks: string[] = document.networks;
+    const cid = await this.ipfsManager.addJSONToNetworks(document, networks);
 
     await this.ipfsManager.putRecordToNetworks(
-      document._id,
+      this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
-      document.networks,
+      networks,
     );
   }
 }
