@@ -721,10 +721,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/value-objects@^2.3.0":
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.3.0.tgz#071614607090ae4ff38052ac0b78bdc7ea1cbd41"
-  integrity sha512-LNEu6iokS1UVTKxyAGIeDX+a/5Iw3DBaV3YDJUbAM0Xuf/n250Uh+m3wGqqJWSqKtJ94Lenq84dB+oUKH01Z/A==
+"@haskou/value-objects@^2.5.0":
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.5.0.tgz#4ecacc1b3c665bcfff7f534fb1fc04daf1c19185"
+  integrity sha512-KgQSaHNQ+7iNMaUynTktSTNq2gaLG28BCsyebj+nkUqAdGFD5dhngFH1gE6CllIh4gWxlSWr+Of8pIYUl/ZgaA==
   dependencies:
     "@noble/curves" "^2.0.1"
     bson-objectid "^2.0.4"
