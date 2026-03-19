@@ -13,6 +13,12 @@ import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 export abstract class HeliaIPFS implements IPFSConnection {
+  private static isInMemoryStorageLocation(storageLocation: string): boolean {
+    return (
+      storageLocation === 'memory' || storageLocation.startsWith('memory/')
+    );
+  }
+
   public static async createPublicHeliaCore(
     options: IPFSOptions,
   ): Promise<HeliaInstance> {
@@ -149,7 +155,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   public async blockPeer(peerId: string): Promise<void> {
     HeliaIPFSParser.registerBlockedPeer(peerId);
 
-    if (!this.options.storageLocation.startsWith('memory')) {
+    if (!HeliaIPFS.isInMemoryStorageLocation(this.options.storageLocation)) {
       await fs.writeFile(
         `${this.options.storageLocation}/blockedPeers.json`,
         JSON.stringify(HeliaIPFSParser.getBlockedPeers()),

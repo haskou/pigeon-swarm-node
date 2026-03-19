@@ -1,5 +1,6 @@
 import Kernel from '@app/Kernel';
 import * as fsSync from 'fs';
+import path from 'path';
 
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
@@ -11,8 +12,14 @@ type IdentityResponseShape = {
 
 export default class IPFSDefinition {
   private static scenarioCount: number = 0;
+
   private static readonly IDENTITY_ROUTING_KEY_PREFIX =
     'pigeon-swarm_identity-';
+
+  private static readonly TEST_STORAGE_ROOT = path.join(
+    Kernel.rootDirectory,
+    'memory',
+  );
 
   private storedIPFSCid: string | undefined;
   private scenarioSuffix: string = '';
@@ -45,6 +52,46 @@ export default class IPFSDefinition {
     return (responseData as IdentityResponseShape).id;
   }
 
+  private isInMemoryStorageLocation(storagePath: string): boolean {
+    return storagePath === 'memory' || storagePath.startsWith('memory/');
+  }
+
+  private getMemoryStorageRoot(): string {
+    return path.resolve(IPFSDefinition.TEST_STORAGE_ROOT);
+  }
+
+  private resolveInMemoryCleanupPath(storagePath: string): string | undefined {
+    const memoryRoot = this.getMemoryStorageRoot();
+
+    if (storagePath === 'memory') {
+      return memoryRoot;
+    }
+
+    const relativePath = storagePath.replace(/^memory\//, '');
+    const resolvedPath = path.resolve(memoryRoot, relativePath);
+
+    if (
+      resolvedPath === memoryRoot ||
+      resolvedPath.startsWith(`${memoryRoot}${path.sep}`)
+    ) {
+      return resolvedPath;
+    }
+
+    return undefined;
+  }
+
+  private isWhitelistedTestStorageLocation(storagePath: string): boolean {
+    const resolvedStoragePath = path.resolve(storagePath);
+    const resolvedWhitelistRoot = path.resolve(
+      IPFSDefinition.TEST_STORAGE_ROOT,
+    );
+
+    return (
+      resolvedStoragePath === resolvedWhitelistRoot ||
+      resolvedStoragePath.startsWith(`${resolvedWhitelistRoot}${path.sep}`)
+    );
+  }
+
   public resetScenarioState(): void {
     this.storedIPFSCid = undefined;
     this.scenarioSuffix = IPFSDefinition.nextScenarioSuffix();
@@ -56,7 +103,28 @@ export default class IPFSDefinition {
   }
 
   public cleanupStorageFolder(storagePath?: string): void {
-    if (storagePath && fsSync.existsSync(storagePath)) {
+    if (!storagePath) {
+      return;
+    }
+
+    if (this.isInMemoryStorageLocation(storagePath)) {
+      const inMemoryCleanupPath = this.resolveInMemoryCleanupPath(storagePath);
+
+      if (inMemoryCleanupPath && fsSync.existsSync(inMemoryCleanupPath)) {
+        fsSync.rmSync(inMemoryCleanupPath, {
+          force: true,
+          recursive: true,
+        });
+      }
+
+      return;
+    }
+
+    if (!this.isWhitelistedTestStorageLocation(storagePath)) {
+      return;
+    }
+
+    if (fsSync.existsSync(storagePath)) {
       fsSync.rmSync(storagePath, {
         force: true,
         recursive: true,

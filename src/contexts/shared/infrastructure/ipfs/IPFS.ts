@@ -68,12 +68,16 @@ export default class IPFS {
     const { networkName, offlineOnly = false } = options;
 
     try {
+      await this.initialize();
+
       if (networkName) {
-        await this.getJSONFromNetwork(cid, networkName);
+        const network = this.registry.find(networkName);
+
+        await network.getJSON(cid);
       } else if (offlineOnly) {
         await this.statAcrossRegisteredNetworksOffline(cid);
       } else {
-        await this.getJSON<unknown>(cid);
+        await this.racer.raceGetJSON<unknown>(this.registry.getAll(), cid);
       }
 
       return true;

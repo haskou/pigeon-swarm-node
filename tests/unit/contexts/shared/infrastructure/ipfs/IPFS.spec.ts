@@ -73,6 +73,7 @@ describe('IPFS', () => {
       const exists = await ipfs.stat(cid, { networkName: 'my-network' });
 
       expect(exists).toBe(true);
+      expect(registry.initialize).toHaveBeenCalled();
       expect(registry.find).toHaveBeenCalledWith('my-network');
       expect(racer.raceGetJSON).not.toHaveBeenCalled();
     });
@@ -91,6 +92,7 @@ describe('IPFS', () => {
       const exists = await ipfs.stat(cid, { offlineOnly: true });
 
       expect(exists).toBe(true);
+      expect(registry.initialize).toHaveBeenCalled();
       expect(firstNetwork.getJSON).toHaveBeenCalledWith(cid);
       expect(secondNetwork.getJSON).toHaveBeenCalledWith(cid);
       expect(racer.raceGetJSON).not.toHaveBeenCalled();

@@ -40,7 +40,6 @@ export default class Definitions {
     if (!kernel) {
       kernel = new Kernel();
       kernel.environmentVariables('test');
-      process.env.IPFS_STORAGE_PATH = 'memory';
       this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
       await kernel.dependencyInjection();
@@ -107,9 +106,9 @@ export default class Definitions {
   public async itHasBeenPinnedInIpfs(): Promise<void> {
     await this.ipfsDefinition.assertPinnedInIPFS(this.response.data);
   }
+
   @then('nothing has been pinned in ipfs')
   public async nothingHasBeenPinnedInIpfs(): Promise<void> {
-  public async nadaSeHaPineadoEnIpfs(): Promise<void> {
     await this.ipfsDefinition.assertNothingPinnedInIPFS(this.response.data);
   }
 
