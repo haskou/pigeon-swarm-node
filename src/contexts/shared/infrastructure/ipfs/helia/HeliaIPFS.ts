@@ -149,7 +149,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   public async blockPeer(peerId: string): Promise<void> {
     HeliaIPFSParser.registerBlockedPeer(peerId);
 
-    if (this.options.storageLocation !== 'memory') {
+    if (!this.options.storageLocation.startsWith('memory')) {
       await fs.writeFile(
         `${this.options.storageLocation}/blockedPeers.json`,
         JSON.stringify(HeliaIPFSParser.getBlockedPeers()),

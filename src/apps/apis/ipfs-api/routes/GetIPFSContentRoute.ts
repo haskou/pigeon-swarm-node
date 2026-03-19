@@ -1,3 +1,4 @@
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -14,12 +15,18 @@ export class GetIPFSContentRoute extends Route {
     @Param('cid') cid: string,
     @Res() response: Response,
   ): Promise<Response> {
-    const content = await this.ipfs.getJSON(new IPFSId(cid));
+    try {
+      const content = await this.ipfs.getJSON(new IPFSId(cid));
 
-    return content
-      ? response.status(HttpRouteStatusEnum.OK).json(content)
-      : response
+      return response.status(HttpRouteStatusEnum.OK).json(content);
+    } catch (error: unknown) {
+      if (error instanceof IPFSContentNotFoundError) {
+        return response
           .status(HttpRouteStatusEnum.NOT_FOUND)
           .json({ error: 'CID not found in any network' });
+      }
+
+      throw error;
+    }
   }
 }

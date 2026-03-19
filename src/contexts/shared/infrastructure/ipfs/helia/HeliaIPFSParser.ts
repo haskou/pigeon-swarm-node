@@ -31,13 +31,19 @@ export type ParsedHeliaIPFSOptions = {
 export class HeliaIPFSParser {
   private static readonly blockedPeers: string[] = [];
 
+  private static isInMemoryStorageLocation(storageLocation: string): boolean {
+    return (
+      storageLocation === 'memory' || storageLocation.startsWith('memory/')
+    );
+  }
+
   private static async parseStorageLocationOptions(
     options: IPFSOptions,
   ): Promise<{
     blockstore: RuntimeBlockstore;
     datastore: RuntimeDatastore;
   }> {
-    if (options.storageLocation === 'memory') {
+    if (HeliaIPFSParser.isInMemoryStorageLocation(options.storageLocation)) {
       return {
         blockstore: await heliaRuntimeAdapter.createMemoryBlockstore(),
         datastore: await heliaRuntimeAdapter.createMemoryDatastore(),
@@ -57,7 +63,7 @@ export class HeliaIPFSParser {
   private static parseBlockedPeers(options: IPFSOptions): {
     connectionGater: ConnectionGater;
   } {
-    if (options.storageLocation !== 'memory') {
+    if (!HeliaIPFSParser.isInMemoryStorageLocation(options.storageLocation)) {
       const peersFromStorage = HeliaIPFSParser.readBlockedPeersFromStorage(
         options.storageLocation,
       );

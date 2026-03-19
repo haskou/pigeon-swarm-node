@@ -1,3 +1,4 @@
+import { IPFSContentNotFoundError } from './errors/IPFSContentNotFoundError';
 import { IPFSNetworksNotFoundByIdsError } from './errors/IPFSNetworksNotFoundByIdsError';
 import IPFSContentRacer from './helia/IPFSContentRacer';
 import { IPFSId } from './helia/IPFSId';
@@ -5,11 +6,38 @@ import { IPFSNetwork } from './networks/IPFSNetwork';
 import { IPFSNetworkConfig } from './networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from './networks/IPFSNetworkRegistry';
 
+export type IPFSStatOptions = {
+  offlineOnly?: boolean;
+  networkName?: string;
+};
+
 export default class IPFS {
   constructor(
     private readonly registry: IPFSNetworkRegistry,
     private readonly racer: IPFSContentRacer,
   ) {}
+
+  private async statAcrossRegisteredNetworksOffline(
+    cid: IPFSId,
+  ): Promise<void> {
+    const networks = this.registry.getAll();
+
+    for (const network of networks) {
+      try {
+        await network.getJSON(cid);
+
+        return;
+      } catch (error: unknown) {
+        if (error instanceof IPFSContentNotFoundError) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new IPFSContentNotFoundError(cid.valueOf());
+  }
 
   public async initialize(): Promise<void> {
     await this.registry.initialize();
@@ -21,10 +49,41 @@ export default class IPFS {
     return this.registry.register(config);
   }
 
+  public async removeNetwork(name: string): Promise<void> {
+    await this.initialize();
+
+    await this.registry.removeNetwork(name);
+  }
+
   public async getJSON<T>(cid: IPFSId): Promise<T> {
     await this.initialize();
 
     return this.racer.raceGetJSON<T>(this.registry.getAll(), cid);
+  }
+
+  public async stat(
+    cid: IPFSId,
+    options: IPFSStatOptions = {},
+  ): Promise<boolean> {
+    const { networkName, offlineOnly = false } = options;
+
+    try {
+      if (networkName) {
+        await this.getJSONFromNetwork(cid, networkName);
+      } else if (offlineOnly) {
+        await this.statAcrossRegisteredNetworksOffline(cid);
+      } else {
+        await this.getJSON<unknown>(cid);
+      }
+
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof IPFSContentNotFoundError) {
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   public async getJSONFromNetwork<T>(
