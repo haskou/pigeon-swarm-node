@@ -1,19 +1,21 @@
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
-import { Network } from '@app/contexts/nodes/domain/Network';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { NetworkMother } from '../../../mothers/NetworkMother';
 import { NodeMother } from '../../../mothers/NodeMother';
 
 describe('Node', () => {
   let mother: NodeMother;
+  let networkMother: NetworkMother;
   let node: Node;
   let primitives: PrimitiveOf<Node>;
 
   beforeEach(() => {
     mother = new NodeMother();
+    networkMother = new NetworkMother();
     node = mother.build();
     primitives = {
       id: mother.id.valueOf(),
@@ -46,11 +48,7 @@ describe('Node', () => {
   describe('addNetwork', () => {
     it('should add a network and record a NodeNetworkWasAdded event', () => {
       const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
-      const network = Network.fromPrimitives({
-        id: networkId.valueOf(),
-        key: undefined,
-        name: 'public',
-      });
+      const network = networkMother.withId(networkId).withoutKey().build();
 
       node.addNetwork(network);
 
@@ -64,16 +62,15 @@ describe('Node', () => {
     });
 
     it('should throw when adding a second public network', () => {
-      const firstPublic = Network.fromPrimitives({
-        id: '550e8400-e29b-41d4-a716-446655440000',
-        key: undefined,
-        name: 'public',
-      });
-      const secondPublic = Network.fromPrimitives({
-        id: '550e8400-e29b-41d4-a716-446655440001',
-        key: undefined,
-        name: 'public_2',
-      });
+      const firstPublic = networkMother
+        .withId(NetworkId.generate())
+        .withoutKey()
+        .build();
+      const secondPublic = new NetworkMother()
+        .withId(NetworkId.generate())
+        .withoutKey()
+        .build();
+
       node.addNetwork(firstPublic);
 
       expect(() => node.addNetwork(secondPublic)).toThrow(

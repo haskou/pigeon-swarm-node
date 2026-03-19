@@ -9,6 +9,10 @@ export class IPFSNetwork {
     private readonly connection: IPFSConnection,
   ) {}
 
+  public getId(): string {
+    return this.config.getId();
+  }
+
   public getName(): string {
     return this.config.getName();
   }

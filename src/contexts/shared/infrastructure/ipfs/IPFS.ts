@@ -1,3 +1,4 @@
+import { IPFSNetworksNotFoundByIdsError } from './errors/IPFSNetworksNotFoundByIdsError';
 import IPFSContentRacer from './helia/IPFSContentRacer';
 import { IPFSId } from './helia/IPFSId';
 import { IPFSNetwork } from './networks/IPFSNetwork';
@@ -37,8 +38,15 @@ export default class IPFS {
     return network.getJSON<T>(cid);
   }
 
+  // TODO: Fix security issue of this method
   public async getRecord(key: string): Promise<string | undefined> {
     await this.initialize();
+
+    // TODO: This should return multiple records and then validate which one is
+    // correct based on the content. For example, Identities id its its public
+    // key which it's the same as the record and it includes a signatures.
+    // So it's easy to validate if the content has been modified maliciously
+    // For other content, we might need to store a hash of the content
 
     return this.racer.raceGetRecord(this.registry.getAll(), key);
   }
@@ -72,6 +80,26 @@ export default class IPFS {
     return results[0];
   }
 
+  public async addJSONToNetworks(
+    data: unknown,
+    networkIds: string[],
+  ): Promise<IPFSId> {
+    await this.initialize();
+
+    const results = await Promise.all(
+      this.registry
+        .getAll()
+        .filter((network) => networkIds.includes(network.getId()))
+        .map((network) => network.addJSON(data)),
+    );
+
+    if (results.length === 0) {
+      throw new IPFSNetworksNotFoundByIdsError(networkIds);
+    }
+
+    return results[0];
+  }
+
   public async putRecord(
     key: string,
     value: string,
@@ -82,6 +110,24 @@ export default class IPFS {
     const network = this.registry.find(networkName);
 
     await network.putRecord(key, value);
+  }
+
+  public async putRecordToNetworks(
+    key: string,
+    value: string,
+    networkIds: string[],
+  ): Promise<void> {
+    await this.initialize();
+
+    const networks = this.registry
+      .getAll()
+      .filter((network) => networkIds.includes(network.getId()));
+
+    if (networks.length === 0) {
+      throw new IPFSNetworksNotFoundByIdsError(networkIds);
+    }
+
+    await Promise.all(networks.map((network) => network.putRecord(key, value)));
   }
 
   public async putRecordToAll(key: string, value: string): Promise<void> {

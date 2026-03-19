@@ -1,6 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IPFSNetworksNotFoundByIdsError } from '../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSNetworksNotFoundByIdsError';
 import IPFSContentRacer from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
@@ -23,6 +24,7 @@ describe('IPFS', () => {
     registry.initialize.mockResolvedValue(undefined);
     registry.getAll.mockReturnValue([mockNetwork]);
     registry.find.mockReturnValue(mockNetwork);
+    mockNetwork.getId.mockReturnValue('550e8400-e29b-41d4-a716-446655440000');
   });
 
   describe('getJSON', () => {
@@ -89,6 +91,31 @@ describe('IPFS', () => {
 
       expect(mockNetwork.addJSON).toHaveBeenCalled();
       expect(result).toEqual(expectedCid);
+    });
+  });
+
+  describe('addJSONToNetworks', () => {
+    it('should add JSON only to selected networks and return first CID', async () => {
+      const expectedCid = new IPFSId('bafyselected');
+
+      mockNetwork.addJSON.mockResolvedValue(expectedCid);
+
+      const result = await ipfs.addJSONToNetworks({ test: true }, [
+        '550e8400-e29b-41d4-a716-446655440000',
+      ]);
+
+      expect(mockNetwork.addJSON).toHaveBeenCalledWith({ test: true });
+      expect(result).toEqual(expectedCid);
+    });
+
+    it('should throw IPFSNetworksNotFoundByIdsError when no networks match', async () => {
+      mockNetwork.getId.mockReturnValue('550e8400-e29b-41d4-a716-446655440002');
+
+      await expect(
+        ipfs.addJSONToNetworks({ test: true }, [
+          '550e8400-e29b-41d4-a716-446655440000',
+        ]),
+      ).rejects.toThrow(IPFSNetworksNotFoundByIdsError);
     });
   });
 

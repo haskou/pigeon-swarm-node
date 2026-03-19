@@ -5,8 +5,7 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 
 export class NodeMother {
-  public id: NodeId = new NodeId('b4ce3ab9-c709-4d3a-af0a-84fefe52f0d7');
-
+  public id: NodeId = NodeId.generate();
   public networks: Map<NetworkId, Network> = new Map();
   public owner?: IdentityId = undefined;
 
@@ -29,15 +28,6 @@ export class NodeMother {
   }
 
   public build(): Node {
-    return Node.fromPrimitives({
-      id: this.id.valueOf(),
-      networks: Object.fromEntries(
-        Array.from(this.networks.entries()).map(([networkId, network]) => [
-          networkId.valueOf(),
-          network.toPrimitives(),
-        ]),
-      ),
-      owner: this.owner?.valueOf(),
-    });
+    return new Node(this.id, this.networks, this.owner);
   }
 }

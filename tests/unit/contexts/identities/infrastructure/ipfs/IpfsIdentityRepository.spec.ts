@@ -4,8 +4,8 @@ import { IdentityNotFoundError } from '../../../../../../src/contexts/identities
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
-import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
@@ -27,17 +27,19 @@ describe('IpfsIdentityRepository', () => {
       const primitives = identity.toPrimitives();
       const expectedCid = new IPFSId('bafyresultcid');
 
-      ipfsManager.addJSONToAll.mockResolvedValue(expectedCid);
-      ipfsManager.putRecordToAll.mockResolvedValue(undefined);
+      ipfsManager.addJSONToNetworks.mockResolvedValue(expectedCid);
+      ipfsManager.putRecordToNetworks.mockResolvedValue(undefined);
 
       await repository.save(identity);
 
-      expect(ipfsManager.addJSONToAll).toHaveBeenCalledWith(
+      expect(ipfsManager.addJSONToNetworks).toHaveBeenCalledWith(
         expect.objectContaining({ _id: primitives.id }),
+        primitives.networks,
       );
-      expect(ipfsManager.putRecordToAll).toHaveBeenCalledWith(
-        primitives.id,
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
         expectedCid.valueOf(),
+        primitives.networks,
       );
     });
   });
@@ -53,6 +55,7 @@ describe('IpfsIdentityRepository', () => {
       ipfsManager.getJSON.mockResolvedValue({
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
+        networks: primitives.networks,
         profile: primitives.profile,
         signature: primitives.signature,
         timestamp: primitives.timestamp,
@@ -60,7 +63,9 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecord).toHaveBeenCalledWith(primitives.id);
+      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+      );
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(result.toPrimitives()).toEqual(primitives);
     });

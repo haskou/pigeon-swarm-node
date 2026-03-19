@@ -11,7 +11,11 @@ export default class IdentityCreator {
   ) {}
 
   public async create(message: IdentityCreateMessage): Promise<Identity> {
-    const identity = await Identity.create(message.name, message.password);
+    const identity = await Identity.create(
+      message.name,
+      message.password,
+      message.networks,
+    );
 
     await this.saver.save(identity);
     await this.eventPublisher.publish(identity.pullDomainEvents());
