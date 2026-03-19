@@ -21,4 +21,4 @@ Feature: Post identity route
     And response contains a valid resource with the following fields
       | profile.name | alice                                |
       | networks[0]  | 123e4567-e89b-12d3-a456-426614174000 |
-    And se ha pineado en ipfs
+    And it has been pinned in ipfs

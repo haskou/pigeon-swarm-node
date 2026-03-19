@@ -103,12 +103,12 @@ export default class Definitions {
     await this.ipfsDefinition.assertCreatedCID(expectedCid);
   }
 
-  @then('se ha pineado en ipfs')
-  public async seHaPineadoEnIpfs(): Promise<void> {
+  @then('it has been pinned in ipfs')
+  public async itHasBeenPinnedInIpfs(): Promise<void> {
     await this.ipfsDefinition.assertPinnedInIPFS(this.response.data);
   }
-
-  @then('nada se ha pineado en ipfs')
+  @then('nothing has been pinned in ipfs')
+  public async nothingHasBeenPinnedInIpfs(): Promise<void> {
   public async nadaSeHaPineadoEnIpfs(): Promise<void> {
     await this.ipfsDefinition.assertNothingPinnedInIPFS(this.response.data);
   }
