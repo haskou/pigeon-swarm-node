@@ -114,7 +114,7 @@ export default class Definitions {
   }
 
   @when('I POST to {string}')
-  public async iPOSTTo(path: string) {
+  public async iPOSTTo(path: string): Promise<void> {
     const isFormData = this.formData !== undefined;
     this.response = await this.restClient.post(
       path,
@@ -124,7 +124,7 @@ export default class Definitions {
   }
 
   @when('I PUT {string}')
-  public async iPUT(path: string) {
+  public async iPUT(path: string): Promise<void> {
     this.response = await this.restClient.put(
       path,
       this.body && JSON.parse(this.body),
@@ -132,7 +132,7 @@ export default class Definitions {
   }
 
   @when('I PATCH {string}')
-  public async iPATCH(path: string) {
+  public async iPATCH(path: string): Promise<void> {
     this.response = await this.restClient.patch(
       path,
       this.body && JSON.parse(this.body),
@@ -140,12 +140,12 @@ export default class Definitions {
   }
 
   @when('I GET {string}')
-  public async iGET(path: string) {
+  public async iGET(path: string): Promise<void> {
     this.response = await this.restClient.get(path, this.headers);
   }
 
   @when('I DELETE {string}')
-  public async iDELETE(path: string) {
+  public async iDELETE(path: string): Promise<void> {
     this.response = await this.restClient.delete(path);
   }
 
