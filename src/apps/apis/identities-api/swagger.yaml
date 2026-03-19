@@ -49,12 +49,12 @@ components:
         - id
         - encryptedKeyPair
         - profile
+        - networks
         - timestamp
         - signature
       properties:
         id:
           type: string
-          format: string
           example: MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=
         encryptedKeyPair:
           type: object
