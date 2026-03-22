@@ -2,6 +2,8 @@ import Kernel from '@app/Kernel';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
+import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
+import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import heliaRuntimeAdapter, {
   DatastoreKeyLike,
   HeliaInstance,
@@ -81,14 +83,22 @@ export abstract class HeliaIPFS implements IPFSConnection {
       cid.valueOf(),
     );
 
-    const exists = await this.heliaCore.blockstore.has(parsedCid, {
-      signal,
-    });
+    if (offlineOnly) {
+      const exists = await this.heliaCore.blockstore.has(parsedCid, {
+        signal,
+      });
 
-    if (!exists) {
-      const mode = offlineOnly ? 'offline' : 'online';
+      if (!exists) {
+        throw new IPFSBlockNotFoundOfflineError(cid.valueOf());
+      }
 
-      throw new Error(`Block not found (${mode}): ${cid.valueOf()}`);
+      return;
+    }
+
+    try {
+      await this.heliaCore.blockstore.get(parsedCid, { signal });
+    } catch {
+      throw new IPFSBlockNotFoundPublicError(cid.valueOf());
     }
   }
 

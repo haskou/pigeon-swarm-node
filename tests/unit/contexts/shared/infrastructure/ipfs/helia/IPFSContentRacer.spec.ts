@@ -64,7 +64,7 @@ describe('IPFSContentRacer', () => {
   });
 
   describe('raceStat', () => {
-    it('should resolve when any network stat succeeds', async () => {
+    it('should resolve when any network stat succeeds and pass signal', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network1 = mock<IPFSNetwork>();
       const network2 = mock<IPFSNetwork>();
@@ -74,6 +74,12 @@ describe('IPFSContentRacer', () => {
 
       await expect(racer.raceStat([network1, network2], cid)).resolves.toBe(
         undefined,
+      );
+
+      expect(network1.stat).toHaveBeenCalledWith(
+        cid,
+        false,
+        expect.any(AbortSignal),
       );
     });
 

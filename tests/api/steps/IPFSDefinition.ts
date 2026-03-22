@@ -1,4 +1,3 @@
-import Kernel from '@app/Kernel';
 import * as fsSync from 'fs';
 import path from 'path';
 
@@ -6,6 +5,7 @@ import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipf
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import Kernel from '../../../src/Kernel';
 
 type IdentityResponseShape = {
   id?: string;

@@ -38,7 +38,9 @@ export default class IPFSContentRacer {
     const timeout = this.startTimeout(controller);
 
     try {
-      await Promise.any(networks.map((network) => network.stat(cid, false)));
+      await Promise.any(
+        networks.map((network) => network.stat(cid, false, controller.signal)),
+      );
 
       controller.abort();
     } catch {
