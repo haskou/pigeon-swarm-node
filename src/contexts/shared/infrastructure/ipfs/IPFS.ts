@@ -6,11 +6,6 @@ import { IPFSNetwork } from './networks/IPFSNetwork';
 import { IPFSNetworkConfig } from './networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from './networks/IPFSNetworkRegistry';
 
-export type IPFSStatOptions = {
-  offlineOnly?: boolean;
-  networkIds?: string[];
-};
-
 export default class IPFS {
   constructor(
     private readonly registry: IPFSNetworkRegistry,

@@ -2,6 +2,7 @@ import Kernel from '@app/Kernel';
 import * as fsSync from 'fs';
 import path from 'path';
 
+import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipfs/helia/HeliaIPFSParser';
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -53,7 +54,7 @@ export default class IPFSDefinition {
   }
 
   private isInMemoryStorageLocation(storagePath: string): boolean {
-    return storagePath === 'memory' || storagePath.startsWith('memory/');
+    return HeliaIPFSParser.isInMemoryStorageLocation(storagePath);
   }
 
   private getMemoryStorageRoot(): string {
