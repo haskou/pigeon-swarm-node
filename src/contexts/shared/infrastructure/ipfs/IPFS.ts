@@ -8,7 +8,7 @@ import IPFSNetworkRegistry from './networks/IPFSNetworkRegistry';
 
 export type IPFSStatOptions = {
   offlineOnly?: boolean;
-  networkName?: string;
+  networkIds?: string[];
 };
 
 export default class IPFS {
@@ -17,6 +17,24 @@ export default class IPFS {
     private readonly racer: IPFSContentRacer,
   ) {}
 
+  private getNetworksByIds(networkIds: string[]): IPFSNetwork[] {
+    const networks = this.registry
+      .getAll()
+      .filter((network) => networkIds.includes(network.getId()));
+
+    if (networks.length === 0) {
+      throw new IPFSNetworksNotFoundByIdsError(networkIds);
+    }
+
+    return networks;
+  }
+
+  private getNetworkById(networkId: string): IPFSNetwork {
+    const [network] = this.getNetworksByIds([networkId]);
+
+    return network;
+  }
+
   private async statAcrossRegisteredNetworksOffline(
     cid: IPFSId,
   ): Promise<void> {
@@ -24,7 +42,7 @@ export default class IPFS {
 
     for (const network of networks) {
       try {
-        await network.getJSON(cid);
+        await network.stat(cid, true);
 
         return;
       } catch (error: unknown) {
@@ -63,21 +81,20 @@ export default class IPFS {
 
   public async stat(
     cid: IPFSId,
-    options: IPFSStatOptions = {},
+    offlineOnly: boolean = false,
+    networkIds?: string[],
   ): Promise<boolean> {
-    const { networkName, offlineOnly = false } = options;
-
     try {
       await this.initialize();
 
-      if (networkName) {
-        const network = this.registry.find(networkName);
+      if (networkIds && networkIds.length > 0) {
+        const networksToCheck = this.getNetworksByIds(networkIds);
 
-        await network.getJSON(cid);
+        await this.racer.raceStat(networksToCheck, cid);
       } else if (offlineOnly) {
         await this.statAcrossRegisteredNetworksOffline(cid);
       } else {
-        await this.racer.raceGetJSON<unknown>(this.registry.getAll(), cid);
+        await this.racer.raceStat(this.registry.getAll(), cid);
       }
 
       return true;
@@ -116,11 +133,11 @@ export default class IPFS {
 
   public async getRecordFromNetwork(
     key: string,
-    networkName: string,
+    networkId: string,
   ): Promise<string | undefined> {
     await this.initialize();
 
-    const network = this.registry.find(networkName);
+    const network = this.getNetworkById(networkId);
 
     return network.getRecord(key);
   }
@@ -149,16 +166,10 @@ export default class IPFS {
   ): Promise<IPFSId> {
     await this.initialize();
 
+    const networks = this.getNetworksByIds(networkIds);
     const results = await Promise.all(
-      this.registry
-        .getAll()
-        .filter((network) => networkIds.includes(network.getId()))
-        .map((network) => network.addJSON(data)),
+      networks.map((network) => network.addJSON(data)),
     );
-
-    if (results.length === 0) {
-      throw new IPFSNetworksNotFoundByIdsError(networkIds);
-    }
 
     return results[0];
   }
@@ -182,13 +193,7 @@ export default class IPFS {
   ): Promise<void> {
     await this.initialize();
 
-    const networks = this.registry
-      .getAll()
-      .filter((network) => networkIds.includes(network.getId()));
-
-    if (networks.length === 0) {
-      throw new IPFSNetworksNotFoundByIdsError(networkIds);
-    }
+    const networks = this.getNetworksByIds(networkIds);
 
     await Promise.all(networks.map((network) => network.putRecord(key, value)));
   }

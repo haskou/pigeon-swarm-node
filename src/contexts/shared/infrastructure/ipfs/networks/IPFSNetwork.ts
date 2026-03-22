@@ -1,3 +1,4 @@
+import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
 import { IPFSConnection } from '../helia/IPFSConnection';
 import { IPFSId } from '../helia/IPFSId';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
@@ -8,6 +9,19 @@ export class IPFSNetwork {
     private readonly config: IPFSNetworkConfig,
     private readonly connection: IPFSConnection,
   ) {}
+
+  public stat(cid: IPFSId, offlineOnly: boolean): Promise<void> {
+    return this.connection.stat(cid, offlineOnly).then(
+      () => Promise.resolve(),
+      (error) => {
+        if (error instanceof Error && error.message.includes('not found')) {
+          return Promise.reject(new IPFSContentNotFoundError(cid.valueOf()));
+        }
+
+        return Promise.reject(error);
+      },
+    );
+  }
 
   public getId(): string {
     return this.config.getId();

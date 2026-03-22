@@ -2,6 +2,7 @@ import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IPFSContentNotFoundError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSConnection } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
@@ -93,6 +94,42 @@ describe('IPFSNetwork', () => {
 
       expect(connection.getJSON).toHaveBeenCalledWith(cid, undefined);
       expect(result).toEqual(expected);
+    });
+  });
+
+  describe('stat', () => {
+    it('should delegate to connection.stat', async () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const cid = new IPFSId('bafytest');
+
+      connection.stat.mockResolvedValue(undefined);
+
+      await expect(network.stat(cid, true)).resolves.toBeUndefined();
+      expect(connection.stat).toHaveBeenCalledWith(cid, true);
+    });
+
+    it('should map not found errors to IPFSContentNotFoundError', async () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const cid = new IPFSId('bafytest');
+
+      connection.stat.mockRejectedValue(new Error('block not found'));
+
+      await expect(network.stat(cid, false)).rejects.toThrow(
+        IPFSContentNotFoundError,
+      );
+    });
+
+    it('should rethrow non not-found errors', async () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const cid = new IPFSId('bafytest');
+      const error = new Error('internal error');
+
+      connection.stat.mockRejectedValue(error);
+
+      await expect(network.stat(cid, false)).rejects.toBe(error);
     });
   });
 

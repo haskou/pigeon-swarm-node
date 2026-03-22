@@ -33,6 +33,21 @@ export default class IPFSContentRacer {
     }
   }
 
+  public async raceStat(networks: IPFSNetwork[], cid: IPFSId): Promise<void> {
+    const controller = new AbortController();
+    const timeout = this.startTimeout(controller);
+
+    try {
+      await Promise.any(networks.map((network) => network.stat(cid, false)));
+
+      controller.abort();
+    } catch {
+      throw new IPFSContentNotFoundError(cid.valueOf());
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   public async raceGetRecord(
     networks: IPFSNetwork[],
     key: string,

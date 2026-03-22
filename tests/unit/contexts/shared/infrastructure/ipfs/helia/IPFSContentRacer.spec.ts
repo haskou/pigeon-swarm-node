@@ -62,4 +62,30 @@ describe('IPFSContentRacer', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('raceStat', () => {
+    it('should resolve when any network stat succeeds', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network1 = mock<IPFSNetwork>();
+      const network2 = mock<IPFSNetwork>();
+
+      network1.stat.mockResolvedValue(undefined);
+      network2.stat.mockRejectedValue(new Error('not found'));
+
+      await expect(racer.raceStat([network1, network2], cid)).resolves.toBe(
+        undefined,
+      );
+    });
+
+    it('should throw IPFSContentNotFoundError when all stat calls fail', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network = mock<IPFSNetwork>();
+
+      network.stat.mockRejectedValue(new Error('not found'));
+
+      await expect(racer.raceStat([network], cid)).rejects.toThrow(
+        IPFSContentNotFoundError,
+      );
+    });
+  });
 });

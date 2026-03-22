@@ -31,12 +31,6 @@ export type ParsedHeliaIPFSOptions = {
 export class HeliaIPFSParser {
   private static readonly blockedPeers: string[] = [];
 
-  private static isInMemoryStorageLocation(storageLocation: string): boolean {
-    return (
-      storageLocation === 'memory' || storageLocation.startsWith('memory/')
-    );
-  }
-
   private static async parseStorageLocationOptions(
     options: IPFSOptions,
   ): Promise<{
@@ -131,6 +125,12 @@ export class HeliaIPFSParser {
     const swarmKey = `/key/swarm/psk/1.0.0/\n/base16/\n${pskHex}`;
 
     return new Uint8Array(Buffer.from(swarmKey));
+  }
+
+  public static isInMemoryStorageLocation(storageLocation: string): boolean {
+    return (
+      storageLocation === 'memory' || storageLocation.startsWith('memory/')
+    );
   }
 
   public static registerBlockedPeer(peerId: string): void {

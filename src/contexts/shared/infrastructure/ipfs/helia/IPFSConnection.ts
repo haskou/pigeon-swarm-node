@@ -8,6 +8,7 @@ export type IPFSOptions = {
 };
 
 export interface IPFSConnection {
+  stat(cid: IPFSId, offlineOnly: boolean, signal?: AbortSignal): Promise<void>;
   addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId>;
   getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T>;
   putRecord(key: string, value: string, signal?: AbortSignal): Promise<void>;

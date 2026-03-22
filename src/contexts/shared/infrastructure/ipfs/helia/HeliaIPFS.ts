@@ -13,12 +13,6 @@ import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 export abstract class HeliaIPFS implements IPFSConnection {
-  private static isInMemoryStorageLocation(storageLocation: string): boolean {
-    return (
-      storageLocation === 'memory' || storageLocation.startsWith('memory/')
-    );
-  }
-
   public static async createPublicHeliaCore(
     options: IPFSOptions,
   ): Promise<HeliaInstance> {
@@ -76,6 +70,26 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const cid = await heliaJSONClient.add(data, { signal });
 
     return new IPFSId(cid.toString());
+  }
+
+  public async stat(
+    cid: IPFSId,
+    offlineOnly: boolean,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+
+    const exists = await this.heliaCore.blockstore.has(parsedCid, {
+      signal,
+    });
+
+    if (!exists) {
+      const mode = offlineOnly ? 'offline' : 'online';
+
+      throw new Error(`Block not found (${mode}): ${cid.valueOf()}`);
+    }
   }
 
   public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
@@ -155,7 +169,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
   public async blockPeer(peerId: string): Promise<void> {
     HeliaIPFSParser.registerBlockedPeer(peerId);
 
-    if (!HeliaIPFS.isInMemoryStorageLocation(this.options.storageLocation)) {
+    if (
+      !HeliaIPFSParser.isInMemoryStorageLocation(this.options.storageLocation)
+    ) {
       await fs.writeFile(
         `${this.options.storageLocation}/blockedPeers.json`,
         JSON.stringify(HeliaIPFSParser.getBlockedPeers()),
