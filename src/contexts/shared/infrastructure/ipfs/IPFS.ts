@@ -30,11 +30,10 @@ export default class IPFS {
     return network;
   }
 
-  private async statAcrossRegisteredNetworksOffline(
+  private async statAcrossNetworksOffline(
     cid: IPFSId,
+    networks: IPFSNetwork[],
   ): Promise<void> {
-    const networks = this.registry.getAll();
-
     for (const network of networks) {
       try {
         await network.stat(cid, true);
@@ -85,9 +84,13 @@ export default class IPFS {
       if (networkIds && networkIds.length > 0) {
         const networksToCheck = this.getNetworksByIds(networkIds);
 
-        await this.racer.raceStat(networksToCheck, cid);
+        if (offlineOnly) {
+          await this.statAcrossNetworksOffline(cid, networksToCheck);
+        } else {
+          await this.racer.raceStat(networksToCheck, cid);
+        }
       } else if (offlineOnly) {
-        await this.statAcrossRegisteredNetworksOffline(cid);
+        await this.statAcrossNetworksOffline(cid, this.registry.getAll());
       } else {
         await this.racer.raceStat(this.registry.getAll(), cid);
       }

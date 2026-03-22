@@ -43,7 +43,11 @@ export default class IPFSContentRacer {
       );
 
       controller.abort();
-    } catch {
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw error;
+      }
+
       throw new IPFSContentNotFoundError(cid.valueOf());
     } finally {
       clearTimeout(timeout);

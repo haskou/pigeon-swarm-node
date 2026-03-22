@@ -102,6 +102,24 @@ describe('IPFS', () => {
       expect(racer.raceStat).not.toHaveBeenCalled();
     });
 
+    it('should check sequentially when offlineOnly is enabled with networkIds', async () => {
+      const cid = new IPFSId('bafy-offline-filtered');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.getId.mockReturnValue('network-1');
+      secondNetwork.getId.mockReturnValue('network-2');
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      secondNetwork.stat.mockResolvedValue(undefined);
+
+      const exists = await ipfs.stat(cid, true, ['network-2']);
+
+      expect(exists).toBe(true);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
+      expect(firstNetwork.stat).not.toHaveBeenCalled();
+      expect(racer.raceStat).not.toHaveBeenCalled();
+    });
+
     it('should throw when provided network ids do not match any network', async () => {
       const cid = new IPFSId('bafy-offline');
 
