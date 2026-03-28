@@ -2,6 +2,8 @@ import Kernel from '@app/Kernel';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
+import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
+import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import heliaRuntimeAdapter, {
   DatastoreKeyLike,
   HeliaInstance,
@@ -70,6 +72,34 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const cid = await heliaJSONClient.add(data, { signal });
 
     return new IPFSId(cid.toString());
+  }
+
+  public async stat(
+    cid: IPFSId,
+    offlineOnly: boolean,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+
+    if (offlineOnly) {
+      const exists = await this.heliaCore.blockstore.has(parsedCid, {
+        signal,
+      });
+
+      if (!exists) {
+        throw new IPFSBlockNotFoundOfflineError(cid.valueOf());
+      }
+
+      return;
+    }
+
+    try {
+      await this.heliaCore.blockstore.get(parsedCid, { signal });
+    } catch {
+      throw new IPFSBlockNotFoundPublicError(cid.valueOf());
+    }
   }
 
   public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
@@ -149,7 +179,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
   public async blockPeer(peerId: string): Promise<void> {
     HeliaIPFSParser.registerBlockedPeer(peerId);
 
-    if (this.options.storageLocation !== 'memory') {
+    if (
+      !HeliaIPFSParser.isInMemoryStorageLocation(this.options.storageLocation)
+    ) {
       await fs.writeFile(
         `${this.options.storageLocation}/blockedPeers.json`,
         JSON.stringify(HeliaIPFSParser.getBlockedPeers()),

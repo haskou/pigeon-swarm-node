@@ -21,8 +21,6 @@ export default class RestClient {
     try {
       return await this.client.get(path, { headers });
     } catch (error: unknown) {
-      console.log(error);
-
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
 

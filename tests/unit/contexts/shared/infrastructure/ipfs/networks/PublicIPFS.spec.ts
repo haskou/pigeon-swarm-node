@@ -1,4 +1,8 @@
 const mockHeliaNode = {
+  blockstore: {
+    get: jest.fn(),
+    has: jest.fn(),
+  },
   datastore: { get: jest.fn(), put: jest.fn() },
   libp2p: {
     getPeers: jest.fn().mockReturnValue([]),
@@ -114,6 +118,9 @@ jest.mock('@app/Kernel', () => ({
   },
 }));
 
+import { IPFSBlockNotFoundOfflineError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundOfflineError';
+import { IPFSBlockNotFoundPublicError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundPublicError';
+import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { PublicIPFS } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 
 describe('PublicIPFS', () => {
@@ -156,6 +163,52 @@ describe('PublicIPFS', () => {
 
       expect(Kernel.logger.info).toHaveBeenCalledWith(
         expect.stringContaining('mock-peer-id'),
+      );
+    });
+  });
+
+  describe('stat', () => {
+    it('should resolve when block exists locally in offline mode', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      mockHeliaNode.blockstore.has.mockResolvedValue(true);
+
+      await expect(connection.stat(cid, true)).resolves.toBeUndefined();
+      expect(mockHeliaNode.blockstore.has).toHaveBeenCalled();
+    });
+
+    it('should throw IPFSBlockNotFoundOfflineError when block does not exist locally', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      mockHeliaNode.blockstore.has.mockResolvedValue(false);
+
+      await expect(connection.stat(cid, true)).rejects.toThrow(
+        IPFSBlockNotFoundOfflineError,
+      );
+    });
+
+    it('should resolve in online mode when block can be fetched', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      mockHeliaNode.blockstore.get.mockResolvedValue(new Uint8Array());
+
+      await expect(connection.stat(cid, false)).resolves.toBeUndefined();
+      expect(mockHeliaNode.blockstore.get).toHaveBeenCalled();
+    });
+
+    it('should throw IPFSBlockNotFoundPublicError when block cannot be fetched', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      mockHeliaNode.blockstore.get.mockRejectedValue(
+        new Error('block not available'),
+      );
+
+      await expect(connection.stat(cid, false)).rejects.toThrow(
+        IPFSBlockNotFoundPublicError,
       );
     });
   });

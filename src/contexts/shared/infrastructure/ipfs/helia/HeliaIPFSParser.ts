@@ -37,7 +37,7 @@ export class HeliaIPFSParser {
     blockstore: RuntimeBlockstore;
     datastore: RuntimeDatastore;
   }> {
-    if (options.storageLocation === 'memory') {
+    if (HeliaIPFSParser.isInMemoryStorageLocation(options.storageLocation)) {
       return {
         blockstore: await heliaRuntimeAdapter.createMemoryBlockstore(),
         datastore: await heliaRuntimeAdapter.createMemoryDatastore(),
@@ -57,7 +57,7 @@ export class HeliaIPFSParser {
   private static parseBlockedPeers(options: IPFSOptions): {
     connectionGater: ConnectionGater;
   } {
-    if (options.storageLocation !== 'memory') {
+    if (!HeliaIPFSParser.isInMemoryStorageLocation(options.storageLocation)) {
       const peersFromStorage = HeliaIPFSParser.readBlockedPeersFromStorage(
         options.storageLocation,
       );
@@ -125,6 +125,12 @@ export class HeliaIPFSParser {
     const swarmKey = `/key/swarm/psk/1.0.0/\n/base16/\n${pskHex}`;
 
     return new Uint8Array(Buffer.from(swarmKey));
+  }
+
+  public static isInMemoryStorageLocation(storageLocation: string): boolean {
+    return (
+      storageLocation === 'memory' || storageLocation.startsWith('memory/')
+    );
   }
 
   public static registerBlockedPeer(peerId: string): void {

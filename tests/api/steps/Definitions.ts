@@ -6,9 +6,10 @@ import { DataTable } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
-import { binding, given, then, when, before } from 'cucumber-tsflow';
+import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
+import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 
 chai.use(chaiSubset);
@@ -23,16 +24,34 @@ export default class Definitions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private response: any = null;
   private restClient: RestClient = new RestClient();
+  private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
+
+  @before()
+  public resetScenarioState(): void {
+    this.body = undefined;
+    this.formData = undefined;
+    this.headers = {};
+    this.response = null;
+    this.ipfsDefinition.resetScenarioState();
+  }
 
   @before()
   public async startKernel(): Promise<void> {
     if (!kernel) {
       kernel = new Kernel();
       kernel.environmentVariables('test');
+      this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
+
       await kernel.dependencyInjection();
       await kernel.runServer();
       kernel.logs();
     }
+  }
+
+  @after()
+  public async cleanupMemoryStorage(): Promise<void> {
+    await this.ipfsDefinition.cleanupRegisteredNetworks();
+    this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
   }
 
   @given('I am an anonymous user')
@@ -41,17 +60,60 @@ export default class Definitions {
   }
 
   @given('I set json body')
-  public iSetJsonBody(body: string) {
+  public iSetJsonBody(body: string): void {
     this.body = body;
   }
 
   @given('I set header {string} to {string}')
-  public iSetHeaderTo(header: string, value: string) {
+  public iSetHeaderTo(header: string, value: string): void {
     this.headers[header] = value;
   }
 
+  @given('I register an in-memory IPFS network {string}')
+  public async iRegisterAnInMemoryIPFSNetwork(
+    networkName: string,
+  ): Promise<void> {
+    await this.ipfsDefinition.registerInMemoryNetwork(networkName);
+  }
+
+  @given(
+    'I register an in-memory IPFS network with id {string} and name {string}',
+  )
+  public async iRegisterAnInMemoryIPFSNetworkWithIdAndName(
+    networkId: string,
+    networkName: string,
+  ): Promise<void> {
+    await this.ipfsDefinition.registerInMemoryNetworkWithId(
+      networkId,
+      networkName,
+    );
+  }
+
+  @given('I store the following json in IPFS network {string}')
+  public async iStoreTheFollowingJsonInIPFSNetwork(
+    networkName: string,
+    body: string,
+  ): Promise<void> {
+    await this.ipfsDefinition.storeJSONInNetwork(networkName, body);
+  }
+
+  @given('CID {string} has been created')
+  public async cidHasBeenCreated(expectedCid: string): Promise<void> {
+    await this.ipfsDefinition.assertCreatedCID(expectedCid);
+  }
+
+  @then('it has been pinned in ipfs')
+  public async itHasBeenPinnedInIpfs(): Promise<void> {
+    await this.ipfsDefinition.assertPinnedInIPFS(this.response.data);
+  }
+
+  @then('nothing has been pinned in ipfs')
+  public async nothingHasBeenPinnedInIpfs(): Promise<void> {
+    await this.ipfsDefinition.assertNothingPinnedInIPFS(this.response.data);
+  }
+
   @when('I POST to {string}')
-  public async iPOSTTo(path: string) {
+  public async iPOSTTo(path: string): Promise<void> {
     const isFormData = this.formData !== undefined;
     this.response = await this.restClient.post(
       path,
@@ -61,7 +123,7 @@ export default class Definitions {
   }
 
   @when('I PUT {string}')
-  public async iPUT(path: string) {
+  public async iPUT(path: string): Promise<void> {
     this.response = await this.restClient.put(
       path,
       this.body && JSON.parse(this.body),
@@ -69,7 +131,7 @@ export default class Definitions {
   }
 
   @when('I PATCH {string}')
-  public async iPATCH(path: string) {
+  public async iPATCH(path: string): Promise<void> {
     this.response = await this.restClient.patch(
       path,
       this.body && JSON.parse(this.body),
@@ -77,17 +139,17 @@ export default class Definitions {
   }
 
   @when('I GET {string}')
-  public async iGET(path: string) {
+  public async iGET(path: string): Promise<void> {
     this.response = await this.restClient.get(path, this.headers);
   }
 
   @when('I DELETE {string}')
-  public async iDELETE(path: string) {
+  public async iDELETE(path: string): Promise<void> {
     this.response = await this.restClient.delete(path);
   }
 
   @then('response code is equal to {int}')
-  public responseCodeIsEqualTo(statusCode: number) {
+  public responseCodeIsEqualTo(statusCode: number): void {
     expect(this.response.status).to.equal(
       statusCode,
       JSON.stringify(this.response.data),
@@ -95,7 +157,7 @@ export default class Definitions {
   }
 
   @then('response body should contain {string}')
-  public responseBodyShouldContain(textToContain: string) {
+  public responseBodyShouldContain(textToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.contain(
       textToContain,
       JSON.stringify(this.response.data),
@@ -103,29 +165,29 @@ export default class Definitions {
   }
 
   @then('response body should contain')
-  public responseBodyShouldContainObject(objectToContain: string) {
+  public responseBodyShouldContainObject(objectToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.contain(objectToContain);
   }
 
   @then('response body should not contain {string}')
-  public responseBodyShouldnotContain(textToContain: string) {
+  public responseBodyShouldnotContain(textToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.not.contain(textToContain);
   }
 
   @then('response body is an array with length of {int}')
-  public responseBodyIsAnArrayWithLengthOf(arrayLength: number) {
+  public responseBodyIsAnArrayWithLengthOf(arrayLength: number): void {
     expect(this.response.data.results ?? this.response.data).to.have.lengthOf(
       arrayLength,
     );
   }
 
   @then('response body should be empty')
-  public responseBodyShouldBeEmpty() {
+  public responseBodyShouldBeEmpty(): void {
     expect(this.response.data).to.equal('');
   }
 
   @then('response contains a valid resource with the following fields')
-  public responseContainsValidResource(table: DataTable) {
+  public responseContainsValidResource(table: DataTable): void {
     const rows = table.rows();
     for (const row of rows) {
       const fieldPath = row[0];
@@ -171,24 +233,27 @@ export default class Definitions {
     index: number,
     property: string,
     value: string,
-  ) {
+  ): void {
     expect(this.response.data.results[index])
       .to.have.property(property)
       .that.equals(value);
   }
 
   @then('response data should match partially')
-  public responseDataShouldMatchPartially(expectedData: string) {
+  public responseDataShouldMatchPartially(expectedData: string): void {
     expect(this.response.data).to.containSubset(JSON.parse(expectedData));
   }
 
   @then('response data should match exactly')
-  public responseDataShouldMatchExactly(expectedData: string) {
+  public responseDataShouldMatchExactly(expectedData: string): void {
     expect(this.response.data).to.deep.equal(JSON.parse(expectedData));
   }
 
   @then('response header {string} should be {string}')
-  public responseHeaderShouldBe(headerName: string, expectedValue: string) {
+  public responseHeaderShouldBe(
+    headerName: string,
+    expectedValue: string,
+  ): void {
     const actualValue = this.response.headers[headerName.toLowerCase()];
     expect(actualValue).to.equal(
       expectedValue,
@@ -200,7 +265,7 @@ export default class Definitions {
   public responseHeaderShouldContain(
     headerName: string,
     expectedValue: string,
-  ) {
+  ): void {
     const actualValue = this.response.headers[headerName.toLowerCase()];
     expect(actualValue).to.contain(
       expectedValue,
@@ -209,7 +274,7 @@ export default class Definitions {
   }
 
   @then('response header {string} should not exist')
-  public responseHeaderShouldNotExist(headerName: string) {
+  public responseHeaderShouldNotExist(headerName: string): void {
     const actualValue = this.response.headers[headerName.toLowerCase()];
     expect(actualValue).to.be.undefined(
       `Header ${headerName} should not exist but found: ${actualValue}`,
@@ -217,7 +282,7 @@ export default class Definitions {
   }
 
   @then('response does not contain property {string}')
-  public responseDoesNotContainProperty(property: string) {
+  public responseDoesNotContainProperty(property: string): void {
     expect(this.response.data).to.not.have.property(property);
   }
 }

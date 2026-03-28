@@ -1,5 +1,5 @@
 const api = [
-  'tests/api/features/*.feature',
+  'tests/api/features/**/*.feature',
   '--require tests/api/steps/*.ts',
   '--require-module ts-node/register',
   '--require-module tsconfig-paths/register tsconfig',

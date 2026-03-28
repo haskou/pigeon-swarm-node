@@ -1,3 +1,6 @@
+import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
+import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
+import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
 import { IPFSConnection } from '../helia/IPFSConnection';
 import { IPFSId } from '../helia/IPFSId';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
@@ -8,6 +11,26 @@ export class IPFSNetwork {
     private readonly config: IPFSNetworkConfig,
     private readonly connection: IPFSConnection,
   ) {}
+
+  public stat(
+    cid: IPFSId,
+    offlineOnly: boolean,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this.connection.stat(cid, offlineOnly, signal).then(
+      () => Promise.resolve(),
+      (error) => {
+        if (
+          error instanceof IPFSBlockNotFoundOfflineError ||
+          error instanceof IPFSBlockNotFoundPublicError
+        ) {
+          return Promise.reject(new IPFSContentNotFoundError(cid.valueOf()));
+        }
+
+        return Promise.reject(error);
+      },
+    );
+  }
 
   public getId(): string {
     return this.config.getId();

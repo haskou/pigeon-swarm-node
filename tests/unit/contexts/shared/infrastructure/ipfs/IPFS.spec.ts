@@ -1,6 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IPFSContentNotFoundError } from '../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSNetworksNotFoundByIdsError } from '../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSNetworksNotFoundByIdsError';
 import IPFSContentRacer from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -42,6 +43,94 @@ describe('IPFS', () => {
     });
   });
 
+  describe('stat', () => {
+    it('should return true when CID exists in any network', async () => {
+      const cid = new IPFSId('bafyexists');
+
+      racer.raceStat.mockResolvedValue(undefined);
+
+      const exists = await ipfs.stat(cid);
+
+      expect(exists).toBe(true);
+      expect(racer.raceStat).toHaveBeenCalledWith([mockNetwork], cid);
+    });
+
+    it('should return false when CID does not exist', async () => {
+      const cid = new IPFSId('bafymissing');
+
+      racer.raceStat.mockRejectedValue(new IPFSContentNotFoundError('cid'));
+
+      const exists = await ipfs.stat(cid);
+
+      expect(exists).toBe(false);
+    });
+
+    it('should check only provided network ids when networkIds are provided', async () => {
+      const cid = new IPFSId('bafy-network');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.getId.mockReturnValue('network-1');
+      secondNetwork.getId.mockReturnValue('network-2');
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      racer.raceStat.mockResolvedValue(undefined);
+
+      const exists = await ipfs.stat(cid, false, ['network-2']);
+
+      expect(exists).toBe(true);
+      expect(registry.initialize).toHaveBeenCalled();
+      expect(racer.raceStat).toHaveBeenCalledWith([secondNetwork], cid);
+    });
+
+    it('should check sequentially when offlineOnly is enabled', async () => {
+      const cid = new IPFSId('bafy-offline');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-offline'),
+      );
+      secondNetwork.stat.mockResolvedValue(undefined);
+
+      const exists = await ipfs.stat(cid, true);
+
+      expect(exists).toBe(true);
+      expect(registry.initialize).toHaveBeenCalled();
+      expect(firstNetwork.stat).toHaveBeenCalledWith(cid, true);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
+      expect(racer.raceStat).not.toHaveBeenCalled();
+    });
+
+    it('should check sequentially when offlineOnly is enabled with networkIds', async () => {
+      const cid = new IPFSId('bafy-offline-filtered');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.getId.mockReturnValue('network-1');
+      secondNetwork.getId.mockReturnValue('network-2');
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      secondNetwork.stat.mockResolvedValue(undefined);
+
+      const exists = await ipfs.stat(cid, true, ['network-2']);
+
+      expect(exists).toBe(true);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
+      expect(firstNetwork.stat).not.toHaveBeenCalled();
+      expect(racer.raceStat).not.toHaveBeenCalled();
+    });
+
+    it('should throw when provided network ids do not match any network', async () => {
+      const cid = new IPFSId('bafy-offline');
+
+      mockNetwork.getId.mockReturnValue('existing-network');
+
+      await expect(ipfs.stat(cid, false, ['missing-network'])).rejects.toThrow(
+        IPFSNetworksNotFoundByIdsError,
+      );
+    });
+  });
+
   describe('getJSONFromNetwork', () => {
     it('should get JSON from a specific network', async () => {
       const cid = new IPFSId('bafytest');
@@ -64,6 +153,28 @@ describe('IPFS', () => {
 
       expect(racer.raceGetRecord).toHaveBeenCalledWith([mockNetwork], 'my-key');
       expect(result).toBe('cid-value');
+    });
+  });
+
+  describe('getRecordFromNetwork', () => {
+    it('should get record from a specific network by network id', async () => {
+      mockNetwork.getRecord.mockResolvedValue('cid-value');
+
+      const result = await ipfs.getRecordFromNetwork(
+        'my-key',
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+
+      expect(mockNetwork.getRecord).toHaveBeenCalledWith('my-key');
+      expect(result).toBe('cid-value');
+    });
+
+    it('should throw when network id is not found', async () => {
+      mockNetwork.getId.mockReturnValue('another-network');
+
+      await expect(
+        ipfs.getRecordFromNetwork('my-key', 'missing-network'),
+      ).rejects.toThrow(IPFSNetworksNotFoundByIdsError);
     });
   });
 
@@ -149,6 +260,14 @@ describe('IPFS', () => {
 
       expect(registry.register).toHaveBeenCalledWith(config);
       expect(result).toEqual(mockNetwork);
+    });
+  });
+
+  describe('removeNetwork', () => {
+    it('should delegate to registry.removeNetwork', async () => {
+      await ipfs.removeNetwork('my-network');
+
+      expect(registry.removeNetwork).toHaveBeenCalledWith('my-network');
     });
   });
 });
