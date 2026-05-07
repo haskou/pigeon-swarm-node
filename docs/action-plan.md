@@ -436,6 +436,15 @@ Last updated: 2026-05-07.
     project config.
   - Added `src/shared/types/promise-with-resolvers.d.ts` for Helia/libp2p
     typings required by build.
+- Docker/local runtime cleanup:
+  - `docker-compose.yml` now uses `.env.local` for backend runtime variables.
+  - Backend port mapping is aligned with `API_PORT=8080`.
+  - `.env.local` now represents local runtime instead of test runtime.
+  - `.env` now has concrete fallback values so Compose does not warn about
+    unresolved variable interpolation.
+  - Dockerfile stages use uppercase `AS`, the final stage uses the bundled
+    `pm2-runtime` dependency instead of installing PM2 globally, and final
+    runtime loads `.env` by leaving `NODE_ENV` empty.
 
 ### In Progress / Needs Cleanup Next
 
@@ -462,15 +471,21 @@ Last updated: 2026-05-07.
   - `[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"`
   - Current working shortcut:
     `PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH <command>`
-- Docker CLI exists, but Docker daemon/socket is unavailable:
-  - `connect: no such file or directory`
-- Docker is intentionally ignored for now per user instruction.
+- Docker cannot be fully verified in this environment:
+  - `/var/run/docker.sock` is owned by `nobody:nobody`.
+  - current user groups are `hasko,nobody`, but Docker still returns
+    `permission denied while trying to connect to the docker API`.
+  - Docker CLI also lacks the `buildx` plugin:
+    `docker: unknown command: docker buildx`.
+  - `docker compose config` is verified and no longer emits `.env`
+    interpolation warnings.
 - Jest may need to run outside the sandbox because it opens local ports and can
   fail with `EPERM` inside the sandbox.
-- No commits have been made yet.
+- Commits have been made with the repository gitmoji message format.
 
 ### Last Verified Checks
 
+- `docker compose config`: pass.
 - `yarn build`: pass.
 - `yarn lint`: pass with 5 `max-params` warnings.
 - Focused Jest command after conversation/node/identity baseline: pass, 16

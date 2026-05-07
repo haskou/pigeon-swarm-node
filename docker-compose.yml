@@ -5,7 +5,7 @@ services:
       target: local
       context: .
     ports:
-      - "8080:80"
+      - "8080:8080"
     volumes:
       - ./:/var/www
       - /var/www/node_modules
@@ -13,7 +13,10 @@ services:
       - /var/www/var
     depends_on:
       - mongodb
+    env_file:
+      - .env.local
     environment:
+      NODE_ENV: local
       MONGO_URL: mongodb://mongodb:27017
       MONGO_DATABASE: pigeon_swarm
 
