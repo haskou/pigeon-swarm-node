@@ -21,9 +21,11 @@ describe('IpfsIdentityMapper', () => {
       expect(document._id).toBe(primitives.id);
       expect(document.encryptedKeyPair).toEqual(primitives.encryptedKeyPair);
       expect(document.networks).toEqual(primitives.networks);
+      expect(document.previousCid).toBe(primitives.previousCid);
       expect(document.profile).toEqual(primitives.profile);
       expect(document.signature).toBe(primitives.signature);
       expect(document.timestamp).toBe(primitives.timestamp);
+      expect(document.version).toBe(primitives.version);
     });
   });
 
@@ -35,9 +37,11 @@ describe('IpfsIdentityMapper', () => {
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
         networks: primitives.networks,
+        previousCid: primitives.previousCid,
         profile: primitives.profile,
         signature: primitives.signature,
         timestamp: primitives.timestamp,
+        version: primitives.version,
       };
 
       const result = mapper.toDomain(document);

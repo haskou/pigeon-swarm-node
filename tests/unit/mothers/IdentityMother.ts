@@ -1,8 +1,11 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
+import { IdentityCid } from '@app/contexts/identities/domain/value-objects/IdentityCid';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
   EncryptedKeyPair,
   EncryptedPrivateKey,
@@ -15,15 +18,15 @@ import {
 export class IdentityMother {
   public encryptedKeyPair: EncryptedKeyPair = new EncryptedKeyPair(
     PublicKey.fromPEM(
-      '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=\n-----END PUBLIC KEY-----\n',
+      '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=\n-----END PUBLIC KEY-----\n',
     ),
     new EncryptedPrivateKey(
-      '2s2IhQsbhsmzNWia+DRGOMIQHEcR+Gi45fSM6Di1FOhOPFTs1NB3Fzhi8/bCEcmGdn0WRq5AjN1pb8iZkZpGpNstPm9v4gcPbGqAUnGCAtAQqiPMiJ1Tr9YQCSIUodxwfowdFvBAZaFGNcoObVoYJgnRjWWq2YQ=.f1itGk2AXdi33/e8.OEIZELL7lzYRXWwFSB0wtA==.CuZAT6/b/TiVLT+sp03ULg==',
+      'Y5yH7g99lREhHu5Z1FvwQfMMvTyt4VzK/LGyvNGnhHxgWdt6W0ARikwVO6Jef3qzyZaEwjIdaiAi1676jwzaXUu87H27cNg3fJyCMw5Wl5EizFOWx66tT2LZU5dCMlqdQrxn6OXe1TxthYUAQ1LJ4LL3HL9PsOI=.9xWThsS9oVtezFtP.vjHbMus/zBRy93U6aGIo0Q==.2E0i7HotLvQ+42IW2gHyew==',
     ),
   );
 
   public id: IdentityId = new IdentityId(
-    'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
+    'MCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=',
   );
 
   public profile: Profile = new Profile(new ProfileName('John'));
@@ -32,10 +35,13 @@ export class IdentityMother {
     new NetworkId('550e8400-e29b-41d4-a716-446655440000'),
   ];
 
+  public password: Password = new Password('fixture-password');
   public timestamp: Timestamp = new Timestamp(1773848829055);
   public signature: Signature = new Signature(
-    'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+    'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
   );
+  public version: IdentityVersion = new IdentityVersion(1);
+  public previousCid: IdentityCid | undefined = undefined;
 
   public withId(id: IdentityId): this {
     this.id = id;
@@ -73,6 +79,18 @@ export class IdentityMother {
     return this;
   }
 
+  public withVersion(version: IdentityVersion): this {
+    this.version = version;
+
+    return this;
+  }
+
+  public withPreviousCid(previousCid: IdentityCid | undefined): this {
+    this.previousCid = previousCid;
+
+    return this;
+  }
+
   public build(): Identity {
     return new Identity(
       this.id,
@@ -81,6 +99,8 @@ export class IdentityMother {
       this.profile,
       this.timestamp,
       this.signature,
+      this.version,
+      this.previousCid,
     );
   }
 }

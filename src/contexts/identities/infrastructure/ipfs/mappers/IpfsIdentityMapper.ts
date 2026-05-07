@@ -8,9 +8,11 @@ export default class IpfsIdentityMapper {
       encryptedKeyPair: document.encryptedKeyPair,
       id: document._id,
       networks: document.networks,
+      previousCid: document.previousCid,
       profile: document.profile,
       signature: document.signature,
       timestamp: document.timestamp,
+      version: document.version,
     });
   }
 
@@ -21,9 +23,11 @@ export default class IpfsIdentityMapper {
       _id: primitives.id,
       encryptedKeyPair: primitives.encryptedKeyPair,
       networks: primitives.networks,
+      previousCid: primitives.previousCid,
       profile: primitives.profile,
       signature: primitives.signature,
       timestamp: primitives.timestamp,
+      version: primitives.version,
     };
   }
 }

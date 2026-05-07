@@ -33,7 +33,11 @@ describe('IpfsIdentityRepository', () => {
       await repository.save(identity);
 
       expect(ipfsManager.addJSONToNetworks).toHaveBeenCalledWith(
-        expect.objectContaining({ _id: primitives.id }),
+        expect.objectContaining({
+          _id: primitives.id,
+          previousCid: primitives.previousCid,
+          version: primitives.version,
+        }),
         primitives.networks,
       );
       expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
@@ -56,9 +60,11 @@ describe('IpfsIdentityRepository', () => {
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
         networks: primitives.networks,
+        previousCid: primitives.previousCid,
         profile: primitives.profile,
         signature: primitives.signature,
         timestamp: primitives.timestamp,
+        version: primitives.version,
       });
 
       const result = await repository.findById(identityId);

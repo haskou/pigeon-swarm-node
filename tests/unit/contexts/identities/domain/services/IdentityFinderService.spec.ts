@@ -1,5 +1,6 @@
 import { IdentityRepository } from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import IdentityFinderService from '@app/contexts/identities/domain/services/IdentityFinderService';
+import { IdentityResolutionDomainService } from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -12,7 +13,10 @@ describe('IdentityFinderService', () => {
 
   beforeEach(() => {
     repository = mock<IdentityRepository>();
-    service = new IdentityFinderService(repository);
+    service = new IdentityFinderService(
+      repository,
+      new IdentityResolutionDomainService(),
+    );
     mother = new IdentityMother();
   });
 
@@ -20,11 +24,11 @@ describe('IdentityFinderService', () => {
     it('should return the identity from the repository', async () => {
       const identity = await mother.build();
       const identityId = new IdentityId(identity.toPrimitives().id);
-      repository.findById.mockResolvedValue(identity);
+      repository.findCandidatesById.mockResolvedValue([identity]);
 
       const result = await service.findById(identityId);
 
-      expect(repository.findById).toHaveBeenCalledWith(identityId);
+      expect(repository.findCandidatesById).toHaveBeenCalledWith(identityId);
       expect(result).toEqual(identity);
     });
 
@@ -32,7 +36,7 @@ describe('IdentityFinderService', () => {
       const identity = await mother.build();
       const identityId = new IdentityId(identity.toPrimitives().id);
       const error = new Error('not found');
-      repository.findById.mockRejectedValue(error);
+      repository.findCandidatesById.mockRejectedValue(error);
 
       await expect(service.findById(identityId)).rejects.toThrow('not found');
     });

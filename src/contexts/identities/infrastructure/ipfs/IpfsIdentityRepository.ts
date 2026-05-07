@@ -16,6 +16,12 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   ) {}
 
   public async findById(id: IdentityId): Promise<Identity> {
+    const candidates = await this.findCandidatesById(id);
+
+    return candidates[0];
+  }
+
+  public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
     const cidString = await this.ipfsManager.getRecord(
       this.ROUTING_KEY_PREFIX + id.valueOf(),
     );
@@ -28,7 +34,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       new IPFSId(cidString),
     );
 
-    return this.mapper.toDomain(document);
+    return [this.mapper.toDomain(document)];
   }
 
   public async save(identity: Identity): Promise<void> {

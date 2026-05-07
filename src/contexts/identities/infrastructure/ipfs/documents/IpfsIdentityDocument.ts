@@ -5,11 +5,13 @@ export interface IpfsIdentityDocument {
     encryptedPrivateKey: string;
   };
   networks: string[];
+  previousCid: string | undefined;
   profile: {
     name: string;
     biography: string | undefined;
     picture: string | undefined;
   };
   timestamp: number;
+  version: number;
   signature: string;
 }

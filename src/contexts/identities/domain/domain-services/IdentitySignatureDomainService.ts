@@ -17,8 +17,10 @@ export class IdentitySignatureDomainService {
       encryptedKeyPair: payload.encryptedKeyPair,
       id: payload.id,
       networks: payload.networks,
+      previousCid: payload.previousCid,
       profile: payload.profile,
       timestamp: payload.timestamp,
+      version: payload.version,
     };
   }
 
