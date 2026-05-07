@@ -115,6 +115,11 @@ tested and committed with the repository gitmoji conventional-commit format.
     candidates invalid before caching
   - DHT candidate lookup now fetches and validates all discovered identity
     content references
+- PubSub event bus:
+  - `PubSubTransport` is a separate infrastructure port, not part of `IPFS`
+  - `HeliaPubSubMessageBusAdapter` maps existing domain events to PubSub topics
+    through that port
+  - DI/runtime wiring and the concrete Helia/libp2p transport remain pending
 - Tooling/runtime:
   - Dockerfile and Compose cleanup
   - `yarn build` passes
@@ -129,8 +134,9 @@ model before building more chat behavior on top.
 
 Steps:
 
-1. Expose PubSub from the Helia runtime adapter.
-2. Add a message-bus adapter behind existing event bus contracts.
+1. Add a concrete Helia/libp2p implementation of `PubSubTransport`.
+2. Register `HeliaPubSubMessageBusAdapter` in DI and select it from
+   `TRANSPORT_DSN`.
 3. Publish serialized domain/integration events to topics:
    - `pigeon.identities`
    - `pigeon.conversation.{conversationId}`
