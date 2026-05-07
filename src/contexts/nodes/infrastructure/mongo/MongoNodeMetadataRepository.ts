@@ -30,6 +30,7 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
     if (metadata) {
       return {
         _id: MongoNodeMetadataRepository.LOCAL_NODE_ID,
+        networks: metadata.networks ?? {},
         nodeId: new NodeId(metadata.nodeId).valueOf(),
         owner: metadata.owner,
       };
@@ -54,6 +55,7 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
       { _id: MongoNodeMetadataRepository.LOCAL_NODE_ID },
       {
         $set: {
+          networks: metadata.networks,
           nodeId: metadata.nodeId,
           owner: metadata.owner,
         },
@@ -70,33 +72,7 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
     );
   }
 
-  public async loadLocalNode(): Promise<Node> {
-    const networks = this.networkRegistry.getAll();
-    const metadata = await this.loadOrCreateMetadata();
-
-    return Node.fromPrimitives({
-      id: metadata.nodeId,
-      networks: Object.fromEntries(
-        networks.map((network) => {
-          const primitives = network.toPrimitives();
-
-          return [
-            primitives.id,
-            {
-              id: primitives.id,
-              key: primitives.key,
-              name: primitives.name,
-            },
-          ];
-        }),
-      ),
-      owner: metadata.owner,
-    });
-  }
-
-  public async saveLocalNode(node: Node): Promise<void> {
-    await this.persistMetadata(this.metadataMapper.toDocument(node));
-
+  private async syncRuntimeNetworks(node: Node): Promise<void> {
     await this.networkRegistry.initialize();
 
     const targetConfigs = this.buildNetworkConfigs(node);
@@ -130,5 +106,23 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
     for (const config of targetConfigsByName.values()) {
       await this.networkRegistry.register(config);
     }
+  }
+
+  public async loadLocalNode(): Promise<Node> {
+    const metadata = await this.loadOrCreateMetadata();
+    const node = Node.fromPrimitives({
+      id: metadata.nodeId,
+      networks: metadata.networks,
+      owner: metadata.owner,
+    });
+
+    await this.syncRuntimeNetworks(node);
+
+    return node;
+  }
+
+  public async saveLocalNode(node: Node): Promise<void> {
+    await this.persistMetadata(this.metadataMapper.toDocument(node));
+    await this.syncRuntimeNetworks(node);
   }
 }

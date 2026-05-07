@@ -68,7 +68,9 @@ In the current app flow, `IPFSNetworkRegistry` composes per-network storage as:
 
 Because of this, setting `IPFS_STORAGE_PATH=memory` does not activate Helia in-memory mode end-to-end. It is treated as a filesystem folder named `memory`.
 
-Also, `IPFSNetworkRegistry` and `LocalNodeRepository` persist files (`networks.json`, `shared-peer-private-key.pb`, `node-metadata.json`) under the storage path.
+`IPFSNetworkRegistry` persists only Helia/libp2p runtime data such as
+`shared-peer-private-key.pb` under the storage path. Node metadata and
+configured network metadata are stored in MongoDB.
 
 Practical recommendation:
 

@@ -88,24 +88,17 @@ package "nodes" {
   }
 
   package "infrastructure" {
-    class LocalNodeRepository {
-      -networkRegistry: IPFSNetworkRegistry
-      -metadataMapper: LocalNodeMetadataMapper
-      +loadLocalNode(): Promise<Node>
-      +saveLocalNode(node: Node): Promise<void>
-    }
-
     class MongoNodeMetadataRepository {
       +loadLocalNode(): Promise<Node>
       +saveLocalNode(node: Node): Promise<void>
     }
 
     note right of MongoNodeMetadataRepository
-      Target repository once MongoDB becomes
-      the node-local index and metadata store.
+      Active node metadata repository.
+      MongoDB owns nodeId, owner and
+      configured network metadata.
     end note
 
-    LocalNodeRepository ..|> NodeRepository
     MongoNodeMetadataRepository ..|> NodeRepository
   }
 }

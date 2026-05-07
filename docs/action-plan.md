@@ -58,6 +58,14 @@ tested and committed with the repository gitmoji conventional-commit format.
   - `NodeOwnerAssigner`
   - `MongoNodeMetadataRepository`
   - mapper/repository tests
+- Node infrastructure:
+  - `MongoNodeMetadataRepository` is the active `NodeRepository` in DI
+  - node id, owner and configured network metadata are persisted in MongoDB
+  - `IPFSNetworkRegistry` no longer persists `networks.json`
+  - `IPFSNetworkRegistry` is runtime-only for active Helia networks, while FS
+    remains only for low-level Helia/libp2p runtime data
+  - `LocalNodeRepository` and local node metadata mapper/document/spec were
+    removed
 - Identity:
   - `Identity.version`
   - `Identity.previousCid` currently exists and should be renamed away from
@@ -90,48 +98,7 @@ tested and committed with the repository gitmoji conventional-commit format.
   - focused unit tests pass
   - `yarn test:api` passes outside the sandbox
 
-## Immediate Slice 1: Move Node Infrastructure Fully To Mongo
-
-Goal: stop using FS/IPFS storage as the source of truth for node application
-metadata.
-
-Rationale:
-
-- There is no strong reason to keep `nodeId`, `owner` or configured network
-  metadata in FS/IPFS storage.
-- Those values are mutable local node metadata, not immutable content-addressed
-  documents.
-- MongoDB already fits the required access pattern better:
-  - one local node metadata document
-  - flexible node/network metadata
-  - indexes later if the node becomes multi-tenant or multi-network-heavy
-- FS should remain only for Helia runtime storage when not using memory mode:
-  blockstore/datastore, libp2p runtime files and other low-level IPFS data.
-
-Steps:
-
-1. Make `MongoNodeMetadataRepository` the active `NodeRepository` in DI.
-2. Remove `LocalNodeRepository` from the active graph.
-3. Move persisted IPFS network configuration out of `IPFSNetworkRegistry` FS
-   files and into Mongo-backed node/network metadata.
-4. Keep `IPFSNetworkRegistry` focused on runtime registration of active Helia
-   networks, not persistence ownership.
-5. Add a migration or compatibility path only if existing local
-   `node-metadata.json` / network config files must be imported.
-6. Delete `LocalNodeRepository`, local node metadata document/mapper and their
-   stale docs once Mongo is active and tests pass.
-7. Update `NodesClasses.puml` and use-case docs to show Mongo as the only node
-   metadata repository.
-
-Tests:
-
-- Unit test `MongoNodeMetadataRepository.loadLocalNode`.
-- Unit test `MongoNodeMetadataRepository.saveLocalNode`.
-- Add/adjust acceptance coverage for node startup with persisted Mongo node
-  metadata.
-- Verify `yarn build`, `yarn lint`, focused node tests and `yarn test:api`.
-
-## Immediate Slice 2: PubSub Event Bus
+## Immediate Slice 1: PubSub Event Bus
 
 Goal: plug Helia/libp2p PubSub into the existing event publisher/consumer
 model before building more chat behavior on top.
@@ -154,7 +121,7 @@ Tests:
 - Keep transport DTOs in infrastructure; application code continues using the
   existing event publisher/consumer contracts.
 
-## Immediate Slice 3: Conversation Encryption Policy
+## Immediate Slice 2: Conversation Encryption Policy
 
 Goal: model that conversations are encrypted according to their conversation
 type.
@@ -175,7 +142,7 @@ Steps:
    payload value.
 7. Update mapper tests and conversation projection tests.
 
-## Immediate Slice 4: Infrastructure Naming Cleanup
+## Immediate Slice 3: Infrastructure Naming Cleanup
 
 Goal: keep IPFS-specific terms out of domain language.
 
@@ -196,7 +163,7 @@ Steps:
 5. Update class diagrams and use cases so only infrastructure diagrams mention
    CID.
 
-## Immediate Slice 5: Remote Content Validation
+## Immediate Slice 4: Remote Content Validation
 
 Goal: fix the security issue called out in `IPFS.getRecord`.
 
@@ -226,7 +193,7 @@ Tests:
 - Unit tests for invalid message candidates once repository exists.
 - Cucumber scenarios for DHT identity convergence.
 
-## Immediate Slice 6: Conversation Repository And Use Cases
+## Immediate Slice 5: Conversation Repository And Use Cases
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 

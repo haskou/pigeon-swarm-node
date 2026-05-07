@@ -11,6 +11,7 @@ export default class MongoNodeMetadataMapper {
 
     return {
       _id: MongoNodeMetadataMapper.LOCAL_NODE_ID,
+      networks: primitives.networks,
       nodeId: primitives.id,
       owner: primitives.owner,
     };
@@ -19,6 +20,7 @@ export default class MongoNodeMetadataMapper {
   public generate(): MongoNodeMetadataDocument {
     return {
       _id: MongoNodeMetadataMapper.LOCAL_NODE_ID,
+      networks: {},
       nodeId: NodeId.generate().valueOf(),
     };
   }
