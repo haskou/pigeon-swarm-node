@@ -1,146 +1,104 @@
 @startuml
 
-title Pigeon Swarm - Global System Flow
+title Pigeon Swarm - Advanced Sync Flow
 
-actor User
+actor "Local User" as User
 
-box "Local Node (Standalone App)"
-participant "Web UI"
-participant "Auth Service"
-participant "Identity Service"
-participant "Peer Network"
-participant "Replication Engine"
-participant "Local Storage"
-participant "IPFS (Helia)"
+box "Local Node"
+participant "Application Use Case" as UseCase
+participant "Domain Model" as Domain
+database "MongoDB\nLocal Read/Write Index" as Mongo
+participant "IPFS / Helia\nImmutable Blobs" as IPFS
+participant "DHT\nHead Discovery" as DHT
+participant "DomainEventPublisher" as EventPublisher
+participant "MessageBus\nHelia PubSub Adapter" as PubSub
+participant "Sync Engine" as Sync
 end box
 
-box "Network"
-participant "Peer Node A"
-participant "Peer Node B"
-participant "Peer Node C"
+box "Remote Node"
+participant "Remote PubSub" as RPubSub
+participant "Remote Sync Engine" as RSync
+database "Remote MongoDB" as RMongo
+participant "Remote IPFS" as RIPFS
+participant "Remote DHT" as RDHT
 end box
 
+== Identity Publication ==
 
-== LOGIN ==
+User -> UseCase : update profile or networks
+UseCase -> Domain : create next Identity
+Domain -> Domain : sign canonical payload
+UseCase -> IPFS : store immutable identity document
+IPFS --> UseCase : identity CID
+UseCase -> Mongo : store local identity metadata
+UseCase -> DHT : put identity CID hint
+UseCase -> EventPublisher : publish IdentityWasPublished
+EventPublisher -> PubSub : adapter publishes domain event
 
-User -> "Web UI" : open app
-"Web UI" -> "Auth Service" : login(password)
+PubSub -> RPubSub : gossip identity CID
+RPubSub -> RSync : handle announcement
+RSync -> RIPFS : fetch identity document
+RIPFS --> RSync : identity document
+RSync -> RSync : validate signature, version and previous CID
+RSync -> RMongo : store local identity metadata
 
-"Auth Service" -> "Local Storage" : load encrypted identity
-"Auth Service" -> "Auth Service" : derive private key
+== 1to1 Conversation Creation ==
 
-"Auth Service" -> "Identity Service" : unlock identity
-"Identity Service" -> "Web UI" : session established
+User -> UseCase : start chat with identity
+UseCase -> Mongo : find local owner identity
+UseCase -> DHT : discover remote identity CIDs if needed
+UseCase -> IPFS : fetch missing identity documents
+UseCase -> Domain : create OneToOneConversation
+Domain -> Domain : derive deterministic conversation id
+UseCase -> Mongo : save conversation aggregate metadata
+UseCase -> PubSub : subscribe conversation topic
 
+== Message Publication ==
 
-== NETWORK BOOTSTRAP ==
+User -> UseCase : send message
+UseCase -> Domain : load Conversation aggregate
+UseCase -> Domain : record MessageSent event
+Domain -> Domain : encrypt payload and sign event
+UseCase -> IPFS : store dependent event blob
+IPFS --> UseCase : event CID
+UseCase -> Mongo : store conversation event metadata
+UseCase -> EventPublisher : publish ConversationMessageWasSent
+EventPublisher -> PubSub : adapter publishes domain event
 
-"Web UI" -> "Peer Network" : connect()
-
-"Peer Network" -> "Peer Network" : load known peers
-
-alt no peers
-"Peer Network" -> "Peer Node A" : bootstrap connect
+PubSub -> RPubSub : gossip message
+RPubSub -> RSync : handle domain event
+RSync -> RMongo : check event id
+alt missing event
+  RSync -> RIPFS : fetch event CID
+  RIPFS --> RSync : event blob
+  RSync -> RSync : load Conversation and validate dependent event
+  RSync -> RMongo : store conversation event metadata
+  RSync -> RPubSub : re-gossip if useful
 end
 
-"Peer Network" -> "Peer Network" : establish gossip channels
+== Edit or Delete ==
 
+User -> UseCase : edit or delete message
+UseCase -> Domain : load Conversation aggregate
+UseCase -> Domain : record MessageEdited or MessageDeleted
+Domain -> Domain : target original event id
+Domain -> Domain : sign compensating event
+UseCase -> IPFS : store immutable edit/delete event
+IPFS --> UseCase : event CID
+UseCase -> Mongo : store conversation event metadata
+UseCase -> EventPublisher : publish conversation domain event
+EventPublisher -> PubSub : adapter publishes domain event
 
-== PEER DISCOVERY ==
+== Anti Entropy Recovery ==
 
-loop gossip network
-
-"Peer Node A" -> "Peer Network" : peer list fragment
-"Peer Network" -> "Local Storage" : store peer
-
-"Peer Network" -> "Peer Node B" : handshake
-"Peer Node B" -> "Peer Network" : handshake response
-
-end
-
-
-== SEARCH USER ==
-
-User -> "Web UI" : search username
-
-"Web UI" -> "Identity Service" : search(name)
-
-"Identity Service" -> "Peer Network" : request identity hints
-
-"Peer Network" -> "Peer Node A" : query
-"Peer Node A" -> "IPFS (Helia)" : fetch profile CID
-
-"IPFS (Helia)" -> "Peer Network" : profile object
-"Peer Network" -> "Identity Service" : identity data
-
-"Identity Service" -> "Web UI" : profile results
-
-
-== OPEN CONVERSATION ==
-
-User -> "Web UI" : open chat
-
-"Web UI" -> "Replication Engine" : load conversation log
-
-"Replication Engine" -> "IPFS (Helia)" : fetch CRDT log
-
-"IPFS (Helia)" -> "Replication Engine" : log entries
-
-"Replication Engine" -> "Web UI" : messages
-
-
-== SEND MESSAGE ==
-
-User -> "Web UI" : send message
-
-"Web UI" -> "Identity Service" : get public key
-"Web UI" -> "Web UI" : encrypt message
-
-"Web UI" -> "Replication Engine" : append message
-
-"Replication Engine" -> "IPFS (Helia)" : store block
-"IPFS (Helia)" -> "Replication Engine" : CID
-
-"Replication Engine" -> "Local Storage" : update log head
-
-"Replication Engine" -> "Peer Network" : broadcast log head
-
-
-== NETWORK PROPAGATION ==
-
-"Peer Network" -> "Peer Node B" : gossip new head
-"Peer Node B" -> "Replication Engine" : request missing blocks
-
-"Peer Node B" -> "IPFS (Helia)" : fetch message block
-
-"IPFS (Helia)" -> "Peer Node B" : message data
-
-"Peer Node B" -> "Replication Engine" : merge CRDT
-
-
-== SEND MEDIA ==
-
-User -> "Web UI" : upload image
-
-"Web UI" -> "IPFS (Helia)" : add file
-
-"IPFS (Helia)" -> "Web UI" : CID
-
-"Web UI" -> "Replication Engine" : message with CID
-
-"Replication Engine" -> "Peer Network" : gossip message
-
-
-== OFFLINE NODE RECOVERY ==
-
-"Peer Node C" -> "Peer Network" : reconnect
-
-"Peer Network" -> "Peer Node C" : gossip latest heads
-
-"Peer Node C" -> "Replication Engine" : detect missing entries
-
-"Peer Node C" -> "IPFS (Helia)" : fetch blocks
-
-"Replication Engine" -> "Local Storage" : rebuild log
+Sync -> PubSub : request known conversation events
+PubSub -> RPubSub : SyncRequest(conversationId, knownEventIds)
+RPubSub -> RSync : compare known events
+RSync -> RMongo : find missing event CIDs
+RSync -> RPubSub : SyncResponse(CIDs)
+RPubSub -> Sync : response
+Sync -> IPFS : fetch missing event blobs
+Sync -> Sync : load Conversation, validate and merge
+Sync -> Mongo : store conversation event metadata
 
 @enduml

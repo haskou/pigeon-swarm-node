@@ -1,140 +1,232 @@
 @startuml
 
-title Pigeon-swarm
+title Pigeon Swarm - Target Domain Classes
 
-package "shared" {
-  package "domain" {
-    class Key extends StringValueObject{}
-    class Hash extends StringValueObject{}
-    class identityId extends PublicKey {}
-    class MessageId extends Hash {}
-    class GroupId extends Hash {}
-    class BoardId extends Hash {}
-    class NodeId extends UUID {}
-    class NetworkId extends UUID {}
-    class Address extends StringValueObject {}
-    class Media {}
-    class Image extends Media{}
-    class Message {
-      -id: MessageId
-      -senderId: identityId
-      -timestamp: Timestamp
-      -media: List<Media>
-      -text?: StringValueObject
-    }
+skinparam packageStyle rectangle
 
-    Message *--> MessageId
-    Message *--> identityId
-    Media *--> Hash
-    Message o--> Media
-  }
+package "shared.domain" {
+  class NodeId <<ValueObject>>
+  class NetworkId <<ValueObject>>
+  class IdentityId <<ValueObject>>
+  class ConversationId <<ValueObject>>
+  class MessageEventId <<ValueObject>>
+  class Cid <<ValueObject>>
+  class Timestamp <<ValueObject>>
+  class Signature <<ValueObject>>
+  class EncryptedPayload <<ValueObject>>
 }
 
-package "KeyRing" {
-  package "domain" {
-    class KeyRing {
-      -id: identityId
-      -contacts: List<identityId>
-      -conversations: Record<conversationId, Key?>
-      -Signature: Hash
-    }
-
-    note left of KeyRing
-      ContactList is a list of contacts of an Identity,
-      this should be encrypted with the Identity's private key
-    end note
+package "nodes.domain" {
+  class Node <<AggregateRoot>> {
+    -id: NodeId
+    -networks: Map<NetworkId, Network>
+    -owner?: IdentityId
+    +addNetwork(network: Network): void
+    +assignOwner(owner: IdentityId): void
   }
 
-  package "application" {
-    class ConversationKeySaver {
-      +saveConversationKey(conversationId: conversationId, key: Key): void
-    }
+  class Network {
+    -id: NetworkId
+    -name: NetworkName
+    -key?: NetworkKey
+    +isPublic(): boolean
   }
+
+  class NetworkName <<ValueObject>>
+  class NetworkKey <<ValueObject>>
+
+  interface NodeRepository {
+    +loadLocalNode(): Promise<Node>
+    +saveLocalNode(node: Node): Promise<void>
+  }
+
+  class NodeLoaderService {
+    +loadNode(): Promise<Node>
+  }
+
+  class NodeSaverService {
+    +saveNode(node: Node): Promise<void>
+  }
+
+  Node *--> NodeId
+  Node o--> "0..*" Network
+  Node --> IdentityId
+  Network *--> NetworkId
+  Network *--> NetworkName
+  Network --> NetworkKey
+  NodeLoaderService --> NodeRepository
+  NodeSaverService --> NodeRepository
 }
 
-package "conversations" {
-  package "domain" {
-
-    abstract class Conversation <AggregateRoot>{
-      -id: ConversationId
-      -participants: List<IdentityId>
-    }
-
-    class OneToOneConversation extends Conversation {
-    }
-
-    class GroupConversation extends Conversation {
-       -publicKey: Key
-    }
-
-    note left of OneToOneConversation
-      Limited to 2 participants, hast to be encrypted
-      with both users exchanging public keys.
-    end note
-
-    class ConversationRepositoryService {}
-
-    interface ConversationRepository {
-      +save(Conversation: Conversation): void
-      +findById(ConversationId: ConversationId): Conversation
-      +remove(ConversationId: ConversationId): void
-    }
-
-    Conversation o--> Message
-    ConversationRepositoryService ..> ConversationRepository
-    ConversationRepositoryService o--> Conversation
+package "identities.domain" {
+  class Identity <<AggregateRoot>> {
+    -id: IdentityId
+    -encryptedKeyPair: EncryptedKeyPair
+    -version: number
+    -previousCid?: Cid
+    -networks: UniqueObjectArray<NetworkId>
+    -profile: Profile
+    -timestamp: Timestamp
+    -signature: Signature
   }
 
-  package "application" {
-    class ConversationFinder {
-      +findById(conversationId: ConversationId): Conversation
-    }
-    class ConversationCreator {
-      +createConversation(participants: List<identityId>): Conversation
-    }
-    class ConversationRemover {
-      +removeConversation(conversationId: ConversationId): void
-    }
+  class Profile {
+    -name: ProfileName
+    -biography?: ProfileBiography
+    -pictureCid?: Cid
   }
 
-    ConversationFinder ..> ConversationRepositoryService
-    ConversationCreator ..> ConversationRepositoryService
-    ConversationRemover ..> ConversationRepositoryService
+  class ProfileName <<ValueObject>>
+  class ProfileBiography <<ValueObject>>
+  class EncryptedKeyPair <<ValueObject>>
+
+  interface IdentityRepository {
+    +save(identity: Identity): Promise<void>
+    +findById(id: IdentityId): Promise<Identity>
+    +findCandidatesById(id: IdentityId): Promise<Identity[]>
+  }
+
+  class IdentitySignatureDomainService {
+    +generateSignature(payload): Signature
+    +isValidSignature(payload, signature): boolean
+  }
+
+  class IdentityResolutionDomainService {
+    +validate(identity: Identity): void
+    +chooseCurrent(candidates: Identity[]): Identity
+  }
+
+  Identity *--> IdentityId
+  Identity *--> EncryptedKeyPair
+  Identity o--> NetworkId
+  Identity *--> Profile
+  Identity --> Cid
+  Profile *--> ProfileName
+  Profile --> ProfileBiography
+  Profile --> Cid
+  IdentityRepository --> Identity
+  IdentitySignatureDomainService ..> Identity
+  IdentityResolutionDomainService --> Identity
 }
 
-package "communities" {
-  package "domain" {
-
-    class Community {
-      -id: GroupId
-      -name: StringValueObject
-      -isEncrypted: Boolean
-      -privateKey?: Key
-      -publicKey?: Key
-    }
+package "conversations.domain" {
+  abstract class Conversation <<AggregateRoot>> {
+    -id: ConversationId
+    -participants: IdentityId[]
+    -events: MessageEvent[]
+    -createdAt: Timestamp
+    +hasParticipant(identityId: IdentityId): boolean
+    +record(event: MessageEvent): void
+    +latestEvents(limit: number): MessageEvent[]
+    +missingEvents(known: MessageEventId[]): MessageEvent[]
   }
-  note left of Community
-   TODO: Add EncryptedMessages
-   TODO: All communities should be encrypted?
-   TODO: How users know private keys?
-   TODO: Voicechat and videochat?
-   TODO: It has channels?
-  end note
+
+  class OneToOneConversation {
+    +create(a: IdentityId, b: IdentityId): OneToOneConversation
+  }
+
+  abstract class MessageEvent <<Entity>> {
+    -id: MessageEventId
+    -authorId: IdentityId
+    -createdAt: Timestamp
+    -previousEventIds: MessageEventId[]
+    -signature: Signature
+    +verify(): boolean
+  }
+
+  class MessageSent {
+    -payload: EncryptedPayload
+    -attachmentCids: Cid[]
+  }
+
+  class MessageEdited {
+    -targetEventId: MessageEventId
+    -payload: EncryptedPayload
+  }
+
+  class MessageDeleted {
+    -targetEventId: MessageEventId
+    -reason?: string
+  }
+
+  interface ConversationRepository {
+    +save(conversation: Conversation): Promise<void>
+    +findById(id: ConversationId): Promise<Conversation>
+    +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
+    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<MessageEvent>
+  }
+
+  class MessageSignatureDomainService {
+    +sign(event): Signature
+    +verify(event): boolean
+  }
+
+  class ConversationProjectionDomainService {
+    +project(conversation: Conversation): object[]
+  }
+
+  Conversation <|-- OneToOneConversation
+  Conversation *--> ConversationId
+  Conversation o--> IdentityId
+  Conversation *--> "0..*" MessageEvent
+  MessageEvent <|-- MessageSent
+  MessageEvent <|-- MessageEdited
+  MessageEvent <|-- MessageDeleted
+  MessageEvent *--> MessageEventId
+  MessageEvent --> IdentityId
+  MessageSent --> EncryptedPayload
+  MessageSent o--> Cid
+  MessageEdited --> MessageEventId
+  MessageDeleted --> MessageEventId
+  ConversationRepository --> Conversation
+  MessageSignatureDomainService ..> MessageEvent
+  ConversationProjectionDomainService --> Conversation
 }
 
-package "boards" {
-  package "domain" {
+package "application" {
+  class IdentityFinder
+  class IdentitySynchronizer
+  class OneToOneConversationCreator
+  class MessageSender
+  class MessageReceiver
+  class LatestMessagesFinder
+  class ConversationSynchronizer
+  class DomainEventPublisher
 
-    class Board {
-      -id: GroupId
-      -name: StringValueObject
-    }
-  }
-  note left of Board
-  Boards are public by default. Anyone can join and see the content.
-  There's no need to use an identity for the participants. Can be anonymous user.
-  TODO: How to categorize boards? Maybe with tags?
-  end note
+  IdentityFinder --> IdentityRepository
+  IdentityFinder --> IdentityResolutionDomainService
+  IdentitySynchronizer --> IdentityRepository
+  OneToOneConversationCreator --> ConversationRepository
+  MessageSender --> ConversationRepository
+  MessageSender --> DomainEventPublisher
+  MessageReceiver --> ConversationRepository
+  LatestMessagesFinder --> ConversationRepository
+  LatestMessagesFinder --> ConversationProjectionDomainService
+  ConversationSynchronizer --> ConversationRepository
+}
+
+package "infrastructure" {
+  class MongoNodeRepository
+  class IpfsIdentityRepository
+  class MongoConversationRepository
+  class IpfsConversationEventStore
+  class HeliaPubSubMessageBusAdapter
+
+  class IpfsIdentityDocument <<Document>>
+  class MongoIdentityDocumentIndex <<Document>>
+  class IpfsMessageDocument <<Document>>
+  class MongoMessageDocumentIndex <<Document>>
+
+  MongoNodeRepository ..|> NodeRepository
+  IpfsIdentityRepository ..|> IdentityRepository
+  MongoConversationRepository ..|> ConversationRepository
+
+  IpfsIdentityRepository --> IpfsIdentityDocument
+  IpfsIdentityRepository --> MongoIdentityDocumentIndex
+  MongoConversationRepository --> IpfsConversationEventStore
+  IpfsConversationEventStore --> IpfsMessageDocument
+  MongoConversationRepository --> MongoMessageDocumentIndex
+  HeliaPubSubMessageBusAdapter ..> DomainEventPublisher
 }
 
 @enduml

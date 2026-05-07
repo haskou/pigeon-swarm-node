@@ -9,6 +9,7 @@ package "nodes" {
       -networks: Map<NetworkId, Network>
       -owner?: IdentityId
       +addNetwork(network: Network): void
+      +assignOwner(owner: IdentityId): void
       +toPrimitives(): object
     }
 
@@ -72,10 +73,40 @@ package "nodes" {
       +loadNode(): Promise<Node>
     }
 
+    class NodeOwnerAssigner {
+      -loader: NodeLoaderService
+      -saver: NodeSaverService
+      +assignOwner(identityId: IdentityId): Promise<void>
+    }
+
     NodeNetworkAdder --> NodeLoaderService
     NodeNetworkAdder --> NodeSaverService
     NodeNetworkAdder --> NodeNetworkAdderMessage
     NodeLoader --> NodeLoaderService
+    NodeOwnerAssigner --> NodeLoaderService
+    NodeOwnerAssigner --> NodeSaverService
+  }
+
+  package "infrastructure" {
+    class LocalNodeRepository {
+      -networkRegistry: IPFSNetworkRegistry
+      -metadataMapper: LocalNodeMetadataMapper
+      +loadLocalNode(): Promise<Node>
+      +saveLocalNode(node: Node): Promise<void>
+    }
+
+    class MongoNodeMetadataRepository {
+      +loadLocalNode(): Promise<Node>
+      +saveLocalNode(node: Node): Promise<void>
+    }
+
+    note right of MongoNodeMetadataRepository
+      Target repository once MongoDB becomes
+      the node-local index and metadata store.
+    end note
+
+    LocalNodeRepository ..|> NodeRepository
+    MongoNodeMetadataRepository ..|> NodeRepository
   }
 }
 

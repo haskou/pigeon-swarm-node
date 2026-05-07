@@ -2,83 +2,129 @@
 
 title Pigeon Swarm - Identities Context
 
-package "identities" {
-  package "domain" {
-
-    class Identity <AggregateRoot> {
-      -id: IdentityId
-      -encryptedKeyPair: EncryptedKeyPair
-      -networks: UniqueObjectArray<NetworkId>
-      -profile: Profile
-      -timestamp: Timestamp
-      -signature: Signature
-      +create(name, password, networks): Identity
-    }
-
-    class Profile {
-      -name: ProfileName
-      -biography?: ProfileBiography
-      -picture?: ProfileImage
-    }
-
-    class ProfileName {
-    }
-
-    class ProfileBiography {
-    }
-
-    class ProfileImage {
-    }
-
-    ' Domain Services
-    class IdentitySignatureDomainService {
-      +generate(identity): Signature
-      +validate(identity): boolean
-    }
-
-    class IdentitySaverService {
-      +save(identity): Promise<void>
-    }
-
-    class IdentityFinderService {
-      +findById(identityId): Promise<Identity>
-    }
-
-    ' Repository
-    interface IdentityRepository {
-      +save(identity: Identity): Promise<void>
-      +findById(id: IdentityId): Promise<Identity>
-    }
-
-    ' Relationships in domain
-    Identity *--> Profile : contains
-    Profile *--> ProfileName
-    Profile *--> ProfileBiography
-    Profile *--> ProfileImage
-    Identity ..> IdentitySignatureDomainService
-    IdentitySaverService --> Identity
-    IdentitySaverService --> IdentityRepository
-    IdentityFinderService --> IdentityRepository
-
+package "identities.domain" {
+  class Identity <<AggregateRoot>> {
+    -id: IdentityId
+    -encryptedKeyPair: EncryptedKeyPair
+    -version: number
+    -previousCid?: Cid
+    -networks: UniqueObjectArray<NetworkId>
+    -profile: Profile
+    -timestamp: Timestamp
+    -signature: Signature
+    +create(name, password, networks): Identity
+    +updateProfile(profile, password): Identity
+    +updateNetworks(networks, password): Identity
   }
 
-  package "application" {
-    ' Use Cases
-    class IdentityCreator {
-      -saverService: IdentitySaverService
-      +create(message: IdentityCreateMessage): Promise<Identity>
-    }
+  class Profile {
+    -name: ProfileName
+    -biography?: ProfileBiography
+    -pictureCid?: Cid
+  }
 
-    class IdentityFinder {
-      -finderService: IdentityFinderService
-      +find(message: IdentityFinderMessage): Promise<Identity>
-    }
+  class ProfileName <<ValueObject>>
+  class ProfileBiography <<ValueObject>>
+  class ProfileImage <<ValueObject>>
+
+  class IdentitySignatureDomainService {
+    +generateSignature(payload, encryptedKeyPair, password): Promise<Signature>
+    +isValidSignature(encryptedKeyPair, payload, signature): boolean
+  }
+
+  class IdentityResolutionDomainService {
+    +validate(identity: Identity): void
+    +chooseCurrent(candidates: Identity[]): Identity
+  }
+
+  interface IdentityRepository {
+    +save(identity: Identity): Promise<void>
+    +findById(id: IdentityId): Promise<Identity>
+    +findCandidatesById(id: IdentityId): Promise<Identity[]>
+  }
+
+  class IdentitySaverService {
+    +save(identity): Promise<void>
+  }
+
+  class IdentityFinderService {
+    +findById(identityId): Promise<Identity>
+  }
+
+  Identity *--> Profile
+  Identity o--> NetworkId
+  Identity --> Cid
+  Profile *--> ProfileName
+  Profile --> ProfileBiography
+  Profile --> Cid
+  Identity ..> IdentitySignatureDomainService
+  IdentityResolutionDomainService --> Identity
+  IdentitySaverService --> IdentityRepository
+  IdentityFinderService --> IdentityRepository
+  IdentityFinderService --> IdentityResolutionDomainService
+}
+
+package "identities.application" {
+  class IdentityCreator {
+    +create(message: IdentityCreateMessage): Promise<Identity>
+  }
+
+  class IdentityUpdater {
+    +update(message: IdentityUpdateMessage): Promise<Identity>
+  }
+
+  class IdentityFinder {
+    +find(message: IdentityFinderMessage): Promise<Identity>
+  }
+
+  class IdentitySynchronizer {
+    +sync(identityId: IdentityId): Promise<Identity>
   }
 
   IdentityCreator --> IdentitySaverService
+  IdentityUpdater --> IdentityFinderService
+  IdentityUpdater --> IdentitySaverService
   IdentityFinder --> IdentityFinderService
+  IdentitySynchronizer --> IdentityRepository
+  IdentitySynchronizer --> IdentityResolutionDomainService
 }
 
+package "identities.infrastructure" {
+  class IpfsIdentityDocument {
+    -_id: string
+    -version: number
+    -previousCid?: string
+    -encryptedKeyPair: object
+    -networks: string[]
+    -profile: object
+    -timestamp: number
+    -signature: string
+  }
 
+  class MongoIdentityDocumentIndex {
+    -identityId: string
+    -cid: string
+    -version: number
+    -previousCid?: string
+    -valid: boolean
+    -receivedAt: number
+  }
+
+  class IpfsIdentityRepository {
+    +save(identity: Identity): Promise<void>
+    +findById(id: IdentityId): Promise<Identity>
+    +findCandidatesById(id: IdentityId): Promise<Identity[]>
+  }
+
+  note right of IpfsIdentityRepository
+    Encapsulates IPFS documents, MongoDB indexes,
+    DHT head hints and PubSub announcements.
+    The domain only receives Identity objects.
+  end note
+
+  IpfsIdentityRepository ..|> IdentityRepository
+  IpfsIdentityRepository --> IpfsIdentityDocument
+  IpfsIdentityRepository --> MongoIdentityDocumentIndex
+}
 
 @enduml
