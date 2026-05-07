@@ -156,6 +156,40 @@ describe('IPFS', () => {
     });
   });
 
+  describe('getRecordCandidates', () => {
+    it('should collect unique records from all networks', async () => {
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+      const thirdNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.getRecord.mockResolvedValue('cid-a');
+      secondNetwork.getRecord.mockResolvedValue('cid-a');
+      thirdNetwork.getRecord.mockResolvedValue('cid-b');
+      registry.getAll.mockReturnValue([
+        firstNetwork,
+        secondNetwork,
+        thirdNetwork,
+      ]);
+
+      const result = await ipfs.getRecordCandidates('my-key');
+
+      expect(result).toEqual(['cid-a', 'cid-b']);
+    });
+
+    it('should skip networks without a record', async () => {
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.getRecord.mockResolvedValue(undefined);
+      secondNetwork.getRecord.mockResolvedValue('cid-b');
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+
+      const result = await ipfs.getRecordCandidates('my-key');
+
+      expect(result).toEqual(['cid-b']);
+    });
+  });
+
   describe('getRecordFromNetwork', () => {
     it('should get record from a specific network by network id', async () => {
       mockNetwork.getRecord.mockResolvedValue('cid-value');

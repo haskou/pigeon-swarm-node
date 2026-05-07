@@ -1,10 +1,14 @@
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
+import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
+import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import MongoIdentityMetadataRepository from '../../../../../../src/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '../../../../../../src/contexts/shared/domain/value-objects/NetworkId';
+import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -26,6 +30,7 @@ describe('IpfsIdentityRepository', () => {
       metadataRepository,
     );
     mother = new IdentityMother();
+    ipfsManager.getRecordCandidates.mockResolvedValue([]);
   });
 
   describe('save', () => {
@@ -91,7 +96,7 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
@@ -116,7 +121,7 @@ describe('IpfsIdentityRepository', () => {
           version: primitives.version,
         },
       ]);
-      ipfsManager.getRecord.mockResolvedValue(dhtCidString);
+      ipfsManager.getRecordCandidates.mockResolvedValue([dhtCidString]);
       ipfsManager.getJSON.mockResolvedValue({
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
@@ -149,7 +154,7 @@ describe('IpfsIdentityRepository', () => {
       const cidString = 'bafystoredcid';
 
       metadataRepository.findValidByIdentityId.mockResolvedValue([]);
-      ipfsManager.getRecord.mockResolvedValue(cidString);
+      ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
       ipfsManager.getJSON.mockResolvedValue({
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
@@ -163,7 +168,7 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
       expect(metadataRepository.save.mock.calls[0][0].toPrimitives()).toEqual(
@@ -206,14 +211,14 @@ describe('IpfsIdentityRepository', () => {
           timestamp: primitives.timestamp,
           version: primitives.version,
         });
-      ipfsManager.getRecord.mockResolvedValue(cidString);
+      ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
 
       const result = await repository.findById(identityId);
 
       expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
         new IPFSId(brokenCidString),
       );
-      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
       expect(result.toPrimitives()).toEqual(primitives);
@@ -224,11 +229,67 @@ describe('IpfsIdentityRepository', () => {
       const identityId = new IdentityId(identity.toPrimitives().id);
 
       metadataRepository.findValidByIdentityId.mockResolvedValue([]);
-      ipfsManager.getRecord.mockResolvedValue(undefined);
+      ipfsManager.getRecordCandidates.mockResolvedValue([]);
 
       await expect(repository.findById(identityId)).rejects.toThrow(
         IdentityNotFoundError,
       );
+    });
+
+    it('should reject DHT candidates for another identity before caching', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const wrongCidString = 'bafywrongidentity';
+      const validCidString = 'bafyvalididentity';
+      const otherIdentity = await Identity.create(
+        new ProfileName('Mallory'),
+        new Password('super-secret-password'),
+        [new NetworkId(primitives.networks[0])],
+      );
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([
+        wrongCidString,
+        validCidString,
+      ]);
+      ipfsManager.getJSON
+        .mockResolvedValueOnce(mapper.toDocument(otherIdentity))
+        .mockResolvedValueOnce(mapper.toDocument(identity));
+
+      const result = await repository.findById(identityId);
+
+      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+        new IPFSId(wrongCidString),
+      );
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(validCidString),
+        true,
+      );
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
+    it('should reject tampered DHT candidates and return not found', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const tamperedCidString = 'bafytamperedidentity';
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([tamperedCidString]);
+      ipfsManager.getJSON.mockResolvedValue({
+        ...mapper.toDocument(identity),
+        signature: 'tampered-signature',
+      });
+
+      await expect(repository.findById(identityId)).rejects.toThrow(
+        IdentityNotFoundError,
+      );
+      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+        new IPFSId(tamperedCidString),
+      );
+      expect(metadataRepository.save).not.toHaveBeenCalled();
     });
   });
 });

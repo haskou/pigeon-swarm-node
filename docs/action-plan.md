@@ -102,8 +102,17 @@ tested and committed with the repository gitmoji conventional-commit format.
   - `HeliaIPFS.getRecord` checks the local datastore before DHT routing
   - `HeliaIPFS.putRecord` persists locally and publishes to DHT as a
     bounded best-effort step
+  - `IPFS.getRecordCandidates` collects unique record candidates across
+    networks instead of forcing callers to trust the first winner
   - API acceptance steps allow slower Helia/libp2p work without masking hung
     scenarios indefinitely
+- Remote identity validation:
+  - `IdentityCandidateValidationDomainService` accepts only candidates matching
+    the requested `IdentityId`
+  - `IpfsIdentityRepository` marks broken/tampered or wrong-identity
+    candidates invalid before caching
+  - DHT candidate lookup now fetches and validates all discovered identity
+    content references
 - Tooling/runtime:
   - Dockerfile and Compose cleanup
   - `yarn build` passes
@@ -161,27 +170,25 @@ Goal: fix the security issue called out in `IPFS.getRecord`.
 
 Steps:
 
-1. Replace the single-record trust model with candidate discovery:
-   - collect one or more record/content-reference candidates from DHT and peers
-   - fetch candidate documents from IPFS
-   - map documents to domain objects
-   - validate before exposing them to application code
+1. Extend identity validation from single candidates to full version chains:
+   - version N must point to version N-1 through
+     `previousIdentityExternalIdentifier`
+   - every document in the chain must match the same `IdentityId`
+   - invalid, missing or cyclic chains are rejected
 2. Keep generic integrity helpers in shared domain only if they are genuinely
    context-free:
    - canonical payload hashing
    - signature payload helpers
    - content hash matching
 3. Keep context rules in context domain services:
-   - identities validate id/public key, signature, version and previous
-     document-reference chain
    - conversations validate message signature, author, participants and
      edit/delete target rules
-4. Mark invalid identity/message metadata in Mongo.
+4. Add remote message validation once `ConversationRepository` exists.
 5. Return not found/empty when all candidates are invalid.
 
 Tests:
 
-- Unit tests for invalid identity candidates.
+- Unit tests for invalid identity chains.
 - Unit tests for invalid message candidates once repository exists.
 - Cucumber scenarios for DHT identity convergence.
 
