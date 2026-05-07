@@ -431,6 +431,14 @@ Last updated: 2026-05-07.
   - Added `MongoIdentityMetadataMapper`.
   - Added `MongoIdentityMetadataRepository`.
   - Added unit tests for identity metadata mapper and repository.
+- Identity repository composite wiring:
+  - `IpfsIdentityRepository.save(identity)` now stores the IPFS document and
+    persists the resulting CID in Mongo identity metadata.
+  - `findCandidatesById(id)` now loads candidate CIDs from Mongo first.
+  - If Mongo has no candidates, the repository falls back to the existing DHT
+    record lookup and caches the fetched CID in Mongo metadata.
+  - DI now registers Mongo identity metadata mapper/repository and injects the
+    metadata repository into `IpfsIdentityRepository`.
 - TypeScript/tooling:
   - `tsconfig.json` now uses `es2023` + `dom` libs so ESLint parser accepts the
     project config.
@@ -489,7 +497,7 @@ Last updated: 2026-05-07.
 - `yarn build`: pass.
 - `yarn lint`: pass with 5 `max-params` warnings.
 - Focused Jest command after conversation/node/identity baseline: pass, 16
-  suites / 53 tests.
+  suites / 54 tests.
   - `tests/unit/contexts/nodes/domain/Node.spec.ts`
   - `tests/unit/contexts/nodes/application/assign-owner`
   - `tests/unit/contexts/nodes/infrastructure/mongo`
@@ -498,15 +506,14 @@ Last updated: 2026-05-07.
 
 ### Exact Next Steps
 
-1. Wire identity Mongo metadata into the identity repository/composite
-   repository:
-   - `save(identity)` should persist IPFS document, then Mongo metadata.
-   - candidate reads should use Mongo metadata first and IPFS fetch internally.
-2. Decide how infrastructure supplies candidate own CIDs to validate
+1. Decide how infrastructure supplies candidate own CIDs to validate
    `previousCid` chains without making `Identity` depend on IPFS.
-3. Start candidate discovery fallback:
-   - keep existing DHT `getRecord` as fallback when Mongo has no candidates.
-   - later add peer/DHT candidate expansion.
+2. Start richer candidate discovery:
+   - keep current DHT `getRecord` fallback for the known head.
+   - later add peer/DHT candidate expansion when multiple heads are possible.
+3. Add metadata invalidation behavior:
+   - decide whether failed IPFS fetches mark Mongo identity metadata as invalid
+     or bubble the error.
 4. Keep running after each slice:
    - `yarn build`
    - `yarn lint`

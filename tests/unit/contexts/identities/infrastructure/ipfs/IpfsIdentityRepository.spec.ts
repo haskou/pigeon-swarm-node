@@ -3,6 +3,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
+import MongoIdentityMetadataRepository from '../../../../../../src/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
@@ -11,13 +12,19 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 describe('IpfsIdentityRepository', () => {
   let ipfsManager: MockProxy<IPFS>;
   let mapper: IpfsIdentityMapper;
+  let metadataRepository: MockProxy<MongoIdentityMetadataRepository>;
   let repository: IpfsIdentityRepository;
   let mother: IdentityMother;
 
   beforeEach(() => {
     ipfsManager = mock<IPFS>();
     mapper = new IpfsIdentityMapper();
-    repository = new IpfsIdentityRepository(ipfsManager, mapper);
+    metadataRepository = mock<MongoIdentityMetadataRepository>();
+    repository = new IpfsIdentityRepository(
+      ipfsManager,
+      mapper,
+      metadataRepository,
+    );
     mother = new IdentityMother();
   });
 
@@ -45,16 +52,57 @@ describe('IpfsIdentityRepository', () => {
         expectedCid.valueOf(),
         primitives.networks,
       );
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        expectedCid,
+        true,
+      );
     });
   });
 
   describe('findById', () => {
-    it('should find identity by looking up record and fetching JSON', async () => {
+    it('should find identity using mongo metadata before DHT fallback', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
       const cidString = 'bafystoredcid';
 
+      metadataRepository.findValidByIdentityId.mockResolvedValue([
+        {
+          _id: primitives.id + ':' + cidString,
+          cid: cidString,
+          identityId: primitives.id,
+          previousCid: primitives.previousCid,
+          receivedAt: Date.now(),
+          valid: true,
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getJSON.mockResolvedValue({
+        _id: primitives.id,
+        encryptedKeyPair: primitives.encryptedKeyPair,
+        networks: primitives.networks,
+        previousCid: primitives.previousCid,
+        profile: primitives.profile,
+        signature: primitives.signature,
+        timestamp: primitives.timestamp,
+        version: primitives.version,
+      });
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getRecord).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
+    it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const cidString = 'bafystoredcid';
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecord.mockResolvedValue(cidString);
       ipfsManager.getJSON.mockResolvedValue({
         _id: primitives.id,
@@ -72,7 +120,13 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecord).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(metadataRepository.save.mock.calls[0][0].toPrimitives()).toEqual(
+        primitives,
+      );
+      expect(metadataRepository.save.mock.calls[0][1]).toEqual(
+        new IPFSId(cidString),
+      );
+      expect(metadataRepository.save.mock.calls[0][2]).toBe(true);
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
@@ -80,6 +134,7 @@ describe('IpfsIdentityRepository', () => {
       const identity = await mother.build();
       const identityId = new IdentityId(identity.toPrimitives().id);
 
+      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecord.mockResolvedValue(undefined);
 
       await expect(repository.findById(identityId)).rejects.toThrow(
