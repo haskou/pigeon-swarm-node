@@ -1,15 +1,11 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import {
-  MessageEvent,
-  MessageEventPrimitives,
-  MessageEventType,
-} from './MessageEvent';
+import { Message, MessageEventType } from './Message';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageEventId } from './value-objects/MessageEventId';
 
-export class MessageDeleted extends MessageEvent {
+export class MessageDeleted extends Message {
   public static create(
     conversationId: ConversationId,
     authorId: IdentityId,
@@ -31,7 +27,7 @@ export class MessageDeleted extends MessageEvent {
   }
 
   public static fromPrimitives(
-    primitives: MessageEventPrimitives,
+    primitives: PrimitiveOf<Message>,
   ): MessageDeleted {
     return new MessageDeleted(
       new MessageEventId(primitives.id),

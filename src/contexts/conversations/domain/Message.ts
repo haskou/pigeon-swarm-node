@@ -5,25 +5,9 @@ import { Cid } from './value-objects/Cid';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageEventId } from './value-objects/MessageEventId';
-import {
-  MessageEventType,
-  MessageEventTypeValue,
-} from './value-objects/MessageEventType';
+import { MessageEventType } from './value-objects/MessageEventType';
 
-export interface MessageEventPrimitives {
-  attachmentCids: string[];
-  authorId: string;
-  conversationId: string;
-  createdAt: number;
-  encryptedPayload?: string;
-  id: string;
-  previousEventIds: string[];
-  signature: string;
-  targetEventId?: string;
-  type: MessageEventTypeValue;
-}
-
-export abstract class MessageEvent {
+export abstract class Message {
   protected constructor(
     private readonly id: MessageEventId,
     private readonly conversationId: ConversationId,
@@ -34,10 +18,7 @@ export abstract class MessageEvent {
     private readonly attachmentCids: Cid[] = [],
   ) {}
 
-  private basePrimitives(): Omit<
-    MessageEventPrimitives,
-    'encryptedPayload' | 'targetEventId' | 'type'
-  > {
+  private basePrimitives() {
     return {
       attachmentCids: this.attachmentCids.map((cid) => cid.valueOf()),
       authorId: this.authorId.valueOf(),
@@ -69,7 +50,7 @@ export abstract class MessageEvent {
     return undefined;
   }
 
-  public toPrimitives(): MessageEventPrimitives {
+  public toPrimitives() {
     return {
       ...this.basePrimitives(),
       encryptedPayload: this.getEncryptedPayload()?.valueOf(),

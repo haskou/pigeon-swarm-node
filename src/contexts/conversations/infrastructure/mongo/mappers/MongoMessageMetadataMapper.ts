@@ -1,19 +1,19 @@
-import { MessageEvent } from '@app/contexts/conversations/domain/MessageEvent';
+import { Message } from '@app/contexts/conversations/domain/Message';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Timestamp } from '@haskou/value-objects';
 
-import { MongoMessageEventMetadataDocument } from '../documents/MongoMessageEventMetadataDocument';
+import { MongoMessageMetadataDocument } from '../documents/MongoMessageMetadataDocument';
 
-export default class MongoMessageEventMetadataMapper {
+export default class MongoMessageMetadataMapper {
   public toDocument(
-    event: MessageEvent,
+    event: Message,
     cid: IPFSId,
     recipientIds: string[],
     networkId?: NetworkId,
     receivedAt: Timestamp = Timestamp.now(),
     valid = true,
-  ): MongoMessageEventMetadataDocument {
+  ): MongoMessageMetadataDocument {
     const primitives = event.toPrimitives();
 
     return {

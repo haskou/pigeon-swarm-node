@@ -6,19 +6,19 @@ package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
     -participants: IdentityId[]
-    -events: MessageEvent[]
+    -events: Message[]
     -createdAt: Timestamp
     +hasParticipant(identityId: IdentityId): boolean
-    +record(event: MessageEvent): void
-    +latestEvents(limit: number): MessageEvent[]
-    +missingEvents(known: MessageEventId[]): MessageEvent[]
+    +record(event: Message): void
+    +latestEvents(limit: number): Message[]
+    +missingEvents(known: MessageEventId[]): Message[]
   }
 
   class OneToOneConversation {
     +create(first: IdentityId, second: IdentityId): OneToOneConversation
   }
 
-  abstract class MessageEvent <<Entity>> {
+  abstract class Message <<Entity>> {
     -id: MessageEventId
     -authorId: IdentityId
     -createdAt: Timestamp
@@ -54,22 +54,22 @@ package "conversations.domain" {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
-    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<MessageEvent>
+    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<Message>
   }
 
   Conversation <|-- OneToOneConversation
-  Conversation *--> "0..*" MessageEvent
-  MessageEvent <|-- MessageSent
-  MessageEvent <|-- MessageEdited
-  MessageEvent <|-- MessageDeleted
+  Conversation *--> "0..*" Message
+  Message <|-- MessageSent
+  Message <|-- MessageEdited
+  Message <|-- MessageDeleted
   Conversation o--> IdentityId
-  MessageEvent --> IdentityId
-  MessageEvent o--> MessageEventId
+  Message --> IdentityId
+  Message o--> MessageEventId
   MessageSent --> EncryptedPayload
   MessageSent o--> Cid
   MessageEdited --> MessageEventId
   MessageDeleted --> MessageEventId
-  MessageSignatureDomainService ..> MessageEvent
+  MessageSignatureDomainService ..> Message
   ConversationProjectionDomainService --> Conversation
   ConversationRepository --> Conversation
 }
@@ -150,17 +150,17 @@ package "conversations.infrastructure" {
   class MongoConversationRepository
 
   class IpfsConversationEventStore {
-    +save(conversationId: ConversationId, event: MessageEvent): Promise<void>
-    +findById(conversationId: ConversationId, eventId: MessageEventId): Promise<MessageEvent>
-    +findLatest(conversationId: ConversationId, limit: number): Promise<MessageEvent[]>
-    +findMissing(conversationId: ConversationId, known: MessageEventId[]): Promise<MessageEvent[]>
+    +save(conversationId: ConversationId, event: Message): Promise<void>
+    +findById(conversationId: ConversationId, eventId: MessageEventId): Promise<Message>
+    +findLatest(conversationId: ConversationId, limit: number): Promise<Message[]>
+    +findMissing(conversationId: ConversationId, known: MessageEventId[]): Promise<Message[]>
   }
 
   class HeliaPubSubMessageBusAdapter
 
   note right of MongoConversationRepository
     Reconstitutes and persists the Conversation
-    aggregate. MessageEvent storage is an
+    aggregate. Message storage is an
     infrastructure detail inside this repository.
   end note
 

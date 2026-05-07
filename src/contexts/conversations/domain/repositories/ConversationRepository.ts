@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Conversation } from '../Conversation';
-import { MessageEvent } from '../MessageEvent';
+import { Message } from '../Message';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageEventId } from '../value-objects/MessageEventId';
 
@@ -10,7 +10,7 @@ export interface ConversationRepository {
   findEventById(
     conversationId: ConversationId,
     eventId: MessageEventId,
-  ): Promise<MessageEvent | undefined>;
+  ): Promise<Message | undefined>;
   findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,

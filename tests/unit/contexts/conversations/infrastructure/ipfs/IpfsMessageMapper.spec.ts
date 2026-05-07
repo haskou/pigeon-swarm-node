@@ -1,38 +1,38 @@
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
-import IpfsMessageEventMapper from '@app/contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageEventMapper';
+import IpfsMessageMapper from '@app/contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature } from '@haskou/value-objects';
 
-describe('IpfsMessageEventMapper', () => {
-  let mapper: IpfsMessageEventMapper;
+describe('IpfsMessageMapper', () => {
+  let mapper: IpfsMessageMapper;
 
   beforeEach(() => {
-    mapper = new IpfsMessageEventMapper();
+    mapper = new IpfsMessageMapper();
   });
 
-  it('should map a message event to an IPFS document', () => {
-    const event = buildSentEvent();
-    const primitives = event.toPrimitives();
+  it('should map a message to an IPFS document', () => {
+    const message = buildSentMessage();
+    const primitives = message.toPrimitives();
 
-    expect(mapper.toDocument(event)).toEqual({
+    expect(mapper.toDocument(message)).toEqual({
       ...primitives,
       schemaVersion: 1,
     });
   });
 
-  it('should map an IPFS document back to a message event', () => {
-    const event = buildSentEvent();
-    const document = mapper.toDocument(event);
+  it('should map an IPFS document back to a message', () => {
+    const message = buildSentMessage();
+    const document = mapper.toDocument(message);
 
     expect(mapper.toDomain(document).toPrimitives()).toEqual(
-      event.toPrimitives(),
+      message.toPrimitives(),
     );
   });
 });
 
-function buildSentEvent(): MessageSent {
+function buildSentMessage(): MessageSent {
   return MessageSent.create(
     new ConversationId('conversation-a:conversation-b'),
     new IdentityId(

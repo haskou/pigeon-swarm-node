@@ -1,6 +1,6 @@
+import { Message } from '../Message';
 import { MessageDeleted } from '../MessageDeleted';
 import { MessageEdited } from '../MessageEdited';
-import { MessageEvent } from '../MessageEvent';
 import { MessageSent } from '../MessageSent';
 import { EncryptedMessagePayload } from '../value-objects/EncryptedMessagePayload';
 import { MessageEventId } from '../value-objects/MessageEventId';
@@ -51,9 +51,7 @@ export class ConversationProjectionDomainService {
     return projection.get(eventId.valueOf()) as ConversationProjectedMessage;
   }
 
-  public project(
-    events: MessageEvent[],
-  ): Map<string, ConversationProjectedMessage> {
+  public project(events: Message[]): Map<string, ConversationProjectedMessage> {
     const projection = new Map<string, ConversationProjectedMessage>();
 
     events.forEach((event) => {

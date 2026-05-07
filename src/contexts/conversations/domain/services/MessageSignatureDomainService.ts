@@ -1,9 +1,13 @@
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import { EncryptedKeyPair, Signature } from '@haskou/value-objects';
+import {
+  EncryptedKeyPair,
+  PrimitiveOf,
+  Signature,
+} from '@haskou/value-objects';
 
-import { MessageEventPrimitives } from '../MessageEvent';
+import { Message } from '../Message';
 
-type MessageSignaturePayload = Omit<MessageEventPrimitives, 'signature'>;
+type MessageSignaturePayload = Omit<PrimitiveOf<Message>, 'signature'>;
 
 export class MessageSignatureDomainService {
   private getCanonicalPayload(

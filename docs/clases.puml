@@ -113,19 +113,19 @@ package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
     -participants: IdentityId[]
-    -events: MessageEvent[]
+    -events: Message[]
     -createdAt: Timestamp
     +hasParticipant(identityId: IdentityId): boolean
-    +record(event: MessageEvent): void
-    +latestEvents(limit: number): MessageEvent[]
-    +missingEvents(known: MessageEventId[]): MessageEvent[]
+    +record(event: Message): void
+    +latestEvents(limit: number): Message[]
+    +missingEvents(known: MessageEventId[]): Message[]
   }
 
   class OneToOneConversation {
     +create(a: IdentityId, b: IdentityId): OneToOneConversation
   }
 
-  abstract class MessageEvent <<Entity>> {
+  abstract class Message <<Entity>> {
     -id: MessageEventId
     -authorId: IdentityId
     -createdAt: Timestamp
@@ -153,7 +153,7 @@ package "conversations.domain" {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
-    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<MessageEvent>
+    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<Message>
   }
 
   class MessageSignatureDomainService {
@@ -168,18 +168,18 @@ package "conversations.domain" {
   Conversation <|-- OneToOneConversation
   Conversation *--> ConversationId
   Conversation o--> IdentityId
-  Conversation *--> "0..*" MessageEvent
-  MessageEvent <|-- MessageSent
-  MessageEvent <|-- MessageEdited
-  MessageEvent <|-- MessageDeleted
-  MessageEvent *--> MessageEventId
-  MessageEvent --> IdentityId
+  Conversation *--> "0..*" Message
+  Message <|-- MessageSent
+  Message <|-- MessageEdited
+  Message <|-- MessageDeleted
+  Message *--> MessageEventId
+  Message --> IdentityId
   MessageSent --> EncryptedPayload
   MessageSent o--> Cid
   MessageEdited --> MessageEventId
   MessageDeleted --> MessageEventId
   ConversationRepository --> Conversation
-  MessageSignatureDomainService ..> MessageEvent
+  MessageSignatureDomainService ..> Message
   ConversationProjectionDomainService --> Conversation
 }
 

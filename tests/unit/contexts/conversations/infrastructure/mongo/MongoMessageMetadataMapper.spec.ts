@@ -1,5 +1,5 @@
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
-import MongoMessageEventMetadataMapper from '@app/contexts/conversations/infrastructure/mongo/mappers/MongoMessageEventMetadataMapper';
+import MongoMessageMetadataMapper from '@app/contexts/conversations/infrastructure/mongo/mappers/MongoMessageMetadataMapper';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -7,23 +7,23 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-describe('MongoMessageEventMetadataMapper', () => {
-  let mapper: MongoMessageEventMetadataMapper;
+describe('MongoMessageMetadataMapper', () => {
+  let mapper: MongoMessageMetadataMapper;
 
   beforeEach(() => {
-    mapper = new MongoMessageEventMetadataMapper();
+    mapper = new MongoMessageMetadataMapper();
   });
 
-  it('should map a message event to mongo metadata', () => {
-    const event = buildSentEvent();
-    const primitives = event.toPrimitives();
+  it('should map a message to mongo metadata', () => {
+    const message = buildSentMessage();
+    const primitives = message.toPrimitives();
     const cid = new IPFSId('bafymessagecid');
     const recipientIds = ['recipient-id'];
     const networkId = NetworkId.generate();
     const receivedAt = new Timestamp(1773848829999);
 
     expect(
-      mapper.toDocument(event, cid, recipientIds, networkId, receivedAt),
+      mapper.toDocument(message, cid, recipientIds, networkId, receivedAt),
     ).toEqual({
       _id: primitives.id,
       authorId: primitives.authorId,
@@ -41,7 +41,7 @@ describe('MongoMessageEventMetadataMapper', () => {
   });
 });
 
-function buildSentEvent(): MessageSent {
+function buildSentMessage(): MessageSent {
   return MessageSent.create(
     new ConversationId('conversation-a:conversation-b'),
     new IdentityId(

@@ -11,7 +11,7 @@ Domain concepts stay simple:
 - `Network` represents a connectivity scope.
 - `Identity` represents the signed user identity.
 - `Conversation` represents a chat between identities.
-- `MessageEvent` represents an immutable signed chat event owned by
+- `Message` represents an immutable signed chat event owned by
   `Conversation`.
 
 MongoDB, IPFS, DHT and PubSub are infrastructure mechanisms. Repositories and
@@ -39,7 +39,7 @@ from its public key. The identity itself carries version metadata such as
 and ordered. The repository returns `Identity`, not an infrastructure-specific
 version object.
 
-**MessageEvent**
+**Message**
 
 A message event is an immutable signed event in a conversation. A sent message,
 an edit and a delete are all message events. Edits and deletes point to a
@@ -216,7 +216,7 @@ Process a message announced by another peer.
 3. `ConversationRepository` loads the target conversation and checks if the
    event is already known.
 4. If missing, the repository fetches the event document from IPFS.
-5. The repository maps the document to a `MessageEvent`.
+5. The repository maps the document to a `Message`.
 6. The `Conversation` aggregate accepts the event only after hash, signature,
    author identity and participant rules pass.
 7. `ConversationRepository.save` stores local lookup metadata.
@@ -238,7 +238,7 @@ Return the latest messages in a conversation.
 2. The application loads the `Conversation` through `ConversationRepository`.
 3. The repository uses local MongoDB metadata and IPFS documents internally to
    reconstitute the aggregate.
-4. The application reads the conversation's dependent `MessageEvent` objects.
+4. The application reads the conversation's dependent `Message` objects.
 5. Events are decrypted when keys are available.
 6. `ConversationProjectionDomainService` applies edits and deletes.
 7. The latest visible messages are returned.

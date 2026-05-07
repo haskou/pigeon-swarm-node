@@ -3,8 +3,8 @@ import { assert } from '@haskou/value-objects';
 
 import { Conversation, ConversationPrimitives } from './Conversation';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
-import { MessageEvent } from './MessageEvent';
-import { MessageEventFactory } from './MessageEventFactory';
+import { Message } from './Message';
+import { MessageFactory } from './MessageFactory';
 import { ConversationId } from './value-objects/ConversationId';
 
 export class OneToOneConversation extends Conversation {
@@ -29,16 +29,14 @@ export class OneToOneConversation extends Conversation {
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      primitives.events.map((event) =>
-        MessageEventFactory.fromPrimitives(event),
-      ),
+      primitives.events.map((event) => MessageFactory.fromPrimitives(event)),
     );
   }
 
   constructor(
     id: ConversationId,
     participants: IdentityId[],
-    events: MessageEvent[] = [],
+    events: Message[] = [],
   ) {
     super(id, participants, events);
 

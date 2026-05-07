@@ -1,6 +1,6 @@
 import { MessageEventTypeValue } from '../../../domain/value-objects/MessageEventType';
 
-export interface MongoMessageEventMetadataDocument {
+export interface MongoMessageMetadataDocument {
   _id: string;
   eventId: string;
   cid: string;

@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
-import { assert, Signature } from '@haskou/value-objects';
+import { assert, PrimitiveOf, Signature } from '@haskou/value-objects';
 
 import { ConversationParticipantNotFoundError } from './errors/ConversationParticipantNotFoundError';
 import { MessageEventTargetAlreadyDeletedError } from './errors/MessageEventTargetAlreadyDeletedError';
@@ -9,10 +9,10 @@ import { MessageEventTargetNotFoundError } from './errors/MessageEventTargetNotF
 import { ConversationMessageWasDeletedEvent } from './events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from './events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from './events/ConversationMessageWasSentEvent';
+import { Message } from './Message';
 import { MessageDeleted } from './MessageDeleted';
 import { MessageEdited } from './MessageEdited';
-import { MessageEvent, MessageEventPrimitives } from './MessageEvent';
-import { MessageEventFactory } from './MessageEventFactory';
+import { MessageFactory } from './MessageFactory';
 import { MessageSent } from './MessageSent';
 import {
   ConversationProjectedMessage,
@@ -25,7 +25,7 @@ import { MessageEventId } from './value-objects/MessageEventId';
 import { MessageEventType } from './value-objects/MessageEventType';
 
 export interface ConversationPrimitives {
-  events: MessageEventPrimitives[];
+  events: PrimitiveOf<Message>[];
   id: string;
   participantIds: string[];
 }
@@ -39,16 +39,14 @@ export class Conversation extends AggregateRoot {
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      primitives.events.map((event) =>
-        MessageEventFactory.fromPrimitives(event),
-      ),
+      primitives.events.map((event) => MessageFactory.fromPrimitives(event)),
     );
   }
 
   constructor(
     private readonly id: ConversationId,
     private readonly participants: IdentityId[],
-    private readonly events: MessageEvent[] = [],
+    private readonly events: Message[] = [],
   ) {
     super();
   }
@@ -180,7 +178,7 @@ export class Conversation extends AggregateRoot {
     return event;
   }
 
-  public findEventById(eventId: MessageEventId): MessageEvent | undefined {
+  public findEventById(eventId: MessageEventId): Message | undefined {
     return this.events.find(
       (event) => event.getId().valueOf() === eventId.valueOf(),
     );
