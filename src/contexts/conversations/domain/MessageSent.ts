@@ -1,11 +1,11 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { Message, MessageEventType } from './Message';
+import { Message, MessageType } from './Message';
 import { Cid } from './value-objects/Cid';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
-import { MessageEventId } from './value-objects/MessageEventId';
+import { MessageId } from './value-objects/MessageId';
 
 export class MessageSent extends Message {
   public static create(
@@ -13,17 +13,17 @@ export class MessageSent extends Message {
     authorId: IdentityId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
-    previousEventIds: MessageEventId[] = [],
+    previousMessageIds: MessageId[] = [],
     attachmentCids: Cid[] = [],
     createdAt: Timestamp = Timestamp.now(),
-    id: MessageEventId = MessageEventId.generate(),
+    id: MessageId = MessageId.generate(),
   ): MessageSent {
     return new MessageSent(
       id,
       conversationId,
       authorId,
       encryptedPayload,
-      previousEventIds,
+      previousMessageIds,
       createdAt,
       signature,
       attachmentCids,
@@ -32,11 +32,13 @@ export class MessageSent extends Message {
 
   public static fromPrimitives(primitives: PrimitiveOf<Message>): MessageSent {
     return new MessageSent(
-      new MessageEventId(primitives.id),
+      new MessageId(primitives.id),
       new ConversationId(primitives.conversationId),
       new IdentityId(primitives.authorId),
       new EncryptedMessagePayload(primitives.encryptedPayload as string),
-      primitives.previousEventIds.map((eventId) => new MessageEventId(eventId)),
+      primitives.previousMessageIds.map(
+        (messageId) => new MessageId(messageId),
+      ),
       new Timestamp(primitives.createdAt),
       new Signature(primitives.signature),
       primitives.attachmentCids.map((cid) => new Cid(cid)),
@@ -44,11 +46,11 @@ export class MessageSent extends Message {
   }
 
   constructor(
-    id: MessageEventId,
+    id: MessageId,
     conversationId: ConversationId,
     authorId: IdentityId,
     private readonly encryptedPayload: EncryptedMessagePayload,
-    previousEventIds: MessageEventId[],
+    previousMessageIds: MessageId[],
     createdAt: Timestamp,
     signature: Signature,
     attachmentCids: Cid[] = [],
@@ -57,15 +59,15 @@ export class MessageSent extends Message {
       id,
       conversationId,
       authorId,
-      previousEventIds,
+      previousMessageIds,
       createdAt,
       signature,
       attachmentCids,
     );
   }
 
-  public getType(): MessageEventType {
-    return MessageEventType.SENT;
+  public getType(): MessageType {
+    return MessageType.SENT;
   }
 
   public getEncryptedPayload(): EncryptedMessagePayload {

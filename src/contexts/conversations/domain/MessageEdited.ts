@@ -1,29 +1,29 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { Message, MessageEventType } from './Message';
+import { Message, MessageType } from './Message';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
-import { MessageEventId } from './value-objects/MessageEventId';
+import { MessageId } from './value-objects/MessageId';
 
 export class MessageEdited extends Message {
   public static create(
     conversationId: ConversationId,
     authorId: IdentityId,
-    targetEventId: MessageEventId,
+    targetMessageId: MessageId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
-    previousEventIds: MessageEventId[] = [],
+    previousMessageIds: MessageId[] = [],
     createdAt: Timestamp = Timestamp.now(),
-    id: MessageEventId = MessageEventId.generate(),
+    id: MessageId = MessageId.generate(),
   ): MessageEdited {
     return new MessageEdited(
       id,
       conversationId,
       authorId,
-      targetEventId,
+      targetMessageId,
       encryptedPayload,
-      previousEventIds,
+      previousMessageIds,
       createdAt,
       signature,
     );
@@ -33,36 +33,45 @@ export class MessageEdited extends Message {
     primitives: PrimitiveOf<Message>,
   ): MessageEdited {
     return new MessageEdited(
-      new MessageEventId(primitives.id),
+      new MessageId(primitives.id),
       new ConversationId(primitives.conversationId),
       new IdentityId(primitives.authorId),
-      new MessageEventId(primitives.targetEventId as string),
+      new MessageId(primitives.targetMessageId as string),
       new EncryptedMessagePayload(primitives.encryptedPayload as string),
-      primitives.previousEventIds.map((eventId) => new MessageEventId(eventId)),
+      primitives.previousMessageIds.map(
+        (messageId) => new MessageId(messageId),
+      ),
       new Timestamp(primitives.createdAt),
       new Signature(primitives.signature),
     );
   }
 
   constructor(
-    id: MessageEventId,
+    id: MessageId,
     conversationId: ConversationId,
     authorId: IdentityId,
-    private readonly targetEventId: MessageEventId,
+    private readonly targetMessageId: MessageId,
     private readonly encryptedPayload: EncryptedMessagePayload,
-    previousEventIds: MessageEventId[],
+    previousMessageIds: MessageId[],
     createdAt: Timestamp,
     signature: Signature,
   ) {
-    super(id, conversationId, authorId, previousEventIds, createdAt, signature);
+    super(
+      id,
+      conversationId,
+      authorId,
+      previousMessageIds,
+      createdAt,
+      signature,
+    );
   }
 
-  public getType(): MessageEventType {
-    return MessageEventType.EDITED;
+  public getType(): MessageType {
+    return MessageType.EDITED;
   }
 
-  public getTargetEventId(): MessageEventId {
-    return this.targetEventId;
+  public getTargetMessageId(): MessageId {
+    return this.targetMessageId;
   }
 
   public getEncryptedPayload(): EncryptedMessagePayload {

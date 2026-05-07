@@ -3,68 +3,76 @@ import { MessageDeleted } from '../MessageDeleted';
 import { MessageEdited } from '../MessageEdited';
 import { MessageSent } from '../MessageSent';
 import { EncryptedMessagePayload } from '../value-objects/EncryptedMessagePayload';
-import { MessageEventId } from '../value-objects/MessageEventId';
-import { MessageEventType } from '../value-objects/MessageEventType';
+import { MessageId } from '../value-objects/MessageId';
+import { MessageType } from '../value-objects/MessageType';
 
 export interface ConversationProjectedMessage {
   deleted: boolean;
   encryptedPayload: string;
-  eventId: string;
+  messageId: string;
 }
 
 export class ConversationProjectionDomainService {
   private applyDeleted(
     projection: Map<string, ConversationProjectedMessage>,
-    event: MessageDeleted,
+    message: MessageDeleted,
   ): void {
-    const message = this.getTarget(projection, event.getTargetEventId());
-    message.deleted = true;
+    const projectedMessage = this.getTarget(
+      projection,
+      message.getTargetMessageId(),
+    );
+    projectedMessage.deleted = true;
   }
 
   private applyEdited(
     projection: Map<string, ConversationProjectedMessage>,
-    event: MessageEdited,
+    message: MessageEdited,
   ): void {
-    const message = this.getTarget(projection, event.getTargetEventId());
-    message.encryptedPayload = this.getPayload(event).valueOf();
+    const projectedMessage = this.getTarget(
+      projection,
+      message.getTargetMessageId(),
+    );
+    projectedMessage.encryptedPayload = this.getPayload(message).valueOf();
   }
 
   private applySent(
     projection: Map<string, ConversationProjectedMessage>,
-    event: MessageSent,
+    message: MessageSent,
   ): void {
-    projection.set(event.getId().valueOf(), {
+    projection.set(message.getId().valueOf(), {
       deleted: false,
-      encryptedPayload: event.getEncryptedPayload().valueOf(),
-      eventId: event.getId().valueOf(),
+      encryptedPayload: message.getEncryptedPayload().valueOf(),
+      messageId: message.getId().valueOf(),
     });
   }
 
-  private getPayload(event: MessageEdited): EncryptedMessagePayload {
-    return event.getEncryptedPayload();
+  private getPayload(message: MessageEdited): EncryptedMessagePayload {
+    return message.getEncryptedPayload();
   }
 
   private getTarget(
     projection: Map<string, ConversationProjectedMessage>,
-    eventId: MessageEventId,
+    messageId: MessageId,
   ): ConversationProjectedMessage {
-    return projection.get(eventId.valueOf()) as ConversationProjectedMessage;
+    return projection.get(messageId.valueOf()) as ConversationProjectedMessage;
   }
 
-  public project(events: Message[]): Map<string, ConversationProjectedMessage> {
+  public project(
+    messages: Message[],
+  ): Map<string, ConversationProjectedMessage> {
     const projection = new Map<string, ConversationProjectedMessage>();
 
-    events.forEach((event) => {
-      if (event.getType().isEqual(MessageEventType.SENT)) {
-        this.applySent(projection, event as MessageSent);
+    messages.forEach((message) => {
+      if (message.getType().isEqual(MessageType.SENT)) {
+        this.applySent(projection, message as MessageSent);
       }
 
-      if (event.getType().isEqual(MessageEventType.EDITED)) {
-        this.applyEdited(projection, event as MessageEdited);
+      if (message.getType().isEqual(MessageType.EDITED)) {
+        this.applyEdited(projection, message as MessageEdited);
       }
 
-      if (event.getType().isEqual(MessageEventType.DELETED)) {
-        this.applyDeleted(projection, event as MessageDeleted);
+      if (message.getType().isEqual(MessageType.DELETED)) {
+        this.applyDeleted(projection, message as MessageDeleted);
       }
     });
 

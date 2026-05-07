@@ -7,14 +7,14 @@ import { MongoMessageMetadataDocument } from '../documents/MongoMessageMetadataD
 
 export default class MongoMessageMetadataMapper {
   public toDocument(
-    event: Message,
+    message: Message,
     cid: IPFSId,
     recipientIds: string[],
     networkId?: NetworkId,
     receivedAt: Timestamp = Timestamp.now(),
     valid = true,
   ): MongoMessageMetadataDocument {
-    const primitives = event.toPrimitives();
+    const primitives = message.toPrimitives();
 
     return {
       _id: primitives.id,
@@ -22,11 +22,11 @@ export default class MongoMessageMetadataMapper {
       cid: cid.valueOf(),
       conversationId: primitives.conversationId,
       createdAt: primitives.createdAt,
-      eventId: primitives.id,
+      messageId: primitives.id,
       networkId: networkId?.valueOf(),
       receivedAt: receivedAt.valueOf(),
       recipientIds,
-      targetEventId: primitives.targetEventId,
+      targetMessageId: primitives.targetMessageId,
       type: primitives.type,
       valid,
     };

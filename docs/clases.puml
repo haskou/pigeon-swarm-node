@@ -9,7 +9,7 @@ package "shared.domain" {
   class NetworkId <<ValueObject>>
   class IdentityId <<ValueObject>>
   class ConversationId <<ValueObject>>
-  class MessageEventId <<ValueObject>>
+  class MessageId <<ValueObject>>
   class Cid <<ValueObject>>
   class Timestamp <<ValueObject>>
   class Signature <<ValueObject>>
@@ -113,12 +113,12 @@ package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
     -participants: IdentityId[]
-    -events: Message[]
+    -messages: Message[]
     -createdAt: Timestamp
     +hasParticipant(identityId: IdentityId): boolean
-    +record(event: Message): void
+    +record(message: Message): void
     +latestEvents(limit: number): Message[]
-    +missingEvents(known: MessageEventId[]): Message[]
+    +missingEvents(known: MessageId[]): Message[]
   }
 
   class OneToOneConversation {
@@ -126,10 +126,10 @@ package "conversations.domain" {
   }
 
   abstract class Message <<Entity>> {
-    -id: MessageEventId
+    -id: MessageId
     -authorId: IdentityId
     -createdAt: Timestamp
-    -previousEventIds: MessageEventId[]
+    -previousMessageIds: MessageId[]
     -signature: Signature
     +verify(): boolean
   }
@@ -140,12 +140,12 @@ package "conversations.domain" {
   }
 
   class MessageEdited {
-    -targetEventId: MessageEventId
+    -targetMessageId: MessageId
     -payload: EncryptedPayload
   }
 
   class MessageDeleted {
-    -targetEventId: MessageEventId
+    -targetMessageId: MessageId
     -reason?: string
   }
 
@@ -153,12 +153,12 @@ package "conversations.domain" {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
-    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<Message>
+    +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
   }
 
   class MessageSignatureDomainService {
-    +sign(event): Signature
-    +verify(event): boolean
+    +sign(message): Signature
+    +verify(message): boolean
   }
 
   class ConversationProjectionDomainService {
@@ -172,12 +172,12 @@ package "conversations.domain" {
   Message <|-- MessageSent
   Message <|-- MessageEdited
   Message <|-- MessageDeleted
-  Message *--> MessageEventId
+  Message *--> MessageId
   Message --> IdentityId
   MessageSent --> EncryptedPayload
   MessageSent o--> Cid
-  MessageEdited --> MessageEventId
-  MessageDeleted --> MessageEventId
+  MessageEdited --> MessageId
+  MessageDeleted --> MessageId
   ConversationRepository --> Conversation
   MessageSignatureDomainService ..> Message
   ConversationProjectionDomainService --> Conversation

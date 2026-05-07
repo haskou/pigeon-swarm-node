@@ -4,17 +4,15 @@ import { Message } from './Message';
 import { MessageDeleted } from './MessageDeleted';
 import { MessageEdited } from './MessageEdited';
 import { MessageSent } from './MessageSent';
-import { MessageEventType } from './value-objects/MessageEventType';
+import { MessageType } from './value-objects/MessageType';
 
 export class MessageFactory {
   private static isEdited(primitives: PrimitiveOf<Message>): boolean {
-    return new MessageEventType(primitives.type).isEqual(
-      MessageEventType.EDITED,
-    );
+    return new MessageType(primitives.type).isEqual(MessageType.EDITED);
   }
 
   private static isSent(primitives: PrimitiveOf<Message>): boolean {
-    return new MessageEventType(primitives.type).isEqual(MessageEventType.SENT);
+    return new MessageType(primitives.type).isEqual(MessageType.SENT);
   }
 
   public static fromPrimitives(primitives: PrimitiveOf<Message>): Message {

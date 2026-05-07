@@ -1,16 +1,16 @@
-import { MessageEventTypeValue } from '../../../domain/value-objects/MessageEventType';
+import { MessageTypeValue } from '../../../domain/value-objects/MessageType';
 
 export interface MongoMessageMetadataDocument {
   _id: string;
-  eventId: string;
+  messageId: string;
   cid: string;
   conversationId: string;
   authorId: string;
   recipientIds: string[];
   networkId: string | undefined;
-  type: MessageEventTypeValue;
+  type: MessageTypeValue;
   createdAt: number;
   receivedAt: number;
-  targetEventId: string | undefined;
+  targetMessageId: string | undefined;
   valid: boolean;
 }

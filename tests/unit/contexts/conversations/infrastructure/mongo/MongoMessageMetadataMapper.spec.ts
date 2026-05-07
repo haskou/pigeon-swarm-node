@@ -30,11 +30,11 @@ describe('MongoMessageMetadataMapper', () => {
       cid: cid.valueOf(),
       conversationId: primitives.conversationId,
       createdAt: primitives.createdAt,
-      eventId: primitives.id,
+      messageId: primitives.id,
       networkId: networkId.valueOf(),
       receivedAt: receivedAt.valueOf(),
       recipientIds,
-      targetEventId: primitives.targetEventId,
+      targetMessageId: primitives.targetMessageId,
       type: primitives.type,
       valid: true,
     });

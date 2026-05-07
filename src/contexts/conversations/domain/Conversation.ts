@@ -3,9 +3,9 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Signature } from '@haskou/value-objects';
 
 import { ConversationParticipantNotFoundError } from './errors/ConversationParticipantNotFoundError';
-import { MessageEventTargetAlreadyDeletedError } from './errors/MessageEventTargetAlreadyDeletedError';
-import { MessageEventTargetAuthorMismatchError } from './errors/MessageEventTargetAuthorMismatchError';
-import { MessageEventTargetNotFoundError } from './errors/MessageEventTargetNotFoundError';
+import { MessageTargetAlreadyDeletedError } from './errors/MessageTargetAlreadyDeletedError';
+import { MessageTargetAuthorMismatchError } from './errors/MessageTargetAuthorMismatchError';
+import { MessageTargetNotFoundError } from './errors/MessageTargetNotFoundError';
 import { ConversationMessageWasDeletedEvent } from './events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from './events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from './events/ConversationMessageWasSentEvent';
@@ -21,56 +21,52 @@ import {
 import { Cid } from './value-objects/Cid';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
-import { MessageEventId } from './value-objects/MessageEventId';
-import { MessageEventType } from './value-objects/MessageEventType';
-
-export interface ConversationPrimitives {
-  events: PrimitiveOf<Message>[];
-  id: string;
-  participantIds: string[];
-}
+import { MessageId } from './value-objects/MessageId';
+import { MessageType } from './value-objects/MessageType';
 
 export class Conversation extends AggregateRoot {
   public static fromPrimitives(
-    primitives: ConversationPrimitives,
+    primitives: PrimitiveOf<Conversation>,
   ): Conversation {
     return new Conversation(
       new ConversationId(primitives.id),
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      primitives.events.map((event) => MessageFactory.fromPrimitives(event)),
+      primitives.messages.map((message) =>
+        MessageFactory.fromPrimitives(message),
+      ),
     );
   }
 
   constructor(
     private readonly id: ConversationId,
     private readonly participants: IdentityId[],
-    private readonly events: Message[] = [],
+    private readonly messages: Message[] = [],
   ) {
     super();
   }
 
   private assertCanChangeMessage(
     authorId: IdentityId,
-    targetEventId: MessageEventId,
+    targetMessageId: MessageId,
   ): void {
     this.assertIsParticipant(authorId);
 
-    const target = this.findEventById(targetEventId);
+    const target = this.findMessageById(targetMessageId);
 
-    assert(target !== undefined, new MessageEventTargetNotFoundError());
+    assert(target !== undefined, new MessageTargetNotFoundError());
     assert(
-      target?.getType().isEqual(MessageEventType.SENT),
-      new MessageEventTargetNotFoundError(),
+      target?.getType().isEqual(MessageType.SENT),
+      new MessageTargetNotFoundError(),
     );
     assert(
       target?.getAuthorId().valueOf() === authorId.valueOf(),
-      new MessageEventTargetAuthorMismatchError(),
+      new MessageTargetAuthorMismatchError(),
     );
     assert(
-      !this.isDeleted(targetEventId),
-      new MessageEventTargetAlreadyDeletedError(),
+      !this.isDeleted(targetMessageId),
+      new MessageTargetAlreadyDeletedError(),
     );
   }
 
@@ -83,17 +79,17 @@ export class Conversation extends AggregateRoot {
     );
   }
 
-  private getLastEventIds(): MessageEventId[] {
-    const lastEvent = this.events[this.events.length - 1];
+  private getLastMessageIds(): MessageId[] {
+    const lastMessage = this.messages[this.messages.length - 1];
 
-    return lastEvent ? [lastEvent.getId()] : [];
+    return lastMessage ? [lastMessage.getId()] : [];
   }
 
-  private isDeleted(eventId: MessageEventId): boolean {
-    return this.events.some(
-      (event) =>
-        event.getType().isEqual(MessageEventType.DELETED) &&
-        event.getTargetEventId()?.valueOf() === eventId.valueOf(),
+  private isDeleted(messageId: MessageId): boolean {
+    return this.messages.some(
+      (message) =>
+        message.getType().isEqual(MessageType.DELETED) &&
+        message.getTargetMessageId()?.valueOf() === messageId.valueOf(),
     );
   }
 
@@ -105,95 +101,95 @@ export class Conversation extends AggregateRoot {
   ): MessageSent {
     this.assertIsParticipant(authorId);
 
-    const event = MessageSent.create(
+    const message = MessageSent.create(
       this.id,
       authorId,
       encryptedPayload,
       signature,
-      this.getLastEventIds(),
+      this.getLastMessageIds(),
       attachmentCids,
     );
 
-    this.events.push(event);
+    this.messages.push(message);
     this.record(
       new ConversationMessageWasSentEvent(this.id.valueOf(), {
-        eventId: event.getId().valueOf(),
+        messageId: message.getId().valueOf(),
       }),
     );
 
-    return event;
+    return message;
   }
 
   public editMessage(
     authorId: IdentityId,
-    targetEventId: MessageEventId,
+    targetMessageId: MessageId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
   ): MessageEdited {
-    this.assertCanChangeMessage(authorId, targetEventId);
+    this.assertCanChangeMessage(authorId, targetMessageId);
 
-    const event = MessageEdited.create(
+    const message = MessageEdited.create(
       this.id,
       authorId,
-      targetEventId,
+      targetMessageId,
       encryptedPayload,
       signature,
-      this.getLastEventIds(),
+      this.getLastMessageIds(),
     );
 
-    this.events.push(event);
+    this.messages.push(message);
     this.record(
       new ConversationMessageWasEditedEvent(this.id.valueOf(), {
-        eventId: event.getId().valueOf(),
-        targetEventId: targetEventId.valueOf(),
+        messageId: message.getId().valueOf(),
+        targetMessageId: targetMessageId.valueOf(),
       }),
     );
 
-    return event;
+    return message;
   }
 
   public deleteMessage(
     authorId: IdentityId,
-    targetEventId: MessageEventId,
+    targetMessageId: MessageId,
     signature: Signature,
   ): MessageDeleted {
-    this.assertCanChangeMessage(authorId, targetEventId);
+    this.assertCanChangeMessage(authorId, targetMessageId);
 
-    const event = MessageDeleted.create(
+    const message = MessageDeleted.create(
       this.id,
       authorId,
-      targetEventId,
+      targetMessageId,
       signature,
-      this.getLastEventIds(),
+      this.getLastMessageIds(),
     );
 
-    this.events.push(event);
+    this.messages.push(message);
     this.record(
       new ConversationMessageWasDeletedEvent(this.id.valueOf(), {
-        eventId: event.getId().valueOf(),
-        targetEventId: targetEventId.valueOf(),
+        messageId: message.getId().valueOf(),
+        targetMessageId: targetMessageId.valueOf(),
       }),
     );
 
-    return event;
+    return message;
   }
 
-  public findEventById(eventId: MessageEventId): Message | undefined {
-    return this.events.find(
-      (event) => event.getId().valueOf() === eventId.valueOf(),
+  public findMessageById(messageId: MessageId): Message | undefined {
+    return this.messages.find(
+      (message) => message.getId().valueOf() === messageId.valueOf(),
     );
   }
 
   public projectMessages(): ConversationProjectedMessage[] {
     return Array.from(
-      new ConversationProjectionDomainService().project(this.events).values(),
+      new ConversationProjectionDomainService().project(this.messages).values(),
     );
   }
 
-  public toPrimitives(): ConversationPrimitives {
+  public toPrimitives() {
     return {
-      events: this.events.map((event) => event.toPrimitives()),
       id: this.id.valueOf(),
+      messages: this.messages.map((message) => message.toPrimitives()),
       participantIds: this.participants.map((participant) =>
         participant.valueOf(),
       ),

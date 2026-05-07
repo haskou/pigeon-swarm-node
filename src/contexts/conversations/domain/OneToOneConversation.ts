@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { assert } from '@haskou/value-objects';
+import { assert, PrimitiveOf } from '@haskou/value-objects';
 
-import { Conversation, ConversationPrimitives } from './Conversation';
+import { Conversation } from './Conversation';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
 import { Message } from './Message';
 import { MessageFactory } from './MessageFactory';
@@ -22,23 +22,25 @@ export class OneToOneConversation extends Conversation {
   }
 
   public static fromPrimitives(
-    primitives: ConversationPrimitives,
+    primitives: PrimitiveOf<Conversation>,
   ): OneToOneConversation {
     return new OneToOneConversation(
       new ConversationId(primitives.id),
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      primitives.events.map((event) => MessageFactory.fromPrimitives(event)),
+      primitives.messages.map((message) =>
+        MessageFactory.fromPrimitives(message),
+      ),
     );
   }
 
   constructor(
     id: ConversationId,
     participants: IdentityId[],
-    events: Message[] = [],
+    messages: Message[] = [],
   ) {
-    super(id, participants, events);
+    super(id, participants, messages);
 
     assert(
       participants.length === 2 &&

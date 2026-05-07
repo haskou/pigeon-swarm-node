@@ -3,13 +3,13 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Conversation } from '../Conversation';
 import { Message } from '../Message';
 import { ConversationId } from '../value-objects/ConversationId';
-import { MessageEventId } from '../value-objects/MessageEventId';
+import { MessageId } from '../value-objects/MessageId';
 
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;
-  findEventById(
+  findMessageById(
     conversationId: ConversationId,
-    eventId: MessageEventId,
+    messageId: MessageId,
   ): Promise<Message | undefined>;
   findOneToOne(
     firstIdentityId: IdentityId,

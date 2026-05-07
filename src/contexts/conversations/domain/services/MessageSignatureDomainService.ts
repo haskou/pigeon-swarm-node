@@ -20,8 +20,8 @@ export class MessageSignatureDomainService {
       createdAt: payload.createdAt,
       encryptedPayload: payload.encryptedPayload,
       id: payload.id,
-      previousEventIds: payload.previousEventIds,
-      targetEventId: payload.targetEventId,
+      previousMessageIds: payload.previousMessageIds,
+      targetMessageId: payload.targetMessageId,
       type: payload.type,
     };
   }

@@ -1,7 +1,7 @@
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
-import { MessageEventTargetAlreadyDeletedError } from '@app/contexts/conversations/domain/errors/MessageEventTargetAlreadyDeletedError';
-import { MessageEventTargetAuthorMismatchError } from '@app/contexts/conversations/domain/errors/MessageEventTargetAuthorMismatchError';
-import { MessageEventTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageEventTargetNotFoundError';
+import { MessageTargetAlreadyDeletedError } from '@app/contexts/conversations/domain/errors/MessageTargetAlreadyDeletedError';
+import { MessageTargetAuthorMismatchError } from '@app/contexts/conversations/domain/errors/MessageTargetAuthorMismatchError';
+import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
@@ -9,8 +9,8 @@ import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { Cid } from '@app/contexts/conversations/domain/value-objects/Cid';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
-import { MessageEventId } from '@app/contexts/conversations/domain/value-objects/MessageEventId';
-import { MessageEventType } from '@app/contexts/conversations/domain/value-objects/MessageEventType';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair, Signature } from '@haskou/value-objects';
 
@@ -28,7 +28,7 @@ describe('Conversation', () => {
   });
 
   describe('sendMessage', () => {
-    it('should add a message sent event and record a domain event', () => {
+    it('should add a sent message and record a domain event', () => {
       const message = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('encrypted-payload'),
@@ -41,12 +41,12 @@ describe('Conversation', () => {
       );
 
       expect(message).toBeInstanceOf(MessageSent);
-      expect(conversation.toPrimitives().events).toHaveLength(1);
-      expect(conversation.toPrimitives().events[0]).toEqual(
+      expect(conversation.toPrimitives().messages).toHaveLength(1);
+      expect(conversation.toPrimitives().messages[0]).toEqual(
         expect.objectContaining({
           authorId: author.valueOf(),
           encryptedPayload: 'encrypted-payload',
-          type: MessageEventType.SENT.valueOf(),
+          type: MessageType.SENT.valueOf(),
         }),
       );
       expect(conversation.pullDomainEvents()).toEqual([
@@ -66,7 +66,7 @@ describe('Conversation', () => {
   });
 
   describe('editMessage', () => {
-    it('should add a message edited event and update the projection', () => {
+    it('should add an edited message and update the projection', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
@@ -81,12 +81,14 @@ describe('Conversation', () => {
         signature(),
       );
 
-      expect(edited.getTargetEventId().valueOf()).toBe(sent.getId().valueOf());
+      expect(edited.getTargetMessageId().valueOf()).toBe(
+        sent.getId().valueOf(),
+      );
       expect(conversation.projectMessages()).toEqual([
         {
           deleted: false,
           encryptedPayload: 'edited-payload',
-          eventId: sent.getId().valueOf(),
+          messageId: sent.getId().valueOf(),
         },
       ]);
       expect(conversation.pullDomainEvents()).toEqual([
@@ -108,23 +110,23 @@ describe('Conversation', () => {
           new EncryptedMessagePayload('edited-payload'),
           signature(),
         ),
-      ).toThrow(MessageEventTargetAuthorMismatchError);
+      ).toThrow(MessageTargetAuthorMismatchError);
     });
 
     it('should reject edits for unknown targets', () => {
       expect(() =>
         conversation.editMessage(
           author,
-          MessageEventId.generate(),
+          MessageId.generate(),
           new EncryptedMessagePayload('edited-payload'),
           signature(),
         ),
-      ).toThrow(MessageEventTargetNotFoundError);
+      ).toThrow(MessageTargetNotFoundError);
     });
   });
 
   describe('deleteMessage', () => {
-    it('should add a message deleted event and mark the projection as deleted', () => {
+    it('should add a deleted message and mark the projection as deleted', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
@@ -138,12 +140,14 @@ describe('Conversation', () => {
         signature(),
       );
 
-      expect(deleted.getTargetEventId().valueOf()).toBe(sent.getId().valueOf());
+      expect(deleted.getTargetMessageId().valueOf()).toBe(
+        sent.getId().valueOf(),
+      );
       expect(conversation.projectMessages()).toEqual([
         {
           deleted: true,
           encryptedPayload: 'original-payload',
-          eventId: sent.getId().valueOf(),
+          messageId: sent.getId().valueOf(),
         },
       ]);
       expect(conversation.pullDomainEvents()).toEqual([
@@ -162,7 +166,7 @@ describe('Conversation', () => {
 
       expect(() =>
         conversation.deleteMessage(author, sent.getId(), signature()),
-      ).toThrow(MessageEventTargetAlreadyDeletedError);
+      ).toThrow(MessageTargetAlreadyDeletedError);
     });
   });
 });

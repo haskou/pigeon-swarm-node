@@ -1,26 +1,26 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { Message, MessageEventType } from './Message';
+import { Message, MessageType } from './Message';
 import { ConversationId } from './value-objects/ConversationId';
-import { MessageEventId } from './value-objects/MessageEventId';
+import { MessageId } from './value-objects/MessageId';
 
 export class MessageDeleted extends Message {
   public static create(
     conversationId: ConversationId,
     authorId: IdentityId,
-    targetEventId: MessageEventId,
+    targetMessageId: MessageId,
     signature: Signature,
-    previousEventIds: MessageEventId[] = [],
+    previousMessageIds: MessageId[] = [],
     createdAt: Timestamp = Timestamp.now(),
-    id: MessageEventId = MessageEventId.generate(),
+    id: MessageId = MessageId.generate(),
   ): MessageDeleted {
     return new MessageDeleted(
       id,
       conversationId,
       authorId,
-      targetEventId,
-      previousEventIds,
+      targetMessageId,
+      previousMessageIds,
       createdAt,
       signature,
     );
@@ -30,33 +30,42 @@ export class MessageDeleted extends Message {
     primitives: PrimitiveOf<Message>,
   ): MessageDeleted {
     return new MessageDeleted(
-      new MessageEventId(primitives.id),
+      new MessageId(primitives.id),
       new ConversationId(primitives.conversationId),
       new IdentityId(primitives.authorId),
-      new MessageEventId(primitives.targetEventId as string),
-      primitives.previousEventIds.map((eventId) => new MessageEventId(eventId)),
+      new MessageId(primitives.targetMessageId as string),
+      primitives.previousMessageIds.map(
+        (messageId) => new MessageId(messageId),
+      ),
       new Timestamp(primitives.createdAt),
       new Signature(primitives.signature),
     );
   }
 
   constructor(
-    id: MessageEventId,
+    id: MessageId,
     conversationId: ConversationId,
     authorId: IdentityId,
-    private readonly targetEventId: MessageEventId,
-    previousEventIds: MessageEventId[],
+    private readonly targetMessageId: MessageId,
+    previousMessageIds: MessageId[],
     createdAt: Timestamp,
     signature: Signature,
   ) {
-    super(id, conversationId, authorId, previousEventIds, createdAt, signature);
+    super(
+      id,
+      conversationId,
+      authorId,
+      previousMessageIds,
+      createdAt,
+      signature,
+    );
   }
 
-  public getType(): MessageEventType {
-    return MessageEventType.DELETED;
+  public getType(): MessageType {
+    return MessageType.DELETED;
   }
 
-  public getTargetEventId(): MessageEventId {
-    return this.targetEventId;
+  public getTargetMessageId(): MessageId {
+    return this.targetMessageId;
   }
 }

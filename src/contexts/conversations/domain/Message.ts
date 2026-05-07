@@ -4,15 +4,15 @@ import { Signature, Timestamp } from '@haskou/value-objects';
 import { Cid } from './value-objects/Cid';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
-import { MessageEventId } from './value-objects/MessageEventId';
-import { MessageEventType } from './value-objects/MessageEventType';
+import { MessageId } from './value-objects/MessageId';
+import { MessageType } from './value-objects/MessageType';
 
 export abstract class Message {
   protected constructor(
-    private readonly id: MessageEventId,
+    private readonly id: MessageId,
     private readonly conversationId: ConversationId,
     private readonly authorId: IdentityId,
-    private readonly previousEventIds: MessageEventId[],
+    private readonly previousMessageIds: MessageId[],
     private readonly createdAt: Timestamp,
     private readonly signature: Signature,
     private readonly attachmentCids: Cid[] = [],
@@ -25,14 +25,14 @@ export abstract class Message {
       conversationId: this.conversationId.valueOf(),
       createdAt: this.createdAt.valueOf(),
       id: this.id.valueOf(),
-      previousEventIds: this.previousEventIds.map((eventId) =>
-        eventId.valueOf(),
+      previousMessageIds: this.previousMessageIds.map((messageId) =>
+        messageId.valueOf(),
       ),
       signature: this.signature.valueOf(),
     };
   }
 
-  public getId(): MessageEventId {
+  public getId(): MessageId {
     return this.id;
   }
 
@@ -40,9 +40,9 @@ export abstract class Message {
     return this.authorId;
   }
 
-  public abstract getType(): MessageEventType;
+  public abstract getType(): MessageType;
 
-  public getTargetEventId(): MessageEventId | undefined {
+  public getTargetMessageId(): MessageId | undefined {
     return undefined;
   }
 
@@ -54,10 +54,10 @@ export abstract class Message {
     return {
       ...this.basePrimitives(),
       encryptedPayload: this.getEncryptedPayload()?.valueOf(),
-      targetEventId: this.getTargetEventId()?.valueOf(),
+      targetMessageId: this.getTargetMessageId()?.valueOf(),
       type: this.getType().valueOf(),
     };
   }
 }
 
-export { MessageEventType };
+export { MessageType };

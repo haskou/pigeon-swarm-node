@@ -3,9 +3,9 @@ import { MessageFactory } from '../../../domain/MessageFactory';
 import { IpfsMessageDocument } from '../documents/IpfsMessageDocument';
 
 export default class IpfsMessageMapper {
-  public toDocument(event: Message): IpfsMessageDocument {
+  public toDocument(message: Message): IpfsMessageDocument {
     return {
-      ...event.toPrimitives(),
+      ...message.toPrimitives(),
       schemaVersion: 1,
     };
   }

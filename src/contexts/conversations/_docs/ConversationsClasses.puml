@@ -6,12 +6,12 @@ package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
     -participants: IdentityId[]
-    -events: Message[]
+    -messages: Message[]
     -createdAt: Timestamp
     +hasParticipant(identityId: IdentityId): boolean
-    +record(event: Message): void
+    +record(message: Message): void
     +latestEvents(limit: number): Message[]
-    +missingEvents(known: MessageEventId[]): Message[]
+    +missingEvents(known: MessageId[]): Message[]
   }
 
   class OneToOneConversation {
@@ -19,10 +19,10 @@ package "conversations.domain" {
   }
 
   abstract class Message <<Entity>> {
-    -id: MessageEventId
+    -id: MessageId
     -authorId: IdentityId
     -createdAt: Timestamp
-    -previousEventIds: MessageEventId[]
+    -previousMessageIds: MessageId[]
     -signature: Signature
     +verify(): boolean
   }
@@ -33,17 +33,17 @@ package "conversations.domain" {
   }
 
   class MessageEdited {
-    -targetEventId: MessageEventId
+    -targetMessageId: MessageId
     -payload: EncryptedPayload
   }
 
   class MessageDeleted {
-    -targetEventId: MessageEventId
+    -targetMessageId: MessageId
   }
 
   class MessageSignatureDomainService {
-    +sign(event): Signature
-    +verify(event): boolean
+    +sign(message): Signature
+    +verify(message): boolean
   }
 
   class ConversationProjectionDomainService {
@@ -54,7 +54,7 @@ package "conversations.domain" {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
-    +findEventById(conversationId: ConversationId, eventId: MessageEventId): Promise<Message>
+    +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
   }
 
   Conversation <|-- OneToOneConversation
@@ -64,11 +64,11 @@ package "conversations.domain" {
   Message <|-- MessageDeleted
   Conversation o--> IdentityId
   Message --> IdentityId
-  Message o--> MessageEventId
+  Message o--> MessageId
   MessageSent --> EncryptedPayload
   MessageSent o--> Cid
-  MessageEdited --> MessageEventId
-  MessageDeleted --> MessageEventId
+  MessageEdited --> MessageId
+  MessageDeleted --> MessageId
   MessageSignatureDomainService ..> Message
   ConversationProjectionDomainService --> Conversation
   ConversationRepository --> Conversation
@@ -80,7 +80,7 @@ package "conversations.application" {
   }
 
   class MessageSender {
-    +send(command): Promise<MessageEventId>
+    +send(command): Promise<MessageId>
   }
 
   class MessageReceiver {
@@ -92,11 +92,11 @@ package "conversations.application" {
   }
 
   class MessageEditor {
-    +edit(command): Promise<MessageEventId>
+    +edit(command): Promise<MessageId>
   }
 
   class MessageDeleter {
-    +delete(command): Promise<MessageEventId>
+    +delete(command): Promise<MessageId>
   }
 
   class ConversationSynchronizer {
@@ -122,19 +122,19 @@ package "conversations.application" {
 
 package "conversations.infrastructure" {
   class IpfsMessageDocument {
-    -eventId: string
+    -messageId: string
     -conversationId: string
     -authorId: string
     -type: string
     -payload: object
     -attachmentCids: string[]
-    -previousEventIds: string[]
+    -previousMessageIds: string[]
     -createdAt: number
     -signature: string
   }
 
   class MongoMessageDocumentIndex {
-    -eventId: string
+    -messageId: string
     -cid: string
     -conversationId: string
     -authorId: string
@@ -143,17 +143,17 @@ package "conversations.infrastructure" {
     -type: string
     -createdAt: number
     -receivedAt: number
-    -targetEventId?: string
+    -targetMessageId?: string
     -valid: boolean
   }
 
   class MongoConversationRepository
 
   class IpfsConversationEventStore {
-    +save(conversationId: ConversationId, event: Message): Promise<void>
-    +findById(conversationId: ConversationId, eventId: MessageEventId): Promise<Message>
+    +save(conversationId: ConversationId, message: Message): Promise<void>
+    +findById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
     +findLatest(conversationId: ConversationId, limit: number): Promise<Message[]>
-    +findMissing(conversationId: ConversationId, known: MessageEventId[]): Promise<Message[]>
+    +findMissing(conversationId: ConversationId, known: MessageId[]): Promise<Message[]>
   }
 
   class HeliaPubSubMessageBusAdapter
