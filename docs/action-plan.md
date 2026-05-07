@@ -88,6 +88,24 @@ Steps:
 6. Store PubSub processing cursors in MongoDB.
 7. Add anti-entropy sync for missed PubSub messages.
 
+Consumers to create under `src/apps/consumers`:
+
+- `pubsub/identities/RegisterIdentityWhenPublished`
+  - receives an identity publication announcement
+  - calls the identity application use case that fetches, validates and stores
+    the identity locally
+- `pubsub/identities/SynchronizeIdentityWhenUpdated`
+  - receives an identity update announcement
+  - calls the identity application use case that resolves the newest valid
+    version chain
+- `pubsub/conversations/RegisterMessageWhenAnnounced`
+  - receives a conversation message announcement
+  - calls the conversation application use case that fetches, validates and
+    stores the message locally
+- `pubsub/conversations/SynchronizeConversationWhenMessageMissed`
+  - runs anti-entropy for a conversation when a cursor gap, reconnect or missed
+    announcement is detected
+
 Tests:
 
 - Unit test the concrete transport with mocked Helia/libp2p PubSub.
