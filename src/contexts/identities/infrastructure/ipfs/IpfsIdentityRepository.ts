@@ -6,6 +6,7 @@ import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError
 import { Identity } from '../../domain/Identity';
 import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
 import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
+import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { MongoIdentityMetadataDocument } from '../mongo/documents/MongoIdentityMetadataDocument';
 import MongoIdentityMetadataRepository from '../mongo/MongoIdentityMetadataRepository';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
@@ -51,6 +52,20 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     }
   }
 
+  private async findPreviousIdentity(
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<Identity | undefined> {
+    try {
+      const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+        new IPFSId(externalIdentifier.valueOf()),
+      );
+
+      return this.mapper.toDomain(document);
+    } catch {
+      return undefined;
+    }
+  }
+
   private async findCandidatesFromMetadata(
     id: IdentityId,
     metadata: MongoIdentityMetadataDocument[],
@@ -66,7 +81,13 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
         const candidate = this.mapper.toDomain(document);
 
-        if (!this.validator.isValidFor(id, candidate)) {
+        const isValid = await this.validator.isValidChainFor(
+          id,
+          candidate,
+          (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
+        );
+
+        if (!isValid) {
           await this.markMetadataInvalid(new IPFSId(cid));
           continue;
         }
@@ -89,7 +110,13 @@ export default class IpfsIdentityRepository implements IdentityRepository {
         await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
       const identity = this.mapper.toDomain(document);
 
-      if (!this.validator.isValidFor(id, identity)) {
+      const isValid = await this.validator.isValidChainFor(
+        id,
+        identity,
+        (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
+      );
+
+      if (!isValid) {
         await this.markMetadataInvalid(cid);
 
         return undefined;

@@ -109,6 +109,8 @@ tested and committed with the repository gitmoji conventional-commit format.
 - Remote identity validation:
   - `IdentityCandidateValidationDomainService` accepts only candidates matching
     the requested `IdentityId`
+  - versioned identity candidates must validate their
+    `previousIdentityExternalIdentifier` chain before being accepted
   - `IpfsIdentityRepository` marks broken/tampered or wrong-identity
     candidates invalid before caching
   - DHT candidate lookup now fetches and validates all discovered identity
@@ -170,25 +172,19 @@ Goal: fix the security issue called out in `IPFS.getRecord`.
 
 Steps:
 
-1. Extend identity validation from single candidates to full version chains:
-   - version N must point to version N-1 through
-     `previousIdentityExternalIdentifier`
-   - every document in the chain must match the same `IdentityId`
-   - invalid, missing or cyclic chains are rejected
-2. Keep generic integrity helpers in shared domain only if they are genuinely
+1. Keep generic integrity helpers in shared domain only if they are genuinely
    context-free:
    - canonical payload hashing
    - signature payload helpers
    - content hash matching
-3. Keep context rules in context domain services:
+2. Keep context rules in context domain services:
    - conversations validate message signature, author, participants and
      edit/delete target rules
-4. Add remote message validation once `ConversationRepository` exists.
-5. Return not found/empty when all candidates are invalid.
+3. Add remote message validation once `ConversationRepository` exists.
+4. Return not found/empty when all candidates are invalid.
 
 Tests:
 
-- Unit tests for invalid identity chains.
 - Unit tests for invalid message candidates once repository exists.
 - Cucumber scenarios for DHT identity convergence.
 

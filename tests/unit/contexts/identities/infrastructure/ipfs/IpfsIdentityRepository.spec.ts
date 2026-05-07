@@ -2,6 +2,8 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
+import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
+import { IdentityExternalIdentifier } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
@@ -288,6 +290,66 @@ describe('IpfsIdentityRepository', () => {
       );
       expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
         new IPFSId(tamperedCidString),
+      );
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should accept a DHT candidate with a valid previous chain', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafypreviousidentity';
+      const candidateCidString = 'bafyupdatedidentity';
+      const candidate = await previousIdentity.updateProfile(
+        new Profile(new ProfileName('Jane')),
+        mother.password,
+        new IdentityExternalIdentifier(previousCidString),
+      );
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
+      ipfsManager.getJSON
+        .mockResolvedValueOnce(mapper.toDocument(candidate))
+        .mockResolvedValueOnce(mapper.toDocument(previousIdentity));
+
+      const result = await repository.findById(
+        new IdentityId(previousPrimitives.id),
+      );
+
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(previousCidString),
+      );
+      expect(metadataRepository.save.mock.calls[0][0].toPrimitives()).toEqual(
+        candidate.toPrimitives(),
+      );
+      expect(metadataRepository.save.mock.calls[0][1]).toEqual(
+        new IPFSId(candidateCidString),
+      );
+      expect(metadataRepository.save.mock.calls[0][2]).toBe(true);
+      expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
+    });
+
+    it('should reject a DHT candidate with a missing previous identity', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafyunknownpreviousidentity';
+      const candidateCidString = 'bafyupdatedidentity';
+      const candidate = await previousIdentity.updateProfile(
+        new Profile(new ProfileName('Jane')),
+        mother.password,
+        new IdentityExternalIdentifier(previousCidString),
+      );
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
+      ipfsManager.getJSON
+        .mockResolvedValueOnce(mapper.toDocument(candidate))
+        .mockRejectedValueOnce(new Error('missing previous identity'));
+
+      await expect(
+        repository.findById(new IdentityId(previousPrimitives.id)),
+      ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+        new IPFSId(candidateCidString),
       );
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
