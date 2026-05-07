@@ -450,6 +450,12 @@ Last updated: 2026-05-07.
     head even when Mongo has local metadata.
   - A DHT CID that is not already known by Mongo is fetched, mapped to
     `Identity`, cached as metadata, and returned as an additional candidate.
+- Conversation message event infrastructure base:
+  - Added `IpfsMessageEventDocument` and `IpfsMessageEventMapper`.
+  - Added `MongoMessageEventMetadataDocument` and
+    `MongoMessageEventMetadataMapper`.
+  - Added mapper tests for IPFS message event documents and Mongo message event
+    metadata.
 - TypeScript/tooling:
   - `tsconfig.json` now uses `es2023` + `dom` libs so ESLint parser accepts the
     project config.
@@ -507,12 +513,12 @@ Last updated: 2026-05-07.
 - `docker compose config`: pass.
 - `yarn build`: pass.
 - `yarn lint`: pass with 5 `max-params` warnings.
-- Focused Jest command after conversation/node/identity baseline: pass, 16
-  suites / 57 tests.
+- Focused Jest command after conversation/node/identity baseline: pass, 18
+  suites / 60 tests.
   - `tests/unit/contexts/nodes/domain/Node.spec.ts`
   - `tests/unit/contexts/nodes/application/assign-owner`
   - `tests/unit/contexts/nodes/infrastructure/mongo`
-  - `tests/unit/contexts/conversations/domain`
+  - `tests/unit/contexts/conversations`
   - `tests/unit/contexts/identities`
 
 ### Exact Next Steps
