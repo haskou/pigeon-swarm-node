@@ -5,6 +5,7 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
 import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
+import { MongoIdentityMetadataDocument } from '../mongo/documents/MongoIdentityMetadataDocument';
 import MongoIdentityMetadataRepository from '../mongo/MongoIdentityMetadataRepository';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
@@ -17,6 +18,27 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     private readonly metadataRepository: MongoIdentityMetadataRepository,
   ) {}
 
+  private async findCandidatesFromMetadata(
+    metadata: MongoIdentityMetadataDocument[],
+  ): Promise<Identity[]> {
+    const cids = [...new Set(metadata.map((document) => document.cid))];
+    const candidates: Identity[] = [];
+
+    for (const cid of cids) {
+      try {
+        const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+          new IPFSId(cid),
+        );
+
+        candidates.push(this.mapper.toDomain(document));
+      } catch {
+        await this.metadataRepository.markInvalid(new IPFSId(cid));
+      }
+    }
+
+    return candidates;
+  }
+
   public async findById(id: IdentityId): Promise<Identity> {
     const candidates = await this.findCandidatesById(id);
 
@@ -27,14 +49,11 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     const metadata = await this.metadataRepository.findValidByIdentityId(id);
 
     if (metadata.length > 0) {
-      const cids = [...new Set(metadata.map((document) => document.cid))];
-      const documents = await Promise.all(
-        cids.map((cid) =>
-          this.ipfsManager.getJSON<IpfsIdentityDocument>(new IPFSId(cid)),
-        ),
-      );
+      const candidates = await this.findCandidatesFromMetadata(metadata);
 
-      return documents.map((document) => this.mapper.toDomain(document));
+      if (candidates.length > 0) {
+        return candidates;
+      }
     }
 
     const cidString = await this.ipfsManager.getRecord(

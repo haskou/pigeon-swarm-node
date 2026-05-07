@@ -74,4 +74,19 @@ describe('MongoIdentityMetadataRepository', () => {
     });
     expect(result).toEqual(documents);
   });
+
+  it('should mark identity metadata as invalid by CID', async () => {
+    const cid = new IPFSId('bafyidentitycid');
+
+    await repository.markInvalid(cid);
+
+    expect(collection.updateMany).toHaveBeenCalledWith(
+      { cid: cid.valueOf() },
+      {
+        $set: {
+          valid: false,
+        },
+      },
+    );
+  });
 });

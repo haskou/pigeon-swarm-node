@@ -61,4 +61,20 @@ export default class MongoIdentityMetadataRepository {
       { upsert: true },
     );
   }
+
+  public async markInvalid(cid: IPFSId): Promise<void> {
+    const collection =
+      await this.mongo.getCollection<MongoIdentityMetadataDocument>(
+        MongoIdentityMetadataRepository.COLLECTION_NAME,
+      );
+
+    await collection.updateMany(
+      { cid: cid.valueOf() },
+      {
+        $set: {
+          valid: false,
+        },
+      },
+    );
+  }
 }

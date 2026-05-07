@@ -439,6 +439,12 @@ Last updated: 2026-05-07.
     record lookup and caches the fetched CID in Mongo metadata.
   - DI now registers Mongo identity metadata mapper/repository and injects the
     metadata repository into `IpfsIdentityRepository`.
+- Identity metadata invalidation:
+  - `MongoIdentityMetadataRepository.markInvalid(cid)` marks stale CID metadata
+    as invalid.
+  - `IpfsIdentityRepository` marks broken Mongo metadata invalid when IPFS
+    cannot fetch a candidate CID, then falls back to DHT if no valid Mongo
+    candidate remains.
 - TypeScript/tooling:
   - `tsconfig.json` now uses `es2023` + `dom` libs so ESLint parser accepts the
     project config.
@@ -497,7 +503,7 @@ Last updated: 2026-05-07.
 - `yarn build`: pass.
 - `yarn lint`: pass with 5 `max-params` warnings.
 - Focused Jest command after conversation/node/identity baseline: pass, 16
-  suites / 54 tests.
+  suites / 56 tests.
   - `tests/unit/contexts/nodes/domain/Node.spec.ts`
   - `tests/unit/contexts/nodes/application/assign-owner`
   - `tests/unit/contexts/nodes/infrastructure/mongo`
@@ -511,14 +517,11 @@ Last updated: 2026-05-07.
 2. Start richer candidate discovery:
    - keep current DHT `getRecord` fallback for the known head.
    - later add peer/DHT candidate expansion when multiple heads are possible.
-3. Add metadata invalidation behavior:
-   - decide whether failed IPFS fetches mark Mongo identity metadata as invalid
-     or bubble the error.
-4. Keep running after each slice:
+3. Keep running after each slice:
    - `yarn build`
    - `yarn lint`
    - focused Jest command above.
-5. Once green and coherent, commit in small conventional commits:
+4. Once green and coherent, commit in small conventional commits:
    - `docs: refine p2p identity and conversation architecture`
    - `feat(infra): add mongodb configuration`
    - `feat(nodes): add mongo-backed local node metadata`

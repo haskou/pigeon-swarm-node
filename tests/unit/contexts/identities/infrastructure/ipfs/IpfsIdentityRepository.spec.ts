@@ -130,6 +130,49 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
+    it('should mark broken mongo metadata as invalid and fallback to DHT', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const brokenCidString = 'bafybrokencid';
+      const cidString = 'bafystoredcid';
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([
+        {
+          _id: primitives.id + ':' + brokenCidString,
+          cid: brokenCidString,
+          identityId: primitives.id,
+          previousCid: primitives.previousCid,
+          receivedAt: Date.now(),
+          valid: true,
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getJSON
+        .mockRejectedValueOnce(new Error('missing block'))
+        .mockResolvedValueOnce({
+          _id: primitives.id,
+          encryptedKeyPair: primitives.encryptedKeyPair,
+          networks: primitives.networks,
+          previousCid: primitives.previousCid,
+          profile: primitives.profile,
+          signature: primitives.signature,
+          timestamp: primitives.timestamp,
+          version: primitives.version,
+        });
+      ipfsManager.getRecord.mockResolvedValue(cidString);
+
+      const result = await repository.findById(identityId);
+
+      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+        new IPFSId(brokenCidString),
+      );
+      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+      );
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
     it('should throw IdentityNotFoundError when no record exists', async () => {
       const identity = await mother.build();
       const identityId = new IdentityId(identity.toPrimitives().id);
