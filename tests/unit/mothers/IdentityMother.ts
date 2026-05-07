@@ -1,6 +1,6 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
-import { IdentityCid } from '@app/contexts/identities/domain/value-objects/IdentityCid';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -41,7 +41,9 @@ export class IdentityMother {
     'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
   );
   public version: IdentityVersion = new IdentityVersion(1);
-  public previousCid: IdentityCid | undefined = undefined;
+  public previousIdentityExternalIdentifier:
+    | IdentityExternalIdentifier
+    | undefined = undefined;
 
   public withId(id: IdentityId): this {
     this.id = id;
@@ -85,8 +87,10 @@ export class IdentityMother {
     return this;
   }
 
-  public withPreviousCid(previousCid: IdentityCid | undefined): this {
-    this.previousCid = previousCid;
+  public withPreviousIdentityExternalIdentifier(
+    previousIdentityExternalIdentifier: IdentityExternalIdentifier | undefined,
+  ): this {
+    this.previousIdentityExternalIdentifier = previousIdentityExternalIdentifier;
 
     return this;
   }
@@ -100,7 +104,7 @@ export class IdentityMother {
       this.timestamp,
       this.signature,
       this.version,
-      this.previousCid,
+      this.previousIdentityExternalIdentifier,
     );
   }
 }

@@ -10,7 +10,8 @@ package "shared.domain" {
   class IdentityId <<ValueObject>>
   class ConversationId <<ValueObject>>
   class MessageId <<ValueObject>>
-  class Cid <<ValueObject>>
+  class AttachmentExternalIdentifier <<ValueObject>>
+  class IdentityExternalIdentifier <<ValueObject>>
   class Timestamp <<ValueObject>>
   class Signature <<ValueObject>>
   class EncryptedPayload <<ValueObject>>
@@ -63,7 +64,7 @@ package "identities.domain" {
     -id: IdentityId
     -encryptedKeyPair: EncryptedKeyPair
     -version: number
-    -previousCid?: Cid
+    -previousIdentityExternalIdentifier?: IdentityExternalIdentifier
     -networks: UniqueObjectArray<NetworkId>
     -profile: Profile
     -timestamp: Timestamp
@@ -73,11 +74,12 @@ package "identities.domain" {
   class Profile {
     -name: ProfileName
     -biography?: ProfileBiography
-    -pictureCid?: Cid
+    -picture?: ProfileImage
   }
 
   class ProfileName <<ValueObject>>
   class ProfileBiography <<ValueObject>>
+  class ProfileImage <<ValueObject>>
   class EncryptedKeyPair <<ValueObject>>
 
   interface IdentityRepository {
@@ -100,10 +102,10 @@ package "identities.domain" {
   Identity *--> EncryptedKeyPair
   Identity o--> NetworkId
   Identity *--> Profile
-  Identity --> Cid
+  Identity --> IdentityExternalIdentifier
   Profile *--> ProfileName
   Profile --> ProfileBiography
-  Profile --> Cid
+  Profile --> ProfileImage
   IdentityRepository --> Identity
   IdentitySignatureDomainService ..> Identity
   IdentityResolutionDomainService --> Identity
@@ -136,7 +138,7 @@ package "conversations.domain" {
 
   class MessageSent {
     -payload: EncryptedPayload
-    -attachmentCids: Cid[]
+    -attachmentExternalIdentifiers: AttachmentExternalIdentifier[]
   }
 
   class MessageEdited {
@@ -175,7 +177,7 @@ package "conversations.domain" {
   Message *--> MessageId
   Message --> IdentityId
   MessageSent --> EncryptedPayload
-  MessageSent o--> Cid
+  MessageSent o--> AttachmentExternalIdentifier
   MessageEdited --> MessageId
   MessageDeleted --> MessageId
   ConversationRepository --> Conversation

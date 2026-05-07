@@ -2,7 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
-import { Cid } from './value-objects/Cid';
+import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
@@ -14,7 +14,7 @@ export class MessageSent extends Message {
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
     previousMessageIds: MessageId[] = [],
-    attachmentCids: Cid[] = [],
+    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
     createdAt: Timestamp = Timestamp.now(),
     id: MessageId = MessageId.generate(),
   ): MessageSent {
@@ -26,7 +26,7 @@ export class MessageSent extends Message {
       previousMessageIds,
       createdAt,
       signature,
-      attachmentCids,
+      attachmentExternalIdentifiers,
     );
   }
 
@@ -41,7 +41,10 @@ export class MessageSent extends Message {
       ),
       new Timestamp(primitives.createdAt),
       new Signature(primitives.signature),
-      primitives.attachmentCids.map((cid) => new Cid(cid)),
+      primitives.attachmentExternalIdentifiers.map(
+        (externalIdentifier) =>
+          new AttachmentExternalIdentifier(externalIdentifier),
+      ),
     );
   }
 
@@ -53,7 +56,7 @@ export class MessageSent extends Message {
     previousMessageIds: MessageId[],
     createdAt: Timestamp,
     signature: Signature,
-    attachmentCids: Cid[] = [],
+    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
   ) {
     super(
       id,
@@ -62,7 +65,7 @@ export class MessageSent extends Message {
       previousMessageIds,
       createdAt,
       signature,
-      attachmentCids,
+      attachmentExternalIdentifiers,
     );
   }
 

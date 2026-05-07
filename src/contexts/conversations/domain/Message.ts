@@ -1,13 +1,17 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { Cid } from './value-objects/Cid';
+import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
 import { MessageType } from './value-objects/MessageType';
 
+type AttachmentExternalIdentifiers = AttachmentExternalIdentifier[];
+
 export abstract class Message {
+  private readonly attachmentExternalIdentifiers: AttachmentExternalIdentifiers;
+
   protected constructor(
     private readonly id: MessageId,
     private readonly conversationId: ConversationId,
@@ -15,12 +19,16 @@ export abstract class Message {
     private readonly previousMessageIds: MessageId[],
     private readonly createdAt: Timestamp,
     private readonly signature: Signature,
-    private readonly attachmentCids: Cid[] = [],
-  ) {}
+    attachmentExternalIdentifiers: AttachmentExternalIdentifiers = [],
+  ) {
+    this.attachmentExternalIdentifiers = attachmentExternalIdentifiers;
+  }
 
   private basePrimitives() {
     return {
-      attachmentCids: this.attachmentCids.map((cid) => cid.valueOf()),
+      attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
+        (externalIdentifier) => externalIdentifier.valueOf(),
+      ),
       authorId: this.authorId.valueOf(),
       conversationId: this.conversationId.valueOf(),
       createdAt: this.createdAt.valueOf(),

@@ -7,7 +7,7 @@ import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { Cid } from '@app/contexts/conversations/domain/value-objects/Cid';
+import { AttachmentExternalIdentifier } from '@app/contexts/conversations/domain/value-objects/AttachmentExternalIdentifier';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -34,7 +34,7 @@ describe('Conversation', () => {
         new EncryptedMessagePayload('encrypted-payload'),
         signature(),
         [
-          new Cid(
+          new AttachmentExternalIdentifier(
             'bafybeigdyrzt5sfp7udm7hu76t5dp5whztr3v3gvl6wv4x7q5v2fi6c5mm',
           ),
         ],

@@ -45,7 +45,8 @@ tested and committed with the repository gitmoji conventional-commit format.
   payload policy explicitly.
 - Domain language should avoid `CID`. Use `content address` in infrastructure
   docs, and use context names such as `IdentityExternalIdentifier` or
-  `MessageExternalIdentifier` when the domain needs to express a durable link.
+  `AttachmentExternalIdentifier` when the domain needs to express a durable
+  external link.
 
 ## Already Done
 
@@ -68,8 +69,8 @@ tested and committed with the repository gitmoji conventional-commit format.
     removed
 - Identity:
   - `Identity.version`
-  - `Identity.previousCid` currently exists and should be renamed away from
-    IPFS-specific language, preferably to `IdentityExternalIdentifier`
+  - `Identity.previousIdentityExternalIdentifier`
+  - `IdentityExternalIdentifier` value object
   - signed versioned identity payloads
   - `IdentityResolutionDomainService`
   - `MongoIdentityMetadataRepository`
@@ -85,6 +86,7 @@ tested and committed with the repository gitmoji conventional-commit format.
   - `MessageFactory`
   - `MessageId`
   - `MessageType` enum value object
+  - `AttachmentExternalIdentifier` value object for attachment links
   - message primitives use message language: `messages`,
     `previousMessageIds` and `targetMessageId`
   - `ConversationProjectionDomainService`
@@ -153,27 +155,7 @@ Steps:
    payload value.
 7. Update mapper tests and conversation projection tests.
 
-## Immediate Slice 3: Infrastructure Naming Cleanup
-
-Goal: keep IPFS-specific terms out of domain language.
-
-Steps:
-
-1. Keep `CID` in IPFS infrastructure code and persistence fields when it refers
-   to a real IPFS content identifier.
-2. Rename domain-facing concepts:
-   - `previousCid` -> `previousIdentityExternalIdentifier`
-   - `IdentityCid` -> `IdentityExternalIdentifier`
-   - `Cid` value object in conversations -> `ContentAddress` or
-     `AttachmentExternalIdentifier`, depending on use
-3. Keep Mongo metadata field names free to use `cid` if they store actual IPFS
-   CIDs.
-4. Let infrastructure mappers translate domain references to concrete IPFS
-   CIDs and back.
-5. Update class diagrams and use cases so only infrastructure diagrams mention
-   CID.
-
-## Immediate Slice 4: Remote Content Validation
+## Immediate Slice 3: Remote Content Validation
 
 Goal: fix the security issue called out in `IPFS.getRecord`.
 
@@ -203,7 +185,7 @@ Tests:
 - Unit tests for invalid message candidates once repository exists.
 - Cucumber scenarios for DHT identity convergence.
 
-## Immediate Slice 5: Conversation Repository And Use Cases
+## Immediate Slice 4: Conversation Repository And Use Cases
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 

@@ -14,7 +14,7 @@ export class MessageSignatureDomainService {
     payload: MessageSignaturePayload,
   ): MessageSignaturePayload {
     return {
-      attachmentCids: payload.attachmentCids,
+      attachmentExternalIdentifiers: payload.attachmentExternalIdentifiers,
       authorId: payload.authorId,
       conversationId: payload.conversationId,
       createdAt: payload.createdAt,

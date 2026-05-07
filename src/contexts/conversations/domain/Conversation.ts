@@ -18,7 +18,7 @@ import {
   ConversationProjectedMessage,
   ConversationProjectionDomainService,
 } from './services/ConversationProjectionDomainService';
-import { Cid } from './value-objects/Cid';
+import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
@@ -97,7 +97,7 @@ export class Conversation extends AggregateRoot {
     authorId: IdentityId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
-    attachmentCids: Cid[] = [],
+    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
   ): MessageSent {
     this.assertIsParticipant(authorId);
 
@@ -107,7 +107,7 @@ export class Conversation extends AggregateRoot {
       encryptedPayload,
       signature,
       this.getLastMessageIds(),
-      attachmentCids,
+      attachmentExternalIdentifiers,
     );
 
     this.messages.push(message);

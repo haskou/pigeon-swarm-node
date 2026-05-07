@@ -23,7 +23,7 @@ describe('MongoIdentityMetadataMapper', () => {
       _id: `${primitives.id}:${cid.valueOf()}`,
       cid: cid.valueOf(),
       identityId: primitives.id,
-      previousCid: primitives.previousCid,
+      previousCid: primitives.previousIdentityExternalIdentifier,
       receivedAt: receivedAt.valueOf(),
       valid: true,
       version: primitives.version,

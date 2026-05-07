@@ -18,11 +18,15 @@ import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignature
 import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
 import { Profile } from './Profile';
-import { IdentityCid } from './value-objects/IdentityCid';
+import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from './value-objects/IdentityVersion';
 import { ProfileName } from './value-objects/ProfileName';
 
+type PreviousReference = IdentityExternalIdentifier;
+
 export class Identity extends AggregateRoot {
+  private readonly previousIdentityExternalIdentifier?: PreviousReference;
+
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
       new IdentityId(primitives.id),
@@ -34,8 +38,10 @@ export class Identity extends AggregateRoot {
       new Timestamp(primitives.timestamp),
       new Signature(primitives.signature),
       new IdentityVersion(primitives.version),
-      primitives.previousCid
-        ? new IdentityCid(primitives.previousCid)
+      primitives.previousIdentityExternalIdentifier
+        ? new IdentityExternalIdentifier(
+            primitives.previousIdentityExternalIdentifier,
+          )
         : undefined,
     );
   }
@@ -53,7 +59,7 @@ export class Identity extends AggregateRoot {
       encryptedKeyPair: primitiveEncryptedKeyPair,
       id: identityId.valueOf(),
       networks: networks.map((networkId) => networkId.valueOf()),
-      previousCid: undefined,
+      previousIdentityExternalIdentifier: undefined,
       profile: new Profile(name).toPrimitives(),
       signature: '',
       timestamp: Timestamp.now().valueOf(),
@@ -82,9 +88,10 @@ export class Identity extends AggregateRoot {
     private timestamp: Timestamp,
     private signature: Signature,
     private readonly version: IdentityVersion,
-    private readonly previousCid?: IdentityCid,
+    previousReference?: PreviousReference,
   ) {
     super();
+    this.previousIdentityExternalIdentifier = previousReference;
 
     assert(
       new IdentitySignatureDomainService().isValidSignature(
@@ -126,7 +133,8 @@ export class Identity extends AggregateRoot {
       encryptedKeyPair: this.encryptedKeyPair.toPrimitives(),
       id: this.id.valueOf(),
       networks: this.networks.toArray().map((networkId) => networkId.valueOf()),
-      previousCid: this.previousCid?.valueOf(),
+      previousIdentityExternalIdentifier:
+        this.previousIdentityExternalIdentifier?.valueOf(),
       profile: this.profile.toPrimitives(),
       signature: this.signature.valueOf(),
       timestamp: this.timestamp.valueOf(),
@@ -137,13 +145,14 @@ export class Identity extends AggregateRoot {
   public async updateNetworks(
     networks: NetworkId[],
     password: Password,
-    previousCid: IdentityCid,
+    previousIdentityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity> {
     const primitives = await this.signNextPrimitives(
       {
         ...this.toPrimitives(),
         networks: networks.map((networkId) => networkId.valueOf()),
-        previousCid: previousCid.valueOf(),
+        previousIdentityExternalIdentifier:
+          previousIdentityExternalIdentifier.valueOf(),
         timestamp: Timestamp.now().valueOf(),
         version: this.version.next().valueOf(),
       },
@@ -159,12 +168,13 @@ export class Identity extends AggregateRoot {
   public async updateProfile(
     profile: Profile,
     password: Password,
-    previousCid: IdentityCid,
+    previousIdentityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity> {
     const primitives = await this.signNextPrimitives(
       {
         ...this.toPrimitives(),
-        previousCid: previousCid.valueOf(),
+        previousIdentityExternalIdentifier:
+          previousIdentityExternalIdentifier.valueOf(),
         profile: profile.toPrimitives(),
         timestamp: Timestamp.now().valueOf(),
         version: this.version.next().valueOf(),

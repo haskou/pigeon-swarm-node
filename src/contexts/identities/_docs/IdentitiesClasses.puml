@@ -7,7 +7,7 @@ package "identities.domain" {
     -id: IdentityId
     -encryptedKeyPair: EncryptedKeyPair
     -version: number
-    -previousCid?: Cid
+    -previousIdentityExternalIdentifier?: IdentityExternalIdentifier
     -networks: UniqueObjectArray<NetworkId>
     -profile: Profile
     -timestamp: Timestamp
@@ -20,12 +20,13 @@ package "identities.domain" {
   class Profile {
     -name: ProfileName
     -biography?: ProfileBiography
-    -pictureCid?: Cid
+    -picture?: ProfileImage
   }
 
   class ProfileName <<ValueObject>>
   class ProfileBiography <<ValueObject>>
   class ProfileImage <<ValueObject>>
+  class IdentityExternalIdentifier <<ValueObject>>
 
   class IdentitySignatureDomainService {
     +generateSignature(payload, encryptedKeyPair, password): Promise<Signature>
@@ -53,10 +54,10 @@ package "identities.domain" {
 
   Identity *--> Profile
   Identity o--> NetworkId
-  Identity --> Cid
+  Identity --> IdentityExternalIdentifier
   Profile *--> ProfileName
   Profile --> ProfileBiography
-  Profile --> Cid
+  Profile --> ProfileImage
   Identity ..> IdentitySignatureDomainService
   IdentityResolutionDomainService --> Identity
   IdentitySaverService --> IdentityRepository

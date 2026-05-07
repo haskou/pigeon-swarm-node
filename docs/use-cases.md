@@ -35,9 +35,9 @@ networks have a key. Identities declare the networks where they can be found.
 
 An identity represents a user-level cryptographic identity. Its id is derived
 from its public key. The identity itself carries version metadata such as
-`version` and `previousCid` so that different immutable copies can be validated
-and ordered. The repository returns `Identity`, not an infrastructure-specific
-version object.
+`version` and `previousIdentityExternalIdentifier` so that different immutable
+copies can be validated and ordered. The repository returns `Identity`, not an
+infrastructure-specific version object.
 
 **Message**
 
@@ -56,17 +56,17 @@ documents, not domain concepts.
 **IPFS / Helia**
 
 IPFS stores immutable identity documents, message event documents, media,
-attachments and large snapshots by CID.
+attachments and large snapshots by content address.
 
 **PubSub**
 
-PubSub announces identity CIDs and message event CIDs quickly between connected
-peers.
+PubSub announces identity and message content references quickly between
+connected peers.
 
 **DHT**
 
-DHT helps a node discover candidate identity CIDs or peer hints when local
-state is missing or stale.
+DHT helps a node discover candidate identity content references or peer hints
+when local state is missing or stale.
 
 ## UC-001: Load Local Node
 
@@ -107,7 +107,8 @@ Create a new signed user identity bound to at least one network.
 7. `IdentityRepository.save` persists and publishes the identity.
 8. The repository stores the immutable identity document in IPFS.
 9. The repository stores local lookup metadata in MongoDB.
-10. The repository announces or exposes the CID through PubSub/DHT.
+10. The repository announces or exposes the content reference through
+    PubSub/DHT.
 11. The local node metadata stores the identity as owner if requested.
 
 **Result**
@@ -125,11 +126,12 @@ Update profile or network hints without losing verifiability.
 1. The user updates profile or networks.
 2. The application loads the current `Identity`.
 3. The domain creates the next `Identity` state with a higher `version` and
-   `previousCid`.
+   `previousIdentityExternalIdentifier`.
 4. The new identity payload is signed.
 5. `IdentityRepository.save` stores the immutable document in IPFS.
 6. The repository updates local metadata in MongoDB.
-7. The repository announces or exposes the new CID through PubSub/DHT.
+7. The repository announces or exposes the new content reference through
+   PubSub/DHT.
 
 **Result**
 
@@ -145,13 +147,14 @@ Find the current accepted information for a remote identity.
 **Main flow**
 
 1. The application asks `IdentityRepository.findById(identityId)`.
-2. The repository checks local MongoDB metadata for known candidate CIDs.
+2. The repository checks local MongoDB metadata for known candidate content
+   references.
 3. If local state is missing or stale, the repository asks DHT/peers for
-   candidate CIDs.
+   candidate content references.
 4. The repository fetches missing identity documents from IPFS.
 5. The repository maps documents to `Identity` objects.
 6. `IdentityResolutionDomainService` validates signatures, identity id,
-   version and previous CID chain.
+   version and previous external identifier chain.
 7. The service chooses the current valid `Identity`.
 8. The repository stores validation metadata locally.
 
@@ -200,8 +203,8 @@ Send an encrypted message to one remote identity.
 
 **Result**
 
-Peers can fetch the immutable event by CID and validate it, while application
-code deals with `Conversation` as the aggregate root.
+Peers can fetch the immutable event by content reference and validate it, while
+application code deals with `Conversation` as the aggregate root.
 
 ## UC-007: Receive 1to1 Message
 
