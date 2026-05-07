@@ -15,6 +15,8 @@ import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 export abstract class HeliaIPFS implements IPFSConnection {
+  private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
+
   public static async createPublicHeliaCore(
     options: IPFSOptions,
   ): Promise<HeliaInstance> {
@@ -61,8 +63,70 @@ export abstract class HeliaIPFS implements IPFSConnection {
     private readonly options: IPFSOptions,
   ) {}
 
+  private createRoutingAbortSignal(signal?: AbortSignal): {
+    signal: AbortSignal;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+    );
+
+    if (signal) {
+      signal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
+    }
+
+    return { signal: controller.signal, timeout };
+  }
+
+  private async getLocalRecord(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
+    const decoder = new TextDecoder();
+
+    try {
+      const datastoreKey: DatastoreKeyLike =
+        await heliaRuntimeAdapter.createDatastoreKey(`/records/${key}`);
+
+      const value = await this.heliaCore.datastore.get(datastoreKey, {
+        signal,
+      });
+
+      return decoder.decode(value);
+    } catch {
+      return undefined;
+    }
+  }
+
   private hasPeers(): boolean {
     return this.getPeers().length > 0;
+  }
+
+  private async publishRoutingRecord(
+    key: string,
+    value: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const encoder = new TextEncoder();
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      await this.heliaCore.routing.put(
+        encoder.encode(key),
+        encoder.encode(value),
+        {
+          signal: routingAbort.signal,
+        },
+      );
+    } catch {
+      Kernel.logger.warn(`DHT record publication skipped for key: ${key}`);
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
   }
 
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
@@ -135,11 +199,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     });
 
     if (this.hasPeers()) {
-      await this.heliaCore.routing.put(
-        encoder.encode(key),
-        encoder.encode(value),
-        { signal },
-      );
+      await this.publishRoutingRecord(key, value, signal);
     }
   }
 
@@ -147,6 +207,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
     key: string,
     signal?: AbortSignal,
   ): Promise<string | undefined> {
+    const localValue = await this.getLocalRecord(key, signal);
+
+    if (localValue !== undefined) {
+      return localValue;
+    }
+
     const decoder = new TextDecoder();
 
     if (this.hasPeers()) {
@@ -162,18 +228,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       }
     }
 
-    try {
-      const datastoreKey: DatastoreKeyLike =
-        await heliaRuntimeAdapter.createDatastoreKey(`/records/${key}`);
-
-      const value = await this.heliaCore.datastore.get(datastoreKey, {
-        signal,
-      });
-
-      return decoder.decode(value);
-    } catch {
-      return undefined;
-    }
+    return undefined;
   }
 
   public async blockPeer(peerId: string): Promise<void> {

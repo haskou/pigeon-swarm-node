@@ -78,10 +78,15 @@ tested and committed with the repository gitmoji conventional-commit format.
   - stale metadata invalidation
 - Conversation domain:
   - `Conversation`
+  - `Conversation.toPrimitives()` uses `PrimitiveOf<Conversation>` instead of
+    a hand-written primitive interface
   - `OneToOneConversation`
   - `Message`, `MessageSent`, `MessageEdited`, `MessageDeleted`
   - `MessageFactory`
-  - `MessageEventType` enum value object
+  - `MessageId`
+  - `MessageType` enum value object
+  - message primitives use message language: `messages`,
+    `previousMessageIds` and `targetMessageId`
   - `ConversationProjectionDomainService`
   - `MessageSignatureDomainService`
   - `ConversationRepository` port
@@ -91,11 +96,17 @@ tested and committed with the repository gitmoji conventional-commit format.
   - `MongoMessageMetadataDocument`
   - `MongoMessageMetadataMapper`
   - mapper tests
+- IPFS record reliability:
+  - `HeliaIPFS.getRecord` checks the local datastore before DHT routing
+  - `HeliaIPFS.putRecord` persists locally and publishes to DHT as a
+    bounded best-effort step
+  - API acceptance steps allow slower Helia/libp2p work without masking hung
+    scenarios indefinitely
 - Tooling/runtime:
   - Dockerfile and Compose cleanup
   - `yarn build` passes
   - `yarn lint` passes with known `max-params` warnings
-  - focused unit tests pass
+  - focused unit tests pass, including shared IPFS infrastructure tests
   - `yarn test:api` passes outside the sandbox
 
 ## Immediate Slice 1: PubSub Event Bus
@@ -153,9 +164,8 @@ Steps:
 2. Rename domain-facing concepts:
    - `previousCid` -> `previousIdentityExternalIdentifier`
    - `IdentityCid` -> `IdentityExternalIdentifier`
-   - `Cid` value object in conversations -> `ContentAddress`,
-     `AttachmentExternalIdentifier` or `MessageExternalIdentifier`,
-     depending on use
+   - `Cid` value object in conversations -> `ContentAddress` or
+     `AttachmentExternalIdentifier`, depending on use
 3. Keep Mongo metadata field names free to use `cid` if they store actual IPFS
    CIDs.
 4. Let infrastructure mappers translate domain references to concrete IPFS

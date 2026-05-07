@@ -114,7 +114,7 @@ jest.mock(
 jest.mock('@app/Kernel', () => ({
   __esModule: true,
   default: {
-    logger: { error: jest.fn(), info: jest.fn() },
+    logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
   },
 }));
 
@@ -129,6 +129,7 @@ describe('PublicIPFS', () => {
       PublicIPFS as unknown as { connectionPool: Record<string, unknown> }
     ).connectionPool = {};
     jest.clearAllMocks();
+    mockHeliaNode.libp2p.getPeers.mockReturnValue([]);
   });
 
   describe('create', () => {
@@ -209,6 +210,41 @@ describe('PublicIPFS', () => {
 
       await expect(connection.stat(cid, false)).rejects.toThrow(
         IPFSBlockNotFoundPublicError,
+      );
+    });
+  });
+
+  describe('records', () => {
+    it('should return local record before trying routing', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.datastore.get.mockResolvedValue(
+        new TextEncoder().encode('local-cid'),
+      );
+
+      const result = await connection.getRecord('identity-id');
+
+      expect(result).toBe('local-cid');
+      expect(mockHeliaNode.routing.get).not.toHaveBeenCalled();
+    });
+
+    it('should keep local record when routing publication fails', async () => {
+      const Kernel = (await import('@app/Kernel')).default;
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.datastore.put.mockResolvedValue(undefined);
+      mockHeliaNode.routing.put.mockRejectedValue(new Error('dht timeout'));
+
+      await expect(
+        connection.putRecord('identity-id', 'local-cid'),
+      ).resolves.toBeUndefined();
+
+      expect(mockHeliaNode.datastore.put).toHaveBeenCalled();
+      expect(mockHeliaNode.routing.put).toHaveBeenCalled();
+      expect(Kernel.logger.warn).toHaveBeenCalledWith(
+        'DHT record publication skipped for key: identity-id',
       );
     });
   });
