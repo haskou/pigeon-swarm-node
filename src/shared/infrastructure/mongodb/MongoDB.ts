@@ -9,11 +9,16 @@ export default class MongoDB {
       'mongodb://localhost:27017',
     private readonly databaseName: string = process.env.MONGO_DATABASE ||
       'pigeon_swarm',
+    private readonly serverSelectionTimeoutMS: number = Number(
+      process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 1000,
+    ),
   ) {}
 
   private async getDatabase(): Promise<Db> {
     if (!this.client) {
-      this.client = new MongoClient(this.url);
+      this.client = new MongoClient(this.url, {
+        serverSelectionTimeoutMS: this.serverSelectionTimeoutMS,
+      });
       await this.client.connect();
       this.database = this.client.db(this.databaseName);
     }

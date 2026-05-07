@@ -18,6 +18,36 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     private readonly metadataRepository: MongoIdentityMetadataRepository,
   ) {}
 
+  private async findValidMetadata(
+    id: IdentityId,
+  ): Promise<MongoIdentityMetadataDocument[]> {
+    try {
+      return await this.metadataRepository.findValidByIdentityId(id);
+    } catch {
+      return [];
+    }
+  }
+
+  private async markMetadataInvalid(cid: IPFSId): Promise<void> {
+    try {
+      await this.metadataRepository.markInvalid(cid);
+    } catch {
+      return;
+    }
+  }
+
+  private async saveMetadata(
+    identity: Identity,
+    cid: IPFSId,
+    valid = true,
+  ): Promise<void> {
+    try {
+      await this.metadataRepository.save(identity, cid, valid);
+    } catch {
+      return;
+    }
+  }
+
   private async findCandidatesFromMetadata(
     metadata: MongoIdentityMetadataDocument[],
   ): Promise<Identity[]> {
@@ -32,7 +62,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
         candidates.push(this.mapper.toDomain(document));
       } catch {
-        await this.metadataRepository.markInvalid(new IPFSId(cid));
+        await this.markMetadataInvalid(new IPFSId(cid));
       }
     }
 
@@ -43,7 +73,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
     const identity = this.mapper.toDomain(document);
 
-    await this.metadataRepository.save(identity, cid, true);
+    await this.saveMetadata(identity, cid, true);
 
     return identity;
   }
@@ -55,7 +85,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   }
 
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
-    const metadata = await this.metadataRepository.findValidByIdentityId(id);
+    const metadata = await this.findValidMetadata(id);
     const candidates =
       metadata.length > 0
         ? await this.findCandidatesFromMetadata(metadata)
@@ -81,7 +111,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     const networks: string[] = document.networks;
     const cid = await this.ipfsManager.addJSONToNetworks(document, networks);
 
-    await this.metadataRepository.save(identity, cid, true);
+    await this.saveMetadata(identity, cid, true);
 
     await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,

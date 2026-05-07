@@ -8,7 +8,7 @@ keep each change small, tested and aligned with DDD boundaries.
 The node is a server-capable P2P runtime.
 
 - MongoDB is the node-local metadata, lookup and sync state store.
-- IPFS/Helia stores immutable identity documents, message event documents and
+- IPFS/Helia stores immutable identity documents, message documents and
   media by CID.
 - The existing `DomainEventPublisher` publishes local domain events.
 - Helia/libp2p PubSub should be plugged in as message-bus infrastructure so
@@ -24,20 +24,23 @@ The node is a server-capable P2P runtime.
 - `Identity` is the aggregate. Add `version` and `previousCid` to `Identity`
   itself if version ordering is needed.
 - `Conversation` is the aggregate root for chat state.
-- `MessageEvent` is an entity owned by `Conversation`; messages are not saved
+- `Message` is an entity owned by `Conversation`; messages are not saved
   or queried through an independent domain aggregate.
 - MongoDB document indexes and IPFS documents belong to infrastructure.
 - Domain repositories expose domain objects:
   - `IdentityRepository` returns `Identity`.
   - `ConversationRepository` returns `Conversation` and reconstitutes its
-    message events.
+    messages.
 - Repositories may internally use MongoDB, IPFS and DHT.
 - Do not create a conversation-specific publisher port. Use the existing
   `DomainEventPublisher` and message bus.
-- Edits and deletes are new signed events, never mutations of the original
-  message event.
+- Edits and deletes are new signed messages, never mutations of the original
+  message.
 - Every remote document must be mapped to a domain object and validated before
   it affects application behavior.
+- A `Conversation` defines whether its messages are encrypted or plaintext.
+  The repository stores immutable message documents either way; encryption is
+  conversation policy, not a MongoDB/IPFS concern.
 
 ## Phase 1: MongoDB Foundation
 
@@ -147,7 +150,7 @@ Expected result:
 4. Add `OneToOneConversation`.
 5. Make 1to1 conversation ids deterministic from the sorted pair of identity
    ids.
-6. Add `MessageEvent` base entity inside the `Conversation` aggregate.
+6. Add `Message` base entity inside the `Conversation` aggregate.
 7. Add event entities:
    - `MessageSent`
    - `MessageEdited`
@@ -157,9 +160,9 @@ Expected result:
 
 Expected result:
 
-- The domain models 1to1 conversations and immutable message events without
+- The domain models 1to1 conversations and immutable messages without
   Mongo/IPFS concepts.
-- Message events depend on `Conversation` for lifecycle, participant checks,
+- Messages depend on `Conversation` for lifecycle, participant checks,
   edit/delete target rules and projection.
 
 ## Phase 6: Conversation Port
@@ -180,7 +183,7 @@ Expected result:
 
 ## Phase 7: Message Infrastructure
 
-1. Add IPFS message event document:
+1. Add IPFS message document:
    - schema version
    - event id
    - conversation id
@@ -203,23 +206,23 @@ Expected result:
    - `receivedAt`
    - `targetEventId`
    - `valid`
-3. Implement message-event persistence inside `ConversationRepository`
+3. Implement message persistence inside `ConversationRepository`
    infrastructure, or behind an infrastructure-only `IpfsConversationEventStore`.
 4. `save(conversation)` should:
    - map new conversation events to IPFS documents
    - store them in IPFS
    - store metadata in MongoDB
    - keep the conversation aggregate reconstitutable from persisted events
-5. Conversation event reads should:
+5. Conversation message reads should:
    - use MongoDB metadata for ordering and pagination
    - fetch missing IPFS documents internally
-   - map documents to `MessageEvent`
+   - map documents to `Message`
    - attach domain events to `Conversation`
 Expected result:
 
 - Messages are immutable IPFS documents.
 - MongoDB remains an internal query accelerator.
-- Application code works through `Conversation`; `MessageEvent` remains a
+- Application code works through `Conversation`; `Message` remains a
   dependent entity.
 - Message propagation uses the existing domain event bus.
 
@@ -236,19 +239,20 @@ Expected result:
    - load local identity
    - load remote identity
    - load the `Conversation`
-   - encrypt payload
+   - encrypt payload when the conversation policy requires encryption, or keep
+     it plaintext when allowed by the conversation policy
    - ask `Conversation` to record a signed `MessageSent`
    - call `ConversationRepository.save`
    - publish `conversation.pullDomainEvents()` with `DomainEventPublisher`
 9. `MessageReceiver` flow:
    - receive announcement
    - load the target `Conversation`
-   - fetch and map the announced event inside conversation infrastructure
-   - ask `Conversation` to accept the validated event
+   - fetch and map the announced message inside conversation infrastructure
+   - ask `Conversation` to accept the validated message
    - call `ConversationRepository.save`
 10. `LatestMessagesFinder` flow:
    - load the `Conversation`
-   - decrypt payloads
+   - decrypt encrypted payloads when needed
    - apply edits/deletes with `ConversationProjectionDomainService`
    - return current visible messages
 
@@ -312,7 +316,7 @@ Expected result:
    - identity signatures
    - identity version ordering
    - deterministic 1to1 conversation id
-   - message event signatures
+   - message signatures
    - edit/delete target rules
 2. Unit test repositories with mocked IPFS and MongoDB dependencies.
 3. Unit test use cases with ports mocked.
@@ -331,6 +335,64 @@ Expected result:
 
 - The architecture is covered at the domain and application boundary.
 
+## Phase 12: Remote Content Validation
+
+1. Replace the current single-value `IPFS.getRecord(key)` trust model with a
+   candidate model:
+   - discover one or more candidate CIDs/records from DHT and peers
+   - fetch candidate documents from IPFS
+   - map them into domain objects
+   - validate them before returning them to application code
+2. Keep the Helia/IPFS adapter infrastructure-only. It may retrieve bytes and
+   candidate CIDs, but it must not decide whether an `Identity` or `Message` is
+   trustworthy.
+3. Add shared domain validation building blocks only for generic integrity
+   concerns:
+   - canonical payload hashing
+   - signature validation contracts/helpers
+   - content-address/hash matching when a context needs it
+4. Keep context-specific rules in their own domain services:
+   - `IdentityResolutionDomainService` validates identity id/public key,
+     signature, version and previous CID chain.
+   - Conversation domain services validate message signatures, author,
+     participant membership, target message and edit/delete rules.
+5. Add repository behavior:
+   - invalid remote identity/message candidates are marked invalid in MongoDB
+     metadata
+   - invalid candidates are never returned as current domain state
+   - if all known candidates are invalid, return not found/empty rather than a
+     stale or untrusted object
+
+Expected result:
+
+- Data fetched from IPFS/DHT is treated as untrusted input until a domain
+  service accepts it.
+
+## Phase 13: E2E DHT and Identity Version Scenarios
+
+1. Add Cucumber acceptance tests with multiple node runtimes or Helia test
+   doubles that preserve DHT/PubSub behavior.
+2. Cover identity convergence:
+   - no peer has the latest identity version: resolver returns the highest
+     valid locally known version and schedules/records a sync miss
+   - only one peer has the latest identity version: another node discovers the
+     candidate through DHT/peer sync, validates the chain, caches metadata and
+     returns the latest identity
+   - multiple peers advertise conflicting heads: resolver rejects invalid
+     signatures/chains and returns the highest valid chain
+3. Cover conversation sync:
+   - one node sends a 1to1 message
+   - another node receives the PubSub/domain-event announcement
+   - if PubSub is missed, anti-entropy sync discovers missing message CIDs
+   - encrypted and plaintext conversation policies both round-trip
+4. Run acceptance tests outside the sandbox when needed because Helia/libp2p
+   opens local interfaces and ports.
+
+Expected result:
+
+- DHT, identity versions and conversation sync are validated at the behavior
+  level, not only by mocked unit tests.
+
 ## Suggested Implementation Order
 
 1. Add Mongo connection and config.
@@ -343,11 +405,14 @@ Expected result:
 8. Add Helia PubSub as a message-bus adapter.
 9. Add anti-entropy sync.
 10. Add HTTP routes.
+11. Add remote content validation.
+12. Add DHT/identity-version acceptance coverage.
 
 ## Open Decisions
 
 - Exact MongoDB deployment model for local development and production.
-- Whether validated ciphertext is cached in MongoDB after IPFS fetch.
+- Whether validated encrypted/plaintext message payloads are cached in MongoDB
+  after IPFS fetch.
 - Conversation topic naming and privacy tradeoffs.
 - Key exchange protocol for 1to1 encryption.
 - Retention policy for IPFS pins and MongoDB metadata.
@@ -387,12 +452,12 @@ Last updated: 2026-05-07.
 - Conversation domain initial pass:
   - `Conversation` aggregate root.
   - `OneToOneConversation`.
-  - Dependent message event entities:
-    - `MessageEvent`
+  - Dependent message entities:
+    - `Message`
     - `MessageSent`
     - `MessageEdited`
     - `MessageDeleted`
-  - `MessageEventFactory`.
+  - `MessageFactory`.
   - Value objects:
     - `ConversationId`
     - `MessageEventId`
@@ -450,12 +515,17 @@ Last updated: 2026-05-07.
     head even when Mongo has local metadata.
   - A DHT CID that is not already known by Mongo is fetched, mapped to
     `Identity`, cached as metadata, and returned as an additional candidate.
-- Conversation message event infrastructure base:
-  - Added `IpfsMessageEventDocument` and `IpfsMessageEventMapper`.
-  - Added `MongoMessageEventMetadataDocument` and
-    `MongoMessageEventMetadataMapper`.
-  - Added mapper tests for IPFS message event documents and Mongo message event
+- Conversation message infrastructure base:
+  - Added `IpfsMessageDocument` and `IpfsMessageMapper`.
+  - Added `MongoMessageMetadataDocument` and
+    `MongoMessageMetadataMapper`.
+  - Added mapper tests for IPFS message documents and Mongo message
     metadata.
+- Conversation message naming cleanup:
+  - Renamed the ambiguous `MessageEvent` entity to `Message`.
+  - Renamed mapper/document/factory files to `Message` naming.
+  - Removed the explicit message primitives interface and now uses
+    `PrimitiveOf<Message>` from `@haskou/value-objects`.
 - TypeScript/tooling:
   - `tsconfig.json` now uses `es2023` + `dom` libs so ESLint parser accepts the
     project config.
@@ -470,6 +540,13 @@ Last updated: 2026-05-07.
   - Dockerfile stages use uppercase `AS`, the final stage uses the bundled
     `pm2-runtime` dependency instead of installing PM2 globally, and final
     runtime loads `.env` by leaving `NODE_ENV` empty.
+- Acceptance stability:
+  - `MongoDB` now uses a bounded server selection timeout.
+  - `IpfsIdentityRepository` treats Mongo identity metadata as an optional
+    local cache, so identity creation still succeeds when IPFS/DHT are
+    available but Mongo is unavailable.
+  - `.env.test` lowers Mongo connection timeout to keep Cucumber scenarios
+    deterministic without requiring a local MongoDB daemon.
 
 ### In Progress / Needs Cleanup Next
 
@@ -481,6 +558,15 @@ Last updated: 2026-05-07.
   into `Conversation.send/edit/delete`; signatures are passed in by caller.
   Decide whether signing belongs in application service or domain service
   invocation.
+- Conversation encryption policy is not modeled yet:
+  - current domain assumes `EncryptedMessagePayload`
+  - next slice should introduce a `ConversationEncryptionPolicy` or equivalent
+    and allow plaintext/encrypted message payloads without leaking storage
+    concerns into domain code.
+- Remote IPFS/DHT content validation is planned but not implemented:
+  - `IPFS.getRecord` still returns a single record
+  - repositories still need a candidate-validation flow that marks invalid
+    metadata and only exposes domain-validated objects.
 - `MongoNodeMetadataRepository` duplicates network-sync logic from
   `LocalNodeRepository`. Accept short term, but consider extracting a small
   shared infrastructure helper later.
@@ -506,6 +592,9 @@ Last updated: 2026-05-07.
     interpolation warnings.
 - Jest may need to run outside the sandbox because it opens local ports and can
   fail with `EPERM` inside the sandbox.
+- `yarn test:api` fails inside the sandbox because the API server and
+  Helia/libp2p cannot bind/list local interfaces. It passes outside the
+  sandbox.
 - Commits have been made with the repository gitmoji message format.
 
 ### Last Verified Checks
@@ -520,21 +609,25 @@ Last updated: 2026-05-07.
   - `tests/unit/contexts/nodes/infrastructure/mongo`
   - `tests/unit/contexts/conversations`
   - `tests/unit/contexts/identities`
+- `yarn test:api`: pass outside sandbox, 3 scenarios / 18 steps.
 
 ### Exact Next Steps
 
-1. Decide how infrastructure supplies candidate own CIDs to validate
+1. Commit the `MessageEvent` to `Message` cleanup and acceptance stability
+   fix.
+2. Decide how infrastructure supplies candidate own CIDs to validate
    `previousCid` chains without making `Identity` depend on IPFS.
-2. Start richer peer candidate discovery:
+3. Start richer peer candidate discovery:
    - current DHT `getRecord` refresh only discovers one known head.
    - later add peer/DHT candidate expansion when multiple heads are possible.
-3. Keep running after each slice:
+4. Add the remote content validation slice:
+   - DHT/IPFS candidate collection
+   - domain validation per context
+   - invalid metadata marking
+   - Cucumber scenarios for missing/latest identity propagation.
+5. Add conversation encryption policy and update message payload modeling for
+   encrypted and plaintext conversations.
+6. Keep running after each slice:
    - `yarn build`
    - `yarn lint`
    - focused Jest command above.
-4. Once green and coherent, commit in small conventional commits:
-   - `docs: refine p2p identity and conversation architecture`
-   - `feat(infra): add mongodb configuration`
-   - `feat(nodes): add mongo-backed local node metadata`
-   - `feat(conversations): add one-to-one conversation domain`
-   - `feat(identities): add versioned identity resolution`
