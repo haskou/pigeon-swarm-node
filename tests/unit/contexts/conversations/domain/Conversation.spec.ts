@@ -1,0 +1,180 @@
+import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
+import { MessageEventTargetAlreadyDeletedError } from '@app/contexts/conversations/domain/errors/MessageEventTargetAlreadyDeletedError';
+import { MessageEventTargetAuthorMismatchError } from '@app/contexts/conversations/domain/errors/MessageEventTargetAuthorMismatchError';
+import { MessageEventTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageEventTargetNotFoundError';
+import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
+import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
+import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
+import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
+import { Cid } from '@app/contexts/conversations/domain/value-objects/Cid';
+import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
+import { MessageEventId } from '@app/contexts/conversations/domain/value-objects/MessageEventId';
+import { MessageEventType } from '@app/contexts/conversations/domain/value-objects/MessageEventType';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { KeyPair, Signature } from '@haskou/value-objects';
+
+describe('Conversation', () => {
+  let author: IdentityId;
+  let recipient: IdentityId;
+  let outsider: IdentityId;
+  let conversation: OneToOneConversation;
+
+  beforeEach(async () => {
+    author = await generateIdentityId();
+    recipient = await generateIdentityId();
+    outsider = await generateIdentityId();
+    conversation = OneToOneConversation.create(author, recipient);
+  });
+
+  describe('sendMessage', () => {
+    it('should add a message sent event and record a domain event', () => {
+      const message = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('encrypted-payload'),
+        signature(),
+        [
+          new Cid(
+            'bafybeigdyrzt5sfp7udm7hu76t5dp5whztr3v3gvl6wv4x7q5v2fi6c5mm',
+          ),
+        ],
+      );
+
+      expect(message).toBeInstanceOf(MessageSent);
+      expect(conversation.toPrimitives().events).toHaveLength(1);
+      expect(conversation.toPrimitives().events[0]).toEqual(
+        expect.objectContaining({
+          authorId: author.valueOf(),
+          encryptedPayload: 'encrypted-payload',
+          type: MessageEventType.SENT.valueOf(),
+        }),
+      );
+      expect(conversation.pullDomainEvents()).toEqual([
+        expect.any(ConversationMessageWasSentEvent),
+      ]);
+    });
+
+    it('should reject messages from non participants', () => {
+      expect(() =>
+        conversation.sendMessage(
+          outsider,
+          new EncryptedMessagePayload('encrypted-payload'),
+          signature(),
+        ),
+      ).toThrow(ConversationParticipantNotFoundError);
+    });
+  });
+
+  describe('editMessage', () => {
+    it('should add a message edited event and update the projection', () => {
+      const sent = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('original-payload'),
+        signature(),
+      );
+      conversation.pullDomainEvents();
+
+      const edited = conversation.editMessage(
+        author,
+        sent.getId(),
+        new EncryptedMessagePayload('edited-payload'),
+        signature(),
+      );
+
+      expect(edited.getTargetEventId().valueOf()).toBe(sent.getId().valueOf());
+      expect(conversation.projectMessages()).toEqual([
+        {
+          deleted: false,
+          encryptedPayload: 'edited-payload',
+          eventId: sent.getId().valueOf(),
+        },
+      ]);
+      expect(conversation.pullDomainEvents()).toEqual([
+        expect.any(ConversationMessageWasEditedEvent),
+      ]);
+    });
+
+    it('should reject edits by a different participant', () => {
+      const sent = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('original-payload'),
+        signature(),
+      );
+
+      expect(() =>
+        conversation.editMessage(
+          recipient,
+          sent.getId(),
+          new EncryptedMessagePayload('edited-payload'),
+          signature(),
+        ),
+      ).toThrow(MessageEventTargetAuthorMismatchError);
+    });
+
+    it('should reject edits for unknown targets', () => {
+      expect(() =>
+        conversation.editMessage(
+          author,
+          MessageEventId.generate(),
+          new EncryptedMessagePayload('edited-payload'),
+          signature(),
+        ),
+      ).toThrow(MessageEventTargetNotFoundError);
+    });
+  });
+
+  describe('deleteMessage', () => {
+    it('should add a message deleted event and mark the projection as deleted', () => {
+      const sent = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('original-payload'),
+        signature(),
+      );
+      conversation.pullDomainEvents();
+
+      const deleted = conversation.deleteMessage(
+        author,
+        sent.getId(),
+        signature(),
+      );
+
+      expect(deleted.getTargetEventId().valueOf()).toBe(sent.getId().valueOf());
+      expect(conversation.projectMessages()).toEqual([
+        {
+          deleted: true,
+          encryptedPayload: 'original-payload',
+          eventId: sent.getId().valueOf(),
+        },
+      ]);
+      expect(conversation.pullDomainEvents()).toEqual([
+        expect.any(ConversationMessageWasDeletedEvent),
+      ]);
+    });
+
+    it('should reject deleting the same message twice', () => {
+      const sent = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('original-payload'),
+        signature(),
+      );
+
+      conversation.deleteMessage(author, sent.getId(), signature());
+
+      expect(() =>
+        conversation.deleteMessage(author, sent.getId(), signature()),
+      ).toThrow(MessageEventTargetAlreadyDeletedError);
+    });
+  });
+});
+
+async function generateIdentityId(): Promise<IdentityId> {
+  const keyPair = await KeyPair.generate();
+
+  return new IdentityId(keyPair.toPrimitives().publicKey);
+}
+
+function signature(): Signature {
+  return new Signature(
+    'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+  );
+}
