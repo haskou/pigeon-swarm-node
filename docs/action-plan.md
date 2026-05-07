@@ -168,6 +168,27 @@ Scenarios:
 Run Helia/libp2p scenarios outside the sandbox when local ports or interfaces
 are required.
 
+## Last Slice: Client Chat API
+
+Goal: expose chat to clients without leaking node-to-node PubSub as the client
+contract.
+
+Steps:
+
+1. Implement HTTP endpoints for conversation commands and reads.
+2. Implement WebSocket realtime for client subscriptions.
+3. Keep PubSub as node-to-node infrastructure behind `DomainEventPublisher`.
+4. Emit WebSocket events only after domain validation and persistence.
+5. Filter subscriptions by authenticated identity and known conversations.
+6. Keep `docs/api.md` updated as the API contract evolves.
+
+Tests:
+
+- Cucumber: client sends an encrypted 1to1 message and another connected
+  client receives it by WebSocket.
+- Cucumber: unauthorized conversation subscription is rejected.
+- Cucumber: reconnect recovers missed events through HTTP pagination or sync.
+
 ## Known Cleanup
 
 - `max-params` warnings:
