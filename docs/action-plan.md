@@ -10,11 +10,12 @@ tested and committed with the repository gitmoji conventional-commit format.
 - The node is a server-capable P2P runtime.
 - MongoDB is the node-local store for application metadata, lookup indexes and
   sync cursors.
-- IPFS/Helia stores immutable content by CID:
+- IPFS/Helia stores immutable content by content address:
   - identity documents
   - message documents
   - media and binary attachments
-- DHT/PubSub discover candidate CIDs, peers and sync announcements.
+- DHT/PubSub discover candidate content references, peers and sync
+  announcements.
 - Domain truth comes from aggregates, value objects, canonical payloads,
   signatures and validation rules.
 - The existing `DomainEventPublisher` remains the application event port.
@@ -22,7 +23,8 @@ tested and committed with the repository gitmoji conventional-commit format.
 
 ## Design Rules
 
-- `Identity` is the aggregate. It owns `version` and `previousCid`.
+- `Identity` is the aggregate. It owns `version` and a previous identity
+  document reference.
 - Do not add `IdentityVersion`, `IdentityHead`, `IdentityBlobStore`,
   `MessageBlobStore` or `ConversationMessageIndex` as domain concepts.
 - `Conversation` is the aggregate root for chat state.
@@ -37,8 +39,13 @@ tested and committed with the repository gitmoji conventional-commit format.
   - `ConversationRepository` returns `Conversation`.
 - Remote documents fetched from IPFS/DHT are untrusted input until a domain
   service accepts them.
-- A conversation defines whether message payloads are encrypted or plaintext.
-  Storage should persist immutable message documents either way.
+- Conversations are encrypted according to their type.
+- For now, 1to1 conversations are always encrypted.
+- Public conversations may exist later; that future type can define a public
+  payload policy explicitly.
+- Domain language should avoid `CID`. Use `content address` in infrastructure
+  docs, and use context names such as `IdentityDocumentReference` or
+  `MessageDocumentReference` when the domain needs to express a durable link.
 
 ## Already Done
 
@@ -54,7 +61,8 @@ tested and committed with the repository gitmoji conventional-commit format.
   - mapper/repository tests
 - Identity:
   - `Identity.version`
-  - `Identity.previousCid`
+  - `Identity.previousCid` currently exists and should be renamed away from
+    IPFS-specific language
   - signed versioned identity payloads
   - `IdentityResolutionDomainService`
   - `MongoIdentityMetadataRepository`
@@ -125,33 +133,78 @@ Tests:
   metadata.
 - Verify `yarn build`, `yarn lint`, focused node tests and `yarn test:api`.
 
-## Immediate Slice 2: Conversation Encryption Policy
+## Immediate Slice 2: PubSub Event Bus
 
-Goal: model that conversations can store encrypted or plaintext payloads.
+Goal: plug Helia/libp2p PubSub into the existing event publisher/consumer
+model before building more chat behavior on top.
 
 Steps:
 
-1. Add a domain value object or enum such as `ConversationEncryptionPolicy`.
+1. Expose PubSub from the Helia runtime adapter.
+2. Add a message-bus adapter behind existing event bus contracts.
+3. Publish serialized domain/integration events to topics:
+   - `pigeon.identities`
+   - `pigeon.conversation.{conversationId}`
+4. Add idempotent consumers.
+5. Store sync cursors in Mongo.
+6. Add anti-entropy sync for missed PubSub messages.
+
+Tests:
+
+- Unit test the PubSub adapter with mocked Helia/libp2p PubSub.
+- Acceptance-test two nodes receiving an identity publication event.
+- Keep transport DTOs in infrastructure; application code continues using the
+  existing event publisher/consumer contracts.
+
+## Immediate Slice 3: Conversation Encryption Policy
+
+Goal: model that conversations are encrypted according to their conversation
+type.
+
+Steps:
+
+1. Add a domain value object or enum such as `ConversationType` or
+   `ConversationEncryptionPolicy`.
 2. Replace the hard assumption that all messages use
    `EncryptedMessagePayload`.
-3. Introduce payload modeling that allows:
-   - encrypted payload
-   - plaintext payload
-4. Keep encryption/decryption mechanics in application/infrastructure services,
+3. Enforce that 1to1 conversations only accept encrypted payloads.
+4. Leave public/plaintext payload support as an explicit future conversation
+   type, not as the default behavior.
+5. Keep encryption/decryption mechanics in application/infrastructure services,
    while the domain enforces whether the selected payload kind is allowed by the
-   conversation policy.
-5. Update message signatures so the canonical payload signs the payload kind and
+   conversation type.
+6. Update message signatures so the canonical payload signs the payload kind and
    payload value.
-6. Update mapper tests and conversation projection tests.
+7. Update mapper tests and conversation projection tests.
 
-## Immediate Slice 3: Remote Content Validation
+## Immediate Slice 4: Infrastructure Naming Cleanup
+
+Goal: keep IPFS-specific terms out of domain language.
+
+Steps:
+
+1. Keep `CID` in IPFS infrastructure code and persistence fields when it refers
+   to a real IPFS content identifier.
+2. Rename domain-facing concepts:
+   - `previousCid` -> `previousDocumentReference` or
+     `previousIdentityReference`
+   - `Cid` value object in conversations -> `ContentAddress`,
+     `AttachmentReference` or `MessageDocumentReference`, depending on use
+3. Keep Mongo metadata field names free to use `cid` if they store actual IPFS
+   CIDs.
+4. Let infrastructure mappers translate domain references to concrete IPFS
+   CIDs and back.
+5. Update class diagrams and use cases so only infrastructure diagrams mention
+   CID.
+
+## Immediate Slice 5: Remote Content Validation
 
 Goal: fix the security issue called out in `IPFS.getRecord`.
 
 Steps:
 
 1. Replace the single-record trust model with candidate discovery:
-   - collect one or more record/CID candidates from DHT and peers
+   - collect one or more record/content-reference candidates from DHT and peers
    - fetch candidate documents from IPFS
    - map documents to domain objects
    - validate before exposing them to application code
@@ -161,8 +214,8 @@ Steps:
    - signature payload helpers
    - content hash matching
 3. Keep context rules in context domain services:
-   - identities validate id/public key, signature, version and previous CID
-     chain
+   - identities validate id/public key, signature, version and previous
+     document-reference chain
    - conversations validate message signature, author, participants and
      edit/delete target rules
 4. Mark invalid identity/message metadata in Mongo.
@@ -174,7 +227,7 @@ Tests:
 - Unit tests for invalid message candidates once repository exists.
 - Cucumber scenarios for DHT identity convergence.
 
-## Immediate Slice 4: Conversation Repository And Use Cases
+## Immediate Slice 6: Conversation Repository And Use Cases
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
@@ -192,22 +245,6 @@ Steps:
    - synchronize conversation
 5. Use the existing `DomainEventPublisher`.
 
-## Immediate Slice 5: PubSub Event Bus
-
-Goal: plug Helia/libp2p PubSub into the existing event publisher/consumer
-model.
-
-Steps:
-
-1. Expose PubSub from the Helia runtime adapter.
-2. Add a message-bus adapter behind existing event bus contracts.
-3. Publish serialized domain/integration events to topics:
-   - `pigeon.identities`
-   - `pigeon.conversation.{conversationId}`
-4. Add idempotent consumers.
-5. Store sync cursors in Mongo.
-6. Add anti-entropy sync for missed PubSub messages.
-
 ## E2E DHT And Identity Version Scenarios
 
 Add Cucumber scenarios covering:
@@ -221,8 +258,10 @@ Add Cucumber scenarios covering:
 - multiple peers advertise conflicting heads:
   invalid signatures/chains are rejected and the highest valid chain wins
 - PubSub missed for a 1to1 message:
-  anti-entropy sync discovers missing message CIDs
-- encrypted and plaintext conversation policies both round-trip
+  anti-entropy sync discovers missing message document references
+- 1to1 conversations round-trip encrypted payloads
+- future public conversation scenarios should be added only when public
+  conversations exist
 
 Run these outside the sandbox when Helia/libp2p needs local interfaces or
 ports.
@@ -236,8 +275,9 @@ ports.
 - `MessageSignatureDomainService` exists but signing is not fully integrated
   into send/edit/delete use cases.
 - `IdentityResolutionDomainService` currently chooses from mapped identity
-  candidates. Full previous-CID chain validation still needs infrastructure to
-  provide candidate CID context without leaking IPFS into the aggregate.
+  candidates. Full previous-document-reference chain validation still needs
+  infrastructure to provide candidate content-address context without leaking
+  IPFS into the aggregate.
 - Consider renaming `IpfsIdentityRepository` later because it now coordinates
   IPFS, Mongo metadata and DHT internally.
 
