@@ -445,6 +445,11 @@ Last updated: 2026-05-07.
   - `IpfsIdentityRepository` marks broken Mongo metadata invalid when IPFS
     cannot fetch a candidate CID, then falls back to DHT if no valid Mongo
     candidate remains.
+- Identity DHT candidate refresh:
+  - `IpfsIdentityRepository.findCandidatesById(id)` now checks the known DHT
+    head even when Mongo has local metadata.
+  - A DHT CID that is not already known by Mongo is fetched, mapped to
+    `Identity`, cached as metadata, and returned as an additional candidate.
 - TypeScript/tooling:
   - `tsconfig.json` now uses `es2023` + `dom` libs so ESLint parser accepts the
     project config.
@@ -503,7 +508,7 @@ Last updated: 2026-05-07.
 - `yarn build`: pass.
 - `yarn lint`: pass with 5 `max-params` warnings.
 - Focused Jest command after conversation/node/identity baseline: pass, 16
-  suites / 56 tests.
+  suites / 57 tests.
   - `tests/unit/contexts/nodes/domain/Node.spec.ts`
   - `tests/unit/contexts/nodes/application/assign-owner`
   - `tests/unit/contexts/nodes/infrastructure/mongo`
@@ -514,8 +519,8 @@ Last updated: 2026-05-07.
 
 1. Decide how infrastructure supplies candidate own CIDs to validate
    `previousCid` chains without making `Identity` depend on IPFS.
-2. Start richer candidate discovery:
-   - keep current DHT `getRecord` fallback for the known head.
+2. Start richer peer candidate discovery:
+   - current DHT `getRecord` refresh only discovers one known head.
    - later add peer/DHT candidate expansion when multiple heads are possible.
 3. Keep running after each slice:
    - `yarn build`

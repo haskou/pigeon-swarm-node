@@ -39,6 +39,15 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     return candidates;
   }
 
+  private async findCandidateFromCid(cid: IPFSId): Promise<Identity> {
+    const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
+    const identity = this.mapper.toDomain(document);
+
+    await this.metadataRepository.save(identity, cid, true);
+
+    return identity;
+  }
+
   public async findById(id: IdentityId): Promise<Identity> {
     const candidates = await this.findCandidatesById(id);
 
@@ -47,31 +56,24 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
     const metadata = await this.metadataRepository.findValidByIdentityId(id);
-
-    if (metadata.length > 0) {
-      const candidates = await this.findCandidatesFromMetadata(metadata);
-
-      if (candidates.length > 0) {
-        return candidates;
-      }
-    }
-
+    const candidates =
+      metadata.length > 0
+        ? await this.findCandidatesFromMetadata(metadata)
+        : [];
+    const knownCids = new Set(metadata.map((document) => document.cid));
     const cidString = await this.ipfsManager.getRecord(
       this.ROUTING_KEY_PREFIX + id.valueOf(),
     );
 
-    if (!cidString) {
+    if (cidString && !knownCids.has(cidString)) {
+      candidates.push(await this.findCandidateFromCid(new IPFSId(cidString)));
+    }
+
+    if (candidates.length === 0) {
       throw new IdentityNotFoundError(id.valueOf());
     }
 
-    const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
-      new IPFSId(cidString),
-    );
-    const identity = this.mapper.toDomain(document);
-
-    await this.metadataRepository.save(identity, new IPFSId(cidString), true);
-
-    return [identity];
+    return candidates;
   }
 
   public async save(identity: Identity): Promise<void> {

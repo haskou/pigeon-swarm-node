@@ -91,9 +91,55 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecord).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecord).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+      );
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(result.toPrimitives()).toEqual(primitives);
+    });
+
+    it('should add the DHT head when mongo has a different candidate', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const mongoCidString = 'bafymongocid';
+      const dhtCidString = 'bafydhtcid';
+
+      metadataRepository.findValidByIdentityId.mockResolvedValue([
+        {
+          _id: primitives.id + ':' + mongoCidString,
+          cid: mongoCidString,
+          identityId: primitives.id,
+          previousCid: primitives.previousCid,
+          receivedAt: Date.now(),
+          valid: true,
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getRecord.mockResolvedValue(dhtCidString);
+      ipfsManager.getJSON.mockResolvedValue({
+        _id: primitives.id,
+        encryptedKeyPair: primitives.encryptedKeyPair,
+        networks: primitives.networks,
+        previousCid: primitives.previousCid,
+        profile: primitives.profile,
+        signature: primitives.signature,
+        timestamp: primitives.timestamp,
+        version: primitives.version,
+      });
+
+      const result = await repository.findCandidatesById(identityId);
+
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(mongoCidString),
+      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(dhtCidString),
+      );
+      expect(metadataRepository.save.mock.calls[0][1]).toEqual(
+        new IPFSId(dhtCidString),
+      );
+      expect(result).toHaveLength(2);
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
