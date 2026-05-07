@@ -14,6 +14,11 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2luZnJhc3RydWN0dXJlX19tb25nb19fbWFwcGVyc19fTW9uZ29Ob2RlTWV0YWRhdGFNYXBwZXJfX01vbmdvTm9kZU1ldGFkYXRhTWFwcGVy:
+    class: /contexts/nodes/infrastructure/mongo/mappers/MongoNodeMetadataMapper
+    arguments: []
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19faGVsaWFfX0lQRlNDb250ZW50UmFjZXJfX0lQRlNDb250ZW50UmFjZXI=:
     class: /contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer
     arguments: []
@@ -87,6 +92,13 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UmVwb3NpdG9yeV9fSWRlbnRpdHlSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlSZXNvbHV0aW9uRG9tYWluU2VydmljZV9fSWRlbnRpdHlSZXNvbHV0aW9uRG9tYWluU2VydmljZQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlSZXNvbHV0aW9uRG9tYWluU2VydmljZV9fSWRlbnRpdHlSZXNvbHV0aW9uRG9tYWluU2VydmljZQ==:
+    class: /contexts/identities/domain/services/IdentityResolutionDomainService
+    arguments: []
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlTYXZlclNlcnZpY2VfX0lkZW50aXR5U2F2ZXJTZXJ2aWNl:
@@ -221,6 +233,15 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX2lwZnNfX21hcHBlcnNfX0lwZnNJZGVudGl0eU1hcHBlcl9fSXBmc0lkZW50aXR5TWFwcGVy
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2FwcGxpY2F0aW9uX19hc3NpZ24tb3duZXJfX05vZGVPd25lckFzc2lnbmVyX19Ob2RlT3duZXJBc3NpZ25lcg==:
+    class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVMb2FkZXJTZXJ2aWNlX19Ob2RlTG9hZGVyU2VydmljZQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVTYXZlclNlcnZpY2VfX05vZGVTYXZlclNlcnZpY2U=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2luZnJhc3RydWN0dXJlX19sb2NhbF9fTG9jYWxOb2RlUmVwb3NpdG9yeV9fTG9jYWxOb2RlUmVwb3NpdG9yeQ==:
     class: /contexts/nodes/infrastructure/local/LocalNodeRepository
     arguments:
@@ -257,6 +278,17 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVTYXZlclNlcnZpY2VfX05vZGVTYXZlclNlcnZpY2U=
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2luZnJhc3RydWN0dXJlX19tb25nb19fTW9uZ29Ob2RlTWV0YWRhdGFSZXBvc2l0b3J5X19Nb25nb05vZGVNZXRhZGF0YVJlcG9zaXRvcnk=:
+    class: /contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tb25nb2RiX19Nb25nb0RCX19Nb25nb0RC
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fbmV0d29ya3NfX0lQRlNOZXR3b3JrUmVnaXN0cnlfX0lQRlNOZXR3b3JrUmVnaXN0cnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2luZnJhc3RydWN0dXJlX19tb25nb19fbWFwcGVyc19fTW9uZ29Ob2RlTWV0YWRhdGFNYXBwZXJfX01vbmdvTm9kZU1ldGFkYXRhTWFwcGVy
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19NZXNzYWdlQnVzQWRhcHRlcl9fTWVzc2FnZUJ1c0FkYXB0ZXI=: >-
