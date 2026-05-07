@@ -44,8 +44,8 @@ tested and committed with the repository gitmoji conventional-commit format.
 - Public conversations may exist later; that future type can define a public
   payload policy explicitly.
 - Domain language should avoid `CID`. Use `content address` in infrastructure
-  docs, and use context names such as `IdentityDocumentReference` or
-  `MessageDocumentReference` when the domain needs to express a durable link.
+  docs, and use context names such as `IdentityExternalIdentifier` or
+  `MessageExternalIdentifier` when the domain needs to express a durable link.
 
 ## Already Done
 
@@ -53,7 +53,6 @@ tested and committed with the repository gitmoji conventional-commit format.
   - `MongoDB` adapter
   - Mongo dependency and env vars
   - Docker Compose MongoDB service
-  - bounded Mongo connection timeout for test stability
 - Node domain:
   - `Node.assignOwner(owner)`
   - `NodeOwnerAssigner`
@@ -62,14 +61,13 @@ tested and committed with the repository gitmoji conventional-commit format.
 - Identity:
   - `Identity.version`
   - `Identity.previousCid` currently exists and should be renamed away from
-    IPFS-specific language
+    IPFS-specific language, preferably to `IdentityExternalIdentifier`
   - signed versioned identity payloads
   - `IdentityResolutionDomainService`
   - `MongoIdentityMetadataRepository`
   - IPFS + Mongo metadata + DHT candidate refresh inside
     `IpfsIdentityRepository`
   - stale metadata invalidation
-  - identity creation still works if Mongo metadata cache is unavailable
 - Conversation domain:
   - `Conversation`
   - `OneToOneConversation`
@@ -186,10 +184,11 @@ Steps:
 1. Keep `CID` in IPFS infrastructure code and persistence fields when it refers
    to a real IPFS content identifier.
 2. Rename domain-facing concepts:
-   - `previousCid` -> `previousDocumentReference` or
-     `previousIdentityReference`
+   - `previousCid` -> `previousIdentityExternalIdentifier`
+   - `IdentityCid` -> `IdentityExternalIdentifier`
    - `Cid` value object in conversations -> `ContentAddress`,
-     `AttachmentReference` or `MessageDocumentReference`, depending on use
+     `AttachmentExternalIdentifier` or `MessageExternalIdentifier`,
+     depending on use
 3. Keep Mongo metadata field names free to use `cid` if they store actual IPFS
    CIDs.
 4. Let infrastructure mappers translate domain references to concrete IPFS
