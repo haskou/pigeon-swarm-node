@@ -4,6 +4,7 @@ import { Node } from '@app/contexts/nodes/domain/Node';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { IdentityMother } from '../../../mothers/IdentityMother';
 import { NetworkMother } from '../../../mothers/NetworkMother';
 import { NodeMother } from '../../../mothers/NodeMother';
 
@@ -76,6 +77,16 @@ describe('Node', () => {
       expect(() => node.addNetwork(secondPublic)).toThrow(
         NodeCannotHaveMoreThanOnePublicNetworkError,
       );
+    });
+  });
+
+  describe('assignOwner', () => {
+    it('should assign the node owner', () => {
+      const owner = new IdentityMother().id;
+
+      node.assignOwner(owner);
+
+      expect(node.toPrimitives().owner).toBe(owner.valueOf());
     });
   });
 });

@@ -49,6 +49,10 @@ export class Node extends AggregateRoot {
     this.record(new NodeNetworkWasAdded(this.id.valueOf()));
   }
 
+  public assignOwner(owner: IdentityId): void {
+    this.owner = owner;
+  }
+
   public toPrimitives() {
     return {
       id: this.id.valueOf(),
