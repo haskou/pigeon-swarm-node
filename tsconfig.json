@@ -15,7 +15,9 @@
     "experimentalDecorators": true,
     "lib": [
       "es6",
-      "es2021"
+      "es2021",
+      "es2023",
+      "dom"
     ],
     "types": [
       "node",

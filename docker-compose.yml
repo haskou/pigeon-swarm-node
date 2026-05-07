@@ -11,3 +11,19 @@ services:
       - /var/www/node_modules
       - /var/www/dist
       - /var/www/var
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_URL: mongodb://mongodb:27017
+      MONGO_DATABASE: pigeon_swarm
+
+  mongodb:
+    container_name: "pigeon_swarm_mongodb"
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
