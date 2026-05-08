@@ -88,6 +88,10 @@ committed.
 - Mongo identity metadata no longer stores invalid rows. Broken metadata is
   deleted and invalid remote candidates are rejected before caching.
 - Node owner assignment is guarded against being assigned twice.
+- `Message` no longer exposes encrypted payload behavior from the base entity;
+  only encrypted message variants serialize encrypted payloads.
+- Memory message bus now resolves the default exchange before matching
+  consumers, so local consumer tests exercise the same publisher contract.
 
 ## Next Slice 1: PubSub Runtime Wiring
 
@@ -121,6 +125,9 @@ Consumers to create under `src/apps/consumers`:
   - receives an identity publication announcement
   - calls `RegisterPublishedIdentity`
   - Cucumber coverage asserts registration metadata is restored locally
+  - the feature announces the publication after the consumer is running, because
+    the in-memory bus does not replay events published before a consumer is
+    attached
 - [ ] `pubsub/identities/SynchronizeIdentityWhenUpdated`
   - receives an identity update announcement
   - calls the identity application use case that resolves the newest valid
@@ -147,8 +154,11 @@ Tests:
 - Unit test `RegisterIdentityWhenPublished`, `RegisterPublishedIdentity` and
   `IdentityRegistrarService`.
 - Cucumber: `RegisterIdentityWhenPublished` restores missing local metadata for
-  a published identity. Current local run is blocked when MongoDB is not
-  listening on `localhost:27017`.
+  a published identity.
+  - Local status: blocked when MongoDB is not listening on `localhost:27017`.
+  - Local Docker status: blocked by Docker socket permissions in this
+    environment.
+  - CI should run this with the MongoDB service from the workflow.
 - Cucumber: two nodes receive an identity publication event.
 - Cucumber: a missed PubSub message is recovered by anti-entropy sync.
 
