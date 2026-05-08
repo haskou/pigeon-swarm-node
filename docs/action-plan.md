@@ -104,27 +104,27 @@ Keep:
 
 Consumers to create under `src/apps/consumers`:
 
-- `pubsub/identities/RegisterIdentityWhenPublished`
+- [x] `pubsub/identities/RegisterIdentityWhenPublished`
   - receives an identity publication announcement
   - calls the identity application use case that fetches, validates and stores
     the identity locally
-- `pubsub/identities/SynchronizeIdentityWhenUpdated`
+- [ ] `pubsub/identities/SynchronizeIdentityWhenUpdated`
   - receives an identity update announcement
   - calls the identity application use case that resolves the newest valid
     version chain
-- `pubsub/conversations/RegisterMessageWhenAnnounced`
+- [ ] `pubsub/conversations/RegisterMessageWhenAnnounced`
   - receives a conversation message announcement
   - calls the conversation application use case that fetches, validates and
     stores the message locally
-- `pubsub/conversations/RegisterMessageEditionWhenAnnounced`
+- [ ] `pubsub/conversations/RegisterMessageEditionWhenAnnounced`
   - receives a conversation message edition announcement
   - calls the conversation application use case that fetches, validates and
     stores the edit message locally without mutating the original message
-- `pubsub/conversations/RegisterMessageDeletionWhenAnnounced`
+- [ ] `pubsub/conversations/RegisterMessageDeletionWhenAnnounced`
   - receives a conversation message deletion announcement
   - calls the conversation application use case that fetches, validates and
     stores the delete message locally as a tombstone/projection change
-- `pubsub/conversations/SynchronizeConversationWhenMessageMissed`
+- [ ] `pubsub/conversations/SynchronizeConversationWhenMessageMissed`
   - runs anti-entropy for a conversation when a cursor gap, reconnect or missed
     announcement is detected
 

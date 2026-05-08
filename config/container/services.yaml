@@ -232,6 +232,15 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fcm91dGVzX19Sb3V0ZV9fUm91dGU=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19hcHBzX19jb25zdW1lcnNfX3B1YnN1Yl9faWRlbnRpdGllc19fUmVnaXN0ZXJJZGVudGl0eVdoZW5QdWJsaXNoZWRfX1JlZ2lzdGVySWRlbnRpdHlXaGVuUHVibGlzaGVk:
+    class: /apps/consumers/pubsub/identities/RegisterIdentityWhenPublished
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudENvbnN1bWVyX19Eb21haW5FdmVudENvbnN1bWVy
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fYXBwbGljYXRpb25fX2ZpbmRfX0lkZW50aXR5RmluZGVyX19JZGVudGl0eUZpbmRlcg==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZV9fSWRlbnRpdHlDcmVhdG9yX19JZGVudGl0eUNyZWF0b3I=:
     class: /contexts/identities/application/create/IdentityCreator
     arguments:
