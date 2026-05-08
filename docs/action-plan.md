@@ -71,22 +71,36 @@ committed.
 - PubSub foundation:
   - `PubSubTransport`
   - `HeliaPubSubMessageBusAdapter`
+  - `HeliaPubSubTransport`
+  - `helia-pubsub://` MessageBus selection
+  - standalone libp2p/gossipsub runtime separated from IPFS storage
   - adapter unit tests
 
 ## Next Slice 1: PubSub Runtime Wiring
 
 Goal: make the existing event publisher usable over Helia/libp2p PubSub.
 
-Steps:
+Done:
 
-1. Add a concrete Helia/libp2p implementation of `PubSubTransport`.
-2. Register the transport and `HeliaPubSubMessageBusAdapter` in DI.
-3. Select the PubSub adapter through configuration, keeping the application on
-   the existing event publisher/consumer contracts.
-4. Define stable topic names for identity and conversation announcements.
-5. Add idempotent consumers.
-6. Store PubSub processing cursors in MongoDB.
-7. Add anti-entropy sync for missed PubSub messages.
+1. Added a concrete Helia/libp2p implementation of `PubSubTransport`.
+2. Registered the transport and `HeliaPubSubMessageBusAdapter` in DI.
+3. Selected the PubSub adapter through `TRANSPORT_DSN=helia-pubsub://`, keeping
+   the application on the existing event publisher/consumer contracts.
+4. Added a standalone libp2p/gossipsub runtime for PubSub, without adding
+   PubSub methods to the IPFS infrastructure.
+
+Remaining steps:
+
+1. Define stable topic names for identity and conversation announcements.
+2. Add idempotent consumers.
+3. Store PubSub processing cursors in MongoDB.
+4. Add anti-entropy sync for missed PubSub messages.
+
+Keep:
+
+- Application code must stay on the existing event publisher/consumer
+  contracts.
+- Transport DTOs stay in infrastructure.
 
 Consumers to create under `src/apps/consumers`:
 

@@ -31,6 +31,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@chainsafe/libp2p-gossipsub": "^14.1.2",
     "@haskou/value-objects": "^2.5.0",
     "@helia/json": "^5.0.7",
     "@helia/strings": "^5.0.7",

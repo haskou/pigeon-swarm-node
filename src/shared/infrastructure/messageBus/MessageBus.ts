@@ -4,6 +4,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
 import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
+import HeliaPubSubMessageBusAdapter from './helia/HeliaPubSubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
 import MessageBusAdapter from './MessageBusAdapter';
 
@@ -45,6 +46,7 @@ export default class MessageBus
   constructor(
     private readonly amqpAdapter: AmqpMessageBusAdapter,
     private readonly memoryAdapter: MemoryMessageBusAdapter,
+    private readonly heliaPubSubAdapter: HeliaPubSubMessageBusAdapter,
   ) {
     this.adapter = this.chooseAdapterFromDsn(process.env.TRANSPORT_DSN || '');
   }
@@ -60,11 +62,19 @@ export default class MessageBus
       return this.memoryAdapter;
     }
 
+    if (dsn.startsWith('helia-pubsub')) {
+      return this.heliaPubSubAdapter;
+    }
+
     throw new InvalidMessageBusAdapterError(dsn);
   }
 
   private ensureDSNIsValid(dsn: string): void {
-    if (!dsn.startsWith('amqp') && !dsn.startsWith('in-memory')) {
+    if (
+      !dsn.startsWith('amqp') &&
+      !dsn.startsWith('in-memory') &&
+      !dsn.startsWith('helia-pubsub')
+    ) {
       throw new InvalidMessageBusAdapterError(dsn);
     }
   }

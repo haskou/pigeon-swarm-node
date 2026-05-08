@@ -1,0 +1,98 @@
+export type PubSubMessage = {
+  data?: Uint8Array;
+  msg?: {
+    data?: Uint8Array;
+    topic?: string;
+  };
+  topic?: string;
+};
+
+export type PubSubEvent = CustomEvent<PubSubMessage>;
+
+export type Libp2pPubSubService = {
+  addEventListener(
+    eventName: string,
+    handler: (event: PubSubEvent) => void,
+  ): void;
+  publish(topic: string, payload: Uint8Array): Promise<unknown>;
+  subscribe(topic: string): Promise<void> | void;
+};
+
+export type Libp2pPubSubNode = {
+  services: {
+    pubsub: Libp2pPubSubService;
+  };
+};
+
+export class HeliaPubSubRuntimeAdapter {
+  private heliaModulePromise?: Promise<typeof import('helia')>;
+  private libp2pModulePromise?: Promise<typeof import('libp2p')>;
+  private gossipsubModulePromise?: Promise<
+    typeof import('@chainsafe/libp2p-gossipsub')
+  >;
+
+  private async nativeImport<TModule>(modulePath: string): Promise<TModule> {
+    if (process.env.JEST_WORKER_ID !== undefined) {
+      return import(modulePath) as TModule;
+    }
+
+    const importer = new Function('path', 'return import(path)') as (
+      path: string,
+    ) => Promise<TModule>;
+
+    return importer(modulePath);
+  }
+
+  private loadHeliaModule(): Promise<typeof import('helia')> {
+    this.heliaModulePromise ??=
+      this.nativeImport<typeof import('helia')>('helia');
+
+    return this.heliaModulePromise;
+  }
+
+  private loadLibp2pModule(): Promise<typeof import('libp2p')> {
+    this.libp2pModulePromise ??=
+      this.nativeImport<typeof import('libp2p')>('libp2p');
+
+    return this.libp2pModulePromise;
+  }
+
+  private loadGossipsubModule(): Promise<
+    typeof import('@chainsafe/libp2p-gossipsub')
+  > {
+    this.gossipsubModulePromise ??= this.nativeImport<
+      typeof import('@chainsafe/libp2p-gossipsub')
+    >('@chainsafe/libp2p-gossipsub');
+
+    return this.gossipsubModulePromise;
+  }
+
+  public async createNode(): Promise<Libp2pPubSubNode> {
+    const [heliaModule, libp2pModule, gossipsubModule] = await Promise.all([
+      this.loadHeliaModule(),
+      this.loadLibp2pModule(),
+      this.loadGossipsubModule(),
+    ]);
+    const libp2pConfig = heliaModule.libp2pDefaults();
+    const configWithServices = libp2pConfig as unknown as {
+      services: Record<string, unknown>;
+    };
+
+    configWithServices.services = {
+      ...(configWithServices.services || {}),
+      pubsub: gossipsubModule.gossipsub({
+        allowPublishToZeroTopicPeers: true,
+      }) as unknown,
+    };
+
+    return libp2pModule.createLibp2p(
+      libp2pConfig as unknown as Parameters<
+        typeof libp2pModule.createLibp2p
+      >[0],
+    ) as unknown as Libp2pPubSubNode;
+  }
+}
+
+const heliaPubSubRuntimeAdapter = new HeliaPubSubRuntimeAdapter();
+
+export default heliaPubSubRuntimeAdapter;

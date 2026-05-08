@@ -54,6 +54,18 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wdWJzdWJfX2hlbGlhX19IZWxpYVB1YlN1YlRyYW5zcG9ydF9fSGVsaWFQdWJTdWJUcmFuc3BvcnQ=:
+    class: /shared/infrastructure/pubsub/helia/HeliaPubSubTransport
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19oZWxpYV9fSGVsaWFQdWJTdWJNZXNzYWdlQnVzQWRhcHRlcl9fSGVsaWFQdWJTdWJNZXNzYWdlQnVzQWRhcHRlcg==:
+    class: /shared/infrastructure/messageBus/helia/HeliaPubSubMessageBusAdapter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wdWJzdWJfX2hlbGlhX19IZWxpYVB1YlN1YlRyYW5zcG9ydF9fSGVsaWFQdWJTdWJUcmFuc3BvcnQ=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tb25nb2RiX19Nb25nb0RCX19Nb25nb0RC:
     class: /shared/infrastructure/mongodb/MongoDB
     arguments: []
@@ -274,6 +286,8 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19hbXFwX19BbXFwTWVzc2FnZUJ1c0FkYXB0ZXJfX0FtcXBNZXNzYWdlQnVzQWRhcHRlcg==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19tZW1vcnlfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVyX19NZW1vcnlNZXNzYWdlQnVzQWRhcHRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19oZWxpYV9fSGVsaWFQdWJTdWJNZXNzYWdlQnVzQWRhcHRlcl9fSGVsaWFQdWJTdWJNZXNzYWdlQnVzQWRhcHRlcg==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm9kZXNfX2FwcGxpY2F0aW9uX19hZGQtbmV0d29ya19fTm9kZU5ldHdvcmtBZGRlcl9fTm9kZU5ldHdvcmtBZGRlcg==:
