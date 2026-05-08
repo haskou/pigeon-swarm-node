@@ -17,11 +17,13 @@ export class MessageFactory {
 
   public static fromPrimitives(primitives: PrimitiveOf<Message>): Message {
     if (MessageFactory.isSent(primitives)) {
-      return MessageSent.fromPrimitives(primitives);
+      return MessageSent.fromPrimitives(primitives as PrimitiveOf<MessageSent>);
     }
 
     if (MessageFactory.isEdited(primitives)) {
-      return MessageEdited.fromPrimitives(primitives);
+      return MessageEdited.fromPrimitives(
+        primitives as PrimitiveOf<MessageEdited>,
+      );
     }
 
     return MessageDeleted.fromPrimitives(primitives);

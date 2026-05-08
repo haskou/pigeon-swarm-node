@@ -3,11 +3,19 @@ import { Signature, Timestamp } from '@haskou/value-objects';
 
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
-import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
 import { MessageType } from './value-objects/MessageType';
 
 type AttachmentExternalIdentifiers = AttachmentExternalIdentifier[];
+type MessageBasePrimitives = {
+  attachmentExternalIdentifiers: string[];
+  authorId: string;
+  conversationId: string;
+  createdAt: number;
+  id: string;
+  previousMessageIds: string[];
+  signature: string;
+};
 
 export abstract class Message {
   private readonly attachmentExternalIdentifiers: AttachmentExternalIdentifiers;
@@ -24,7 +32,7 @@ export abstract class Message {
     this.attachmentExternalIdentifiers = attachmentExternalIdentifiers;
   }
 
-  private basePrimitives() {
+  protected basePrimitives(): MessageBasePrimitives {
     return {
       attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
         (externalIdentifier) => externalIdentifier.valueOf(),
@@ -54,14 +62,9 @@ export abstract class Message {
     return undefined;
   }
 
-  public getEncryptedPayload(): EncryptedMessagePayload | undefined {
-    return undefined;
-  }
-
   public toPrimitives() {
     return {
       ...this.basePrimitives(),
-      encryptedPayload: this.getEncryptedPayload()?.valueOf(),
       targetMessageId: this.getTargetMessageId()?.valueOf(),
       type: this.getType().valueOf(),
     };

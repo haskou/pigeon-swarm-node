@@ -30,7 +30,9 @@ export class MessageSent extends Message {
     );
   }
 
-  public static fromPrimitives(primitives: PrimitiveOf<Message>): MessageSent {
+  public static fromPrimitives(
+    primitives: PrimitiveOf<MessageSent>,
+  ): MessageSent {
     return new MessageSent(
       new MessageId(primitives.id),
       new ConversationId(primitives.conversationId),
@@ -73,7 +75,10 @@ export class MessageSent extends Message {
     return MessageType.SENT;
   }
 
-  public getEncryptedPayload(): EncryptedMessagePayload {
-    return this.encryptedPayload;
+  public toPrimitives() {
+    return {
+      ...super.toPrimitives(),
+      encryptedPayload: this.encryptedPayload.valueOf(),
+    };
   }
 }

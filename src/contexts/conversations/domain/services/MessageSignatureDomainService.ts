@@ -7,7 +7,9 @@ import {
 
 import { Message } from '../Message';
 
-type MessageSignaturePayload = Omit<PrimitiveOf<Message>, 'signature'>;
+type MessageSignaturePayload = Omit<PrimitiveOf<Message>, 'signature'> & {
+  encryptedPayload?: string;
+};
 
 export class MessageSignatureDomainService {
   private getCanonicalPayload(

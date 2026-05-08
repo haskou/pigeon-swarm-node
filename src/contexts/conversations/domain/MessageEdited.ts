@@ -30,7 +30,7 @@ export class MessageEdited extends Message {
   }
 
   public static fromPrimitives(
-    primitives: PrimitiveOf<Message>,
+    primitives: PrimitiveOf<MessageEdited>,
   ): MessageEdited {
     return new MessageEdited(
       new MessageId(primitives.id),
@@ -74,7 +74,10 @@ export class MessageEdited extends Message {
     return this.targetMessageId;
   }
 
-  public getEncryptedPayload(): EncryptedMessagePayload {
-    return this.encryptedPayload;
+  public toPrimitives() {
+    return {
+      ...super.toPrimitives(),
+      encryptedPayload: this.encryptedPayload.valueOf(),
+    };
   }
 }
