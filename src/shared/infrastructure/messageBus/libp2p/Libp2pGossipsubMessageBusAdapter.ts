@@ -4,20 +4,22 @@ import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTranspo
 
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
+import PubSubTopicResolver from './PubSubTopicResolver';
 
 export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
-  constructor(private readonly transport: PubSubTransport) {}
+  private readonly topicResolver: PubSubTopicResolver;
 
-  private getTopic(exchange: string, routingKey: string): string {
-    return `${exchange}.${routingKey}`;
+  constructor(
+    private readonly transport: PubSubTransport,
+    topicResolver?: PubSubTopicResolver,
+  ) {
+    this.topicResolver = topicResolver || new PubSubTopicResolver();
   }
 
   private instanceDomainEvent(
     DomainEventInstance: Constructor<DomainEvent>,
-    payload: string,
+    message: Message,
   ): DomainEvent {
-    const message = JSON.parse(payload) as Message;
-
     return new DomainEventInstance(
       message.aggregate_id,
       message.attributes,
@@ -31,13 +33,20 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     _queueName: string,
     bindingKey: string,
     DomainEventInstance: Constructor<DomainEvent>,
-    exchange: string,
+    _exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
     await this.transport.subscribe(
-      this.getTopic(exchange, bindingKey),
-      async (payload) =>
-        handler(this.instanceDomainEvent(DomainEventInstance, payload)),
+      this.topicResolver.fromRoutingKey(bindingKey),
+      async (payload) => {
+        const message = JSON.parse(payload) as Message;
+
+        if (message.type !== bindingKey) {
+          return;
+        }
+
+        await handler(this.instanceDomainEvent(DomainEventInstance, message));
+      },
     );
   }
 
@@ -46,12 +55,10 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
   }
 
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
-    const exchange = process.env.SERVICE_NAME || 'pigeon-swarm';
-
     await Promise.all(
       domainEvents.map((event) =>
         this.transport.publish(
-          this.getTopic(exchange, event.eventName()),
+          this.topicResolver.fromRoutingKey(event.eventName()),
           event.decode(),
         ),
       ),

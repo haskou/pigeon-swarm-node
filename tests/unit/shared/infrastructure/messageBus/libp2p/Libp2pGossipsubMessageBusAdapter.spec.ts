@@ -4,10 +4,18 @@ import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTranspo
 import { mock, MockProxy } from 'jest-mock-extended';
 
 class TestDomainEvent extends DomainEvent {
-  public static EVENT_NAME = 'test.event';
+  public static EVENT_NAME = 'identities.v1.identity.was_created';
 
   public eventName(): string {
     return TestDomainEvent.EVENT_NAME;
+  }
+}
+
+class OtherIdentityDomainEvent extends DomainEvent {
+  public static EVENT_NAME = 'identities.v1.identity.was_updated';
+
+  public eventName(): string {
+    return OtherIdentityDomainEvent.EVENT_NAME;
   }
 }
 
@@ -16,7 +24,6 @@ describe('Libp2pGossipsubAdapter', () => {
   let adapter: Libp2pGossipsubAdapter;
 
   beforeEach(() => {
-    process.env.SERVICE_NAME = 'test-service';
     transport = mock<PubSubTransport>();
     adapter = new Libp2pGossipsubAdapter(transport);
   });
@@ -27,7 +34,7 @@ describe('Libp2pGossipsubAdapter', () => {
     await adapter.publish([event]);
 
     expect(transport.publish).toHaveBeenCalledWith(
-      'test-service.test.event',
+      'pigeon-swarm.identities.v1.announcements',
       event.decode(),
     );
   });
@@ -49,11 +56,33 @@ describe('Libp2pGossipsubAdapter', () => {
     );
 
     expect(transport.subscribe).toHaveBeenCalledWith(
-      'test-service.test.event',
+      'pigeon-swarm.identities.v1.announcements',
       expect.any(Function),
     );
     expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(handler.mock.calls[0][0].toPrimitives).toBeUndefined();
+    expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should ignore other events published on the same context topic', async () => {
+    const handler = jest.fn();
+    const expectedEvent = new TestDomainEvent('aggregate-id');
+    const otherEvent = new OtherIdentityDomainEvent('other-aggregate-id');
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      await callback(otherEvent.decode());
+      await callback(expectedEvent.decode());
+    });
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+
+    expect(handler).toHaveBeenCalledTimes(1);
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
   });
 });

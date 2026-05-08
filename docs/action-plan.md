@@ -92,6 +92,9 @@ committed.
   only encrypted message variants serialize encrypted payloads.
 - Memory message bus now resolves the default exchange before matching
   consumers, so local consumer tests exercise the same publisher contract.
+- Libp2p gossipsub uses stable context/version topics such as
+  `pigeon-swarm.identities.v1.announcements` instead of service-local exchange
+  names, and filters event types inside the topic payload.
 
 ## Next Slice 1: PubSub Runtime Wiring
 
@@ -108,10 +111,9 @@ Done:
 
 Remaining steps:
 
-1. Define stable topic names for identity and conversation announcements.
-2. Add idempotent consumers.
-3. Store PubSub processing cursors in MongoDB.
-4. Add anti-entropy sync for missed PubSub messages.
+1. Add idempotent consumers.
+2. Store PubSub processing cursors in MongoDB.
+3. Add anti-entropy sync for missed PubSub messages.
 
 Keep:
 
@@ -151,6 +153,7 @@ Consumers to create under `src/apps/consumers`:
 Tests:
 
 - Unit test the concrete transport with mocked libp2p gossipsub.
+- Unit test stable PubSub topic resolution and same-topic event filtering.
 - Unit test `RegisterIdentityWhenPublished`, `RegisterPublishedIdentity` and
   `IdentityRegistrarService`.
 - Cucumber: `RegisterIdentityWhenPublished` restores missing local metadata for
