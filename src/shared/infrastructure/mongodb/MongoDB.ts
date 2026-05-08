@@ -19,6 +19,9 @@ export default class MongoDB {
       this.client = new MongoClient(this.url, {
         serverSelectionTimeoutMS: this.serverSelectionTimeoutMS,
       });
+    }
+
+    if (!this.database) {
       await this.client.connect();
       this.database = this.client.db(this.databaseName);
     }

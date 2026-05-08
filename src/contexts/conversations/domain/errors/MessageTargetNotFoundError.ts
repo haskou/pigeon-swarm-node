@@ -1,7 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
-export class MessageTargetNotFoundError extends BaseError {
+export class MessageTargetNotFoundError extends DomainError {
   constructor() {
-    super('Message target was not found', MessageTargetNotFoundError.prototype);
+    super('Message target was not found');
   }
 }

@@ -4,6 +4,5 @@ export interface MongoIdentityMetadataDocument {
   cid: string;
   version: number;
   previousCid: string | undefined;
-  valid: boolean;
   receivedAt: number;
 }

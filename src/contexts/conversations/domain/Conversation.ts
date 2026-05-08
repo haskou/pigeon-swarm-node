@@ -14,10 +14,6 @@ import { MessageDeleted } from './MessageDeleted';
 import { MessageEdited } from './MessageEdited';
 import { MessageFactory } from './MessageFactory';
 import { MessageSent } from './MessageSent';
-import {
-  ConversationProjectedMessage,
-  ConversationProjectionDomainService,
-} from './services/ConversationProjectionDomainService';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
@@ -55,13 +51,13 @@ export class Conversation extends AggregateRoot {
 
     const target = this.findMessageById(targetMessageId);
 
-    assert(target !== undefined, new MessageTargetNotFoundError());
+    assert(target, new MessageTargetNotFoundError());
     assert(
       target?.getType().isEqual(MessageType.SENT),
       new MessageTargetNotFoundError(),
     );
     assert(
-      target?.getAuthorId().valueOf() === authorId.valueOf(),
+      target?.getAuthorId().isEqual(authorId),
       new MessageTargetAuthorMismatchError(),
     );
     assert(
@@ -72,9 +68,7 @@ export class Conversation extends AggregateRoot {
 
   private assertIsParticipant(authorId: IdentityId): void {
     assert(
-      this.participants.some(
-        (participant) => participant.valueOf() === authorId.valueOf(),
-      ),
+      this.participants.some((participant) => participant.isEqual(authorId)),
       new ConversationParticipantNotFoundError(),
     );
   }
@@ -89,7 +83,7 @@ export class Conversation extends AggregateRoot {
     return this.messages.some(
       (message) =>
         message.getType().isEqual(MessageType.DELETED) &&
-        message.getTargetMessageId()?.valueOf() === messageId.valueOf(),
+        message.getTargetMessageId()?.isEqual(messageId),
     );
   }
 
@@ -175,15 +169,7 @@ export class Conversation extends AggregateRoot {
   }
 
   public findMessageById(messageId: MessageId): Message | undefined {
-    return this.messages.find(
-      (message) => message.getId().valueOf() === messageId.valueOf(),
-    );
-  }
-
-  public projectMessages(): ConversationProjectedMessage[] {
-    return Array.from(
-      new ConversationProjectionDomainService().project(this.messages).values(),
-    );
+    return this.messages.find((message) => message.getId().isEqual(messageId));
   }
 
   public toPrimitives() {

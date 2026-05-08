@@ -1,5 +1,5 @@
-import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
-import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
+import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
+import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
@@ -10,7 +10,7 @@ export default class RegisterIdentityWhenPublished extends Consumer {
 
   constructor(
     consumer: DomainEventConsumer,
-    private readonly finder: IdentityFinder,
+    private readonly registrar: RegisterPublishedIdentity,
   ) {
     super(consumer);
   }
@@ -32,6 +32,8 @@ export default class RegisterIdentityWhenPublished extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    await this.finder.find(new IdentityFinderMessage(event.aggregateId));
+    await this.registrar.register(
+      new RegisterPublishedIdentityMessage(event.aggregateId),
+    );
   }
 }

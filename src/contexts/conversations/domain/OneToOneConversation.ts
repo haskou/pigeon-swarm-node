@@ -13,10 +13,7 @@ export class OneToOneConversation extends Conversation {
     secondParticipant: IdentityId,
   ): OneToOneConversation {
     return new OneToOneConversation(
-      ConversationId.deterministic(
-        firstParticipant.valueOf(),
-        secondParticipant.valueOf(),
-      ),
+      ConversationId.deterministic(firstParticipant, secondParticipant),
       [firstParticipant, secondParticipant],
     );
   }
@@ -43,8 +40,7 @@ export class OneToOneConversation extends Conversation {
     super(id, participants, messages);
 
     assert(
-      participants.length === 2 &&
-        participants[0].valueOf() !== participants[1].valueOf(),
+      participants.length === 2 && participants[0].isNotEqual(participants[1]),
       new ConversationMustHaveTwoDifferentParticipantsError(),
     );
   }

@@ -8,7 +8,6 @@ export default class MongoIdentityMetadataMapper {
   public toDocument(
     identity: Identity,
     cid: IPFSId,
-    valid = true,
     receivedAt: Timestamp = Timestamp.now(),
   ): MongoIdentityMetadataDocument {
     const primitives = identity.toPrimitives();
@@ -19,7 +18,6 @@ export default class MongoIdentityMetadataMapper {
       identityId: primitives.id,
       previousCid: primitives.previousIdentityExternalIdentifier,
       receivedAt: receivedAt.valueOf(),
-      valid,
       version: primitives.version,
     };
   }

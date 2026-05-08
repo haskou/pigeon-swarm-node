@@ -52,6 +52,10 @@ package "identities.domain" {
     +findById(identityId): Promise<Identity>
   }
 
+  class IdentityRegistrarService {
+    +register(identityId): Promise<Identity>
+  }
+
   Identity *--> Profile
   Identity o--> NetworkId
   Identity --> IdentityExternalIdentifier
@@ -63,6 +67,8 @@ package "identities.domain" {
   IdentitySaverService --> IdentityRepository
   IdentityFinderService --> IdentityRepository
   IdentityFinderService --> IdentityResolutionDomainService
+  IdentityRegistrarService --> IdentityRepository
+  IdentityRegistrarService --> IdentityResolutionDomainService
 }
 
 package "identities.application" {
@@ -78,6 +84,10 @@ package "identities.application" {
     +find(message: IdentityFinderMessage): Promise<Identity>
   }
 
+  class RegisterPublishedIdentity {
+    +register(message: RegisterPublishedIdentityMessage): Promise<Identity>
+  }
+
   class IdentitySynchronizer {
     +sync(identityId: IdentityId): Promise<Identity>
   }
@@ -86,6 +96,7 @@ package "identities.application" {
   IdentityUpdater --> IdentityFinderService
   IdentityUpdater --> IdentitySaverService
   IdentityFinder --> IdentityFinderService
+  RegisterPublishedIdentity --> IdentityRegistrarService
   IdentitySynchronizer --> IdentityRepository
   IdentitySynchronizer --> IdentityResolutionDomainService
 }
@@ -94,7 +105,7 @@ package "identities.infrastructure" {
   class IpfsIdentityDocument {
     -_id: string
     -version: number
-    -previousCid?: string
+    -previousExternalIdentifier?: string
     -encryptedKeyPair: object
     -networks: string[]
     -profile: object
@@ -104,10 +115,9 @@ package "identities.infrastructure" {
 
   class MongoIdentityDocumentIndex {
     -identityId: string
-    -cid: string
+    -externalIdentifier: string
     -version: number
-    -previousCid?: string
-    -valid: boolean
+    -previousExternalIdentifier?: string
     -receivedAt: number
   }
 

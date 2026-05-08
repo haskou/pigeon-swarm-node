@@ -19,13 +19,12 @@ describe('MongoIdentityMetadataMapper', () => {
     const cid = new IPFSId('bafyidentitycid');
     const receivedAt = new Timestamp(1773848829999);
 
-    expect(mapper.toDocument(identity, cid, true, receivedAt)).toEqual({
+    expect(mapper.toDocument(identity, cid, receivedAt)).toEqual({
       _id: `${primitives.id}:${cid.valueOf()}`,
       cid: cid.valueOf(),
       identityId: primitives.id,
       previousCid: primitives.previousIdentityExternalIdentifier,
       receivedAt: receivedAt.valueOf(),
-      valid: true,
       version: primitives.version,
     });
   });

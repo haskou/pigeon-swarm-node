@@ -46,10 +46,6 @@ package "conversations.domain" {
     +verify(message): boolean
   }
 
-  class ConversationProjectionDomainService {
-    +project(conversation: Conversation): object[]
-  }
-
   interface ConversationRepository {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
@@ -70,7 +66,6 @@ package "conversations.domain" {
   MessageEdited --> MessageId
   MessageDeleted --> MessageId
   MessageSignatureDomainService ..> Message
-  ConversationProjectionDomainService --> Conversation
   ConversationRepository --> Conversation
 }
 
@@ -112,7 +107,6 @@ package "conversations.application" {
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository
   LatestMessagesFinder --> ConversationRepository
-  LatestMessagesFinder --> ConversationProjectionDomainService
   MessageEditor --> ConversationRepository
   MessageEditor --> DomainEventPublisher
   MessageDeleter --> ConversationRepository
@@ -135,7 +129,7 @@ package "conversations.infrastructure" {
 
   class MongoMessageDocumentIndex {
     -messageId: string
-    -cid: string
+    -externalIdentifier: string
     -conversationId: string
     -authorId: string
     -recipientIds: string[]
@@ -144,7 +138,6 @@ package "conversations.infrastructure" {
     -createdAt: number
     -receivedAt: number
     -targetMessageId?: string
-    -valid: boolean
   }
 
   class MongoConversationRepository

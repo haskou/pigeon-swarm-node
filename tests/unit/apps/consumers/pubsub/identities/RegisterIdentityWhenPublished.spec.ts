@@ -1,6 +1,6 @@
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
-import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
-import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
+import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
+import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -9,14 +9,14 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('RegisterIdentityWhenPublished', () => {
   let eventConsumer: MockProxy<DomainEventConsumer>;
-  let finder: MockProxy<IdentityFinder>;
+  let registrar: MockProxy<RegisterPublishedIdentity>;
   let consumer: RegisterIdentityWhenPublished;
 
   beforeEach(() => {
     process.env.SERVICE_NAME = 'pigeon-swarm';
     eventConsumer = mock<DomainEventConsumer>();
-    finder = mock<IdentityFinder>();
-    consumer = new RegisterIdentityWhenPublished(eventConsumer, finder);
+    registrar = mock<RegisterPublishedIdentity>();
+    consumer = new RegisterIdentityWhenPublished(eventConsumer, registrar);
   });
 
   it('should subscribe to identity creation events', async () => {
@@ -31,13 +31,17 @@ describe('RegisterIdentityWhenPublished', () => {
     );
   });
 
-  it('should resolve the published identity through the application boundary', async () => {
+  it('should register the published identity through the application boundary', async () => {
     const identityId = new IdentityMother().id.valueOf();
     const event = new IdentityWasCreatedEvent(identityId);
 
     await consumer.handler(event);
 
-    expect(finder.find).toHaveBeenCalledWith(expect.any(IdentityFinderMessage));
-    expect(finder.find.mock.calls[0][0].identityId.valueOf()).toBe(identityId);
+    expect(registrar.register).toHaveBeenCalledWith(
+      expect.any(RegisterPublishedIdentityMessage),
+    );
+    expect(registrar.register.mock.calls[0][0].identityId.valueOf()).toBe(
+      identityId,
+    );
   });
 });

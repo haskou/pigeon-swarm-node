@@ -1,22 +1,23 @@
 import { ConversationMustHaveTwoDifferentParticipantsError } from '@app/contexts/conversations/domain/errors/ConversationMustHaveTwoDifferentParticipantsError';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/value-objects';
+
+import { ConversationMother } from '../../../mothers/ConversationMother';
 
 describe('OneToOneConversation', () => {
   let firstParticipant: IdentityId;
   let secondParticipant: IdentityId;
 
   beforeEach(async () => {
-    firstParticipant = await generateIdentityId();
-    secondParticipant = await generateIdentityId();
+    firstParticipant = await ConversationMother.generateIdentityId();
+    secondParticipant = await ConversationMother.generateIdentityId();
   });
 
   it('should create a deterministic id from the sorted participant ids', () => {
-    const conversation = OneToOneConversation.create(
+    const conversation = new ConversationMother(
       firstParticipant,
       secondParticipant,
-    );
+    ).build();
     const reversed = OneToOneConversation.create(
       secondParticipant,
       firstParticipant,
@@ -48,9 +49,3 @@ describe('OneToOneConversation', () => {
     ).toThrow(ConversationMustHaveTwoDifferentParticipantsError);
   });
 });
-
-async function generateIdentityId(): Promise<IdentityId> {
-  const keyPair = await KeyPair.generate();
-
-  return new IdentityId(keyPair.toPrimitives().publicKey);
-}

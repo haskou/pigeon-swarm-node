@@ -1,3 +1,3 @@
-import { UUID } from '@haskou/value-objects';
+import { ShortId } from '@haskou/value-objects';
 
-export class MessageId extends UUID {}
+export class MessageId extends ShortId {}

@@ -15,7 +15,7 @@ export default class MongoIdentityMetadataRepository {
     private readonly mapper: MongoIdentityMetadataMapper,
   ) {}
 
-  public async findValidByIdentityId(
+  public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<MongoIdentityMetadataDocument[]> {
     // Version is the primary ordering; receivedAt only breaks ties.
@@ -29,22 +29,17 @@ export default class MongoIdentityMetadataRepository {
     return collection
       .find({
         identityId: identityId.valueOf(),
-        valid: true,
       })
       .sort(sortCriteria)
       .toArray();
   }
 
-  public async save(
-    identity: Identity,
-    cid: IPFSId,
-    valid = true,
-  ): Promise<void> {
+  public async save(identity: Identity, cid: IPFSId): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
         MongoIdentityMetadataRepository.COLLECTION_NAME,
       );
-    const document = this.mapper.toDocument(identity, cid, valid);
+    const document = this.mapper.toDocument(identity, cid);
 
     await collection.updateOne(
       { _id: document._id },
@@ -54,7 +49,6 @@ export default class MongoIdentityMetadataRepository {
           identityId: document.identityId,
           previousCid: document.previousCid,
           receivedAt: document.receivedAt,
-          valid: document.valid,
           version: document.version,
         },
       },
@@ -62,19 +56,12 @@ export default class MongoIdentityMetadataRepository {
     );
   }
 
-  public async markInvalid(cid: IPFSId): Promise<void> {
+  public async deleteByExternalIdentifier(cid: IPFSId): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
         MongoIdentityMetadataRepository.COLLECTION_NAME,
       );
 
-    await collection.updateMany(
-      { cid: cid.valueOf() },
-      {
-        $set: {
-          valid: false,
-        },
-      },
-    );
+    await collection.deleteMany({ cid: cid.valueOf() });
   }
 }

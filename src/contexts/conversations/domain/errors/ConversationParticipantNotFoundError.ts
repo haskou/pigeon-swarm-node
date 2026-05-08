@@ -1,10 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
-export class ConversationParticipantNotFoundError extends BaseError {
+export class ConversationParticipantNotFoundError extends DomainError {
   constructor() {
-    super(
-      'Message author must be a conversation participant',
-      ConversationParticipantNotFoundError.prototype,
-    );
+    super('Message author must be a conversation participant');
   }
 }

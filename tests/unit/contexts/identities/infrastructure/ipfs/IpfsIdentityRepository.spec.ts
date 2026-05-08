@@ -62,7 +62,6 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         expectedCid,
-        true,
       );
     });
   });
@@ -74,14 +73,13 @@ describe('IpfsIdentityRepository', () => {
       const identityId = new IdentityId(primitives.id);
       const cidString = 'bafystoredcid';
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([
+      metadataRepository.findByIdentityId.mockResolvedValue([
         {
           _id: primitives.id + ':' + cidString,
           cid: cidString,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
-          valid: true,
           version: primitives.version,
         },
       ]);
@@ -112,14 +110,13 @@ describe('IpfsIdentityRepository', () => {
       const mongoCidString = 'bafymongocid';
       const dhtCidString = 'bafydhtcid';
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([
+      metadataRepository.findByIdentityId.mockResolvedValue([
         {
           _id: primitives.id + ':' + mongoCidString,
           cid: mongoCidString,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
-          valid: true,
           version: primitives.version,
         },
       ]);
@@ -155,7 +152,7 @@ describe('IpfsIdentityRepository', () => {
       const identityId = new IdentityId(primitives.id);
       const cidString = 'bafystoredcid';
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
       ipfsManager.getJSON.mockResolvedValue({
         _id: primitives.id,
@@ -179,25 +176,23 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.save.mock.calls[0][1]).toEqual(
         new IPFSId(cidString),
       );
-      expect(metadataRepository.save.mock.calls[0][2]).toBe(true);
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should mark broken mongo metadata as invalid and fallback to DHT', async () => {
+    it('should delete broken mongo metadata and fallback to DHT', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
       const brokenCidString = 'bafybrokencid';
       const cidString = 'bafystoredcid';
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([
+      metadataRepository.findByIdentityId.mockResolvedValue([
         {
           _id: primitives.id + ':' + brokenCidString,
           cid: brokenCidString,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
-          valid: true,
           version: primitives.version,
         },
       ]);
@@ -217,7 +212,7 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
         new IPFSId(brokenCidString),
       );
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
@@ -230,7 +225,7 @@ describe('IpfsIdentityRepository', () => {
       const identity = await mother.build();
       const identityId = new IdentityId(identity.toPrimitives().id);
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([]);
 
       await expect(repository.findById(identityId)).rejects.toThrow(
@@ -250,7 +245,7 @@ describe('IpfsIdentityRepository', () => {
         [new NetworkId(primitives.networks[0])],
       );
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([
         wrongCidString,
         validCidString,
@@ -261,13 +256,12 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
         new IPFSId(wrongCidString),
       );
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         new IPFSId(validCidString),
-        true,
       );
       expect(result.toPrimitives()).toEqual(primitives);
     });
@@ -278,7 +272,7 @@ describe('IpfsIdentityRepository', () => {
       const identityId = new IdentityId(primitives.id);
       const tamperedCidString = 'bafytamperedidentity';
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([tamperedCidString]);
       ipfsManager.getJSON.mockResolvedValue({
         ...mapper.toDocument(identity),
@@ -288,7 +282,7 @@ describe('IpfsIdentityRepository', () => {
       await expect(repository.findById(identityId)).rejects.toThrow(
         IdentityNotFoundError,
       );
-      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
         new IPFSId(tamperedCidString),
       );
       expect(metadataRepository.save).not.toHaveBeenCalled();
@@ -305,7 +299,7 @@ describe('IpfsIdentityRepository', () => {
         new IdentityExternalIdentifier(previousCidString),
       );
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
       ipfsManager.getJSON
         .mockResolvedValueOnce(mapper.toDocument(candidate))
@@ -324,7 +318,6 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.save.mock.calls[0][1]).toEqual(
         new IPFSId(candidateCidString),
       );
-      expect(metadataRepository.save.mock.calls[0][2]).toBe(true);
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
 
@@ -339,7 +332,7 @@ describe('IpfsIdentityRepository', () => {
         new IdentityExternalIdentifier(previousCidString),
       );
 
-      metadataRepository.findValidByIdentityId.mockResolvedValue([]);
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
       ipfsManager.getJSON
         .mockResolvedValueOnce(mapper.toDocument(candidate))
@@ -348,7 +341,7 @@ describe('IpfsIdentityRepository', () => {
       await expect(
         repository.findById(new IdentityId(previousPrimitives.id)),
       ).rejects.toThrow(IdentityNotFoundError);
-      expect(metadataRepository.markInvalid).toHaveBeenCalledWith(
+      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
         new IPFSId(candidateCidString),
       );
       expect(metadataRepository.save).not.toHaveBeenCalled();

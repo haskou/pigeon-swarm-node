@@ -1,10 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
-export class MessageTargetAlreadyDeletedError extends BaseError {
+export class MessageTargetAlreadyDeletedError extends DomainError {
   constructor() {
-    super(
-      'Deleted messages cannot be edited or deleted again',
-      MessageTargetAlreadyDeletedError.prototype,
-    );
+    super('Deleted messages cannot be edited or deleted again');
   }
 }

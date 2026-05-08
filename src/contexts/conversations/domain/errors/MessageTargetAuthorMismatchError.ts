@@ -1,10 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
-export class MessageTargetAuthorMismatchError extends BaseError {
+export class MessageTargetAuthorMismatchError extends DomainError {
   constructor() {
-    super(
-      'Only the original message author can edit or delete it',
-      MessageTargetAuthorMismatchError.prototype,
-    );
+    super('Only the original message author can edit or delete it');
   }
 }

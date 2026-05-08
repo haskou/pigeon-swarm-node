@@ -49,9 +49,9 @@ aggregate boundary.
 
 **Local Database**
 
-MongoDB is the node-local query and metadata store. It stores CIDs, validation
-state, sync state and lookup metadata, but those structures are infrastructure
-documents, not domain concepts.
+MongoDB is the node-local query and metadata store. It stores external
+identifiers, sync state and lookup metadata, but those structures are
+infrastructure documents, not domain concepts.
 
 **IPFS / Helia**
 
@@ -243,7 +243,7 @@ Return the latest messages in a conversation.
    reconstitute the aggregate.
 4. The application reads the conversation's dependent `Message` objects.
 5. Events are decrypted when keys are available.
-6. `ConversationProjectionDomainService` applies edits and deletes.
+6. The read side applies edits and deletes when building the client response.
 7. The latest visible messages are returned.
 
 **Result**
@@ -266,7 +266,7 @@ Edit a previously sent message without mutating the original event.
    metadata.
 5. The application publishes `conversation.pullDomainEvents()` through the
    existing `DomainEventPublisher`.
-6. Conversation projection shows the latest valid edit.
+6. The read side shows the latest valid edit.
 
 **Result**
 
@@ -287,7 +287,7 @@ Hide a message from the distributed conversation view without mutating history.
 4. `ConversationRepository.save` persists the aggregate.
 5. The application publishes `conversation.pullDomainEvents()` through the
    existing `DomainEventPublisher`.
-6. Conversation projection replaces the message content with a tombstone.
+6. The read side replaces the message content with a tombstone.
 
 **Result**
 
@@ -302,8 +302,10 @@ Catch up after being offline or after missing PubSub messages.
 
 **Main flow**
 
-1. The sync engine asks peers for known event ids or recent CIDs.
-2. Peers respond with event ids and CIDs unknown to the local node.
+1. The sync engine asks peers for known event ids or recent external
+   identifiers.
+2. Peers respond with event ids and external identifiers unknown to the local
+   node.
 3. `ConversationRepository` fetches missing event documents from IPFS while
    reconstituting the conversation.
 4. The `Conversation` aggregate validates and merges dependent events.

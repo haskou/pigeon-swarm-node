@@ -5,6 +5,7 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeOwnerAlreadyAssignedError } from './errors/NodeOwnerAlreadyAssignedError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { Network } from './Network';
 
@@ -50,6 +51,8 @@ export class Node extends AggregateRoot {
   }
 
   public assignOwner(owner: IdentityId): void {
+    assert(!this.owner, new NodeOwnerAlreadyAssignedError());
+
     this.owner = owner;
   }
 

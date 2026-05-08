@@ -163,10 +163,6 @@ package "conversations.domain" {
     +verify(message): boolean
   }
 
-  class ConversationProjectionDomainService {
-    +project(conversation: Conversation): object[]
-  }
-
   Conversation <|-- OneToOneConversation
   Conversation *--> ConversationId
   Conversation o--> IdentityId
@@ -182,7 +178,6 @@ package "conversations.domain" {
   MessageDeleted --> MessageId
   ConversationRepository --> Conversation
   MessageSignatureDomainService ..> Message
-  ConversationProjectionDomainService --> Conversation
 }
 
 package "application" {
@@ -203,7 +198,6 @@ package "application" {
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository
   LatestMessagesFinder --> ConversationRepository
-  LatestMessagesFinder --> ConversationProjectionDomainService
   ConversationSynchronizer --> ConversationRepository
 }
 

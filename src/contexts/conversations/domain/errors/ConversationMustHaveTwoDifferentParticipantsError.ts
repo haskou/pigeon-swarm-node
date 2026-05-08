@@ -1,11 +1,8 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { DomainError } from '@haskou/value-objects';
 
 // eslint-disable-next-line max-len
-export class ConversationMustHaveTwoDifferentParticipantsError extends BaseError {
+export class ConversationMustHaveTwoDifferentParticipantsError extends DomainError {
   constructor() {
-    super(
-      'One-to-one conversations must have two different participants',
-      ConversationMustHaveTwoDifferentParticipantsError.prototype,
-    );
+    super('One-to-one conversations must have two different participants');
   }
 }

@@ -1,4 +1,5 @@
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeOwnerAlreadyAssignedError } from '@app/contexts/nodes/domain/errors/NodeOwnerAlreadyAssignedError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -87,6 +88,16 @@ describe('Node', () => {
       node.assignOwner(owner);
 
       expect(node.toPrimitives().owner).toBe(owner.valueOf());
+    });
+
+    it('should reject assigning the node owner twice', () => {
+      const owner = new IdentityMother().id;
+
+      node.assignOwner(owner);
+
+      expect(() => node.assignOwner(owner)).toThrow(
+        NodeOwnerAlreadyAssignedError,
+      );
     });
   });
 });

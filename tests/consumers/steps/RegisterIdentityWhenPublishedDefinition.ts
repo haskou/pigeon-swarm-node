@@ -2,13 +2,16 @@ import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities
 import { IdentityCreateMessage } from '@app/contexts/identities/application/create/messages/IdentityCreateMessage';
 import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import Kernel from '@app/Kernel';
 import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import { setDefaultTimeout } from '@cucumber/cucumber';
 import { expect } from 'chai';
-import { after, before, binding, given, then } from 'cucumber-tsflow';
+import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import * as fsSync from 'fs';
 import path from 'path';
 
@@ -104,7 +107,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
     this.cleanupStorageFolder();
   }
 
-  @given('the register identity when published consumer is running')
+  @when('the register identity when published consumer is running')
   public async theConsumerIsRunning(): Promise<void> {
     if (!kernel) {
       throw new Error('Kernel is not initialized.');
@@ -115,7 +118,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
     await kernel.runConsumers();
   }
 
-  @given('a real identity has been created in network {string}')
+  @given('a real identity has been published in network {string}')
   public async aRealIdentityHasBeenCreated(networkName: string): Promise<void> {
     const networkId = '123e4567-e89b-12d3-a456-426614174001';
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
@@ -127,10 +130,30 @@ export default class RegisterIdentityWhenPublishedDefinition {
     );
   }
 
-  @then(
-    'the register identity when published consumer should finish successfully',
-  )
-  public async theConsumerShouldFinishSuccessfully(): Promise<void> {
+  @given('the local identity registration metadata is missing')
+  public async theLocalIdentityRegistrationMetadataIsMissing(): Promise<void> {
+    if (!this.identity) {
+      throw new Error('Identity is not initialized.');
+    }
+
+    const ipfs = Kernel.di.getService<IPFS>(IPFS);
+    const metadataRepository =
+      Kernel.di.getService<MongoIdentityMetadataRepository>(
+        MongoIdentityMetadataRepository,
+      );
+    const [externalIdentifier] = await ipfs.getRecordCandidates(
+      `pigeon-swarm_identity-${this.identity.toPrimitives().id}`,
+    );
+
+    if (!externalIdentifier) {
+      throw new Error('Identity external identifier was not published.');
+    }
+
+    await metadataRepository.deleteByExternalIdentifier(new IPFSId(externalIdentifier));
+  }
+
+  @then('the published identity should be registered locally')
+  public async thePublishedIdentityShouldBeRegisteredLocally(): Promise<void> {
     await this.waitUntilQueueIsEmpty(RegisterIdentityWhenPublished.QUEUE_NAME);
 
     expect(this.identity).to.not.equal(undefined);
@@ -139,5 +162,15 @@ export default class RegisterIdentityWhenPublishedDefinition {
         RegisterIdentityWhenPublished.QUEUE_NAME
       ] || [],
     ).to.deep.equal([]);
+
+    const metadataRepository =
+      Kernel.di.getService<MongoIdentityMetadataRepository>(
+        MongoIdentityMetadataRepository,
+      );
+    const metadata = await metadataRepository.findByIdentityId(
+      new IdentityId(this.identity!.toPrimitives().id),
+    );
+
+    expect(metadata).to.have.length.greaterThan(0);
   }
 }

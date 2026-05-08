@@ -1,6 +1,6 @@
 # Pigeon Swarm Action Plan
 
-Last updated: 2026-05-07.
+Last updated: 2026-05-08.
 
 Keep this file as a living execution plan: current decisions, done work, next
 small slices, and verification. Remove historical noise once it has been
@@ -65,7 +65,10 @@ committed.
   - `MessageType`
   - `AttachmentExternalIdentifier`
   - message sent/edited/deleted domain events
-  - conversation projection and signature domain services
+  - message signature domain service
+  - domain errors extend `DomainError`
+  - message ids use `ShortId`
+  - message payload uses `EncryptedPayload`
 - Conversation infrastructure documents and mappers for IPFS message documents
   and Mongo message metadata.
 - PubSub foundation:
@@ -75,6 +78,16 @@ committed.
   - `libp2p-gossipsub://` MessageBus selection
   - standalone libp2p/gossipsub runtime separated from IPFS storage
   - adapter unit tests
+- First real PubSub consumer:
+  - `RegisterIdentityWhenPublished`
+  - `RegisterPublishedIdentity`
+  - `RegisterPublishedIdentityMessage`
+  - `IdentityRegistrarService`
+  - the consumer registers published identities instead of using
+    `IdentityFinder`
+- Mongo identity metadata no longer stores invalid rows. Broken metadata is
+  deleted and invalid remote candidates are rejected before caching.
+- Node owner assignment is guarded against being assigned twice.
 
 ## Next Slice 1: PubSub Runtime Wiring
 
@@ -91,18 +104,10 @@ Done:
 
 Remaining steps:
 
-1. Replace the provisional identity publication consumer wiring:
-   - add `RegisterPublishedIdentity` application use case
-   - add `RegisterPublishedIdentityMessage`
-   - make `RegisterIdentityWhenPublished` depend on that registrar, not on
-     `IdentityFinder`
-   - keep `IdentityFinder` as read-only from the caller perspective
-   - update the consumer e2e to assert local registration, not only successful
-     lookup
-2. Define stable topic names for identity and conversation announcements.
-3. Add idempotent consumers.
-4. Store PubSub processing cursors in MongoDB.
-5. Add anti-entropy sync for missed PubSub messages.
+1. Define stable topic names for identity and conversation announcements.
+2. Add idempotent consumers.
+3. Store PubSub processing cursors in MongoDB.
+4. Add anti-entropy sync for missed PubSub messages.
 
 Keep:
 
@@ -114,8 +119,8 @@ Consumers to create under `src/apps/consumers`:
 
 - [x] `pubsub/identities/RegisterIdentityWhenPublished`
   - receives an identity publication announcement
-  - currently provisional: must be rewired to a dedicated
-    `RegisterPublishedIdentity` use case before adding more consumers
+  - calls `RegisterPublishedIdentity`
+  - Cucumber coverage asserts registration metadata is restored locally
 - [ ] `pubsub/identities/SynchronizeIdentityWhenUpdated`
   - receives an identity update announcement
   - calls the identity application use case that resolves the newest valid
@@ -139,6 +144,11 @@ Consumers to create under `src/apps/consumers`:
 Tests:
 
 - Unit test the concrete transport with mocked libp2p gossipsub.
+- Unit test `RegisterIdentityWhenPublished`, `RegisterPublishedIdentity` and
+  `IdentityRegistrarService`.
+- Cucumber: `RegisterIdentityWhenPublished` restores missing local metadata for
+  a published identity. Current local run is blocked when MongoDB is not
+  listening on `localhost:27017`.
 - Cucumber: two nodes receive an identity publication event.
 - Cucumber: a missed PubSub message is recovered by anti-entropy sync.
 
@@ -155,7 +165,7 @@ Steps:
 4. Keep encryption/decryption mechanics in application or infrastructure
    services.
 5. Include payload kind and payload value in the canonical signature payload.
-6. Update mapper, projection and signature tests.
+6. Update mapper and signature tests.
 
 Tests:
 

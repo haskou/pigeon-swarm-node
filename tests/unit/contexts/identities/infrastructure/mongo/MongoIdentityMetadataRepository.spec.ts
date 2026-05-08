@@ -43,7 +43,6 @@ describe('MongoIdentityMetadataRepository', () => {
           identityId: expectedDocument.identityId,
           previousCid: expectedDocument.previousCid,
           receivedAt: expect.any(Number),
-          valid: true,
           version: expectedDocument.version,
         },
       },
@@ -51,7 +50,7 @@ describe('MongoIdentityMetadataRepository', () => {
     );
   });
 
-  it('should find valid identity metadata sorted by version', async () => {
+  it('should find identity metadata sorted by version', async () => {
     const identity = mother.build();
     const primitives = identity.toPrimitives();
     const documents = [
@@ -62,11 +61,10 @@ describe('MongoIdentityMetadataRepository', () => {
     cursor.sort.mockReturnValue(cursor);
     cursor.toArray.mockResolvedValue(documents);
 
-    const result = await repository.findValidByIdentityId(mother.id);
+    const result = await repository.findByIdentityId(mother.id);
 
     expect(collection.find).toHaveBeenCalledWith({
       identityId: primitives.id,
-      valid: true,
     });
     expect(cursor.sort).toHaveBeenCalledWith({
       version: -1,
@@ -75,18 +73,11 @@ describe('MongoIdentityMetadataRepository', () => {
     expect(result).toEqual(documents);
   });
 
-  it('should mark identity metadata as invalid by CID', async () => {
+  it('should delete identity metadata by external identifier', async () => {
     const cid = new IPFSId('bafyidentitycid');
 
-    await repository.markInvalid(cid);
+    await repository.deleteByExternalIdentifier(cid);
 
-    expect(collection.updateMany).toHaveBeenCalledWith(
-      { cid: cid.valueOf() },
-      {
-        $set: {
-          valid: false,
-        },
-      },
-    );
+    expect(collection.deleteMany).toHaveBeenCalledWith({ cid: cid.valueOf() });
   });
 });

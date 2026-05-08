@@ -12,19 +12,23 @@ import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/valu
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair, Signature } from '@haskou/value-objects';
+import { Signature } from '@haskou/value-objects';
+
+import { ConversationMother } from '../../../mothers/ConversationMother';
 
 describe('Conversation', () => {
   let author: IdentityId;
   let recipient: IdentityId;
   let outsider: IdentityId;
+  let mother: ConversationMother;
   let conversation: OneToOneConversation;
 
   beforeEach(async () => {
-    author = await generateIdentityId();
-    recipient = await generateIdentityId();
-    outsider = await generateIdentityId();
-    conversation = OneToOneConversation.create(author, recipient);
+    mother = await ConversationMother.create();
+    author = mother.author;
+    recipient = mother.recipient;
+    outsider = await ConversationMother.generateIdentityId();
+    conversation = mother.build();
   });
 
   describe('sendMessage', () => {
@@ -66,7 +70,7 @@ describe('Conversation', () => {
   });
 
   describe('editMessage', () => {
-    it('should add an edited message and update the projection', () => {
+    it('should add an edited message', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
@@ -84,13 +88,7 @@ describe('Conversation', () => {
       expect(edited.getTargetMessageId().valueOf()).toBe(
         sent.getId().valueOf(),
       );
-      expect(conversation.projectMessages()).toEqual([
-        {
-          deleted: false,
-          encryptedPayload: 'edited-payload',
-          messageId: sent.getId().valueOf(),
-        },
-      ]);
+      expect(conversation.toPrimitives().messages).toHaveLength(2);
       expect(conversation.pullDomainEvents()).toEqual([
         expect.any(ConversationMessageWasEditedEvent),
       ]);
@@ -126,7 +124,7 @@ describe('Conversation', () => {
   });
 
   describe('deleteMessage', () => {
-    it('should add a deleted message and mark the projection as deleted', () => {
+    it('should add a deleted message', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
@@ -143,13 +141,7 @@ describe('Conversation', () => {
       expect(deleted.getTargetMessageId().valueOf()).toBe(
         sent.getId().valueOf(),
       );
-      expect(conversation.projectMessages()).toEqual([
-        {
-          deleted: true,
-          encryptedPayload: 'original-payload',
-          messageId: sent.getId().valueOf(),
-        },
-      ]);
+      expect(conversation.toPrimitives().messages).toHaveLength(2);
       expect(conversation.pullDomainEvents()).toEqual([
         expect.any(ConversationMessageWasDeletedEvent),
       ]);
@@ -170,12 +162,6 @@ describe('Conversation', () => {
     });
   });
 });
-
-async function generateIdentityId(): Promise<IdentityId> {
-  const keyPair = await KeyPair.generate();
-
-  return new IdentityId(keyPair.toPrimitives().publicKey);
-}
 
 function signature(): Signature {
   return new Signature(
