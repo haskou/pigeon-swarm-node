@@ -95,6 +95,7 @@ committed.
 - Libp2p gossipsub uses stable context/version topics such as
   `pigeon-swarm.identities.v1.announcements` instead of service-local exchange
   names, and filters event types inside the topic payload.
+- Consumers ignore duplicate in-process deliveries by `queueName:eventId`.
 
 ## Next Slice 1: PubSub Runtime Wiring
 
@@ -111,9 +112,8 @@ Done:
 
 Remaining steps:
 
-1. Add idempotent consumers.
-2. Store PubSub processing cursors in MongoDB.
-3. Add anti-entropy sync for missed PubSub messages.
+1. Store PubSub processing cursors in MongoDB so idempotency survives restarts.
+2. Add anti-entropy sync for missed PubSub messages.
 
 Keep:
 
@@ -154,6 +154,7 @@ Tests:
 
 - Unit test the concrete transport with mocked libp2p gossipsub.
 - Unit test stable PubSub topic resolution and same-topic event filtering.
+- Unit test consumer duplicate delivery handling.
 - Unit test `RegisterIdentityWhenPublished`, `RegisterPublishedIdentity` and
   `IdentityRegistrarService`.
 - Cucumber: `RegisterIdentityWhenPublished` restores missing local metadata for
