@@ -44,7 +44,7 @@ SERVICE_NAME=pigeon-swarm
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...`, `in-memory...` or `helia-pubsub://`). |
+| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...`, `in-memory...` or `libp2p-gossipsub://`). |
 | `TRANSPORT_MAX_RETRIES` | Adapter default | No | Retry count for AMQP operations. |
 | `TRANSPORT_RETRY_DELAY` | Adapter default | No | Delay between retries (ms). |
 
@@ -88,6 +88,6 @@ TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
 ```
 
-Use `TRANSPORT_DSN=helia-pubsub://` to publish and subscribe through the
+Use `TRANSPORT_DSN=libp2p-gossipsub://` to publish and subscribe through the
 standalone libp2p/gossipsub runtime. This runtime is separate from IPFS content
 storage.

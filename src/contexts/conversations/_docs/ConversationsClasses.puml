@@ -156,7 +156,7 @@ package "conversations.infrastructure" {
     +findMissing(conversationId: ConversationId, known: MessageId[]): Promise<Message[]>
   }
 
-  class HeliaPubSubMessageBusAdapter
+  class Libp2pGossipsubMessageBusAdapter
 
   note right of MongoConversationRepository
     Reconstitutes and persists the Conversation
@@ -168,7 +168,7 @@ package "conversations.infrastructure" {
   MongoConversationRepository --> IpfsConversationEventStore
   IpfsConversationEventStore --> IpfsMessageDocument
   MongoConversationRepository --> MongoMessageDocumentIndex
-  HeliaPubSubMessageBusAdapter ..> DomainEventPublisher
+  Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
 }
 
 @enduml

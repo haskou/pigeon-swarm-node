@@ -1,5 +1,5 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import HeliaPubSubMessageBusAdapter from '@app/shared/infrastructure/messageBus/helia/HeliaPubSubMessageBusAdapter';
+import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -11,14 +11,14 @@ class TestDomainEvent extends DomainEvent {
   }
 }
 
-describe('HeliaPubSubMessageBusAdapter', () => {
+describe('Libp2pGossipsubAdapter', () => {
   let transport: MockProxy<PubSubTransport>;
-  let adapter: HeliaPubSubMessageBusAdapter;
+  let adapter: Libp2pGossipsubAdapter;
 
   beforeEach(() => {
     process.env.SERVICE_NAME = 'test-service';
     transport = mock<PubSubTransport>();
-    adapter = new HeliaPubSubMessageBusAdapter(transport);
+    adapter = new Libp2pGossipsubAdapter(transport);
   });
 
   it('should publish domain events to pubsub topics', async () => {

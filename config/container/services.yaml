@@ -55,12 +55,12 @@ services:
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wdWJzdWJfX2hlbGlhX19IZWxpYVB1YlN1YlRyYW5zcG9ydF9fSGVsaWFQdWJTdWJUcmFuc3BvcnQ=:
-    class: /shared/infrastructure/pubsub/helia/HeliaPubSubTransport
+    class: /shared/infrastructure/pubsub/libp2p/Libp2pGossipsubTransport
     arguments: []
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19oZWxpYV9fSGVsaWFQdWJTdWJNZXNzYWdlQnVzQWRhcHRlcl9fSGVsaWFQdWJTdWJNZXNzYWdlQnVzQWRhcHRlcg==:
-    class: /shared/infrastructure/messageBus/helia/HeliaPubSubMessageBusAdapter
+    class: /shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wdWJzdWJfX2hlbGlhX19IZWxpYVB1YlN1YlRyYW5zcG9ydF9fSGVsaWFQdWJTdWJUcmFuc3BvcnQ=

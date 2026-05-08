@@ -2,16 +2,16 @@ import Kernel from '@app/Kernel';
 
 import { PubSubTransport } from '../PubSubTransport';
 import runtime, {
-  HeliaPubSubRuntimeAdapter,
+  Libp2pGossipsubRuntimeAdapter,
   Libp2pPubSubNode,
   PubSubEvent,
-} from './HeliaPubSubRuntimeAdapter';
+} from './Libp2pGossipsubRuntimeAdapter';
 
-export default class HeliaPubSubTransport implements PubSubTransport {
+export default class Libp2pGossipsubTransport implements PubSubTransport {
   private nodePromise?: Promise<Libp2pPubSubNode>;
 
   constructor(
-    private readonly runtimeAdapter: HeliaPubSubRuntimeAdapter = runtime,
+    private readonly runtimeAdapter: Libp2pGossipsubRuntimeAdapter = runtime,
   ) {}
 
   private async getNode(): Promise<Libp2pPubSubNode> {

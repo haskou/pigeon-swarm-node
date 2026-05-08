@@ -24,7 +24,7 @@ export type Libp2pPubSubNode = {
   };
 };
 
-export class HeliaPubSubRuntimeAdapter {
+export class Libp2pGossipsubRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof import('helia')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private gossipsubModulePromise?: Promise<
@@ -93,6 +93,6 @@ export class HeliaPubSubRuntimeAdapter {
   }
 }
 
-const heliaPubSubRuntimeAdapter = new HeliaPubSubRuntimeAdapter();
+const libp2pGossipsubRuntimeAdapter = new Libp2pGossipsubRuntimeAdapter();
 
-export default heliaPubSubRuntimeAdapter;
+export default libp2pGossipsubRuntimeAdapter;

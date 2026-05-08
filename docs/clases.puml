@@ -212,7 +212,7 @@ package "infrastructure" {
   class IpfsIdentityRepository
   class MongoConversationRepository
   class IpfsConversationEventStore
-  class HeliaPubSubMessageBusAdapter
+  class Libp2pGossipsubMessageBusAdapter
 
   class IpfsIdentityDocument <<Document>>
   class MongoIdentityDocumentIndex <<Document>>
@@ -228,7 +228,7 @@ package "infrastructure" {
   MongoConversationRepository --> IpfsConversationEventStore
   IpfsConversationEventStore --> IpfsMessageDocument
   MongoConversationRepository --> MongoMessageDocumentIndex
-  HeliaPubSubMessageBusAdapter ..> DomainEventPublisher
+  Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
 }
 
 @enduml

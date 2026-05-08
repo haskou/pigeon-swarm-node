@@ -1,18 +1,18 @@
-import HeliaPubSubTransport from '@app/shared/infrastructure/pubsub/helia/HeliaPubSubTransport';
+import Libp2pGossipsubTransport from '@app/shared/infrastructure/pubsub/libp2p/Libp2pGossipsubTransport';
 import {
-  HeliaPubSubRuntimeAdapter,
+  Libp2pGossipsubRuntimeAdapter,
   Libp2pPubSubNode,
   PubSubEvent,
-} from '@app/shared/infrastructure/pubsub/helia/HeliaPubSubRuntimeAdapter';
+} from '@app/shared/infrastructure/pubsub/libp2p/Libp2pGossipsubRuntimeAdapter';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-describe('HeliaPubSubTransport', () => {
-  let runtimeAdapter: MockProxy<HeliaPubSubRuntimeAdapter>;
+describe('Libp2pGossipsubTransport', () => {
+  let runtimeAdapter: MockProxy<Libp2pGossipsubRuntimeAdapter>;
   let node: Libp2pPubSubNode;
-  let transport: HeliaPubSubTransport;
+  let transport: Libp2pGossipsubTransport;
 
   beforeEach(() => {
-    runtimeAdapter = mock<HeliaPubSubRuntimeAdapter>();
+    runtimeAdapter = mock<Libp2pGossipsubRuntimeAdapter>();
     node = {
       services: {
         pubsub: {
@@ -23,7 +23,7 @@ describe('HeliaPubSubTransport', () => {
       },
     };
     runtimeAdapter.createNode.mockResolvedValue(node);
-    transport = new HeliaPubSubTransport(runtimeAdapter);
+    transport = new Libp2pGossipsubTransport(runtimeAdapter);
   });
 
   it('should publish encoded payloads through the PubSub node', async () => {

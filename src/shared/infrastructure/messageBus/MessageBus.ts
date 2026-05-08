@@ -4,7 +4,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
 import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
-import HeliaPubSubMessageBusAdapter from './helia/HeliaPubSubMessageBusAdapter';
+import Libp2pGossipsubAdapter from './libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
 import MessageBusAdapter from './MessageBusAdapter';
 
@@ -46,7 +46,7 @@ export default class MessageBus
   constructor(
     private readonly amqpAdapter: AmqpMessageBusAdapter,
     private readonly memoryAdapter: MemoryMessageBusAdapter,
-    private readonly heliaPubSubAdapter: HeliaPubSubMessageBusAdapter,
+    private readonly libp2pGossipsubAdapter: Libp2pGossipsubAdapter,
   ) {
     this.adapter = this.chooseAdapterFromDsn(process.env.TRANSPORT_DSN || '');
   }
@@ -62,8 +62,8 @@ export default class MessageBus
       return this.memoryAdapter;
     }
 
-    if (dsn.startsWith('helia-pubsub')) {
-      return this.heliaPubSubAdapter;
+    if (dsn.startsWith('libp2p-gossipsub')) {
+      return this.libp2pGossipsubAdapter;
     }
 
     throw new InvalidMessageBusAdapterError(dsn);
@@ -73,7 +73,7 @@ export default class MessageBus
     if (
       !dsn.startsWith('amqp') &&
       !dsn.startsWith('in-memory') &&
-      !dsn.startsWith('helia-pubsub')
+      !dsn.startsWith('libp2p-gossipsub')
     ) {
       throw new InvalidMessageBusAdapterError(dsn);
     }

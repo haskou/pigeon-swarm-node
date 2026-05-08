@@ -5,7 +5,7 @@ import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTranspo
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
 
-export default class HeliaPubSubMessageBusAdapter implements MessageBusAdapter {
+export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
   constructor(private readonly transport: PubSubTransport) {}
 
   private getTopic(exchange: string, routingKey: string): string {

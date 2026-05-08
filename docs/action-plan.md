@@ -70,21 +70,21 @@ committed.
   and Mongo message metadata.
 - PubSub foundation:
   - `PubSubTransport`
-  - `HeliaPubSubMessageBusAdapter`
-  - `HeliaPubSubTransport`
-  - `helia-pubsub://` MessageBus selection
+  - `Libp2pGossipsubMessageBusAdapter`
+  - `Libp2pGossipsubTransport`
+  - `libp2p-gossipsub://` MessageBus selection
   - standalone libp2p/gossipsub runtime separated from IPFS storage
   - adapter unit tests
 
 ## Next Slice 1: PubSub Runtime Wiring
 
-Goal: make the existing event publisher usable over Helia/libp2p PubSub.
+Goal: make the existing event publisher usable over libp2p gossipsub.
 
 Done:
 
 1. Added a concrete Helia/libp2p implementation of `PubSubTransport`.
-2. Registered the transport and `HeliaPubSubMessageBusAdapter` in DI.
-3. Selected the PubSub adapter through `TRANSPORT_DSN=helia-pubsub://`, keeping
+2. Registered the transport and `Libp2pGossipsubMessageBusAdapter` in DI.
+3. Selected the PubSub adapter through `TRANSPORT_DSN=libp2p-gossipsub://`, keeping
    the application on the existing event publisher/consumer contracts.
 4. Added a standalone libp2p/gossipsub runtime for PubSub, without adding
    PubSub methods to the IPFS infrastructure.
@@ -130,7 +130,7 @@ Consumers to create under `src/apps/consumers`:
 
 Tests:
 
-- Unit test the concrete transport with mocked Helia/libp2p PubSub.
+- Unit test the concrete transport with mocked libp2p gossipsub.
 - Cucumber: two nodes receive an identity publication event.
 - Cucumber: a missed PubSub message is recovered by anti-entropy sync.
 
