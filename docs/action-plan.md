@@ -215,6 +215,49 @@ Tests:
 - Cucumber: unauthorized conversation subscription is rejected.
 - Cucumber: reconnect recovers missed events through HTTP pagination or sync.
 
+## Final Documentation Slice: PubSub Sync Protocol
+
+Goal: document how offline nodes catch up using only PubSub for node-to-node
+coordination.
+
+Context:
+
+- Nodes cannot call each other through HTTP APIs.
+- Nodes may not know each other's IPs or reachable addresses.
+- PubSub is the only live node-to-node coordination channel.
+- IPFS/Helia stores immutable content; PubSub only moves announcements,
+  requests, responses and candidate external identifiers.
+
+Preliminary protocol ideas to document:
+
+- `conversation.sync.request`
+  - sent when a node starts, reconnects or detects a cursor gap
+  - includes `requestId`, `conversationId`, `fromNodeId`, known heads and an
+    expiration timestamp
+- `conversation.sync.response`
+  - sent by nodes that know the conversation
+  - includes heads/checkpoints, latest known message metadata and the matching
+    `requestId`
+- `conversation.missing.request`
+  - asks for candidate external identifiers after a known cursor/head
+  - includes pagination limits to avoid flooding PubSub
+- `conversation.missing.response`
+  - returns candidate message metadata and external identifiers
+  - never acts as truth; receivers still fetch immutable documents from IPFS
+    and validate them in domain services
+- `identity.sync.request` / `identity.sync.response`
+  - equivalent flow for identity version convergence
+
+Documentation TODO:
+
+- define topics for global sync and per-conversation sync
+- define DTO schemas separately from WebSocket DTOs
+- define request correlation, expiry, dedupe and retry rules
+- define MongoDB sync cursor documents
+- define `waiting_for_peers` behavior when nobody has the latest data
+- define what happens when only one peer has the latest data
+- define Cucumber scenarios for offline-week catch-up
+
 ## Known Cleanup
 
 - `max-params` warnings:
