@@ -91,10 +91,18 @@ Done:
 
 Remaining steps:
 
-1. Define stable topic names for identity and conversation announcements.
-2. Add idempotent consumers.
-3. Store PubSub processing cursors in MongoDB.
-4. Add anti-entropy sync for missed PubSub messages.
+1. Replace the provisional identity publication consumer wiring:
+   - add `RegisterPublishedIdentity` application use case
+   - add `RegisterPublishedIdentityMessage`
+   - make `RegisterIdentityWhenPublished` depend on that registrar, not on
+     `IdentityFinder`
+   - keep `IdentityFinder` as read-only from the caller perspective
+   - update the consumer e2e to assert local registration, not only successful
+     lookup
+2. Define stable topic names for identity and conversation announcements.
+3. Add idempotent consumers.
+4. Store PubSub processing cursors in MongoDB.
+5. Add anti-entropy sync for missed PubSub messages.
 
 Keep:
 
@@ -106,8 +114,8 @@ Consumers to create under `src/apps/consumers`:
 
 - [x] `pubsub/identities/RegisterIdentityWhenPublished`
   - receives an identity publication announcement
-  - calls the identity application use case that fetches, validates and stores
-    the identity locally
+  - currently provisional: must be rewired to a dedicated
+    `RegisterPublishedIdentity` use case before adding more consumers
 - [ ] `pubsub/identities/SynchronizeIdentityWhenUpdated`
   - receives an identity update announcement
   - calls the identity application use case that resolves the newest valid
