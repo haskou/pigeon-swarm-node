@@ -8,8 +8,6 @@ tags:
   - name: identities
   - name: ipfs
 paths:
-  /hewo:
-    $ref: './example-api/swagger.yaml#/paths/~1hewo'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /ipfs/{cid}:

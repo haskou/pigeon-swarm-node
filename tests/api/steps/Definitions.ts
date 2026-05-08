@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable no-case-declarations */
 import Kernel from '@app/Kernel';
-import { DataTable } from '@cucumber/cucumber';
+import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
@@ -13,6 +13,8 @@ import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 
 chai.use(chaiSubset);
+
+setDefaultTimeout(20_000);
 
 let kernel: Kernel | null = null;
 

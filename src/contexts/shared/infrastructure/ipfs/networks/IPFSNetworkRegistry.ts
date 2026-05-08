@@ -1,5 +1,4 @@
 import { createPrivateKey } from 'crypto';
-import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
@@ -20,10 +19,6 @@ export default class IPFSNetworkRegistry {
 
   private sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
   private sharedPeerPrivateKeyPem?: string;
-
-  private get configFilePath(): string {
-    return `${this.storagePath}/networks.json`;
-  }
 
   private get sharedPeerKeyFilePath(): string {
     return `${this.storagePath}/shared-peer-private-key.pb`;
@@ -92,36 +87,6 @@ export default class IPFSNetworkRegistry {
     return this.sharedPeerPrivateKeyPem;
   }
 
-  private readPersistedConfigs(): IPFSNetworkConfig[] {
-    try {
-      const raw = fsSync.readFileSync(this.configFilePath, 'utf-8');
-      const parsed: unknown = JSON.parse(raw);
-
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed.map(
-        (entry: { id: string; name: string; key: string | undefined }) =>
-          IPFSNetworkConfig.fromPrimitives(entry),
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async persistConfigs(): Promise<void> {
-    const primitives = this.networks.map((network) =>
-      network.getConfig().toPrimitives(),
-    );
-
-    await fs.mkdir(this.storagePath, { recursive: true });
-    await fs.writeFile(
-      this.configFilePath,
-      JSON.stringify(primitives, null, 2),
-    );
-  }
-
   private ensurePeerIdIsUnique(candidate: IPFSNetwork): void {
     const duplicatedNetwork = this.networks.find(
       (network) => network.getPeerId() === candidate.getPeerId(),
@@ -174,24 +139,7 @@ export default class IPFSNetworkRegistry {
       return;
     }
 
-    const configs = this.readPersistedConfigs();
-    const sharedPrivateKey = await this.loadOrCreateSharedPeerPrivateKey();
-
-    for (const config of configs) {
-      const alreadyRegistered = this.networks.some(
-        (n) => n.getName() === config.getName(),
-      );
-
-      if (!alreadyRegistered) {
-        const network = await this.createNetworkFromConfig(
-          config,
-          sharedPrivateKey,
-        );
-        this.ensurePeerIdIsUnique(network);
-        this.networks.push(network);
-      }
-    }
-
+    await this.loadOrCreateSharedPeerPrivateKey();
     this.initialized = true;
   }
 
@@ -211,12 +159,11 @@ export default class IPFSNetworkRegistry {
     );
     this.ensurePeerIdIsUnique(network);
     this.networks.push(network);
-    await this.persistConfigs();
 
     return network;
   }
 
-  public async removeNetwork(name: string): Promise<void> {
+  public removeNetwork(name: string): void {
     const index = this.networks.findIndex(
       (network) => network.getName() === name,
     );
@@ -226,7 +173,6 @@ export default class IPFSNetworkRegistry {
     }
 
     this.networks.splice(index, 1);
-    await this.persistConfigs();
   }
 
   public find(name: string): IPFSNetwork {

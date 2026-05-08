@@ -95,8 +95,15 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     exchange?: string,
   ): Promise<void> {
     return new Promise((resolve) => {
+      const targetExchange =
+        exchange || process.env.SERVICE_NAME || 'pigeon-swarm';
+
       for (const domainEvent of domainEvents) {
-        const queues = this.getQueueNameFromDomainEvent(domainEvent, exchange);
+        const queues = this.getQueueNameFromDomainEvent(
+          domainEvent,
+          targetExchange,
+        );
+
         for (const queue of queues) {
           if (!MemoryMessageBusAdapter.memoryMessages[queue]) {
             MemoryMessageBusAdapter.memoryMessages[queue] = [];
@@ -108,7 +115,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
 
           MemoryMessageBusAdapter.memoryMessages[queue].push({
             event: domainEvent.decode(),
-            exchange: exchange || `${process.env.SERVICE_NAME}`,
+            exchange: targetExchange,
             routingKey: domainEvent.eventName(),
           });
         }

@@ -4,7 +4,6 @@ import path from 'path';
 type SwaggerSpec = string;
 
 const swaggerFileByApi: Record<string, string> = {
-  'example-api': 'example-api/swagger.yaml',
   'identities-api': 'identities-api/swagger.yaml',
   'ipfs-api': 'ipfs-api/swagger.yaml',
 };

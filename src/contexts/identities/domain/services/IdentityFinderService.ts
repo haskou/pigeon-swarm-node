@@ -2,12 +2,17 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { Identity } from '../Identity';
 import { IdentityRepository } from '../repositories/IdentityRepository';
+import { IdentityResolutionDomainService } from './IdentityResolutionDomainService';
 
 export default class IdentityFinderService {
-  constructor(private readonly repository: IdentityRepository) {}
+  constructor(
+    private readonly repository: IdentityRepository,
+    private readonly resolver: IdentityResolutionDomainService,
+  ) {}
 
   public async findById(identityId: IdentityId): Promise<Identity> {
-    const identity = await this.repository.findById(identityId);
+    const candidates = await this.repository.findCandidatesById(identityId);
+    const identity = this.resolver.resolve(identityId, candidates);
 
     return identity;
   }

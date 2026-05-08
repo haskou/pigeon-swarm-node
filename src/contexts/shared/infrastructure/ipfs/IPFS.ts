@@ -129,6 +129,16 @@ export default class IPFS {
     return this.racer.raceGetRecord(this.registry.getAll(), key);
   }
 
+  public async getRecordCandidates(key: string): Promise<string[]> {
+    await this.initialize();
+
+    const results = await Promise.all(
+      this.registry.getAll().map((network) => network.getRecord(key)),
+    );
+
+    return [...new Set(results.filter((value) => value !== undefined))];
+  }
+
   public async getRecordFromNetwork(
     key: string,
     networkId: string,

@@ -19,6 +19,14 @@ export class IdentityId extends PublicKey {
     super(IdentityId.addPEMHeaders(value?.valueOf()));
   }
 
+  public isEqual(other: unknown): boolean {
+    return other instanceof IdentityId && this.valueOf() === other.valueOf();
+  }
+
+  public isNotEqual(other: unknown): boolean {
+    return !this.isEqual(other);
+  }
+
   public valueOf(): string {
     return IdentityId.removePEMHeaders(this.toString());
   }

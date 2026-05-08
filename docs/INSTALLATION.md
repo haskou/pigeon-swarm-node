@@ -44,7 +44,7 @@ SERVICE_NAME=pigeon-swarm
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...` or `in-memory...`). |
+| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...`, `in-memory...` or `libp2p-gossipsub://`). |
 | `TRANSPORT_MAX_RETRIES` | Adapter default | No | Retry count for AMQP operations. |
 | `TRANSPORT_RETRY_DELAY` | Adapter default | No | Delay between retries (ms). |
 
@@ -68,7 +68,9 @@ In the current app flow, `IPFSNetworkRegistry` composes per-network storage as:
 
 Because of this, setting `IPFS_STORAGE_PATH=memory` does not activate Helia in-memory mode end-to-end. It is treated as a filesystem folder named `memory`.
 
-Also, `IPFSNetworkRegistry` and `LocalNodeRepository` persist files (`networks.json`, `shared-peer-private-key.pb`, `node-metadata.json`) under the storage path.
+`IPFSNetworkRegistry` persists only Helia/libp2p runtime data such as
+`shared-peer-private-key.pb` under the storage path. Node metadata and
+configured network metadata are stored in MongoDB.
 
 Practical recommendation:
 
@@ -85,3 +87,7 @@ IPFS_STORAGE_PATH=./ipfs_storage
 TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
 ```
+
+Use `TRANSPORT_DSN=libp2p-gossipsub://` to publish and subscribe through the
+standalone libp2p/gossipsub runtime. This runtime is separate from IPFS content
+storage.

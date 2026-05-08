@@ -1,0 +1,167 @@
+@startuml
+
+title Pigeon Swarm - Conversations Context
+
+package "conversations.domain" {
+  abstract class Conversation <<AggregateRoot>> {
+    -id: ConversationId
+    -participants: IdentityId[]
+    -messages: Message[]
+    -createdAt: Timestamp
+    +hasParticipant(identityId: IdentityId): boolean
+    +record(message: Message): void
+    +latestEvents(limit: number): Message[]
+    +missingEvents(known: MessageId[]): Message[]
+  }
+
+  class OneToOneConversation {
+    +create(first: IdentityId, second: IdentityId): OneToOneConversation
+  }
+
+  abstract class Message <<Entity>> {
+    -id: MessageId
+    -authorId: IdentityId
+    -createdAt: Timestamp
+    -previousMessageIds: MessageId[]
+    -signature: Signature
+    +verify(): boolean
+  }
+
+  class MessageSent {
+    -payload: EncryptedPayload
+    -attachmentExternalIdentifiers: AttachmentExternalIdentifier[]
+  }
+
+  class MessageEdited {
+    -targetMessageId: MessageId
+    -payload: EncryptedPayload
+  }
+
+  class MessageDeleted {
+    -targetMessageId: MessageId
+  }
+
+  class MessageSignatureDomainService {
+    +sign(message): Signature
+    +verify(message): boolean
+  }
+
+  interface ConversationRepository {
+    +save(conversation: Conversation): Promise<void>
+    +findById(id: ConversationId): Promise<Conversation>
+    +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
+    +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
+  }
+
+  Conversation <|-- OneToOneConversation
+  Conversation *--> "0..*" Message
+  Message <|-- MessageSent
+  Message <|-- MessageEdited
+  Message <|-- MessageDeleted
+  Conversation o--> IdentityId
+  Message --> IdentityId
+  Message o--> MessageId
+  MessageSent --> EncryptedPayload
+  MessageSent o--> AttachmentExternalIdentifier
+  MessageEdited --> MessageId
+  MessageDeleted --> MessageId
+  MessageSignatureDomainService ..> Message
+  ConversationRepository --> Conversation
+}
+
+package "conversations.application" {
+  class OneToOneConversationCreator {
+    +create(command): Promise<OneToOneConversation>
+  }
+
+  class MessageSender {
+    +send(command): Promise<MessageId>
+  }
+
+  class MessageReceiver {
+    +receive(command): Promise<void>
+  }
+
+  class LatestMessagesFinder {
+    +find(query): Promise<object[]>
+  }
+
+  class MessageEditor {
+    +edit(command): Promise<MessageId>
+  }
+
+  class MessageDeleter {
+    +delete(command): Promise<MessageId>
+  }
+
+  class ConversationSynchronizer {
+    +sync(conversationId: ConversationId): Promise<void>
+  }
+
+  class DomainEventPublisher {
+    +publish(domainEvents): Promise<void>
+  }
+
+  OneToOneConversationCreator --> ConversationRepository
+  MessageSender --> ConversationRepository
+  MessageSender --> DomainEventPublisher
+  MessageReceiver --> ConversationRepository
+  LatestMessagesFinder --> ConversationRepository
+  MessageEditor --> ConversationRepository
+  MessageEditor --> DomainEventPublisher
+  MessageDeleter --> ConversationRepository
+  MessageDeleter --> DomainEventPublisher
+  ConversationSynchronizer --> ConversationRepository
+}
+
+package "conversations.infrastructure" {
+  class IpfsMessageDocument {
+    -messageId: string
+    -conversationId: string
+    -authorId: string
+    -type: string
+    -payload: object
+    -attachmentExternalIdentifiers: string[]
+    -previousMessageIds: string[]
+    -createdAt: number
+    -signature: string
+  }
+
+  class MongoMessageDocumentIndex {
+    -messageId: string
+    -externalIdentifier: string
+    -conversationId: string
+    -authorId: string
+    -recipientIds: string[]
+    -networkId: string
+    -type: string
+    -createdAt: number
+    -receivedAt: number
+    -targetMessageId?: string
+  }
+
+  class MongoConversationRepository
+
+  class IpfsConversationEventStore {
+    +save(conversationId: ConversationId, message: Message): Promise<void>
+    +findById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
+    +findLatest(conversationId: ConversationId, limit: number): Promise<Message[]>
+    +findMissing(conversationId: ConversationId, known: MessageId[]): Promise<Message[]>
+  }
+
+  class Libp2pGossipsubMessageBusAdapter
+
+  note right of MongoConversationRepository
+    Reconstitutes and persists the Conversation
+    aggregate. Message storage is an
+    infrastructure detail inside this repository.
+  end note
+
+  MongoConversationRepository ..|> ConversationRepository
+  MongoConversationRepository --> IpfsConversationEventStore
+  IpfsConversationEventStore --> IpfsMessageDocument
+  MongoConversationRepository --> MongoMessageDocumentIndex
+  Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
+}
+
+@enduml

@@ -27,7 +27,7 @@ Messages and media are distributed across peers and replicated automatically so 
 
 Think of it like:
 
-* Telegram
+* self-hosted Discord
 * mixed with BitTorrent
 * sprinkled with IPFS
 * held together by cryptography and stubborn optimism.
@@ -77,7 +77,7 @@ Setup instructions and environment variables are documented in:
 
 ## Who is behind this?
 
-Four nerds who thought this sounded like a fun idea.
+A nerd who thought this sounded like a fun idea.
 
 That’s it.
 

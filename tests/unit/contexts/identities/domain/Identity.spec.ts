@@ -1,7 +1,10 @@
 import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { Profile } from '@app/contexts/identities/domain/Profile';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
@@ -28,8 +31,10 @@ describe('Identity', () => {
       expect(primitives.networks).toEqual(
         mother.networks.map((network) => network.valueOf()),
       );
+      expect(primitives.previousIdentityExternalIdentifier).toBeUndefined();
       expect(primitives.signature).toBeDefined();
       expect(primitives.timestamp).toBe(mother.timestamp.valueOf());
+      expect(primitives.version).toBe(mother.version.valueOf());
       expect(primitives.encryptedKeyPair).toEqual(
         mother.encryptedKeyPair.toPrimitives(),
       );
@@ -57,6 +62,32 @@ describe('Identity', () => {
       );
     });
 
+    it('should throw InvalidIdentitySignatureError when version is tampered', () => {
+      const identity = mother.build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        version: primitives.version + 1,
+      };
+
+      expect(() => Identity.fromPrimitives(tampered)).toThrow(
+        InvalidIdentitySignatureError,
+      );
+    });
+
+    it('should throw InvalidIdentitySignatureError when previousIdentityExternalIdentifier is tampered', () => {
+      const identity = mother.build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        previousIdentityExternalIdentifier: 'bafytamperedidentity',
+      };
+
+      expect(() => Identity.fromPrimitives(tampered)).toThrow(
+        InvalidIdentitySignatureError,
+      );
+    });
+
     it('should return correct primitives', () => {
       const identity = mother.build();
 
@@ -64,9 +95,12 @@ describe('Identity', () => {
         encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),
         id: mother.id.valueOf(),
         networks: mother.networks.map((network) => network.valueOf()),
+        previousIdentityExternalIdentifier:
+          mother.previousIdentityExternalIdentifier?.valueOf(),
         profile: mother.profile.toPrimitives(),
         signature: mother.signature.valueOf(),
         timestamp: mother.timestamp.valueOf(),
+        version: mother.version.valueOf(),
       });
     });
   });
@@ -98,6 +132,8 @@ describe('Identity', () => {
       const primitives = identity.toPrimitives();
 
       expect(primitives.networks).toHaveLength(2);
+      expect(primitives.previousIdentityExternalIdentifier).toBeUndefined();
+      expect(primitives.version).toBe(1);
       expect(primitives.networks).toEqual(
         networks.map((network) => network.valueOf()),
       );
@@ -129,6 +165,62 @@ describe('Identity', () => {
       expect(primitives.networks).toHaveLength(3);
       expect(primitives.networks).toEqual(
         networks.map((network) => network.valueOf()),
+      );
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('should create the next signed identity version', async () => {
+      const identity = mother.build();
+      const previousIdentityExternalIdentifier =
+        new IdentityExternalIdentifier('bafycurrentidentity');
+      const profile = new Profile(new ProfileName('Jane'));
+
+      const updatedIdentity = await identity.updateProfile(
+        profile,
+        mother.password,
+        previousIdentityExternalIdentifier,
+      );
+      const primitives = updatedIdentity.toPrimitives();
+
+      expect(primitives.id).toBe(identity.toPrimitives().id);
+      expect(primitives.profile).toEqual(profile.toPrimitives());
+      expect(primitives.previousIdentityExternalIdentifier).toBe(
+        previousIdentityExternalIdentifier.valueOf(),
+      );
+      expect(primitives.version).toBe(2);
+      expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
+        IdentityWasUpdatedEvent,
+      );
+    });
+  });
+
+  describe('updateNetworks', () => {
+    it('should create the next signed identity with new networks', async () => {
+      const identity = mother.build();
+      const previousIdentityExternalIdentifier =
+        new IdentityExternalIdentifier('bafycurrentidentity');
+      const networks = [
+        new NetworkId(faker.string.uuid()),
+        new NetworkId(faker.string.uuid()),
+      ];
+
+      const updatedIdentity = await identity.updateNetworks(
+        networks,
+        mother.password,
+        previousIdentityExternalIdentifier,
+      );
+      const primitives = updatedIdentity.toPrimitives();
+
+      expect(primitives.networks).toEqual(
+        networks.map((network) => network.valueOf()),
+      );
+      expect(primitives.previousIdentityExternalIdentifier).toBe(
+        previousIdentityExternalIdentifier.valueOf(),
+      );
+      expect(primitives.version).toBe(2);
+      expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
+        IdentityWasUpdatedEvent,
       );
     });
   });
