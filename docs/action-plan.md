@@ -96,6 +96,42 @@ Tests to design with Cucumber:
   validates, caches and returns it.
 - A node starts after a week offline and recovers missed conversation messages.
 
+## Consumer Backlog
+
+Keep consumers thin: receive PubSub/domain events, call an application use case,
+and let repositories/domain validation decide what is trustworthy.
+
+- [x] `pubsub/identities/RegisterIdentityWhenPublished`
+  - calls `RegisterPublishedIdentity`
+  - registers missing local metadata for a published identity
+- [ ] `pubsub/identities/SynchronizeIdentityWhenUpdated`
+  - receives identity update announcements
+  - calls an identity synchronization use case that resolves the newest valid
+    version chain
+- [ ] `pubsub/identities/RespondToIdentitySyncRequest`
+  - receives identity sync requests
+  - publishes valid local candidates as sync responses
+- [ ] `pubsub/identities/RegisterIdentityWhenSyncAvailable`
+  - receives identity sync responses
+  - fetches and validates the announced candidate before caching metadata
+- [ ] `pubsub/conversations/RegisterMessageWhenAnnounced`
+  - receives a sent-message announcement
+  - calls the conversation use case that fetches, validates and stores the
+    message locally
+- [ ] `pubsub/conversations/RegisterMessageEditionWhenAnnounced`
+  - receives an edit-message announcement
+  - stores the edit as a new immutable message, without mutating the original
+- [ ] `pubsub/conversations/RegisterMessageDeletionWhenAnnounced`
+  - receives a delete-message announcement
+  - stores the delete as a new immutable tombstone/projection event
+- [ ] `pubsub/conversations/RespondToConversationSyncRequest`
+  - receives conversation sync requests
+  - publishes bounded candidate metadata for known messages
+- [ ] `pubsub/conversations/RegisterMessagesWhenSyncAvailable`
+  - receives conversation sync responses
+  - fetches and validates candidate message documents before updating local
+    projections
+
 ## Next Slice 1: Conversation Encryption Policy
 
 Goal: model encryption as a domain rule of the conversation type.

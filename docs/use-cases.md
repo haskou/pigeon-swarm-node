@@ -63,6 +63,10 @@ attachments and large snapshots by content address.
 PubSub announces identity and message content references quickly between
 connected peers.
 
+PubSub also coordinates anti-entropy between nodes. A node that was offline
+publishes sync requests, receives candidate responses from peers and validates
+the referenced immutable documents before updating local metadata.
+
 **DHT**
 
 DHT helps a node discover candidate identity content references or peer hints
