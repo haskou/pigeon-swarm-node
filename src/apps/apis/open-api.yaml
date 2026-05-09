@@ -6,8 +6,11 @@ info:
 tags:
   - name: identities
   - name: ipfs
+  - name: keychains
 paths:
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /ipfs/{cid}:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'
+  /keychains/:
+    $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'

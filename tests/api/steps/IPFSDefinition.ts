@@ -11,6 +11,10 @@ type IdentityResponseShape = {
   id?: string;
 };
 
+type ExternalIdentifierResponseShape = {
+  keychainExternalIdentifier?: string;
+};
+
 export default class IPFSDefinition {
   private static scenarioCount: number = 0;
 
@@ -213,6 +217,30 @@ export default class IPFSDefinition {
     if (!exists) {
       throw new Error(
         `Routing record exists for identity id ${identityId} but CID ${cid} is not available`,
+      );
+    }
+  }
+
+  public async assertKeychainExternalIdentifierExists(
+    responseData: unknown,
+  ): Promise<void> {
+    if (typeof responseData !== 'object' || responseData === null) {
+      throw new Error('Response does not contain a keychain external identifier');
+    }
+
+    const externalIdentifier = (responseData as ExternalIdentifierResponseShape)
+      .keychainExternalIdentifier;
+
+    if (!externalIdentifier) {
+      throw new Error('Response does not contain a keychain external identifier');
+    }
+
+    const ipfs = Kernel.di.getService<IPFS>(IPFS);
+    const exists = await ipfs.stat(new IPFSId(externalIdentifier));
+
+    if (!exists) {
+      throw new Error(
+        `Keychain external identifier ${externalIdentifier} is not available`,
       );
     }
   }

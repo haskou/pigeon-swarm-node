@@ -89,7 +89,7 @@ The server should not receive the keychain password. The API should use signed
 requests:
 
 ```http
-POST /keychains/current
+POST /keychains
 X-Identity-Id: <identityId>
 X-Timestamp: <timestamp>
 X-Nonce: <nonce>

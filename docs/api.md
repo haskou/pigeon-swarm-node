@@ -46,10 +46,10 @@ TODO:
 The node stores and announces encrypted keychain documents. It must never
 receive the keychain password and must never decrypt the payload.
 
-### Publish current keychain
+### Publish keychain version
 
 ```http
-PUT /keychains/current
+POST /keychains
 ```
 
 Request:
@@ -73,7 +73,7 @@ Response:
 }
 ```
 
-TODO:
+Implemented:
 
 - validate owner identity from the signed request
 - validate keychain signature and version chain

@@ -11,9 +11,14 @@ describe('ApiSwaggerFactory', () => {
     it('should load one yaml document per api folder', () => {
       const specs = factory.createByApi();
 
-      expect(Object.keys(specs)).toEqual(['identities-api', 'ipfs-api']);
+      expect(Object.keys(specs)).toEqual([
+        'identities-api',
+        'ipfs-api',
+        'keychains-api',
+      ]);
       expect(specs['identities-api']).toContain('/identities/:');
       expect(specs['ipfs-api']).toContain('/ipfs/{cid}:');
+      expect(specs['keychains-api']).toContain('/keychains/:');
     });
   });
 
@@ -28,6 +33,9 @@ describe('ApiSwaggerFactory', () => {
       expect(spec).toContain(
         "$ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'",
       );
+      expect(spec).toContain(
+        "$ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'",
+      );
     });
   });
 
@@ -38,6 +46,7 @@ describe('ApiSwaggerFactory', () => {
       expect(routes).toEqual({
         'identities-api': '/api/swagger/identities-api/swagger.yaml',
         'ipfs-api': '/api/swagger/ipfs-api/swagger.yaml',
+        'keychains-api': '/api/swagger/keychains-api/swagger.yaml',
       });
     });
   });

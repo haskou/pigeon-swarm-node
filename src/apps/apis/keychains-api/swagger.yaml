@@ -1,0 +1,94 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Keychains API
+  version: 1.0.0
+  description: Endpoints for publishing encrypted keychain versions.
+tags:
+  - name: keychains
+paths:
+  /keychains/:
+    post:
+      tags:
+        - keychains
+      summary: Publish encrypted keychain version
+      parameters:
+        - in: header
+          name: X-Identity-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Timestamp
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Nonce
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostKeychainBody'
+      responses:
+        '200':
+          description: Keychain published successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeychainPublicationResource'
+        '401':
+          description: Missing or invalid signed request headers.
+        '409':
+          description: Invalid keychain candidate.
+components:
+  schemas:
+    PostKeychainBody:
+      type: object
+      required:
+        - encryptedPayload
+        - signature
+        - timestamp
+        - version
+      properties:
+        encryptedPayload:
+          type: string
+          example: encrypted-keychain-payload
+        previousKeychainExternalIdentifier:
+          type: string
+          nullable: true
+          example: bagaaieras...
+        signature:
+          type: string
+          example: lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==
+        timestamp:
+          type: number
+          example: 1773848829055
+        version:
+          type: integer
+          minimum: 1
+          example: 1
+    KeychainPublicationResource:
+      type: object
+      required:
+        - keychainExternalIdentifier
+        - ownerIdentityId
+        - version
+      properties:
+        keychainExternalIdentifier:
+          type: string
+          example: bagaaieras...
+        ownerIdentityId:
+          type: string
+          example: MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=
+        version:
+          type: integer
+          example: 1
