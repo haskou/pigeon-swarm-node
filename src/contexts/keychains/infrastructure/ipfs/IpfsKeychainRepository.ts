@@ -1,5 +1,6 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
@@ -31,6 +32,12 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     } catch {
       return undefined;
     }
+  }
+
+  public async findByExternalIdentifier(
+    externalIdentifier: KeychainExternalIdentifier,
+  ): Promise<Keychain | undefined> {
+    return this.findCandidateFromCid(new IPFSId(externalIdentifier.valueOf()));
   }
 
   public async findCandidatesByOwnerId(
@@ -70,7 +77,7 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     return candidates;
   }
 
-  public async save(keychain: Keychain): Promise<void> {
+  public async save(keychain: Keychain): Promise<KeychainExternalIdentifier> {
     const document = this.mapper.toDocument(keychain);
     const cid = await this.ipfsManager.addJSONToAll(document);
 
@@ -79,5 +86,7 @@ export default class IpfsKeychainRepository implements KeychainRepository {
       this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
     );
+
+    return new KeychainExternalIdentifier(cid.valueOf());
   }
 }

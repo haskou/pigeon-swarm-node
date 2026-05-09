@@ -1,8 +1,11 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable no-case-declarations */
+import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@app/Kernel';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
+import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
@@ -71,6 +74,50 @@ export default class Definitions {
     this.headers[header] = value;
   }
 
+  @given('I sign the current keychain publication request')
+  public async iSignTheCurrentKeychainPublicationRequest(): Promise<void> {
+    if (!this.body) {
+      throw new Error('Body must be set before signing the request.');
+    }
+
+    const keyPair = await KeyPair.generate();
+    const ownerIdentityId = new IdentityId(keyPair.toPrimitives().publicKey);
+    const parsedBody = JSON.parse(this.body);
+    const keychainSignaturePayload = {
+      encryptedPayload: parsedBody.encryptedPayload,
+      ownerIdentityId: ownerIdentityId.valueOf(),
+      previousKeychainExternalIdentifier:
+        parsedBody.previousKeychainExternalIdentifier ?? undefined,
+      timestamp: parsedBody.timestamp,
+      version: parsedBody.version,
+    };
+    const signature = keyPair
+      .sign(JSON.stringify(keychainSignaturePayload))
+      .valueOf();
+    const signedBody = {
+      ...parsedBody,
+      signature,
+    };
+    const timestamp = String(Date.now());
+    const nonce = 'api-keychain-nonce';
+    const verifier = new SignedHttpRequestVerifier();
+    const signedRequestPayload = verifier.getCanonicalPayload(
+      'POST',
+      '/keychains/',
+      timestamp,
+      nonce,
+      signedBody,
+    );
+
+    this.body = JSON.stringify(signedBody);
+    this.headers['x-identity-id'] = ownerIdentityId.valueOf();
+    this.headers['x-timestamp'] = timestamp;
+    this.headers['x-nonce'] = nonce;
+    this.headers['x-signature'] = keyPair
+      .sign(JSON.stringify(signedRequestPayload))
+      .valueOf();
+  }
+
   @given('I register an in-memory IPFS network {string}')
   public async iRegisterAnInMemoryIPFSNetwork(
     networkName: string,
@@ -109,6 +156,13 @@ export default class Definitions {
     await this.ipfsDefinition.assertPinnedInIPFS(this.response.data);
   }
 
+  @then('keychain external identifier exists in ipfs')
+  public async keychainExternalIdentifierExistsInIpfs(): Promise<void> {
+    await this.ipfsDefinition.assertKeychainExternalIdentifierExists(
+      this.response.data,
+    );
+  }
+
   @then('nothing has been pinned in ipfs')
   public async nothingHasBeenPinnedInIpfs(): Promise<void> {
     await this.ipfsDefinition.assertNothingPinnedInIPFS(this.response.data);
@@ -120,7 +174,9 @@ export default class Definitions {
     this.response = await this.restClient.post(
       path,
       isFormData ? this.formData : this.body && JSON.parse(this.body),
-      isFormData ? { headers: this.formData?.getHeaders() } : this.headers,
+      isFormData ? { headers: this.formData?.getHeaders() } : {
+        headers: this.headers,
+      },
     );
   }
 

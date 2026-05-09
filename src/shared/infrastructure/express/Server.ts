@@ -1,6 +1,7 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
+import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -112,6 +113,7 @@ export default class Server {
           HealthRoute,
           ConsumeDlxRoute,
           PostIdentityRoute,
+          PostKeychainRoute,
           GetIPFSContentRoute,
         ],
         cors: true,
