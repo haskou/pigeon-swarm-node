@@ -60,38 +60,12 @@ current work, verification and the next useful cut.
   the topic payload.
 - First real PubSub consumer:
   `pubsub/identities/RegisterIdentityWhenPublished`.
+- Processed PubSub events are persisted in MongoDB by `queueName:eventId`, while
+  retaining in-process duplicate protection.
+- `RegisterIdentityWhenPublished` performs registration through
+  `RegisterPublishedIdentity`; finder use cases remain read-only.
 
-## Current Slice: PubSub Processing Cursors
-
-Goal: make consumer idempotency survive process restarts.
-
-Status:
-
-- [x] Keep in-process duplicate protection by `queueName:eventId`.
-- [x] Add MongoDB storage for processed domain events.
-- [x] Make the base `Consumer` consult MongoDB when DI is available.
-- [x] Run focused unit tests and lint.
-
-Tests:
-
-- Unit: processed event repository marks an event as processed with upsert.
-- Unit: processed event repository checks processed/missing events.
-- Unit: existing PubSub consumer duplicate delivery behavior still passes.
-
-## Next Slice 1: Identity PubSub Consumer Cohesion
-
-Goal: finish the naming/cohesion cleanup around the first consumer.
-
-Steps:
-
-1. Ensure `RegisterIdentityWhenPublished` performs registration through a
-   registration use case, not through a finder.
-2. Keep finder use cases read-only.
-3. Keep Cucumber coverage for restoring missing local identity metadata from a
-   real published identity.
-4. Review unresolved PR feedback before opening the next PR.
-
-## Next Slice 2: PubSub Anti-Entropy
+## Current Slice: PubSub Anti-Entropy
 
 Goal: recover missed PubSub events when a node was offline or detects a gap.
 
@@ -122,7 +96,7 @@ Tests to design with Cucumber:
   validates, caches and returns it.
 - A node starts after a week offline and recovers missed conversation messages.
 
-## Next Slice 3: Conversation Encryption Policy
+## Next Slice 1: Conversation Encryption Policy
 
 Goal: model encryption as a domain rule of the conversation type.
 
@@ -141,7 +115,7 @@ Tests:
 - Unit: signed payload changes when payload kind changes.
 - Cucumber: 1to1 conversation round-trips encrypted messages.
 
-## Next Slice 4: Conversation Repository And Remote Message Validation
+## Next Slice 2: Conversation Repository And Remote Message Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
