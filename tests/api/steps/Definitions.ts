@@ -26,6 +26,11 @@ export default class Definitions {
   private body: string | undefined;
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
+  private identityKeyPair: KeyPair | undefined;
+
+  private keychainExternalIdentifier: string | undefined;
+
+  private ownerIdentityId: IdentityId | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private response: any = null;
   private restClient: RestClient = new RestClient();
@@ -36,6 +41,9 @@ export default class Definitions {
     this.body = undefined;
     this.formData = undefined;
     this.headers = {};
+    this.identityKeyPair = undefined;
+    this.keychainExternalIdentifier = undefined;
+    this.ownerIdentityId = undefined;
     this.response = null;
     this.ipfsDefinition.resetScenarioState();
   }
@@ -74,14 +82,50 @@ export default class Definitions {
     this.headers[header] = value;
   }
 
+  private async ensureIdentityKeyPair(): Promise<KeyPair> {
+    if (!this.identityKeyPair) {
+      this.identityKeyPair = await KeyPair.generate();
+      this.ownerIdentityId = new IdentityId(
+        this.identityKeyPair.toPrimitives().publicKey,
+      );
+    }
+
+    return this.identityKeyPair;
+  }
+
+  private async signCurrentRequest(method: string, path: string): Promise<void> {
+    if (!this.body) {
+      throw new Error('Body must be set before signing the request.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const timestamp = String(Date.now());
+    const nonce = `api-nonce-${timestamp}`;
+    const verifier = new SignedHttpRequestVerifier();
+    const signedRequestPayload = verifier.getCanonicalPayload(
+      method,
+      path,
+      timestamp,
+      nonce,
+      JSON.parse(this.body),
+    );
+
+    this.headers['x-identity-id'] = this.ownerIdentityId?.valueOf() || '';
+    this.headers['x-timestamp'] = timestamp;
+    this.headers['x-nonce'] = nonce;
+    this.headers['x-signature'] = keyPair
+      .sign(JSON.stringify(signedRequestPayload))
+      .valueOf();
+  }
+
   @given('I sign the current keychain publication request')
   public async iSignTheCurrentKeychainPublicationRequest(): Promise<void> {
     if (!this.body) {
       throw new Error('Body must be set before signing the request.');
     }
 
-    const keyPair = await KeyPair.generate();
-    const ownerIdentityId = new IdentityId(keyPair.toPrimitives().publicKey);
+    const keyPair = await this.ensureIdentityKeyPair();
+    const ownerIdentityId = this.ownerIdentityId as IdentityId;
     const parsedBody = JSON.parse(this.body);
     const keychainSignaturePayload = {
       encryptedPayload: parsedBody.encryptedPayload,
@@ -98,24 +142,57 @@ export default class Definitions {
       ...parsedBody,
       signature,
     };
-    const timestamp = String(Date.now());
-    const nonce = 'api-keychain-nonce';
-    const verifier = new SignedHttpRequestVerifier();
-    const signedRequestPayload = verifier.getCanonicalPayload(
-      'POST',
-      '/keychains/',
-      timestamp,
-      nonce,
-      signedBody,
-    );
 
     this.body = JSON.stringify(signedBody);
-    this.headers['x-identity-id'] = ownerIdentityId.valueOf();
-    this.headers['x-timestamp'] = timestamp;
-    this.headers['x-nonce'] = nonce;
-    this.headers['x-signature'] = keyPair
-      .sign(JSON.stringify(signedRequestPayload))
-      .valueOf();
+    await this.signCurrentRequest('POST', '/keychains/');
+  }
+
+  @given('I have published a keychain for the authenticated identity')
+  public async iHavePublishedAKeychainForTheAuthenticatedIdentity(): Promise<void> {
+    this.body = JSON.stringify({
+      encryptedPayload: 'encrypted-keychain-payload',
+      previousKeychainExternalIdentifier: null,
+      timestamp: 1773848829055,
+      version: 1,
+    });
+
+    await this.iSignTheCurrentKeychainPublicationRequest();
+    this.response = await this.restClient.post(
+      '/keychains/',
+      JSON.parse(this.body),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not publish keychain: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.keychainExternalIdentifier =
+      this.response.data.keychainExternalIdentifier;
+  }
+
+  @given('I set a one-to-one conversation body for a new participant')
+  public async iSetAOneToOneConversationBodyForANewParticipant(): Promise<void> {
+    if (!this.keychainExternalIdentifier) {
+      throw new Error('Keychain must be published first.');
+    }
+
+    const participantKeyPair = await KeyPair.generate();
+    const participantIdentityId = new IdentityId(
+      participantKeyPair.toPrimitives().publicKey,
+    );
+
+    this.body = JSON.stringify({
+      keychainExternalIdentifier: this.keychainExternalIdentifier,
+      participantIdentityId: participantIdentityId.valueOf(),
+    });
+  }
+
+  @given('I sign the current one-to-one conversation request')
+  public async iSignTheCurrentOneToOneConversationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/conversations/1to1');
   }
 
   @given('I register an in-memory IPFS network {string}')

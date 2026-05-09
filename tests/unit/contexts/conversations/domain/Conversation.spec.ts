@@ -5,6 +5,7 @@ import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/e
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { AttachmentExternalIdentifier } from '@app/contexts/conversations/domain/value-objects/AttachmentExternalIdentifier';
@@ -33,6 +34,8 @@ describe('Conversation', () => {
 
   describe('sendMessage', () => {
     it('should add a sent message and record a domain event', () => {
+      conversation.pullDomainEvents();
+
       const message = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('encrypted-payload'),
@@ -66,6 +69,14 @@ describe('Conversation', () => {
           signature(),
         ),
       ).toThrow(ConversationParticipantNotFoundError);
+    });
+  });
+
+  describe('create', () => {
+    it('should record a created domain event', () => {
+      expect(conversation.pullDomainEvents()).toEqual([
+        expect.any(ConversationWasCreatedEvent),
+      ]);
     });
   });
 

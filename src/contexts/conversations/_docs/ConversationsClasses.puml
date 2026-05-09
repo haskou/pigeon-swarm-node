@@ -18,6 +18,10 @@ package "conversations.domain" {
     +create(first: IdentityId, second: IdentityId): OneToOneConversation
   }
 
+  class ConversationWasCreatedEvent {
+    +eventName(): string
+  }
+
   abstract class Message <<Entity>> {
     -id: MessageId
     -authorId: IdentityId
@@ -67,6 +71,7 @@ package "conversations.domain" {
   MessageDeleted --> MessageId
   MessageSignatureDomainService ..> Message
   ConversationRepository --> Conversation
+  OneToOneConversation ..> ConversationWasCreatedEvent
 }
 
 package "conversations.application" {
@@ -103,6 +108,7 @@ package "conversations.application" {
   }
 
   OneToOneConversationCreator --> ConversationRepository
+  OneToOneConversationCreator --> DomainEventPublisher
   MessageSender --> ConversationRepository
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository
@@ -141,12 +147,11 @@ package "conversations.infrastructure" {
   }
 
   class MongoConversationRepository
-
-  class IpfsConversationEventStore {
-    +save(conversationId: ConversationId, message: Message): Promise<void>
-    +findById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
-    +findLatest(conversationId: ConversationId, limit: number): Promise<Message[]>
-    +findMissing(conversationId: ConversationId, known: MessageId[]): Promise<Message[]>
+  class MongoConversationDocument {
+    -_id: string
+    -type: string
+    -participantIds: string[]
+    -createdAt: number
   }
 
   class Libp2pGossipsubMessageBusAdapter
@@ -158,8 +163,8 @@ package "conversations.infrastructure" {
   end note
 
   MongoConversationRepository ..|> ConversationRepository
-  MongoConversationRepository --> IpfsConversationEventStore
-  IpfsConversationEventStore --> IpfsMessageDocument
+  MongoConversationRepository --> MongoConversationDocument
+  MongoConversationRepository ..> IpfsMessageDocument
   MongoConversationRepository --> MongoMessageDocumentIndex
   Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
 }

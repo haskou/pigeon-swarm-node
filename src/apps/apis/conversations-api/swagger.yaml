@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Conversations API
+  version: 1.0.0
+  description: Endpoints for creating and reading conversations.
+tags:
+  - name: conversations
+paths:
+  /conversations/1to1:
+    post:
+      tags:
+        - conversations
+      summary: Create or get one-to-one conversation
+      parameters:
+        - in: header
+          name: X-Identity-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Timestamp
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Nonce
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostOneToOneConversationBody'
+      responses:
+        '200':
+          description: Conversation created or found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+components:
+  schemas:
+    PostOneToOneConversationBody:
+      type: object
+      required:
+        - participantIdentityId
+        - keychainExternalIdentifier
+      properties:
+        participantIdentityId:
+          type: string
+        keychainExternalIdentifier:
+          type: string
+    ConversationResource:
+      type: object
+      required:
+        - id
+        - participantIds
+        - type
+      properties:
+        id:
+          type: string
+          example: one-to-one:3bd1...
+        participantIds:
+          type: array
+          items:
+            type: string
+        type:
+          type: string
+          enum:
+            - one-to-one

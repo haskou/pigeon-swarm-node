@@ -107,7 +107,8 @@ TODO:
 
 ## Conversation HTTP API
 
-TODO: define authentication and identity selection for every endpoint.
+Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
+`X-Timestamp`, `X-Nonce` and `X-Signature`.
 
 ### List conversations
 
@@ -133,18 +134,33 @@ Request:
 
 ```json
 {
-  "participantIdentityId": "TODO",
-  "keychainExternalIdentifier": "TODO"
+  "participantIdentityId": "<identityId>",
+  "keychainExternalIdentifier": "<externalIdentifier>"
 }
 ```
 
+Response:
+
+```json
+{
+  "id": "one-to-one:<deterministic-id>",
+  "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
+  "type": "one-to-one"
+}
+```
+
+Implemented:
+
+- the command is idempotent by participant pair
+- validate that the keychain candidate belongs to the authenticated identity
+- persist conversation metadata in MongoDB
+- publish `ConversationWasCreatedEvent`
+
 TODO:
 
-- define whether this is idempotent by participant pair
-- define response shape
 - define error when remote identity cannot be resolved
-- validate that the keychain candidate belongs to the authenticated identity
 - define encryption setup and key exchange boundary inside the client keychain
+- define how the receiver discovers or registers the conversation from PubSub
 
 ### Get latest messages
 
