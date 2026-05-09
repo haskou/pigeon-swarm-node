@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf, Signature } from '@haskou/value-objects';
+import { PrimitiveOf, PublicKey, Signature } from '@haskou/value-objects';
 
 import { Keychain } from '../Keychain';
 
@@ -23,7 +23,9 @@ export class KeychainSignatureDomainService {
     const primitives = keychain.toPrimitives();
     const { signature, ...payload } = primitives;
 
-    return new IdentityId(primitives.ownerIdentityId).isValidSignature(
+    const ownerIdentityId = new IdentityId(primitives.ownerIdentityId);
+
+    return PublicKey.fromPEM(ownerIdentityId.toString()).isValidSignature(
       JSON.stringify(this.getCanonicalPayload(payload)),
       new Signature(signature),
     );
