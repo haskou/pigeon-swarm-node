@@ -16,6 +16,8 @@ before implementation so the client contract does not leak P2P infrastructure.
 - WebSocket events notify already accepted or synchronized changes.
 - IPFS external identifiers may appear in API responses only as opaque external
   identifiers, never as domain concepts.
+- Node-to-node missed-message recovery is documented separately in
+  [PubSub Sync Protocol](pubsub-sync-protocol.md).
 
 ## Conversation HTTP API
 
