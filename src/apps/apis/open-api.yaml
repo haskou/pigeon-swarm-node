@@ -4,7 +4,6 @@ info:
   version: 1.0.0
   description: Aggregated OpenAPI document built with references to each API file.
 tags:
-  - name: example
   - name: identities
   - name: ipfs
 paths:

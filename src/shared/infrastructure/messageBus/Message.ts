@@ -3,6 +3,7 @@ export interface Message {
   routingKey: string;
   event: string;
   exchange: string;
+  type: string;
   occurred_on: string;
   aggregate_id: string;
   attributes: Record<string, unknown>;

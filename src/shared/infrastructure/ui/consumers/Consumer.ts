@@ -3,7 +3,21 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 
 export default abstract class Consumer {
+  private static processedEventIds = new Set<string>();
+
   constructor(private readonly consumer: DomainEventConsumer) {}
+
+  private getProcessedEventId(event: DomainEvent): string {
+    return `${this.queueName}:${event.eventId}`;
+  }
+
+  private hasProcessed(event: DomainEvent): boolean {
+    return Consumer.processedEventIds.has(this.getProcessedEventId(event));
+  }
+
+  private markAsProcessed(event: DomainEvent): void {
+    Consumer.processedEventIds.add(this.getProcessedEventId(event));
+  }
 
   public abstract get queueName(): string;
   public abstract get eventName(): string;
@@ -17,9 +31,14 @@ export default abstract class Consumer {
       this.eventName,
       this.domainEvent,
       this.exchange,
-      ((event: DomainEvent) => this.handler(event)) as (
-        event: DomainEvent,
-      ) => Promise<void>,
+      (async (event: DomainEvent) => {
+        if (this.hasProcessed(event)) {
+          return;
+        }
+
+        await this.handler(event);
+        this.markAsProcessed(event);
+      }) as (event: DomainEvent) => Promise<void>,
     );
   }
 
