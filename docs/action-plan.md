@@ -10,8 +10,8 @@ current work, verification and the next useful cut.
 - Each node is a server-capable P2P runtime.
 - MongoDB is the node-local store for metadata, lookup indexes, pagination and
   processing/sync cursors.
-- IPFS/Helia stores immutable content: identity documents, message documents,
-  media and binary attachments.
+- IPFS/Helia stores immutable content: identity documents, keychain documents,
+  message documents, media and binary attachments.
 - PubSub distributes live node-to-node announcements and integration events.
 - DHT discovers candidate external identifiers and peers.
 - Domain truth comes from aggregates, value objects, canonical payloads,
@@ -21,8 +21,10 @@ current work, verification and the next useful cut.
 
 ## Design Rules
 
-- `Identity` is the aggregate. It owns `version` and
+- `Identity` is the public user aggregate. It owns `version` and
   `previousIdentityExternalIdentifier`.
+- `Keychain` is the encrypted portable user secret store. Nodes never decrypt
+  its payload.
 - `Conversation` is the aggregate root for chat state.
 - `Message` is an entity owned by `Conversation`.
 - Edits and deletes are new signed messages, never mutations of the original
@@ -32,8 +34,9 @@ current work, verification and the next useful cut.
 - MongoDB documents, IPFS documents, DHT records and PubSub DTOs are
   infrastructure details.
 - Domain language avoids `CID`. Use names such as
-  `IdentityExternalIdentifier` or `AttachmentExternalIdentifier`; content
-  addressing vocabulary stays in infrastructure.
+  `IdentityExternalIdentifier`, `KeychainExternalIdentifier` or
+  `AttachmentExternalIdentifier`; content addressing vocabulary stays in
+  infrastructure.
 - Remote content is untrusted until the corresponding domain validation service
   accepts it.
 - PubSub is a separate infrastructure capability, not an `IPFS` method.
@@ -65,36 +68,27 @@ current work, verification and the next useful cut.
 - `RegisterIdentityWhenPublished` performs registration through
   `RegisterPublishedIdentity`; finder use cases remain read-only.
 
-## Current Slice: PubSub Anti-Entropy
+## Current Slice: Keychain Foundation
 
-Goal: recover missed PubSub events when a node was offline or detects a gap.
+Goal: add the encrypted, portable user secret store needed before real
+conversation creation and encrypted messages.
 
-Constraints:
+Status:
 
-- Nodes cannot use each other's HTTP APIs.
-- Nodes may not know each other's IPs.
-- PubSub is the node-to-node coordination channel.
-- IPFS/Helia stores immutable content; PubSub moves announcements, requests,
-  responses and candidate external identifiers.
+- [x] Add `Keychain` aggregate with version and previous external identifier.
+- [x] Add IPFS document mapper for encrypted keychain documents.
+- [x] Add MongoDB keychain metadata persistence.
+- [x] Add repository save/find candidates by owner identity.
+- [x] Add owner, signature and version-chain validation service.
+- [ ] Add signed request authentication for API calls.
+- [ ] Add keychain HTTP endpoints.
 
-Preliminary protocol:
+Keep:
 
-- `identity.sync.request` / `identity.sync.response` for identity version
-  convergence.
-- `conversation.sync.request` / `conversation.sync.response` for conversation
-  heads/checkpoints.
-- `conversation.missing.request` / `conversation.missing.response` for bounded
-  pagination of missing candidate message identifiers.
-- Responses never become truth directly; receivers still fetch immutable
-  documents and validate them in domain services.
-
-Tests to design with Cucumber:
-
-- Nobody has the latest identity version: resolver returns the highest valid
-  known version and records a sync miss.
-- Only one peer has the latest identity version: another node discovers,
-  validates, caches and returns it.
-- A node starts after a week offline and recovers missed conversation messages.
+- Nodes do not receive keychain passwords.
+- Nodes do not decrypt keychain payloads.
+- Clients unlock and mutate keychain contents locally.
+- See [Keychains](keychains.md).
 
 ## Consumer Backlog
 
@@ -132,26 +126,35 @@ and let repositories/domain validation decide what is trustworthy.
   - fetches and validates candidate message documents before updating local
     projections
 
-## Next Slice 1: Conversation Encryption Policy
+## Next Slice 1: Signed HTTP Requests
 
-Goal: model encryption as a domain rule of the conversation type.
+Goal: authenticate API calls without passwords or JWT sessions.
 
 Steps:
 
-1. Add a `ConversationType` or `ConversationEncryptionPolicy` enum/value object.
-2. Make message payload kind explicit in the domain.
-3. Enforce encrypted payloads for 1to1 conversations.
-4. Keep encryption/decryption mechanics in application or infrastructure
-   services.
-5. Include payload kind and payload value in the canonical signature payload.
+1. Define canonical request payload:
+   - method
+   - path
+   - timestamp
+   - nonce
+   - body hash
+2. Verify `X-Identity-Id`, `X-Timestamp`, `X-Nonce` and `X-Signature`.
+3. Store recent nonces in MongoDB to prevent replay.
+4. Add Cucumber coverage for accepted, invalid and replayed signed requests.
 
-Tests:
+## Next Slice 2: Conversation Creation API
 
-- Unit: 1to1 rejects unencrypted payloads.
-- Unit: signed payload changes when payload kind changes.
-- Cucumber: 1to1 conversation round-trips encrypted messages.
+Goal: create usable 1to1 conversations through the API.
 
-## Next Slice 2: Conversation Repository And Remote Message Validation
+Steps:
+
+1. Require signed request auth.
+2. Accept `participantIdentityId` and `keychainExternalIdentifier`.
+3. Validate the keychain candidate belongs to the owner identity.
+4. Create deterministic 1to1 conversation metadata.
+5. Publish `ConversationWasCreatedEvent`.
+
+## Next Slice 3: Conversation Messages And Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
@@ -205,8 +208,9 @@ Tests:
 Focused commands for this stage:
 
 ```bash
-PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn jest tests/unit/shared/infrastructure/messageBus tests/unit/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished.spec.ts --runInBand
+PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn jest tests/unit/contexts/keychains --runInBand
 PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn lint
+PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn build
 ```
 
 Broader checks before merge when the slice grows:
