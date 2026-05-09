@@ -68,47 +68,26 @@ current work, verification and the next useful cut.
 - `RegisterIdentityWhenPublished` performs registration through
   `RegisterPublishedIdentity`; finder use cases remain read-only.
 
-## Current Slice: Keychain Foundation
+## Recently Completed
 
-Goal: add the encrypted, portable user secret store needed before real
-conversation creation and encrypted messages.
+- Keychain aggregate, IPFS documents, MongoDB metadata and validation services.
+- `POST /keychains` for publishing encrypted keychain versions.
+- Signed HTTP request verification for implemented API commands.
+- Keychain API Cucumber coverage.
 
-Status:
+## Current Slice: Conversation Creation API
 
-- [x] Add `Keychain` aggregate with version and previous external identifier.
-- [x] Add IPFS document mapper for encrypted keychain documents.
-- [x] Add MongoDB keychain metadata persistence.
-- [x] Add repository save/find candidates by owner identity.
-- [x] Add owner, signature and version-chain validation service.
-- [x] Keep domain services on aggregate/value-object methods, not
-  `toPrimitives`.
-
-Keep:
-
-- Nodes do not receive keychain passwords.
-- Nodes do not decrypt keychain payloads.
-- Clients unlock and mutate keychain contents locally.
-- See [Keychains](keychains.md).
-
-## Current Slice: Keychain API And Consumers
-
-Goal: expose keychain publication through the application boundary and register
-published keychains from PubSub.
+Goal: create usable 1to1 conversations through the API.
 
 Status:
 
-- [x] Add signed request authentication for keychain publication.
-- [x] Add `POST /keychains` as a create/publish command, not a mutable
-  `PUT` update.
-- [x] Add `publish encrypted keychain version` application use case.
-- [x] Add Cucumber coverage for API publication.
-- [ ] Add `register published keychain candidate` application use case.
-- [ ] Add `find current keychain for authenticated identity` application use
-  case.
-- [ ] Add PubSub consumers:
-  - `pubsub/keychains/RegisterKeychainWhenPublished`
-  - `pubsub/keychains/SynchronizeKeychainWhenUpdated`
-- [ ] Add Cucumber coverage for consumer registration.
+- [x] Require signed request auth.
+- [x] Accept `participantIdentityId` and `keychainExternalIdentifier`.
+- [x] Validate the keychain candidate belongs to the authenticated identity.
+- [x] Create deterministic 1to1 conversation metadata in MongoDB.
+- [x] Publish `ConversationWasCreatedEvent` from the aggregate root creation.
+- [x] Add Cucumber coverage for creating a 1to1 conversation through the API.
+- [x] Update OpenAPI and API docs.
 
 ## Consumer Backlog
 
@@ -162,19 +141,7 @@ Steps:
 3. Store recent nonces in MongoDB to prevent replay.
 4. Add Cucumber coverage for accepted, invalid and replayed signed requests.
 
-## Next Slice 2: Conversation Creation API
-
-Goal: create usable 1to1 conversations through the API.
-
-Steps:
-
-1. Require signed request auth.
-2. Accept `participantIdentityId` and `keychainExternalIdentifier`.
-3. Validate the keychain candidate belongs to the owner identity.
-4. Create deterministic 1to1 conversation metadata.
-5. Publish `ConversationWasCreatedEvent`.
-
-## Next Slice 3: Conversation Messages And Remote Validation
+## Next Slice 2: Conversation Messages And Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
@@ -195,12 +162,25 @@ Steps:
 
 Use cases:
 
-- create/get 1to1 conversation
+- get/list 1to1 conversations
 - send message
 - edit message
 - delete message
 - latest messages
 - synchronize conversation
+
+## Next Slice 3: Keychain Consumers
+
+Goal: register and synchronize published keychain candidates from PubSub.
+
+Steps:
+
+1. Add `register published keychain candidate` application use case.
+2. Add `find current keychain for authenticated identity` application use case.
+3. Add PubSub consumers:
+   - `pubsub/keychains/RegisterKeychainWhenPublished`
+   - `pubsub/keychains/SynchronizeKeychainWhenUpdated`
+4. Add Cucumber coverage for consumer registration.
 
 ## Last Slice: Client Chat API
 
@@ -231,11 +211,5 @@ Focused commands for this stage:
 PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn jest tests/unit/contexts/keychains --runInBand
 PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn lint
 PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn build
-```
-
-Broader checks before merge when the slice grows:
-
-```bash
-PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn test:api
-PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn test:consumer
+PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn test
 ```

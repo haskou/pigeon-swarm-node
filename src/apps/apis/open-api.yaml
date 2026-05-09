@@ -4,10 +4,13 @@ info:
   version: 1.0.0
   description: Aggregated OpenAPI document built with references to each API file.
 tags:
+  - name: conversations
   - name: identities
   - name: ipfs
   - name: keychains
 paths:
+  /conversations/1to1:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~11to1'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /ipfs/{cid}:

@@ -3,6 +3,7 @@ import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
+import { ConversationWasCreatedEvent } from './events/ConversationWasCreatedEvent';
 import { Message } from './Message';
 import { MessageFactory } from './MessageFactory';
 import { ConversationId } from './value-objects/ConversationId';
@@ -12,10 +13,18 @@ export class OneToOneConversation extends Conversation {
     firstParticipant: IdentityId,
     secondParticipant: IdentityId,
   ): OneToOneConversation {
-    return new OneToOneConversation(
+    const conversation = new OneToOneConversation(
       ConversationId.deterministic(firstParticipant, secondParticipant),
       [firstParticipant, secondParticipant],
     );
+
+    conversation.record(
+      new ConversationWasCreatedEvent(conversation.toPrimitives().id, {
+        participantIds: conversation.toPrimitives().participantIds,
+      }),
+    );
+
+    return conversation;
   }
 
   public static fromPrimitives(

@@ -1,4 +1,5 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { PostOneToOneConversationRoute } from '@app/apps/apis/conversations-api/routes/PostOneToOneConversationRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
@@ -114,6 +115,7 @@ export default class Server {
           ConsumeDlxRoute,
           PostIdentityRoute,
           PostKeychainRoute,
+          PostOneToOneConversationRoute,
           GetIPFSContentRoute,
         ],
         cors: true,
