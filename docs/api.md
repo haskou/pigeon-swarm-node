@@ -1,6 +1,6 @@
 # Pigeon Swarm API
 
-Last updated: 2026-05-07.
+Last updated: 2026-05-09.
 
 This document is intentionally incomplete. It captures the intended API shape
 before implementation so the client contract does not leak P2P infrastructure.
@@ -18,6 +18,92 @@ before implementation so the client contract does not leak P2P infrastructure.
   identifiers, never as domain concepts.
 - Node-to-node missed-message recovery is documented separately in
   [PubSub Sync Protocol](pubsub-sync-protocol.md).
+- Keychain design is documented separately in [Keychains](keychains.md).
+
+## Authentication
+
+TODO: replace password/JWT flows with signed HTTP requests.
+
+Every mutating endpoint should be authenticated by a canonical request
+signature:
+
+```http
+X-Identity-Id: <identityId>
+X-Timestamp: <timestamp>
+X-Nonce: <nonce>
+X-Signature: <signature>
+```
+
+TODO:
+
+- define canonical request payload: method, path, timestamp, nonce and body hash
+- store recent nonces in MongoDB to prevent replay
+- define allowed clock skew
+- define Cucumber scenarios for valid, invalid and replayed signed requests
+
+## Keychain HTTP API
+
+The node stores and announces encrypted keychain documents. It must never
+receive the keychain password and must never decrypt the payload.
+
+### Publish current keychain
+
+```http
+PUT /keychains/current
+```
+
+Request:
+
+```json
+{
+  "version": 1,
+  "previousKeychainExternalIdentifier": null,
+  "encryptedPayload": "TODO",
+  "signature": "TODO"
+}
+```
+
+Response:
+
+```json
+{
+  "ownerIdentityId": "TODO",
+  "version": 1,
+  "keychainExternalIdentifier": "TODO"
+}
+```
+
+TODO:
+
+- validate owner identity from the signed request
+- validate keychain signature and version chain
+- persist immutable encrypted document in IPFS
+- persist metadata in MongoDB
+- publish keychain announcement through the domain event publisher
+
+### Get current keychain
+
+```http
+GET /keychains/current
+```
+
+Response:
+
+```json
+{
+  "ownerIdentityId": "TODO",
+  "version": 1,
+  "keychainExternalIdentifier": "TODO",
+  "encryptedPayload": "TODO",
+  "signature": "TODO"
+}
+```
+
+TODO:
+
+- return only the authenticated identity keychain
+- resolve latest valid candidate from local MongoDB, DHT and future sync data
+- return encrypted payload as-is for client-side unlock/decryption
 
 ## Conversation HTTP API
 
@@ -47,7 +133,8 @@ Request:
 
 ```json
 {
-  "participantIdentityId": "TODO"
+  "participantIdentityId": "TODO",
+  "keychainExternalIdentifier": "TODO"
 }
 ```
 
@@ -56,7 +143,8 @@ TODO:
 - define whether this is idempotent by participant pair
 - define response shape
 - define error when remote identity cannot be resolved
-- define encryption setup and key exchange boundary
+- validate that the keychain candidate belongs to the authenticated identity
+- define encryption setup and key exchange boundary inside the client keychain
 
 ### Get latest messages
 
