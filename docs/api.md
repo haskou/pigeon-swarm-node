@@ -165,36 +165,39 @@ TODO:
 ### Get latest messages
 
 ```http
-GET /conversations/{conversationId}/messages?limit=50&before=TODO
+GET /conversations/{conversationId}/messages?limit=50&beforeMessageId=TODO
 ```
 
 Response:
 
 ```json
 {
-  "conversationId": "TODO",
+  "conversationId": "one-to-one:<deterministic-id>",
   "messages": [
     {
-      "messageId": "TODO",
+      "id": "TODO",
       "type": "sent",
       "authorIdentityId": "TODO",
-      "createdAt": "TODO",
-      "externalIdentifier": "TODO",
-      "payload": {
-        "kind": "encrypted",
-        "value": "TODO"
-      }
+      "createdAt": 1773848829055,
+      "encryptedPayload": "TODO",
+      "previousMessageIds": [],
+      "attachmentExternalIdentifiers": []
     }
   ],
-  "nextCursor": "TODO"
+  "nextBeforeMessageId": "TODO"
 }
 ```
 
+Implemented:
+
+- require signed request auth
+- return the latest messages ordered from oldest to newest in the page
+- when `beforeMessageId` is provided, return messages older than that message
+
 TODO:
 
-- decide whether payload is returned inline or fetched lazily by external
-  identifier
-- define cursor format
+- define whether payload should stay inline or become lazy by external
+  identifier for large payloads
 - define tombstone projection for deleted messages
 - define edited message projection
 - define attachment metadata projection
@@ -209,27 +212,39 @@ Request:
 
 ```json
 {
-  "payload": {
-    "kind": "encrypted",
-    "value": "TODO"
-  },
-  "attachments": [
-    {
-      "externalIdentifier": "TODO",
-      "mimeType": "TODO",
-      "size": 0
-    }
-  ]
+  "encryptedPayload": "TODO",
+  "signature": "TODO",
+  "attachmentExternalIdentifiers": ["TODO"]
 }
 ```
 
-TODO:
+Response:
+
+```json
+{
+  "id": "TODO",
+  "conversationId": "one-to-one:<deterministic-id>",
+  "authorIdentityId": "TODO",
+  "type": "sent",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "TODO",
+  "previousMessageIds": [],
+  "attachmentExternalIdentifiers": []
+}
+```
+
+Implemented:
 
 - enforce encrypted payloads for 1to1 conversations
+- persist immutable message document in IPFS
+- persist message metadata in MongoDB
+- publish `ConversationMessageWasSentEvent`
+
+TODO:
+
 - define client-generated idempotency key
 - define attachment upload flow
-- define message signing boundary
-- define response shape after IPFS and Mongo persistence
+- harden message signature validation against the canonical message payload
 
 ### Edit message
 

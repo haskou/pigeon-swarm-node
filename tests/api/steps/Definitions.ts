@@ -28,7 +28,9 @@ export default class Definitions {
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
 
+  private conversationId: string | undefined;
   private keychainExternalIdentifier: string | undefined;
+  private messageId: string | undefined;
 
   private ownerIdentityId: IdentityId | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,7 +44,9 @@ export default class Definitions {
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
+    this.conversationId = undefined;
     this.keychainExternalIdentifier = undefined;
+    this.messageId = undefined;
     this.ownerIdentityId = undefined;
     this.response = null;
     this.ipfsDefinition.resetScenarioState();
@@ -94,10 +98,6 @@ export default class Definitions {
   }
 
   private async signCurrentRequest(method: string, path: string): Promise<void> {
-    if (!this.body) {
-      throw new Error('Body must be set before signing the request.');
-    }
-
     const keyPair = await this.ensureIdentityKeyPair();
     const timestamp = String(Date.now());
     const nonce = `api-nonce-${timestamp}`;
@@ -107,7 +107,7 @@ export default class Definitions {
       path,
       timestamp,
       nonce,
-      JSON.parse(this.body),
+      this.body ? JSON.parse(this.body) : {},
     );
 
     this.headers['x-identity-id'] = this.ownerIdentityId?.valueOf() || '';
@@ -195,6 +195,87 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/conversations/1to1');
   }
 
+  @given('I have created a one-to-one conversation')
+  public async iHaveCreatedAOneToOneConversation(): Promise<void> {
+    await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
+    await this.iSetAOneToOneConversationBodyForANewParticipant();
+    await this.iSignTheCurrentOneToOneConversationRequest();
+
+    this.response = await this.restClient.post(
+      '/conversations/1to1',
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not create conversation: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.conversationId = this.response.data.id;
+  }
+
+  @given('I set an encrypted conversation message body')
+  public async iSetAnEncryptedConversationMessageBody(): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      encryptedPayload: 'encrypted-message-payload',
+      signature: keyPair.sign('encrypted-message-payload').valueOf(),
+    });
+  }
+
+  @given('I sign the current conversation message request')
+  public async iSignTheCurrentConversationMessageRequest(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/conversations/${this.conversationId}/messages`,
+    );
+  }
+
+  @given('I sign the current latest conversation messages request')
+  public async iSignTheCurrentLatestConversationMessagesRequest(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/conversations/${this.conversationId}/messages`,
+    );
+  }
+
+  @given('I have sent an encrypted conversation message')
+  public async iHaveSentAnEncryptedConversationMessage(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    await this.iSetAnEncryptedConversationMessageBody();
+    await this.iSignTheCurrentConversationMessageRequest();
+
+    this.response = await this.restClient.post(
+      `/conversations/${this.conversationId}/messages`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not send message: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.messageId = this.response.data.id;
+  }
+
   @given('I register an in-memory IPFS network {string}')
   public async iRegisterAnInMemoryIPFSNetwork(
     networkName: string,
@@ -276,6 +357,43 @@ export default class Definitions {
   @when('I GET {string}')
   public async iGET(path: string): Promise<void> {
     this.response = await this.restClient.get(path, this.headers);
+  }
+
+  @when('I POST the message to the current conversation')
+  public async iPostTheMessageToTheCurrentConversation(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/conversations/${this.conversationId}/messages`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET latest messages from the current conversation')
+  public async iGetLatestMessagesFromTheCurrentConversation(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/conversations/${this.conversationId}/messages?limit=50`,
+      this.headers,
+    );
+  }
+
+  @when('I GET latest messages before the sent message')
+  public async iGetLatestMessagesBeforeTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/conversations/${this.conversationId}/messages?limit=50&beforeMessageId=${this.messageId}`,
+      this.headers,
+    );
   }
 
   @when('I DELETE {string}')

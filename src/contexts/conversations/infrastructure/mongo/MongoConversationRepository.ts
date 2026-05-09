@@ -4,25 +4,92 @@ import { ConversationRepository } from '@app/contexts/conversations/domain/repos
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
+import { IpfsMessageDocument } from '../ipfs/documents/IpfsMessageDocument';
+import IpfsMessageMapper from '../ipfs/mappers/IpfsMessageMapper';
 import { MongoConversationDocument } from './documents/MongoConversationDocument';
+import { MongoMessageMetadataDocument } from './documents/MongoMessageMetadataDocument';
 import MongoConversationMapper from './mappers/MongoConversationMapper';
+import MongoMessageMetadataMapper from './mappers/MongoMessageMetadataMapper';
 
 type Repository = ConversationRepository;
 
 export default class MongoConversationRepository implements Repository {
   private static readonly COLLECTION = 'conversations';
+  private static readonly MESSAGES_COLLECTION = 'conversation_messages';
 
   constructor(
     private readonly mongo: MongoDB,
     private readonly mapper: MongoConversationMapper,
+    private readonly ipfsManager: IPFS,
+    private readonly messageMapper: IpfsMessageMapper,
+    private readonly metadataMapper: MongoMessageMetadataMapper,
   ) {}
 
   private async collection() {
     return this.mongo.getCollection<MongoConversationDocument>(
       MongoConversationRepository.COLLECTION,
     );
+  }
+
+  private async messageMetadataCollection() {
+    return this.mongo.getCollection<MongoMessageMetadataDocument>(
+      MongoConversationRepository.MESSAGES_COLLECTION,
+    );
+  }
+
+  private async findMessagesByConversationId(
+    conversationId: ConversationId,
+  ): Promise<Message[]> {
+    const documents = await (
+      await this.messageMetadataCollection()
+    )
+      .find({
+        conversationId: conversationId.valueOf(),
+        valid: true,
+      })
+      .sort({ createdAt: 1 })
+      .toArray();
+
+    const messages: Message[] = [];
+
+    for (const document of documents) {
+      const message = await this.findMessageFromMetadata(document);
+
+      if (message) {
+        messages.push(message);
+      }
+    }
+
+    return messages;
+  }
+
+  private async findMessageFromMetadata(
+    metadata: MongoMessageMetadataDocument,
+  ): Promise<Message | undefined> {
+    try {
+      const document = await this.ipfsManager.getJSON<IpfsMessageDocument>(
+        new IPFSId(metadata.cid),
+      );
+
+      return this.messageMapper.toDomain(document);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private getRecipientIds(
+    conversation: Conversation,
+    message: Message,
+  ): string[] {
+    return conversation
+      .toPrimitives()
+      .participantIds.filter(
+        (participantId) => participantId !== message.getAuthorId().valueOf(),
+      );
   }
 
   public async findById(
@@ -34,17 +101,66 @@ export default class MongoConversationRepository implements Repository {
       _id: conversationId.valueOf(),
     });
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    if (!document) {
+      return undefined;
+    }
+
+    return this.mapper.toDomain(
+      document,
+      await this.findMessagesByConversationId(conversationId),
+    );
   }
 
-  public findMessageById(
+  public async findLatestMessages(
+    conversationId: ConversationId,
+    limit: number,
+    beforeMessageId?: MessageId,
+  ): Promise<Message[]> {
+    const collection = await this.messageMetadataCollection();
+    const beforeDocument = beforeMessageId
+      ? await collection.findOne({
+          conversationId: conversationId.valueOf(),
+          messageId: beforeMessageId.valueOf(),
+          valid: true,
+        })
+      : undefined;
+    const documents = await collection
+      .find({
+        ...(beforeDocument
+          ? { createdAt: { $lt: beforeDocument.createdAt } }
+          : {}),
+        conversationId: conversationId.valueOf(),
+        valid: true,
+      })
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .toArray();
+    const messages: Message[] = [];
+
+    for (const document of documents.reverse()) {
+      const message = await this.findMessageFromMetadata(document);
+
+      if (message) {
+        messages.push(message);
+      }
+    }
+
+    return messages;
+  }
+
+  public async findMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined> {
-    void conversationId;
-    void messageId;
+    const metadata = await (
+      await this.messageMetadataCollection()
+    ).findOne({
+      conversationId: conversationId.valueOf(),
+      messageId: messageId.valueOf(),
+      valid: true,
+    });
 
-    return Promise.resolve<Message | undefined>(undefined);
+    return metadata ? this.findMessageFromMetadata(metadata) : undefined;
   }
 
   public async findOneToOne(
@@ -66,5 +182,41 @@ export default class MongoConversationRepository implements Repository {
       { $setOnInsert: document },
       { upsert: true },
     );
+
+    for (const message of conversation.toPrimitives().messages) {
+      const existing = await this.findMessageById(
+        new ConversationId(message.conversationId),
+        new MessageId(message.id),
+      );
+
+      if (existing) {
+        continue;
+      }
+
+      const domainMessage = conversation.findMessageById(
+        new MessageId(message.id),
+      );
+
+      if (!domainMessage) {
+        continue;
+      }
+
+      const cid = await this.ipfsManager.addJSONToAll(
+        this.messageMapper.toDocument(domainMessage),
+      );
+      const metadata = this.metadataMapper.toDocument(
+        domainMessage,
+        cid,
+        this.getRecipientIds(conversation, domainMessage),
+      );
+
+      await (
+        await this.messageMetadataCollection()
+      ).updateOne(
+        { _id: metadata._id },
+        { $setOnInsert: metadata },
+        { upsert: true },
+      );
+    }
   }
 }
