@@ -1,0 +1,102 @@
+@startuml
+
+title Pigeon Swarm - Keychains Context
+
+package "keychains.domain" {
+  class Keychain <<AggregateRoot>> {
+    -ownerIdentityId: IdentityId
+    -encryptedPayload: EncryptedKeychainPayload
+    -timestamp: Timestamp
+    -signature: Signature
+    -version: KeychainVersion
+    -previousKeychainExternalIdentifier?: KeychainExternalIdentifier
+    +publish(primitives): Keychain
+    +fromPrimitives(primitives): Keychain
+  }
+
+  class EncryptedKeychainPayload <<ValueObject>>
+  class KeychainExternalIdentifier <<ValueObject>>
+  class KeychainVersion <<ValueObject>>
+
+  class KeychainWasPublishedEvent <<DomainEvent>>
+
+  interface KeychainRepository {
+    +save(keychain: Keychain): Promise<void>
+    +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
+  }
+
+  class KeychainSignatureDomainService {
+    +isValidSignature(keychain: Keychain): boolean
+  }
+
+  class KeychainCandidateValidationDomainService {
+    +isValidChainFor(ownerIdentityId, keychain, findPrevious): Promise<boolean>
+  }
+
+  Keychain --> IdentityId
+  Keychain --> EncryptedKeychainPayload
+  Keychain --> KeychainVersion
+  Keychain --> KeychainExternalIdentifier
+  Keychain --> Signature
+  Keychain --> Timestamp
+  Keychain ..> KeychainWasPublishedEvent
+  KeychainSignatureDomainService ..> Keychain
+  KeychainCandidateValidationDomainService --> KeychainSignatureDomainService
+  KeychainCandidateValidationDomainService ..> Keychain
+  KeychainRepository --> Keychain
+}
+
+package "keychains.infrastructure" {
+  class IpfsKeychainDocument {
+    -_id: string
+    -encryptedPayload: string
+    -previousCid?: string
+    -signature: string
+    -timestamp: number
+    -version: number
+  }
+
+  class MongoKeychainMetadataDocument {
+    -_id: string
+    -cid: string
+    -ownerIdentityId: string
+    -previousCid?: string
+    -receivedAt: number
+    -version: number
+  }
+
+  class IpfsKeychainRepository {
+    +save(keychain: Keychain): Promise<void>
+    +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
+  }
+
+  class IpfsKeychainMapper {
+    +toDocument(keychain: Keychain): IpfsKeychainDocument
+    +toDomain(document: IpfsKeychainDocument): Keychain
+  }
+
+  class MongoKeychainMetadataRepository {
+    +save(keychain: Keychain, cid: IPFSId): Promise<void>
+    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<MongoKeychainMetadataDocument[]>
+  }
+
+  class MongoKeychainMetadataMapper {
+    +toDocument(keychain: Keychain, cid: IPFSId): MongoKeychainMetadataDocument
+  }
+
+  note right of IpfsKeychainRepository
+    Encapsulates IPFS documents, MongoDB metadata,
+    DHT record candidates and content addressing.
+    The domain only receives Keychain objects and
+    opaque KeychainExternalIdentifier values.
+  end note
+
+  IpfsKeychainRepository ..|> KeychainRepository
+  IpfsKeychainRepository --> IpfsKeychainMapper
+  IpfsKeychainRepository --> MongoKeychainMetadataRepository
+  IpfsKeychainRepository --> IpfsKeychainDocument
+  MongoKeychainMetadataRepository --> MongoKeychainMetadataMapper
+  MongoKeychainMetadataRepository --> MongoKeychainMetadataDocument
+}
+
+@enduml

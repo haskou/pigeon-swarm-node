@@ -28,6 +28,9 @@ Create a new bounded context:
 src/contexts/keychains/
 ```
 
+The context class diagram lives in
+[`src/contexts/keychains/_docs/KeychainsClasses.puml`](../src/contexts/keychains/_docs/KeychainsClasses.puml).
+
 Suggested domain objects:
 
 - `Keychain`
