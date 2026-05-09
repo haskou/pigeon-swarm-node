@@ -45,7 +45,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
+  /conversations/{conversationId}/messages:
+    post:
+      tags:
+        - conversations
+      summary: Send encrypted message to conversation
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostConversationMessageBody'
+      responses:
+        '200':
+          description: Message accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResource'
+    get:
+      tags:
+        - conversations
+      summary: Get latest conversation messages
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: beforeMessageId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest messages page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesResource'
 components:
+  parameters:
+    ConversationId:
+      in: path
+      name: conversationId
+      required: true
+      schema:
+        type: string
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
   schemas:
     PostOneToOneConversationBody:
       type: object
@@ -75,3 +156,64 @@ components:
           type: string
           enum:
             - one-to-one
+    PostConversationMessageBody:
+      type: object
+      required:
+        - encryptedPayload
+        - signature
+      properties:
+        encryptedPayload:
+          type: string
+        signature:
+          type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string
+    MessageResource:
+      type: object
+      required:
+        - id
+        - conversationId
+        - authorIdentityId
+        - type
+        - createdAt
+        - previousMessageIds
+        - attachmentExternalIdentifiers
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        authorIdentityId:
+          type: string
+        type:
+          type: string
+        createdAt:
+          type: integer
+        encryptedPayload:
+          type: string
+        previousMessageIds:
+          type: array
+          items:
+            type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string
+        targetMessageId:
+          type: string
+    MessagesResource:
+      type: object
+      required:
+        - conversationId
+        - messages
+      properties:
+        conversationId:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageResource'
+        nextBeforeMessageId:
+          type: string

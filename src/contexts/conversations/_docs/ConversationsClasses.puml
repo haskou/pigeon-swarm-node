@@ -55,6 +55,7 @@ package "conversations.domain" {
     +findById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
     +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
+    +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
   }
 
   Conversation <|-- OneToOneConversation
@@ -80,7 +81,7 @@ package "conversations.application" {
   }
 
   class MessageSender {
-    +send(command): Promise<MessageId>
+    +send(command): Promise<MessageSent>
   }
 
   class MessageReceiver {
@@ -88,7 +89,7 @@ package "conversations.application" {
   }
 
   class LatestMessagesFinder {
-    +find(query): Promise<object[]>
+    +find(query): Promise<Message[]>
   }
 
   class MessageEditor {

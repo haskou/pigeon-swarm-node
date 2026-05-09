@@ -1,4 +1,6 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
+import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageRoute';
 import { PostOneToOneConversationRoute } from '@app/apps/apis/conversations-api/routes/PostOneToOneConversationRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
@@ -116,6 +118,8 @@ export default class Server {
           PostIdentityRoute,
           PostKeychainRoute,
           PostOneToOneConversationRoute,
+          PostConversationMessageRoute,
+          GetConversationMessagesRoute,
           GetIPFSContentRoute,
         ],
         cors: true,

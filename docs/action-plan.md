@@ -75,18 +75,19 @@ current work, verification and the next useful cut.
 - Signed HTTP request verification for implemented API commands.
 - Keychain API Cucumber coverage.
 
-## Current Slice: Conversation Creation API
+## Current Slice: Conversation Messages API
 
-Goal: create usable 1to1 conversations through the API.
+Goal: make the first real 1to1 chat loop usable through HTTP.
 
 Status:
 
-- [x] Require signed request auth.
-- [x] Accept `participantIdentityId` and `keychainExternalIdentifier`.
-- [x] Validate the keychain candidate belongs to the authenticated identity.
-- [x] Create deterministic 1to1 conversation metadata in MongoDB.
-- [x] Publish `ConversationWasCreatedEvent` from the aggregate root creation.
-- [x] Add Cucumber coverage for creating a 1to1 conversation through the API.
+- [x] Add `POST /conversations/{conversationId}/messages`.
+- [x] Store immutable encrypted message documents in IPFS.
+- [x] Store message metadata in MongoDB for ordering and pagination.
+- [x] Publish `ConversationMessageWasSentEvent`.
+- [x] Add `GET /conversations/{conversationId}/messages`.
+- [x] Support `limit` and `beforeMessageId` pagination.
+- [x] Add Cucumber coverage for send/list and `beforeMessageId` pagination.
 - [x] Update OpenAPI and API docs.
 
 ## Consumer Backlog
@@ -141,32 +142,27 @@ Steps:
 3. Store recent nonces in MongoDB to prevent replay.
 4. Add Cucumber coverage for accepted, invalid and replayed signed requests.
 
-## Next Slice 2: Conversation Messages And Remote Validation
+## Next Slice 2: Conversation Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
 Steps:
 
-1. Implement `ConversationRepository` infrastructure.
-2. Persist immutable message documents in IPFS.
-3. Persist message metadata in MongoDB for ordering, pagination and candidate
-   validity.
-4. Validate remote message candidates before caching:
+1. Validate remote message candidates before caching:
    - message signature
    - author belongs to the conversation
    - message type is allowed
    - edit/delete target exists and is valid
    - payload policy matches the conversation type
-5. Return empty/not found when all remote candidates are invalid.
-6. Publish conversation announcements through `DomainEventPublisher`.
+2. Return empty/not found when all remote candidates are invalid.
+3. Publish conversation announcements through `DomainEventPublisher`.
+4. Add PubSub consumer coverage for sent-message announcements.
 
 Use cases:
 
 - get/list 1to1 conversations
-- send message
 - edit message
 - delete message
-- latest messages
 - synchronize conversation
 
 ## Next Slice 3: Keychain Consumers
