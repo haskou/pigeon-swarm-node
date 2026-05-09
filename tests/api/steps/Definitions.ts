@@ -29,6 +29,7 @@ export default class Definitions {
   private identityKeyPair: KeyPair | undefined;
 
   private conversationId: string | undefined;
+  private createdIdentityId: string | undefined;
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
 
@@ -45,6 +46,7 @@ export default class Definitions {
     this.headers = {};
     this.identityKeyPair = undefined;
     this.conversationId = undefined;
+    this.createdIdentityId = undefined;
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
     this.ownerIdentityId = undefined;
@@ -186,13 +188,14 @@ export default class Definitions {
 
     this.body = JSON.stringify({
       keychainExternalIdentifier: this.keychainExternalIdentifier,
-      participantIdentityId: participantIdentityId.valueOf(),
+      participantIdentityIds: [participantIdentityId.valueOf()],
+      type: 'one-to-one',
     });
   }
 
   @given('I sign the current one-to-one conversation request')
   public async iSignTheCurrentOneToOneConversationRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/conversations/1to1');
+    await this.signCurrentRequest('POST', '/conversations/');
   }
 
   @given('I have created a one-to-one conversation')
@@ -202,7 +205,7 @@ export default class Definitions {
     await this.iSignTheCurrentOneToOneConversationRequest();
 
     this.response = await this.restClient.post(
-      '/conversations/1to1',
+      '/conversations/',
       JSON.parse(this.body || '{}'),
       { headers: this.headers },
     );
@@ -250,6 +253,25 @@ export default class Definitions {
       'GET',
       `/conversations/${this.conversationId}/messages`,
     );
+  }
+
+  @given('I sign the current identity keychain request')
+  public async iSignTheCurrentIdentityKeychainRequest(): Promise<void> {
+    if (!this.ownerIdentityId) {
+      throw new Error('Authenticated identity must exist first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
+    );
+  }
+
+  @given('I sign the current conversations request')
+  public async iSignTheCurrentConversationsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/conversations/');
   }
 
   @given('I have sent an encrypted conversation message')
@@ -336,6 +358,10 @@ export default class Definitions {
         headers: this.headers,
       },
     );
+
+    if (this.response.data?.id) {
+      this.createdIdentityId = this.response.data.id;
+    }
   }
 
   @when('I PUT {string}')
@@ -392,6 +418,38 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/conversations/${this.conversationId}/messages?limit=50&beforeMessageId=${this.messageId}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the authenticated identity keychain')
+  public async iGetTheAuthenticatedIdentityKeychain(): Promise<void> {
+    if (!this.ownerIdentityId) {
+      throw new Error('Authenticated identity must exist first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET current conversations')
+  public async iGetCurrentConversations(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/conversations/?limit=20',
+      this.headers,
+    );
+  }
+
+  @when('I GET the created identity')
+  public async iGetTheCreatedIdentity(): Promise<void> {
+    if (!this.createdIdentityId) {
+      throw new Error('Identity must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/identities/${encodeURIComponent(this.createdIdentityId)}`,
       this.headers,
     );
   }

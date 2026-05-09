@@ -9,11 +9,17 @@ tags:
   - name: ipfs
   - name: keychains
 paths:
-  /conversations/1to1:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~11to1'
+  /conversations:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
+  /conversations/{conversationId}/messages:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
+  /identities/{identityId}:
+    $ref: './identities-api/swagger.yaml#/paths/~1identities~1{identityId}'
   /ipfs/{cid}:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'
   /keychains/:
     $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'
+  /keychains/{identityId}:
+    $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1{identityId}'

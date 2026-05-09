@@ -49,6 +49,44 @@ paths:
           description: Missing or invalid signed request headers.
         '409':
           description: Invalid keychain candidate.
+  /keychains/{identityId}:
+    get:
+      tags:
+        - keychains
+      summary: Get current encrypted keychain for identity
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Identity-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Timestamp
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Nonce
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current encrypted keychain.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeychainResource'
 components:
   schemas:
     PostKeychainBody:
@@ -92,3 +130,28 @@ components:
         version:
           type: integer
           example: 1
+    KeychainResource:
+      type: object
+      required:
+        - encryptedPayload
+        - keychainExternalIdentifier
+        - ownerIdentityId
+        - signature
+        - timestamp
+        - version
+      properties:
+        encryptedPayload:
+          type: string
+        keychainExternalIdentifier:
+          type: string
+        ownerIdentityId:
+          type: string
+        previousKeychainExternalIdentifier:
+          type: string
+          nullable: true
+        signature:
+          type: string
+        timestamp:
+          type: number
+        version:
+          type: integer

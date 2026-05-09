@@ -5,26 +5,26 @@ import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
-import { PostOneToOneConversationBody } from '../bodies/PostOneToOneConversationBody';
-import { PostOneToOneConversationRequest } from '../requests/PostOneToOneConversationRequest';
+import { PostConversationBody } from '../bodies/PostConversationBody';
+import { PostConversationRequest } from '../requests/PostConversationRequest';
 import { ConversationViewModel } from '../view-model/ConversationViewModel';
 
 @JsonController('/conversations')
-export class PostOneToOneConversationRoute extends Route {
+export class PostConversationRoute extends Route {
   private readonly creator: OneToOneConversationCreator =
     this.get<OneToOneConversationCreator>(OneToOneConversationCreator);
 
   private readonly signedRequestVerifier = new SignedHttpRequestVerifier();
 
-  @Post('/1to1')
-  public async createOneToOneConversation(
-    @Body() body: PostOneToOneConversationBody,
+  @Post('/')
+  public async createConversation(
+    @Body() body: PostConversationBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const ownerIdentityId = this.signedRequestVerifier.verify(request);
     const conversation = await this.creator.create(
-      new PostOneToOneConversationRequest(body, ownerIdentityId).getMessage(),
+      new PostConversationRequest(body, ownerIdentityId).getMessage(),
     );
 
     return response
