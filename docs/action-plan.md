@@ -65,25 +65,27 @@ current work, verification and the next useful cut.
 - `RegisterIdentityWhenPublished` performs registration through
   `RegisterPublishedIdentity`; finder use cases remain read-only.
 
-## Current Slice: Conversation API
+## Current Slice: Keychain Foundation
 
-Goal: make real 1to1 conversation flows testable through the HTTP API.
+Goal: add the encrypted, portable user secret store needed before real
+conversation creation and encrypted messages.
 
 Status:
 
-- [x] Add a `CreateOneToOneConversation` application use case.
-- [x] Add MongoDB conversation metadata persistence.
-- [x] Add `POST /conversations/1to1`.
-- [x] Add API documentation and Cucumber coverage for creating a conversation.
-- [ ] Add message send/read endpoints.
-- [ ] Add WebSocket client realtime.
+- [x] Add `Keychain` aggregate with version and previous external identifier.
+- [x] Add IPFS document mapper for encrypted keychain documents.
+- [x] Add MongoDB keychain metadata persistence.
+- [x] Add repository save/find candidates by owner identity.
+- [x] Add owner, signature and version-chain validation service.
+- [ ] Add signed request authentication for API calls.
+- [ ] Add keychain HTTP endpoints.
 
 Keep:
 
-- For now, 1to1 conversations are the only supported conversation type and are
-  treated as encrypted by design.
-- The future public-conversation policy should be introduced when a second
-  conversation type exists.
+- Nodes do not receive keychain passwords.
+- Nodes do not decrypt keychain payloads.
+- Clients unlock and mutate keychain contents locally.
+- See [Keychains](keychains.md).
 
 ## Consumer Backlog
 
@@ -121,7 +123,35 @@ and let repositories/domain validation decide what is trustworthy.
   - fetches and validates candidate message documents before updating local
     projections
 
-## Next Slice 1: Conversation Messages And Remote Validation
+## Next Slice 1: Signed HTTP Requests
+
+Goal: authenticate API calls without passwords or JWT sessions.
+
+Steps:
+
+1. Define canonical request payload:
+   - method
+   - path
+   - timestamp
+   - nonce
+   - body hash
+2. Verify `X-Identity-Id`, `X-Timestamp`, `X-Nonce` and `X-Signature`.
+3. Store recent nonces in MongoDB to prevent replay.
+4. Add Cucumber coverage for accepted, invalid and replayed signed requests.
+
+## Next Slice 2: Conversation Creation API
+
+Goal: create usable 1to1 conversations through the API.
+
+Steps:
+
+1. Require signed request auth.
+2. Accept `participantIdentityId` and `keychainExternalIdentifier`.
+3. Validate the keychain candidate belongs to the owner identity.
+4. Create deterministic 1to1 conversation metadata.
+5. Publish `ConversationWasCreatedEvent`.
+
+## Next Slice 3: Conversation Messages And Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
