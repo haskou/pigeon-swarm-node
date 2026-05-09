@@ -83,6 +83,10 @@ The plaintext payload is client-side only. A possible shape after decryption:
 This payload is not a server contract. The server contract is the encrypted
 document around it.
 
+The useful legacy `KeyRing` idea is preserved here: contacts and conversation
+keys belong inside the client-side encrypted keychain payload. Nodes only see
+the encrypted blob, version chain and signatures.
+
 ## API Direction
 
 The server should not receive the keychain password. The API should use signed
