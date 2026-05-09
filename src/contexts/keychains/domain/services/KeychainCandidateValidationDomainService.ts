@@ -14,37 +14,27 @@ export class KeychainCandidateValidationDomainService {
   ) {}
 
   private async hasValidPrevious(
+    ownerIdentityId: IdentityId,
     keychain: Keychain,
     findPrevious: PreviousKeychainFinder,
   ): Promise<boolean> {
-    const primitives = keychain.toPrimitives();
-
-    if (primitives.version === 1) {
-      return primitives.previousKeychainExternalIdentifier === undefined;
+    if (keychain.isFirstVersion()) {
+      return !keychain.getPreviousKeychainExternalIdentifier();
     }
 
-    if (!primitives.previousKeychainExternalIdentifier) {
+    const previousKeychainExternalIdentifier =
+      keychain.getPreviousKeychainExternalIdentifier();
+
+    if (!previousKeychainExternalIdentifier) {
       return false;
     }
 
-    const previous = await findPrevious(
-      new KeychainExternalIdentifier(
-        primitives.previousKeychainExternalIdentifier,
-      ),
-    );
-    const previousPrimitives = previous?.toPrimitives();
+    const previous = await findPrevious(previousKeychainExternalIdentifier);
 
-    return (
-      previousPrimitives?.ownerIdentityId === primitives.ownerIdentityId &&
-      previousPrimitives.version === primitives.version - 1 &&
-      (previous
-        ? await this.isValidChainFor(
-            new IdentityId(primitives.ownerIdentityId),
-            previous,
-            findPrevious,
-          )
-        : false)
-    );
+    return previous
+      ? keychain.isNextVersionAfter(previous) &&
+          (await this.isValidChainFor(ownerIdentityId, previous, findPrevious))
+      : false;
   }
 
   public async isValidChainFor(
@@ -52,9 +42,7 @@ export class KeychainCandidateValidationDomainService {
     keychain: Keychain,
     findPrevious: PreviousKeychainFinder,
   ): Promise<boolean> {
-    const primitives = keychain.toPrimitives();
-
-    if (primitives.ownerIdentityId !== ownerIdentityId.valueOf()) {
+    if (!keychain.belongsTo(ownerIdentityId)) {
       return false;
     }
 
@@ -62,6 +50,6 @@ export class KeychainCandidateValidationDomainService {
       return false;
     }
 
-    return this.hasValidPrevious(keychain, findPrevious);
+    return this.hasValidPrevious(ownerIdentityId, keychain, findPrevious);
   }
 }

@@ -80,8 +80,8 @@ Status:
 - [x] Add MongoDB keychain metadata persistence.
 - [x] Add repository save/find candidates by owner identity.
 - [x] Add owner, signature and version-chain validation service.
-- [ ] Add signed request authentication for API calls.
-- [ ] Add keychain HTTP endpoints.
+- [x] Keep domain services on aggregate/value-object methods, not
+  `toPrimitives`.
 
 Keep:
 
@@ -89,6 +89,25 @@ Keep:
 - Nodes do not decrypt keychain payloads.
 - Clients unlock and mutate keychain contents locally.
 - See [Keychains](keychains.md).
+
+## Next Slice 1: Keychain API And Consumers
+
+Goal: expose keychain publication through the application boundary and register
+published keychains from PubSub.
+
+Steps:
+
+1. Add signed request authentication for keychain API calls.
+2. Add keychain publication endpoint as a create/publish command, not a mutable
+   `PUT` update.
+3. Add application use cases:
+   - publish encrypted keychain version
+   - register published keychain candidate
+   - find current keychain for authenticated identity
+4. Add PubSub consumers:
+   - `pubsub/keychains/RegisterKeychainWhenPublished`
+   - `pubsub/keychains/SynchronizeKeychainWhenUpdated`
+5. Add Cucumber coverage for API publication and consumer registration.
 
 ## Consumer Backlog
 
@@ -126,7 +145,7 @@ and let repositories/domain validation decide what is trustworthy.
   - fetches and validates candidate message documents before updating local
     projections
 
-## Next Slice 1: Signed HTTP Requests
+## Next Slice 2: Signed HTTP Requests
 
 Goal: authenticate API calls without passwords or JWT sessions.
 
@@ -142,7 +161,7 @@ Steps:
 3. Store recent nonces in MongoDB to prevent replay.
 4. Add Cucumber coverage for accepted, invalid and replayed signed requests.
 
-## Next Slice 2: Conversation Creation API
+## Next Slice 3: Conversation Creation API
 
 Goal: create usable 1to1 conversations through the API.
 
@@ -154,7 +173,7 @@ Steps:
 4. Create deterministic 1to1 conversation metadata.
 5. Publish `ConversationWasCreatedEvent`.
 
-## Next Slice 3: Conversation Messages And Remote Validation
+## Next Slice 4: Conversation Messages And Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 

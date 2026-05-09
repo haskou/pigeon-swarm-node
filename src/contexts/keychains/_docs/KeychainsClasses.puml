@@ -12,6 +12,10 @@ package "keychains.domain" {
     -previousKeychainExternalIdentifier?: KeychainExternalIdentifier
     +publish(primitives): Keychain
     +fromPrimitives(primitives): Keychain
+    +belongsTo(ownerIdentityId: IdentityId): boolean
+    +isFirstVersion(): boolean
+    +isNextVersionAfter(previous: Keychain): boolean
+    +getSignaturePayload(): object
   }
 
   class EncryptedKeychainPayload <<ValueObject>>

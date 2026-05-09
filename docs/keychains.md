@@ -161,8 +161,10 @@ Do not implement conversation creation in the first keychain PR.
 ## Later PRs
 
 - Signed HTTP request verifier middleware/service.
-- `PUT /keychains/current`.
+- Keychain publication API as a create/publish command, not as a mutable update.
 - `GET /keychains/current`.
+- `pubsub/keychains/RegisterKeychainWhenPublished`.
+- `pubsub/keychains/SynchronizeKeychainWhenUpdated`.
 - `POST /conversations/1to1` using `participantIdentityId` and
   `keychainExternalIdentifier`.
 - Message send/read endpoints using encrypted payloads.

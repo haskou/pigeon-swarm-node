@@ -1,9 +1,4 @@
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf, PublicKey, Signature } from '@haskou/value-objects';
-
-import { Keychain } from '../Keychain';
-
-type KeychainSignaturePayload = Omit<PrimitiveOf<Keychain>, 'signature'>;
+import { Keychain, KeychainSignaturePayload } from '../Keychain';
 
 export class KeychainSignatureDomainService {
   private getCanonicalPayload(
@@ -20,14 +15,13 @@ export class KeychainSignatureDomainService {
   }
 
   public isValidSignature(keychain: Keychain): boolean {
-    const primitives = keychain.toPrimitives();
-    const { signature, ...payload } = primitives;
-
-    const ownerIdentityId = new IdentityId(primitives.ownerIdentityId);
-
-    return PublicKey.fromPEM(ownerIdentityId.toString()).isValidSignature(
-      JSON.stringify(this.getCanonicalPayload(payload)),
-      new Signature(signature),
-    );
+    return keychain
+      .getOwnerPublicKey()
+      .isValidSignature(
+        JSON.stringify(
+          this.getCanonicalPayload(keychain.getSignaturePayload()),
+        ),
+        keychain.getSignature(),
+      );
   }
 }

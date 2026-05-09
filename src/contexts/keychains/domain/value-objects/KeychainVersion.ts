@@ -12,4 +12,12 @@ export class KeychainVersion extends Integer {
   public next(): KeychainVersion {
     return new KeychainVersion(this.valueOf() + 1);
   }
+
+  public isFirst(): boolean {
+    return this.valueOf() === 1;
+  }
+
+  public isNextAfter(previous: KeychainVersion): boolean {
+    return this.valueOf() === previous.valueOf() + 1;
+  }
 }
