@@ -65,36 +65,25 @@ current work, verification and the next useful cut.
 - `RegisterIdentityWhenPublished` performs registration through
   `RegisterPublishedIdentity`; finder use cases remain read-only.
 
-## Current Slice: PubSub Anti-Entropy
+## Current Slice: Conversation API
 
-Goal: recover missed PubSub events when a node was offline or detects a gap.
+Goal: make real 1to1 conversation flows testable through the HTTP API.
 
-Constraints:
+Status:
 
-- Nodes cannot use each other's HTTP APIs.
-- Nodes may not know each other's IPs.
-- PubSub is the node-to-node coordination channel.
-- IPFS/Helia stores immutable content; PubSub moves announcements, requests,
-  responses and candidate external identifiers.
+- [x] Add a `CreateOneToOneConversation` application use case.
+- [x] Add MongoDB conversation metadata persistence.
+- [x] Add `POST /conversations/1to1`.
+- [x] Add API documentation and Cucumber coverage for creating a conversation.
+- [ ] Add message send/read endpoints.
+- [ ] Add WebSocket client realtime.
 
-Preliminary protocol:
+Keep:
 
-- `identity.sync.request` / `identity.sync.response` for identity version
-  convergence.
-- `conversation.sync.request` / `conversation.sync.response` for conversation
-  heads/checkpoints.
-- `conversation.missing.request` / `conversation.missing.response` for bounded
-  pagination of missing candidate message identifiers.
-- Responses never become truth directly; receivers still fetch immutable
-  documents and validate them in domain services.
-
-Tests to design with Cucumber:
-
-- Nobody has the latest identity version: resolver returns the highest valid
-  known version and records a sync miss.
-- Only one peer has the latest identity version: another node discovers,
-  validates, caches and returns it.
-- A node starts after a week offline and recovers missed conversation messages.
+- For now, 1to1 conversations are the only supported conversation type and are
+  treated as encrypted by design.
+- The future public-conversation policy should be introduced when a second
+  conversation type exists.
 
 ## Consumer Backlog
 
@@ -132,26 +121,7 @@ and let repositories/domain validation decide what is trustworthy.
   - fetches and validates candidate message documents before updating local
     projections
 
-## Next Slice 1: Conversation Encryption Policy
-
-Goal: model encryption as a domain rule of the conversation type.
-
-Steps:
-
-1. Add a `ConversationType` or `ConversationEncryptionPolicy` enum/value object.
-2. Make message payload kind explicit in the domain.
-3. Enforce encrypted payloads for 1to1 conversations.
-4. Keep encryption/decryption mechanics in application or infrastructure
-   services.
-5. Include payload kind and payload value in the canonical signature payload.
-
-Tests:
-
-- Unit: 1to1 rejects unencrypted payloads.
-- Unit: signed payload changes when payload kind changes.
-- Cucumber: 1to1 conversation round-trips encrypted messages.
-
-## Next Slice 2: Conversation Repository And Remote Message Validation
+## Next Slice 1: Conversation Messages And Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
@@ -205,8 +175,9 @@ Tests:
 Focused commands for this stage:
 
 ```bash
-PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn jest tests/unit/shared/infrastructure/messageBus tests/unit/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished.spec.ts --runInBand
+PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn jest tests/unit/contexts/conversations tests/unit/apps/apis/ApiSwaggerFactory.spec.ts --runInBand
 PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn lint
+PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn build
 ```
 
 Broader checks before merge when the slice grows:

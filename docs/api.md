@@ -1,6 +1,6 @@
 # Pigeon Swarm API
 
-Last updated: 2026-05-07.
+Last updated: 2026-05-09.
 
 This document is intentionally incomplete. It captures the intended API shape
 before implementation so the client contract does not leak P2P infrastructure.
@@ -47,14 +47,25 @@ Request:
 
 ```json
 {
-  "participantIdentityId": "TODO"
+  "firstParticipantIdentityId": "TODO",
+  "secondParticipantIdentityId": "TODO"
+}
+```
+
+Response:
+
+```json
+{
+  "id": "one-to-one:TODO",
+  "participantIds": ["TODO", "TODO"],
+  "messages": []
 }
 ```
 
 TODO:
 
-- define whether this is idempotent by participant pair
-- define response shape
+- replace `firstParticipantIdentityId` with authenticated local identity once
+  authentication/current identity selection exists
 - define error when remote identity cannot be resolved
 - define encryption setup and key exchange boundary
 

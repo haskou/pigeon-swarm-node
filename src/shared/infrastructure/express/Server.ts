@@ -1,4 +1,5 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { PostOneToOneConversationRoute } from '@app/apps/apis/conversations-api/routes/PostOneToOneConversationRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import * as express from 'express';
@@ -111,6 +112,7 @@ export default class Server {
         controllers: [
           HealthRoute,
           ConsumeDlxRoute,
+          PostOneToOneConversationRoute,
           PostIdentityRoute,
           GetIPFSContentRoute,
         ],

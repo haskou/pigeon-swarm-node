@@ -1,0 +1,55 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Conversations API
+  version: 1.0.0
+  description: Endpoints for 1to1 conversations.
+tags:
+  - name: conversations
+paths:
+  /conversations/1to1:
+    post:
+      tags:
+        - conversations
+      summary: Create or get a 1to1 conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostOneToOneConversationBody'
+      responses:
+        '200':
+          description: Conversation created or found successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+components:
+  schemas:
+    PostOneToOneConversationBody:
+      type: object
+      required:
+        - firstParticipantIdentityId
+        - secondParticipantIdentityId
+      properties:
+        firstParticipantIdentityId:
+          type: string
+        secondParticipantIdentityId:
+          type: string
+    ConversationResource:
+      type: object
+      required:
+        - id
+        - participantIds
+        - messages
+      properties:
+        id:
+          type: string
+        participantIds:
+          type: array
+          items:
+            type: string
+        messages:
+          type: array
+          items:
+            type: object
