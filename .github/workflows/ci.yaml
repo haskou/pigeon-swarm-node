@@ -13,16 +13,6 @@ permissions:
 jobs:
   Checks:
     runs-on: ubuntu-22.04
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,6 +23,14 @@ jobs:
           node-version: 24
           cache: 'yarn'
           registry-url: 'https://npm.pkg.github.com'
+
+      - name: Cache MongoDB Memory Server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-memory-server-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            mongodb-memory-server-${{ runner.os }}-
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile --ignore-engines
