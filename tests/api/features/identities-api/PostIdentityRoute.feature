@@ -22,3 +22,7 @@ Feature: Post identity route
       | profile.name | alice                                |
       | networks[0]  | 123e4567-e89b-12d3-a456-426614174000 |
     And it has been pinned in ipfs
+    When I GET the created identity
+    Then response code is equal to 200
+    And response contains a valid resource with the following fields
+      | profile.name | alice                                |

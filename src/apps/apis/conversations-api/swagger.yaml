@@ -6,38 +6,22 @@ info:
 tags:
   - name: conversations
 paths:
-  /conversations/1to1:
+  /conversations:
     post:
       tags:
         - conversations
-      summary: Create or get one-to-one conversation
+      summary: Create or get conversation
       parameters:
-        - in: header
-          name: X-Identity-Id
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-Timestamp
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-Nonce
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-Signature
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostOneToOneConversationBody'
+              $ref: '#/components/schemas/PostConversationBody'
       responses:
         '200':
           description: Conversation created or found.
@@ -45,6 +29,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
+    get:
+      tags:
+        - conversations
+      summary: List authenticated identity conversations
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: beforeConversationId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authenticated identity conversations page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationsResource'
   /conversations/{conversationId}/messages:
     post:
       tags:
@@ -128,14 +137,22 @@ components:
       schema:
         type: string
   schemas:
-    PostOneToOneConversationBody:
+    PostConversationBody:
       type: object
       required:
-        - participantIdentityId
+        - type
+        - participantIdentityIds
         - keychainExternalIdentifier
       properties:
-        participantIdentityId:
+        type:
           type: string
+          enum:
+            - one-to-one
+        participantIdentityIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
         keychainExternalIdentifier:
           type: string
     ConversationResource:
@@ -156,6 +173,17 @@ components:
           type: string
           enum:
             - one-to-one
+    ConversationsResource:
+      type: object
+      required:
+        - conversations
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationResource'
+        nextBeforeConversationId:
+          type: string
     PostConversationMessageBody:
       type: object
       required:

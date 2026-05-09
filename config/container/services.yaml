@@ -440,6 +440,15 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19hcHBsaWNhdGlvbl9fZmluZC1jdXJyZW50X19DdXJyZW50S2V5Y2hhaW5GaW5kZXJfX0N1cnJlbnRLZXljaGFpbkZpbmRlcg==:
+    class: /contexts/keychains/application/find-current/CurrentKeychainFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19kb21haW5fX3JlcG9zaXRvcmllc19fS2V5Y2hhaW5SZXBvc2l0b3J5X19LZXljaGFpblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19kb21haW5fX3NlcnZpY2VzX19LZXljaGFpbkNhbmRpZGF0ZVZhbGlkYXRpb25Eb21haW5TZXJ2aWNlX19LZXljaGFpbkNhbmRpZGF0ZVZhbGlkYXRpb25Eb21haW5TZXJ2aWNl
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19kb21haW5fX3JlcG9zaXRvcmllc19fS2V5Y2hhaW5SZXBvc2l0b3J5X19LZXljaGFpblJlcG9zaXRvcnk=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0tleWNoYWluUmVwb3NpdG9yeV9fSXBmc0tleWNoYWluUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fYXBwbGljYXRpb25fX2NyZWF0ZS1vbmUtdG8tb25lX19PbmVUb09uZUNvbnZlcnNhdGlvbkNyZWF0b3JfX09uZVRvT25lQ29udmVyc2F0aW9uQ3JlYXRvcg==:
@@ -467,6 +476,13 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fYXBwbGljYXRpb25fX2ZpbmQtbGF0ZXN0LW1lc3NhZ2VzX19MYXRlc3RNZXNzYWdlc0ZpbmRlcl9fTGF0ZXN0TWVzc2FnZXNGaW5kZXI=:
     class: /contexts/conversations/application/find-latest-messages/LatestMessagesFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fYXBwbGljYXRpb25fX2ZpbmQtY29udmVyc2F0aW9uc19fQ29udmVyc2F0aW9uc0ZpbmRlcl9fQ29udmVyc2F0aW9uc0ZpbmRlcg==:
+    class: /contexts/conversations/application/find-conversations/ConversationsFinder
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnk=

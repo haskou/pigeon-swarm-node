@@ -1,5 +1,8 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import {
+  KeychainCandidate,
+  KeychainRepository,
+} from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -43,10 +46,19 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   public async findCandidatesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<Keychain[]> {
+    const candidates =
+      await this.findCandidateReferencesByOwnerId(ownerIdentityId);
+
+    return candidates.map((candidate) => candidate.keychain);
+  }
+
+  public async findCandidateReferencesByOwnerId(
+    ownerIdentityId: IdentityId,
+  ): Promise<KeychainCandidate[]> {
     const metadata =
       await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId);
     const knownCids = new Set(metadata.map((document) => document.cid));
-    const candidates: Keychain[] = [];
+    const candidates: KeychainCandidate[] = [];
 
     for (const document of metadata) {
       const candidate = await this.findCandidateFromCid(
@@ -54,7 +66,10 @@ export default class IpfsKeychainRepository implements KeychainRepository {
       );
 
       if (candidate) {
-        candidates.push(candidate);
+        candidates.push({
+          externalIdentifier: new KeychainExternalIdentifier(document.cid),
+          keychain: candidate,
+        });
       }
     }
 
@@ -70,7 +85,10 @@ export default class IpfsKeychainRepository implements KeychainRepository {
       const candidate = await this.findCandidateFromCid(new IPFSId(cidString));
 
       if (candidate) {
-        candidates.push(candidate);
+        candidates.push({
+          externalIdentifier: new KeychainExternalIdentifier(cidString),
+          keychain: candidate,
+        });
       }
     }
 

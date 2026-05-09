@@ -24,6 +24,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+  /identities/{identityId}:
+    get:
+      tags:
+        - identities
+      summary: Get latest known identity
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest valid identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityResource'
 components:
   schemas:
     PostIdentityBody:
@@ -52,6 +70,7 @@ components:
         - networks
         - timestamp
         - signature
+        - version
       properties:
         id:
           type: string
@@ -95,3 +114,9 @@ components:
         signature:
           type: string
           example: lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==
+        version:
+          type: integer
+          example: 1
+        previousIdentityExternalIdentifier:
+          type: string
+          nullable: true

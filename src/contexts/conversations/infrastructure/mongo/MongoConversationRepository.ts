@@ -111,6 +111,41 @@ export default class MongoConversationRepository implements Repository {
     );
   }
 
+  public async findByParticipant(
+    participantId: IdentityId,
+    limit: number,
+    beforeConversationId?: ConversationId,
+  ): Promise<Conversation[]> {
+    const collection = await this.collection();
+    const beforeDocument = beforeConversationId
+      ? await collection.findOne({ _id: beforeConversationId.valueOf() })
+      : undefined;
+    const documents = await collection
+      .find({
+        ...(beforeDocument
+          ? { createdAt: { $lt: beforeDocument.createdAt } }
+          : {}),
+        participantIds: participantId.valueOf(),
+      })
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .toArray();
+    const conversations: Conversation[] = [];
+
+    for (const document of documents) {
+      conversations.push(
+        this.mapper.toDomain(
+          document,
+          await this.findMessagesByConversationId(
+            new ConversationId(document._id),
+          ),
+        ),
+      );
+    }
+
+    return conversations;
+  }
+
   public async findLatestMessages(
     conversationId: ConversationId,
     limit: number,

@@ -17,7 +17,7 @@ describe('ApiSwaggerFactory', () => {
         'ipfs-api',
         'keychains-api',
       ]);
-      expect(specs['conversations-api']).toContain('/conversations/1to1:');
+      expect(specs['conversations-api']).toContain('/conversations:');
       expect(specs['identities-api']).toContain('/identities/:');
       expect(specs['ipfs-api']).toContain('/ipfs/{cid}:');
       expect(specs['keychains-api']).toContain('/keychains/:');
@@ -30,7 +30,7 @@ describe('ApiSwaggerFactory', () => {
 
       expect(spec).toContain('title: Pigeon-swarm APIs');
       expect(spec).toContain(
-        "$ref: './conversations-api/swagger.yaml#/paths/~1conversations~11to1'",
+        "$ref: './conversations-api/swagger.yaml#/paths/~1conversations'",
       );
       expect(spec).toContain(
         "$ref: './identities-api/swagger.yaml#/paths/~1identities~1'",

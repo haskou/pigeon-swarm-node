@@ -9,7 +9,7 @@ Feature: Post one-to-one conversation route
     And I have published a keychain for the authenticated identity
     And I set a one-to-one conversation body for a new participant
     And I sign the current one-to-one conversation request
-    When I POST to "/conversations/1to1"
+    When I POST to "/conversations/"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | type | one-to-one |

@@ -41,6 +41,19 @@ TODO:
 - define allowed clock skew
 - define Cucumber scenarios for valid, invalid and replayed signed requests
 
+## Identity HTTP API
+
+### Get identity
+
+```http
+GET /identities/{identityId}
+```
+
+Implemented:
+
+- resolve the latest valid known identity candidate
+- return profile, networks, version, previous identity reference and signature
+
 ## Keychain HTTP API
 
 The node stores and announces encrypted keychain documents. It must never
@@ -84,7 +97,7 @@ Implemented:
 ### Get current keychain
 
 ```http
-GET /keychains/current
+GET /keychains/{identityId}
 ```
 
 Response:
@@ -99,11 +112,15 @@ Response:
 }
 ```
 
+Implemented:
+
+- only return the authenticated identity keychain
+- resolve latest valid candidate from local MongoDB and DHT candidates
+- return encrypted payload as-is for client-side unlock/decryption
+
 TODO:
 
-- return only the authenticated identity keychain
-- resolve latest valid candidate from local MongoDB, DHT and future sync data
-- return encrypted payload as-is for client-side unlock/decryption
+- include future sync data once node-to-node anti-entropy exists
 
 ## Conversation HTTP API
 
@@ -113,13 +130,17 @@ Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
 ### List conversations
 
 ```http
-GET /conversations
+GET /conversations?limit=20&beforeConversationId=TODO
 ```
+
+Implemented:
+
+- require signed request auth
+- list conversations where the authenticated identity participates
+- support `limit` and `beforeConversationId`
 
 TODO:
 
-- define pagination
-- define filtering by participant
 - define unread counters
 - define last message projection
 - define sync status projection
@@ -127,14 +148,15 @@ TODO:
 ### Create or get a 1to1 conversation
 
 ```http
-POST /conversations/1to1
+POST /conversations
 ```
 
 Request:
 
 ```json
 {
-  "participantIdentityId": "<identityId>",
+  "type": "one-to-one",
+  "participantIdentityIds": ["<participantIdentityId>"],
   "keychainExternalIdentifier": "<externalIdentifier>"
 }
 ```

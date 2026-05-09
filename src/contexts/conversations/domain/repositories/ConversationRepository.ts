@@ -7,6 +7,11 @@ import { MessageId } from '../value-objects/MessageId';
 
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;
+  findByParticipant(
+    participantId: IdentityId,
+    limit: number,
+    beforeConversationId?: ConversationId,
+  ): Promise<Conversation[]>;
   findLatestMessages(
     conversationId: ConversationId,
     limit: number,

@@ -75,19 +75,20 @@ current work, verification and the next useful cut.
 - Signed HTTP request verification for implemented API commands.
 - Keychain API Cucumber coverage.
 
-## Current Slice: Conversation Messages API
+## Current Slice: Client Bootstrap API
 
-Goal: make the first real 1to1 chat loop usable through HTTP.
+Goal: let a client recover enough state through HTTP to start real manual
+testing without WebSocket or node-to-node sync.
 
 Status:
 
-- [x] Add `POST /conversations/{conversationId}/messages`.
-- [x] Store immutable encrypted message documents in IPFS.
-- [x] Store message metadata in MongoDB for ordering and pagination.
-- [x] Publish `ConversationMessageWasSentEvent`.
-- [x] Add `GET /conversations/{conversationId}/messages`.
-- [x] Support `limit` and `beforeMessageId` pagination.
-- [x] Add Cucumber coverage for send/list and `beforeMessageId` pagination.
+- [x] Replace `POST /conversations/1to1` with REST-shaped
+  `POST /conversations`.
+- [x] Add `GET /identities/{identityId}`.
+- [x] Add `GET /keychains/{identityId}` for the authenticated identity.
+- [x] Add `GET /conversations` for authenticated identity conversations.
+- [x] Keep message send/list API from the previous slice.
+- [x] Add Cucumber coverage for identity, keychain and conversation bootstrap.
 - [x] Update OpenAPI and API docs.
 
 ## Consumer Backlog
