@@ -18,7 +18,7 @@ export class GetIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identity = await this.finder.find(
-      new IdentityFinderMessage(identityId),
+      new IdentityFinderMessage(decodeURIComponent(identityId)),
     );
 
     return response
