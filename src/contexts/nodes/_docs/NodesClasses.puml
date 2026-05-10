@@ -9,7 +9,9 @@ package "nodes" {
       -networks: Map<NetworkId, Network>
       -owner?: IdentityId
       +addNetwork(network: Network): void
-      +assignOwner(owner: IdentityId): void
+      +assignOwner(owner: IdentityId, authenticatedIdentityId: IdentityId): void
+      +hasOwner(): boolean
+      +isOwnedBy(identityId: IdentityId): boolean
       +toPrimitives(): object
     }
 
@@ -26,12 +28,15 @@ package "nodes" {
       +eventName(): string
     }
 
+    class NodeOwnerCanOnlyBeChangedByCurrentOwnerError <DomainError>
+
     class NetworkId
     class NetworkName
     class NetworkKey
 
     Node o--> "0..N" Network
     Node ..> NodeNetworkWasAdded
+    Node ..> NodeOwnerCanOnlyBeChangedByCurrentOwnerError
     Network *--> NetworkId
     Network *--> NetworkName
     Network --> NetworkKey
@@ -68,6 +73,12 @@ package "nodes" {
       -network: Network
     }
 
+    class NodeOwnerAssignerMessage {
+      +owner: IdentityId
+      +authenticatedIdentityId: IdentityId
+      +constructor(owner: string, authenticatedIdentityId: string)
+    }
+
     class NodeLoader {
       -nodeLoaderService: NodeLoaderService
       +loadNode(): Promise<Node>
@@ -76,7 +87,7 @@ package "nodes" {
     class NodeOwnerAssigner {
       -loader: NodeLoaderService
       -saver: NodeSaverService
-      +assignOwner(identityId: IdentityId): Promise<void>
+      +assignOwner(message: NodeOwnerAssignerMessage): Promise<void>
     }
 
     NodeNetworkAdder --> NodeLoaderService
@@ -85,10 +96,12 @@ package "nodes" {
     NodeLoader --> NodeLoaderService
     NodeOwnerAssigner --> NodeLoaderService
     NodeOwnerAssigner --> NodeSaverService
+    NodeOwnerAssigner --> NodeOwnerAssignerMessage
   }
 
   package "infrastructure" {
     class MongoNodeMetadataRepository {
+      -networkRegistry: IPFSNetworkRegistry
       +loadLocalNode(): Promise<Node>
       +saveLocalNode(node: Node): Promise<void>
     }
@@ -97,6 +110,8 @@ package "nodes" {
       Active node metadata repository.
       MongoDB owns nodeId, owner and
       configured network metadata.
+      Loading and saving synchronizes
+      the runtime IPFSNetworkRegistry.
     end note
 
     MongoNodeMetadataRepository ..|> NodeRepository
