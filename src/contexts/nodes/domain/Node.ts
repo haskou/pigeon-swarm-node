@@ -56,7 +56,7 @@ export class Node extends AggregateRoot {
   ): void {
     if (this.owner) {
       assert(
-        this.owner.isEqual(authenticatedIdentityId),
+        this.isOwnedBy(authenticatedIdentityId),
         new NodeOwnerCanOnlyBeChangedByCurrentOwnerError(),
       );
     }

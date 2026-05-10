@@ -2,7 +2,6 @@ import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttp
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -29,12 +28,13 @@ export class PutNodeOwnerRoute extends Route {
   ): Promise<Response> {
     const authenticatedIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const ownerIdentityId = body.identityId
-      ? new IdentityId(body.identityId)
-      : authenticatedIdentityId;
+    const ownerIdentityId = body.identityId ?? authenticatedIdentityId.valueOf();
 
     await this.assigner.assignOwner(
-      new NodeOwnerAssignerMessage(ownerIdentityId, authenticatedIdentityId),
+      new NodeOwnerAssignerMessage(
+        ownerIdentityId,
+        authenticatedIdentityId.valueOf(),
+      ),
     );
 
     const node = await this.loader.loadNode();

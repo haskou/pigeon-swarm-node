@@ -42,7 +42,7 @@ export default class Kernel {
     return Kernel._di.getService(ClassDefinition) as Scheduler;
   }
 
-  private async loadLocalNodeState(): Promise<void> {
+  public async loadLocalNodeState(): Promise<void> {
     const nodeLoader = Kernel._di.getService<NodeLoader>(NodeLoader);
 
     await nodeLoader.loadNode();
@@ -62,8 +62,6 @@ export default class Kernel {
   }
 
   public async runServer(): Promise<void> {
-    await this.loadLocalNodeState();
-
     return this._server.run();
   }
 

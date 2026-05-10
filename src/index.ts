@@ -36,6 +36,10 @@ async function init() {
   kernel.logs();
   console.timeEnd('Logs');
 
+  console.time('Load local node state');
+  await kernel.loadLocalNodeState();
+  console.timeEnd('Load local node state');
+
   console.time('IPFS Runtime');
   const ipfsRuntime = new IPFSRuntime();
   await ipfsRuntime.run();
