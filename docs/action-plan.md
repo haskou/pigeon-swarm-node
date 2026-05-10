@@ -74,21 +74,32 @@ current work, verification and the next useful cut.
 - `POST /keychains` for publishing encrypted keychain versions.
 - Signed HTTP request verification for implemented API commands.
 - Keychain API Cucumber coverage.
+- Client bootstrap API:
+  - `GET /identities/{identityId}`
+  - `GET /keychains/{identityId}`
+  - `GET /conversations`
+  - `POST /conversations`
+  - `POST /conversations/{conversationId}/messages`
+  - `GET /conversations/{conversationId}/messages`
+- OpenAPI and API docs for the implemented client endpoints.
 
-## Current Slice: Client Bootstrap API
+## Current Slice: Signed Message And Request Hardening
 
-Goal: let a client recover enough state through HTTP to start real manual
-testing without WebSocket or node-to-node sync.
+Goal: authenticate API calls without passwords or JWT sessions and reject
+tampered conversation messages.
 
 Status:
 
-- [x] Replace `POST /conversations/1to1` with REST-shaped
-  `POST /conversations`.
-- [x] Add `GET /identities/{identityId}`.
-- [x] Add `GET /keychains/{identityId}` for the authenticated identity.
-- [x] Add `GET /conversations` for authenticated identity conversations.
-- [x] Keep message send/list API from the previous slice.
-- [x] Add Cucumber coverage for identity, keychain and conversation bootstrap.
+- [x] Verify canonical signed HTTP requests.
+- [x] Store used nonces in MongoDB per identity.
+- [x] Reject stale signed request timestamps.
+- [x] Validate sent-message signatures against the canonical message payload.
+- [x] Move client-generated message `id` and `createdAt` into the send-message
+  request so the client can sign the final immutable message shape.
+- [x] Align `POST /conversations` request naming with response naming:
+  `participantIds`.
+- [x] Add Cucumber coverage for invalid message signatures, replayed nonces and
+  expired timestamps.
 - [x] Update OpenAPI and API docs.
 
 ## Consumer Backlog
@@ -127,23 +138,7 @@ and let repositories/domain validation decide what is trustworthy.
   - fetches and validates candidate message documents before updating local
     projections
 
-## Next Slice 1: Signed HTTP Requests Hardening
-
-Goal: authenticate API calls without passwords or JWT sessions.
-
-Steps:
-
-1. Define canonical request payload:
-   - method
-   - path
-   - timestamp
-   - nonce
-   - body hash
-2. Verify `X-Identity-Id`, `X-Timestamp`, `X-Nonce` and `X-Signature`.
-3. Store recent nonces in MongoDB to prevent replay.
-4. Add Cucumber coverage for accepted, invalid and replayed signed requests.
-
-## Next Slice 2: Conversation Remote Validation
+## Next Slice 1: Conversation Remote Validation
 
 Goal: make 1to1 chat usable through the aggregate boundary.
 
@@ -166,7 +161,7 @@ Use cases:
 - delete message
 - synchronize conversation
 
-## Next Slice 3: Keychain Consumers
+## Next Slice 2: Keychain Consumers
 
 Goal: register and synchronize published keychain candidates from PubSub.
 

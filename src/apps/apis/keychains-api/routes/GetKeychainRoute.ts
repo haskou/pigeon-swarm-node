@@ -1,5 +1,5 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -15,7 +15,8 @@ export class GetKeychainRoute extends Route {
   private readonly finder: CurrentKeychainFinder =
     this.get<CurrentKeychainFinder>(CurrentKeychainFinder);
 
-  private readonly signedRequestVerifier = new SignedHttpRequestVerifier();
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Get('/:identityId')
   public async getKeychain(
@@ -23,7 +24,8 @@ export class GetKeychainRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const requesterIdentityId = this.signedRequestVerifier.verify(request);
+    const requesterIdentityId =
+      await this.signedRequestAuthenticator.authenticate(request);
     const ownerIdentityId = new IdentityId(identityId);
 
     if (!ownerIdentityId.isEqual(requesterIdentityId)) {

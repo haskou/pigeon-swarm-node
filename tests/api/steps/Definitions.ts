@@ -2,6 +2,8 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable no-case-declarations */
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@app/Kernel';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
@@ -99,10 +101,13 @@ export default class Definitions {
     return this.identityKeyPair;
   }
 
-  private async signCurrentRequest(method: string, path: string): Promise<void> {
+  private async signCurrentRequest(
+    method: string,
+    path: string,
+    timestamp: string = String(Date.now()),
+  ): Promise<void> {
     const keyPair = await this.ensureIdentityKeyPair();
-    const timestamp = String(Date.now());
-    const nonce = `api-nonce-${timestamp}`;
+    const nonce = `api-nonce-${timestamp}-${Math.random()}`;
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
@@ -185,10 +190,11 @@ export default class Definitions {
     const participantIdentityId = new IdentityId(
       participantKeyPair.toPrimitives().publicKey,
     );
+    const ownerIdentityId = this.ownerIdentityId as IdentityId;
 
     this.body = JSON.stringify({
       keychainExternalIdentifier: this.keychainExternalIdentifier,
-      participantIdentityIds: [participantIdentityId.valueOf()],
+      participantIds: [ownerIdentityId.valueOf(), participantIdentityId.valueOf()],
       type: 'one-to-one',
     });
   }
@@ -222,11 +228,39 @@ export default class Definitions {
   @given('I set an encrypted conversation message body')
   public async iSetAnEncryptedConversationMessageBody(): Promise<void> {
     const keyPair = await this.ensureIdentityKeyPair();
+    const id = MessageId.generate().valueOf();
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorId: this.ownerIdentityId?.valueOf() || '',
+      conversationId: this.conversationId || '',
+      createdAt,
+      encryptedPayload: 'encrypted-message-payload',
+      id,
+      previousMessageIds: [] as string[],
+      targetMessageId: undefined as string | undefined,
+      type: MessageType.SENT.valueOf(),
+    };
 
     this.body = JSON.stringify({
       attachmentExternalIdentifiers: [],
+      createdAt,
       encryptedPayload: 'encrypted-message-payload',
-      signature: keyPair.sign('encrypted-message-payload').valueOf(),
+      id,
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
+  @given('I set an invalid encrypted conversation message body')
+  public async iSetAnInvalidEncryptedConversationMessageBody(): Promise<void> {
+    await this.iSetAnEncryptedConversationMessageBody();
+
+    const invalidKeyPair = await KeyPair.generate();
+    const parsedBody = JSON.parse(this.body || '{}');
+
+    this.body = JSON.stringify({
+      ...parsedBody,
+      signature: invalidKeyPair.sign('invalid-message-payload').valueOf(),
     });
   }
 
@@ -272,6 +306,16 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest('GET', '/conversations/');
+  }
+
+  @given('I sign the current conversations request with an expired timestamp')
+  public async iSignTheCurrentConversationsRequestWithAnExpiredTimestamp(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/conversations/',
+      String(Date.now() - 10 * 60 * 1000),
+    );
   }
 
   @given('I have sent an encrypted conversation message')

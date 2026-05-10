@@ -1,6 +1,11 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
-import { assert, PrimitiveOf, Signature } from '@haskou/value-objects';
+import {
+  assert,
+  PrimitiveOf,
+  Signature,
+  Timestamp,
+} from '@haskou/value-objects';
 
 import { ConversationParticipantNotFoundError } from './errors/ConversationParticipantNotFoundError';
 import { MessageTargetAlreadyDeletedError } from './errors/MessageTargetAlreadyDeletedError';
@@ -92,6 +97,8 @@ export class Conversation extends AggregateRoot {
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
     attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
+    createdAt: Timestamp = Timestamp.now(),
+    id: MessageId = MessageId.generate(),
   ): MessageSent {
     this.assertIsParticipant(authorId);
 
@@ -102,6 +109,8 @@ export class Conversation extends AggregateRoot {
       signature,
       this.getLastMessageIds(),
       attachmentExternalIdentifiers,
+      createdAt,
+      id,
     );
 
     this.messages.push(message);

@@ -10,7 +10,7 @@ paths:
     post:
       tags:
         - conversations
-      summary: Create or get conversation
+      summary: Create conversation
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -24,7 +24,7 @@ paths:
               $ref: '#/components/schemas/PostConversationBody'
       responses:
         '200':
-          description: Conversation created or found.
+          description: Conversation created.
           content:
             application/json:
               schema:
@@ -141,16 +141,16 @@ components:
       type: object
       required:
         - type
-        - participantIdentityIds
+        - participantIds
         - keychainExternalIdentifier
       properties:
         type:
           type: string
           enum:
             - one-to-one
-        participantIdentityIds:
+        participantIds:
           type: array
-          minItems: 1
+          minItems: 2
           items:
             type: string
         keychainExternalIdentifier:
@@ -187,9 +187,15 @@ components:
     PostConversationMessageBody:
       type: object
       required:
+        - id
+        - createdAt
         - encryptedPayload
         - signature
       properties:
+        id:
+          type: string
+        createdAt:
+          type: integer
         encryptedPayload:
           type: string
         signature:

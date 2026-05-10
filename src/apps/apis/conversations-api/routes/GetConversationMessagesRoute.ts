@@ -1,4 +1,4 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -20,7 +20,8 @@ export class GetConversationMessagesRoute extends Route {
   private readonly finder: LatestMessagesFinder =
     this.get<LatestMessagesFinder>(LatestMessagesFinder);
 
-  private readonly signedRequestVerifier = new SignedHttpRequestVerifier();
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Get('/:conversationId/messages')
   public async getMessages(
@@ -30,7 +31,8 @@ export class GetConversationMessagesRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const requesterIdentityId = this.signedRequestVerifier.verify(request);
+    const requesterIdentityId =
+      await this.signedRequestAuthenticator.authenticate(request);
     const messages = await this.finder.find(
       new GetConversationMessagesRequest(
         conversationId,

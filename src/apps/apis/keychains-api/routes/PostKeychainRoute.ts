@@ -1,4 +1,4 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import KeychainPublisher from '@app/contexts/keychains/application/publish/KeychainPublisher';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -14,7 +14,8 @@ export class PostKeychainRoute extends Route {
   private readonly keychainPublisher: KeychainPublisher =
     this.get<KeychainPublisher>(KeychainPublisher);
 
-  private readonly signedRequestVerifier = new SignedHttpRequestVerifier();
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Post('/')
   public async publishKeychain(
@@ -22,7 +23,8 @@ export class PostKeychainRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const ownerIdentityId = this.signedRequestVerifier.verify(request);
+    const ownerIdentityId =
+      await this.signedRequestAuthenticator.authenticate(request);
     const publishRequest = new PostKeychainRequest(body, ownerIdentityId);
     const externalIdentifier = await this.keychainPublisher.publish(
       publishRequest.getKeychainPublishMessage(),
