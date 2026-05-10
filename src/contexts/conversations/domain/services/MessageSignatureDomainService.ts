@@ -2,6 +2,7 @@ import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
   EncryptedKeyPair,
   PrimitiveOf,
+  PublicKey,
   Signature,
 } from '@haskou/value-objects';
 
@@ -40,11 +41,11 @@ export class MessageSignatureDomainService {
   }
 
   public isValidSignature(
-    encryptedKeyPair: EncryptedKeyPair,
+    publicKey: PublicKey,
     payload: MessageSignaturePayload,
     signature: Signature,
   ): boolean {
-    return encryptedKeyPair.isValidSignature(
+    return publicKey.isValidSignature(
       JSON.stringify(this.getCanonicalPayload(payload)),
       signature,
     );

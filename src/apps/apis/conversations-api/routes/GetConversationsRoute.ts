@@ -1,4 +1,4 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import ConversationsFinder from '@app/contexts/conversations/application/find-conversations/ConversationsFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -13,7 +13,8 @@ export class GetConversationsRoute extends Route {
   private readonly finder: ConversationsFinder =
     this.get<ConversationsFinder>(ConversationsFinder);
 
-  private readonly signedRequestVerifier = new SignedHttpRequestVerifier();
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Get('/')
   public async getConversations(
@@ -23,7 +24,8 @@ export class GetConversationsRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const requesterIdentityId = this.signedRequestVerifier.verify(request);
+    const requesterIdentityId =
+      await this.signedRequestAuthenticator.authenticate(request);
     const conversations = await this.finder.find(
       new GetConversationsRequest(
         requesterIdentityId,

@@ -1,4 +1,10 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class PostConversationMessageBody {
   @IsOptional()
@@ -9,6 +15,13 @@ export class PostConversationMessageBody {
   @IsString()
   @IsNotEmpty()
   public readonly encryptedPayload: string;
+
+  @IsInt()
+  public readonly createdAt: number;
+
+  @IsString()
+  @IsNotEmpty()
+  public readonly id: string;
 
   @IsString()
   @IsNotEmpty()

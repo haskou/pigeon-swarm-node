@@ -145,7 +145,7 @@ TODO:
 - define last message projection
 - define sync status projection
 
-### Create or get a 1to1 conversation
+### Create a 1to1 conversation
 
 ```http
 POST /conversations
@@ -156,7 +156,7 @@ Request:
 ```json
 {
   "type": "one-to-one",
-  "participantIdentityIds": ["<participantIdentityId>"],
+  "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "keychainExternalIdentifier": "<externalIdentifier>"
 }
 ```
@@ -173,7 +173,7 @@ Response:
 
 Implemented:
 
-- the command is idempotent by participant pair
+- create the one-to-one conversation for the participant pair
 - validate that the keychain candidate belongs to the authenticated identity
 - persist conversation metadata in MongoDB
 - publish `ConversationWasCreatedEvent`
@@ -234,6 +234,8 @@ Request:
 
 ```json
 {
+  "id": "<clientGeneratedMessageId>",
+  "createdAt": 1773848829055,
   "encryptedPayload": "TODO",
   "signature": "TODO",
   "attachmentExternalIdentifiers": ["TODO"]
@@ -258,15 +260,19 @@ Response:
 Implemented:
 
 - enforce encrypted payloads for 1to1 conversations
+- validate the signature against the canonical message payload
 - persist immutable message document in IPFS
 - persist message metadata in MongoDB
 - publish `ConversationMessageWasSentEvent`
 
 TODO:
 
-- define client-generated idempotency key
 - define attachment upload flow
-- harden message signature validation against the canonical message payload
+
+Signed HTTP request validation:
+
+- reject reused `X-Nonce` values per identity
+- reject stale `X-Timestamp` values outside the freshness window
 
 ### Edit message
 

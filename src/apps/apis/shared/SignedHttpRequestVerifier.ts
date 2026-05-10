@@ -15,7 +15,13 @@ type SignedRequestPayload = {
 };
 
 export class SignedHttpRequestVerifier {
-  private getRequiredHeader(request: Request, header: string): string {
+  private hashBody(body: unknown): string {
+    return createHash('sha256')
+      .update(JSON.stringify(body || {}))
+      .digest('hex');
+  }
+
+  public getRequiredHeader(request: Request, header: string): string {
     const value = request.header(header);
 
     if (!value) {
@@ -23,12 +29,6 @@ export class SignedHttpRequestVerifier {
     }
 
     return value;
-  }
-
-  private hashBody(body: unknown): string {
-    return createHash('sha256')
-      .update(JSON.stringify(body || {}))
-      .digest('hex');
   }
 
   public getCanonicalPayload(
@@ -47,7 +47,11 @@ export class SignedHttpRequestVerifier {
     };
   }
 
-  public verify(request: Request): IdentityId {
+  public verifySignature(request: Request): {
+    identityId: IdentityId;
+    nonce: string;
+    timestamp: string;
+  } {
     const identityId = new IdentityId(
       this.getRequiredHeader(request, 'x-identity-id'),
     );
@@ -72,6 +76,10 @@ export class SignedHttpRequestVerifier {
       throw new InvalidSignedRequestError();
     }
 
-    return identityId;
+    return { identityId, nonce, timestamp };
+  }
+
+  public verify(request: Request): IdentityId {
+    return this.verifySignature(request).identityId;
   }
 }

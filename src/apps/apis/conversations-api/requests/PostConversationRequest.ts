@@ -10,9 +10,13 @@ export class PostConversationRequest {
   ) {}
 
   public getMessage(): OneToOneConversationCreateMessage {
+    const participantId = this.body.participantIds.find(
+      (id) => id !== this.ownerIdentityId.valueOf(),
+    );
+
     return new OneToOneConversationCreateMessage(
       this.ownerIdentityId.valueOf(),
-      this.body.participantIdentityIds[0],
+      participantId ?? this.body.participantIds[0],
       this.body.keychainExternalIdentifier,
     );
   }

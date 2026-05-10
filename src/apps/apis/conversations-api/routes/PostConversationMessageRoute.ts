@@ -1,4 +1,4 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import MessageSender from '@app/contexts/conversations/application/send-message/MessageSender';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -21,7 +21,8 @@ export class PostConversationMessageRoute extends Route {
   private readonly sender: MessageSender =
     this.get<MessageSender>(MessageSender);
 
-  private readonly signedRequestVerifier = new SignedHttpRequestVerifier();
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Post('/:conversationId/messages')
   public async sendMessage(
@@ -30,7 +31,8 @@ export class PostConversationMessageRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const authorIdentityId = this.signedRequestVerifier.verify(request);
+    const authorIdentityId =
+      await this.signedRequestAuthenticator.authenticate(request);
     const message = await this.sender.send(
       new PostConversationMessageRequest(
         conversationId,

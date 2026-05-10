@@ -12,9 +12,9 @@ export class PostConversationBody {
   public readonly keychainExternalIdentifier: string;
 
   @IsArray()
-  @ArrayMinSize(1)
+  @ArrayMinSize(2)
   @IsString({ each: true })
-  public readonly participantIdentityIds: string[];
+  public readonly participantIds: string[];
 
   @IsString()
   @IsIn(['one-to-one'])
