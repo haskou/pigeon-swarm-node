@@ -4,7 +4,10 @@
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import { MongoNodeMetadataDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodeMetadataDocument';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Kernel from '@app/Kernel';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
@@ -83,6 +86,22 @@ export default class Definitions {
   @given('I am an anonymous user')
   public iAmAnAnonymousUser(): void {
     return;
+  }
+
+  @given('the local node has no owner and no networks')
+  public async theLocalNodeHasNoOwnerAndNoNetworks(): Promise<void> {
+    const mongo = Kernel.di.getService<MongoDB>(MongoDB);
+    const collection =
+      await mongo.getCollection<MongoNodeMetadataDocument>('node_metadata');
+    const networkRegistry =
+      Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry);
+
+    await collection.deleteOne({ _id: 'local' });
+    await Promise.all(
+      networkRegistry
+        .getAll()
+        .map((network) => networkRegistry.removeNetwork(network.getName())),
+    );
   }
 
   @given('I set json body')
