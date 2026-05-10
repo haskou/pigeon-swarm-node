@@ -28,7 +28,8 @@ export class PutNodeOwnerRoute extends Route {
   ): Promise<Response> {
     const authenticatedIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const ownerIdentityId = body.identityId ?? authenticatedIdentityId.valueOf();
+    const ownerIdentityId =
+      body.identityId ?? authenticatedIdentityId.valueOf();
 
     await this.assigner.assignOwner(
       new NodeOwnerAssignerMessage(
