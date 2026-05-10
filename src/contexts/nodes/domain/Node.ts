@@ -5,7 +5,7 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
-import { NodeOwnerAlreadyAssignedError } from './errors/NodeOwnerAlreadyAssignedError';
+import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { Network } from './Network';
 
@@ -50,10 +50,26 @@ export class Node extends AggregateRoot {
     this.record(new NodeNetworkWasAdded(this.id.valueOf()));
   }
 
-  public assignOwner(owner: IdentityId): void {
-    assert(!this.owner, new NodeOwnerAlreadyAssignedError());
+  public assignOwner(
+    owner: IdentityId,
+    authenticatedIdentityId: IdentityId,
+  ): void {
+    if (this.owner) {
+      assert(
+        this.owner.isEqual(authenticatedIdentityId),
+        new NodeOwnerCanOnlyBeChangedByCurrentOwnerError(),
+      );
+    }
 
     this.owner = owner;
+  }
+
+  public hasOwner(): boolean {
+    return this.owner !== undefined;
+  }
+
+  public isOwnedBy(identityId: IdentityId): boolean {
+    return this.owner?.isEqual(identityId) ?? false;
   }
 
   public toPrimitives() {

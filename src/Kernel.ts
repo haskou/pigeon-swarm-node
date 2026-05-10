@@ -4,6 +4,7 @@ import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import dotenv from 'dotenv';
 import path from 'path';
 
+import NodeLoader from './contexts/nodes/application/load/NodeLoader';
 import Scheduler from './shared/infrastructure/scheduler/Scheduler';
 import Consumer from './shared/infrastructure/ui/consumers/Consumer';
 
@@ -41,6 +42,12 @@ export default class Kernel {
     return Kernel._di.getService(ClassDefinition) as Scheduler;
   }
 
+  private async loadLocalNodeState(): Promise<void> {
+    const nodeLoader = Kernel._di.getService<NodeLoader>(NodeLoader);
+
+    await nodeLoader.loadNode();
+  }
+
   public environmentVariables(
     env: string = (process.env.NODE_ENV = 'local'),
   ): void {
@@ -54,7 +61,9 @@ export default class Kernel {
     await Kernel._di.compile();
   }
 
-  public runServer(): Promise<void> {
+  public async runServer(): Promise<void> {
+    await this.loadLocalNodeState();
+
     return this._server.run();
   }
 

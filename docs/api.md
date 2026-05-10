@@ -22,9 +22,7 @@ before implementation so the client contract does not leak P2P infrastructure.
 
 ## Authentication
 
-TODO: replace password/JWT flows with signed HTTP requests.
-
-Every mutating endpoint should be authenticated by a canonical request
+Mutating endpoints are authenticated by a canonical request
 signature:
 
 ```http
@@ -34,12 +32,103 @@ X-Nonce: <nonce>
 X-Signature: <signature>
 ```
 
-TODO:
+Implemented:
 
-- define canonical request payload: method, path, timestamp, nonce and body hash
-- store recent nonces in MongoDB to prevent replay
-- define allowed clock skew
-- define Cucumber scenarios for valid, invalid and replayed signed requests
+- canonical request payload: method, path, timestamp, nonce and body hash
+- recent nonces in MongoDB to prevent replay
+- timestamp freshness validation
+- Cucumber scenarios for invalid, replayed and stale signed requests
+
+## Node HTTP API
+
+### Get local node
+
+```http
+GET /node
+```
+
+Response:
+
+```json
+{
+  "id": "<nodeId>",
+  "owner": "<identityId>"
+}
+```
+
+Implemented:
+
+- return the local node id
+- return the owner when the node has already been claimed
+- keep networks out of this response
+
+### Get local node networks
+
+```http
+GET /node/networks
+```
+
+Response:
+
+```json
+{
+  "networks": [
+    {
+      "id": "<networkId>",
+      "name": "public",
+      "key": "<optionalPrivateNetworkKey>"
+    }
+  ]
+}
+```
+
+Implemented:
+
+- return the networks configured for the local node
+
+### Add local node network
+
+```http
+POST /node/networks
+```
+
+Request:
+
+```json
+{
+  "id": "<networkId>",
+  "name": "private",
+  "key": "<optionalPrivateNetworkKey>"
+}
+```
+
+Implemented:
+
+- allow unsigned network additions while the node has no owner
+- require signed request auth from the owner after the node is claimed
+- persist the network in MongoDB
+- synchronize the runtime IPFS network registry after saving
+
+### Put local node owner
+
+```http
+PUT /node/owner
+```
+
+Request:
+
+```json
+{
+  "identityId": "<newOwnerIdentityId>"
+}
+```
+
+Implemented:
+
+- claim an unowned node as the authenticated identity
+- change the owner only when the request is signed by the current owner
+- persist owner state in MongoDB
+- load persisted node state when the API process starts
 
 ## Identity HTTP API
 

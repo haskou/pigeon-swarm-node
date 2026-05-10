@@ -2,7 +2,6 @@ import { createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
-import { IPFSPeerIdDuplicatedError } from '../errors/IPFSPeerIdDuplicatedError';
 import libp2pKeyAdapter, {
   Libp2pPrivateKeyLike,
 } from './adapters/Libp2pKeyAdapter';
@@ -87,22 +86,6 @@ export default class IPFSNetworkRegistry {
     return this.sharedPeerPrivateKeyPem;
   }
 
-  private ensurePeerIdIsUnique(candidate: IPFSNetwork): void {
-    const duplicatedNetwork = this.networks.find(
-      (network) => network.getPeerId() === candidate.getPeerId(),
-    );
-
-    if (!duplicatedNetwork) {
-      return;
-    }
-
-    throw new IPFSPeerIdDuplicatedError(
-      candidate.getPeerId(),
-      duplicatedNetwork.getName(),
-      candidate.getName(),
-    );
-  }
-
   private async createNetworkFromConfig(
     config: IPFSNetworkConfig,
     sharedPrivateKey: Libp2pPrivateKeyLike,
@@ -157,7 +140,6 @@ export default class IPFSNetworkRegistry {
       config,
       sharedPrivateKey,
     );
-    this.ensurePeerIdIsUnique(network);
     this.networks.push(network);
 
     return network;

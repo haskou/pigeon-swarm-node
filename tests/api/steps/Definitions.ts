@@ -11,6 +11,7 @@ import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
+import { generateKeyPairSync } from 'crypto';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
@@ -34,6 +35,8 @@ export default class Definitions {
   private createdIdentityId: string | undefined;
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
+  private otherIdentityId: IdentityId | undefined;
+  private otherIdentityKeyPair: KeyPair | undefined;
 
   private ownerIdentityId: IdentityId | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,6 +54,8 @@ export default class Definitions {
     this.createdIdentityId = undefined;
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
+    this.otherIdentityId = undefined;
+    this.otherIdentityKeyPair = undefined;
     this.ownerIdentityId = undefined;
     this.response = null;
     this.ipfsDefinition.resetScenarioState();
@@ -101,12 +106,26 @@ export default class Definitions {
     return this.identityKeyPair;
   }
 
+  private async ensureOtherIdentityKeyPair(): Promise<KeyPair> {
+    if (!this.otherIdentityKeyPair) {
+      this.otherIdentityKeyPair = await KeyPair.generate();
+      this.otherIdentityId = new IdentityId(
+        this.otherIdentityKeyPair.toPrimitives().publicKey,
+      );
+    }
+
+    return this.otherIdentityKeyPair;
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
     timestamp: string = String(Date.now()),
+    keyPair: KeyPair | undefined = undefined,
+    identityId: IdentityId | undefined = undefined,
   ): Promise<void> {
-    const keyPair = await this.ensureIdentityKeyPair();
+    const signerKeyPair = keyPair ?? (await this.ensureIdentityKeyPair());
+    const signerIdentityId = identityId ?? this.ownerIdentityId;
     const nonce = `api-nonce-${timestamp}-${Math.random()}`;
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
@@ -117,10 +136,10 @@ export default class Definitions {
       this.body ? JSON.parse(this.body) : {},
     );
 
-    this.headers['x-identity-id'] = this.ownerIdentityId?.valueOf() || '';
+    this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
     this.headers['x-timestamp'] = timestamp;
     this.headers['x-nonce'] = nonce;
-    this.headers['x-signature'] = keyPair
+    this.headers['x-signature'] = signerKeyPair
       .sign(JSON.stringify(signedRequestPayload))
       .valueOf();
   }
@@ -318,6 +337,60 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current node owner request')
+  public async iSignTheCurrentNodeOwnerRequest(): Promise<void> {
+    this.body = this.body ?? '{}';
+    await this.signCurrentRequest('PUT', '/node/owner/');
+  }
+
+  @given('another identity signs the current node owner request')
+  public async anotherIdentitySignsTheCurrentNodeOwnerRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = this.body ?? '{}';
+    await this.signCurrentRequest(
+      'PUT',
+      '/node/owner/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('another identity signs the current node network request')
+  public async anotherIdentitySignsTheCurrentNodeNetworkRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/node/networks/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current node network request')
+  public async iSignTheCurrentNodeNetworkRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/node/networks/');
+  }
+
+  @given(
+    'I set a private node network body with id {string} and name {string}',
+  )
+  public iSetAPrivateNodeNetworkBodyWithIdAndName(
+    id: string,
+    name: string,
+  ): void {
+    const { privateKey } = generateKeyPairSync('ed25519');
+
+    this.body = JSON.stringify({
+      id,
+      key: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+      name,
+    });
+  }
+
   @given('I have sent an encrypted conversation message')
   public async iHaveSentAnEncryptedConversationMessage(): Promise<void> {
     if (!this.conversationId) {
@@ -413,6 +486,7 @@ export default class Definitions {
     this.response = await this.restClient.put(
       path,
       this.body && JSON.parse(this.body),
+      { headers: this.headers },
     );
   }
 

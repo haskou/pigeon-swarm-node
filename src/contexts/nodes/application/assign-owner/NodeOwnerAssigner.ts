@@ -10,7 +10,7 @@ export default class NodeOwnerAssigner {
 
   public async assignOwner(message: NodeOwnerAssignerMessage): Promise<void> {
     const node = await this.loader.loadNode();
-    node.assignOwner(message.owner);
+    node.assignOwner(message.owner, message.authenticatedIdentityId);
 
     await this.saver.saveNode(node);
   }

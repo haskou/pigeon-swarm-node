@@ -8,6 +8,7 @@ const swaggerFileByApi: Record<string, string> = {
   'identities-api': 'identities-api/swagger.yaml',
   'ipfs-api': 'ipfs-api/swagger.yaml',
   'keychains-api': 'keychains-api/swagger.yaml',
+  'nodes-api': 'nodes-api/swagger.yaml',
 };
 
 export class ApiSwaggerFactory {

@@ -123,7 +123,6 @@ jest.mock('@app/Kernel', () => ({
   },
 }));
 
-import { IPFSPeerIdDuplicatedError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSPeerIdDuplicatedError';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -135,7 +134,7 @@ describe('IPFSNetworkRegistry', () => {
     .toString();
 
   describe('register', () => {
-    it('should throw when trying to register a duplicated peer id', async () => {
+    it('should allow the same peer id in different networks', async () => {
       const registry = new IPFSNetworkRegistry();
       const existingNetwork = mock<IPFSNetwork>();
       const duplicatedNetwork = mock<IPFSNetwork>();
@@ -170,15 +169,21 @@ describe('IPFSNetworkRegistry', () => {
         )
         .mockResolvedValue(duplicatedNetwork);
 
-      await expect(
-        registry.register(
-          new IPFSNetworkConfig(
-            '550e8400-e29b-41d4-a716-446655440000',
-            'private_1',
-            new PrivateKey(validPem),
-          ),
+      await registry.register(
+        new IPFSNetworkConfig(
+          '550e8400-e29b-41d4-a716-446655440000',
+          'private_1',
+          new PrivateKey(validPem),
         ),
-      ).rejects.toThrow(IPFSPeerIdDuplicatedError);
+      );
+
+      expect(
+        (
+          registry as unknown as {
+            networks: IPFSNetwork[];
+          }
+        ).networks,
+      ).toEqual([existingNetwork, duplicatedNetwork]);
     });
   });
 });

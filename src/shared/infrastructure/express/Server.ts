@@ -8,6 +8,10 @@ import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIden
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
+import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
+import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
+import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
+import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -127,6 +131,10 @@ export default class Server {
           PostConversationMessageRoute,
           GetConversationMessagesRoute,
           GetIPFSContentRoute,
+          GetNodeRoute,
+          GetNodeNetworksRoute,
+          PostNodeNetworkRoute,
+          PutNodeOwnerRoute,
         ],
         cors: true,
         defaultErrorHandler: false,

@@ -24,7 +24,7 @@ describe('NodeOwnerAssigner', () => {
 
     loader.loadNode.mockResolvedValue(node);
 
-    await assigner.assignOwner(new NodeOwnerAssignerMessage(owner));
+    await assigner.assignOwner(new NodeOwnerAssignerMessage(owner, owner));
 
     expect(saver.saveNode).toHaveBeenCalledWith(node);
     expect(node.toPrimitives().owner).toBe(owner.valueOf());

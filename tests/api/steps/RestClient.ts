@@ -61,9 +61,9 @@ export default class RestClient {
     }
   }
 
-  public async put(path: string, data: string): Promise<any> {
+  public async put(path: string, data: any, headers = {}): Promise<any> {
     try {
-      return await this.client.put(path, JSON.parse(data));
+      return await this.client.put(path, data, headers);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;

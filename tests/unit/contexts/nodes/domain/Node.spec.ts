@@ -1,9 +1,11 @@
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
-import { NodeOwnerAlreadyAssignedError } from '@app/contexts/nodes/domain/errors/NodeOwnerAlreadyAssignedError';
+import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
 import { Node } from '@app/contexts/nodes/domain/Node';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
+import { generateKeyPairSync } from 'crypto';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 import { NetworkMother } from '../../../mothers/NetworkMother';
@@ -14,6 +16,14 @@ describe('Node', () => {
   let networkMother: NetworkMother;
   let node: Node;
   let primitives: PrimitiveOf<Node>;
+
+  const generateIdentityId = (): IdentityId => {
+    const { publicKey } = generateKeyPairSync('ed25519');
+
+    return new IdentityId(
+      publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+    );
+  };
 
   beforeEach(() => {
     mother = new NodeMother();
@@ -85,18 +95,30 @@ describe('Node', () => {
     it('should assign the node owner', () => {
       const owner = new IdentityMother().id;
 
-      node.assignOwner(owner);
+      node.assignOwner(owner, owner);
 
       expect(node.toPrimitives().owner).toBe(owner.valueOf());
     });
 
-    it('should reject assigning the node owner twice', () => {
+    it('should allow the current owner to change the node owner', () => {
       const owner = new IdentityMother().id;
+      const nextOwner = generateIdentityId();
 
-      node.assignOwner(owner);
+      node.assignOwner(owner, owner);
+      node.assignOwner(nextOwner, owner);
 
-      expect(() => node.assignOwner(owner)).toThrow(
-        NodeOwnerAlreadyAssignedError,
+      expect(node.toPrimitives().owner).toBe(nextOwner.valueOf());
+    });
+
+    it('should reject changing the node owner by another identity', () => {
+      const owner = new IdentityMother().id;
+      const anotherIdentity = generateIdentityId();
+      const nextOwner = generateIdentityId();
+
+      node.assignOwner(owner, owner);
+
+      expect(() => node.assignOwner(nextOwner, anotherIdentity)).toThrow(
+        NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
       );
     });
   });
