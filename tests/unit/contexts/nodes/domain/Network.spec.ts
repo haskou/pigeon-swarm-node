@@ -1,6 +1,7 @@
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { Network } from '../../../../../src/contexts/nodes/domain/Network';
+import { NetworkKey } from '../../../../../src/contexts/nodes/domain/value-objects/NetworkKey';
 import { NetworkMother } from '../../../mothers/NetworkMother';
 
 describe('Network', () => {
@@ -42,6 +43,29 @@ describe('Network', () => {
       const network = Network.fromPrimitives(original.toPrimitives());
 
       expect(network).toEqual(original);
+    });
+
+    it('should accept private network keys without trailing newline', () => {
+      const original = mother.withPrivateKey().build();
+      const primitivesWithoutTrailingNewline = {
+        ...original.toPrimitives(),
+        key: original.toPrimitives().key?.replace(/\n$/, ''),
+      };
+
+      const network = Network.fromPrimitives(primitivesWithoutTrailingNewline);
+
+      expect(network.toPrimitives().key).toBe(original.toPrimitives().key);
+    });
+  });
+
+  describe('key', () => {
+    it('should normalize private keys with a trailing newline', () => {
+      const key = mother.withPrivateKey().key as NetworkKey;
+      const keyWithoutTrailingNewline = key.valueOf().replace(/\n$/, '');
+
+      expect(new NetworkKey(keyWithoutTrailingNewline).valueOf()).toBe(
+        key.valueOf(),
+      );
     });
   });
 
