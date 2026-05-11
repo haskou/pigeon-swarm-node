@@ -2,10 +2,49 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm IPFS API
   version: 1.0.0
-  description: Endpoints for reading JSON content from IPFS.
+  description: Endpoints for publishing and reading JSON content from IPFS.
 tags:
   - name: ipfs
 paths:
+  /ipfs/public:
+    post:
+      tags:
+        - ipfs
+      summary: Publish public content to IPFS
+      description: Accepts raw request bytes, stores them as a public JSON IPFS document, and returns the CID to reference from identities, messages, or posts.
+      security:
+        - signedRequest: []
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+          example: image/png
+        - name: X-Filename
+          in: header
+          required: false
+          schema:
+            type: string
+          example: avatar.png
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Public content stored in IPFS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicIPFSContentResource'
+        '401':
+          description: Invalid signed request.
+        '422':
+          description: Public content is too large.
   /ipfs/{cid}:
     get:
       tags:
@@ -32,7 +71,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/IpfsContentNotFoundError'
 components:
+  securitySchemes:
+    signedRequest:
+      type: apiKey
+      in: header
+      name: X-Signature
   schemas:
+    PublicIPFSContentResource:
+      type: object
+      required:
+        - cid
+        - contentType
+        - size
+      properties:
+        cid:
+          type: string
+          example: bafybeigdyrztomockimagecid
+        contentType:
+          type: string
+          example: image/png
+        filename:
+          type: string
+          nullable: true
+          example: avatar.png
+        size:
+          type: number
+          example: 215040
     IpfsContentNotFoundError:
       type: object
       required:

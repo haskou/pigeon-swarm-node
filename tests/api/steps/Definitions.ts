@@ -30,6 +30,7 @@ let kernel: Kernel | null = null;
 
 @binding()
 export default class Definitions {
+  private binaryBody: Buffer | undefined;
   private body: string | undefined;
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
@@ -51,6 +52,7 @@ export default class Definitions {
 
   @before()
   public resetScenarioState(): void {
+    this.binaryBody = undefined;
     this.body = undefined;
     this.formData = undefined;
     this.headers = {};
@@ -212,7 +214,7 @@ export default class Definitions {
       path,
       timestamp,
       nonce,
-      this.body ? JSON.parse(this.body) : {},
+      this.binaryBody ?? (this.body ? JSON.parse(this.body) : {}),
     );
 
     this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
@@ -444,6 +446,20 @@ export default class Definitions {
       'GET',
       `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
     );
+  }
+
+  @given(
+    'I set public IPFS content with content type {string} and text {string}',
+  )
+  public iSetPublicIPFSContent(contentType: string, text: string): void {
+    this.binaryBody = Buffer.from(text);
+    this.headers['content-type'] = contentType;
+    this.headers['x-filename'] = 'avatar.png';
+  }
+
+  @given('I sign the current public IPFS content request')
+  public async iSignTheCurrentPublicIPFSContentRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/ipfs/public');
   }
 
   @given('I sign the current conversations request')
@@ -719,7 +735,9 @@ export default class Definitions {
     const isFormData = this.formData !== undefined;
     this.response = await this.restClient.post(
       path,
-      isFormData ? this.formData : this.body && JSON.parse(this.body),
+      isFormData
+        ? this.formData
+        : this.binaryBody ?? (this.body && JSON.parse(this.body)),
       isFormData ? { headers: this.formData?.getHeaders() } : {
         headers: this.headers,
       },

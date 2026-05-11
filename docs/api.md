@@ -154,6 +154,58 @@ Implemented:
 - persist owner state in MongoDB
 - load persisted node state when the API process starts
 
+## IPFS HTTP API
+
+### Publish public content
+
+```http
+POST /ipfs/public
+```
+
+Requires signed request headers. The authenticated identity does not need to be
+published yet, so clients can generate a keypair locally, sign this request, get
+a CID, and then publish the identity with `profile.picture` or a message with
+`attachmentExternalIdentifiers`.
+
+Request body is the raw binary content. Send metadata as headers:
+
+```http
+Content-Type: image/png
+X-Filename: avatar.png
+```
+
+Response:
+
+```json
+{
+  "cid": "<publicContentCid>",
+  "contentType": "image/png",
+  "filename": "avatar.png",
+  "size": 215040
+}
+```
+
+Implemented:
+
+- publish public content to every configured IPFS network
+- accept raw request bytes instead of wrapping the content in JSON/base64
+- store content as a JSON IPFS document with `contentType`, base64 `data`,
+  optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
+- preserve the original filename through `X-Filename`
+- limit content size to 10 MiB
+- return the CID to store in signed identity profiles, messages or posts
+
+### Get IPFS JSON content
+
+```http
+GET /ipfs/{cid}
+```
+
+Implemented:
+
+- read JSON content by CID from any configured IPFS network
+- return `404` when the CID is not found
+
 ## Identity HTTP API
 
 ### Get identity
@@ -189,7 +241,8 @@ Response:
   "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
-    "handle": "alice"
+    "handle": "alice",
+    "picture": "<publicImageCid>"
   },
   "previousIdentityExternalIdentifier": null,
   "timestamp": 1773848829055,
@@ -247,8 +300,8 @@ Implemented:
 - normalize handles to lowercase without `@`
 - return `identityExternalIdentifier`, which is the current published identity
   CID to send as `previousIdentityExternalIdentifier` in the next update
-- accept identity request bodies up to 10 MiB so signed profile images can be
-  sent as data URLs in `profile.picture`
+- store `profile.picture` as a public IPFS image CID, not as base64 or a data
+  URL
 
 Client-signed identity signatures must cover the canonical identity payload:
 
@@ -262,7 +315,7 @@ Client-signed identity signatures must cover the canonical identity payload:
     "biography": null,
     "handle": "alice",
     "name": "Alice",
-    "picture": null
+    "picture": "<publicImageCid>"
   },
   "timestamp": 1773848829055,
   "version": 1
@@ -291,7 +344,8 @@ Request:
   "previousIdentityExternalIdentifier": "<previousIdentityCid>",
   "profile": {
     "name": "Alice Updated",
-    "handle": "alice_new"
+    "handle": "alice_new",
+    "picture": "<newPublicContentCid>"
   },
   "timestamp": 1773848829056,
   "signature": "<identitySignature>",
@@ -309,8 +363,8 @@ Implemented:
   publishing
 - return the new `identityExternalIdentifier` for the just-published identity
   version
-- accept identity request bodies up to 10 MiB so signed profile images can be
-  sent as data URLs in `profile.picture`
+- store `profile.picture` as a public IPFS image CID; omit it or send `null`
+  in the signed profile to remove the profile image
 
 ## Keychain HTTP API
 
