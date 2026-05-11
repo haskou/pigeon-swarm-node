@@ -8,8 +8,16 @@ const mockHeliaNode = {
     getPeers: jest.fn().mockReturnValue([]),
     peerId: { toString: () => 'mock-peer-id' },
   },
+  pins: {
+    add: jest.fn(),
+    isPinned: jest.fn(),
+  },
   routing: { get: jest.fn(), put: jest.fn() },
 };
+
+async function* pinResults(cid: { toString(): string }) {
+  yield cid;
+}
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
 const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
@@ -114,7 +122,7 @@ jest.mock(
 jest.mock('@app/Kernel', () => ({
   __esModule: true,
   default: {
-    logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+    logger: { debug: jest.fn(), error: jest.fn(), info: jest.fn(), warn: jest.fn() },
   },
 }));
 
@@ -130,6 +138,10 @@ describe('PublicIPFS', () => {
     ).connectionPool = {};
     jest.clearAllMocks();
     mockHeliaNode.libp2p.getPeers.mockReturnValue([]);
+    mockHeliaNode.pins.add.mockReturnValue(
+      pinResults({ toString: () => 'bafymockcid' }),
+    );
+    mockHeliaNode.pins.isPinned.mockResolvedValue(false);
   });
 
   describe('create', () => {
@@ -210,6 +222,26 @@ describe('PublicIPFS', () => {
 
       await expect(connection.stat(cid, false)).rejects.toThrow(
         IPFSBlockNotFoundPublicError,
+      );
+    });
+  });
+
+  describe('getJSON', () => {
+    it('should pin fetched JSON content for local availability', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      const result = await connection.getJSON(cid);
+
+      expect(result).toEqual({ test: true });
+      expect(mockHeliaNode.pins.add).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        {
+          metadata: {
+            strategy: 'read-through-cache',
+          },
+          signal: undefined,
+        },
       );
     });
   });
