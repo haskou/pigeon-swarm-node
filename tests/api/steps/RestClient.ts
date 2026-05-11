@@ -80,9 +80,17 @@ export default class RestClient {
     }
   }
 
-  public async delete(path: string): Promise<any> {
+  public async delete(
+    path: string,
+    data?: any,
+    config: AxiosRequestConfig = {},
+  ): Promise<any> {
     try {
-      return await this.client.delete(path);
+      return await this.client.delete(path, {
+        ...config,
+        data,
+        headers: { 'content-type': 'application/json', ...config.headers },
+      });
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;

@@ -168,6 +168,14 @@ export default class IPFS {
     return results[0];
   }
 
+  public async removeJSONFromAll(cid: IPFSId): Promise<void> {
+    await this.initialize();
+
+    await Promise.all(
+      this.registry.getAll().map((network) => network.removeJSON(cid)),
+    );
+  }
+
   public async addJSONToNetworks(
     data: unknown,
     networkIds: string[],

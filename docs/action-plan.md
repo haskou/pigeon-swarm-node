@@ -5,18 +5,19 @@ Last updated: 2026-05-11.
 Keep this file short. Completed slices should move into Git history, API docs
 and tests instead of staying here as long-form notes.
 
-## Current Slice: Node Peer Heartbeats
+## Current Slice: Conversation Message Deletion
 
-Goal: let nodes announce themselves so other nodes can discover active peers in
-the network.
+Goal: let users delete their own conversation messages and synchronize the
+deletion across nodes.
 
 Status:
 
-- [x] Publish local node heartbeat events every 5 minutes.
-- [x] Store remote heartbeat events as active peer projections.
-- [x] Expose active peers through `GET /peers`.
-- [x] Keep heartbeat networks to id/name only, without private keys.
-- [ ] Validate the flow with two real nodes running on separate networks.
+- [x] Create signed `deleted` message tombstones.
+- [x] Expose `DELETE /conversations/{conversationId}/messages/{messageId}`.
+- [x] Publish deletion events through the existing consumer bus.
+- [x] Invalidate deleted message metadata locally.
+- [x] Remove deleted message blocks from local IPFS blockstores when present.
+- [ ] Validate deletion synchronization with two real nodes.
 
 ## Next Slice 1: Node Network Management
 
@@ -69,6 +70,8 @@ Tests:
 - Private attachments:
   - validate the frontend attachment flow with real 1to1 messages
   - document the encrypted attachment payload expected inside `encryptedPayload`
+- Node peer heartbeats:
+  - validate the flow with two real nodes running on separate networks
 - Posts:
   - publish encrypted or public post payloads through IPFS
   - model author, visibility, attachments and timeline reads

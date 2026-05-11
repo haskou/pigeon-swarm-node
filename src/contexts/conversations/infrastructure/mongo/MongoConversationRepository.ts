@@ -114,6 +114,31 @@ export default class MongoConversationRepository implements Repository {
       );
   }
 
+  private async deleteTargetMessageContent(message: Message): Promise<void> {
+    const targetMessageId = message.getTargetMessageId();
+
+    if (!targetMessageId) {
+      return;
+    }
+
+    const metadata = await (
+      await this.messageMetadataCollection()
+    ).findOne({
+      conversationId: message.toPrimitives().conversationId,
+      messageId: targetMessageId.valueOf(),
+      valid: true,
+    });
+
+    if (!metadata) {
+      return;
+    }
+
+    await this.ipfsManager.removeJSONFromAll(new IPFSId(metadata.cid));
+    await (
+      await this.messageMetadataCollection()
+    ).updateOne({ _id: metadata._id }, { $set: { valid: false } });
+  }
+
   public async findById(
     conversationId: ConversationId,
   ): Promise<Conversation | undefined> {
@@ -329,6 +354,7 @@ export default class MongoConversationRepository implements Repository {
         ),
         cid.valueOf(),
       );
+      await this.deleteTargetMessageContent(domainMessage);
     }
   }
 }

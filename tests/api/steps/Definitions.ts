@@ -440,6 +440,34 @@ export default class Definitions {
     });
   }
 
+  @given('I set a delete conversation message body')
+  public async iSetADeleteConversationMessageBody(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const id = MessageId.generate().valueOf();
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorId: this.ownerIdentityId?.valueOf() || '',
+      conversationId: this.conversationId,
+      createdAt,
+      encryptedPayload: undefined as string | undefined,
+      id,
+      previousMessageIds: [this.messageId],
+      targetMessageId: this.messageId,
+      type: MessageType.DELETED.valueOf(),
+    };
+
+    this.body = JSON.stringify({
+      createdAt,
+      id,
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
   @given('I sign the current conversation message request')
   public async iSignTheCurrentConversationMessageRequest(): Promise<void> {
     if (!this.conversationId) {
@@ -449,6 +477,18 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       `/conversations/${this.conversationId}/messages`,
+    );
+  }
+
+  @given('I sign the current conversation message deletion request')
+  public async iSignTheCurrentConversationMessageDeletionRequest(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'DELETE',
+      `/conversations/${this.conversationId}/messages/${this.messageId}`,
     );
   }
 
@@ -903,7 +943,24 @@ export default class Definitions {
 
   @when('I DELETE {string}')
   public async iDELETE(path: string): Promise<void> {
-    this.response = await this.restClient.delete(path);
+    this.response = await this.restClient.delete(
+      path,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the sent message from the current conversation')
+  public async iDELETETheSentMessageFromTheCurrentConversation(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/conversations/${this.conversationId}/messages/${this.messageId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
   }
 
   @then('response code is equal to {int}')

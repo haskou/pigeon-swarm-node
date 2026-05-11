@@ -172,6 +172,8 @@ export class Conversation extends AggregateRoot {
     authorId: IdentityId,
     targetMessageId: MessageId,
     signature: Signature,
+    createdAt: Timestamp = Timestamp.now(),
+    id: MessageId = MessageId.generate(),
   ): MessageDeleted {
     this.assertCanChangeMessage(authorId, targetMessageId);
 
@@ -181,6 +183,8 @@ export class Conversation extends AggregateRoot {
       targetMessageId,
       signature,
       this.getLastMessageIds(),
+      createdAt,
+      id,
     );
 
     this.messages.push(message);

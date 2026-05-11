@@ -104,6 +104,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagesResource'
+  /conversations/{conversationId}/messages/{messageId}:
+    delete:
+      tags:
+        - conversations
+      summary: Delete conversation message
+      description: Creates a signed deleted-message tombstone, publishes a deletion event, invalidates the target message locally and removes the local IPFS block when present.
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteConversationMessageBody'
+      responses:
+        '200':
+          description: Message deletion accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResource'
 components:
   parameters:
     ConversationId:
@@ -204,6 +234,20 @@ components:
           type: array
           items:
             type: string
+    DeleteConversationMessageBody:
+      type: object
+      required:
+        - id
+        - createdAt
+        - signature
+      properties:
+        id:
+          type: string
+          description: Client-generated id for the deleted-message tombstone.
+        createdAt:
+          type: integer
+        signature:
+          type: string
     MessageResource:
       type: object
       required:
