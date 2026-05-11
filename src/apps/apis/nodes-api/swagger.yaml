@@ -84,6 +84,19 @@ paths:
                 $ref: '#/components/schemas/NodeResource'
         '409':
           description: The current owner did not sign the request.
+  /peers/:
+    get:
+      tags:
+        - nodes
+      summary: Get active peers
+      description: Returns nodes seen through heartbeat events during the active peer window. Network private keys are never included.
+      responses:
+        '200':
+          description: Active peers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeersResource'
 components:
   parameters:
     XIdentityId:
@@ -149,6 +162,40 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NetworkResource'
+    PeerResource:
+      type: object
+      required:
+        - id
+        - lastSeenAt
+        - networks
+      properties:
+        id:
+          type: string
+        owner:
+          type: string
+        lastSeenAt:
+          type: number
+        networks:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+    PeersResource:
+      type: object
+      required:
+        - peers
+      properties:
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeerResource'
     PostNodeNetworkBody:
       type: object
       required:

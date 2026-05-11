@@ -67,13 +67,36 @@ export class Libp2pGossipsubRuntimeAdapter {
     return this.gossipsubModulePromise;
   }
 
+  private withoutWebRtcTransports<
+    TConfig extends {
+      addresses?: { listen?: string[] };
+      transports?: Array<(...args: unknown[]) => unknown>;
+    },
+  >(config: TConfig): TConfig {
+    config.addresses = {
+      ...(config.addresses || {}),
+      listen: (config.addresses?.listen || []).filter(
+        (address) => !address.includes('webrtc'),
+      ),
+    };
+    config.transports = (config.transports || []).filter((transport) => {
+      const source = transport.toString().toLowerCase();
+
+      return !source.includes('webrtc');
+    });
+
+    return config;
+  }
+
   public async createNode(): Promise<Libp2pPubSubNode> {
     const [heliaModule, libp2pModule, gossipsubModule] = await Promise.all([
       this.loadHeliaModule(),
       this.loadLibp2pModule(),
       this.loadGossipsubModule(),
     ]);
-    const libp2pConfig = heliaModule.libp2pDefaults();
+    const libp2pConfig = this.withoutWebRtcTransports(
+      heliaModule.libp2pDefaults(),
+    );
     const configWithServices = libp2pConfig as unknown as {
       services: Record<string, unknown>;
     };

@@ -7,11 +7,13 @@ import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdenti
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
+import { PostPrivateIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostPrivateIPFSContentRoute';
 import { PostPublicIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostPublicIPFSContentRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
+import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
@@ -137,11 +139,13 @@ export default class Server {
           PostConversationMessageRoute,
           GetConversationMessagesRoute,
           GetIPFSContentRoute,
+          PostPrivateIPFSContentRoute,
           PostPublicIPFSContentRoute,
           GetNodeRoute,
           GetNodeNetworksRoute,
           PostNodeNetworkRoute,
           PutNodeOwnerRoute,
+          GetPeersRoute,
           GetNotificationsRoute,
           PostNotificationRoute,
           PatchNotificationRoute,

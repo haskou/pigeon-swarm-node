@@ -142,6 +142,29 @@ export class HeliaRuntimeAdapter {
     return this.datastoreFsModulePromise;
   }
 
+  private withoutWebRtcTransports(defaults: Libp2pDefaults): Libp2pDefaults {
+    const config = defaults as unknown as {
+      addresses?: {
+        listen?: string[];
+      };
+      transports?: Array<(...args: unknown[]) => unknown>;
+    };
+
+    config.addresses = {
+      ...(config.addresses || {}),
+      listen: (config.addresses?.listen || []).filter(
+        (address) => !address.includes('webrtc'),
+      ),
+    };
+    config.transports = (config.transports || []).filter((transport) => {
+      const source = transport.toString().toLowerCase();
+
+      return !source.includes('webrtc');
+    });
+
+    return defaults;
+  }
+
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
@@ -183,7 +206,11 @@ export class HeliaRuntimeAdapter {
   public async getLibp2pDefaults(): Promise<Libp2pDefaults> {
     const heliaModule = await this.loadHeliaModule();
 
-    return heliaModule.libp2pDefaults();
+    if (typeof heliaModule.libp2pDefaults !== 'function') {
+      return {} as Libp2pDefaults;
+    }
+
+    return this.withoutWebRtcTransports(heliaModule.libp2pDefaults());
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {

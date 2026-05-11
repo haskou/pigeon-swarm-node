@@ -19,6 +19,8 @@ paths:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /identities/{reference}:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1{reference}'
+  /ipfs/private:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1private'
   /ipfs/public:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1public'
   /ipfs/{cid}:
@@ -33,6 +35,8 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1'
   /node/owner/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner~1'
+  /peers/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1peers~1'
   /notifications/:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'
   /notifications/{notificationId}:

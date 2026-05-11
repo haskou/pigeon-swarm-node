@@ -14,6 +14,8 @@ import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
+import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
+import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import Kernel from '@app/Kernel';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
@@ -50,12 +52,13 @@ async function init() {
     RegisterMessageDeletionWhenAnnounced,
     RespondToConversationSyncRequest,
     RegisterMessagesWhenSyncAvailable,
+    RegisterNodePeerWhenHeartbeatReceived,
   );
   await kernel.runConsumers();
   console.timeEnd('Run consumers');
 
   console.time('Run Schedulers');
-  kernel.addSchedulers();
+  kernel.addSchedulers(NodeHeartbeatScheduler);
   await kernel.runSchedulers();
   console.timeEnd('Run Schedulers');
 

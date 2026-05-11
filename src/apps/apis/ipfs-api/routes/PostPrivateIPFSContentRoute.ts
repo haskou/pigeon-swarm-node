@@ -15,9 +15,10 @@ import {
 
 import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
 
-interface PublicIPFSContentDocument {
+interface PrivateIPFSContentDocument {
   contentType: string;
-  data: string;
+  encryptedData: string;
+  encrypted: true;
   filename?: string;
   size: number;
   uploadedAt: number;
@@ -25,7 +26,7 @@ interface PublicIPFSContentDocument {
 }
 
 @JsonController('/ipfs')
-export class PostPublicIPFSContentRoute extends Route {
+export class PostPrivateIPFSContentRoute extends Route {
   private static readonly MAX_CONTENT_SIZE_BYTES = 10 * 1024 * 1024;
 
   private readonly ipfs: IPFS = this.get<IPFS>(IPFS);
@@ -33,10 +34,10 @@ export class PostPublicIPFSContentRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  @Post('/public')
+  @Post('/private')
   @UseBefore(
     express.raw({
-      limit: `${PostPublicIPFSContentRoute.MAX_CONTENT_SIZE_BYTES}b`,
+      limit: `${PostPrivateIPFSContentRoute.MAX_CONTENT_SIZE_BYTES}b`,
       type: '*/*',
     }),
   )
@@ -50,15 +51,16 @@ export class PostPublicIPFSContentRoute extends Route {
       await this.signedRequestAuthenticator.authenticate(request);
     const body = Buffer.isBuffer(request.body) ? request.body : Buffer.from([]);
 
-    if (body.length > PostPublicIPFSContentRoute.MAX_CONTENT_SIZE_BYTES) {
+    if (body.length > PostPrivateIPFSContentRoute.MAX_CONTENT_SIZE_BYTES) {
       throw new IPFSContentTooLargeError(
-        PostPublicIPFSContentRoute.MAX_CONTENT_SIZE_BYTES,
+        PostPrivateIPFSContentRoute.MAX_CONTENT_SIZE_BYTES,
       );
     }
 
-    const document: PublicIPFSContentDocument = {
+    const document: PrivateIPFSContentDocument = {
       contentType: contentType || 'application/octet-stream',
-      data: body.toString('base64'),
+      encrypted: true,
+      encryptedData: body.toString('base64'),
       filename,
       size: body.length,
       uploadedAt: Date.now(),
@@ -69,6 +71,7 @@ export class PostPublicIPFSContentRoute extends Route {
     return response.status(HttpRouteStatusEnum.CREATED).json({
       cid: cid.valueOf(),
       contentType: document.contentType,
+      encrypted: true,
       filename,
       size: body.length,
     });

@@ -44,10 +44,16 @@ export default class Libp2pGossipsubTransport implements PubSubTransport {
   public async publish(topic: string, payload: string): Promise<void> {
     const node = await this.getNode();
 
-    await node.services.pubsub.publish(
-      topic,
-      new TextEncoder().encode(payload),
-    );
+    try {
+      await node.services.pubsub.publish(
+        topic,
+        new TextEncoder().encode(payload),
+      );
+    } catch (error: unknown) {
+      Kernel.logger.warn(
+        `PubSub publish failed for topic "${topic}": ${String(error)}`,
+      );
+    }
   }
 
   public async subscribe(

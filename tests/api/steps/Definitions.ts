@@ -5,6 +5,7 @@ import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpReque
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { MongoNodeMetadataDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodeMetadataDocument';
+import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodePeerDocument';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -107,6 +108,30 @@ export default class Definitions {
         .getAll()
         .map((network) => networkRegistry.removeNetwork(network.getName())),
     );
+  }
+
+  @given('a node peer heartbeat has been received')
+  public async aNodePeerHeartbeatHasBeenReceived(): Promise<void> {
+    const mongo = Kernel.di.getService<MongoDB>(MongoDB);
+    const collection =
+      await mongo.getCollection<MongoNodePeerDocument>('node_peers');
+    const ownerKeyPair = await KeyPair.generate();
+    const ownerIdentityId = new IdentityId(
+      ownerKeyPair.toPrimitives().publicKey,
+    );
+
+    await collection.deleteMany({});
+    await collection.insertOne({
+      _id: '550e8400-e29b-41d4-a716-446655440010',
+      lastSeenAt: Date.now(),
+      networks: [
+        {
+          id: '550e8400-e29b-41d4-a716-446655440011',
+          name: 'public',
+        },
+      ],
+      owner: ownerIdentityId.valueOf(),
+    });
   }
 
   @given('I set json body')
@@ -454,7 +479,7 @@ export default class Definitions {
   }
 
   @given(
-    'I set public IPFS content with content type {string} and text {string}',
+    'I set raw IPFS content with content type {string} and text {string}',
   )
   public iSetPublicIPFSContent(contentType: string, text: string): void {
     this.binaryBody = Buffer.from(text);
@@ -465,6 +490,11 @@ export default class Definitions {
   @given('I sign the current public IPFS content request')
   public async iSignTheCurrentPublicIPFSContentRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/ipfs/public');
+  }
+
+  @given('I sign the current private IPFS content request')
+  public async iSignTheCurrentPrivateIPFSContentRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/ipfs/private');
   }
 
   @given('I sign the current conversations request')
