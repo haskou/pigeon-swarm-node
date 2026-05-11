@@ -11,11 +11,13 @@ import heliaRuntimeAdapter, {
   ParsedCidLike,
 } from './adapters/HeliaRuntimeAdapter';
 import { HeliaIPFSParser, ParsedHeliaIPFSOptions } from './HeliaIPFSParser';
+import HeliaPinningStrategy from './HeliaPinningStrategy';
 import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
+  private readonly pinningStrategy: HeliaPinningStrategy;
 
   public static async createPublicHeliaCore(
     options: IPFSOptions,
@@ -61,7 +63,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
   constructor(
     private readonly heliaCore: HeliaInstance,
     private readonly options: IPFSOptions,
-  ) {}
+    pinningStrategy?: HeliaPinningStrategy,
+  ) {
+    this.pinningStrategy = pinningStrategy ?? new HeliaPinningStrategy();
+  }
 
   private createRoutingAbortSignal(signal?: AbortSignal): {
     signal: AbortSignal;
@@ -147,6 +152,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return;
     }
 
+    await this.pinningStrategy.ensureUnpinned(
+      this.heliaCore,
+      parsedCid,
+      signal,
+    );
     await this.heliaCore.blockstore.delete(parsedCid, { signal });
   }
 
@@ -189,10 +199,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     });
 
-    Kernel.logger.warn(
-      `Repining to ensure local node availability: ${cid.valueOf()}. This is a temporary measure until we implement a more robust pinning strategy on each context.`,
-    );
-    await this.addJSON(json, signal);
+    await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
 
     return json;
   }
