@@ -6,6 +6,45 @@ info:
 tags:
   - name: ipfs
 paths:
+  /ipfs/private:
+    post:
+      tags:
+        - ipfs
+      summary: Publish encrypted private content to IPFS
+      description: Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document, and returns the CID to reference from encrypted message payloads and attachmentExternalIdentifiers.
+      security:
+        - signedRequest: []
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+          example: application/octet-stream
+        - name: X-Filename
+          in: header
+          required: false
+          schema:
+            type: string
+          example: encrypted-photo.bin
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Private encrypted content stored in IPFS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateIPFSContentResource'
+        '401':
+          description: Invalid signed request.
+        '422':
+          description: Private content is too large.
   /ipfs/public:
     post:
       tags:
@@ -94,6 +133,30 @@ components:
           type: string
           nullable: true
           example: avatar.png
+        size:
+          type: number
+          example: 215040
+    PrivateIPFSContentResource:
+      type: object
+      required:
+        - cid
+        - contentType
+        - encrypted
+        - size
+      properties:
+        cid:
+          type: string
+          example: bafybeigdyrztomockencryptedcid
+        contentType:
+          type: string
+          example: application/octet-stream
+        encrypted:
+          type: boolean
+          example: true
+        filename:
+          type: string
+          nullable: true
+          example: encrypted-photo.bin
         size:
           type: number
           example: 215040

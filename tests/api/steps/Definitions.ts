@@ -479,7 +479,7 @@ export default class Definitions {
   }
 
   @given(
-    'I set public IPFS content with content type {string} and text {string}',
+    'I set raw IPFS content with content type {string} and text {string}',
   )
   public iSetPublicIPFSContent(contentType: string, text: string): void {
     this.binaryBody = Buffer.from(text);
@@ -490,6 +490,11 @@ export default class Definitions {
   @given('I sign the current public IPFS content request')
   public async iSignTheCurrentPublicIPFSContentRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/ipfs/public');
+  }
+
+  @given('I sign the current private IPFS content request')
+  public async iSignTheCurrentPrivateIPFSContentRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/ipfs/private');
   }
 
   @given('I sign the current conversations request')

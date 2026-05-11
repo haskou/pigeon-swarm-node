@@ -19,6 +19,8 @@ paths:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /identities/{reference}:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1{reference}'
+  /ipfs/private:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1private'
   /ipfs/public:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1public'
   /ipfs/{cid}:

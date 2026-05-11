@@ -230,7 +230,50 @@ Implemented:
   optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
 - preserve the original filename through `X-Filename`
 - limit content size to 10 MiB
-- return the CID to store in signed identity profiles, messages or posts
+- return the CID to store in signed identity profiles or posts
+
+### Publish private content
+
+```http
+POST /ipfs/private
+```
+
+Requires signed request headers. The backend never encrypts, decrypts or
+inspects the original private file. Clients must encrypt the file bytes locally
+before sending the request.
+
+Request body is the encrypted raw binary content. Send metadata as headers:
+
+```http
+Content-Type: application/octet-stream
+X-Filename: encrypted-photo.bin
+```
+
+Response:
+
+```json
+{
+  "cid": "<privateContentCid>",
+  "contentType": "application/octet-stream",
+  "encrypted": true,
+  "filename": "encrypted-photo.bin",
+  "size": 215040
+}
+```
+
+Implemented:
+
+- publish client-encrypted private content to every configured IPFS network
+- accept raw encrypted request bytes instead of wrapping the content in
+  JSON/base64
+- store content as a JSON IPFS document with `encrypted: true`,
+  `contentType`, base64 `encryptedData`, optional `filename`, `size`,
+  `uploadedAt` and `uploadedByIdentityId`
+- preserve `X-Filename` when provided; do not send a sensitive clear-text
+  filename here if it should remain private
+- limit encrypted content size to 10 MiB
+- return the CID to place in `attachmentExternalIdentifiers` for encrypted
+  conversation messages
 
 ### Get IPFS JSON content
 
@@ -568,7 +611,7 @@ Request:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedMessagePayload>",
   "signature": "<messageSignature>",
-  "attachmentExternalIdentifiers": ["<externalIdentifier>"]
+  "attachmentExternalIdentifiers": ["<privateContentCid>"]
 }
 ```
 
@@ -594,6 +637,8 @@ Implemented:
 - persist immutable message document in IPFS
 - persist message metadata in MongoDB
 - publish `ConversationMessageWasSentEvent`
+- store only attachment CIDs in the message; private attachment bytes must be
+  encrypted by the client and published first with `POST /ipfs/private`
 
 Signed HTTP request validation:
 

@@ -6,7 +6,7 @@ Feature: Post public IPFS content route
   Scenario: Publish public content to IPFS
     Given I am an anonymous user
     And I register an in-memory IPFS network "api-test-network"
-    And I set public IPFS content with content type "image/png" and text "hello"
+    And I set raw IPFS content with content type "image/png" and text "hello"
     And I sign the current public IPFS content request
     When I POST to "/ipfs/public"
     Then response code is equal to 201
