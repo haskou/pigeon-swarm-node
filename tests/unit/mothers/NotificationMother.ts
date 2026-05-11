@@ -42,7 +42,6 @@ export class NotificationMother {
         new Signature(
           'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
         ),
-        undefined,
       ),
       this.createdAt,
     );

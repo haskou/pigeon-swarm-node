@@ -26,8 +26,6 @@ export default class MongoNotificationMapper {
         encryptedConversationKey: document.payload.encryptedConversationKey,
         inviterIdentityId: document.payload.inviterIdentityId,
         inviterSignature: document.payload.inviterSignature,
-        keychainExternalIdentifier:
-          document.payload.keychainExternalIdentifier || '',
         recipientIdentityId: document.payload.recipientIdentityId,
       },
       recipientIdentityId: document.recipientIdentityId,

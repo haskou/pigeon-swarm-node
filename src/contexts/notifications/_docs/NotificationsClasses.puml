@@ -12,7 +12,7 @@ package "notifications" {
       -state: NotificationState
       -payload: ConversationInvitationPayload
       -createdAt: Timestamp
-      +accept(keychainExternalIdentifier: string): void
+      +accept(): void
       +decline(): void
       +isRecipient(identityId: IdentityId): boolean
       +toPrimitives(): object
@@ -24,8 +24,6 @@ package "notifications" {
       -recipientIdentityId: IdentityId
       -encryptedConversationKey: EncryptedConversationKey
       -inviterSignature: Signature
-      -keychainExternalIdentifier?: KeychainExternalIdentifier
-      +accept(keychainExternalIdentifier: KeychainExternalIdentifier): ConversationInvitationPayload
       +toPrimitives(): object
     }
 

@@ -5,7 +5,6 @@ export type NotificationResource = {
     conversationId: string;
     encryptedConversationKey: string;
     inviterIdentityId: string;
-    keychainExternalIdentifier?: string;
     recipientIdentityId: string;
     inviterSignature: string;
   };

@@ -129,8 +129,6 @@ components:
           type: string
         encryptedConversationKey:
           type: string
-        keychainExternalIdentifier:
-          type: string
         inviterSignature:
           type: string
     NotificationResource:
@@ -197,5 +195,3 @@ components:
           enum:
             - accepted
             - declined
-        keychainExternalIdentifier:
-          type: string

@@ -509,7 +509,6 @@ export default class Definitions {
   @given('I set a notification accepted body')
   public iSetANotificationAcceptedBody(): void {
     this.body = JSON.stringify({
-      keychainExternalIdentifier: 'keychain-cid-after-accept',
       state: 'accepted',
     });
   }

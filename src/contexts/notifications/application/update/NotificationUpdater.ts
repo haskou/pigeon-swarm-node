@@ -18,7 +18,7 @@ export default class NotificationUpdater {
     message: NotificationUpdateMessage,
   ): void {
     if (message.state.isEqual(NotificationState.ACCEPTED)) {
-      notification.accept(message.keychainExternalIdentifier || '');
+      notification.accept();
     }
 
     if (message.state.isEqual(NotificationState.DECLINED)) {

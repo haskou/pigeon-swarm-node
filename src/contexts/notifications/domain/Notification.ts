@@ -1,4 +1,3 @@
-import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
@@ -64,15 +63,11 @@ export class Notification extends AggregateRoot {
     super();
   }
 
-  public accept(keychainExternalIdentifier: string): void {
+  public accept(): void {
     this.state = NotificationState.ACCEPTED;
     this.status = NotificationStatus.READ;
-    this.payload = this.payload.accept(
-      new KeychainExternalIdentifier(keychainExternalIdentifier),
-    );
     this.record(
       new NotificationWasAcceptedEvent(this.id.valueOf(), {
-        keychainExternalIdentifier,
         recipientIdentityId: this.recipientIdentityId.valueOf(),
       }),
     );

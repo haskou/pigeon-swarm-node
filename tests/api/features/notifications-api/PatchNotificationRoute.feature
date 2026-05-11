@@ -11,9 +11,8 @@ Feature: Patch notification route
     When I PATCH the current notification
     Then response code is equal to 200
     And response contains a valid resource with the following fields
-      | status                                 | read                      |
-      | state                                  | accepted                  |
-      | payload.keychainExternalIdentifier     | keychain-cid-after-accept |
+      | status | read     |
+      | state  | accepted |
 
   Scenario: Decline a conversation invitation notification
     Given I am an anonymous user

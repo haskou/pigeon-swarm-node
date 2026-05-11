@@ -1,10 +1,6 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsString } from 'class-validator';
 
 export class PatchNotificationBody {
-  @IsOptional()
-  @IsString()
-  public readonly keychainExternalIdentifier?: string;
-
   @IsString()
   @IsNotEmpty()
   @IsIn(['accepted', 'declined'])

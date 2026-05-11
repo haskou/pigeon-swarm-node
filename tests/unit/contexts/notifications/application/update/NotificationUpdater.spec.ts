@@ -33,16 +33,12 @@ describe('NotificationUpdater', () => {
         notification.toPrimitives().id,
         recipientIdentityId.valueOf(),
         'accepted',
-        'accepted-keychain-cid',
       ),
     );
 
     expect(repository.save).toHaveBeenCalledWith(notification);
     expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
     expect(notification.toPrimitives()).toMatchObject({
-      payload: {
-        keychainExternalIdentifier: 'accepted-keychain-cid',
-      },
       state: 'accepted',
       status: 'read',
     });

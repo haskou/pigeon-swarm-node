@@ -20,7 +20,6 @@ export default class NotificationCreator {
         encryptedConversationKey: message.encryptedConversationKey.valueOf(),
         inviterIdentityId: message.inviterIdentityId.valueOf(),
         inviterSignature: message.inviterSignature.valueOf(),
-        keychainExternalIdentifier: undefined,
         recipientIdentityId: message.recipientIdentityId.valueOf(),
       }),
     );

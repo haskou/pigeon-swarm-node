@@ -7,7 +7,6 @@ export type MongoConversationInvitationPayloadDocument = {
   encryptedConversationKey: string;
   inviterIdentityId: string;
   inviterSignature: string;
-  keychainExternalIdentifier?: string;
   recipientIdentityId: string;
 };
 

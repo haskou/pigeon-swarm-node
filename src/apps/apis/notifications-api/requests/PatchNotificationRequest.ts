@@ -15,7 +15,6 @@ export class PatchNotificationRequest {
       this.notificationId,
       this.recipientIdentityId.valueOf(),
       this.body.state,
-      this.body.keychainExternalIdentifier,
     );
   }
 }

@@ -422,8 +422,7 @@ Accept request:
 
 ```json
 {
-  "state": "accepted",
-  "keychainExternalIdentifier": "<updatedRecipientKeychain>"
+  "state": "accepted"
 }
 ```
 
