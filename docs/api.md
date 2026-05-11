@@ -157,6 +157,40 @@ Implemented:
 - persist owner state in MongoDB
 - load persisted node state when the API process starts
 
+### Get active peers
+
+```http
+GET /peers
+```
+
+Response:
+
+```json
+{
+  "peers": [
+    {
+      "id": "<nodeId>",
+      "owner": "<identityId>",
+      "lastSeenAt": 1773848829055,
+      "networks": [
+        {
+          "id": "<networkId>",
+          "name": "public"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Implemented:
+
+- publish a local node heartbeat every 5 minutes through the consumer bus
+- store heartbeats received from remote nodes as active peers
+- return peers seen during the active peer window
+- include node id, owner and network id/name only
+- never expose private network keys in peer heartbeat payloads
+
 ## IPFS HTTP API
 
 ### Publish public content
@@ -637,7 +671,6 @@ Implemented:
 - require signed request auth from the recipient
 - allow recipient-only accept and decline
 - mark accepted or declined notifications as read
-- store the recipient keychain external identifier when accepted
 
 ## Planned API
 

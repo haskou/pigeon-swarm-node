@@ -12,6 +12,7 @@ import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychai
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
+import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
@@ -142,6 +143,7 @@ export default class Server {
           GetNodeNetworksRoute,
           PostNodeNetworkRoute,
           PutNodeOwnerRoute,
+          GetPeersRoute,
           GetNotificationsRoute,
           PostNotificationRoute,
           PatchNotificationRoute,

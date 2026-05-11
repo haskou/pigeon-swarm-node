@@ -5,21 +5,18 @@ Last updated: 2026-05-11.
 Keep this file short. Completed slices should move into Git history, API docs
 and tests instead of staying here as long-form notes.
 
-## Current Slice: Private Attachments
+## Current Slice: Node Peer Heartbeats
 
-Goal: make 1to1 message attachments usable without exposing private content to
-the backend.
+Goal: let nodes announce themselves so other nodes can discover active peers in
+the network.
 
 Status:
 
-- [x] Publish public profile media through `POST /ipfs/public`.
-- [x] Keep identity `profile.picture` as an IPFS CID instead of embedded
-  base64/data URLs.
-- [x] Publish client-encrypted private content through `POST /ipfs/private`.
-- [x] Keep message attachments as `attachmentExternalIdentifiers`.
-- [ ] Validate the frontend attachment flow with real 1to1 messages.
-- [ ] Document the encrypted attachment payload expected inside
-  `encryptedPayload`.
+- [x] Publish local node heartbeat events every 5 minutes.
+- [x] Store remote heartbeat events as active peer projections.
+- [x] Expose active peers through `GET /peers`.
+- [x] Keep heartbeat networks to id/name only, without private keys.
+- [ ] Validate the flow with two real nodes running on separate networks.
 
 ## Next Slice 1: Node Network Management
 
@@ -69,6 +66,9 @@ Tests:
 
 ## Later Slices
 
+- Private attachments:
+  - validate the frontend attachment flow with real 1to1 messages
+  - document the encrypted attachment payload expected inside `encryptedPayload`
 - Posts:
   - publish encrypted or public post payloads through IPFS
   - model author, visibility, attachments and timeline reads

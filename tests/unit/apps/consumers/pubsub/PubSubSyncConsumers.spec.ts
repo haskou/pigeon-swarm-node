@@ -10,6 +10,7 @@ import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
+import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
@@ -37,6 +38,9 @@ import { KeychainSyncResponseMessage } from '@app/contexts/keychains/application
 import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
+import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
+import { NodePeerRegisterMessage } from '@app/contexts/nodes/application/register-peer/messages/NodePeerRegisterMessage';
+import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -265,5 +269,45 @@ describe('PubSub sync consumers', () => {
     expect(registrar.register.mock.calls[0][0].messageId.valueOf()).toBe(
       messageId,
     );
+  });
+
+  it('registers node peers announced by heartbeat events', async () => {
+    const nodeId = '550e8400-e29b-41d4-a716-446655440010';
+    const networkId = '550e8400-e29b-41d4-a716-446655440011';
+    const ownerIdentityId = new IdentityMother().id.valueOf();
+    const registrar = mock<NodePeerRegistrar>();
+    const consumer = new RegisterNodePeerWhenHeartbeatReceived(
+      eventConsumer,
+      registrar,
+    );
+
+    await consumer.init();
+    await consumer.handler(
+      new NodeHeartbeatWasSent(nodeId, {
+        networks: [{ id: networkId, name: 'public' }],
+        owner: ownerIdentityId,
+      }),
+    );
+
+    expect(eventConsumer.consume).toHaveBeenCalledWith(
+      RegisterNodePeerWhenHeartbeatReceived.QUEUE_NAME,
+      NodeHeartbeatWasSent.EVENT_NAME,
+      NodeHeartbeatWasSent,
+      'pigeon-swarm',
+      expect.any(Function),
+    );
+    expect(registrar.register).toHaveBeenCalledWith(
+      expect.any(NodePeerRegisterMessage),
+    );
+    expect(registrar.register.mock.calls[0][0].nodeId.valueOf()).toBe(nodeId);
+    expect(registrar.register.mock.calls[0][0].owner?.valueOf()).toBe(
+      ownerIdentityId,
+    );
+    expect(
+      registrar.register.mock.calls[0][0].networks[0].toPrimitives(),
+    ).toEqual({
+      id: networkId,
+      name: 'public',
+    });
   });
 });

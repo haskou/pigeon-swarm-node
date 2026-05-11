@@ -33,6 +33,8 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1'
   /node/owner/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner~1'
+  /peers/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1peers~1'
   /notifications/:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'
   /notifications/{notificationId}:
