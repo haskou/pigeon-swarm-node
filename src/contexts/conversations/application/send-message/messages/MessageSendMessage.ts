@@ -11,6 +11,7 @@ export type MessageSendPayload = {
   createdAt: number;
   encryptedPayload: string;
   id: string;
+  replyToMessageId?: string;
   signature: string;
 };
 
@@ -21,6 +22,7 @@ export class MessageSendMessage {
   public readonly createdAt: Timestamp;
   public readonly encryptedPayload: EncryptedMessagePayload;
   public readonly id: MessageId;
+  public readonly replyToMessageId?: MessageId;
   public readonly signature: Signature;
 
   constructor(
@@ -41,6 +43,9 @@ export class MessageSendMessage {
       payload.encryptedPayload,
     );
     this.id = new MessageId(payload.id);
+    this.replyToMessageId = payload.replyToMessageId
+      ? new MessageId(payload.replyToMessageId)
+      : undefined;
     this.signature = new Signature(payload.signature);
   }
 }

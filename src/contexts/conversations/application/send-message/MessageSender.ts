@@ -31,6 +31,7 @@ export default class MessageSender {
       message.attachmentExternalIdentifiers,
       message.createdAt,
       message.id,
+      message.replyToMessageId,
     );
 
     const isValidSignature = this.signatureService.isValidSignature(

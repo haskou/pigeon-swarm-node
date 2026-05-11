@@ -70,6 +70,70 @@ describe('Conversation', () => {
         ),
       ).toThrow(ConversationParticipantNotFoundError);
     });
+
+    it('should add a sent reply message', () => {
+      const target = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('target-payload'),
+        signature(),
+      );
+
+      const reply = conversation.sendMessage(
+        recipient,
+        new EncryptedMessagePayload('reply-payload'),
+        signature(),
+        [],
+        undefined,
+        undefined,
+        target.getId(),
+      );
+
+      expect(reply.getReplyToMessageId()?.valueOf()).toBe(
+        target.getId().valueOf(),
+      );
+      expect(conversation.toPrimitives().messages[1]).toEqual(
+        expect.objectContaining({
+          encryptedPayload: 'reply-payload',
+          replyToMessageId: target.getId().valueOf(),
+          type: MessageType.SENT.valueOf(),
+        }),
+      );
+    });
+
+    it('should reject replies to unknown messages', () => {
+      expect(() =>
+        conversation.sendMessage(
+          author,
+          new EncryptedMessagePayload('reply-payload'),
+          signature(),
+          [],
+          undefined,
+          undefined,
+          MessageId.generate(),
+        ),
+      ).toThrow(MessageTargetNotFoundError);
+    });
+
+    it('should reject replies to deleted messages', () => {
+      const target = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('target-payload'),
+        signature(),
+      );
+      conversation.deleteMessage(author, target.getId(), signature());
+
+      expect(() =>
+        conversation.sendMessage(
+          recipient,
+          new EncryptedMessagePayload('reply-payload'),
+          signature(),
+          [],
+          undefined,
+          undefined,
+          target.getId(),
+        ),
+      ).toThrow(MessageTargetAlreadyDeletedError);
+    });
   });
 
   describe('create', () => {

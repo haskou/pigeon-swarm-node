@@ -14,6 +14,7 @@ type MessageBasePrimitives = {
   createdAt: number;
   id: string;
   previousMessageIds: string[];
+  replyToMessageId?: string;
   signature: string;
 };
 
@@ -27,6 +28,7 @@ export abstract class Message {
     private readonly previousMessageIds: MessageId[],
     private readonly createdAt: Timestamp,
     private readonly signature: Signature,
+    private readonly replyToMessageId?: MessageId,
     attachmentExternalIdentifiers: AttachmentExternalIdentifiers = [],
   ) {
     this.attachmentExternalIdentifiers = attachmentExternalIdentifiers;
@@ -44,6 +46,7 @@ export abstract class Message {
       previousMessageIds: this.previousMessageIds.map((messageId) =>
         messageId.valueOf(),
       ),
+      replyToMessageId: this.replyToMessageId?.valueOf(),
       signature: this.signature.valueOf(),
     };
   }
@@ -64,6 +67,10 @@ export abstract class Message {
 
   public getTargetMessageId(): MessageId | undefined {
     return undefined;
+  }
+
+  public getReplyToMessageId(): MessageId | undefined {
+    return this.replyToMessageId;
   }
 
   public toPrimitives() {

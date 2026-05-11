@@ -20,6 +20,7 @@ export class MessageViewModel {
       encryptedPayload: primitives.encryptedPayload,
       id: primitives.id,
       previousMessageIds: primitives.previousMessageIds,
+      replyToMessageId: primitives.replyToMessageId,
       targetMessageId: primitives.targetMessageId,
       type: primitives.type,
     };

@@ -17,6 +17,7 @@ export class MessageSent extends Message {
     attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
     createdAt: Timestamp = Timestamp.now(),
     id: MessageId = MessageId.generate(),
+    replyToMessageId?: MessageId,
   ): MessageSent {
     return new MessageSent(
       id,
@@ -27,6 +28,7 @@ export class MessageSent extends Message {
       createdAt,
       signature,
       attachmentExternalIdentifiers,
+      replyToMessageId,
     );
   }
 
@@ -47,6 +49,9 @@ export class MessageSent extends Message {
         (externalIdentifier) =>
           new AttachmentExternalIdentifier(externalIdentifier),
       ),
+      primitives.replyToMessageId
+        ? new MessageId(primitives.replyToMessageId)
+        : undefined,
     );
   }
 
@@ -59,6 +64,7 @@ export class MessageSent extends Message {
     createdAt: Timestamp,
     signature: Signature,
     attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
+    replyToMessageId?: MessageId,
   ) {
     super(
       id,
@@ -67,6 +73,7 @@ export class MessageSent extends Message {
       previousMessageIds,
       createdAt,
       signature,
+      replyToMessageId,
       attachmentExternalIdentifiers,
     );
   }

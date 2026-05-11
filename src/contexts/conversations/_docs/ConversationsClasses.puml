@@ -27,6 +27,7 @@ package "conversations.domain" {
     -authorId: IdentityId
     -createdAt: Timestamp
     -previousMessageIds: MessageId[]
+    -replyToMessageId?: MessageId
     -signature: Signature
     +verify(): boolean
   }

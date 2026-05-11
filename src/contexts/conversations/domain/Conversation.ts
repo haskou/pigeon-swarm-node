@@ -78,6 +78,24 @@ export class Conversation extends AggregateRoot {
     );
   }
 
+  private assertCanReplyToMessage(replyToMessageId?: MessageId): void {
+    if (!replyToMessageId) {
+      return;
+    }
+
+    const target = this.findMessageById(replyToMessageId);
+
+    assert(target, new MessageTargetNotFoundError());
+    assert(
+      target?.getType().isEqual(MessageType.SENT),
+      new MessageTargetNotFoundError(),
+    );
+    assert(
+      !this.isDeleted(replyToMessageId),
+      new MessageTargetAlreadyDeletedError(),
+    );
+  }
+
   private getLastMessageIds(): MessageId[] {
     const lastMessage = this.messages[this.messages.length - 1];
 
@@ -99,8 +117,10 @@ export class Conversation extends AggregateRoot {
     attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
     createdAt: Timestamp = Timestamp.now(),
     id: MessageId = MessageId.generate(),
+    replyToMessageId?: MessageId,
   ): MessageSent {
     this.assertIsParticipant(authorId);
+    this.assertCanReplyToMessage(replyToMessageId);
 
     const message = MessageSent.create(
       this.id,
@@ -111,6 +131,7 @@ export class Conversation extends AggregateRoot {
       attachmentExternalIdentifiers,
       createdAt,
       id,
+      replyToMessageId,
     );
 
     this.messages.push(message);
@@ -130,6 +151,7 @@ export class Conversation extends AggregateRoot {
 
     if (message.getType().isEqual(MessageType.SENT)) {
       this.assertIsParticipant(message.getAuthorId());
+      this.assertCanReplyToMessage(message.getReplyToMessageId());
     } else {
       const targetMessageId = message.getTargetMessageId();
 

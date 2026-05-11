@@ -414,6 +414,7 @@ export default class Definitions {
       encryptedPayload: 'encrypted-message-payload',
       id,
       previousMessageIds: [] as string[],
+      replyToMessageId: undefined as string | undefined,
       targetMessageId: undefined as string | undefined,
       type: MessageType.SENT.valueOf(),
     };
@@ -423,6 +424,38 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-message-payload',
       id,
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
+  @given('I set an encrypted conversation reply body')
+  public async iSetAnEncryptedConversationReplyBody(): Promise<void> {
+    if (!this.messageId) {
+      throw new Error('Message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const id = MessageId.generate().valueOf();
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorId: this.ownerIdentityId?.valueOf() || '',
+      conversationId: this.conversationId || '',
+      createdAt,
+      encryptedPayload: 'encrypted-reply-payload',
+      id,
+      previousMessageIds: [this.messageId],
+      replyToMessageId: this.messageId,
+      targetMessageId: undefined as string | undefined,
+      type: MessageType.SENT.valueOf(),
+    };
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      createdAt,
+      encryptedPayload: 'encrypted-reply-payload',
+      id,
+      replyToMessageId: this.messageId,
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });
   }

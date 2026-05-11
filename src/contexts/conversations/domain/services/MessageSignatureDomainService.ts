@@ -24,6 +24,7 @@ export class MessageSignatureDomainService {
       encryptedPayload: payload.encryptedPayload,
       id: payload.id,
       previousMessageIds: payload.previousMessageIds,
+      replyToMessageId: payload.replyToMessageId,
       targetMessageId: payload.targetMessageId,
       type: payload.type,
     };

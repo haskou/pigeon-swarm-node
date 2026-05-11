@@ -584,6 +584,7 @@ Response:
       "createdAt": 1773848829055,
       "encryptedPayload": "<encryptedMessagePayload>",
       "previousMessageIds": [],
+      "replyToMessageId": "<messageId>",
       "attachmentExternalIdentifiers": []
     }
   ],
@@ -611,6 +612,7 @@ Request:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedMessagePayload>",
   "signature": "<messageSignature>",
+  "replyToMessageId": "<messageId>",
   "attachmentExternalIdentifiers": ["<privateContentCid>"]
 }
 ```
@@ -626,6 +628,7 @@ Response:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedMessagePayload>",
   "previousMessageIds": [],
+  "replyToMessageId": "<messageId>",
   "attachmentExternalIdentifiers": []
 }
 ```
@@ -633,6 +636,8 @@ Response:
 Implemented:
 
 - enforce encrypted payloads for 1to1 conversations
+- allow replies by sending `replyToMessageId` with the id of an existing,
+  non-deleted `sent` message in the same conversation
 - validate the signature against the canonical message payload
 - persist immutable message document in IPFS
 - persist message metadata in MongoDB
