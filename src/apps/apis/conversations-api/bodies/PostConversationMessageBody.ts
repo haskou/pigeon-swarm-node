@@ -23,6 +23,11 @@ export class PostConversationMessageBody {
   @IsNotEmpty()
   public readonly id: string;
 
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly replyToMessageId?: string;
+
   @IsString()
   @IsNotEmpty()
   public readonly signature: string;

@@ -6,6 +6,7 @@ export interface MessageResource {
   encryptedPayload?: string;
   id: string;
   previousMessageIds: string[];
+  replyToMessageId?: string;
   targetMessageId?: string;
   type: string;
 }

@@ -230,7 +230,10 @@ components:
           type: string
         signature:
           type: string
-          description: Signature of the deleted-message canonical payload, using previousMessageIds equal to the path messageId.
+          description: Signature of the sent-message canonical payload. Include replyToMessageId in the signed payload when replying to a message.
+        replyToMessageId:
+          type: string
+          description: Optional id of the existing sent message this message replies to.
         attachmentExternalIdentifiers:
           type: array
           items:
@@ -249,6 +252,7 @@ components:
           type: integer
         signature:
           type: string
+          description: Signature of the deleted-message canonical payload, using previousMessageIds equal to the path messageId.
     MessageResource:
       type: object
       required:
@@ -276,6 +280,8 @@ components:
           type: array
           items:
             type: string
+        replyToMessageId:
+          type: string
         attachmentExternalIdentifiers:
           type: array
           items:
