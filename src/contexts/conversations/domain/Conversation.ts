@@ -182,7 +182,7 @@ export class Conversation extends AggregateRoot {
       authorId,
       targetMessageId,
       signature,
-      this.getLastMessageIds(),
+      [targetMessageId],
       createdAt,
       id,
     );

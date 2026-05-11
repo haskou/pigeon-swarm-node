@@ -665,7 +665,7 @@ Response:
   "authorIdentityId": "<identityId>",
   "type": "deleted",
   "createdAt": 1773848829055,
-  "previousMessageIds": ["<previousMessageId>"],
+  "previousMessageIds": ["<deletedMessageId>"],
   "attachmentExternalIdentifiers": [],
   "targetMessageId": "<deletedMessageId>"
 }
@@ -677,6 +677,8 @@ Implemented:
 - only allow the original message author to delete the message
 - validate the deletion tombstone signature against the canonical deleted
   message payload
+- use `previousMessageIds: [messageId]` for deletion signatures, so the client
+  signs a deterministic payload based on the message being deleted
 - persist the immutable `deleted` tombstone in IPFS
 - publish `ConversationMessageWasDeletedEvent`
 - invalidate the target message metadata locally so it no longer appears in
