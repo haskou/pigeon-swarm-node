@@ -1,4 +1,6 @@
 import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
+import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
+import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -18,9 +20,12 @@ export class PostIdentityRoute extends Route {
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
+  private readonly identityFinder: IdentityFinder =
+    this.get<IdentityFinder>(IdentityFinder);
+
   @Post('/')
   public async createIdentity(
-    @Body() body: PostIdentityBody,
+    @Body({ options: { limit: '10mb' } }) body: PostIdentityBody,
     @Res() response: Response,
   ): Promise<Response> {
     const request = new PostIdentityRequest(body);
@@ -29,8 +34,14 @@ export class PostIdentityRoute extends Route {
           request.getIdentityPublishMessage(),
         )
       : await this.identityCreator.create(request.getIdentityCreateMessage());
+    const candidate = await this.identityFinder.findCandidate(
+      new IdentityFinderMessage(identity.toPrimitives().id),
+    );
 
-    const viewModel = new IdentityViewModel(identity);
+    const viewModel = new IdentityViewModel(
+      candidate.identity,
+      candidate.externalIdentifier,
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send(viewModel.toResource());
   }

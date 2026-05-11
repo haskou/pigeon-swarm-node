@@ -1,3 +1,3 @@
-import { StringValueObject } from '@haskou/value-objects';
+import { EncryptedPayload } from '@haskou/value-objects';
 
-export class EncryptedKeychainPayload extends StringValueObject {}
+export class EncryptedKeychainPayload extends EncryptedPayload {}

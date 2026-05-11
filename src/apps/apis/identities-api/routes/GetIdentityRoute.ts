@@ -17,12 +17,17 @@ export class GetIdentityRoute extends Route {
     @Param('identityId') identityId: string,
     @Res() response: Response,
   ): Promise<Response> {
-    const identity = await this.finder.find(
+    const candidate = await this.finder.findCandidate(
       new IdentityFinderMessage(decodeURIComponent(identityId)),
     );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new IdentityViewModel(identity).toResource());
+      .send(
+        new IdentityViewModel(
+          candidate.identity,
+          candidate.externalIdentifier,
+        ).toResource(),
+      );
   }
 }

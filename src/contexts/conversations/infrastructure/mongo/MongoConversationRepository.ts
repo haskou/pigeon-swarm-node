@@ -1,6 +1,9 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import {
+  ConversationMessageCandidate,
+  ConversationRepository,
+} from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -20,6 +23,8 @@ type Repository = ConversationRepository;
 export default class MongoConversationRepository implements Repository {
   private static readonly COLLECTION = 'conversations';
   private static readonly MESSAGES_COLLECTION = 'conversation_messages';
+  private static readonly MESSAGE_ROUTING_KEY_PREFIX =
+    'pigeon-swarm_conversation-message-';
 
   constructor(
     private readonly mongo: MongoDB,
@@ -74,6 +79,23 @@ export default class MongoConversationRepository implements Repository {
       const document = await this.ipfsManager.getJSON<IpfsMessageDocument>(
         new IPFSId(metadata.cid),
       );
+
+      return this.messageMapper.toDomain(document);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private getMessageRoutingKey(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): string {
+    return `${MongoConversationRepository.MESSAGE_ROUTING_KEY_PREFIX}${conversationId.valueOf()}-${messageId.valueOf()}`;
+  }
+
+  private async findMessageFromCid(cid: IPFSId): Promise<Message | undefined> {
+    try {
+      const document = await this.ipfsManager.getJSON<IpfsMessageDocument>(cid);
 
       return this.messageMapper.toDomain(document);
     } catch {
@@ -198,6 +220,54 @@ export default class MongoConversationRepository implements Repository {
     return metadata ? this.findMessageFromMetadata(metadata) : undefined;
   }
 
+  public async findMessageCandidates(
+    conversationId: ConversationId,
+    limit: number,
+  ): Promise<ConversationMessageCandidate[]> {
+    const documents = await (
+      await this.messageMetadataCollection()
+    )
+      .find({
+        conversationId: conversationId.valueOf(),
+        valid: true,
+      })
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return documents.reverse().map((document) => ({
+      authorIdentityId: document.authorId,
+      createdAt: document.createdAt,
+      messageId: document.messageId,
+      messageType: document.type,
+    }));
+  }
+
+  public async findCandidateMessageById(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<Message | undefined> {
+    const localMessage = await this.findMessageById(conversationId, messageId);
+
+    if (localMessage) {
+      return localMessage;
+    }
+
+    const cidStrings = await this.ipfsManager.getRecordCandidates(
+      this.getMessageRoutingKey(conversationId, messageId),
+    );
+
+    for (const cidString of cidStrings) {
+      const message = await this.findMessageFromCid(new IPFSId(cidString));
+
+      if (message) {
+        return message;
+      }
+    }
+
+    return undefined;
+  }
+
   public async findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
@@ -251,6 +321,13 @@ export default class MongoConversationRepository implements Repository {
         { _id: metadata._id },
         { $setOnInsert: metadata },
         { upsert: true },
+      );
+      await this.ipfsManager.putRecordToAll(
+        this.getMessageRoutingKey(
+          new ConversationId(message.conversationId),
+          new MessageId(message.id),
+        ),
+        cid.valueOf(),
       );
     }
   }

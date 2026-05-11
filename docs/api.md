@@ -173,7 +173,33 @@ Implemented:
 
 - resolve the latest valid known identity candidate
 - resolve by identity id or profile handle
-- return profile, networks, version, previous identity reference and signature
+- return profile, networks, version, current identity reference, previous
+  identity reference and signature
+
+Response:
+
+```json
+{
+  "id": "<identityId>",
+  "identityExternalIdentifier": "<currentIdentityCid>",
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<encryptedPrivateKey>"
+  },
+  "networks": ["<networkId>"],
+  "profile": {
+    "name": "Alice",
+    "handle": "alice"
+  },
+  "previousIdentityExternalIdentifier": null,
+  "timestamp": 1773848829055,
+  "signature": "<identitySignature>",
+  "version": 1
+}
+```
+
+Use `identityExternalIdentifier` as the next update's
+`previousIdentityExternalIdentifier`.
 
 ### Create identity
 
@@ -219,6 +245,10 @@ Implemented:
 - keep client passwords out of the backend in the client-signed flow
 - store `profile.handle` as part of the signed identity profile
 - normalize handles to lowercase without `@`
+- return `identityExternalIdentifier`, which is the current published identity
+  CID to send as `previousIdentityExternalIdentifier` in the next update
+- accept identity request bodies up to 10 MiB so signed profile images can be
+  sent as data URLs in `profile.picture`
 
 Client-signed identity signatures must cover the canonical identity payload:
 
@@ -277,6 +307,10 @@ Implemented:
 - accept encrypted keypair changes, including client-side password changes
 - validate the signed identity candidate and previous identity chain before
   publishing
+- return the new `identityExternalIdentifier` for the just-published identity
+  version
+- accept identity request bodies up to 10 MiB so signed profile images can be
+  sent as data URLs in `profile.picture`
 
 ## Keychain HTTP API
 

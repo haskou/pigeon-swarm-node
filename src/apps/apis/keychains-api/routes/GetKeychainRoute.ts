@@ -24,16 +24,17 @@ export class GetKeychainRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
+    const parsedIdentityId = decodeURIComponent(identityId);
     const requesterIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const ownerIdentityId = new IdentityId(identityId);
+    const ownerIdentityId = new IdentityId(parsedIdentityId);
 
     if (!ownerIdentityId.isEqual(requesterIdentityId)) {
       throw new InvalidSignedRequestError();
     }
 
     const keychain = await this.finder.find(
-      new CurrentKeychainFindMessage(identityId),
+      new CurrentKeychainFindMessage(parsedIdentityId),
     );
 
     return response

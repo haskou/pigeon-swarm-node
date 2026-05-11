@@ -23,17 +23,20 @@ Feature: Post identity route
       | profile.name | alice                                |
       | profile.handle | alice                              |
       | networks[0]  | 123e4567-e89b-12d3-a456-426614174000 |
+    And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
     When I GET the created identity
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name | alice                                |
       | profile.handle | alice                              |
+    And response body should contain "identityExternalIdentifier"
     When I GET "/identities/@alice"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | alice |
       | profile.handle | alice |
+    And response body should contain "identityExternalIdentifier"
 
   Scenario: Publish a client-signed identity without sending a password
     Given I am an anonymous user
@@ -45,12 +48,14 @@ Feature: Post identity route
       | profile.name   | bob                                  |
       | profile.handle | bob                                  |
       | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
+    And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
     When I GET "/identities/@bob"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | bob |
       | profile.handle | bob |
+    And response body should contain "identityExternalIdentifier"
 
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user
@@ -66,8 +71,10 @@ Feature: Post identity route
       | profile.name   | carol updated |
       | profile.handle | carol_new     |
       | version        | 2             |
+    And response body should contain "identityExternalIdentifier"
     When I GET "/identities/@carol_new"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | carol updated |
       | profile.handle | carol_new     |
+    And response body should contain "identityExternalIdentifier"

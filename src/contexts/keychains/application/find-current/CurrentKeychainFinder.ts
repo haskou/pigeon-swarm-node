@@ -1,10 +1,10 @@
-import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import {
   KeychainCandidate,
   KeychainRepository,
 } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 
+import { KeychainNotFoundError } from '../../domain/errors/KeychainNotFoundError';
 import { CurrentKeychainFindMessage } from './messages/CurrentKeychainFindMessage';
 
 export default class CurrentKeychainFinder {
@@ -35,7 +35,7 @@ export default class CurrentKeychainFinder {
     }
 
     if (validCandidates.length === 0) {
-      throw new IdentityNotFoundError(message.ownerIdentityId.valueOf());
+      throw new KeychainNotFoundError(message.ownerIdentityId);
     }
 
     return validCandidates.sort(

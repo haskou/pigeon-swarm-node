@@ -4,9 +4,15 @@ import { Identity } from '../Identity';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../value-objects/ProfileHandle';
 
+export interface IdentityCandidate {
+  externalIdentifier: IdentityExternalIdentifier;
+  identity: Identity;
+}
+
 export interface IdentityRepository {
   save(identity: Identity): Promise<void>;
   findById(id: IdentityId): Promise<Identity>;
+  findCandidateReferencesById(id: IdentityId): Promise<IdentityCandidate[]>;
   findByHandle(handle: ProfileHandle): Promise<Identity>;
   findByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,

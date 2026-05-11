@@ -1,6 +1,6 @@
 # Pigeon Swarm Action Plan
 
-Last updated: 2026-05-10.
+Last updated: 2026-05-11.
 
 Keep this file short. Completed slices should move into Git history, API docs
 and tests instead of staying here as long-form notes.
@@ -32,30 +32,30 @@ and let repositories/domain validation decide what is trustworthy.
 - [x] `pubsub/identities/RegisterIdentityWhenPublished`
   - calls `RegisterPublishedIdentity`
   - registers missing local metadata for a published identity
-- [ ] `pubsub/identities/SynchronizeIdentityWhenUpdated`
+- [x] `pubsub/identities/SynchronizeIdentityWhenUpdated`
   - receives identity update announcements
   - calls an identity synchronization use case that resolves the newest valid
     version chain
-- [ ] `pubsub/identities/RespondToIdentitySyncRequest`
+- [x] `pubsub/identities/RespondToIdentitySyncRequest`
   - receives identity sync requests
   - publishes valid local candidates as sync responses
-- [ ] `pubsub/identities/RegisterIdentityWhenSyncAvailable`
+- [x] `pubsub/identities/RegisterIdentityWhenSyncAvailable`
   - receives identity sync responses
   - fetches and validates the announced candidate before caching metadata
-- [ ] `pubsub/conversations/RegisterMessageWhenAnnounced`
+- [x] `pubsub/conversations/RegisterMessageWhenAnnounced`
   - receives a sent-message announcement
   - calls the conversation use case that fetches, validates and stores the
     message locally
-- [ ] `pubsub/conversations/RegisterMessageEditionWhenAnnounced`
+- [x] `pubsub/conversations/RegisterMessageEditionWhenAnnounced`
   - receives an edit-message announcement
   - stores the edit as a new immutable message, without mutating the original
-- [ ] `pubsub/conversations/RegisterMessageDeletionWhenAnnounced`
+- [x] `pubsub/conversations/RegisterMessageDeletionWhenAnnounced`
   - receives a delete-message announcement
   - stores the delete as a new immutable tombstone/projection event
-- [ ] `pubsub/conversations/RespondToConversationSyncRequest`
+- [x] `pubsub/conversations/RespondToConversationSyncRequest`
   - receives conversation sync requests
   - publishes bounded candidate metadata for known messages
-- [ ] `pubsub/conversations/RegisterMessagesWhenSyncAvailable`
+- [x] `pubsub/conversations/RegisterMessagesWhenSyncAvailable`
   - receives conversation sync responses
   - fetches and validates candidate message documents before updating local
     projections
@@ -94,6 +94,8 @@ Steps:
 3. Add PubSub consumers:
    - `pubsub/keychains/RegisterKeychainWhenPublished`
    - `pubsub/keychains/SynchronizeKeychainWhenUpdated`
+   - `pubsub/keychains/RespondToKeychainSyncRequest`
+   - `pubsub/keychains/RegisterKeychainWhenSyncAvailable`
 4. Add Cucumber coverage for consumer registration.
 
 ## Last Slice: Client Chat API

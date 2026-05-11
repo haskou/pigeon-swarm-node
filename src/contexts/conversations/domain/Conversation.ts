@@ -123,6 +123,23 @@ export class Conversation extends AggregateRoot {
     return message;
   }
 
+  public registerMessage(message: Message): void {
+    if (this.findMessageById(message.getId())) {
+      return;
+    }
+
+    if (message.getType().isEqual(MessageType.SENT)) {
+      this.assertIsParticipant(message.getAuthorId());
+    } else {
+      const targetMessageId = message.getTargetMessageId();
+
+      assert(targetMessageId, new MessageTargetNotFoundError());
+      this.assertCanChangeMessage(message.getAuthorId(), targetMessageId);
+    }
+
+    this.messages.push(message);
+  }
+
   public editMessage(
     authorId: IdentityId,
     targetMessageId: MessageId,
