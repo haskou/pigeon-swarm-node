@@ -2,10 +2,35 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm IPFS API
   version: 1.0.0
-  description: Endpoints for reading JSON content from IPFS.
+  description: Endpoints for publishing and reading JSON content from IPFS.
 tags:
   - name: ipfs
 paths:
+  /ipfs/public-images:
+    post:
+      tags:
+        - ipfs
+      summary: Publish a public image to IPFS
+      description: Stores public image bytes as a JSON IPFS document and returns the CID to reference from identities, messages, or posts.
+      security:
+        - signedRequest: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPublicImageRequest'
+      responses:
+        '201':
+          description: Public image stored in IPFS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicImageResource'
+        '401':
+          description: Invalid signed request.
+        '422':
+          description: Public image is too large.
   /ipfs/{cid}:
     get:
       tags:
@@ -32,7 +57,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/IpfsContentNotFoundError'
 components:
+  securitySchemes:
+    signedRequest:
+      type: apiKey
+      in: header
+      name: X-Signature
   schemas:
+    PostPublicImageRequest:
+      type: object
+      required:
+        - contentType
+        - data
+      properties:
+        contentType:
+          type: string
+          pattern: '^image\/[a-zA-Z0-9.+-]+$'
+          example: image/png
+        data:
+          type: string
+          format: byte
+          description: Raw image bytes encoded as base64, without a data URL prefix.
+        filename:
+          type: string
+          nullable: true
+          example: avatar.png
+    PublicImageResource:
+      type: object
+      required:
+        - cid
+        - contentType
+        - size
+      properties:
+        cid:
+          type: string
+          example: bafybeigdyrztomockimagecid
+        contentType:
+          type: string
+          example: image/png
+        size:
+          type: number
+          example: 215040
     IpfsContentNotFoundError:
       type: object
       required:

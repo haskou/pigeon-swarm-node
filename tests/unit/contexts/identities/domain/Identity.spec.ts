@@ -1,5 +1,6 @@
 import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
+import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
@@ -192,6 +193,19 @@ describe('Identity', () => {
       expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
         IdentityWasUpdatedEvent,
       );
+    });
+  });
+
+  describe('profile image', () => {
+    it('should reject embedded data URLs', () => {
+      expect(() =>
+        Profile.fromPrimitives({
+          biography: undefined,
+          handle: undefined,
+          name: 'Jane',
+          picture: 'data:image/png;base64,aGVsbG8=',
+        }),
+      ).toThrow(InvalidProfileImageError);
     });
   });
 

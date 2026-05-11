@@ -7,6 +7,7 @@ import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdenti
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
+import { PostPublicImageRoute } from '@app/apps/apis/ipfs-api/routes/PostPublicImageRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
@@ -136,6 +137,7 @@ export default class Server {
           PostConversationMessageRoute,
           GetConversationMessagesRoute,
           GetIPFSContentRoute,
+          PostPublicImageRoute,
           GetNodeRoute,
           GetNodeNetworksRoute,
           PostNodeNetworkRoute,

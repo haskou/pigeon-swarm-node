@@ -446,6 +446,22 @@ export default class Definitions {
     );
   }
 
+  @given(
+    'I set a public image body with content type {string} and base64 data {string}',
+  )
+  public iSetAPublicImageBody(contentType: string, data: string): void {
+    this.body = JSON.stringify({
+      contentType,
+      data,
+      filename: 'avatar.png',
+    });
+  }
+
+  @given('I sign the current public image upload request')
+  public async iSignTheCurrentPublicImageUploadRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/ipfs/public-images');
+  }
+
   @given('I sign the current conversations request')
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
