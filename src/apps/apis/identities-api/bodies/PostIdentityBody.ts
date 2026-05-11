@@ -1,17 +1,64 @@
-import { ArrayMinSize, IsArray, IsNotEmpty, IsString } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class PostIdentityBody {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  public readonly name: string;
+  public readonly id?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  public readonly password: string;
+  public readonly name?: string;
 
+  @IsOptional()
+  @IsString()
+  public readonly handle?: string;
+
+  @IsOptional()
+  @IsString()
+  public readonly password?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
-  @IsNotEmpty()
-  public readonly networks: string[];
+  public readonly networks?: string[];
+
+  @IsOptional()
+  @IsObject()
+  public readonly encryptedKeyPair?: {
+    encryptedPrivateKey: string;
+    publicKey: string;
+  };
+
+  @IsOptional()
+  @IsObject()
+  public readonly profile?: {
+    biography?: string;
+    handle?: string;
+    name: string;
+    picture?: string;
+  };
+
+  @IsOptional()
+  @IsNumber()
+  public readonly timestamp?: number;
+
+  @IsOptional()
+  @IsString()
+  public readonly signature?: string;
+
+  @IsOptional()
+  @IsNumber()
+  public readonly version?: number;
+
+  @IsOptional()
+  @IsString()
+  public readonly previousIdentityExternalIdentifier?: string;
 }

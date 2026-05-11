@@ -274,6 +274,25 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlDYW5kaWRhdGVWYWxpZGF0aW9uRG9tYWluU2VydmljZV9fSWRlbnRpdHlDYW5kaWRhdGVWYWxpZGF0aW9uRG9tYWluU2VydmljZQ==:
+    class: >-
+      /contexts/identities/domain/services/IdentityCandidateValidationDomainService
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fYXBwbGljYXRpb25fX3B1Ymxpc2hfX0lkZW50aXR5UHVibGlzaGVyX19JZGVudGl0eVB1Ymxpc2hlcg==:
+    class: /contexts/identities/application/publish/IdentityPublisher
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlTYXZlclNlcnZpY2VfX0lkZW50aXR5U2F2ZXJTZXJ2aWNl
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UmVwb3NpdG9yeV9fSWRlbnRpdHlSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlDYW5kaWRhdGVWYWxpZGF0aW9uRG9tYWluU2VydmljZV9fSWRlbnRpdHlDYW5kaWRhdGVWYWxpZGF0aW9uRG9tYWluU2VydmljZQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19fZG9tYWluX19zZXJ2aWNlc19fSWRlbnRpdHlGaW5kZXJTZXJ2aWNlX19JZGVudGl0eUZpbmRlclNlcnZpY2U=:
     class: /contexts/identities/domain/services/IdentityFinderService
     arguments:

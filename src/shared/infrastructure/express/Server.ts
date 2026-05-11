@@ -5,6 +5,7 @@ import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/r
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
 import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdentityRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
+import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
@@ -127,6 +128,7 @@ export default class Server {
           ConsumeDlxRoute,
           GetIdentityRoute,
           PostIdentityRoute,
+          PutIdentityRoute,
           GetKeychainRoute,
           PostKeychainRoute,
           PostConversationRoute,
