@@ -11,8 +11,7 @@ export class PostNotificationRequest {
       this.body.inviterIdentityId,
       this.body.recipientIdentityId,
       this.body.encryptedConversationKey,
-      this.body.signature,
-      this.body.keyEncryptionAlgorithm,
+      this.body.inviterSignature,
     );
   }
 }

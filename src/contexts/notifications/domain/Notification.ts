@@ -4,6 +4,9 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { ConversationInvitationPayload } from './ConversationInvitationPayload';
+import { NotificationWasAcceptedEvent } from './events/NotificationWasAcceptedEvent';
+import { NotificationWasCreatedEvent } from './events/NotificationWasCreatedEvent';
+import { NotificationWasDeclinedEvent } from './events/NotificationWasDeclinedEvent';
 import { NotificationId } from './value-objects/NotificationId';
 import { NotificationState } from './value-objects/NotificationState';
 import { NotificationStatus } from './value-objects/NotificationStatus';
@@ -15,7 +18,7 @@ export class Notification extends AggregateRoot {
     createdAt: Timestamp = Timestamp.now(),
     id: NotificationId = NotificationId.generate(),
   ): Notification {
-    return new Notification(
+    const notification = new Notification(
       id,
       NotificationType.CONVERSATION_INVITATION,
       payload.getRecipientIdentityId(),
@@ -23,8 +26,16 @@ export class Notification extends AggregateRoot {
       NotificationState.PENDING,
       payload,
       createdAt,
-      undefined,
     );
+
+    notification.record(
+      new NotificationWasCreatedEvent(notification.toPrimitives().id, {
+        recipientIdentityId: notification.toPrimitives().recipientIdentityId,
+        type: notification.toPrimitives().type,
+      }),
+    );
+
+    return notification;
   }
 
   public static fromPrimitives(
@@ -38,7 +49,6 @@ export class Notification extends AggregateRoot {
       new NotificationState(primitives.state),
       ConversationInvitationPayload.fromPrimitives(primitives.payload),
       new Timestamp(primitives.createdAt),
-      primitives.archivedAt ? new Timestamp(primitives.archivedAt) : undefined,
     );
   }
 
@@ -50,7 +60,6 @@ export class Notification extends AggregateRoot {
     private state: NotificationState,
     private payload: ConversationInvitationPayload,
     private readonly createdAt: Timestamp,
-    private archivedAt: Timestamp | undefined,
   ) {
     super();
   }
@@ -61,15 +70,22 @@ export class Notification extends AggregateRoot {
     this.payload = this.payload.accept(
       new KeychainExternalIdentifier(keychainExternalIdentifier),
     );
-  }
-
-  public archive(archivedAt: Timestamp = Timestamp.now()): void {
-    this.archivedAt = archivedAt;
+    this.record(
+      new NotificationWasAcceptedEvent(this.id.valueOf(), {
+        keychainExternalIdentifier,
+        recipientIdentityId: this.recipientIdentityId.valueOf(),
+      }),
+    );
   }
 
   public decline(): void {
     this.state = NotificationState.DECLINED;
     this.status = NotificationStatus.READ;
+    this.record(
+      new NotificationWasDeclinedEvent(this.id.valueOf(), {
+        recipientIdentityId: this.recipientIdentityId.valueOf(),
+      }),
+    );
   }
 
   public getRecipientIdentityId(): IdentityId {
@@ -90,7 +106,6 @@ export class Notification extends AggregateRoot {
 
   public toPrimitives() {
     return {
-      archivedAt: this.archivedAt?.valueOf(),
       createdAt: this.createdAt.valueOf(),
       id: this.id.valueOf(),
       payload: this.payload.toPrimitives(),

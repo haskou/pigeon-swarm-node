@@ -405,9 +405,8 @@ export default class Definitions {
       conversationId: 'one-to-one:notification-api-conversation',
       encryptedConversationKey: 'encrypted-conversation-key',
       inviterIdentityId: this.ownerIdentityId?.valueOf(),
-      keyEncryptionAlgorithm: 'rsa-oaep-sha256',
+      inviterSignature: inviterKeyPair.sign('conversation-invitation').valueOf(),
       recipientIdentityId: this.otherIdentityId?.valueOf(),
-      signature: inviterKeyPair.sign('conversation-invitation').valueOf(),
       type: 'conversation_invitation',
     });
   }

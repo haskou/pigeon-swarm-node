@@ -2,17 +2,20 @@ import { NotificationCreateMessage } from '@app/contexts/notifications/applicati
 import NotificationCreator from '@app/contexts/notifications/application/create/NotificationCreator';
 import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('NotificationCreator', () => {
   let repository: MockProxy<NotificationRepository>;
+  let eventPublisher: MockProxy<DomainEventPublisher>;
   let creator: NotificationCreator;
 
   beforeEach(() => {
     repository = mock<NotificationRepository>();
-    creator = new NotificationCreator(repository);
+    eventPublisher = mock<DomainEventPublisher>();
+    creator = new NotificationCreator(repository, eventPublisher);
   });
 
   it('should create a conversation invitation notification', async () => {
@@ -32,6 +35,7 @@ describe('NotificationCreator', () => {
     );
 
     expect(repository.save).toHaveBeenCalledWith(notification);
+    expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
     expect(notification.toPrimitives()).toMatchObject({
       payload: {
         encryptedConversationKey: 'encrypted-conversation-key',

@@ -49,7 +49,6 @@ export default class MongoNotificationRepository implements Repository {
         ...(beforeDocument
           ? { createdAt: { $lt: beforeDocument.createdAt } }
           : {}),
-        $or: [{ archivedAt: { $exists: false } }, { archivedAt: null }],
         recipientIdentityId: recipientIdentityId.valueOf(),
       })
       .limit(limit)

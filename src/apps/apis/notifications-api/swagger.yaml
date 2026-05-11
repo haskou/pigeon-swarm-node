@@ -119,7 +119,7 @@ components:
         - inviterIdentityId
         - recipientIdentityId
         - encryptedConversationKey
-        - signature
+        - inviterSignature
       properties:
         conversationId:
           type: string
@@ -129,11 +129,9 @@ components:
           type: string
         encryptedConversationKey:
           type: string
-        keyEncryptionAlgorithm:
-          type: string
         keychainExternalIdentifier:
           type: string
-        signature:
+        inviterSignature:
           type: string
     NotificationResource:
       type: object
@@ -165,8 +163,6 @@ components:
             - pending
             - accepted
             - declined
-        archivedAt:
-          type: integer
         createdAt:
           type: integer
         payload:
@@ -193,19 +189,13 @@ components:
                 - conversation_invitation
     PatchNotificationBody:
       type: object
+      required:
+        - state
       properties:
-        status:
-          type: string
-          enum:
-            - unread
-            - read
         state:
           type: string
           enum:
-            - pending
             - accepted
             - declined
         keychainExternalIdentifier:
           type: string
-        archive:
-          type: boolean

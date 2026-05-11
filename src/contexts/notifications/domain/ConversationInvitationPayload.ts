@@ -4,7 +4,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { PrimitiveOf, Signature } from '@haskou/value-objects';
 
 import { EncryptedConversationKey } from './value-objects/EncryptedConversationKey';
-import { KeyEncryptionAlgorithm } from './value-objects/KeyEncryptionAlgorithm';
 
 export class ConversationInvitationPayload {
   public static fromPrimitives(
@@ -15,10 +14,7 @@ export class ConversationInvitationPayload {
       new IdentityId(primitives.inviterIdentityId),
       new IdentityId(primitives.recipientIdentityId),
       new EncryptedConversationKey(primitives.encryptedConversationKey),
-      new Signature(primitives.signature),
-      primitives.keyEncryptionAlgorithm
-        ? new KeyEncryptionAlgorithm(primitives.keyEncryptionAlgorithm)
-        : undefined,
+      new Signature(primitives.inviterSignature),
       primitives.keychainExternalIdentifier
         ? new KeychainExternalIdentifier(primitives.keychainExternalIdentifier)
         : undefined,
@@ -30,8 +26,7 @@ export class ConversationInvitationPayload {
     private readonly inviterIdentityId: IdentityId,
     private readonly recipientIdentityId: IdentityId,
     private readonly encryptedConversationKey: EncryptedConversationKey,
-    private readonly signature: Signature,
-    private readonly keyEncryptionAlgorithm: KeyEncryptionAlgorithm | undefined,
+    private readonly inviterSignature: Signature,
     private readonly keychainExternalIdentifier:
       | KeychainExternalIdentifier
       | undefined,
@@ -45,8 +40,7 @@ export class ConversationInvitationPayload {
       this.inviterIdentityId,
       this.recipientIdentityId,
       this.encryptedConversationKey,
-      this.signature,
-      this.keyEncryptionAlgorithm,
+      this.inviterSignature,
       keychainExternalIdentifier,
     );
   }
@@ -60,10 +54,9 @@ export class ConversationInvitationPayload {
       conversationId: this.conversationId.valueOf(),
       encryptedConversationKey: this.encryptedConversationKey.valueOf(),
       inviterIdentityId: this.inviterIdentityId.valueOf(),
+      inviterSignature: this.inviterSignature.valueOf(),
       keychainExternalIdentifier: this.keychainExternalIdentifier?.valueOf(),
-      keyEncryptionAlgorithm: this.keyEncryptionAlgorithm?.valueOf(),
       recipientIdentityId: this.recipientIdentityId.valueOf(),
-      signature: this.signature.valueOf(),
     };
   }
 }

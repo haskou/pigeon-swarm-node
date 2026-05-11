@@ -8,7 +8,6 @@ export default class MongoNotificationMapper {
 
     return {
       _id: primitives.id,
-      ...(primitives.archivedAt ? { archivedAt: primitives.archivedAt } : {}),
       createdAt: primitives.createdAt,
       payload: primitives.payload,
       recipientIdentityId: primitives.recipientIdentityId,
@@ -20,18 +19,16 @@ export default class MongoNotificationMapper {
 
   public toDomain(document: MongoNotificationDocument): Notification {
     return Notification.fromPrimitives({
-      archivedAt: document.archivedAt,
       createdAt: document.createdAt,
       id: document._id,
       payload: {
         conversationId: document.payload.conversationId,
         encryptedConversationKey: document.payload.encryptedConversationKey,
         inviterIdentityId: document.payload.inviterIdentityId,
+        inviterSignature: document.payload.inviterSignature,
         keychainExternalIdentifier:
           document.payload.keychainExternalIdentifier || '',
-        keyEncryptionAlgorithm: document.payload.keyEncryptionAlgorithm || '',
         recipientIdentityId: document.payload.recipientIdentityId,
-        signature: document.payload.signature,
       },
       recipientIdentityId: document.recipientIdentityId,
       state: document.state,

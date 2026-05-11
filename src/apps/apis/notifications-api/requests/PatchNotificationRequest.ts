@@ -14,10 +14,8 @@ export class PatchNotificationRequest {
     return new NotificationUpdateMessage(
       this.notificationId,
       this.recipientIdentityId.valueOf(),
-      this.body.status,
       this.body.state,
       this.body.keychainExternalIdentifier,
-      this.body.archive,
     );
   }
 }

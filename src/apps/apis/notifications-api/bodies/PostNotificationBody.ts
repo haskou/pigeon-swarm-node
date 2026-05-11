@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsString } from 'class-validator';
 
 export class PostNotificationBody {
   @IsString()
@@ -13,17 +13,13 @@ export class PostNotificationBody {
   @IsNotEmpty()
   public readonly inviterIdentityId: string;
 
-  @IsOptional()
-  @IsString()
-  public readonly keyEncryptionAlgorithm?: string;
-
   @IsString()
   @IsNotEmpty()
   public readonly recipientIdentityId: string;
 
   @IsString()
   @IsNotEmpty()
-  public readonly signature: string;
+  public readonly inviterSignature: string;
 
   @IsString()
   @IsIn(['conversation_invitation'])

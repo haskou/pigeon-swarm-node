@@ -384,7 +384,6 @@ Implemented:
 
 - require signed request auth
 - return notifications where the authenticated identity is the recipient
-- exclude archived notifications
 - support `limit` and `beforeNotificationId`
 
 ### Create a conversation invitation notification
@@ -402,8 +401,7 @@ Request:
   "inviterIdentityId": "<aliceIdentityId>",
   "recipientIdentityId": "<bobIdentityId>",
   "encryptedConversationKey": "<encryptedForBob>",
-  "keyEncryptionAlgorithm": "rsa-oaep-sha256",
-  "signature": "<inviterSignature>"
+  "inviterSignature": "<inviterSignature>"
 }
 ```
 

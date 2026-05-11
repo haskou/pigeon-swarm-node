@@ -6,15 +6,13 @@ export type MongoConversationInvitationPayloadDocument = {
   conversationId: string;
   encryptedConversationKey: string;
   inviterIdentityId: string;
-  keyEncryptionAlgorithm?: string;
+  inviterSignature: string;
   keychainExternalIdentifier?: string;
   recipientIdentityId: string;
-  signature: string;
 };
 
 export type MongoNotificationDocument = {
   _id: string;
-  archivedAt?: number;
   createdAt: number;
   payload: MongoConversationInvitationPayloadDocument;
   recipientIdentityId: string;

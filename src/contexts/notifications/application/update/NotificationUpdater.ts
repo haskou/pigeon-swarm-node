@@ -3,35 +3,25 @@ import { NotificationRecipientMismatchError } from '@app/contexts/notifications/
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { NotificationState } from '@app/contexts/notifications/domain/value-objects/NotificationState';
-import { NotificationStatus } from '@app/contexts/notifications/domain/value-objects/NotificationStatus';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { NotificationUpdateMessage } from './messages/NotificationUpdateMessage';
 
 export default class NotificationUpdater {
-  constructor(private readonly repository: NotificationRepository) {}
+  constructor(
+    private readonly repository: NotificationRepository,
+    private readonly eventPublisher: DomainEventPublisher,
+  ) {}
 
-  private applyStatus(
+  private updateState(
     notification: Notification,
     message: NotificationUpdateMessage,
   ): void {
-    if (message.status?.isEqual(NotificationStatus.READ)) {
-      notification.markAsRead();
-    }
-
-    if (message.status?.isEqual(NotificationStatus.UNREAD)) {
-      notification.markAsUnread();
-    }
-  }
-
-  private applyState(
-    notification: Notification,
-    message: NotificationUpdateMessage,
-  ): void {
-    if (message.state?.isEqual(NotificationState.ACCEPTED)) {
+    if (message.state.isEqual(NotificationState.ACCEPTED)) {
       notification.accept(message.keychainExternalIdentifier || '');
     }
 
-    if (message.state?.isEqual(NotificationState.DECLINED)) {
+    if (message.state.isEqual(NotificationState.DECLINED)) {
       notification.decline();
     }
   }
@@ -49,14 +39,10 @@ export default class NotificationUpdater {
       throw new NotificationRecipientMismatchError();
     }
 
-    this.applyStatus(notification, message);
-    this.applyState(notification, message);
-
-    if (message.archive) {
-      notification.archive();
-    }
+    this.updateState(notification, message);
 
     await this.repository.save(notification);
+    await this.eventPublisher.publish(notification.pullDomainEvents());
 
     return notification;
   }
