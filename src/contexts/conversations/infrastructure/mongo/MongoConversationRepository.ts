@@ -1,6 +1,9 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import {
+  ConversationMessageCandidate,
+  ConversationRepository,
+} from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -215,6 +218,29 @@ export default class MongoConversationRepository implements Repository {
     });
 
     return metadata ? this.findMessageFromMetadata(metadata) : undefined;
+  }
+
+  public async findMessageCandidates(
+    conversationId: ConversationId,
+    limit: number,
+  ): Promise<ConversationMessageCandidate[]> {
+    const documents = await (
+      await this.messageMetadataCollection()
+    )
+      .find({
+        conversationId: conversationId.valueOf(),
+        valid: true,
+      })
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return documents.reverse().map((document) => ({
+      authorIdentityId: document.authorId,
+      createdAt: document.createdAt,
+      messageId: document.messageId,
+      messageType: document.type,
+    }));
   }
 
   public async findCandidateMessageById(

@@ -5,12 +5,23 @@ import { Message } from '../Message';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 
+export interface ConversationMessageCandidate {
+  authorIdentityId: string;
+  createdAt: number;
+  messageId: string;
+  messageType: string;
+}
+
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;
   findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
+  findMessageCandidates(
+    conversationId: ConversationId,
+    limit: number,
+  ): Promise<ConversationMessageCandidate[]>;
   findByParticipant(
     participantId: IdentityId,
     limit: number,

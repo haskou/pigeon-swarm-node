@@ -1,0 +1,57 @@
+import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
+import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
+import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { mock, MockProxy } from 'jest-mock-extended';
+
+describe('ConversationSyncResponder', () => {
+  let repository: MockProxy<ConversationRepository>;
+  let eventPublisher: MockProxy<DomainEventPublisher>;
+  let responder: ConversationSyncResponder;
+
+  beforeEach(() => {
+    repository = mock<ConversationRepository>();
+    eventPublisher = mock<DomainEventPublisher>();
+    responder = new ConversationSyncResponder(repository, eventPublisher);
+  });
+
+  it('should publish bounded message candidates without loading the whole conversation', async () => {
+    const conversationId = new ConversationId(
+      'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de',
+    );
+    const messageCandidates = [
+      {
+        authorIdentityId: 'author-id',
+        createdAt: 1778513696020,
+        messageId: 'message-id',
+        messageType: 'sent',
+      },
+    ];
+
+    repository.findMessageCandidates.mockResolvedValue(messageCandidates);
+
+    await responder.respond(
+      new ConversationSyncResponseMessage(
+        conversationId.valueOf(),
+        'request-3',
+      ),
+    );
+
+    expect(repository.findMessageCandidates).toHaveBeenCalledWith(
+      conversationId,
+      100,
+    );
+    expect(repository.findById).not.toHaveBeenCalled();
+    expect(eventPublisher.publish).toHaveBeenCalledWith([
+      expect.any(ConversationSyncAvailableEvent),
+    ]);
+    expect(
+      eventPublisher.publish.mock.calls[0][0][0].attributes,
+    ).toMatchObject({
+      messageCandidates,
+      requestId: 'request-3',
+    });
+  });
+});
