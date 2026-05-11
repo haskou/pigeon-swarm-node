@@ -3,6 +3,10 @@ import Kernel from '@app/Kernel';
 import { HeliaInstance, ParsedCidLike } from './adapters/HeliaRuntimeAdapter';
 
 export default class HeliaPinningStrategy {
+  private debug(message: string): void {
+    Kernel.logger.debug?.(message);
+  }
+
   private async consumePinOperation(
     operation: AsyncGenerator<ParsedCidLike, void, undefined>,
   ): Promise<void> {
@@ -30,13 +34,9 @@ export default class HeliaPinningStrategy {
         }),
       );
 
-      Kernel.logger.debug(
-        `Pinned IPFS content for local availability: ${cid.toString()}`,
-      );
+      this.debug(`Pinned IPFS content for local availability: ${cid}`);
     } catch {
-      Kernel.logger.debug(
-        `Skipped IPFS content pinning for local availability: ${cid.toString()}`,
-      );
+      this.debug(`Skipped IPFS content pinning for local availability: ${cid}`);
     }
   }
 
@@ -52,13 +52,9 @@ export default class HeliaPinningStrategy {
 
       await this.consumePinOperation(heliaCore.pins.rm(cid, { signal }));
 
-      Kernel.logger.debug(
-        `Unpinned IPFS content before local removal: ${cid.toString()}`,
-      );
+      this.debug(`Unpinned IPFS content before local removal: ${cid}`);
     } catch {
-      Kernel.logger.debug(
-        `Skipped IPFS content unpinning before local removal: ${cid.toString()}`,
-      );
+      this.debug(`Skipped IPFS content unpinning before local removal: ${cid}`);
     }
   }
 }
