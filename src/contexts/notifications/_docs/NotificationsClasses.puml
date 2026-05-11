@@ -1,0 +1,77 @@
+@startuml
+
+title Pigeon-swarm - Notifications Context
+
+package "notifications" {
+  package "domain" {
+    class Notification <AggregateRoot> {
+      -id: NotificationId
+      -type: NotificationType
+      -recipientIdentityId: IdentityId
+      -status: NotificationStatus
+      -state: NotificationState
+      -payload: ConversationInvitationPayload
+      -createdAt: Timestamp
+      -archivedAt?: Timestamp
+      +accept(keychainExternalIdentifier: string): void
+      +archive(): void
+      +decline(): void
+      +isRecipient(identityId: IdentityId): boolean
+      +toPrimitives(): object
+    }
+
+    class ConversationInvitationPayload {
+      -conversationId: ConversationId
+      -inviterIdentityId: IdentityId
+      -recipientIdentityId: IdentityId
+      -encryptedConversationKey: EncryptedConversationKey
+      -signature: Signature
+      -keyEncryptionAlgorithm?: KeyEncryptionAlgorithm
+      -keychainExternalIdentifier?: KeychainExternalIdentifier
+      +accept(keychainExternalIdentifier: KeychainExternalIdentifier): ConversationInvitationPayload
+      +toPrimitives(): object
+    }
+
+    class NotificationRepository <interface> {
+      +findById(notificationId: NotificationId): Promise<Notification?>
+      +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
+      +save(notification: Notification): Promise<void>
+    }
+
+    Notification *--> ConversationInvitationPayload
+    NotificationRepository o--> Notification
+  }
+
+  package "application" {
+    class NotificationCreator {
+      -repository: NotificationRepository
+      +create(message: NotificationCreateMessage): Promise<Notification>
+    }
+
+    class NotificationsFinder {
+      -repository: NotificationRepository
+      +find(message: NotificationsFindMessage): Promise<Notification[]>
+    }
+
+    class NotificationUpdater {
+      -repository: NotificationRepository
+      +update(message: NotificationUpdateMessage): Promise<Notification>
+    }
+
+    NotificationCreator --> NotificationRepository
+    NotificationsFinder --> NotificationRepository
+    NotificationUpdater --> NotificationRepository
+  }
+
+  package "infrastructure" {
+    class MongoNotificationRepository {
+      +findById(notificationId: NotificationId): Promise<Notification?>
+      +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
+      +save(notification: Notification): Promise<void>
+    }
+
+    MongoNotificationRepository ..|> NotificationRepository
+  }
+}
+
+@enduml

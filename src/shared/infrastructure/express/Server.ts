@@ -12,6 +12,9 @@ import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNet
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
+import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
+import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/PatchNotificationRoute';
+import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/PostNotificationRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -135,6 +138,9 @@ export default class Server {
           GetNodeNetworksRoute,
           PostNodeNetworkRoute,
           PutNodeOwnerRoute,
+          GetNotificationsRoute,
+          PostNotificationRoute,
+          PatchNotificationRoute,
         ],
         cors: true,
         defaultErrorHandler: false,

@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Notifications API
+  version: 1.0.0
+  description: Endpoints for actionable identity notifications.
+tags:
+  - name: notifications
+paths:
+  /notifications/:
+    get:
+      tags:
+        - notifications
+      summary: List authenticated identity notifications
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: beforeNotificationId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notifications for the authenticated recipient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationsResource'
+    post:
+      tags:
+        - notifications
+      summary: Create a conversation invitation notification
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostNotificationBody'
+      responses:
+        '200':
+          description: Notification created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResource'
+        '403':
+          description: Authenticated identity is not the inviter.
+  /notifications/{notificationId}:
+    patch:
+      tags:
+        - notifications
+      summary: Update a notification as the recipient
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchNotificationBody'
+      responses:
+        '200':
+          description: Notification updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResource'
+        '409':
+          description: Authenticated identity is not the notification recipient.
+components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    ConversationInvitationPayload:
+      type: object
+      required:
+        - conversationId
+        - inviterIdentityId
+        - recipientIdentityId
+        - encryptedConversationKey
+        - signature
+      properties:
+        conversationId:
+          type: string
+        inviterIdentityId:
+          type: string
+        recipientIdentityId:
+          type: string
+        encryptedConversationKey:
+          type: string
+        keyEncryptionAlgorithm:
+          type: string
+        keychainExternalIdentifier:
+          type: string
+        signature:
+          type: string
+    NotificationResource:
+      type: object
+      required:
+        - id
+        - type
+        - recipientIdentityId
+        - status
+        - state
+        - payload
+        - createdAt
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+            - conversation_invitation
+        recipientIdentityId:
+          type: string
+        status:
+          type: string
+          enum:
+            - unread
+            - read
+        state:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - declined
+        archivedAt:
+          type: integer
+        createdAt:
+          type: integer
+        payload:
+          $ref: '#/components/schemas/ConversationInvitationPayload'
+    NotificationsResource:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationResource'
+    PostNotificationBody:
+      allOf:
+        - $ref: '#/components/schemas/ConversationInvitationPayload'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              enum:
+                - conversation_invitation
+    PatchNotificationBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - unread
+            - read
+        state:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - declined
+        keychainExternalIdentifier:
+          type: string
+        archive:
+          type: boolean

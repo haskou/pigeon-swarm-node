@@ -17,12 +17,14 @@ describe('ApiSwaggerFactory', () => {
         'ipfs-api',
         'keychains-api',
         'nodes-api',
+        'notifications-api',
       ]);
       expect(specs['conversations-api']).toContain('/conversations:');
       expect(specs['identities-api']).toContain('/identities/:');
       expect(specs['ipfs-api']).toContain('/ipfs/{cid}:');
       expect(specs['keychains-api']).toContain('/keychains/:');
       expect(specs['nodes-api']).toContain('/node/:');
+      expect(specs['notifications-api']).toContain('/notifications/:');
     });
   });
 
@@ -46,6 +48,9 @@ describe('ApiSwaggerFactory', () => {
       expect(spec).toContain(
         "$ref: './nodes-api/swagger.yaml#/paths/~1node~1'",
       );
+      expect(spec).toContain(
+        "$ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'",
+      );
     });
   });
 
@@ -59,6 +64,7 @@ describe('ApiSwaggerFactory', () => {
         'ipfs-api': '/api/swagger/ipfs-api/swagger.yaml',
         'keychains-api': '/api/swagger/keychains-api/swagger.yaml',
         'nodes-api': '/api/swagger/nodes-api/swagger.yaml',
+        'notifications-api': '/api/swagger/notifications-api/swagger.yaml',
       });
     });
   });

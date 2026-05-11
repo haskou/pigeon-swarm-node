@@ -363,6 +363,82 @@ Signed HTTP request validation:
 - reject reused `X-Nonce` values per identity
 - reject stale `X-Timestamp` values outside the freshness window
 
+## Notification HTTP API
+
+Notifications are for actionable events that require client-side identity
+material, such as accepting a conversation invitation. Message delivery does
+not create notifications.
+
+### List notifications
+
+```http
+GET /notifications?limit=20&beforeNotificationId=TODO
+```
+
+Implemented:
+
+- require signed request auth
+- return notifications where the authenticated identity is the recipient
+- exclude archived notifications
+- support `limit` and `beforeNotificationId`
+
+### Create a conversation invitation notification
+
+```http
+POST /notifications
+```
+
+Request:
+
+```json
+{
+  "type": "conversation_invitation",
+  "conversationId": "one-to-one:<deterministic-id>",
+  "inviterIdentityId": "<aliceIdentityId>",
+  "recipientIdentityId": "<bobIdentityId>",
+  "encryptedConversationKey": "<encryptedForBob>",
+  "keyEncryptionAlgorithm": "rsa-oaep-sha256",
+  "signature": "<inviterSignature>"
+}
+```
+
+Implemented:
+
+- require signed request auth from the inviter
+- persist the notification in MongoDB
+- store encrypted key material as opaque payload only
+- keep private keys and decrypted conversation keys out of the backend
+
+### Update a notification
+
+```http
+PATCH /notifications/{notificationId}
+```
+
+Accept request:
+
+```json
+{
+  "state": "accepted",
+  "keychainExternalIdentifier": "<updatedRecipientKeychain>"
+}
+```
+
+Decline request:
+
+```json
+{
+  "state": "declined"
+}
+```
+
+Implemented:
+
+- require signed request auth from the recipient
+- allow recipient-only accept and decline
+- mark accepted or declined notifications as read
+- store the recipient keychain external identifier when accepted
+
 ### Edit message
 
 ```http
