@@ -27,6 +27,7 @@ describe('HeliaPinningStrategy', () => {
       pins: {
         add: jest.fn().mockReturnValue(pinResults(cid)),
         isPinned: jest.fn().mockResolvedValue(false),
+        rm: jest.fn().mockReturnValue(pinResults(cid)),
       },
     } as unknown as HeliaInstance;
     strategy = new HeliaPinningStrategy();
@@ -68,6 +69,39 @@ describe('HeliaPinningStrategy', () => {
     );
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
       'Skipped IPFS content pinning for local availability: bafymockcid',
+    );
+  });
+
+  it('should unpin pinned content before local removal', async () => {
+    jest.mocked(heliaCore.pins.isPinned).mockResolvedValue(true);
+
+    await strategy.ensureUnpinned(heliaCore, cid);
+
+    expect(heliaCore.pins.rm).toHaveBeenCalledWith(cid, {
+      signal: undefined,
+    });
+    expect(Kernel.logger.debug).toHaveBeenCalledWith(
+      'Unpinned IPFS content before local removal: bafymockcid',
+    );
+  });
+
+  it('should not unpin content that is not pinned', async () => {
+    await strategy.ensureUnpinned(heliaCore, cid);
+
+    expect(heliaCore.pins.rm).not.toHaveBeenCalled();
+  });
+
+  it('should not fail removals when unpinning fails', async () => {
+    jest.mocked(heliaCore.pins.isPinned).mockResolvedValue(true);
+    jest.mocked(heliaCore.pins.rm).mockImplementation(() => {
+      throw new Error('unpin failed');
+    });
+
+    await expect(strategy.ensureUnpinned(heliaCore, cid)).resolves.toBe(
+      undefined,
+    );
+    expect(Kernel.logger.debug).toHaveBeenCalledWith(
+      'Skipped IPFS content unpinning before local removal: bafymockcid',
     );
   });
 });

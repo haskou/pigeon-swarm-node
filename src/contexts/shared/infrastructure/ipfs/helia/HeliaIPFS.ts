@@ -152,6 +152,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return;
     }
 
+    await this.pinningStrategy.ensureUnpinned(
+      this.heliaCore,
+      parsedCid,
+      signal,
+    );
     await this.heliaCore.blockstore.delete(parsedCid, { signal });
   }
 

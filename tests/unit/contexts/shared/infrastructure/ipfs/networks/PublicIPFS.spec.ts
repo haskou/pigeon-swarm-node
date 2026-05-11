@@ -1,5 +1,6 @@
 const mockHeliaNode = {
   blockstore: {
+    delete: jest.fn(),
     get: jest.fn(),
     has: jest.fn(),
   },
@@ -11,6 +12,7 @@ const mockHeliaNode = {
   pins: {
     add: jest.fn(),
     isPinned: jest.fn(),
+    rm: jest.fn(),
   },
   routing: { get: jest.fn(), put: jest.fn() },
 };
@@ -142,6 +144,9 @@ describe('PublicIPFS', () => {
       pinResults({ toString: () => 'bafymockcid' }),
     );
     mockHeliaNode.pins.isPinned.mockResolvedValue(false);
+    mockHeliaNode.pins.rm.mockReturnValue(
+      pinResults({ toString: () => 'bafymockcid' }),
+    );
   });
 
   describe('create', () => {
@@ -243,6 +248,21 @@ describe('PublicIPFS', () => {
           signal: undefined,
         },
       );
+    });
+  });
+
+  describe('removeJSON', () => {
+    it('should unpin pinned content before deleting the block', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      mockHeliaNode.blockstore.has.mockResolvedValue(true);
+      mockHeliaNode.pins.isPinned.mockResolvedValue(true);
+
+      await connection.removeJSON(cid);
+
+      expect(mockHeliaNode.pins.rm).toHaveBeenCalled();
+      expect(mockHeliaNode.blockstore.delete).toHaveBeenCalled();
     });
   });
 
