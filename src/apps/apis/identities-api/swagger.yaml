@@ -157,7 +157,7 @@ components:
             picture:
               type: string
               nullable: true
-              description: Public IPFS image CID returned by POST /ipfs/public-images.
+              description: Public IPFS content CID returned by POST /ipfs/public.
               example: bafybeigdyrztomockimagecid
         timestamp:
           type: number
@@ -222,7 +222,7 @@ components:
             picture:
               type: string
               nullable: true
-              description: Public IPFS image CID returned by POST /ipfs/public-images.
+              description: Public IPFS content CID returned by POST /ipfs/public.
               example: bafybeigdyrztomockimagecid
         timestamp:
           type: number

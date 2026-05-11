@@ -6,31 +6,45 @@ info:
 tags:
   - name: ipfs
 paths:
-  /ipfs/public-images:
+  /ipfs/public:
     post:
       tags:
         - ipfs
-      summary: Publish a public image to IPFS
-      description: Stores public image bytes as a JSON IPFS document and returns the CID to reference from identities, messages, or posts.
+      summary: Publish public content to IPFS
+      description: Accepts raw request bytes, stores them as a public JSON IPFS document, and returns the CID to reference from identities, messages, or posts.
       security:
         - signedRequest: []
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+          example: image/png
+        - name: X-Filename
+          in: header
+          required: false
+          schema:
+            type: string
+          example: avatar.png
       requestBody:
         required: true
         content:
-          application/json:
+          application/octet-stream:
             schema:
-              $ref: '#/components/schemas/PostPublicImageRequest'
+              type: string
+              format: binary
       responses:
         '201':
-          description: Public image stored in IPFS.
+          description: Public content stored in IPFS.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PublicImageResource'
+                $ref: '#/components/schemas/PublicIPFSContentResource'
         '401':
           description: Invalid signed request.
         '422':
-          description: Public image is too large.
+          description: Public content is too large.
   /ipfs/{cid}:
     get:
       tags:
@@ -63,25 +77,7 @@ components:
       in: header
       name: X-Signature
   schemas:
-    PostPublicImageRequest:
-      type: object
-      required:
-        - contentType
-        - data
-      properties:
-        contentType:
-          type: string
-          pattern: '^image\/[a-zA-Z0-9.+-]+$'
-          example: image/png
-        data:
-          type: string
-          format: byte
-          description: Raw image bytes encoded as base64, without a data URL prefix.
-        filename:
-          type: string
-          nullable: true
-          example: avatar.png
-    PublicImageResource:
+    PublicIPFSContentResource:
       type: object
       required:
         - cid
@@ -94,6 +90,10 @@ components:
         contentType:
           type: string
           example: image/png
+        filename:
+          type: string
+          nullable: true
+          example: avatar.png
         size:
           type: number
           example: 215040

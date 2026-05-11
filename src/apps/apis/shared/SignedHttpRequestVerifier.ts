@@ -16,6 +16,10 @@ type SignedRequestPayload = {
 
 export class SignedHttpRequestVerifier {
   private hashBody(body: unknown): string {
+    if (Buffer.isBuffer(body)) {
+      return createHash('sha256').update(body).digest('hex');
+    }
+
     return createHash('sha256')
       .update(JSON.stringify(body || {}))
       .digest('hex');

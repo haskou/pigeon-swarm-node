@@ -156,43 +156,43 @@ Implemented:
 
 ## IPFS HTTP API
 
-### Publish public image
+### Publish public content
 
 ```http
-POST /ipfs/public-images
+POST /ipfs/public
 ```
 
 Requires signed request headers. The authenticated identity does not need to be
 published yet, so clients can generate a keypair locally, sign this request, get
-an image CID, and then publish the identity with `profile.picture`.
+a CID, and then publish the identity with `profile.picture` or a message with
+`attachmentExternalIdentifiers`.
 
-Request:
+Request body is the raw binary content. Send metadata as headers:
 
-```json
-{
-  "contentType": "image/png",
-  "data": "<rawImageBytesAsBase64WithoutDataUrlPrefix>",
-  "filename": "avatar.png"
-}
+```http
+Content-Type: image/png
+X-Filename: avatar.png
 ```
 
 Response:
 
 ```json
 {
-  "cid": "<publicImageCid>",
+  "cid": "<publicContentCid>",
   "contentType": "image/png",
+  "filename": "avatar.png",
   "size": 215040
 }
 ```
 
 Implemented:
 
-- publish public images to every configured IPFS network
-- store image bytes as a JSON IPFS document with `contentType`, `data`, `size`,
-  `uploadedAt` and `uploadedByIdentityId`
-- accept only `image/*` content types
-- limit decoded image size to 2 MiB
+- publish public content to every configured IPFS network
+- accept raw request bytes instead of wrapping the content in JSON/base64
+- store content as a JSON IPFS document with `contentType`, base64 `data`,
+  optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
+- preserve the original filename through `X-Filename`
+- limit content size to 10 MiB
 - return the CID to store in signed identity profiles, messages or posts
 
 ### Get IPFS JSON content
@@ -345,7 +345,7 @@ Request:
   "profile": {
     "name": "Alice Updated",
     "handle": "alice_new",
-    "picture": "<newPublicImageCid>"
+    "picture": "<newPublicContentCid>"
   },
   "timestamp": 1773848829056,
   "signature": "<identitySignature>",
