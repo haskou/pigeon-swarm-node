@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Identities API
   version: 1.0.0
-  description: Endpoints for creating identities.
+  description: Endpoints for creating, updating and resolving identities.
 tags:
   - name: identities
 paths:
@@ -24,16 +24,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
-  /identities/{identityId}:
+  /identities/{reference}:
     get:
       tags:
         - identities
       summary: Get latest known identity
       parameters:
         - in: path
-          name: identityId
+          name: reference
           required: true
-          description: Percent-encoded identity id. Clients must use encodeURIComponent(identityId) because identity ids can contain path separators and reserved URL characters.
+          description: Percent-encoded identity id or profile handle. Clients must use encodeURIComponent(identityId) for identity ids because they can contain path separators and reserved URL characters. Handles may be passed with or without @.
           schema:
             type: string
           example: MCowBQYDK2VwAyEANHSu7gNCaXDe%2Bhzph8c3HomozCnC%2FLdXe13%2FWpeIaVM%3D
@@ -44,25 +44,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+    put:
+      tags:
+        - identities
+      summary: Publish signed identity update
+      parameters:
+        - in: path
+          name: reference
+          required: true
+          description: Percent-encoded identity id.
+          schema:
+            type: string
+        - in: header
+          name: X-Identity-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Timestamp
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Nonce
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignedIdentityBody'
+      responses:
+        '200':
+          description: Identity updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityResource'
 components:
   schemas:
     PostIdentityBody:
+      oneOf:
+        - type: object
+          required:
+            - name
+            - password
+            - networks
+          properties:
+            name:
+              type: string
+              example: Alice
+            handle:
+              type: string
+              example: '@alice'
+            password:
+              type: string
+              example: super-secret-password
+            networks:
+              type: array
+              items:
+                type: string
+                format: uuid
+        - $ref: '#/components/schemas/SignedIdentityBody'
+    SignedIdentityBody:
       type: object
       required:
-        - name
-        - password
+        - id
+        - encryptedKeyPair
+        - networks
+        - profile
+        - timestamp
+        - signature
+        - version
       properties:
-        name:
+        id:
           type: string
-          example: Alice
-        password:
-          type: string
-          example: super-secret-password
+        encryptedKeyPair:
+          type: object
+          required:
+            - encryptedPrivateKey
+            - publicKey
+          properties:
+            encryptedPrivateKey:
+              type: string
+            publicKey:
+              type: string
         networks:
           type: array
           items:
             type: string
             format: uuid
+        profile:
+          type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+            handle:
+              type: string
+              description: Normalized lowercase handle without @ for client-signed identities.
+            biography:
+              type: string
+              nullable: true
+            picture:
+              type: string
+              nullable: true
+        timestamp:
+          type: number
+        signature:
+          type: string
+        version:
+          type: integer
+        previousIdentityExternalIdentifier:
+          type: string
+          nullable: true
     IdentityResource:
       type: object
       required:
@@ -102,6 +205,10 @@ components:
             name:
               type: string
               example: Alice
+            handle:
+              type: string
+              nullable: true
+              example: alice
             biography:
               type: string
               example: I'm just a regular user of the Pigeon-swarm app!

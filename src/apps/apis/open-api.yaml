@@ -17,8 +17,8 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
-  /identities/{identityId}:
-    $ref: './identities-api/swagger.yaml#/paths/~1identities~1{identityId}'
+  /identities/{reference}:
+    $ref: './identities-api/swagger.yaml#/paths/~1identities~1{reference}'
   /ipfs/{cid}:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'
   /keychains/:

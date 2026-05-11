@@ -8,6 +8,7 @@ export interface IdentityResource {
   profile: {
     name: string;
     biography: string | undefined;
+    handle: string | undefined;
     picture: string | undefined;
   };
   timestamp: number;

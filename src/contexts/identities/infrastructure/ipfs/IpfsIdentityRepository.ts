@@ -7,6 +7,7 @@ import { Identity } from '../../domain/Identity';
 import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
 import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
+import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import { MongoIdentityMetadataDocument } from '../mongo/documents/MongoIdentityMetadataDocument';
 import MongoIdentityMetadataRepository from '../mongo/MongoIdentityMetadataRepository';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
@@ -128,10 +129,39 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     }
   }
 
+  private async findCandidateFromMetadata(
+    metadata: MongoIdentityMetadataDocument,
+  ): Promise<Identity | undefined> {
+    return this.findCandidateFromCid(
+      new IdentityId(metadata.identityId),
+      new IPFSId(metadata.cid),
+    );
+  }
+
   public async findById(id: IdentityId): Promise<Identity> {
     const candidates = await this.findCandidatesById(id);
 
     return candidates[0];
+  }
+
+  public async findByHandle(handle: ProfileHandle): Promise<Identity> {
+    const metadata = await this.metadataRepository.findByHandle(handle);
+
+    for (const document of metadata) {
+      const candidate = await this.findCandidateFromMetadata(document);
+
+      if (candidate?.toPrimitives().profile.handle === handle.valueOf()) {
+        return candidate;
+      }
+    }
+
+    throw new IdentityNotFoundError(handle.valueOf());
+  }
+
+  public async findByExternalIdentifier(
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<Identity | undefined> {
+    return this.findPreviousIdentity(externalIdentifier);
   }
 
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {

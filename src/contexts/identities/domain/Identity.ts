@@ -20,6 +20,7 @@ import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
 import { Profile } from './Profile';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from './value-objects/IdentityVersion';
+import { ProfileHandle } from './value-objects/ProfileHandle';
 import { ProfileName } from './value-objects/ProfileName';
 
 type PreviousReference = IdentityExternalIdentifier;
@@ -50,6 +51,7 @@ export class Identity extends AggregateRoot {
     name: ProfileName,
     password: Password,
     networks: NetworkId[] = [],
+    handle?: ProfileHandle,
   ): Promise<Identity> {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
@@ -60,7 +62,7 @@ export class Identity extends AggregateRoot {
       id: identityId.valueOf(),
       networks: networks.map((networkId) => networkId.valueOf()),
       previousIdentityExternalIdentifier: undefined,
-      profile: new Profile(name).toPrimitives(),
+      profile: new Profile(name, undefined, undefined, handle).toPrimitives(),
       signature: '',
       timestamp: Timestamp.now().valueOf(),
       version: 1,
@@ -76,6 +78,18 @@ export class Identity extends AggregateRoot {
     const identity = Identity.fromPrimitives(primitives);
 
     identity.record(new IdentityWasCreatedEvent(primitives.id));
+
+    return identity;
+  }
+
+  public static publishCandidate(primitives: PrimitiveOf<Identity>): Identity {
+    const identity = Identity.fromPrimitives(primitives);
+
+    identity.record(
+      primitives.version === 1
+        ? new IdentityWasCreatedEvent(primitives.id)
+        : new IdentityWasUpdatedEvent(primitives.id),
+    );
 
     return identity;
   }

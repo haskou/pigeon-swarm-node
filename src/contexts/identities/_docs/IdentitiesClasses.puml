@@ -12,18 +12,21 @@ package "identities.domain" {
     -profile: Profile
     -timestamp: Timestamp
     -signature: Signature
-    +create(name, password, networks): Identity
+    +create(name, password, networks, handle?): Identity
+    +publishCandidate(primitives): Identity
     +updateProfile(profile, password): Identity
     +updateNetworks(networks, password): Identity
   }
 
   class Profile {
     -name: ProfileName
+    -handle?: ProfileHandle
     -biography?: ProfileBiography
     -picture?: ProfileImage
   }
 
   class ProfileName <<ValueObject>>
+  class ProfileHandle <<ValueObject>>
   class ProfileBiography <<ValueObject>>
   class ProfileImage <<ValueObject>>
   class IdentityExternalIdentifier <<ValueObject>>
@@ -41,6 +44,8 @@ package "identities.domain" {
   interface IdentityRepository {
     +save(identity: Identity): Promise<void>
     +findById(id: IdentityId): Promise<Identity>
+    +findByHandle(handle: ProfileHandle): Promise<Identity>
+    +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 
@@ -50,6 +55,7 @@ package "identities.domain" {
 
   class IdentityFinderService {
     +findById(identityId): Promise<Identity>
+    +findByHandle(handle): Promise<Identity>
   }
 
   class IdentityRegistrarService {
@@ -60,6 +66,7 @@ package "identities.domain" {
   Identity o--> NetworkId
   Identity --> IdentityExternalIdentifier
   Profile *--> ProfileName
+  Profile --> ProfileHandle
   Profile --> ProfileBiography
   Profile --> ProfileImage
   Identity ..> IdentitySignatureDomainService
@@ -84,6 +91,10 @@ package "identities.application" {
     +find(message: IdentityFinderMessage): Promise<Identity>
   }
 
+  class IdentityPublisher {
+    +publish(message: IdentityPublishMessage): Promise<Identity>
+  }
+
   class RegisterPublishedIdentity {
     +register(message: RegisterPublishedIdentityMessage): Promise<Identity>
   }
@@ -93,6 +104,8 @@ package "identities.application" {
   }
 
   IdentityCreator --> IdentitySaverService
+  IdentityPublisher --> IdentitySaverService
+  IdentityPublisher --> IdentityRepository
   IdentityUpdater --> IdentityFinderService
   IdentityUpdater --> IdentitySaverService
   IdentityFinder --> IdentityFinderService
@@ -115,6 +128,7 @@ package "identities.infrastructure" {
 
   class MongoIdentityDocumentIndex {
     -identityId: string
+    -handle?: string
     -externalIdentifier: string
     -version: number
     -previousExternalIdentifier?: string
@@ -124,6 +138,8 @@ package "identities.infrastructure" {
   class IpfsIdentityRepository {
     +save(identity: Identity): Promise<void>
     +findById(id: IdentityId): Promise<Identity>
+    +findByHandle(handle: ProfileHandle): Promise<Identity>
+    +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 

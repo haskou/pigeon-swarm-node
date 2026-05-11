@@ -15,6 +15,7 @@ export default class IdentityCreator {
       message.name,
       message.password,
       message.networks,
+      message.handle,
     );
 
     await this.saver.save(identity);

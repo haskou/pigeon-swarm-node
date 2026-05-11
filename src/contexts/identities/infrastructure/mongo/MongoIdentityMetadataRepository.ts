@@ -4,6 +4,7 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Sort } from 'mongodb';
 
 import { Identity } from '../../domain/Identity';
+import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import { MongoIdentityMetadataDocument } from './documents/MongoIdentityMetadataDocument';
 import MongoIdentityMetadataMapper from './mappers/MongoIdentityMetadataMapper';
 
@@ -34,6 +35,23 @@ export default class MongoIdentityMetadataRepository {
       .toArray();
   }
 
+  public async findByHandle(
+    handle: ProfileHandle,
+  ): Promise<MongoIdentityMetadataDocument[]> {
+    const sortCriteria: Sort = { receivedAt: -1, version: -1 };
+    const collection =
+      await this.mongo.getCollection<MongoIdentityMetadataDocument>(
+        MongoIdentityMetadataRepository.COLLECTION_NAME,
+      );
+
+    return collection
+      .find({
+        handle: handle.valueOf(),
+      })
+      .sort(sortCriteria)
+      .toArray();
+  }
+
   public async save(identity: Identity, cid: IPFSId): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
@@ -46,6 +64,7 @@ export default class MongoIdentityMetadataRepository {
       {
         $set: {
           cid: document.cid,
+          handle: document.handle,
           identityId: document.identityId,
           previousCid: document.previousCid,
           receivedAt: document.receivedAt,

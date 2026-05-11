@@ -58,6 +58,7 @@ const url = `/identities/${encodeURIComponent(identityId)}`;
 This applies to:
 
 - `GET /identities/{identityId}`
+- `PUT /identities/{identityId}`
 - `GET /keychains/{identityId}`
 
 Header values such as `X-Identity-Id` are not URL encoded.
@@ -158,18 +159,124 @@ Implemented:
 ### Get identity
 
 ```http
-GET /identities/{identityId}
+GET /identities/{reference}
 ```
 
 Path parameters:
 
-- `identityId`: percent-encoded identity id. Use
-  `encodeURIComponent(identityId)`.
+- `reference`: either a percent-encoded identity id or a profile handle.
+- Identity ids must use `encodeURIComponent(identityId)`.
+- Handles may be passed with or without `@`; they are stored lowercase without
+  `@`.
 
 Implemented:
 
 - resolve the latest valid known identity candidate
+- resolve by identity id or profile handle
 - return profile, networks, version, previous identity reference and signature
+
+### Create identity
+
+```http
+POST /identities
+```
+
+Legacy backend-generated request:
+
+```json
+{
+  "name": "Alice",
+  "handle": "@alice",
+  "password": "super-secret-password",
+  "networks": ["<networkId>"]
+}
+```
+
+Client-signed request:
+
+```json
+{
+  "id": "<identityId>",
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<encryptedPrivateKey>"
+  },
+  "networks": ["<networkId>"],
+  "profile": {
+    "name": "Alice",
+    "handle": "alice"
+  },
+  "timestamp": 1773848829055,
+  "signature": "<identitySignature>",
+  "version": 1
+}
+```
+
+Implemented:
+
+- keep the legacy password-based creation flow for local clients
+- accept client-generated encrypted keypairs and signed identity candidates
+- keep client passwords out of the backend in the client-signed flow
+- store `profile.handle` as part of the signed identity profile
+- normalize handles to lowercase without `@`
+
+Client-signed identity signatures must cover the canonical identity payload:
+
+```json
+{
+  "encryptedKeyPair": "<encryptedKeyPair>",
+  "id": "<identityId>",
+  "networks": ["<networkId>"],
+  "previousIdentityExternalIdentifier": null,
+  "profile": {
+    "biography": null,
+    "handle": "alice",
+    "name": "Alice",
+    "picture": null
+  },
+  "timestamp": 1773848829055,
+  "version": 1
+}
+```
+
+The actual JSON signature payload should omit undefined optional fields; handles
+must already be normalized before signing.
+
+### Update identity
+
+```http
+PUT /identities/{identityId}
+```
+
+Request:
+
+```json
+{
+  "id": "<identityId>",
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<encryptedPrivateKey>"
+  },
+  "networks": ["<networkId>"],
+  "previousIdentityExternalIdentifier": "<previousIdentityCid>",
+  "profile": {
+    "name": "Alice Updated",
+    "handle": "alice_new"
+  },
+  "timestamp": 1773848829056,
+  "signature": "<identitySignature>",
+  "version": 2
+}
+```
+
+Implemented:
+
+- require signed request auth from the identity owner
+- accept profile changes, profile image removal and handle changes as signed
+  identity updates
+- accept encrypted keypair changes, including client-side password changes
+- validate the signed identity candidate and previous identity chain before
+  publishing
 
 ## Keychain HTTP API
 

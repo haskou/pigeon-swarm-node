@@ -6,6 +6,7 @@ import { MessageId } from '@app/contexts/conversations/domain/value-objects/Mess
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { MongoNodeMetadataDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodeMetadataDocument';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Kernel from '@app/Kernel';
@@ -138,6 +139,63 @@ export default class Definitions {
     return this.otherIdentityKeyPair;
   }
 
+  private async buildClientSignedIdentityBody(
+    name: string,
+    handle: string,
+    password: string,
+    version: number = 1,
+    previousIdentityExternalIdentifier: string | undefined = undefined,
+  ): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const ownerIdentityId = this.ownerIdentityId as IdentityId;
+    const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const networks = ['123e4567-e89b-12d3-a456-426614174000'];
+    const normalizedHandle = handle.replace(/^@/, '').toLowerCase();
+    const profile: {
+      biography: string | undefined;
+      handle: string;
+      name: string;
+      picture: string | undefined;
+    } = {
+      biography: undefined,
+      handle: normalizedHandle,
+      name,
+      picture: undefined,
+    };
+    const signaturePayload = {
+      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      id: ownerIdentityId.valueOf(),
+      networks,
+      previousIdentityExternalIdentifier,
+      profile,
+      timestamp: 1773848829055 + version,
+      version,
+    };
+    const signature = keyPair.sign(JSON.stringify(signaturePayload)).valueOf();
+
+    this.body = JSON.stringify({
+      ...signaturePayload,
+      signature,
+    });
+  }
+
+  private async findCreatedIdentityExternalIdentifier(): Promise<string> {
+    if (!this.createdIdentityId) {
+      throw new Error('Identity must be created first.');
+    }
+
+    const ipfs = Kernel.di.getService<IPFS>(IPFS);
+    const externalIdentifier = await ipfs.getRecord(
+      `pigeon-swarm_identity-${this.createdIdentityId}`,
+    );
+
+    if (!externalIdentifier) {
+      throw new Error('Created identity external identifier not found.');
+    }
+
+    return externalIdentifier;
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -192,6 +250,52 @@ export default class Definitions {
 
     this.body = JSON.stringify(signedBody);
     await this.signCurrentRequest('POST', '/keychains/');
+  }
+
+  @given(
+    'I set a client-signed identity body with name {string} and handle {string}',
+  )
+  public async iSetAClientSignedIdentityBody(
+    name: string,
+    handle: string,
+  ): Promise<void> {
+    await this.buildClientSignedIdentityBody(
+      name,
+      handle,
+      'client-secret-password',
+    );
+  }
+
+  @given(
+    'I set a client-signed identity update body with name {string}, handle {string} and password {string}',
+  )
+  public async iSetAClientSignedIdentityUpdateBody(
+    name: string,
+    handle: string,
+    password: string,
+  ): Promise<void> {
+    const previousIdentityExternalIdentifier =
+      await this.findCreatedIdentityExternalIdentifier();
+
+    await this.buildClientSignedIdentityBody(
+      name,
+      handle,
+      password,
+      2,
+      previousIdentityExternalIdentifier,
+    );
+  }
+
+  @given('I sign the current identity update request')
+  public async iSignTheCurrentIdentityUpdateRequest(): Promise<void> {
+    if (!this.createdIdentityId) {
+      throw new Error('Identity must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PUT',
+      `/identities/${encodeURIComponent(this.createdIdentityId)}`,
+    );
   }
 
   @given('I have published a keychain for the authenticated identity')
@@ -630,6 +734,19 @@ export default class Definitions {
   public async iPUT(path: string): Promise<void> {
     this.response = await this.restClient.put(
       path,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT the created identity')
+  public async iPUTTheCreatedIdentity(): Promise<void> {
+    if (!this.createdIdentityId) {
+      throw new Error('Identity must be created first.');
+    }
+
+    this.response = await this.restClient.put(
+      `/identities/${encodeURIComponent(this.createdIdentityId)}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

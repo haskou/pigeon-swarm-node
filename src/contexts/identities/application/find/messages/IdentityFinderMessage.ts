@@ -1,9 +1,16 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-export class IdentityFinderMessage {
-  public readonly identityId: IdentityId;
+import { ProfileHandle } from '../../../domain/value-objects/ProfileHandle';
 
-  constructor(identityId: string) {
-    this.identityId = new IdentityId(identityId);
+export class IdentityFinderMessage {
+  public readonly handle?: ProfileHandle;
+  public readonly identityId?: IdentityId;
+
+  constructor(reference: string) {
+    try {
+      this.identityId = new IdentityId(reference);
+    } catch {
+      this.handle = new ProfileHandle(reference);
+    }
   }
 }
