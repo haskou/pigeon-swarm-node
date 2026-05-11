@@ -117,6 +117,11 @@ export default class Definitions {
     this.headers[header] = value;
   }
 
+  @given('I clear request headers')
+  public iClearRequestHeaders(): void {
+    this.headers = {};
+  }
+
   private async ensureIdentityKeyPair(): Promise<KeyPair> {
     if (!this.identityKeyPair) {
       this.identityKeyPair = await KeyPair.generate();
