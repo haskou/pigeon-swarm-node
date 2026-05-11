@@ -33,8 +33,10 @@ paths:
         - in: path
           name: identityId
           required: true
+          description: Percent-encoded identity id. Clients must use encodeURIComponent(identityId) because identity ids can contain path separators and reserved URL characters.
           schema:
             type: string
+          example: MCowBQYDK2VwAyEANHSu7gNCaXDe%2Bhzph8c3HomozCnC%2FLdXe13%2FWpeIaVM%3D
       responses:
         '200':
           description: Latest valid identity.

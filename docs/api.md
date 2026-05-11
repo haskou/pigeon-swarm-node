@@ -1,9 +1,11 @@
 # Pigeon Swarm API
 
-Last updated: 2026-05-09.
+Last updated: 2026-05-11.
 
-This document is intentionally incomplete. It captures the intended API shape
-before implementation so the client contract does not leak P2P infrastructure.
+This document describes the HTTP API currently implemented by the node. Planned
+or intentionally unsupported API shapes are kept in the final
+[Planned API](#planned-api) section so they are not confused with the usable
+contract.
 
 ## Principles
 
@@ -22,8 +24,7 @@ before implementation so the client contract does not leak P2P infrastructure.
 
 ## Authentication
 
-Mutating endpoints are authenticated by a canonical request
-signature:
+Authenticated endpoints use a canonical request signature:
 
 ```http
 X-Identity-Id: <identityId>
@@ -38,6 +39,28 @@ Implemented:
 - recent nonces in MongoDB to prevent replay
 - timestamp freshness validation
 - Cucumber scenarios for invalid, replayed and stale signed requests
+
+## Path Parameters
+
+Path parameters must be percent-encoded with `encodeURIComponent` before being
+placed in the URL.
+
+Identity ids are public keys encoded as text. They can contain `/`, `+`, `=`
+and newlines when represented as PEM, so raw identity ids must never be placed
+directly in a path segment.
+
+Example:
+
+```ts
+const url = `/identities/${encodeURIComponent(identityId)}`;
+```
+
+This applies to:
+
+- `GET /identities/{identityId}`
+- `GET /keychains/{identityId}`
+
+Header values such as `X-Identity-Id` are not URL encoded.
 
 ## Node HTTP API
 
@@ -138,6 +161,11 @@ Implemented:
 GET /identities/{identityId}
 ```
 
+Path parameters:
+
+- `identityId`: percent-encoded identity id. Use
+  `encodeURIComponent(identityId)`.
+
 Implemented:
 
 - resolve the latest valid known identity candidate
@@ -160,8 +188,8 @@ Request:
 {
   "version": 1,
   "previousKeychainExternalIdentifier": null,
-  "encryptedPayload": "TODO",
-  "signature": "TODO"
+  "encryptedPayload": "<encryptedKeychainPayload>",
+  "signature": "<keychainSignature>"
 }
 ```
 
@@ -169,9 +197,9 @@ Response:
 
 ```json
 {
-  "ownerIdentityId": "TODO",
+  "ownerIdentityId": "<identityId>",
   "version": 1,
-  "keychainExternalIdentifier": "TODO"
+  "keychainExternalIdentifier": "<externalIdentifier>"
 }
 ```
 
@@ -189,15 +217,20 @@ Implemented:
 GET /keychains/{identityId}
 ```
 
+Path parameters:
+
+- `identityId`: percent-encoded identity id. Use
+  `encodeURIComponent(identityId)`.
+
 Response:
 
 ```json
 {
-  "ownerIdentityId": "TODO",
+  "ownerIdentityId": "<identityId>",
   "version": 1,
-  "keychainExternalIdentifier": "TODO",
-  "encryptedPayload": "TODO",
-  "signature": "TODO"
+  "keychainExternalIdentifier": "<externalIdentifier>",
+  "encryptedPayload": "<encryptedKeychainPayload>",
+  "signature": "<keychainSignature>"
 }
 ```
 
@@ -207,10 +240,6 @@ Implemented:
 - resolve latest valid candidate from local MongoDB and DHT candidates
 - return encrypted payload as-is for client-side unlock/decryption
 
-TODO:
-
-- include future sync data once node-to-node anti-entropy exists
-
 ## Conversation HTTP API
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
@@ -219,7 +248,7 @@ Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
 ### List conversations
 
 ```http
-GET /conversations?limit=20&beforeConversationId=TODO
+GET /conversations?limit=20&beforeConversationId=<conversationId>
 ```
 
 Implemented:
@@ -227,12 +256,6 @@ Implemented:
 - require signed request auth
 - list conversations where the authenticated identity participates
 - support `limit` and `beforeConversationId`
-
-TODO:
-
-- define unread counters
-- define last message projection
-- define sync status projection
 
 ### Create a 1to1 conversation
 
@@ -267,16 +290,10 @@ Implemented:
 - persist conversation metadata in MongoDB
 - publish `ConversationWasCreatedEvent`
 
-TODO:
-
-- define error when remote identity cannot be resolved
-- define encryption setup and key exchange boundary inside the client keychain
-- define how the receiver discovers or registers the conversation from PubSub
-
 ### Get latest messages
 
 ```http
-GET /conversations/{conversationId}/messages?limit=50&beforeMessageId=TODO
+GET /conversations/{conversationId}/messages?limit=50&beforeMessageId=<messageId>
 ```
 
 Response:
@@ -286,16 +303,16 @@ Response:
   "conversationId": "one-to-one:<deterministic-id>",
   "messages": [
     {
-      "id": "TODO",
+      "id": "<messageId>",
       "type": "sent",
-      "authorIdentityId": "TODO",
+      "authorIdentityId": "<identityId>",
       "createdAt": 1773848829055,
-      "encryptedPayload": "TODO",
+      "encryptedPayload": "<encryptedMessagePayload>",
       "previousMessageIds": [],
       "attachmentExternalIdentifiers": []
     }
   ],
-  "nextBeforeMessageId": "TODO"
+  "nextBeforeMessageId": "<messageId>"
 }
 ```
 
@@ -304,14 +321,6 @@ Implemented:
 - require signed request auth
 - return the latest messages ordered from oldest to newest in the page
 - when `beforeMessageId` is provided, return messages older than that message
-
-TODO:
-
-- define whether payload should stay inline or become lazy by external
-  identifier for large payloads
-- define tombstone projection for deleted messages
-- define edited message projection
-- define attachment metadata projection
 
 ### Send message
 
@@ -325,9 +334,9 @@ Request:
 {
   "id": "<clientGeneratedMessageId>",
   "createdAt": 1773848829055,
-  "encryptedPayload": "TODO",
-  "signature": "TODO",
-  "attachmentExternalIdentifiers": ["TODO"]
+  "encryptedPayload": "<encryptedMessagePayload>",
+  "signature": "<messageSignature>",
+  "attachmentExternalIdentifiers": ["<externalIdentifier>"]
 }
 ```
 
@@ -335,12 +344,12 @@ Response:
 
 ```json
 {
-  "id": "TODO",
+  "id": "<messageId>",
   "conversationId": "one-to-one:<deterministic-id>",
-  "authorIdentityId": "TODO",
+  "authorIdentityId": "<identityId>",
   "type": "sent",
   "createdAt": 1773848829055,
-  "encryptedPayload": "TODO",
+  "encryptedPayload": "<encryptedMessagePayload>",
   "previousMessageIds": [],
   "attachmentExternalIdentifiers": []
 }
@@ -354,14 +363,88 @@ Implemented:
 - persist message metadata in MongoDB
 - publish `ConversationMessageWasSentEvent`
 
-TODO:
-
-- define attachment upload flow
-
 Signed HTTP request validation:
 
 - reject reused `X-Nonce` values per identity
 - reject stale `X-Timestamp` values outside the freshness window
+
+## Notification HTTP API
+
+Notifications are for actionable events that require client-side identity
+material, such as accepting a conversation invitation. Message delivery does
+not create notifications.
+
+### List notifications
+
+```http
+GET /notifications?limit=20&beforeNotificationId=<notificationId>
+```
+
+Implemented:
+
+- require signed request auth
+- return notifications where the authenticated identity is the recipient
+- support `limit` and `beforeNotificationId`
+
+### Create a conversation invitation notification
+
+```http
+POST /notifications
+```
+
+Request:
+
+```json
+{
+  "type": "conversation_invitation",
+  "conversationId": "one-to-one:<deterministic-id>",
+  "inviterIdentityId": "<aliceIdentityId>",
+  "recipientIdentityId": "<bobIdentityId>",
+  "encryptedConversationKey": "<encryptedForBob>",
+  "inviterSignature": "<inviterSignature>"
+}
+```
+
+Implemented:
+
+- require signed request auth from the inviter
+- persist the notification in MongoDB
+- store encrypted key material as opaque payload only
+- keep private keys and decrypted conversation keys out of the backend
+
+### Update a notification
+
+```http
+PATCH /notifications/{notificationId}
+```
+
+Accept request:
+
+```json
+{
+  "state": "accepted"
+}
+```
+
+Decline request:
+
+```json
+{
+  "state": "declined"
+}
+```
+
+Implemented:
+
+- require signed request auth from the recipient
+- allow recipient-only accept and decline
+- mark accepted or declined notifications as read
+- store the recipient keychain external identifier when accepted
+
+## Planned API
+
+The following API shapes are not implemented yet. They are kept here as design
+notes for upcoming conversation sync and realtime work.
 
 ### Edit message
 
@@ -369,7 +452,7 @@ Signed HTTP request validation:
 PATCH /conversations/{conversationId}/messages/{messageId}
 ```
 
-TODO:
+Planned:
 
 - model edit as a new immutable message document
 - define author-only rule
@@ -382,7 +465,7 @@ TODO:
 DELETE /conversations/{conversationId}/messages/{messageId}
 ```
 
-TODO:
+Planned:
 
 - model delete as a new immutable message document
 - define author-only rule
@@ -395,20 +478,20 @@ TODO:
 POST /conversations/{conversationId}/sync
 ```
 
-TODO:
+Planned:
 
 - define anti-entropy strategy
 - define response when no peer has missing messages
 - define response when only one peer has missing messages
 - define sync cursor persistence
 
-## Realtime WebSocket API
+### Realtime WebSocket API
 
 ```http
 GET /realtime
 ```
 
-TODO:
+Planned:
 
 - define authentication handshake
 - define reconnect behavior
@@ -423,7 +506,7 @@ Client message:
 ```json
 {
   "type": "conversation.subscribe",
-  "conversationId": "TODO"
+  "conversationId": "<conversationId>"
 }
 ```
 
@@ -432,11 +515,11 @@ Server response:
 ```json
 {
   "type": "conversation.subscribed",
-  "conversationId": "TODO"
+  "conversationId": "<conversationId>"
 }
 ```
 
-TODO:
+Planned:
 
 - reject subscriptions when the authenticated identity is not a participant
 - decide if subscribing triggers a sync
@@ -449,41 +532,41 @@ Server messages:
 ```json
 {
   "type": "message.sent",
-  "conversationId": "TODO",
-  "messageId": "TODO",
-  "externalIdentifier": "TODO"
+  "conversationId": "<conversationId>",
+  "messageId": "<messageId>",
+  "externalIdentifier": "<externalIdentifier>"
 }
 ```
 
 ```json
 {
   "type": "message.edited",
-  "conversationId": "TODO",
-  "messageId": "TODO",
-  "targetMessageId": "TODO",
-  "externalIdentifier": "TODO"
+  "conversationId": "<conversationId>",
+  "messageId": "<messageId>",
+  "targetMessageId": "<messageId>",
+  "externalIdentifier": "<externalIdentifier>"
 }
 ```
 
 ```json
 {
   "type": "message.deleted",
-  "conversationId": "TODO",
-  "messageId": "TODO",
-  "targetMessageId": "TODO",
-  "externalIdentifier": "TODO"
+  "conversationId": "<conversationId>",
+  "messageId": "<messageId>",
+  "targetMessageId": "<messageId>",
+  "externalIdentifier": "<externalIdentifier>"
 }
 ```
 
 ```json
 {
   "type": "conversation.synced",
-  "conversationId": "TODO",
+  "conversationId": "<conversationId>",
   "newMessages": 0
 }
 ```
 
-TODO:
+Planned:
 
 - define if events carry full projections or only identifiers
 - define ordering guarantees per conversation
@@ -507,7 +590,7 @@ Node B -> MongoDB: cache valid metadata
 Node B -> Client B: WebSocket message event
 ```
 
-TODO:
+Planned:
 
 - define PubSub DTOs separately from WebSocket DTOs
 - define idempotency keys shared by PubSub consumers

@@ -1,4 +1,4 @@
-import axios, { Axios, AxiosError } from 'axios';
+import axios, { Axios, AxiosError, AxiosRequestConfig } from 'axios';
 
 export default class RestClient {
   private readonly client: Axios;
@@ -45,10 +45,15 @@ export default class RestClient {
     }
   }
 
-  public async patch(path: string, data: string): Promise<any> {
+  public async patch(
+    path: string,
+    data: string,
+    config: AxiosRequestConfig = {},
+  ): Promise<any> {
     try {
       return await this.client.patch(path, data, {
-        headers: { 'content-type': 'application/json' },
+        ...config,
+        headers: { 'content-type': 'application/json', ...config.headers },
       });
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {

@@ -504,3 +504,45 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnk=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX01vbmdvQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb05vdGlmaWNhdGlvbk1hcHBlcl9fTW9uZ29Ob3RpZmljYXRpb25NYXBwZXI=:
+    class: >-
+      /contexts/notifications/infrastructure/mongo/mappers/MongoNotificationMapper
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fYXBwbGljYXRpb25fX2NyZWF0ZV9fTm90aWZpY2F0aW9uQ3JlYXRvcl9fTm90aWZpY2F0aW9uQ3JlYXRvcg==:
+    class: /contexts/notifications/application/create/NotificationCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vdGlmaWNhdGlvblJlcG9zaXRvcnlfX05vdGlmaWNhdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fYXBwbGljYXRpb25fX2ZpbmRfX05vdGlmaWNhdGlvbnNGaW5kZXJfX05vdGlmaWNhdGlvbnNGaW5kZXI=:
+    class: /contexts/notifications/application/find/NotificationsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vdGlmaWNhdGlvblJlcG9zaXRvcnlfX05vdGlmaWNhdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fYXBwbGljYXRpb25fX3VwZGF0ZV9fTm90aWZpY2F0aW9uVXBkYXRlcl9fTm90aWZpY2F0aW9uVXBkYXRlcg==:
+    class: /contexts/notifications/application/update/NotificationUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vdGlmaWNhdGlvblJlcG9zaXRvcnlfX05vdGlmaWNhdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb05vdGlmaWNhdGlvblJlcG9zaXRvcnlfX01vbmdvTm90aWZpY2F0aW9uUmVwb3NpdG9yeQ==:
+    class: /contexts/notifications/infrastructure/mongo/MongoNotificationRepository
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tb25nb2RiX19Nb25nb0RCX19Nb25nb0RC
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb05vdGlmaWNhdGlvbk1hcHBlcl9fTW9uZ29Ob3RpZmljYXRpb25NYXBwZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vdGlmaWNhdGlvblJlcG9zaXRvcnlfX05vdGlmaWNhdGlvblJlcG9zaXRvcnk=: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb05vdGlmaWNhdGlvblJlcG9zaXRvcnlfX01vbmdvTm90aWZpY2F0aW9uUmVwb3NpdG9yeQ==

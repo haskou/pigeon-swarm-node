@@ -38,6 +38,7 @@ export default class Definitions {
   private createdIdentityId: string | undefined;
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
+  private notificationId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
 
@@ -57,6 +58,7 @@ export default class Definitions {
     this.createdIdentityId = undefined;
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
+    this.notificationId = undefined;
     this.otherIdentityId = undefined;
     this.otherIdentityKeyPair = undefined;
     this.ownerIdentityId = undefined;
@@ -394,6 +396,130 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/node/networks/');
   }
 
+  @given('I set a conversation invitation notification body')
+  public async iSetAConversationInvitationNotificationBody(): Promise<void> {
+    const inviterKeyPair = await this.ensureIdentityKeyPair();
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      conversationId: 'one-to-one:notification-api-conversation',
+      encryptedConversationKey: 'encrypted-conversation-key',
+      inviterIdentityId: this.ownerIdentityId?.valueOf(),
+      inviterSignature: inviterKeyPair.sign('conversation-invitation').valueOf(),
+      recipientIdentityId: this.otherIdentityId?.valueOf(),
+      type: 'conversation_invitation',
+    });
+  }
+
+  @given('I sign the current notification creation request')
+  public async iSignTheCurrentNotificationCreationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/notifications/');
+  }
+
+  @given('another identity signs the current notification creation request')
+  public async anotherIdentitySignsTheCurrentNotificationCreationRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/notifications/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the notification recipient signs the current notifications request')
+  public async notificationRecipientSignsTheCurrentNotificationsRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/notifications/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current notifications request')
+  public async iSignTheCurrentNotificationsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/notifications/');
+  }
+
+  @given('the notification recipient signs the current notification patch request')
+  public async notificationRecipientSignsTheCurrentNotificationPatchRequest(): Promise<void> {
+    if (!this.notificationId) {
+      throw new Error('Notification must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/notifications/${this.notificationId}`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('another identity signs the current notification patch request')
+  public async anotherIdentitySignsTheCurrentNotificationPatchRequest(): Promise<void> {
+    if (!this.notificationId) {
+      throw new Error('Notification must be created first.');
+    }
+
+    const unrelatedKeyPair = await KeyPair.generate();
+    const unrelatedIdentityId = new IdentityId(
+      unrelatedKeyPair.toPrimitives().publicKey,
+    );
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/notifications/${this.notificationId}`,
+      String(Date.now()),
+      unrelatedKeyPair,
+      unrelatedIdentityId,
+    );
+  }
+
+  @given('I have created a conversation invitation notification')
+  public async iHaveCreatedAConversationInvitationNotification(): Promise<void> {
+    await this.iSetAConversationInvitationNotificationBody();
+    await this.iSignTheCurrentNotificationCreationRequest();
+
+    this.response = await this.restClient.post(
+      '/notifications/',
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not create notification: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.notificationId = this.response.data.id;
+  }
+
+  @given('I set a notification accepted body')
+  public iSetANotificationAcceptedBody(): void {
+    this.body = JSON.stringify({
+      state: 'accepted',
+    });
+  }
+
+  @given('I set a notification declined body')
+  public iSetANotificationDeclinedBody(): void {
+    this.body = JSON.stringify({
+      state: 'declined',
+    });
+  }
+
   @given(
     'I set a private node network body with id {string} and name {string}',
   )
@@ -514,6 +640,20 @@ export default class Definitions {
     this.response = await this.restClient.patch(
       path,
       this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PATCH the current notification')
+  public async iPATCHTheCurrentNotification(): Promise<void> {
+    if (!this.notificationId) {
+      throw new Error('Notification must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/notifications/${this.notificationId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
     );
   }
 
