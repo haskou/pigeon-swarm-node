@@ -5,64 +5,37 @@ Last updated: 2026-05-11.
 Keep this file short. Completed slices should move into Git history, API docs
 and tests instead of staying here as long-form notes.
 
-## Current Slice: Signed Message And Request Hardening
+## Current Slice: Private Attachments
 
-Goal: authenticate API calls without passwords or JWT sessions and reject
-tampered conversation messages.
+Goal: make 1to1 message attachments usable without exposing private content to
+the backend.
 
 Status:
 
-- [x] Verify canonical signed HTTP requests.
-- [x] Store used nonces in MongoDB per identity.
-- [x] Reject stale signed request timestamps.
-- [x] Validate sent-message signatures against the canonical message payload.
-- [x] Move client-generated message `id` and `createdAt` into the send-message
-  request so the client can sign the final immutable message shape.
-- [x] Align `POST /conversations` request naming with response naming:
-  `participantIds`.
-- [x] Add Cucumber coverage for invalid message signatures, replayed nonces and
-  expired timestamps.
-- [x] Update OpenAPI and API docs.
+- [x] Publish public profile media through `POST /ipfs/public`.
+- [x] Keep identity `profile.picture` as an IPFS CID instead of embedded
+  base64/data URLs.
+- [x] Publish client-encrypted private content through `POST /ipfs/private`.
+- [x] Keep message attachments as `attachmentExternalIdentifiers`.
+- [ ] Validate the frontend attachment flow with real 1to1 messages.
+- [ ] Document the encrypted attachment payload expected inside
+  `encryptedPayload`.
 
-## Consumer Backlog
+## Next Slice 1: Node Network Management
 
-Keep consumers thin: receive PubSub/domain events, call an application use case,
-and let repositories/domain validation decide what is trustworthy.
+Goal: let node owners fully manage local IPFS networks.
 
-- [x] `pubsub/identities/RegisterIdentityWhenPublished`
-  - calls `RegisterPublishedIdentity`
-  - registers missing local metadata for a published identity
-- [x] `pubsub/identities/SynchronizeIdentityWhenUpdated`
-  - receives identity update announcements
-  - calls an identity synchronization use case that resolves the newest valid
-    version chain
-- [x] `pubsub/identities/RespondToIdentitySyncRequest`
-  - receives identity sync requests
-  - publishes valid local candidates as sync responses
-- [x] `pubsub/identities/RegisterIdentityWhenSyncAvailable`
-  - receives identity sync responses
-  - fetches and validates the announced candidate before caching metadata
-- [x] `pubsub/conversations/RegisterMessageWhenAnnounced`
-  - receives a sent-message announcement
-  - calls the conversation use case that fetches, validates and stores the
-    message locally
-- [x] `pubsub/conversations/RegisterMessageEditionWhenAnnounced`
-  - receives an edit-message announcement
-  - stores the edit as a new immutable message, without mutating the original
-- [x] `pubsub/conversations/RegisterMessageDeletionWhenAnnounced`
-  - receives a delete-message announcement
-  - stores the delete as a new immutable tombstone/projection event
-- [x] `pubsub/conversations/RespondToConversationSyncRequest`
-  - receives conversation sync requests
-  - publishes bounded candidate metadata for known messages
-- [x] `pubsub/conversations/RegisterMessagesWhenSyncAvailable`
-  - receives conversation sync responses
-  - fetches and validates candidate message documents before updating local
-    projections
+Steps:
 
-## Next Slice 1: Conversation Remote Validation
+1. Add `DELETE /node/networks/{networkId}` or equivalent route.
+2. Require owner signed request once the node is owned.
+3. Remove the network from MongoDB.
+4. Synchronize the runtime IPFS network registry after removal.
+5. Add API Cucumber coverage and OpenAPI/docs.
 
-Goal: make 1to1 chat usable through the aggregate boundary.
+## Next Slice 2: Conversation Remote Validation
+
+Goal: make node-to-node conversation synchronization trustworthy.
 
 Steps:
 
@@ -73,44 +46,19 @@ Steps:
    - edit/delete target exists and is valid
    - payload policy matches the conversation type
 2. Return empty/not found when all remote candidates are invalid.
-3. Publish conversation announcements through `DomainEventPublisher`.
-4. Add PubSub consumer coverage for sent-message announcements.
+3. Add end-to-end validation with two nodes.
 
-Use cases:
+## Next Slice 3: Client Realtime
 
-- get/list 1to1 conversations
-- edit message
-- delete message
-- synchronize conversation
-
-## Next Slice 2: Keychain Consumers
-
-Goal: register and synchronize published keychain candidates from PubSub.
+Goal: expose chat updates to clients without leaking node-to-node PubSub as the
+client contract.
 
 Steps:
 
-1. Add `register published keychain candidate` application use case.
-2. Add `find current keychain for authenticated identity` application use case.
-3. Add PubSub consumers:
-   - `pubsub/keychains/RegisterKeychainWhenPublished`
-   - `pubsub/keychains/SynchronizeKeychainWhenUpdated`
-   - `pubsub/keychains/RespondToKeychainSyncRequest`
-   - `pubsub/keychains/RegisterKeychainWhenSyncAvailable`
-4. Add Cucumber coverage for consumer registration.
-
-## Last Slice: Client Chat API
-
-Goal: expose chat to clients without leaking node-to-node PubSub as the client
-contract.
-
-Steps:
-
-1. Implement HTTP endpoints for conversation commands and reads.
-2. Implement WebSocket realtime for client subscriptions.
-3. Keep PubSub as node-to-node infrastructure behind `DomainEventPublisher`.
-4. Emit WebSocket events only after domain validation and persistence.
-5. Filter subscriptions by authenticated identity and known conversations.
-6. Keep `docs/api.md` updated as the API contract evolves.
+1. Implement WebSocket subscriptions for authenticated clients.
+2. Emit WebSocket events only after domain validation and persistence.
+3. Filter subscriptions by authenticated identity and known conversations.
+4. Recover missed events through HTTP pagination or sync.
 
 Tests:
 
@@ -119,25 +67,20 @@ Tests:
 - Cucumber: unauthorized conversation subscription is rejected.
 - Cucumber: reconnect recovers missed events through HTTP pagination or sync.
 
-## Next Slices
+## Later Slices
 
+- Posts:
+  - publish encrypted or public post payloads through IPFS
+  - model author, visibility, attachments and timeline reads
+  - reuse identity handles and IPFS media references
 - Conversation invitations/notifications:
-  - create a notification/invitation context for conversation membership offers
-  - publish `new_conversation` invitations for invitees
+  - keep invitation notifications actionable
   - include encrypted conversation-key envelopes per invitee
   - let invitees accept or decline before joining
-  - store read state as conversation membership state, not keychain data
-- Conversation remote validation:
-  - validate remote message candidates before caching
-  - reject candidates with invalid signatures, authors, targets or payload policy
-  - publish conversation announcements through `DomainEventPublisher`
-  - add PubSub consumer coverage for sent-message announcements
-- Keychain consumers:
-  - register published keychain candidates from PubSub
-  - synchronize keychain updates from PubSub
-- Client realtime:
-  - expose WebSocket subscriptions behind node-side validation
-  - recover missed events through HTTP pagination or sync
+- Identity profile polish:
+  - decide whether handles need reservation/conflict policies across nodes
+  - add profile search/listing if product flow needs discovery beyond exact
+    handle lookup
 
 ## Verification
 
