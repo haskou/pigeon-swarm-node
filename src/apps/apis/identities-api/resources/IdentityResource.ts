@@ -14,5 +14,6 @@ export interface IdentityResource {
   timestamp: number;
   signature: string;
   version: number;
+  identityExternalIdentifier?: string;
   previousIdentityExternalIdentifier?: string;
 }

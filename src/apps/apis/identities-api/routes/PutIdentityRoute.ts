@@ -1,4 +1,6 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
+import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityUpdateRequesterMismatchError } from '@app/contexts/identities/domain/errors/IdentityUpdateRequesterMismatchError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -23,13 +25,16 @@ export class PutIdentityRoute extends Route {
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
+  private readonly identityFinder: IdentityFinder =
+    this.get<IdentityFinder>(IdentityFinder);
+
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Put('/:identityId')
   public async updateIdentity(
     @Param('identityId') identityId: string,
-    @Body() body: PutIdentityBody,
+    @Body({ options: { limit: '10mb' } }) body: PutIdentityBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -48,9 +53,17 @@ export class PutIdentityRoute extends Route {
     const identity = await this.identityPublisher.publish(
       new PutIdentityRequest(body).getIdentityPublishMessage(),
     );
+    const candidate = await this.identityFinder.findCandidate(
+      new IdentityFinderMessage(identity.toPrimitives().id),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new IdentityViewModel(identity).toResource());
+      .send(
+        new IdentityViewModel(
+          candidate.identity,
+          candidate.externalIdentifier,
+        ).toResource(),
+      );
   }
 }

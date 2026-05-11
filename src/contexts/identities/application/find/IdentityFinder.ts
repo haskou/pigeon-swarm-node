@@ -1,5 +1,6 @@
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
+import { IdentityCandidate } from '../../domain/repositories/IdentityRepository';
 import IdentityFinderService from '../../domain/services/IdentityFinderService';
 import { IdentityFinderMessage } from './messages/IdentityFinderMessage';
 
@@ -13,6 +14,20 @@ export default class IdentityFinder {
 
     if (message.handle) {
       return this.finder.findByHandle(message.handle);
+    }
+
+    throw new IdentityNotFoundError('');
+  }
+
+  public async findCandidate(
+    message: IdentityFinderMessage,
+  ): Promise<IdentityCandidate> {
+    if (message.identityId) {
+      return this.finder.findCandidateById(message.identityId);
+    }
+
+    if (message.handle) {
+      return this.finder.findCandidateByHandle(message.handle);
     }
 
     throw new IdentityNotFoundError('');
