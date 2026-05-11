@@ -5,6 +5,8 @@ import { ConversationRepository } from '../../domain/repositories/ConversationRe
 import { ConversationSyncResponseMessage } from './messages/ConversationSyncResponseMessage';
 
 export default class ConversationSyncResponder {
+  private static readonly MESSAGE_CANDIDATE_LIMIT = 100;
+
   constructor(
     private readonly repository: ConversationRepository,
     private readonly eventPublisher: DomainEventPublisher,
@@ -13,23 +15,15 @@ export default class ConversationSyncResponder {
   public async respond(
     message: ConversationSyncResponseMessage,
   ): Promise<void> {
-    const conversation = await this.repository.findById(message.conversationId);
-
-    if (!conversation) {
-      return;
-    }
-
-    const messages = conversation.toPrimitives().messages;
+    const messageCandidates = await this.repository.findMessageCandidates(
+      message.conversationId,
+      ConversationSyncResponder.MESSAGE_CANDIDATE_LIMIT,
+    );
 
     await this.eventPublisher.publish([
       new ConversationSyncAvailableEvent(message.conversationId.valueOf(), {
-        messageCandidates: messages.map((conversationMessage) => ({
-          authorIdentityId: conversationMessage.authorId,
-          createdAt: conversationMessage.createdAt,
-          messageId: conversationMessage.id,
-          messageType: conversationMessage.type,
-        })),
-        requestId: message.requestId,
+        messageCandidates,
+        requestId: message.requestId?.valueOf(),
       }),
     ]);
   }

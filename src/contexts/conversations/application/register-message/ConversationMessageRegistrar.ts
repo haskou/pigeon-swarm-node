@@ -1,4 +1,4 @@
-import { PublicKey, Signature } from '@haskou/value-objects';
+import { assert, PublicKey, Signature } from '@haskou/value-objects';
 
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { InvalidMessageSignatureError } from '../../domain/errors/InvalidMessageSignatureError';
@@ -15,18 +15,20 @@ export default class ConversationMessageRegistrar {
   public async register(message: RegisterConversationMessage): Promise<void> {
     const conversation = await this.repository.findById(message.conversationId);
 
-    if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId);
-    }
+    assert(
+      conversation !== undefined,
+      new ConversationNotFoundError(message.conversationId),
+    );
 
     const candidate = await this.repository.findCandidateMessageById(
       message.conversationId,
       message.messageId,
     );
 
-    if (!candidate) {
-      throw new ConversationNotFoundError(message.conversationId);
-    }
+    assert(
+      candidate !== undefined,
+      new ConversationNotFoundError(message.conversationId),
+    );
 
     const isValidSignature = this.signatureService.isValidSignature(
       PublicKey.fromPEM(candidate.getAuthorId().toString()),
@@ -34,9 +36,7 @@ export default class ConversationMessageRegistrar {
       new Signature(candidate.toPrimitives().signature),
     );
 
-    if (!isValidSignature) {
-      throw new InvalidMessageSignatureError();
-    }
+    assert(isValidSignature, new InvalidMessageSignatureError());
 
     conversation.registerMessage(candidate);
     await this.repository.save(conversation);

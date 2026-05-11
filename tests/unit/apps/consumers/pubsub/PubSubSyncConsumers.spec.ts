@@ -240,7 +240,9 @@ describe('PubSub sync consumers', () => {
     expect(responder.respond.mock.calls[0][0].conversationId.valueOf()).toBe(
       conversationId,
     );
-    expect(responder.respond.mock.calls[0][0].requestId).toBe('request-3');
+    expect(responder.respond.mock.calls[0][0].requestId?.valueOf()).toBe(
+      'request-3',
+    );
   });
 
   it('registers valid messages announced by conversation sync responses', async () => {
