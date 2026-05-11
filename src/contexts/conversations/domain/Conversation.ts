@@ -202,6 +202,10 @@ export class Conversation extends AggregateRoot {
     return this.messages.find((message) => message.getId().isEqual(messageId));
   }
 
+  public getId(): ConversationId {
+    return this.id;
+  }
+
   public hasParticipant(identityId: IdentityId): boolean {
     return this.participants.some((participant) =>
       participant.isEqual(identityId),
