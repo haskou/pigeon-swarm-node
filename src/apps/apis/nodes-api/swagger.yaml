@@ -23,6 +23,9 @@ paths:
       tags:
         - nodes
       summary: Get local node networks
+      description: Private network keys are returned only when X-Identity-Id matches the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XOptionalIdentityId'
       responses:
         '200':
           description: Local node networks.
@@ -89,6 +92,13 @@ components:
       required: true
       schema:
         type: string
+    XOptionalIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: false
+      schema:
+        type: string
+      description: Optional identity used to decide whether private network keys can be included in GET /node/networks/. Only the node owner receives keys.
     XTimestamp:
       in: header
       name: X-Timestamp
@@ -129,6 +139,7 @@ components:
           type: string
         key:
           type: string
+          description: Present only when the caller identity in X-Identity-Id is the node owner, or when returned by owner-only write operations.
     NetworksResource:
       type: object
       required:
@@ -150,6 +161,7 @@ components:
           type: string
         key:
           type: string
+          description: Optional private network key to register a private IPFS network.
     PutNodeOwnerBody:
       type: object
       properties:

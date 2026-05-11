@@ -90,6 +90,7 @@ Implemented:
 
 ```http
 GET /node/networks
+X-Identity-Id: <optionalIdentityId>
 ```
 
 Response:
@@ -109,6 +110,8 @@ Response:
 Implemented:
 
 - return the networks configured for the local node
+- include private network `key` values only when `X-Identity-Id` matches the current node owner
+- omit private network `key` values for anonymous callers, non-owner identities or malformed identity headers
 
 ### Add local node network
 
