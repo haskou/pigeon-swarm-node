@@ -21,7 +21,7 @@ export default class MessageSender {
     );
 
     if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId.valueOf());
+      throw new ConversationNotFoundError(message.conversationId);
     }
 
     const sentMessage = conversation.sendMessage(

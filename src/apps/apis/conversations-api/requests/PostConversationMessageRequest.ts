@@ -14,11 +14,7 @@ export class PostConversationMessageRequest {
     return new MessageSendMessage(
       this.conversationId,
       this.authorIdentityId.valueOf(),
-      this.body.id,
-      this.body.encryptedPayload,
-      this.body.signature,
-      this.body.createdAt,
-      this.body.attachmentExternalIdentifiers ?? [],
+      this.body,
     );
   }
 }
