@@ -6,6 +6,14 @@ import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../../domain/value-objects/MessageId';
 
+export type MessageSendPayload = {
+  attachmentExternalIdentifiers?: string[];
+  createdAt: number;
+  encryptedPayload: string;
+  id: string;
+  signature: string;
+};
+
 export class MessageSendMessage {
   public readonly attachmentExternalIdentifiers: AttachmentExternalIdentifier[];
   public readonly authorIdentityId: IdentityId;
@@ -18,21 +26,21 @@ export class MessageSendMessage {
   constructor(
     conversationId: string,
     authorIdentityId: string,
-    id: string,
-    encryptedPayload: string,
-    signature: string,
-    createdAt: number,
-    attachmentExternalIdentifiers: string[] = [],
+    payload: MessageSendPayload,
   ) {
-    this.attachmentExternalIdentifiers = attachmentExternalIdentifiers.map(
+    this.attachmentExternalIdentifiers = (
+      payload.attachmentExternalIdentifiers ?? []
+    ).map(
       (externalIdentifier) =>
         new AttachmentExternalIdentifier(externalIdentifier),
     );
     this.authorIdentityId = new IdentityId(authorIdentityId);
     this.conversationId = new ConversationId(conversationId);
-    this.createdAt = new Timestamp(createdAt);
-    this.encryptedPayload = new EncryptedMessagePayload(encryptedPayload);
-    this.id = new MessageId(id);
-    this.signature = new Signature(signature);
+    this.createdAt = new Timestamp(payload.createdAt);
+    this.encryptedPayload = new EncryptedMessagePayload(
+      payload.encryptedPayload,
+    );
+    this.id = new MessageId(payload.id);
+    this.signature = new Signature(payload.signature);
   }
 }

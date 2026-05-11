@@ -16,7 +16,7 @@ export default class LatestMessagesFinder {
     );
 
     if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId.valueOf());
+      throw new ConversationNotFoundError(message.conversationId);
     }
 
     if (!conversation.hasParticipant(message.requesterIdentityId)) {
