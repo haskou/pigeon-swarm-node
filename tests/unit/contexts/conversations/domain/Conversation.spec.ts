@@ -158,6 +158,29 @@ describe('Conversation', () => {
       ]);
     });
 
+    it('should use the target message as the deleted message previous id', () => {
+      const target = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('target-payload'),
+        signature(),
+      );
+      conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('newer-payload'),
+        signature(),
+      );
+
+      const deleted = conversation.deleteMessage(
+        author,
+        target.getId(),
+        signature(),
+      );
+
+      expect(deleted.toPrimitives().previousMessageIds).toEqual([
+        target.getId().valueOf(),
+      ]);
+    });
+
     it('should reject deleting the same message twice', () => {
       const sent = conversation.sendMessage(
         author,

@@ -109,7 +109,7 @@ paths:
       tags:
         - conversations
       summary: Delete conversation message
-      description: Creates a signed deleted-message tombstone, publishes a deletion event, invalidates the target message locally and removes the local IPFS block when present.
+      description: Creates a signed deleted-message tombstone, publishes a deletion event, invalidates the target message locally and removes the local IPFS block when present. The deletion signature must use previousMessageIds with only the target message id.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - in: path
@@ -230,6 +230,7 @@ components:
           type: string
         signature:
           type: string
+          description: Signature of the deleted-message canonical payload, using previousMessageIds equal to the path messageId.
         attachmentExternalIdentifiers:
           type: array
           items:
