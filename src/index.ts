@@ -1,6 +1,19 @@
 /* eslint-disable no-console */
 import 'module-alias/register';
 import 'reflect-metadata';
+import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
+import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
+import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
+import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
+import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
+import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
+import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
+import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
+import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
+import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
+import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
+import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
+import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import Kernel from '@app/Kernel';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
@@ -23,7 +36,21 @@ async function init() {
   console.timeEnd('Run server');
 
   console.time('Run consumers');
-  kernel.addConsumers();
+  kernel.addConsumers(
+    RegisterIdentityWhenPublished,
+    SynchronizeIdentityWhenUpdated,
+    RespondToIdentitySyncRequest,
+    RegisterIdentityWhenSyncAvailable,
+    RegisterKeychainWhenPublished,
+    SynchronizeKeychainWhenUpdated,
+    RespondToKeychainSyncRequest,
+    RegisterKeychainWhenSyncAvailable,
+    RegisterMessageWhenAnnounced,
+    RegisterMessageEditionWhenAnnounced,
+    RegisterMessageDeletionWhenAnnounced,
+    RespondToConversationSyncRequest,
+    RegisterMessagesWhenSyncAvailable,
+  );
   await kernel.runConsumers();
   console.timeEnd('Run consumers');
 

@@ -7,6 +7,10 @@ import { MessageId } from '../value-objects/MessageId';
 
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;
+  findCandidateMessageById(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<Message | undefined>;
   findByParticipant(
     participantId: IdentityId,
     limit: number,

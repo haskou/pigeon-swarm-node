@@ -4,7 +4,10 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
-import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
+import {
+  IdentityCandidate,
+  IdentityRepository,
+} from '../../domain/repositories/IdentityRepository';
 import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
@@ -101,6 +104,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   private async findCandidateFromCid(
     id: IdentityId,
     cid: IPFSId,
+    shouldSaveMetadata: boolean = true,
   ): Promise<Identity | undefined> {
     try {
       const document =
@@ -119,7 +123,9 @@ export default class IpfsIdentityRepository implements IdentityRepository {
         return undefined;
       }
 
-      await this.saveMetadata(identity, cid);
+      if (shouldSaveMetadata) {
+        await this.saveMetadata(identity, cid);
+      }
 
       return identity;
     } catch {
@@ -164,12 +170,27 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     return this.findPreviousIdentity(externalIdentifier);
   }
 
-  public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
+  public async findCandidateReferencesById(
+    id: IdentityId,
+  ): Promise<IdentityCandidate[]> {
     const metadata = await this.findValidMetadata(id);
-    const candidates =
-      metadata.length > 0
-        ? await this.findCandidatesFromMetadata(id, metadata)
-        : [];
+    const candidates: IdentityCandidate[] = [];
+
+    for (const document of metadata) {
+      const candidate = await this.findCandidateFromCid(
+        id,
+        new IPFSId(document.cid),
+        false,
+      );
+
+      if (candidate) {
+        candidates.push({
+          externalIdentifier: new IdentityExternalIdentifier(document.cid),
+          identity: candidate,
+        });
+      }
+    }
+
     const knownCids = new Set(metadata.map((document) => document.cid));
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + id.valueOf(),
@@ -186,7 +207,10 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       );
 
       if (candidate) {
-        candidates.push(candidate);
+        candidates.push({
+          externalIdentifier: new IdentityExternalIdentifier(cidString),
+          identity: candidate,
+        });
       }
     }
 
@@ -195,6 +219,12 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     }
 
     return candidates;
+  }
+
+  public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
+    const candidates = await this.findCandidateReferencesById(id);
+
+    return candidates.map((candidate) => candidate.identity);
   }
 
   public async save(identity: Identity): Promise<void> {
