@@ -52,6 +52,10 @@ export abstract class Message {
     return this.id;
   }
 
+  public getConversationId(): ConversationId {
+    return this.conversationId;
+  }
+
   public getAuthorId(): IdentityId {
     return this.authorId;
   }
