@@ -22,7 +22,7 @@ export type ConnectionGater = {
 export type ParsedHeliaIPFSOptions = {
   blockstore: RuntimeBlockstore;
   datastore: RuntimeDatastore;
-  libp2p: {
+  libp2p: Libp2pDefaults & {
     connectionGater: ConnectionGater;
     privateKey?: Libp2pPrivateKeyLike;
   };
@@ -147,10 +147,13 @@ export class HeliaIPFSParser {
     options: IPFSOptions,
   ): Promise<ParsedHeliaIPFSOptions> {
     const { connectionGater } = HeliaIPFSParser.parseBlockedPeers(options);
+    const libp2pConfig =
+      (await heliaRuntimeAdapter.getLibp2pDefaults()) as ParsedHeliaIPFSOptions['libp2p'];
 
     return {
       ...(await HeliaIPFSParser.parseStorageLocationOptions(options)),
       libp2p: {
+        ...libp2pConfig,
         connectionGater,
         ...(options.privateKey ? { privateKey: options.privateKey } : {}),
       },
@@ -162,7 +165,7 @@ export class HeliaIPFSParser {
     networkKey: NetworkPrivateKey,
   ): Promise<Libp2pDefaults> {
     return HeliaIPFSParser.parseOptions(options).then((parsedOptions) =>
-      heliaRuntimeAdapter.getLibp2pDefaults().then((libp2pConfig) => {
+      Promise.resolve(parsedOptions.libp2p).then((libp2pConfig) => {
         const privateLibp2pConfig = libp2pConfig as unknown as {
           connectionGater?: unknown;
           connectionProtector?: (components: unknown) => unknown;
