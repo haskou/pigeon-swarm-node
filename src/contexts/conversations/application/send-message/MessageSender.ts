@@ -32,6 +32,7 @@ export default class MessageSender {
       message.createdAt,
       message.id,
       message.replyToMessageId,
+      message.previousMessageIds,
     );
 
     const isValidSignature = this.signatureService.isValidSignature(

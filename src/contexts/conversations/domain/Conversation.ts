@@ -96,6 +96,12 @@ export class Conversation extends AggregateRoot {
     );
   }
 
+  private assertPreviousMessagesExist(previousMessageIds: MessageId[]): void {
+    previousMessageIds.forEach((messageId) => {
+      assert(this.findMessageById(messageId), new MessageTargetNotFoundError());
+    });
+  }
+
   private getLastMessageIds(): MessageId[] {
     const lastMessage = this.messages[this.messages.length - 1];
 
@@ -118,16 +124,19 @@ export class Conversation extends AggregateRoot {
     createdAt: Timestamp = Timestamp.now(),
     id: MessageId = MessageId.generate(),
     replyToMessageId?: MessageId,
+    previousMessageIds?: MessageId[],
   ): MessageSent {
     this.assertIsParticipant(authorId);
     this.assertCanReplyToMessage(replyToMessageId);
+    const messagePreviousMessageIds = previousMessageIds ?? [];
+    this.assertPreviousMessagesExist(messagePreviousMessageIds);
 
     const message = MessageSent.create(
       this.id,
       authorId,
       encryptedPayload,
       signature,
-      this.getLastMessageIds(),
+      messagePreviousMessageIds,
       attachmentExternalIdentifiers,
       createdAt,
       id,

@@ -230,7 +230,12 @@ components:
           type: string
         signature:
           type: string
-          description: Signature of the sent-message canonical payload. Include replyToMessageId in the signed payload when replying to a message.
+          description: Signature of the sent-message canonical payload. Include previousMessageIds and replyToMessageId in the signed payload when present.
+        previousMessageIds:
+          type: array
+          description: Optional previous message ids used by the client to sign the message. When included in the signed payload, send the exact same array in the body. When omitted, the node uses an empty list.
+          items:
+            type: string
         replyToMessageId:
           type: string
           description: Optional id of the existing sent message this message replies to.

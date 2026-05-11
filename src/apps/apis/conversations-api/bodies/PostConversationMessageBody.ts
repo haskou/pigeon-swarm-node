@@ -24,6 +24,11 @@ export class PostConversationMessageBody {
   public readonly id: string;
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  public readonly previousMessageIds?: string[];
+
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   public readonly replyToMessageId?: string;

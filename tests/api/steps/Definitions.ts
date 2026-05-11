@@ -424,6 +424,7 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-message-payload',
       id,
+      previousMessageIds: [],
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });
   }
@@ -455,6 +456,7 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-reply-payload',
       id,
+      previousMessageIds: [this.messageId],
       replyToMessageId: this.messageId,
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });

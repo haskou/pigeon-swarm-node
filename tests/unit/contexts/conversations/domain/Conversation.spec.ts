@@ -77,6 +77,11 @@ describe('Conversation', () => {
         new EncryptedMessagePayload('target-payload'),
         signature(),
       );
+      const newer = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('newer-payload'),
+        signature(),
+      );
 
       const reply = conversation.sendMessage(
         recipient,
@@ -86,14 +91,16 @@ describe('Conversation', () => {
         undefined,
         undefined,
         target.getId(),
+        [newer.getId()],
       );
 
       expect(reply.getReplyToMessageId()?.valueOf()).toBe(
         target.getId().valueOf(),
       );
-      expect(conversation.toPrimitives().messages[1]).toEqual(
+      expect(conversation.toPrimitives().messages[2]).toEqual(
         expect.objectContaining({
           encryptedPayload: 'reply-payload',
+          previousMessageIds: [newer.getId().valueOf()],
           replyToMessageId: target.getId().valueOf(),
           type: MessageType.SENT.valueOf(),
         }),
@@ -110,6 +117,22 @@ describe('Conversation', () => {
           undefined,
           undefined,
           MessageId.generate(),
+          [],
+        ),
+      ).toThrow(MessageTargetNotFoundError);
+    });
+
+    it('should reject explicit previous ids that do not exist', () => {
+      expect(() =>
+        conversation.sendMessage(
+          author,
+          new EncryptedMessagePayload('message-payload'),
+          signature(),
+          [],
+          undefined,
+          undefined,
+          undefined,
+          [MessageId.generate()],
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -131,6 +154,7 @@ describe('Conversation', () => {
           undefined,
           undefined,
           target.getId(),
+          [],
         ),
       ).toThrow(MessageTargetAlreadyDeletedError);
     });

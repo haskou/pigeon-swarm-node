@@ -11,6 +11,7 @@ export type MessageSendPayload = {
   createdAt: number;
   encryptedPayload: string;
   id: string;
+  previousMessageIds?: string[];
   replyToMessageId?: string;
   signature: string;
 };
@@ -22,6 +23,7 @@ export class MessageSendMessage {
   public readonly createdAt: Timestamp;
   public readonly encryptedPayload: EncryptedMessagePayload;
   public readonly id: MessageId;
+  public readonly previousMessageIds?: MessageId[];
   public readonly replyToMessageId?: MessageId;
   public readonly signature: Signature;
 
@@ -43,6 +45,9 @@ export class MessageSendMessage {
       payload.encryptedPayload,
     );
     this.id = new MessageId(payload.id);
+    this.previousMessageIds = payload.previousMessageIds?.map(
+      (messageId) => new MessageId(messageId),
+    );
     this.replyToMessageId = payload.replyToMessageId
       ? new MessageId(payload.replyToMessageId)
       : undefined;

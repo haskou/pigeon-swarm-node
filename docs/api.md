@@ -612,6 +612,7 @@ Request:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedMessagePayload>",
   "signature": "<messageSignature>",
+  "previousMessageIds": ["<lastKnownMessageId>"],
   "replyToMessageId": "<messageId>",
   "attachmentExternalIdentifiers": ["<privateContentCid>"]
 }
@@ -636,6 +637,10 @@ Response:
 Implemented:
 
 - enforce encrypted payloads for 1to1 conversations
+- accept optional `previousMessageIds` so clients can sign the same canonical
+  payload that will be persisted; when omitted, the node uses an empty list
+- when `previousMessageIds` is included in the canonical signed payload, send
+  the exact same array in the request body
 - allow replies by sending `replyToMessageId` with the id of an existing,
   non-deleted `sent` message in the same conversation
 - validate the signature against the canonical message payload
