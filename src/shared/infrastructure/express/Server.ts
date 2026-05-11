@@ -1,4 +1,5 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
 import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageRoute';
@@ -137,6 +138,7 @@ export default class Server {
           PostConversationRoute,
           GetConversationsRoute,
           PostConversationMessageRoute,
+          DeleteConversationMessageRoute,
           GetConversationMessagesRoute,
           GetIPFSContentRoute,
           PostPrivateIPFSContentRoute,

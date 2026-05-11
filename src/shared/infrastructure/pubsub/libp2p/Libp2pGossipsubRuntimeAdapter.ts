@@ -73,19 +73,20 @@ export class Libp2pGossipsubRuntimeAdapter {
       transports?: Array<(...args: unknown[]) => unknown>;
     },
   >(config: TConfig): TConfig {
-    config.addresses = {
-      ...(config.addresses || {}),
-      listen: (config.addresses?.listen || []).filter(
-        (address) => !address.includes('webrtc'),
-      ),
+    return {
+      ...config,
+      addresses: {
+        ...(config.addresses || {}),
+        listen: (config.addresses?.listen || []).filter(
+          (address) => !address.includes('webrtc'),
+        ),
+      },
+      transports: (config.transports || []).filter((transport) => {
+        const source = transport.toString().toLowerCase();
+
+        return !source.includes('webrtc');
+      }),
     };
-    config.transports = (config.transports || []).filter((transport) => {
-      const source = transport.toString().toLowerCase();
-
-      return !source.includes('webrtc');
-    });
-
-    return config;
   }
 
   public async createNode(): Promise<Libp2pPubSubNode> {

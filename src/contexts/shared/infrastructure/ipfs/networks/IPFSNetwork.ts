@@ -62,6 +62,10 @@ export class IPFSNetwork {
     return this.connection.addJSON(data, signal);
   }
 
+  public async removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void> {
+    return this.connection.removeJSON(cid, signal);
+  }
+
   public async putRecord(
     key: string,
     value: string,

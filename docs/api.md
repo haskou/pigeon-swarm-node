@@ -640,6 +640,51 @@ Implemented:
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
 
+### Delete message
+
+```http
+DELETE /conversations/{conversationId}/messages/{messageId}
+```
+
+Request:
+
+```json
+{
+  "id": "<clientGeneratedDeletionMessageId>",
+  "createdAt": 1773848829055,
+  "signature": "<deletedMessageSignature>"
+}
+```
+
+Response:
+
+```json
+{
+  "id": "<deletionMessageId>",
+  "conversationId": "one-to-one:<deterministic-id>",
+  "authorIdentityId": "<identityId>",
+  "type": "deleted",
+  "createdAt": 1773848829055,
+  "previousMessageIds": ["<previousMessageId>"],
+  "attachmentExternalIdentifiers": [],
+  "targetMessageId": "<deletedMessageId>"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- only allow the original message author to delete the message
+- validate the deletion tombstone signature against the canonical deleted
+  message payload
+- persist the immutable `deleted` tombstone in IPFS
+- publish `ConversationMessageWasDeletedEvent`
+- invalidate the target message metadata locally so it no longer appears in
+  message reads
+- remove the target message block from local IPFS blockstores when present
+- apply the same invalidation/removal when a deletion event is consumed from
+  another node
+
 Signed HTTP request validation:
 
 - reject reused `X-Nonce` values per identity
@@ -734,19 +779,6 @@ Planned:
 - define author-only rule
 - define editable message types
 - define projection returned to clients
-
-### Delete message
-
-```http
-DELETE /conversations/{conversationId}/messages/{messageId}
-```
-
-Planned:
-
-- model delete as a new immutable message document
-- define author-only rule
-- define tombstone behavior
-- define whether attachments are unpinned locally
 
 ### Synchronize conversation
 

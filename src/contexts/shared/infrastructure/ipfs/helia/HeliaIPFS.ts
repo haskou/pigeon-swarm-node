@@ -138,6 +138,18 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return new IPFSId(cid.toString());
   }
 
+  public async removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void> {
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+
+    if (!(await this.heliaCore.blockstore.has(parsedCid, { signal }))) {
+      return;
+    }
+
+    await this.heliaCore.blockstore.delete(parsedCid, { signal });
+  }
+
   public async stat(
     cid: IPFSId,
     offlineOnly: boolean,
