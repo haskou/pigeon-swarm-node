@@ -183,7 +183,9 @@ export default class Definitions {
     const keyPair = await this.ensureIdentityKeyPair();
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
-    const networks = ['123e4567-e89b-12d3-a456-426614174000'];
+    const networks = [
+      this.currentNetworkId ?? '123e4567-e89b-12d3-a456-426614174000',
+    ];
     const normalizedHandle = handle.replace(/^@/, '').toLowerCase();
     const profile: {
       biography: string | undefined;
@@ -211,6 +213,37 @@ export default class Definitions {
       ...signaturePayload,
       signature,
     });
+  }
+
+  private async ensureAuthenticatedIdentityIsPublished(): Promise<void> {
+    const ownerIdentityId = this.ownerIdentityId ?? new IdentityId(
+      (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
+    );
+
+    if (this.createdIdentityId === ownerIdentityId.valueOf()) {
+      return;
+    }
+
+    await this.buildClientSignedIdentityBody(
+      'Test Identity',
+      'test-identity',
+      'Client-secret1!',
+    );
+    await this.signCurrentRequest('POST', '/identities/');
+
+    const response = await this.restClient.post(
+      '/identities/',
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Could not publish identity: ${JSON.stringify(response.data)}`,
+      );
+    }
+
+    this.createdIdentityId = response.data.id;
   }
 
   private async findCreatedIdentityExternalIdentifier(): Promise<string> {
@@ -262,6 +295,10 @@ export default class Definitions {
     if (!this.body) {
       throw new Error('Body must be set before signing the request.');
     }
+
+    const unsignedBody = this.body;
+    await this.ensureAuthenticatedIdentityIsPublished();
+    this.body = unsignedBody;
 
     const keyPair = await this.ensureIdentityKeyPair();
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
