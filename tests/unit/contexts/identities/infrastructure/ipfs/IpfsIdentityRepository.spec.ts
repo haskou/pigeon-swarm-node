@@ -241,7 +241,7 @@ describe('IpfsIdentityRepository', () => {
       const validCidString = 'bafyvalididentity';
       const otherIdentity = await Identity.create(
         new ProfileName('Mallory'),
-        new Password('super-secret-password'),
+        new Password('Super-secret-password!'),
         [new NetworkId(primitives.networks[0])],
       );
 

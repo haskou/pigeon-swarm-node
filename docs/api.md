@@ -391,8 +391,7 @@ Path parameters:
 
 - `reference`: either a percent-encoded identity id or a profile handle.
 - Identity ids must use `encodeURIComponent(identityId)`.
-- Handles may be passed with or without `@`; they are stored lowercase without
-  `@`.
+- Handles are stored lowercase and must be passed without `@`.
 
 Implemented:
 
@@ -438,8 +437,8 @@ Legacy backend-generated request:
 ```json
 {
   "name": "Alice",
-  "handle": "@alice",
-  "password": "super-secret-password",
+  "handle": "alice",
+  "password": "Super-secret-password!",
   "networks": ["<networkId>"]
 }
 ```
@@ -470,7 +469,11 @@ Implemented:
 - accept client-generated encrypted keypairs and signed identity candidates
 - keep client passwords out of the backend in the client-signed flow
 - store `profile.handle` as part of the signed identity profile
-- normalize handles to lowercase without `@`
+- normalize handles to lowercase
+- reject handles containing spaces, `@` or any character outside letters,
+  numbers, dots, hyphens and underscores
+- require legacy backend-generated passwords to be 12 to 256 characters long
+  and include at least one uppercase letter, one lowercase letter and one symbol
 - return `identityExternalIdentifier`, which is the current published identity
   CID to send as `previousIdentityExternalIdentifier` in the next update
 - store `profile.picture` as a public IPFS image CID, not as base64 or a data
@@ -532,6 +535,8 @@ Implemented:
 - accept profile changes, profile image removal and handle changes as signed
   identity updates
 - accept encrypted keypair changes, including client-side password changes
+- allow adding networks, but reject signed identity updates that remove any
+  previously joined network
 - validate the signed identity candidate and previous identity chain before
   publishing
 - return the new `identityExternalIdentifier` for the just-published identity

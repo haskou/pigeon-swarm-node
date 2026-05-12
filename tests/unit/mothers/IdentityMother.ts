@@ -21,7 +21,7 @@ export class IdentityMother {
       '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=\n-----END PUBLIC KEY-----\n',
     ),
     new EncryptedPrivateKey(
-      'Y5yH7g99lREhHu5Z1FvwQfMMvTyt4VzK/LGyvNGnhHxgWdt6W0ARikwVO6Jef3qzyZaEwjIdaiAi1676jwzaXUu87H27cNg3fJyCMw5Wl5EizFOWx66tT2LZU5dCMlqdQrxn6OXe1TxthYUAQ1LJ4LL3HL9PsOI=.9xWThsS9oVtezFtP.vjHbMus/zBRy93U6aGIo0Q==.2E0i7HotLvQ+42IW2gHyew==',
+      'v2.scrypt.N16384.r8.p1.pX6RQxiWclXHSfpuc8FVtA==.mD4gxsvXwO+DXHmH.HHKbJ5okm2odc0rMTWb/Ug==.hf8ooIEg4R2airdHlpnTmtxlQBKbnTjRqb6FwwC91YSnd6N03xc0CwKBnyPv2v4NHkKPf57UY+UvDVkWLFkPciVIqCFVN14VOHS5XgelwqB8QWln4vsbsx9Ya5lKhKqtOPctyOCTlarXC+05KW4avyrVlJI5pdQ=',
     ),
   );
 
@@ -35,12 +35,16 @@ export class IdentityMother {
     new NetworkId('550e8400-e29b-41d4-a716-446655440000'),
   ];
 
-  public password: Password = new Password('fixture-password');
+  public password: Password = new Password('Fixture-password!');
+
   public timestamp: Timestamp = new Timestamp(1773848829055);
+
   public signature: Signature = new Signature(
-    'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
+    'WZ3ndjkTKbmWN++lFJ67tum7BXg97ryd4OvNoB/hu6QBAGIbd2jTLZYPuCPJn9SbzYbGWUVskGHes06L+wU/Cg==',
   );
+
   public version: IdentityVersion = new IdentityVersion(1);
+
   public previousIdentityExternalIdentifier:
     | IdentityExternalIdentifier
     | undefined = undefined;
@@ -90,7 +94,8 @@ export class IdentityMother {
   public withPreviousIdentityExternalIdentifier(
     previousIdentityExternalIdentifier: IdentityExternalIdentifier | undefined,
   ): this {
-    this.previousIdentityExternalIdentifier = previousIdentityExternalIdentifier;
+    this.previousIdentityExternalIdentifier =
+      previousIdentityExternalIdentifier;
 
     return this;
   }
