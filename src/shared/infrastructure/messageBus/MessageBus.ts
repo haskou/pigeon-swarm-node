@@ -3,6 +3,7 @@ import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
+import { webSocketEventHub } from '../websocket/WebSocketEventHub';
 import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
 import Libp2pGossipsubAdapter from './libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
@@ -114,6 +115,7 @@ export default class MessageBus
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
     const enrichedEvents = this.enrichEventsWithContext(domainEvents);
     await this.adapter.publish(enrichedEvents);
+    webSocketEventHub.publish(enrichedEvents);
   }
 
   public async consume(

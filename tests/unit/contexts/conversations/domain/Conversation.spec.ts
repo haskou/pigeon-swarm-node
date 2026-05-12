@@ -56,9 +56,13 @@ describe('Conversation', () => {
           type: MessageType.SENT.valueOf(),
         }),
       );
-      expect(conversation.pullDomainEvents()).toEqual([
-        expect.any(ConversationMessageWasSentEvent),
-      ]);
+      const events = conversation.pullDomainEvents();
+
+      expect(events).toEqual([expect.any(ConversationMessageWasSentEvent)]);
+      expect(events[0].attributes).toEqual({
+        messageId: message.getId().valueOf(),
+        participantIds: [author.valueOf(), recipient.valueOf()],
+      });
     });
 
     it('should reject messages from non participants', () => {
@@ -188,9 +192,14 @@ describe('Conversation', () => {
         sent.getId().valueOf(),
       );
       expect(conversation.toPrimitives().messages).toHaveLength(2);
-      expect(conversation.pullDomainEvents()).toEqual([
-        expect.any(ConversationMessageWasEditedEvent),
-      ]);
+      const events = conversation.pullDomainEvents();
+
+      expect(events).toEqual([expect.any(ConversationMessageWasEditedEvent)]);
+      expect(events[0].attributes).toEqual({
+        messageId: edited.getId().valueOf(),
+        participantIds: [author.valueOf(), recipient.valueOf()],
+        targetMessageId: sent.getId().valueOf(),
+      });
     });
 
     it('should reject edits by a different participant', () => {
@@ -241,9 +250,14 @@ describe('Conversation', () => {
         sent.getId().valueOf(),
       );
       expect(conversation.toPrimitives().messages).toHaveLength(2);
-      expect(conversation.pullDomainEvents()).toEqual([
-        expect.any(ConversationMessageWasDeletedEvent),
-      ]);
+      const events = conversation.pullDomainEvents();
+
+      expect(events).toEqual([expect.any(ConversationMessageWasDeletedEvent)]);
+      expect(events[0].attributes).toEqual({
+        messageId: deleted.getId().valueOf(),
+        participantIds: [author.valueOf(), recipient.valueOf()],
+        targetMessageId: sent.getId().valueOf(),
+      });
     });
 
     it('should use the target message as the deleted message previous id', () => {

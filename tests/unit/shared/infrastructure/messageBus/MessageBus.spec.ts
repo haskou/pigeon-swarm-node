@@ -3,6 +3,7 @@ import AmqpMessageBusAdapter from '@app/shared/infrastructure/messageBus/amqp/Am
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 class TestDomainEvent extends DomainEvent {
@@ -26,11 +27,15 @@ describe('MessageBus', () => {
 
   afterEach(() => {
     delete process.env.TRANSPORT_DSN;
+    jest.restoreAllMocks();
   });
 
   it('should publish through the Libp2p Gossipsub adapter when configured', async () => {
     process.env.TRANSPORT_DSN = 'libp2p-gossipsub://';
     const event = new TestDomainEvent('aggregate-id', {});
+    const websocketPublish = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation();
     const messageBus = new MessageBus(
       amqpAdapter,
       memoryAdapter,
@@ -40,6 +45,7 @@ describe('MessageBus', () => {
     await messageBus.publish([event]);
 
     expect(libp2pGossipsubAdapter.publish).toHaveBeenCalledWith([event]);
+    expect(websocketPublish).toHaveBeenCalledWith([event]);
     expect(amqpAdapter.publish).not.toHaveBeenCalled();
     expect(memoryAdapter.publish).not.toHaveBeenCalled();
   });
