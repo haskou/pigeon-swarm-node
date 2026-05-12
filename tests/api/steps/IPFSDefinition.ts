@@ -29,7 +29,8 @@ export default class IPFSDefinition {
   private storedIPFSCid: string | undefined;
   private scenarioSuffix: string = '';
   private readonly ipfsNetworkAliases: Record<string, string> = {};
-  private registeredNetworkNames: string[] = [];
+  private readonly ipfsNetworkIdAliases: Record<string, string> = {};
+  private registeredNetworkIds: string[] = [];
 
   private static nextScenarioSuffix(): string {
     IPFSDefinition.scenarioCount += 1;
@@ -47,6 +48,18 @@ export default class IPFSDefinition {
     }
 
     return networkName;
+  }
+
+  private resolveRegisteredIPFSNetworkId(networkAlias: string): string {
+    const networkId = this.ipfsNetworkIdAliases[networkAlias];
+
+    if (!networkId) {
+      throw new Error(
+        `IPFS network alias "${networkAlias}" is not registered in this scenario`,
+      );
+    }
+
+    return networkId;
   }
 
   private extractIdentityId(responseData: unknown): string | undefined {
@@ -100,10 +113,13 @@ export default class IPFSDefinition {
   public resetScenarioState(): void {
     this.storedIPFSCid = undefined;
     this.scenarioSuffix = IPFSDefinition.nextScenarioSuffix();
-    this.registeredNetworkNames = [];
+    this.registeredNetworkIds = [];
 
     Object.keys(this.ipfsNetworkAliases).forEach((alias) => {
       delete this.ipfsNetworkAliases[alias];
+    });
+    Object.keys(this.ipfsNetworkIdAliases).forEach((alias) => {
+      delete this.ipfsNetworkIdAliases[alias];
     });
   }
 
@@ -140,14 +156,13 @@ export default class IPFSDefinition {
   public async registerInMemoryNetwork(networkAlias: string): Promise<void> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkAlias}-${this.scenarioSuffix}`;
-    const networkConfig = new IPFSNetworkConfig(
-      `test-${scenarioNetworkName}`,
-      scenarioNetworkName,
-    );
+    const networkId = `test-${scenarioNetworkName}`;
+    const networkConfig = new IPFSNetworkConfig(networkId, scenarioNetworkName);
 
     await ipfs.registerNetwork(networkConfig);
     this.ipfsNetworkAliases[networkAlias] = scenarioNetworkName;
-    this.registeredNetworkNames.push(scenarioNetworkName);
+    this.ipfsNetworkIdAliases[networkAlias] = networkId;
+    this.registeredNetworkIds.push(networkId);
   }
 
   public async registerInMemoryNetworkWithId(
@@ -159,7 +174,9 @@ export default class IPFSDefinition {
     const networkConfig = new IPFSNetworkConfig(networkId, scenarioNetworkName);
 
     await ipfs.registerNetwork(networkConfig);
-    this.registeredNetworkNames.push(scenarioNetworkName);
+    this.ipfsNetworkAliases[networkName] = scenarioNetworkName;
+    this.ipfsNetworkIdAliases[networkName] = networkId;
+    this.registeredNetworkIds.push(networkId);
   }
 
   public async storeJSONInNetwork(
@@ -167,9 +184,10 @@ export default class IPFSDefinition {
     body: string,
   ): Promise<void> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
-    const registeredNetworkName =
-      this.resolveRegisteredIPFSNetworkName(networkAlias);
-    const cid = await ipfs.addJSON(JSON.parse(body), registeredNetworkName);
+    const cid = await ipfs.addJSON(
+      JSON.parse(body),
+      this.resolveRegisteredIPFSNetworkId(networkAlias),
+    );
 
     this.storedIPFSCid = cid.valueOf();
   }
@@ -225,14 +243,18 @@ export default class IPFSDefinition {
     responseData: unknown,
   ): Promise<void> {
     if (typeof responseData !== 'object' || responseData === null) {
-      throw new Error('Response does not contain a keychain external identifier');
+      throw new Error(
+        'Response does not contain a keychain external identifier',
+      );
     }
 
     const externalIdentifier = (responseData as ExternalIdentifierResponseShape)
       .keychainExternalIdentifier;
 
     if (!externalIdentifier) {
-      throw new Error('Response does not contain a keychain external identifier');
+      throw new Error(
+        'Response does not contain a keychain external identifier',
+      );
     }
 
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
@@ -270,15 +292,15 @@ export default class IPFSDefinition {
   }
 
   public async cleanupRegisteredNetworks(): Promise<void> {
-    if (this.registeredNetworkNames.length === 0) {
+    if (this.registeredNetworkIds.length === 0) {
       return;
     }
 
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
 
     await Promise.all(
-      this.registeredNetworkNames.map((networkName) =>
-        ipfs.removeNetwork(networkName),
+      this.registeredNetworkIds.map((networkId) =>
+        ipfs.removeNetwork(networkId),
       ),
     );
   }

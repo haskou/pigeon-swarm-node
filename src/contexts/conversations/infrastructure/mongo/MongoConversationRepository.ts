@@ -373,15 +373,26 @@ export default class MongoConversationRepository implements Repository {
           await this.ipfsManager.getJSON<IpfsMessageDocument>(
             new IPFSId(metadata.cid),
           );
-        const cid = await this.ipfsManager.addJSONToAll(messageDocument);
+        const cid = metadata.networkId
+          ? await this.ipfsManager.addJSONToNetworks(messageDocument, [
+              metadata.networkId,
+            ])
+          : await this.ipfsManager.addJSONToAll(messageDocument);
 
-        await this.ipfsManager.putRecordToAll(
-          this.getMessageRoutingKey(
-            new ConversationId(metadata.conversationId),
-            new MessageId(metadata.messageId),
-          ),
-          cid.valueOf(),
+        const routingKey = this.getMessageRoutingKey(
+          new ConversationId(metadata.conversationId),
+          new MessageId(metadata.messageId),
         );
+
+        if (metadata.networkId) {
+          await this.ipfsManager.putRecordToNetworks(
+            routingKey,
+            cid.valueOf(),
+            [metadata.networkId],
+          );
+        } else {
+          await this.ipfsManager.putRecordToAll(routingKey, cid.valueOf());
+        }
         republished++;
       } catch {
         continue;

@@ -61,10 +61,10 @@ export default class IPFS {
     return this.registry.register(config);
   }
 
-  public async removeNetwork(name: string): Promise<void> {
+  public async removeNetwork(id: string): Promise<void> {
     await this.initialize();
 
-    await this.registry.removeNetwork(name);
+    await this.registry.removeNetwork(id);
   }
 
   public async getJSON<T>(cid: IPFSId): Promise<T> {
@@ -107,11 +107,11 @@ export default class IPFS {
 
   public async getJSONFromNetwork<T>(
     cid: IPFSId,
-    networkName: string,
+    networkId: string,
   ): Promise<T> {
     await this.initialize();
 
-    const network = this.registry.find(networkName);
+    const network = this.registry.find(networkId);
 
     return network.getJSON<T>(cid);
   }
@@ -150,10 +150,10 @@ export default class IPFS {
     return network.getRecord(key);
   }
 
-  public async addJSON(data: unknown, networkName: string): Promise<IPFSId> {
+  public async addJSON(data: unknown, networkId: string): Promise<IPFSId> {
     await this.initialize();
 
-    const network = this.registry.find(networkName);
+    const network = this.registry.find(networkId);
 
     return network.addJSON(data);
   }
@@ -193,11 +193,11 @@ export default class IPFS {
   public async putRecord(
     key: string,
     value: string,
-    networkName: string,
+    networkId: string,
   ): Promise<void> {
     await this.initialize();
 
-    const network = this.registry.find(networkName);
+    const network = this.registry.find(networkId);
 
     await network.putRecord(key, value);
   }
@@ -228,9 +228,9 @@ export default class IPFS {
     return this.registry.getAll();
   }
 
-  public async getNetwork(name: string): Promise<IPFSNetwork> {
+  public async getNetwork(id: string): Promise<IPFSNetwork> {
     await this.initialize();
 
-    return this.registry.find(name);
+    return this.registry.find(id);
   }
 }

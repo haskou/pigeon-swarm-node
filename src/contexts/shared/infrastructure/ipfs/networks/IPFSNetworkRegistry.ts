@@ -92,13 +92,14 @@ export default class IPFSNetworkRegistry {
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<IPFSNetwork> {
     const key = config.getKey();
+    const storageLocation = `${this.storagePath}/${config.getId()}`;
 
     if (key) {
       const connection = await PrivateIPFS.create({
         key,
         name: config.getName(),
         privateKey: sharedPrivateKey,
-        storageLocation: `${this.storagePath}/${config.getName()}`,
+        storageLocation,
       });
 
       return new IPFSNetwork(config, connection);
@@ -106,7 +107,7 @@ export default class IPFSNetworkRegistry {
 
     const connection = await PublicIPFS.create({
       privateKey: sharedPrivateKey,
-      storageLocation: `${this.storagePath}/${config.getName()}`,
+      storageLocation,
     });
 
     return new IPFSNetwork(config, connection);
@@ -129,7 +130,7 @@ export default class IPFSNetworkRegistry {
 
   public async register(config: IPFSNetworkConfig): Promise<IPFSNetwork> {
     const existing = this.networks.find(
-      (n) => n.getName() === config.getName(),
+      (network) => network.getId() === config.getId(),
     );
 
     if (existing) {
@@ -151,10 +152,8 @@ export default class IPFSNetworkRegistry {
     this.listeners.push(listener);
   }
 
-  public removeNetwork(name: string): void {
-    const index = this.networks.findIndex(
-      (network) => network.getName() === name,
-    );
+  public removeNetwork(id: string): void {
+    const index = this.networks.findIndex((network) => network.getId() === id);
 
     if (index === -1) {
       return;
@@ -163,11 +162,11 @@ export default class IPFSNetworkRegistry {
     this.networks.splice(index, 1);
   }
 
-  public find(name: string): IPFSNetwork {
-    const network = this.networks.find((n) => n.getName() === name);
+  public find(id: string): IPFSNetwork {
+    const network = this.networks.find((n) => n.getId() === id);
 
     if (!network) {
-      throw new IPFSNetworkNotFoundError(name);
+      throw new IPFSNetworkNotFoundError(id);
     }
 
     return network;
