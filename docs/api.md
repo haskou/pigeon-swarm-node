@@ -169,6 +169,8 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
+| `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
+| `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
 | `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
 | `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
@@ -1207,6 +1209,11 @@ Implemented:
 }
 ```
 
+The accepted message is published to WebSocket clients as
+`communities.v1.channel.message.was_sent`. Frontend can use
+`event.aggregate_id` as `communityId`, `event.attributes.channelId` as
+`channelId` and `event.attributes.messageId` as the id to fetch or reconcile.
+
 ### List channel messages
 
 ```http
@@ -1232,6 +1239,72 @@ Implemented:
 - support `limit` from 1 to 100
 - when `beforeMessageId` is provided, return messages older than that message
 
+### Delete channel message
+
+```http
+DELETE /communities/{communityId}/channels/{channelId}/messages/{messageId}
+```
+
+Request:
+
+```json
+{
+  "id": "<clientGeneratedDeletionId>",
+  "createdAt": 1773848829055,
+  "signature": "<deletionSignature>"
+}
+```
+
+The deletion signature covers:
+
+```json
+{
+  "actorIdentityId": "<identityId>",
+  "channelId": "<channelId>",
+  "communityId": "<communityId>",
+  "createdAt": 1773848829055,
+  "id": "<clientGeneratedDeletionId>",
+  "targetMessageId": "<messageId>",
+  "type": "deleted"
+}
+```
+
+Response:
+
+```json
+{
+  "id": "<clientGeneratedDeletionId>",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "targetMessageId": "<messageId>",
+  "deletedByIdentityId": "<identityId>",
+  "type": "deleted"
+}
+```
+
+Implemented:
+
+- require signed request auth from a community member
+- require the channel to exist in the community
+- validate the deletion signature
+- remove the target message from local storage
+- publish `communities.v1.channel.message.was_deleted` to community members
+
+### Community keys
+
+The backend does not generate, store or decrypt community keys. Frontend owns
+the symmetric community key lifecycle.
+
+Recommended MVP flow:
+
+- creator generates one symmetric community key when creating the community
+- store that key in the creator's encrypted keychain under `communityId`
+- when adding a member, encrypt the community key for the recipient identity
+  public key
+- create a `community_invitation` notification with the encrypted community key
+- recipient accepts the notification client-side, decrypts the key locally and
+  publishes a new keychain version containing the key under `communityId`
+
 ## Notification HTTP API
 
 Notifications are for actionable events that require client-side identity
@@ -1250,7 +1323,7 @@ Implemented:
 - return notifications where the authenticated identity is the recipient
 - support `limit` and `beforeNotificationId`
 
-### Create a conversation invitation notification
+### Create an invitation notification
 
 ```http
 POST /notifications
@@ -1265,6 +1338,19 @@ Request:
   "inviterIdentityId": "<aliceIdentityId>",
   "recipientIdentityId": "<bobIdentityId>",
   "encryptedConversationKey": "<encryptedForBob>",
+  "inviterSignature": "<inviterSignature>"
+}
+```
+
+Community invitation request:
+
+```json
+{
+  "type": "community_invitation",
+  "communityId": "<communityId>",
+  "inviterIdentityId": "<aliceIdentityId>",
+  "recipientIdentityId": "<bobIdentityId>",
+  "encryptedCommunityKey": "<encryptedForBob>",
   "inviterSignature": "<inviterSignature>"
 }
 ```

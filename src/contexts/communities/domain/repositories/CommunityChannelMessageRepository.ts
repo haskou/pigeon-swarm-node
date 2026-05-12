@@ -15,5 +15,10 @@ export interface CommunityChannelMessageRepository {
     limit: number,
     beforeMessageId?: CommunityChannelMessageId,
   ): Promise<CommunityChannelMessage[]>;
+  delete(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    messageId: CommunityChannelMessageId,
+  ): Promise<void>;
   save(message: CommunityChannelMessage): Promise<void>;
 }

@@ -2,12 +2,14 @@ import { PostCommunityChannelMessageBody } from '@app/apps/apis/communities-api/
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
+import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageEncryptedPayload } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { PublicKey, Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -27,6 +29,8 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
   private readonly signatureService =
     new CommunityChannelMessageSignatureDomainService();
+
+  private readonly eventPublisher = this.get<MessageBus>(MessageBus);
 
   @Post('/:communityId/channels/:channelId/messages')
   public async sendMessage(
@@ -70,6 +74,20 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
     }
 
     await this.messageRepository().save(message);
+    const communityPrimitives = community.toPrimitives();
+
+    await this.eventPublisher.publish([
+      new CommunityChannelMessageWasSentEvent(communityId, {
+        authorIdentityId: authorIdentityId.valueOf(),
+        channelId,
+        community: communityPrimitives,
+        communityId,
+        memberIds: communityPrimitives.memberIds,
+        message: primitives,
+        messageId: body.id,
+        networkId: communityPrimitives.networkId,
+      }),
+    ]);
 
     return response
       .status(HttpRouteStatusEnum.OK)

@@ -4,6 +4,8 @@ import { CommunityChannelId } from './value-objects/CommunityChannelId';
 import { CommunityChannelName } from './value-objects/CommunityChannelName';
 
 export class CommunityTextChannel {
+  private static readonly TYPE: 'text' = 'text';
+
   public static create(name: CommunityChannelName): CommunityTextChannel {
     return new CommunityTextChannel(
       CommunityChannelId.generate(),
@@ -41,7 +43,7 @@ export class CommunityTextChannel {
       createdAt: this.createdAt.valueOf(),
       id: this.id.valueOf(),
       name: this.name.valueOf(),
-      type: 'text' as const,
+      type: CommunityTextChannel.TYPE,
     };
   }
 }

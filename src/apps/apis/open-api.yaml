@@ -26,6 +26,8 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}'
   /communities/{communityId}/channels/{channelId}/messages:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages'
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}'
   /conversations:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
   /conversations/{conversationId}/messages:

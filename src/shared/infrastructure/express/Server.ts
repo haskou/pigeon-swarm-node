@@ -1,4 +1,5 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
@@ -177,6 +178,7 @@ export default class Server {
           PatchCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
           PostCommunityChannelMessageRoute,
+          DeleteCommunityChannelMessageRoute,
         ],
         cors: true,
         defaultErrorHandler: false,

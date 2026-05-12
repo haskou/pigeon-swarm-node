@@ -92,11 +92,42 @@ export class MongoCommunityChannelMessageRepository {
     return documents.reverse().map((document) => this.toDomain(document));
   }
 
+  public async findByCommunity(
+    communityId: CommunityId,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        communityId: communityId.valueOf(),
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return documents.reverse().map((document) => this.toDomain(document));
+  }
+
   public async save(message: CommunityChannelMessage): Promise<void> {
     const document = this.toDocument(message);
 
     await (
       await this.collection()
     ).updateOne({ _id: document._id }, { $set: document }, { upsert: true });
+  }
+
+  public async delete(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    messageId: CommunityChannelMessageId,
+  ): Promise<void> {
+    await (
+      await this.collection()
+    ).deleteOne({
+      _id: messageId.valueOf(),
+      channelId: channelId.valueOf(),
+      communityId: communityId.valueOf(),
+    });
   }
 }

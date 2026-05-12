@@ -27,9 +27,11 @@ describe('NotificationCreator', () => {
     const notification = await creator.create(
       new NotificationCreateMessage(
         'one-to-one:notification-test',
+        undefined,
         inviterIdentityId.valueOf(),
         recipientIdentityId.valueOf(),
         'encrypted-conversation-key',
+        undefined,
         'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
       ),
     );

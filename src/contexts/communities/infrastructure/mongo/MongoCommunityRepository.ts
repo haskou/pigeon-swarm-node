@@ -70,6 +70,12 @@ export class MongoCommunityRepository implements CommunityRepository {
     return documents.map((document) => this.toDomain(document));
   }
 
+  public async findAll(): Promise<Community[]> {
+    const documents = await (await this.collection()).find({}).toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
   public async save(community: Community): Promise<void> {
     const document = this.toDocument(community);
 

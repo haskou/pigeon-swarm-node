@@ -1,4 +1,7 @@
 import NodeStartupSynchronizer from '@app/apps/synchronizers/NodeStartupSynchronizer';
+import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
+import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
@@ -13,12 +16,14 @@ import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkNam
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { PrimitiveOf } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('NodeStartupSynchronizer', () => {
   const nodeId = '550e8400-e29b-41d4-a716-446655440010';
 
   let conversationRepository: MockProxy<MongoConversationRepository>;
+  let communityRepository: MockProxy<MongoCommunityRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let heartbeatSender: MockProxy<NodeHeartbeatSender>;
   let identityMetadataRepository: MockProxy<MongoIdentityMetadataRepository>;
@@ -28,6 +33,7 @@ describe('NodeStartupSynchronizer', () => {
 
   beforeEach(() => {
     conversationRepository = mock<MongoConversationRepository>();
+    communityRepository = mock<MongoCommunityRepository>();
     eventPublisher = mock<DomainEventPublisher>();
     heartbeatSender = mock<NodeHeartbeatSender>();
     identityMetadataRepository = mock<MongoIdentityMetadataRepository>();
@@ -53,6 +59,7 @@ describe('NodeStartupSynchronizer', () => {
       identityMetadataRepository,
       keychainMetadataRepository,
       conversationRepository,
+      communityRepository,
       eventPublisher,
     );
   });
@@ -92,6 +99,7 @@ describe('NodeStartupSynchronizer', () => {
         networkId: '123e4567-e89b-12d3-a456-426614174000',
       },
     ]);
+    communityRepository.findAll.mockResolvedValue([]);
 
     const result = await synchronizer.synchronize();
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
@@ -99,6 +107,7 @@ describe('NodeStartupSynchronizer', () => {
     expect(heartbeatSender.send).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       conversationRequests: 1,
+      communityRequests: 0,
       identityRequests: 1,
       keychainRequests: 1,
     });
@@ -121,6 +130,48 @@ describe('NodeStartupSynchronizer', () => {
     });
     expect(publishedEvents[2].attributes).toMatchObject({
       conversationId: 'one-to-one:conversation',
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+      requesterNodeId: nodeId,
+      requestId: result.requestId,
+    });
+  });
+
+  it('should publish community startup sync requests', async () => {
+    const communityPrimitives: PrimitiveOf<Community> = {
+      avatar: undefined,
+      banner: undefined,
+      createdAt: 1,
+      description: 'Community description',
+      id: '550e8400-e29b-41d4-a716-446655440020',
+      memberIds: [],
+      name: 'Community',
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+      ownerIdentityId: 'identity-1',
+      textChannels: [],
+      visibility: 'private',
+    };
+
+    identityMetadataRepository.findAll.mockResolvedValue([]);
+    keychainMetadataRepository.findAll.mockResolvedValue([]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([]);
+    communityRepository.findAll.mockResolvedValue([
+      {
+        toPrimitives: () => communityPrimitives,
+      },
+    ] as never);
+
+    const result = await synchronizer.synchronize();
+    const publishedEvents = eventPublisher.publish.mock.calls[0][0];
+
+    expect(result).toMatchObject({
+      communityRequests: 1,
+      conversationRequests: 0,
+      identityRequests: 0,
+      keychainRequests: 0,
+    });
+    expect(publishedEvents).toEqual([expect.any(CommunitySyncRequestedEvent)]);
+    expect(publishedEvents[0].attributes).toMatchObject({
+      communityId: '550e8400-e29b-41d4-a716-446655440020',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
       requestId: result.requestId,

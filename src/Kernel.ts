@@ -74,6 +74,10 @@ export default class Kernel {
     }
   }
 
+  public addConsumerInstances(...consumers: Consumer[]): void {
+    Kernel._consumers.push(...consumers);
+  }
+
   public async runConsumers(): Promise<void> {
     for (const consumer of Kernel.consumers) {
       await consumer.init();

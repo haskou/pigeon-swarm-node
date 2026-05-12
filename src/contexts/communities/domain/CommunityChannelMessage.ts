@@ -9,8 +9,13 @@ import { CommunityChannelMessageId } from './value-objects/CommunityChannelMessa
 import { CommunityId } from './value-objects/CommunityId';
 
 type Attachments = CommunityChannelAttachmentId[];
+export type CommunityChannelMessagePrimitives = ReturnType<
+  CommunityChannelMessage['toPrimitives']
+>;
 
 export class CommunityChannelMessage {
+  private static readonly TYPE: 'sent' = 'sent';
+
   public static create(
     metadata: CommunityChannelMessageMetadata,
     encryptedPayload: CommunityChannelMessageEncryptedPayload,
@@ -64,7 +69,7 @@ export class CommunityChannelMessage {
       encryptedPayload: this.encryptedPayload.valueOf(),
       id: this.metadata.getId().valueOf(),
       signature: this.signature.valueOf(),
-      type: 'sent' as const,
+      type: CommunityChannelMessage.TYPE,
     };
   }
 }

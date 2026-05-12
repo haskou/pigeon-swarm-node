@@ -12,6 +12,7 @@ describe('ApiSwaggerFactory', () => {
       const specs = factory.createByApi();
 
       expect(Object.keys(specs)).toEqual([
+        'communities-api',
         'conversations-api',
         'identities-api',
         'ipfs-api',
@@ -19,6 +20,7 @@ describe('ApiSwaggerFactory', () => {
         'nodes-api',
         'notifications-api',
       ]);
+      expect(specs['communities-api']).toContain('/communities/:');
       expect(specs['conversations-api']).toContain('/conversations:');
       expect(specs['identities-api']).toContain('/identities/:');
       expect(specs['ipfs-api']).toContain('/ipfs/{cid}:');
@@ -59,6 +61,7 @@ describe('ApiSwaggerFactory', () => {
       const routes = factory.createRouteByApi('/api');
 
       expect(routes).toEqual({
+        'communities-api': '/api/swagger/communities-api/swagger.yaml',
         'conversations-api': '/api/swagger/conversations-api/swagger.yaml',
         'identities-api': '/api/swagger/identities-api/swagger.yaml',
         'ipfs-api': '/api/swagger/ipfs-api/swagger.yaml',

@@ -6,11 +6,35 @@ type CommunityChannelMessageSignaturePayload = Omit<
   ReturnType<CommunityChannelMessage['toPrimitives']>,
   'signature'
 >;
+type CommunityChannelMessageDeletionSignaturePayload = {
+  actorIdentityId: string;
+  channelId: string;
+  communityId: string;
+  createdAt: number;
+  id: string;
+  targetMessageId: string;
+  type: 'deleted';
+};
+type CommunityChannelSignaturePayload =
+  | CommunityChannelMessageSignaturePayload
+  | CommunityChannelMessageDeletionSignaturePayload;
 
 export class CommunityChannelMessageSignatureDomainService {
   private getCanonicalPayload(
-    payload: CommunityChannelMessageSignaturePayload,
-  ): CommunityChannelMessageSignaturePayload {
+    payload: CommunityChannelSignaturePayload,
+  ): CommunityChannelSignaturePayload {
+    if (payload.type === 'deleted') {
+      return {
+        actorIdentityId: payload.actorIdentityId,
+        channelId: payload.channelId,
+        communityId: payload.communityId,
+        createdAt: payload.createdAt,
+        id: payload.id,
+        targetMessageId: payload.targetMessageId,
+        type: payload.type,
+      };
+    }
+
     return {
       attachmentExternalIdentifiers: payload.attachmentExternalIdentifiers,
       authorIdentityId: payload.authorIdentityId,
@@ -25,7 +49,7 @@ export class CommunityChannelMessageSignatureDomainService {
 
   public isValidSignature(
     publicKey: PublicKey,
-    payload: CommunityChannelMessageSignaturePayload,
+    payload: CommunityChannelSignaturePayload,
     signature: Signature,
   ): boolean {
     return publicKey.isValidSignature(

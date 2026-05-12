@@ -21,13 +21,7 @@ export default class MongoNotificationMapper {
     return Notification.fromPrimitives({
       createdAt: document.createdAt,
       id: document._id,
-      payload: {
-        conversationId: document.payload.conversationId,
-        encryptedConversationKey: document.payload.encryptedConversationKey,
-        inviterIdentityId: document.payload.inviterIdentityId,
-        inviterSignature: document.payload.inviterSignature,
-        recipientIdentityId: document.payload.recipientIdentityId,
-      },
+      payload: document.payload,
       recipientIdentityId: document.recipientIdentityId,
       state: document.state,
       status: document.status,

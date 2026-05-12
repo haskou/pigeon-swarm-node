@@ -283,6 +283,43 @@ paths:
                 $ref: '#/components/schemas/CommunityChannelMessageResource'
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the message signature is invalid.
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}:
+    delete:
+      tags:
+        - communities
+      summary: Delete an encrypted private community text channel message
+      description: Only community members can delete channel messages. The deletion is announced through realtime and pubsub events.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteCommunityChannelMessageBody'
+      responses:
+        '200':
+          description: Message deleted locally.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedCommunityChannelMessageResource'
+        '409':
+          description: Authenticated identity is not a member, the channel does not exist, or the deletion signature is invalid.
 components:
   parameters:
     CommunityId:
@@ -456,6 +493,30 @@ components:
             $ref: '#/components/schemas/CommunityChannelMessageResource'
         nextBeforeMessageId:
           type: string
+    DeletedCommunityChannelMessageResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - channelId
+        - targetMessageId
+        - deletedByIdentityId
+        - type
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        channelId:
+          type: string
+        targetMessageId:
+          type: string
+        deletedByIdentityId:
+          type: string
+        type:
+          type: string
+          enum:
+            - deleted
     PostCommunityBody:
       type: object
       required:
@@ -539,3 +600,16 @@ components:
           type: array
           items:
             type: string
+    DeleteCommunityChannelMessageBody:
+      type: object
+      required:
+        - id
+        - createdAt
+        - signature
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: integer
+        signature:
+          type: string
