@@ -7,6 +7,7 @@ export interface MongoCommunityTextChannelDocument {
 
 export interface MongoCommunityDocument {
   _id: string;
+  avatar?: string;
   banner?: string;
   createdAt: number;
   description: string;

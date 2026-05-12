@@ -6,6 +6,7 @@ export interface CommunityTextChannelResource {
 }
 
 export interface CommunityResource {
+  avatar?: string;
   banner?: string;
   createdAt: number;
   description: string;

@@ -1,3 +1,4 @@
+import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
@@ -32,6 +33,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
       actorIdentityId,
       new CommunityName(body.name),
       new CommunityDescription(body.description),
+      body.avatar ? new CommunityAvatar(body.avatar) : undefined,
       body.banner ? new CommunityBanner(body.banner) : undefined,
     );
     await this.repository().save(community);

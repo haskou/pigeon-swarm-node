@@ -969,7 +969,8 @@ Response:
       "ownerIdentityId": "<identityId>",
       "name": "Pigeon Lab",
       "description": "Private workspace",
-      "banner": "<publicImageCid>",
+      "avatar": "<publicAvatarCid>",
+      "banner": "<publicBannerCid>",
       "memberIds": ["<identityId>"],
       "textChannels": [],
       "visibility": "private",
@@ -998,7 +999,8 @@ Request:
   "networkId": "<networkId>",
   "name": "Pigeon Lab",
   "description": "Private workspace",
-  "banner": "<publicImageCid>"
+  "avatar": "<publicAvatarCid>",
+  "banner": "<publicBannerCid>"
 }
 ```
 
@@ -1007,6 +1009,7 @@ Implemented:
 - create a private community in the requested network
 - set the authenticated identity as owner
 - add the owner as the first member
+- store `avatar` as an optional public IPFS CID, not as base64
 - store `banner` as an optional public IPFS CID, not as base64
 
 ### Get community
@@ -1032,14 +1035,16 @@ Request:
 {
   "name": "Pigeon Lab",
   "description": "Updated private workspace",
-  "banner": "<publicImageCid>"
+  "avatar": "<publicAvatarCid>",
+  "banner": "<publicBannerCid>"
 }
 ```
 
 Implemented:
 
 - require signed request auth from the community owner
-- update name, description and optional banner CID
+- update name, description and optional avatar/banner CIDs
+- omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
 
 ### List community members

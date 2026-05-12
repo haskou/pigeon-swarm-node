@@ -8,6 +8,7 @@ import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityChannelNotFoundError } from './errors/CommunityChannelNotFoundError';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityAvatar } from './value-objects/CommunityAvatar';
 import { CommunityBanner } from './value-objects/CommunityBanner';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
 import { CommunityChannelName } from './value-objects/CommunityChannelName';
@@ -21,13 +22,14 @@ export class Community extends AggregateRoot {
     networkId: NetworkId,
     name: CommunityName,
     description: CommunityDescription,
+    avatar?: CommunityAvatar,
     banner?: CommunityBanner,
   ): Community {
     return new Community(
       CommunityId.generate(),
       networkId,
       ownerIdentityId,
-      new CommunityProfile(name, description, banner),
+      new CommunityProfile(name, description, avatar, banner),
       [ownerIdentityId],
       [],
       Timestamp.now(),
@@ -42,6 +44,7 @@ export class Community extends AggregateRoot {
       new CommunityProfile(
         new CommunityName(primitives.name),
         new CommunityDescription(primitives.description),
+        primitives.avatar ? new CommunityAvatar(primitives.avatar) : undefined,
         primitives.banner ? new CommunityBanner(primitives.banner) : undefined,
       ),
       primitives.memberIds.map((memberId) => new IdentityId(memberId)),
@@ -120,10 +123,11 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityName,
     description: CommunityDescription,
+    avatar?: CommunityAvatar,
     banner?: CommunityBanner,
   ): void {
     this.assertOwner(actor);
-    this.profile = new CommunityProfile(name, description, banner);
+    this.profile = new CommunityProfile(name, description, avatar, banner);
   }
 
   public getId(): CommunityId {
@@ -144,6 +148,7 @@ export class Community extends AggregateRoot {
 
   public toPrimitives() {
     return {
+      avatar: this.profile.getAvatar()?.valueOf(),
       banner: this.profile.getBanner()?.valueOf(),
       createdAt: this.createdAt.valueOf(),
       description: this.profile.getDescription().valueOf(),

@@ -42,12 +42,14 @@ package "communities/domain" {
   class CommunityProfile {
     - name: CommunityName
     - description: CommunityDescription
+    - avatar: CommunityAvatar?
     - banner: CommunityBanner?
   }
 
   class CommunityId
   class CommunityName
   class CommunityDescription
+  class CommunityAvatar
   class CommunityBanner
   class CommunityChannelId
   class CommunityChannelName
@@ -70,6 +72,7 @@ package "communities/domain" {
   Community --> CommunityId
   CommunityProfile --> CommunityName
   CommunityProfile --> CommunityDescription
+  CommunityProfile --> CommunityAvatar
   CommunityProfile --> CommunityBanner
   CommunityTextChannel --> CommunityChannelId
   CommunityTextChannel --> CommunityChannelName

@@ -454,6 +454,7 @@ export default class Definitions {
   @given('I set a private community body')
   public iSetAPrivateCommunityBody(): void {
     this.body = JSON.stringify({
+      avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Private API community',
       name: 'API community',

@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
@@ -25,6 +26,7 @@ export class PostCommunityRoute extends CommunityRouteSupport {
       new NetworkId(body.networkId),
       new CommunityName(body.name),
       new CommunityDescription(body.description),
+      body.avatar ? new CommunityAvatar(body.avatar) : undefined,
       body.banner ? new CommunityBanner(body.banner) : undefined,
     );
 

@@ -357,6 +357,9 @@ components:
           type: string
         description:
           type: string
+        avatar:
+          type: string
+          description: Public IPFS CID for the community avatar/icon.
         banner:
           type: string
           description: Public IPFS CID for the community banner.
@@ -468,9 +471,12 @@ components:
         description:
           type: string
           maxLength: 500
+        avatar:
+          type: string
+          description: Optional public IPFS CID for the community avatar/icon.
         banner:
           type: string
-          description: Optional public IPFS CID.
+          description: Optional public IPFS CID for the community banner.
     PatchCommunityBody:
       type: object
       required:
@@ -483,6 +489,9 @@ components:
         description:
           type: string
           maxLength: 500
+        avatar:
+          type: string
+          description: Optional public IPFS CID. Omit it to remove the avatar.
         banner:
           type: string
           description: Optional public IPFS CID. Omit it to remove the banner.

@@ -13,6 +13,7 @@ Feature: Communities API
     And response contains a valid resource with the following fields
       | name       | API community |
       | visibility | private       |
+    And response body should contain "bafybeigcommunityavatar"
     And response body should contain "bafybeigcommunitybanner"
 
   Scenario: Owner adds a member and the member can read the private community
