@@ -110,8 +110,8 @@ components:
               type: string
               minLength: 12
               maxLength: 256
-              description: Must include at least one uppercase letter, one lowercase letter and one symbol.
-              example: Super-secret-password!
+              description: Must include at least one uppercase letter, one lowercase letter, one number and one symbol.
+              example: Super-secret-password1!
             networks:
               type: array
               description: Initial identity networks. Existing networks cannot be removed in later identity versions.

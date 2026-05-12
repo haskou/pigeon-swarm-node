@@ -11,7 +11,7 @@ Feature: Post identity route
       {
         "name": "alice",
         "handle": "alice",
-        "password": "Super-secret-password!",
+        "password": "Super-secret-password1!",
         "networks": [
           "123e4567-e89b-12d3-a456-426614174000"
         ]
@@ -63,7 +63,7 @@ Feature: Post identity route
     And I set a client-signed identity body with name "carol" and handle "carol"
     When I POST to "/identities/"
     Then response code is equal to 200
-    Given I set a client-signed identity update body with name "carol updated", handle "carol_new" and password "New-client-password!"
+    Given I set a client-signed identity update body with name "carol updated", handle "carol_new" and password "New-client-password1!"
     And I sign the current identity update request
     When I PUT the created identity
     Then response code is equal to 200

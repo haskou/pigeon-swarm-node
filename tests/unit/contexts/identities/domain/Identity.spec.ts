@@ -17,7 +17,7 @@ import { IdentityMother } from '../../../mothers/IdentityMother';
 
 describe('Identity', () => {
   let mother: IdentityMother;
-  const validPassword = 'Valid-password!';
+  const validPassword = 'Valid-password11!';
 
   beforeEach(() => {
     mother = new IdentityMother();

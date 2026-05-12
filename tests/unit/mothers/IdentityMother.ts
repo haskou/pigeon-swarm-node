@@ -18,15 +18,15 @@ import {
 export class IdentityMother {
   public encryptedKeyPair: EncryptedKeyPair = new EncryptedKeyPair(
     PublicKey.fromPEM(
-      '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=\n-----END PUBLIC KEY-----\n',
+      '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=\n-----END PUBLIC KEY-----\n',
     ),
     new EncryptedPrivateKey(
-      'v2.scrypt.N16384.r8.p1.pX6RQxiWclXHSfpuc8FVtA==.mD4gxsvXwO+DXHmH.HHKbJ5okm2odc0rMTWb/Ug==.hf8ooIEg4R2airdHlpnTmtxlQBKbnTjRqb6FwwC91YSnd6N03xc0CwKBnyPv2v4NHkKPf57UY+UvDVkWLFkPciVIqCFVN14VOHS5XgelwqB8QWln4vsbsx9Ya5lKhKqtOPctyOCTlarXC+05KW4avyrVlJI5pdQ=',
+      'v2.scrypt.N16384.r8.p1.hSp15tPrsJheKwC4J+Wqvw==.13CIyclcX1IZ4BH3.lSjxFpnWqpOOqyiZefvCCg==.I2ttbo5D3AK7+ITmVZOnIBfiLVAjmRw4dkAd75yo0CMdAM/sNtgz02cLwx0E7sOgwN2/VSsWsDYu+Sx24qkR8w68i54Ix5ZZgNGWL9U5D2NTujjMdim/igVLKrtDArZMmxv6O2fqL/pA1VgtHX95WIPyc6wc5Fk=',
     ),
   );
 
   public id: IdentityId = new IdentityId(
-    'MCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=',
+    'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=',
   );
 
   public profile: Profile = new Profile(new ProfileName('John'));
@@ -35,12 +35,12 @@ export class IdentityMother {
     new NetworkId('550e8400-e29b-41d4-a716-446655440000'),
   ];
 
-  public password: Password = new Password('Fixture-password!');
+  public password: Password = new Password('Fixture-password1!');
 
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'WZ3ndjkTKbmWN++lFJ67tum7BXg97ryd4OvNoB/hu6QBAGIbd2jTLZYPuCPJn9SbzYbGWUVskGHes06L+wU/Cg==',
+    'PXcne5HUw9qR94mKIYV37y521BdMOWtK+evZNeEoAfOQrbt8AR6iE5uEpl/tLXFu/Zr+BVqdpAAI0ZDrh97pDg==',
   );
 
   public version: IdentityVersion = new IdentityVersion(1);

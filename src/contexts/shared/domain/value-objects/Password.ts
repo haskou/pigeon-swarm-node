@@ -20,6 +20,7 @@ export class Password extends StringValueObject {
       this.value.length <= Password.MAX_LENGTH &&
       /[A-Z]/.test(this.value) &&
       /[a-z]/.test(this.value) &&
+      /[0-9]/.test(this.value) &&
       /[^A-Za-z0-9]/.test(this.value)
     );
   }

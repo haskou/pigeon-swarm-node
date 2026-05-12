@@ -175,7 +175,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
     await ipfs.registerNetwork(new IPFSNetworkConfig(networkId, networkName));
     this.identity = await creator.create(
-      new IdentityCreateMessage('alice', 'Super-secret-password!', [networkId]),
+      new IdentityCreateMessage('alice', 'Super-secret-password1!', [
+        networkId,
+      ]),
     );
   }
 

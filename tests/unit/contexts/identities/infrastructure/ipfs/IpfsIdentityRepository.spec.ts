@@ -212,9 +212,9 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
-        new IPFSId(brokenCidString),
-      );
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).toHaveBeenCalledWith(new IPFSId(brokenCidString));
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
@@ -241,7 +241,7 @@ describe('IpfsIdentityRepository', () => {
       const validCidString = 'bafyvalididentity';
       const otherIdentity = await Identity.create(
         new ProfileName('Mallory'),
-        new Password('Super-secret-password!'),
+        new Password('Super-secret-password1!'),
         [new NetworkId(primitives.networks[0])],
       );
 
@@ -256,9 +256,9 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
-        new IPFSId(wrongCidString),
-      );
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).toHaveBeenCalledWith(new IPFSId(wrongCidString));
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         new IPFSId(validCidString),
@@ -282,9 +282,9 @@ describe('IpfsIdentityRepository', () => {
       await expect(repository.findById(identityId)).rejects.toThrow(
         IdentityNotFoundError,
       );
-      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
-        new IPFSId(tamperedCidString),
-      );
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).toHaveBeenCalledWith(new IPFSId(tamperedCidString));
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
 
@@ -341,9 +341,9 @@ describe('IpfsIdentityRepository', () => {
       await expect(
         repository.findById(new IdentityId(previousPrimitives.id)),
       ).rejects.toThrow(IdentityNotFoundError);
-      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
-        new IPFSId(candidateCidString),
-      );
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).toHaveBeenCalledWith(new IPFSId(candidateCidString));
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
   });

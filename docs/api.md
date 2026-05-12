@@ -438,7 +438,7 @@ Legacy backend-generated request:
 {
   "name": "Alice",
   "handle": "alice",
-  "password": "Super-secret-password!",
+  "password": "Super-secret-password1!",
   "networks": ["<networkId>"]
 }
 ```
@@ -473,7 +473,8 @@ Implemented:
 - reject handles containing spaces, `@` or any character outside letters,
   numbers, dots, hyphens and underscores
 - require legacy backend-generated passwords to be 12 to 256 characters long
-  and include at least one uppercase letter, one lowercase letter and one symbol
+  and include at least one uppercase letter, one lowercase letter, one number
+  and one symbol
 - return `identityExternalIdentifier`, which is the current published identity
   CID to send as `previousIdentityExternalIdentifier` in the next update
 - store `profile.picture` as a public IPFS image CID, not as base64 or a data
