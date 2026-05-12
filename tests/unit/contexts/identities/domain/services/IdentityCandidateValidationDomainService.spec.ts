@@ -1,7 +1,12 @@
+import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import { Profile } from '@app/contexts/identities/domain/Profile';
 import { IdentityCandidateValidationDomainService } from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
-import { Profile } from '@app/contexts/identities/domain/Profile';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { faker } from '@faker-js/faker';
+import { EncryptedKeyPair } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
@@ -28,7 +33,7 @@ describe('IdentityCandidateValidationDomainService', () => {
     const result = await service.isValidChainFor(
       mother.id,
       candidate,
-      async () => previousIdentity,
+      () => Promise.resolve(previousIdentity),
     );
 
     expect(result).toBe(true);
@@ -45,7 +50,38 @@ describe('IdentityCandidateValidationDomainService', () => {
     const result = await service.isValidChainFor(
       mother.id,
       candidate,
-      async () => undefined,
+      () => Promise.resolve(undefined),
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('should reject a versioned candidate that removes a previous network', async () => {
+    const previousIdentity = mother.build();
+    const previousPrimitives = previousIdentity.toPrimitives();
+    const candidatePrimitives = {
+      ...previousPrimitives,
+      networks: [new NetworkId(faker.string.uuid()).valueOf()],
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      signature: '',
+      timestamp: previousPrimitives.timestamp + 1,
+      version: previousPrimitives.version + 1,
+    };
+    const signature =
+      await new IdentitySignatureDomainService().generateSignature(
+        candidatePrimitives,
+        EncryptedKeyPair.fromPrimitives(previousPrimitives.encryptedKeyPair),
+        mother.password,
+      );
+    const candidate = Identity.fromPrimitives({
+      ...candidatePrimitives,
+      signature: signature.valueOf(),
+    });
+
+    const result = await service.isValidChainFor(
+      mother.id,
+      candidate,
+      () => Promise.resolve(previousIdentity),
     );
 
     expect(result).toBe(false);

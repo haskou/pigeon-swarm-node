@@ -1,8 +1,8 @@
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
-import { IdentityCreateMessage } from '@app/contexts/identities/application/create/messages/IdentityCreateMessage';
 import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
-import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityCreateMessage } from '@app/contexts/identities/application/create/messages/IdentityCreateMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { Identity } from '@app/contexts/identities/domain/Identity';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -175,7 +175,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
     await ipfs.registerNetwork(new IPFSNetworkConfig(networkId, networkName));
     this.identity = await creator.create(
-      new IdentityCreateMessage('alice', 'super-secret-password', [networkId]),
+      new IdentityCreateMessage('alice', 'Super-secret-password1!', [
+        networkId,
+      ]),
     );
   }
 

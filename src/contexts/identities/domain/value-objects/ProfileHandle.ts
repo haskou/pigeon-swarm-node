@@ -5,10 +5,10 @@ import { InvalidProfileHandleError } from '../errors/InvalidProfileHandleError';
 export class ProfileHandle extends StringValueObject {
   private static readonly MAX_LENGTH = 32;
   private static readonly MIN_LENGTH = 3;
-  private static readonly VALID_HANDLE = /^[a-z0-9_]+$/;
+  private static readonly VALID_HANDLE = /^[a-z0-9._-]+$/;
 
   private static normalize(value: string | StringValueObject): string {
-    return value.valueOf().replace(/^@/, '').toLowerCase();
+    return value.valueOf().toLowerCase();
   }
 
   constructor(value: string | StringValueObject) {

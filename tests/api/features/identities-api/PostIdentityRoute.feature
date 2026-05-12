@@ -10,8 +10,8 @@ Feature: Post identity route
       """
       {
         "name": "alice",
-        "handle": "@alice",
-        "password": "super-secret-password",
+        "handle": "alice",
+        "password": "Super-secret-password1!",
         "networks": [
           "123e4567-e89b-12d3-a456-426614174000"
         ]
@@ -31,7 +31,7 @@ Feature: Post identity route
       | profile.name | alice                                |
       | profile.handle | alice                              |
     And response body should contain "identityExternalIdentifier"
-    When I GET "/identities/@alice"
+    When I GET "/identities/alice"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | alice |
@@ -41,7 +41,7 @@ Feature: Post identity route
   Scenario: Publish a client-signed identity without sending a password
     Given I am an anonymous user
     And I register an in-memory IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
-    And I set a client-signed identity body with name "bob" and handle "@bob"
+    And I set a client-signed identity body with name "bob" and handle "bob"
     When I POST to "/identities/"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
@@ -50,7 +50,7 @@ Feature: Post identity route
       | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
     And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
-    When I GET "/identities/@bob"
+    When I GET "/identities/bob"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | bob |
@@ -60,10 +60,10 @@ Feature: Post identity route
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user
     And I register an in-memory IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
-    And I set a client-signed identity body with name "carol" and handle "@carol"
+    And I set a client-signed identity body with name "carol" and handle "carol"
     When I POST to "/identities/"
     Then response code is equal to 200
-    Given I set a client-signed identity update body with name "carol updated", handle "@carol_new" and password "new-client-password"
+    Given I set a client-signed identity update body with name "carol updated", handle "carol_new" and password "New-client-password1!"
     And I sign the current identity update request
     When I PUT the created identity
     Then response code is equal to 200
@@ -72,7 +72,7 @@ Feature: Post identity route
       | profile.handle | carol_new     |
       | version        | 2             |
     And response body should contain "identityExternalIdentifier"
-    When I GET "/identities/@carol_new"
+    When I GET "/identities/carol_new"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | carol updated |

@@ -1,29 +1,58 @@
 import { InvalidPasswordError } from '@app/contexts/shared/domain/errors/InvalidPasswordError';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import { faker } from '@faker-js/faker';
 
 describe('Password', () => {
   describe('constructor', () => {
-    it('should create a valid password with 8 or more characters', () => {
-      const validPassword = faker.internet.password({ length: 12 });
+    it('should create a valid password with the required complexity', () => {
+      const validPassword = 'Valid-password1!';
 
       const password = new Password(validPassword);
 
       expect(password.valueOf()).toBe(validPassword);
     });
 
-    it('should create a valid password with exactly 8 characters', () => {
-      const exactPassword = faker.string.alphanumeric(8);
+    it('should create a valid password with exactly 12 characters', () => {
+      const exactPassword = 'Valid-pass1!';
 
       const password = new Password(exactPassword);
 
       expect(password.valueOf()).toBe(exactPassword);
     });
 
-    it('should throw InvalidPasswordError when password is shorter than 8 characters', () => {
-      const shortPassword = faker.string.alphanumeric(7);
+    it('should throw InvalidPasswordError when password is shorter than 12 characters', () => {
+      const shortPassword = 'Short-1';
 
       expect(() => new Password(shortPassword)).toThrow(InvalidPasswordError);
+    });
+
+    it('should throw InvalidPasswordError when password is longer than 256 characters', () => {
+      const longPassword = `A${'a'.repeat(254)}1!`;
+
+      expect(() => new Password(longPassword)).toThrow(InvalidPasswordError);
+    });
+
+    it('should throw InvalidPasswordError when password has no uppercase letters', () => {
+      expect(() => new Password('valid-password1!')).toThrow(
+        InvalidPasswordError,
+      );
+    });
+
+    it('should throw InvalidPasswordError when password has no lowercase letters', () => {
+      expect(() => new Password('VALID-PASSWORD1!')).toThrow(
+        InvalidPasswordError,
+      );
+    });
+
+    it('should throw InvalidPasswordError when password has no numbers', () => {
+      expect(() => new Password('Valid-password!')).toThrow(
+        InvalidPasswordError,
+      );
+    });
+
+    it('should throw InvalidPasswordError when password has no symbols', () => {
+      expect(() => new Password('Validpassword1')).toThrow(
+        InvalidPasswordError,
+      );
     });
 
     it('should throw InvalidPasswordError when password is empty', () => {

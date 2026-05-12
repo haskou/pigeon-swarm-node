@@ -1,3 +1,4 @@
+import { IdentityCannotLeaveNetworkError } from '@app/contexts/identities/domain/errors/IdentityCannotLeaveNetworkError';
 import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
@@ -16,6 +17,7 @@ import { IdentityMother } from '../../../mothers/IdentityMother';
 
 describe('Identity', () => {
   let mother: IdentityMother;
+  const validPassword = 'Valid-password11!';
 
   beforeEach(() => {
     mother = new IdentityMother();
@@ -110,7 +112,7 @@ describe('Identity', () => {
     it('should record an IdentityWasCreatedEvent', async () => {
       const identity = await Identity.create(
         new ProfileName(faker.person.firstName().substring(0, 20)),
-        new Password(faker.internet.password({ length: 12 })),
+        new Password(validPassword),
         [new NetworkId(faker.string.uuid())],
       );
 
@@ -127,7 +129,7 @@ describe('Identity', () => {
       ];
       const identity = await Identity.create(
         new ProfileName(faker.person.firstName().substring(0, 20)),
-        new Password(faker.internet.password({ length: 12 })),
+        new Password(validPassword),
         networks,
       );
       const primitives = identity.toPrimitives();
@@ -144,7 +146,7 @@ describe('Identity', () => {
       await expect(
         Identity.create(
           new ProfileName(faker.person.firstName().substring(0, 20)),
-          new Password(faker.internet.password({ length: 12 })),
+          new Password(validPassword),
           [],
         ),
       ).rejects.toThrow(IdentityMustHaveAtLeastOneNetworkError);
@@ -158,7 +160,7 @@ describe('Identity', () => {
       ];
       const identity = await Identity.create(
         new ProfileName(faker.person.firstName().substring(0, 20)),
-        new Password(faker.internet.password({ length: 12 })),
+        new Password(validPassword),
         networks,
       );
       const primitives = identity.toPrimitives();
@@ -173,8 +175,9 @@ describe('Identity', () => {
   describe('updateProfile', () => {
     it('should create the next signed identity version', async () => {
       const identity = mother.build();
-      const previousIdentityExternalIdentifier =
-        new IdentityExternalIdentifier('bafycurrentidentity');
+      const previousIdentityExternalIdentifier = new IdentityExternalIdentifier(
+        'bafycurrentidentity',
+      );
       const profile = new Profile(new ProfileName('Jane'));
 
       const updatedIdentity = await identity.updateProfile(
@@ -212,9 +215,11 @@ describe('Identity', () => {
   describe('updateNetworks', () => {
     it('should create the next signed identity with new networks', async () => {
       const identity = mother.build();
-      const previousIdentityExternalIdentifier =
-        new IdentityExternalIdentifier('bafycurrentidentity');
+      const previousIdentityExternalIdentifier = new IdentityExternalIdentifier(
+        'bafycurrentidentity',
+      );
       const networks = [
+        ...mother.networks,
         new NetworkId(faker.string.uuid()),
         new NetworkId(faker.string.uuid()),
       ];
@@ -236,6 +241,25 @@ describe('Identity', () => {
       expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
         IdentityWasUpdatedEvent,
       );
+    });
+
+    it('should throw IdentityCannotLeaveNetworkError when a network is removed', async () => {
+      const firstAdditionalNetwork = new NetworkId(faker.string.uuid());
+      const secondAdditionalNetwork = new NetworkId(faker.string.uuid());
+      const identity = mother.build();
+      const identityWithAdditionalNetworks = await identity.updateNetworks(
+        [...mother.networks, firstAdditionalNetwork, secondAdditionalNetwork],
+        mother.password,
+        new IdentityExternalIdentifier('bafycurrentidentity'),
+      );
+
+      await expect(
+        identityWithAdditionalNetworks.updateNetworks(
+          [firstAdditionalNetwork, secondAdditionalNetwork],
+          mother.password,
+          new IdentityExternalIdentifier('bafynextidentity'),
+        ),
+      ).rejects.toThrow(IdentityCannotLeaveNetworkError);
     });
   });
 });

@@ -8,6 +8,17 @@ export type PreviousIdentityResolver = (
 ) => Promise<Identity | undefined>;
 
 export class IdentityCandidateValidationDomainService {
+  private keepsPreviousNetworks(
+    candidate: Identity,
+    previousIdentity: Identity,
+  ): boolean {
+    const candidateNetworks = candidate.toPrimitives().networks;
+
+    return previousIdentity
+      .toPrimitives()
+      .networks.every((networkId) => candidateNetworks.includes(networkId));
+  }
+
   public isValidFor(identityId: IdentityId, candidate: Identity): boolean {
     return candidate.toPrimitives().id === identityId.valueOf();
   }
@@ -57,6 +68,10 @@ export class IdentityCandidateValidationDomainService {
     const previousPrimitives = previousIdentity.toPrimitives();
 
     if (previousPrimitives.version !== primitives.version - 1) {
+      return false;
+    }
+
+    if (!this.keepsPreviousNetworks(candidate, previousIdentity)) {
       return false;
     }
 

@@ -13,6 +13,7 @@ import {
 } from '@haskou/value-objects';
 
 import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
+import { IdentityCannotLeaveNetworkError } from './errors/IdentityCannotLeaveNetworkError';
 import { IdentityMustHaveAtLeastOneNetworkError } from './errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignatureError';
 import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
@@ -142,6 +143,17 @@ export class Identity extends AggregateRoot {
     };
   }
 
+  private ensureKeepsCurrentNetworks(networks: NetworkId[]): void {
+    const nextNetworkIds = networks.map((networkId) => networkId.valueOf());
+
+    assert(
+      this.networks
+        .toArray()
+        .every((networkId) => nextNetworkIds.includes(networkId.valueOf())),
+      new IdentityCannotLeaveNetworkError(),
+    );
+  }
+
   public toPrimitives() {
     return {
       encryptedKeyPair: this.encryptedKeyPair.toPrimitives(),
@@ -161,6 +173,8 @@ export class Identity extends AggregateRoot {
     password: Password,
     previousIdentityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity> {
+    this.ensureKeepsCurrentNetworks(networks);
+
     const primitives = await this.signNextPrimitives(
       {
         ...this.toPrimitives(),
