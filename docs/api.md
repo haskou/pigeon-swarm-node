@@ -691,6 +691,60 @@ Implemented:
 - return the latest messages ordered from oldest to newest in the page
 - when `beforeMessageId` is provided, return messages older than that message
 
+### Get one message
+
+```http
+GET /conversations/{conversationId}/messages/{messageId}
+```
+
+Response:
+
+```json
+{
+  "id": "<messageId>",
+  "conversationId": "one-to-one:<deterministic-id>",
+  "authorIdentityId": "<identityId>",
+  "type": "sent",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "<encryptedMessagePayload>",
+  "previousMessageIds": [],
+  "replyToMessageId": "<messageId>",
+  "attachmentExternalIdentifiers": []
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- return one message by id so WebSocket clients can fetch only the announced
+  message instead of reloading the whole page
+
+### Get messages around one message
+
+```http
+GET /conversations/{conversationId}/messages/{messageId}/around?before=20&after=20
+```
+
+Response:
+
+```json
+{
+  "messages": [],
+  "previousCursor": "<messageBeforeWindowOrNull>",
+  "nextCursor": "<messageAfterWindowOrNull>"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- return a window ordered from oldest to newest around `messageId`
+- include cursors when there are more messages before or after the returned
+  window
+- support reply navigation when the replied-to message is not currently loaded
+
 ### Send message
 
 ```http
@@ -739,7 +793,8 @@ Implemented:
 - validate the signature against the canonical message payload
 - persist immutable message document in IPFS
 - persist message metadata in MongoDB
-- publish `ConversationMessageWasSentEvent`
+- publish `ConversationMessageWasSentEvent` with `messageId`, `authorId` and
+  `participantIds`
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
 

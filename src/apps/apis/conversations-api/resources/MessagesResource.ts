@@ -5,3 +5,9 @@ export interface MessagesResource {
   messages: MessageResource[];
   nextBeforeMessageId?: string;
 }
+
+export interface MessagesAroundResource {
+  messages: MessageResource[];
+  nextCursor?: string;
+  previousCursor?: string;
+}

@@ -52,6 +52,15 @@ export default class MongoIdentityMetadataRepository {
       .toArray();
   }
 
+  public async findAll(): Promise<MongoIdentityMetadataDocument[]> {
+    const collection =
+      await this.mongo.getCollection<MongoIdentityMetadataDocument>(
+        MongoIdentityMetadataRepository.COLLECTION_NAME,
+      );
+
+    return collection.find().toArray();
+  }
+
   public async save(identity: Identity, cid: IPFSId): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(

@@ -8,6 +8,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
+import { MongoKeychainMetadataDocument } from '../mongo/documents/MongoKeychainMetadataDocument';
 import MongoKeychainMetadataRepository from '../mongo/MongoKeychainMetadataRepository';
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
@@ -106,5 +107,39 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     );
 
     return new KeychainExternalIdentifier(cid.valueOf());
+  }
+
+  public async republishLocalRoutingRecords(): Promise<number> {
+    const metadata = await this.metadataRepository.findAll();
+    const uniqueDocuments = new Map<string, MongoKeychainMetadataDocument>();
+
+    for (const document of metadata) {
+      uniqueDocuments.set(
+        `${document.ownerIdentityId}:${document.cid}`,
+        document,
+      );
+    }
+
+    let republished = 0;
+
+    for (const document of uniqueDocuments.values()) {
+      try {
+        const keychainDocument =
+          await this.ipfsManager.getJSON<IpfsKeychainDocument>(
+            new IPFSId(document.cid),
+          );
+        const cid = await this.ipfsManager.addJSONToAll(keychainDocument);
+
+        await this.ipfsManager.putRecordToAll(
+          this.ROUTING_KEY_PREFIX + document.ownerIdentityId,
+          cid.valueOf(),
+        );
+        republished++;
+      } catch {
+        continue;
+      }
+    }
+
+    return republished;
   }
 }

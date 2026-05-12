@@ -105,6 +105,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/MessagesResource'
   /conversations/{conversationId}/messages/{messageId}:
+    get:
+      tags:
+        - conversations
+      summary: Get one conversation message by id
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Conversation message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResource'
     delete:
       tags:
         - conversations
@@ -134,6 +156,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+  /conversations/{conversationId}/messages/{messageId}/around:
+    get:
+      tags:
+        - conversations
+      summary: Get conversation messages around one message
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+        - in: query
+          name: before
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: after
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Message window around the requested message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesAroundResource'
 components:
   parameters:
     ConversationId:
@@ -306,4 +361,17 @@ components:
           items:
             $ref: '#/components/schemas/MessageResource'
         nextBeforeMessageId:
+          type: string
+    MessagesAroundResource:
+      type: object
+      required:
+        - messages
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageResource'
+        previousCursor:
+          type: string
+        nextCursor:
           type: string
