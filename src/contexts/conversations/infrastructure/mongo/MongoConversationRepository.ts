@@ -2,6 +2,7 @@ import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import {
   ConversationMessageCandidate,
+  ConversationMessagesAround,
   ConversationRepository,
 } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -245,6 +246,67 @@ export default class MongoConversationRepository implements Repository {
     return metadata ? this.findMessageFromMetadata(metadata) : undefined;
   }
 
+  public async findMessagesAround(
+    conversationId: ConversationId,
+    messageId: MessageId,
+    before: number,
+    after: number,
+  ): Promise<ConversationMessagesAround> {
+    const collection = await this.messageMetadataCollection();
+    const target = await collection.findOne({
+      conversationId: conversationId.valueOf(),
+      messageId: messageId.valueOf(),
+      valid: true,
+    });
+
+    if (!target) {
+      return { messages: [] };
+    }
+
+    const [beforeDocuments, afterDocuments] = await Promise.all([
+      collection
+        .find({
+          conversationId: conversationId.valueOf(),
+          createdAt: { $lt: target.createdAt },
+          valid: true,
+        })
+        .limit(before + 1)
+        .sort({ createdAt: -1 })
+        .toArray(),
+      collection
+        .find({
+          conversationId: conversationId.valueOf(),
+          createdAt: { $gt: target.createdAt },
+          valid: true,
+        })
+        .limit(after + 1)
+        .sort({ createdAt: 1 })
+        .toArray(),
+    ]);
+    const previousCursor = beforeDocuments[before]?.messageId;
+    const nextCursor = afterDocuments[after]?.messageId;
+    const windowDocuments = [
+      ...beforeDocuments.slice(0, before).reverse(),
+      target,
+      ...afterDocuments.slice(0, after),
+    ];
+    const messages: Message[] = [];
+
+    for (const document of windowDocuments) {
+      const message = await this.findMessageFromMetadata(document);
+
+      if (message) {
+        messages.push(message);
+      }
+    }
+
+    return {
+      messages,
+      nextCursor,
+      previousCursor,
+    };
+  }
+
   public async findMessageCandidates(
     conversationId: ConversationId,
     limit: number,
@@ -291,6 +353,36 @@ export default class MongoConversationRepository implements Repository {
     }
 
     return undefined;
+  }
+
+  public async republishLocalRoutingRecords(): Promise<number> {
+    const documents = await (await this.messageMetadataCollection())
+      .find({ valid: true })
+      .toArray();
+    let republished = 0;
+
+    for (const metadata of documents) {
+      try {
+        const messageDocument =
+          await this.ipfsManager.getJSON<IpfsMessageDocument>(
+            new IPFSId(metadata.cid),
+          );
+        const cid = await this.ipfsManager.addJSONToAll(messageDocument);
+
+        await this.ipfsManager.putRecordToAll(
+          this.getMessageRoutingKey(
+            new ConversationId(metadata.conversationId),
+            new MessageId(metadata.messageId),
+          ),
+          cid.valueOf(),
+        );
+        republished++;
+      } catch {
+        continue;
+      }
+    }
+
+    return republished;
   }
 
   public async findOneToOne(

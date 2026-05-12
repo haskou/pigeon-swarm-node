@@ -156,10 +156,30 @@ Dropped:
 | `keychains.` | Refetch current keychain if the event belongs to the session identity. |
 | `notifications.` | Refetch notifications. |
 | `conversations.v1.conversation.` | Refetch conversation list. |
-| `conversations.v1.message.` | Refetch latest messages for `event.aggregate_id`. |
+| `conversations.v1.message.` | Fetch the announced message with `GET /conversations/{conversationId}/messages/{messageId}`. |
 | `nodes.` | Refetch `GET /peers/`. |
 
 For conversation message events, `event.aggregate_id` is the conversation id.
+For sent-message events, `event.attributes.messageId` is the message id and
+`event.attributes.authorId` is the author identity id. Clients can ignore or
+reconcile optimistic messages from the current identity by comparing `authorId`
+and `messageId`.
+
+When a reply points to a message that is not loaded, use:
+
+```http
+GET /conversations/{conversationId}/messages/{messageId}/around?before=20&after=20
+```
+
+The response is:
+
+```json
+{
+  "messages": [],
+  "previousCursor": "<messageBeforeWindowOrNull>",
+  "nextCursor": "<messageAfterWindowOrNull>"
+}
+```
 
 ## Reconnect Strategy
 

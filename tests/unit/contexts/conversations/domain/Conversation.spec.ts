@@ -60,6 +60,7 @@ describe('Conversation', () => {
 
       expect(events).toEqual([expect.any(ConversationMessageWasSentEvent)]);
       expect(events[0].attributes).toEqual({
+        authorId: author.valueOf(),
         messageId: message.getId().valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
       });

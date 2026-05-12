@@ -240,4 +240,35 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       networks,
     );
   }
+
+  public async republishLocalRoutingRecords(): Promise<number> {
+    const metadata = await this.metadataRepository.findAll();
+    const uniqueDocuments = new Map<string, MongoIdentityMetadataDocument>();
+
+    for (const document of metadata) {
+      uniqueDocuments.set(`${document.identityId}:${document.cid}`, document);
+    }
+
+    let republished = 0;
+
+    for (const document of uniqueDocuments.values()) {
+      try {
+        const identityDocument =
+          await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+            new IPFSId(document.cid),
+          );
+        const cid = await this.ipfsManager.addJSONToAll(identityDocument);
+
+        await this.ipfsManager.putRecordToAll(
+          this.ROUTING_KEY_PREFIX + document.identityId,
+          cid.valueOf(),
+        );
+        republished++;
+      } catch {
+        continue;
+      }
+    }
+
+    return republished;
+  }
 }

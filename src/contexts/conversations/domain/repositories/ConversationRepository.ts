@@ -12,6 +12,12 @@ export interface ConversationMessageCandidate {
   messageType: string;
 }
 
+export interface ConversationMessagesAround {
+  messages: Message[];
+  nextCursor?: string;
+  previousCursor?: string;
+}
+
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;
   findCandidateMessageById(
@@ -36,6 +42,12 @@ export interface ConversationRepository {
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
+  findMessagesAround(
+    conversationId: ConversationId,
+    messageId: MessageId,
+    before: number,
+    after: number,
+  ): Promise<ConversationMessagesAround>;
   findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,

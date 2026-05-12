@@ -15,6 +15,7 @@ import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keycha
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
+import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import Kernel from '@app/Kernel';
 
@@ -74,6 +75,13 @@ async function init() {
   const ipfsRuntime = new IPFSRuntime();
   await ipfsRuntime.run();
   console.timeEnd('IPFS Runtime');
+
+  console.time('Republish local routing records');
+  const localRoutingRecordRepublisher =
+    new LocalRoutingRecordRepublisherScheduler();
+  await localRoutingRecordRepublisher.execute();
+  await localRoutingRecordRepublisher.init();
+  console.timeEnd('Republish local routing records');
 
   console.info('Ready!');
 }

@@ -30,6 +30,15 @@ export default class MongoKeychainMetadataRepository {
       .toArray();
   }
 
+  public async findAll(): Promise<MongoKeychainMetadataDocument[]> {
+    const collection =
+      await this.mongo.getCollection<MongoKeychainMetadataDocument>(
+        MongoKeychainMetadataRepository.COLLECTION,
+      );
+
+    return collection.find().toArray();
+  }
+
   public async save(keychain: Keychain, cid: IPFSId): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoKeychainMetadataDocument>(
