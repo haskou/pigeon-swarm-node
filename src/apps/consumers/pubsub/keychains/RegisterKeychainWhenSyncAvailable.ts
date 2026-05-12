@@ -1,6 +1,7 @@
 import KeychainCandidateRegistrar from '@app/contexts/keychains/application/register-candidate/KeychainCandidateRegistrar';
 import { RegisterKeychainCandidateMessage } from '@app/contexts/keychains/application/register-candidate/messages/RegisterKeychainCandidateMessage';
 import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
@@ -12,6 +13,7 @@ export default class RegisterKeychainWhenSyncAvailable extends Consumer {
   constructor(
     consumer: DomainEventConsumer,
     private readonly registrar: KeychainCandidateRegistrar,
+    private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
   }
@@ -33,6 +35,14 @@ export default class RegisterKeychainWhenSyncAvailable extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
+    this.tracker.markAvailable(
+      'keychain',
+      String(event.attributes.ownerIdentityId || event.aggregateId),
+      event.attributes.requestId
+        ? String(event.attributes.requestId)
+        : undefined,
+    );
+
     await this.registrar.register(
       new RegisterKeychainCandidateMessage(
         String(event.attributes.externalIdentifier),

@@ -250,6 +250,39 @@ Implemented:
 - persist owner state in MongoDB
 - load persisted node state when the API process starts
 
+### Trigger node sync
+
+```http
+POST /node/sync
+```
+
+Requires signed request headers. If the node has an owner, the signer must be
+the current owner.
+
+Response:
+
+```json
+{
+  "requestId": "<syncRequestId>",
+  "identityRequests": 1,
+  "keychainRequests": 1,
+  "conversationRequests": 1
+}
+```
+
+Implemented:
+
+- publish an immediate node heartbeat
+- publish scoped `sync_requested` events for locally known identities,
+  keychains and conversations
+- include `requestId`, `requesterNodeId` and known local version hints when
+  available
+- use responder suppression so peers wait a deterministic short delay, cancel
+  when an equivalent `sync_available` is observed first, and respond at most
+  once per `requestId` and resource
+- run the same synchronization once during node startup after IPFS and
+  consumers are ready
+
 ### Get active peers
 
 ```http

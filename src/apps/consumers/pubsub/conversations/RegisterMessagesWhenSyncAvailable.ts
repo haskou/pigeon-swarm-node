@@ -1,6 +1,7 @@
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
@@ -16,6 +17,7 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   constructor(
     consumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
+    private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
   }
@@ -48,6 +50,14 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
+    this.tracker.markAvailable(
+      'conversation',
+      event.aggregateId,
+      event.attributes.requestId
+        ? String(event.attributes.requestId)
+        : undefined,
+    );
+
     const candidates = Array.isArray(event.attributes.messageCandidates)
       ? event.attributes.messageCandidates.filter((candidate) =>
           this.isMessageCandidate(candidate),

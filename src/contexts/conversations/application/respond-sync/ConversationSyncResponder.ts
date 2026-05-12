@@ -1,3 +1,4 @@
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { ConversationSyncAvailableEvent } from '../../domain/events/ConversationSyncAvailableEvent';
@@ -10,11 +11,22 @@ export default class ConversationSyncResponder {
   constructor(
     private readonly repository: ConversationRepository,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {}
 
   public async respond(
     message: ConversationSyncResponseMessage,
   ): Promise<void> {
+    const shouldRespond = await this.tracker.shouldRespond(
+      'conversation',
+      message.conversationId.valueOf(),
+      message.requestId?.valueOf(),
+    );
+
+    if (!shouldRespond) {
+      return;
+    }
+
     const messageCandidates = await this.repository.findMessageCandidates(
       message.conversationId,
       ConversationSyncResponder.MESSAGE_CANDIDATE_LIMIT,

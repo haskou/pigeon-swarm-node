@@ -16,6 +16,7 @@ import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNet
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
+import { PostNodeSyncRoute } from '@app/apps/apis/nodes-api/routes/PostNodeSyncRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
 import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/PatchNotificationRoute';
@@ -148,6 +149,7 @@ export default class Server {
           GetNodeRoute,
           GetNodeNetworksRoute,
           PostNodeNetworkRoute,
+          PostNodeSyncRoute,
           PutNodeOwnerRoute,
           GetPeersRoute,
           GetNotificationsRoute,
