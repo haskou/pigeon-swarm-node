@@ -31,18 +31,15 @@ describe('ConversationMessageRegistrar', () => {
     conversationId: ConversationId,
     messageId: MessageId,
   ): MessageSent {
-    return MessageSent.create(
+    return MessageSent.create({
+      authorId: mother.author,
       conversationId,
-      mother.author,
-      new EncryptedMessagePayload('encrypted-payload'),
-      new Signature(
+      encryptedPayload: new EncryptedMessagePayload('encrypted-payload'),
+      id: messageId,
+      signature: new Signature(
         'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
       ),
-      [],
-      [],
-      undefined,
-      messageId,
-    );
+    });
   }
 
   it('registers a remote candidate that matches the announced message', async () => {
@@ -141,18 +138,15 @@ describe('ConversationMessageRegistrar', () => {
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const outsider = await ConversationMother.generateIdentityId();
-    const candidate = MessageSent.create(
+    const candidate = MessageSent.create({
+      authorId: outsider,
       conversationId,
-      outsider,
-      new EncryptedMessagePayload('encrypted-payload'),
-      new Signature(
+      encryptedPayload: new EncryptedMessagePayload('encrypted-payload'),
+      id: messageId,
+      signature: new Signature(
         'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
       ),
-      [],
-      [],
-      undefined,
-      messageId,
-    );
+    });
 
     repository.findById.mockResolvedValue(conversation);
     repository.findCandidateMessageById.mockResolvedValue(candidate);

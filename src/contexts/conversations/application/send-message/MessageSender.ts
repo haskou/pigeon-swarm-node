@@ -28,11 +28,13 @@ export default class MessageSender {
       message.authorIdentityId,
       message.encryptedPayload,
       message.signature,
-      message.attachmentExternalIdentifiers,
-      message.createdAt,
-      message.id,
-      message.replyToMessageId,
-      message.previousMessageIds,
+      {
+        attachmentExternalIdentifiers: message.attachmentExternalIdentifiers,
+        createdAt: message.createdAt,
+        id: message.id,
+        previousMessageIds: message.previousMessageIds,
+        replyToMessageId: message.replyToMessageId,
+      },
     );
 
     const isValidSignature = this.signatureService.isValidSignature(

@@ -1,7 +1,6 @@
-/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature, Timestamp } from '@haskou/value-objects';
 
+import { MessageMetadata } from './MessageMetadata';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageId } from './value-objects/MessageId';
@@ -23,13 +22,7 @@ export abstract class Message {
   private readonly attachmentExternalIdentifiers: AttachmentExternalIdentifiers;
 
   protected constructor(
-    private readonly id: MessageId,
-    private readonly conversationId: ConversationId,
-    private readonly authorId: IdentityId,
-    private readonly previousMessageIds: MessageId[],
-    private readonly createdAt: Timestamp,
-    private readonly signature: Signature,
-    private readonly replyToMessageId?: MessageId,
+    private readonly metadata: MessageMetadata,
     attachmentExternalIdentifiers: AttachmentExternalIdentifiers = [],
   ) {
     this.attachmentExternalIdentifiers = attachmentExternalIdentifiers;
@@ -40,28 +33,28 @@ export abstract class Message {
       attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
         (externalIdentifier) => externalIdentifier.valueOf(),
       ),
-      authorId: this.authorId.valueOf(),
-      conversationId: this.conversationId.valueOf(),
-      createdAt: this.createdAt.valueOf(),
-      id: this.id.valueOf(),
-      previousMessageIds: this.previousMessageIds.map((messageId) =>
-        messageId.valueOf(),
-      ),
-      replyToMessageId: this.replyToMessageId?.valueOf(),
-      signature: this.signature.valueOf(),
+      authorId: this.metadata.getAuthorId().valueOf(),
+      conversationId: this.metadata.getConversationId().valueOf(),
+      createdAt: this.metadata.getCreatedAt().valueOf(),
+      id: this.metadata.getId().valueOf(),
+      previousMessageIds: this.metadata
+        .getPreviousMessageIds()
+        .map((messageId) => messageId.valueOf()),
+      replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
+      signature: this.metadata.getSignature().valueOf(),
     };
   }
 
   public getId(): MessageId {
-    return this.id;
+    return this.metadata.getId();
   }
 
   public getConversationId(): ConversationId {
-    return this.conversationId;
+    return this.metadata.getConversationId();
   }
 
   public getAuthorId(): IdentityId {
-    return this.authorId;
+    return this.metadata.getAuthorId();
   }
 
   public abstract getType(): MessageType;
@@ -71,7 +64,7 @@ export abstract class Message {
   }
 
   public getReplyToMessageId(): MessageId | undefined {
-    return this.replyToMessageId;
+    return this.metadata.getReplyToMessageId();
   }
 
   public toPrimitives() {

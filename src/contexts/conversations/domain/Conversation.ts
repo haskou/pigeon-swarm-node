@@ -1,4 +1,3 @@
-/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
@@ -26,6 +25,14 @@ import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
 import { MessageType } from './value-objects/MessageType';
+
+type MessageSendOptions = {
+  attachmentExternalIdentifiers?: AttachmentExternalIdentifier[];
+  createdAt?: Timestamp;
+  id?: MessageId;
+  previousMessageIds?: MessageId[];
+  replyToMessageId?: MessageId;
+};
 
 export class Conversation extends AggregateRoot {
   public static fromPrimitives(
@@ -124,28 +131,24 @@ export class Conversation extends AggregateRoot {
     authorId: IdentityId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
-    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
-    createdAt: Timestamp = Timestamp.now(),
-    id: MessageId = MessageId.generate(),
-    replyToMessageId?: MessageId,
-    previousMessageIds?: MessageId[],
+    options: MessageSendOptions = {},
   ): MessageSent {
     this.assertIsParticipant(authorId);
-    this.assertCanReplyToMessage(replyToMessageId);
-    const messagePreviousMessageIds = previousMessageIds ?? [];
+    this.assertCanReplyToMessage(options.replyToMessageId);
+    const messagePreviousMessageIds = options.previousMessageIds ?? [];
     this.assertPreviousMessagesExist(messagePreviousMessageIds);
 
-    const message = MessageSent.create(
-      this.id,
+    const message = MessageSent.create({
+      attachmentExternalIdentifiers: options.attachmentExternalIdentifiers,
       authorId,
+      conversationId: this.id,
+      createdAt: options.createdAt,
       encryptedPayload,
+      id: options.id,
+      previousMessageIds: messagePreviousMessageIds,
+      replyToMessageId: options.replyToMessageId,
       signature,
-      messagePreviousMessageIds,
-      attachmentExternalIdentifiers,
-      createdAt,
-      id,
-      replyToMessageId,
-    );
+    });
 
     this.messages.push(message);
     this.record(
@@ -186,14 +189,14 @@ export class Conversation extends AggregateRoot {
   ): MessageEdited {
     this.assertCanChangeMessage(authorId, targetMessageId);
 
-    const message = MessageEdited.create(
-      this.id,
+    const message = MessageEdited.create({
       authorId,
-      targetMessageId,
+      conversationId: this.id,
       encryptedPayload,
+      previousMessageIds: this.getLastMessageIds(),
       signature,
-      this.getLastMessageIds(),
-    );
+      targetMessageId,
+    });
 
     this.messages.push(message);
     this.record(
@@ -217,15 +220,15 @@ export class Conversation extends AggregateRoot {
   ): MessageDeleted {
     this.assertCanChangeMessage(authorId, targetMessageId);
 
-    const message = MessageDeleted.create(
-      this.id,
+    const message = MessageDeleted.create({
       authorId,
-      targetMessageId,
-      signature,
-      [targetMessageId],
+      conversationId: this.id,
       createdAt,
       id,
-    );
+      previousMessageIds: [targetMessageId],
+      signature,
+      targetMessageId,
+    });
 
     this.messages.push(message);
     this.record(

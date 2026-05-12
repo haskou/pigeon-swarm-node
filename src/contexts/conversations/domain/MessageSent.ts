@@ -1,35 +1,39 @@
-/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
+import { MessageMetadata } from './MessageMetadata';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
 
+export type MessageSentCreateData = {
+  attachmentExternalIdentifiers?: AttachmentExternalIdentifier[];
+  authorId: IdentityId;
+  conversationId: ConversationId;
+  createdAt?: Timestamp;
+  encryptedPayload: EncryptedMessagePayload;
+  id?: MessageId;
+  previousMessageIds?: MessageId[];
+  replyToMessageId?: MessageId;
+  signature: Signature;
+};
+
 export class MessageSent extends Message {
-  public static create(
-    conversationId: ConversationId,
-    authorId: IdentityId,
-    encryptedPayload: EncryptedMessagePayload,
-    signature: Signature,
-    previousMessageIds: MessageId[] = [],
-    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
-    createdAt: Timestamp = Timestamp.now(),
-    id: MessageId = MessageId.generate(),
-    replyToMessageId?: MessageId,
-  ): MessageSent {
+  public static create(data: MessageSentCreateData): MessageSent {
     return new MessageSent(
-      id,
-      conversationId,
-      authorId,
-      encryptedPayload,
-      previousMessageIds,
-      createdAt,
-      signature,
-      attachmentExternalIdentifiers,
-      replyToMessageId,
+      new MessageMetadata(
+        data.id ?? MessageId.generate(),
+        data.conversationId,
+        data.authorId,
+        data.previousMessageIds ?? [],
+        data.createdAt ?? Timestamp.now(),
+        data.signature,
+        data.replyToMessageId,
+      ),
+      data.encryptedPayload,
+      data.attachmentExternalIdentifiers,
     );
   }
 
@@ -37,46 +41,33 @@ export class MessageSent extends Message {
     primitives: PrimitiveOf<MessageSent>,
   ): MessageSent {
     return new MessageSent(
-      new MessageId(primitives.id),
-      new ConversationId(primitives.conversationId),
-      new IdentityId(primitives.authorId),
-      new EncryptedMessagePayload(primitives.encryptedPayload as string),
-      primitives.previousMessageIds.map(
-        (messageId) => new MessageId(messageId),
+      new MessageMetadata(
+        new MessageId(primitives.id),
+        new ConversationId(primitives.conversationId),
+        new IdentityId(primitives.authorId),
+        primitives.previousMessageIds.map(
+          (messageId) => new MessageId(messageId),
+        ),
+        new Timestamp(primitives.createdAt),
+        new Signature(primitives.signature),
+        primitives.replyToMessageId
+          ? new MessageId(primitives.replyToMessageId)
+          : undefined,
       ),
-      new Timestamp(primitives.createdAt),
-      new Signature(primitives.signature),
+      new EncryptedMessagePayload(primitives.encryptedPayload as string),
       primitives.attachmentExternalIdentifiers.map(
         (externalIdentifier) =>
           new AttachmentExternalIdentifier(externalIdentifier),
       ),
-      primitives.replyToMessageId
-        ? new MessageId(primitives.replyToMessageId)
-        : undefined,
     );
   }
 
   constructor(
-    id: MessageId,
-    conversationId: ConversationId,
-    authorId: IdentityId,
+    metadata: MessageMetadata,
     private readonly encryptedPayload: EncryptedMessagePayload,
-    previousMessageIds: MessageId[],
-    createdAt: Timestamp,
-    signature: Signature,
     attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
-    replyToMessageId?: MessageId,
   ) {
-    super(
-      id,
-      conversationId,
-      authorId,
-      previousMessageIds,
-      createdAt,
-      signature,
-      replyToMessageId,
-      attachmentExternalIdentifiers,
-    );
+    super(metadata, attachmentExternalIdentifiers);
   }
 
   public getType(): MessageType {
