@@ -22,6 +22,7 @@ setDefaultTimeout(20_000);
 let kernel: Kernel | null = null;
 
 type TestLogger = {
+  debug(message: string): void;
   error(message: string): void;
   info(message: string): void;
   warn(message: string): void;
@@ -64,6 +65,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
         _logs: TestLogger;
       }
     )._logs = {
+      debug: () => undefined,
       error: () => undefined,
       info: () => undefined,
       warn: () => undefined,
