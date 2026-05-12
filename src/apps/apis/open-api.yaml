@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm APIs
   version: 1.0.0
-  description: Aggregated OpenAPI document built with references to each API file.
+  description: Aggregated OpenAPI document built with references to each API file. The WebSocket realtime upgrade endpoint is documented in docs/api.md.
 tags:
   - name: conversations
   - name: identities

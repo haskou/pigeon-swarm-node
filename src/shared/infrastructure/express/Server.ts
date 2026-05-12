@@ -27,6 +27,7 @@ import { createExpressServer } from 'routing-controllers';
 import { ServerNotRunningError } from '../errors/ServerNotRunningError';
 import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
+import { WebSocketRealtimeServer } from '../websocket/WebSocketRealtimeServer';
 import { HttpErrorHandler } from './HttpErrorHandler';
 
 type HttpApp = express.Application;
@@ -36,6 +37,7 @@ type SwaggerRouteMap = Record<string, string>;
 export default class Server {
   private _app: HttpApp | undefined;
   private _server: HttpServer | undefined;
+  private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
   private buildSwaggerHtml(
     routePrefix: string,
@@ -178,6 +180,7 @@ export default class Server {
       this._server = this.app.listen(process.env.API_PORT || 8080, () => {
         resolve();
       });
+      this.webSocketRealtimeServer.attach(this._server, `${routePrefix}/ws`);
     });
   }
 }

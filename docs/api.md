@@ -1,6 +1,6 @@
 # Pigeon Swarm API
 
-Last updated: 2026-05-11.
+Last updated: 2026-05-12.
 
 This document describes the HTTP API currently implemented by the node. Planned
 or intentionally unsupported API shapes are kept in the final
@@ -21,6 +21,8 @@ contract.
 - Node-to-node missed-message recovery is documented separately in
   [PubSub Sync Protocol](pubsub-sync-protocol.md).
 - Keychain design is documented separately in [Keychains](keychains.md).
+- Frontend WebSocket usage is documented separately in
+  [Frontend Realtime WebSocket](frontend-websocket-realtime.md).
 
 ## Authentication
 
@@ -62,6 +64,97 @@ This applies to:
 - `GET /keychains/{identityId}`
 
 Header values such as `X-Identity-Id` are not URL encoded.
+
+## Realtime WebSocket API
+
+Realtime events are exposed through a WebSocket upgrade endpoint:
+
+```http
+GET /ws
+```
+
+This endpoint is intentionally documented here instead of in OpenAPI because it
+is an HTTP upgrade, not a regular request/response endpoint.
+
+Browser clients cannot set custom headers in the native `WebSocket` constructor,
+so they must authenticate with signed query parameters:
+
+```ts
+const path = '/ws';
+const timestamp = String(Date.now());
+const nonce = crypto.randomUUID();
+const body = {};
+const canonicalPayload = {
+  bodyHash: sha256(JSON.stringify(body)),
+  method: 'GET',
+  nonce,
+  path,
+  timestamp,
+};
+const signature = sign(JSON.stringify(canonicalPayload));
+const url =
+  `ws://localhost:8080${path}` +
+  `?identityId=${encodeURIComponent(identityId)}` +
+  `&timestamp=${encodeURIComponent(timestamp)}` +
+  `&nonce=${encodeURIComponent(nonce)}` +
+  `&signature=${encodeURIComponent(signature)}`;
+const socket = new WebSocket(url);
+```
+
+Non-browser clients may send the same signature through headers:
+
+```http
+X-Identity-Id: <identityId>
+X-Timestamp: <timestamp>
+X-Nonce: <nonce>
+X-Signature: <signature>
+```
+
+The signed path is the WebSocket path without query string. If `ROUTE_PREFIX`
+is configured, sign `<ROUTE_PREFIX>/ws`.
+
+Connection acknowledgement:
+
+```json
+{
+  "type": "connection_ack",
+  "identityId": "<identityId>"
+}
+```
+
+Domain event payload:
+
+```json
+{
+  "type": "domain_event",
+  "event": {
+    "aggregate_id": "<aggregateId>",
+    "attributes": {},
+    "causation_id": "<eventId>",
+    "correlation_id": "<eventId>",
+    "event_id": "<eventId>",
+    "occurred_on": 1770000000000,
+    "type": "<domain.event.name>"
+  }
+}
+```
+
+Implemented:
+
+- require a valid signed WebSocket handshake
+- accept browser-compatible query parameter authentication
+- accept header authentication for non-browser clients
+- reject stale timestamps and reused WebSocket nonces
+- push domain events after they have been published by the local node
+- deliver identity events only to the matching identity connection
+- deliver keychain events only to the matching keychain owner
+- deliver notification events only to the notification recipient
+- deliver conversation events only to the conversation participants when the
+  event carries `participantIds`
+- deliver node-wide events, such as heartbeat/peer updates, to all
+  authenticated WebSocket clients on the local node
+- drop non-node events that do not carry enough identity information to route
+  them safely
 
 ## Node HTTP API
 
@@ -805,15 +898,14 @@ Planned:
 - define response when only one peer has missing messages
 - define sync cursor persistence
 
-### Realtime WebSocket API
+### Realtime WebSocket Subscriptions
 
 ```http
-GET /realtime
+GET /ws
 ```
 
 Planned:
 
-- define authentication handshake
 - define reconnect behavior
 - define heartbeat/ping interval
 - define event ack format

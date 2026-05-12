@@ -1,0 +1,163 @@
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { WebSocket } from 'ws';
+
+type WebSocketRealtimeMessage =
+  | {
+      identityId: string;
+      type: 'connection_ack';
+    }
+  | {
+      event: unknown;
+      type: 'domain_event';
+    };
+
+const identityAttributeKeys = [
+  'authorIdentityId',
+  'creatorIdentityId',
+  'deletedBy',
+  'editedBy',
+  'inviteeIdentityId',
+  'inviterIdentityId',
+  'ownerIdentityId',
+  'participantIds',
+  'recipientIdentityId',
+  'requesterIdentityId',
+  'senderIdentityId',
+  'author_id',
+  'creator_id',
+  'deleted_by',
+  'edited_by',
+  'invitee_id',
+  'inviter_id',
+  'owner_id',
+  'participant_ids',
+  'recipient_id',
+  'requester_id',
+  'sender_id',
+];
+
+export class WebSocketEventHub {
+  private readonly clients = new Map<string, Set<WebSocket>>();
+
+  private broadcast(
+    event: DomainEvent,
+    message: WebSocketRealtimeMessage,
+  ): void {
+    const recipients = this.getEventRecipients(event);
+    const targetClients =
+      recipients.size > 0
+        ? [...recipients].map((recipient) => this.clients.get(recipient))
+        : this.getNodeWideClients(event);
+
+    for (const identityClients of targetClients) {
+      if (!identityClients) {
+        continue;
+      }
+
+      for (const client of identityClients) {
+        this.send(client, message);
+      }
+    }
+  }
+
+  private getEventRecipients(event: DomainEvent): Set<string> {
+    const recipients = new Set<string>();
+
+    for (const key of identityAttributeKeys) {
+      this.collectIdentityValues(event.attributes[key], recipients);
+    }
+
+    if (this.isIdentityEvent(event) || this.isKeychainEvent(event)) {
+      recipients.add(event.aggregateId);
+    }
+
+    return recipients;
+  }
+
+  private getNodeWideClients(event: DomainEvent): Array<Set<WebSocket>> {
+    if (!this.isNodeWideEvent(event)) {
+      return [];
+    }
+
+    return [...this.clients.values()];
+  }
+
+  private isIdentityEvent(event: DomainEvent): boolean {
+    return event.eventName().startsWith('identities.');
+  }
+
+  private isKeychainEvent(event: DomainEvent): boolean {
+    return event.eventName().startsWith('keychains.');
+  }
+
+  private isNodeWideEvent(event: DomainEvent): boolean {
+    return event.eventName().startsWith('nodes.');
+  }
+
+  private collectIdentityValues(value: unknown, recipients: Set<string>): void {
+    if (typeof value === 'string' && value.length > 0) {
+      recipients.add(value);
+
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        this.collectIdentityValues(item, recipients);
+      }
+    }
+  }
+
+  private send(client: WebSocket, message: WebSocketRealtimeMessage): void {
+    if (client.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    client.send(JSON.stringify(message));
+  }
+
+  private unregister(identityId: string, client: WebSocket): void {
+    const identityClients = this.clients.get(identityId);
+
+    if (!identityClients) {
+      return;
+    }
+
+    identityClients.delete(client);
+
+    if (identityClients.size === 0) {
+      this.clients.delete(identityId);
+    }
+  }
+
+  public clear(): void {
+    this.clients.clear();
+  }
+
+  public publish(events: DomainEvent[]): void {
+    for (const event of events) {
+      this.broadcast(event, {
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      });
+    }
+  }
+
+  public register(identityId: IdentityId, client: WebSocket): void {
+    const identityIdValue = identityId.toString();
+    const identityClients = this.clients.get(identityIdValue) || new Set();
+
+    identityClients.add(client);
+    this.clients.set(identityIdValue, identityClients);
+
+    client.on('close', () => this.unregister(identityIdValue, client));
+    client.on('error', () => this.unregister(identityIdValue, client));
+    this.send(client, {
+      identityId: identityIdValue,
+      type: 'connection_ack',
+    });
+  }
+}
+
+export const webSocketEventHub = new WebSocketEventHub();
