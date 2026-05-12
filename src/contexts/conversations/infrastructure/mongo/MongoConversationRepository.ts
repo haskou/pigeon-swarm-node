@@ -330,6 +330,12 @@ export default class MongoConversationRepository implements Repository {
     }));
   }
 
+  public async findConversationIdsWithMessages(): Promise<string[]> {
+    const collection = await this.messageMetadataCollection();
+
+    return collection.distinct('conversationId', { valid: true });
+  }
+
   public async findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,

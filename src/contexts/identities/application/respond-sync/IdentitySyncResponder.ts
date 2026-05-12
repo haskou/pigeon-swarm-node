@@ -1,3 +1,4 @@
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { IdentitySyncAvailableEvent } from '../../domain/events/IdentitySyncAvailableEvent';
@@ -8,9 +9,20 @@ export default class IdentitySyncResponder {
   constructor(
     private readonly repository: IdentityRepository,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {}
 
   public async respond(message: IdentitySyncResponseMessage): Promise<void> {
+    const shouldRespond = await this.tracker.shouldRespond(
+      'identity',
+      message.identityId.valueOf(),
+      message.requestId,
+    );
+
+    if (!shouldRespond) {
+      return;
+    }
+
     const candidates = await this.repository.findCandidateReferencesById(
       message.identityId,
     );

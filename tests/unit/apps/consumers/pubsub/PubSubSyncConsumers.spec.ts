@@ -38,9 +38,10 @@ import { KeychainSyncResponseMessage } from '@app/contexts/keychains/application
 import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
-import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
 import { NodePeerRegisterMessage } from '@app/contexts/nodes/application/register-peer/messages/NodePeerRegisterMessage';
+import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -53,10 +54,12 @@ describe('PubSub sync consumers', () => {
   const externalIdentifier = 'bafybeigdyrztomockexternalidentifier';
 
   let eventConsumer: MockProxy<DomainEventConsumer>;
+  let suppressionTracker: MockProxy<SyncResponseSuppressionTracker>;
 
   beforeEach(() => {
     process.env.SERVICE_NAME = 'pigeon-swarm';
     eventConsumer = mock<DomainEventConsumer>();
+    suppressionTracker = mock<SyncResponseSuppressionTracker>();
   });
 
   it('synchronizes identity updates through the published identity registrar', async () => {
@@ -108,6 +111,7 @@ describe('PubSub sync consumers', () => {
     const consumer = new RegisterIdentityWhenSyncAvailable(
       eventConsumer,
       registrar,
+      suppressionTracker,
     );
 
     await consumer.handler(
@@ -116,6 +120,11 @@ describe('PubSub sync consumers', () => {
       }),
     );
 
+    expect(suppressionTracker.markAvailable).toHaveBeenCalledWith(
+      'identity',
+      'identity-sync',
+      undefined,
+    );
     expect(registrar.register).toHaveBeenCalledWith(
       expect.any(RegisterIdentityCandidateMessage),
     );
@@ -136,7 +145,9 @@ describe('PubSub sync consumers', () => {
       finder,
     );
 
-    await registerConsumer.handler(new KeychainWasPublishedEvent(ownerIdentityId));
+    await registerConsumer.handler(
+      new KeychainWasPublishedEvent(ownerIdentityId),
+    );
     await syncConsumer.handler(new KeychainWasPublishedEvent(ownerIdentityId));
 
     expect(finder.find).toHaveBeenCalledWith(
@@ -154,7 +165,9 @@ describe('PubSub sync consumers', () => {
     const consumer = new RespondToKeychainSyncRequest(eventConsumer, responder);
 
     await consumer.handler(
-      new KeychainSyncRequestedEvent(ownerIdentityId, { requestId: 'request-2' }),
+      new KeychainSyncRequestedEvent(ownerIdentityId, {
+        requestId: 'request-2',
+      }),
     );
 
     expect(responder.respond).toHaveBeenCalledWith(
@@ -171,6 +184,7 @@ describe('PubSub sync consumers', () => {
     const consumer = new RegisterKeychainWhenSyncAvailable(
       eventConsumer,
       registrar,
+      suppressionTracker,
     );
 
     await consumer.handler(
@@ -179,6 +193,11 @@ describe('PubSub sync consumers', () => {
       }),
     );
 
+    expect(suppressionTracker.markAvailable).toHaveBeenCalledWith(
+      'keychain',
+      'keychain-sync',
+      undefined,
+    );
     expect(registrar.register).toHaveBeenCalledWith(
       expect.any(RegisterKeychainCandidateMessage),
     );
@@ -254,6 +273,7 @@ describe('PubSub sync consumers', () => {
     const consumer = new RegisterMessagesWhenSyncAvailable(
       eventConsumer,
       registrar,
+      suppressionTracker,
     );
 
     await consumer.handler(
@@ -262,6 +282,11 @@ describe('PubSub sync consumers', () => {
       }),
     );
 
+    expect(suppressionTracker.markAvailable).toHaveBeenCalledWith(
+      'conversation',
+      conversationId,
+      undefined,
+    );
     expect(registrar.register).toHaveBeenCalledTimes(1);
     expect(registrar.register).toHaveBeenCalledWith(
       expect.any(RegisterConversationMessage),
