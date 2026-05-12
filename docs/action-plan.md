@@ -1,6 +1,6 @@
 # Pigeon Swarm Action Plan
 
-Last updated: 2026-05-11.
+Last updated: 2026-05-12.
 
 Keep this file short. Completed slices should move into Git history, API docs
 and tests instead of staying here as long-form notes.
@@ -50,6 +50,53 @@ Tests:
   receives it by WebSocket.
 - Cucumber: unauthorized conversation subscription is rejected.
 - Cucumber: reconnect recovers missed events through HTTP pagination or sync.
+
+## Next Slice 3: Node Startup Sync MVP
+
+Goal: when a node starts, ask peers for missing local data without making every
+peer respond at once.
+
+Steps:
+
+1. Add a startup synchronizer after Mongo, logs, IPFS networks and consumers are
+   ready.
+2. Send an immediate node heartbeat on startup.
+3. Publish sync requests for locally known identities, keychains and
+   conversations.
+4. Include `requestId`, requester node/peer id and known local version/candidate
+   hints in sync requests.
+5. Add responder suppression: deterministic delay, cancel if a sufficient
+   `sync_available` for the same `requestId` is observed first, and respond at
+   most once per `requestId/resource`.
+6. Add a signed `POST /node/sync` endpoint to trigger the same bootstrap sync
+   manually.
+7. Document the startup sync request/response contract.
+
+Tests:
+
+- Unit: startup synchronizer publishes heartbeat and scoped sync requests.
+- Unit: responders suppress duplicate responses for the same request.
+- Consumer: one peer responds when it has useful data.
+- Consumer: a second peer cancels when it sees an equivalent response first.
+
+## Later Slice: Node Startup Sync Final
+
+Goal: make startup synchronization scalable, resumable and quiet on larger
+networks.
+
+Steps:
+
+1. Persist per-context sync cursors and `lastSyncAt` metadata.
+2. Add paginated conversation sync with `limit`, `since`, `before/after` or
+   known-message hints.
+3. Return only IPFS candidates/references in sync responses, not large payloads.
+4. Add requester-side cutoffs: timeout, max responses and “good enough”
+   completion criteria per resource.
+5. Add responder-side rate limits per requester/peer and network.
+6. Add discovery for conversations not yet known locally, using invitation,
+   participant or index events without exposing unrelated conversations.
+7. Emit WebSocket updates when bootstrap sync registers new local data.
+8. Add two-real-node end-to-end coverage for cold start recovery.
 
 ## Later Slices
 
