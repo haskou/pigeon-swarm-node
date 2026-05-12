@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Communities API
+  version: 1.0.0
+  description: Endpoints for private communities, members, and text channel metadata.
+tags:
+  - name: communities
+paths:
+  /communities/:
+    get:
+      tags:
+        - communities
+      summary: List private communities for the authenticated member
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Communities where the authenticated identity is a member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunitiesResource'
+    post:
+      tags:
+        - communities
+      summary: Create a private community
+      description: The authenticated identity becomes the owner and first member.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityBody'
+      responses:
+        '200':
+          description: Community created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+  /communities/{communityId}:
+    get:
+      tags:
+        - communities
+      summary: Get a private community
+      description: Only community members can read the community.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not a community member.
+    patch:
+      tags:
+        - communities
+      summary: Update private community profile
+      description: Only the community owner can update the name, description, or banner CID.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchCommunityBody'
+      responses:
+        '200':
+          description: Community updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner.
+  /communities/{communityId}/members:
+    get:
+      tags:
+        - communities
+      summary: List private community members
+      description: Only community members can list members.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMembersResource'
+    post:
+      tags:
+        - communities
+      summary: Add a member to a private community
+      description: Only the community owner can add members. Adding an existing member is idempotent.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityMemberBody'
+      responses:
+        '200':
+          description: Member added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner.
+  /communities/{communityId}/channels:
+    get:
+      tags:
+        - communities
+      summary: List private community channels
+      description: Only community members can list text channel metadata.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community text channels.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelsResource'
+  /communities/{communityId}/channels/text:
+    post:
+      tags:
+        - communities
+      summary: Create a private community text channel
+      description: Only the community owner can create text channels.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityTextChannelBody'
+      responses:
+        '200':
+          description: Text channel created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityTextChannelResource'
+        '409':
+          description: Authenticated identity is not the community owner.
+  /communities/{communityId}/channels/{channelId}:
+    patch:
+      tags:
+        - communities
+      summary: Rename a private community text channel
+      description: Only the community owner can rename text channels.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchCommunityChannelBody'
+      responses:
+        '200':
+          description: Channel renamed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner or the channel does not exist.
+components:
+  parameters:
+    CommunityId:
+      in: path
+      name: communityId
+      required: true
+      schema:
+        type: string
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    CommunityTextChannelResource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - createdAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - text
+        createdAt:
+          type: integer
+    CommunityResource:
+      type: object
+      required:
+        - id
+        - networkId
+        - ownerIdentityId
+        - name
+        - description
+        - memberIds
+        - textChannels
+        - visibility
+        - createdAt
+      properties:
+        id:
+          type: string
+        networkId:
+          type: string
+        ownerIdentityId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        banner:
+          type: string
+          description: Public IPFS CID for the community banner.
+        memberIds:
+          type: array
+          items:
+            type: string
+        textChannels:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityTextChannelResource'
+        visibility:
+          type: string
+          enum:
+            - private
+        createdAt:
+          type: integer
+    CommunitiesResource:
+      type: object
+      required:
+        - communities
+      properties:
+        communities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityResource'
+    CommunityMembersResource:
+      type: object
+      required:
+        - memberIds
+      properties:
+        memberIds:
+          type: array
+          items:
+            type: string
+    CommunityChannelsResource:
+      type: object
+      required:
+        - channels
+      properties:
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityTextChannelResource'
+    PostCommunityBody:
+      type: object
+      required:
+        - networkId
+        - name
+        - description
+      properties:
+        networkId:
+          type: string
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+        banner:
+          type: string
+          description: Optional public IPFS CID.
+    PatchCommunityBody:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+        banner:
+          type: string
+          description: Optional public IPFS CID. Omit it to remove the banner.
+    PostCommunityMemberBody:
+      type: object
+      required:
+        - identityId
+      properties:
+        identityId:
+          type: string
+    PostCommunityTextChannelBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 80
+    PatchCommunityChannelBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 80

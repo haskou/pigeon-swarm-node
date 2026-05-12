@@ -1,0 +1,109 @@
+@startuml CommunitiesClasses
+
+skinparam classAttributeIconSize 0
+
+package "communities/domain" {
+  class Community {
+    - id: CommunityId
+    - networkId: NetworkId
+    - ownerIdentityId: IdentityId
+    - profile: CommunityProfile
+    - members: IdentityId[]
+    - textChannels: CommunityTextChannel[]
+    - createdAt: Timestamp
+    + create(ownerIdentityId, networkId, name, description, banner?): Community
+    + addMember(actor, member): void
+    + addTextChannel(actor, name): CommunityTextChannel
+    + renameTextChannel(actor, channelId, name): void
+    + updateProfile(actor, name, description, banner?): void
+    + assertIsMember(identityId): void
+  }
+
+  class CommunityTextChannel {
+    - id: CommunityChannelId
+    - name: CommunityChannelName
+    - createdAt: Timestamp
+    + create(name): CommunityTextChannel
+    + rename(name): void
+  }
+
+  class CommunityProfile {
+    - name: CommunityName
+    - description: CommunityDescription
+    - banner: CommunityBanner?
+  }
+
+  class CommunityId
+  class CommunityName
+  class CommunityDescription
+  class CommunityBanner
+  class CommunityChannelId
+  class CommunityChannelName
+  interface CommunityRepository {
+    + findById(id): Community?
+    + findByMember(identityId): Community[]
+    + save(community): void
+  }
+
+  Community *-- CommunityTextChannel
+  Community *-- CommunityProfile
+  Community --> CommunityId
+  CommunityProfile --> CommunityName
+  CommunityProfile --> CommunityDescription
+  CommunityProfile --> CommunityBanner
+  CommunityTextChannel --> CommunityChannelId
+  CommunityTextChannel --> CommunityChannelName
+  CommunityRepository ..> Community
+}
+
+package "shared value objects" {
+  class IdentityId
+  class NetworkId
+  class Timestamp
+}
+
+Community --> IdentityId : owner + members
+Community --> NetworkId
+Community --> Timestamp
+CommunityTextChannel --> Timestamp
+
+package "communities/infrastructure" {
+  class MongoCommunityRepository
+  class MongoCommunityDocument
+
+  MongoCommunityRepository ..|> CommunityRepository
+  MongoCommunityRepository --> MongoCommunityDocument
+}
+
+package "communities-api" {
+  class PostCommunityRoute
+  class GetCommunitiesRoute
+  class GetCommunityRoute
+  class PatchCommunityRoute
+  class GetCommunityMembersRoute
+  class PostCommunityMemberRoute
+  class GetCommunityChannelsRoute
+  class PostCommunityTextChannelRoute
+  class PatchCommunityChannelRoute
+
+  PostCommunityRoute ..> Community
+  GetCommunitiesRoute ..> CommunityRepository
+  GetCommunityRoute ..> CommunityRepository
+  PatchCommunityRoute ..> Community
+  GetCommunityMembersRoute ..> Community
+  PostCommunityMemberRoute ..> Community
+  GetCommunityChannelsRoute ..> Community
+  PostCommunityTextChannelRoute ..> Community
+  PatchCommunityChannelRoute ..> Community
+}
+
+note right of Community
+  MVP scope:
+  - private communities only
+  - one owner
+  - owner administers profile,
+    members and text channel metadata
+  - text channel messages are out of scope
+end note
+
+@enduml

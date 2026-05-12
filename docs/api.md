@@ -942,6 +942,209 @@ Signed HTTP request validation:
 - reject reused `X-Nonce` values per identity
 - reject stale `X-Timestamp` values outside the freshness window
 
+## Community HTTP API
+
+Communities are private in the current MVP. A community belongs to one network,
+has one owner, and contains member ids plus text channel metadata. Community
+text channels are not backed by conversation messages in this PR.
+
+Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
+`X-Timestamp`, `X-Nonce` and `X-Signature`.
+
+### List communities
+
+```http
+GET /communities
+```
+
+Response:
+
+```json
+{
+  "communities": [
+    {
+      "id": "<communityId>",
+      "networkId": "<networkId>",
+      "ownerIdentityId": "<identityId>",
+      "name": "Pigeon Lab",
+      "description": "Private workspace",
+      "banner": "<publicImageCid>",
+      "memberIds": ["<identityId>"],
+      "textChannels": [],
+      "visibility": "private",
+      "createdAt": 1773848829055
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- list only communities where the authenticated identity is a member
+- return private community metadata, member ids and text channel metadata
+
+### Create community
+
+```http
+POST /communities
+```
+
+Request:
+
+```json
+{
+  "networkId": "<networkId>",
+  "name": "Pigeon Lab",
+  "description": "Private workspace",
+  "banner": "<publicImageCid>"
+}
+```
+
+Implemented:
+
+- create a private community in the requested network
+- set the authenticated identity as owner
+- add the owner as the first member
+- store `banner` as an optional public IPFS CID, not as base64
+
+### Get community
+
+```http
+GET /communities/{communityId}
+```
+
+Implemented:
+
+- require signed request auth
+- only allow community members to read the community
+
+### Update community profile
+
+```http
+PATCH /communities/{communityId}
+```
+
+Request:
+
+```json
+{
+  "name": "Pigeon Lab",
+  "description": "Updated private workspace",
+  "banner": "<publicImageCid>"
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- update name, description and optional banner CID
+- omit `banner` to remove the banner
+
+### List community members
+
+```http
+GET /communities/{communityId}/members
+```
+
+Response:
+
+```json
+{
+  "memberIds": ["<identityId>"]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- only allow community members to list members
+
+### Add community member
+
+```http
+POST /communities/{communityId}/members
+```
+
+Request:
+
+```json
+{
+  "identityId": "<newMemberIdentityId>"
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- add the identity id as a member
+- treat adding an existing member as idempotent
+
+### List community channels
+
+```http
+GET /communities/{communityId}/channels
+```
+
+Response:
+
+```json
+{
+  "channels": [
+    {
+      "id": "<channelId>",
+      "name": "general",
+      "type": "text",
+      "createdAt": 1773848829055
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- only allow community members to list channel metadata
+
+### Create text channel
+
+```http
+POST /communities/{communityId}/channels/text
+```
+
+Request:
+
+```json
+{
+  "name": "general"
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- create text channel metadata in the community
+- keep channel messages out of scope for this MVP
+
+### Rename channel
+
+```http
+PATCH /communities/{communityId}/channels/{channelId}
+```
+
+Request:
+
+```json
+{
+  "name": "announcements"
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- rename an existing text channel
+
 ## Notification HTTP API
 
 Notifications are for actionable events that require client-side identity

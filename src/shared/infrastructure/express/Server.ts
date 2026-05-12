@@ -1,4 +1,13 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
+import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
+import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
+import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
+import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelRoute';
+import { PatchCommunityRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoute';
+import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
+import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
+import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
@@ -155,6 +164,15 @@ export default class Server {
           GetNotificationsRoute,
           PostNotificationRoute,
           PatchNotificationRoute,
+          GetCommunitiesRoute,
+          PostCommunityRoute,
+          GetCommunityRoute,
+          PatchCommunityRoute,
+          GetCommunityMembersRoute,
+          PostCommunityMemberRoute,
+          GetCommunityChannelsRoute,
+          PostCommunityTextChannelRoute,
+          PatchCommunityChannelRoute,
         ],
         cors: true,
         defaultErrorHandler: false,

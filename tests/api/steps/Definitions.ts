@@ -33,6 +33,8 @@ let kernel: Kernel | null = null;
 export default class Definitions {
   private binaryBody: Buffer | undefined;
   private body: string | undefined;
+  private communityChannelId: string | undefined;
+  private communityId: string | undefined;
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -56,6 +58,8 @@ export default class Definitions {
   public resetScenarioState(): void {
     this.binaryBody = undefined;
     this.body = undefined;
+    this.communityChannelId = undefined;
+    this.communityId = undefined;
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -445,6 +449,147 @@ export default class Definitions {
       ],
       type: 'group',
     });
+  }
+
+  @given('I set a private community body')
+  public iSetAPrivateCommunityBody(): void {
+    this.body = JSON.stringify({
+      banner: 'bafybeigcommunitybanner',
+      description: 'Private API community',
+      name: 'API community',
+      networkId: this.currentNetworkId,
+    });
+  }
+
+  @given('I sign the current community creation request')
+  public async iSignTheCurrentCommunityCreationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/communities/');
+  }
+
+  @given('I remember the current community')
+  public iRememberTheCurrentCommunity(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community response id not found.');
+    }
+
+    this.communityId = this.response.data.id;
+  }
+
+  @given('I set a community member body for another identity')
+  public async iSetACommunityMemberBodyForAnotherIdentity(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      identityId: this.otherIdentityId?.valueOf(),
+    });
+  }
+
+  @given('I sign the current community member request')
+  public async iSignTheCurrentCommunityMemberRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/members`,
+    );
+  }
+
+  @given('the community member signs the current communities request')
+  public async theCommunityMemberSignsTheCurrentCommunitiesRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/communities/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current community request')
+  public async theCommunityMemberSignsTheCurrentCommunityRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I set a community text channel body')
+  public iSetACommunityTextChannelBody(): void {
+    this.body = JSON.stringify({
+      name: 'general',
+    });
+  }
+
+  @given('I sign the current community text channel request')
+  public async iSignTheCurrentCommunityTextChannelRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/channels/text`,
+    );
+  }
+
+  @given('another identity signs the current community text channel request')
+  public async anotherIdentitySignsTheCurrentCommunityTextChannelRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/channels/text`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I remember the current community text channel')
+  public iRememberTheCurrentCommunityTextChannel(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community channel response id not found.');
+    }
+
+    this.communityChannelId = this.response.data.id;
+  }
+
+  @given('I set a community text channel rename body')
+  public iSetACommunityTextChannelRenameBody(): void {
+    this.body = JSON.stringify({
+      name: 'announcements',
+    });
+  }
+
+  @given('I sign the current community text channel rename request')
+  public async iSignTheCurrentCommunityTextChannelRenameRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+    );
   }
 
   @given('I sign the current one-to-one conversation request')
@@ -971,6 +1116,65 @@ export default class Definitions {
 
     this.response = await this.restClient.patch(
       `/notifications/${this.notificationId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST to the current community members')
+  public async iPOSTToTheCurrentCommunityMembers(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/members`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET current communities')
+  public async iGETCurrentCommunities(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/communities/',
+      this.headers,
+    );
+  }
+
+  @when('I GET the current community')
+  public async iGETTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}`,
+      this.headers,
+    );
+  }
+
+  @when('I POST a text channel to the current community')
+  public async iPOSTATextChannelToTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/text`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PATCH the current community text channel')
+  public async iPATCHTheCurrentCommunityTextChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
