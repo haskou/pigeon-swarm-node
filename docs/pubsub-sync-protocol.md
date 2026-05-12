@@ -1,6 +1,6 @@
 # PubSub Sync Protocol
 
-Last updated: 2026-05-09.
+Last updated: 2026-05-12.
 
 This document defines the node-to-node anti-entropy protocol. Clients do not
 use this contract directly; clients use HTTP and WebSocket APIs exposed by their
@@ -13,7 +13,10 @@ selected node.
 - Avoid node-to-node HTTP APIs. Nodes may not know each other's IPs.
 - Keep PubSub as coordination only. Immutable documents are still fetched from
   IPFS/Helia and validated by domain services.
-- Store local progress, request dedupe and retry state in MongoDB.
+- Store local metadata, request suppression and retry state in MongoDB.
+- Keep gossip scoped by network. A node publishes an event only on the networks
+  carried by the event attributes (`networkId`, `networkIds` or
+  `networks[].id`) and ignores hints for unrelated networks.
 
 ## Trust Model
 
@@ -34,8 +37,11 @@ Stable topics stay context/version based:
 
 - `pigeon-swarm.identities.v1.announcements`
 - `pigeon-swarm.identities.v1.sync`
+- `pigeon-swarm.keychains.v1.announcements`
+- `pigeon-swarm.keychains.v1.sync`
 - `pigeon-swarm.conversations.v1.announcements`
 - `pigeon-swarm.conversations.v1.sync`
+- `pigeon-swarm.nodes.v1.announcements`
 
 The message `type` field selects the concrete event/request inside the topic.
 
@@ -43,17 +49,25 @@ The message `type` field selects the concrete event/request inside the topic.
 
 Every sync message uses the normal message-bus envelope plus sync attributes.
 
-Required attributes:
+Sync request/response attributes:
 
 - `requestId`: unique id for request/response correlation.
-- `fromNodeId`: sender node id.
-- `expiresAt`: unix timestamp in milliseconds. Expired messages are ignored.
+- `requesterNodeId`: sender node id for startup/manual sync requests.
+- `networkId`: required when the resource is scoped to one network, such as a
+  conversation.
 
 Optional attributes:
 
 - `replyToNodeId`: intended receiver node id for directed responses. PubSub
   still broadcasts it; receivers filter locally.
-- `networkId`: connectivity scope when the request is network-specific.
+- `knownVersion`: latest local version known by the requester.
+- `knownExternalIdentifier`: latest local external identifier known by the
+  requester when available.
+
+`requestId` is generated per sync trigger by the requester. Responders use a
+suppression tracker to wait a deterministic short delay, cancel their response
+when an equivalent `sync_available` is observed first, and respond at most once
+per `requestId` and resource.
 
 ## Identity Sync
 
@@ -68,8 +82,7 @@ Attributes:
 - `knownVersion`
 - `knownExternalIdentifier`
 - `requestId`
-- `fromNodeId`
-- `expiresAt`
+- `requesterNodeId`
 
 ### `identities.v1.identity.sync_available`
 
@@ -80,19 +93,49 @@ Attributes:
 - `identityId`
 - `version`
 - `externalIdentifier`
-- `previousExternalIdentifier`
 - `requestId`
-- `fromNodeId`
-- `replyToNodeId`
-- `expiresAt`
+- `version`
 
 Receiver behavior:
 
-1. Ignore if `replyToNodeId` exists and does not match the local node.
-2. Ignore if the request is expired or already processed.
-3. Fetch `externalIdentifier` from IPFS/Helia.
-4. Validate identity id, signature and version chain.
-5. Store metadata in MongoDB only after validation succeeds.
+1. Mark the `requestId` as available for the identity to suppress duplicate
+   local responses.
+2. Fetch `externalIdentifier` from IPFS/Helia.
+3. Validate identity id, signature and version chain.
+4. Store metadata in MongoDB only after validation succeeds.
+
+## Keychain Sync
+
+### `keychains.v1.keychain.sync_requested`
+
+Sent when a node starts, reconnects or wants to verify the latest known
+keychain for an identity.
+
+Attributes:
+
+- `ownerIdentityId`
+- `knownVersion`
+- `requestId`
+- `requesterNodeId`
+
+### `keychains.v1.keychain.sync_available`
+
+Sent by a node that has a valid current keychain candidate for the owner.
+
+Attributes:
+
+- `ownerIdentityId`
+- `version`
+- `externalIdentifier`
+- `requestId`
+
+Receiver behavior:
+
+1. Mark the `requestId` as available for the owner identity to suppress
+   duplicate local responses.
+2. Fetch `externalIdentifier` from IPFS/Helia.
+3. Validate owner identity, keychain signature and version chain.
+4. Store metadata in MongoDB only after validation succeeds.
 
 ## Conversation Sync
 
@@ -104,15 +147,12 @@ its local projection may be missing messages.
 Attributes:
 
 - `conversationId`
-- `knownMessageIds`
-- `knownCheckpoint`
-- `limit`
+- `networkId`
 - `requestId`
-- `fromNodeId`
-- `expiresAt`
+- `requesterNodeId`
 
-`knownCheckpoint` is an infrastructure cursor, not a domain value. It may be a
-MongoDB projection cursor or a compact list of known message heads.
+Conversation sync is network-specific. The `networkId` is mandatory and the
+request is published only in that network.
 
 ### `conversations.v1.conversation.sync_available`
 
@@ -121,43 +161,55 @@ Sent by a node that knows messages after the requested checkpoint.
 Attributes:
 
 - `conversationId`
+- `networkId`
 - `messageCandidates`
 - `requestId`
-- `fromNodeId`
-- `replyToNodeId`
-- `expiresAt`
 
 Each `messageCandidates` item contains:
 
 - `messageId`
-- `messageType`
-- `authorIdentityId`
-- `createdAt`
-- `externalIdentifier`
+
+The message id is enough for the receiver to fetch the immutable message
+document through the conversation repository/IPFS path and validate it against
+the conversation aggregate.
 
 Receiver behavior:
 
-1. Ignore directed responses for another node.
-2. Ignore expired or duplicate responses.
+1. Mark the `requestId` as available for the conversation to suppress duplicate
+   local responses.
+2. Ignore malformed candidates without a string `messageId`.
 3. Fetch candidate documents from IPFS/Helia.
 4. Validate signature, participant membership, message type and edit/delete
    target rules.
 5. Store message metadata and update local projections only after validation.
 
+## Announcements And Realtime Bridge
+
+Announcement events are also domain events and can be forwarded to local
+WebSocket clients after they are accepted locally:
+
+- `identities.v1.identity.was_created`
+- `identities.v1.identity.was_updated`
+- `keychains.v1.keychain.was_published`
+- `conversations.v1.conversation.was_created`
+- `conversations.v1.message.was_sent`
+- `conversations.v1.message.was_edited`
+- `conversations.v1.message.was_deleted`
+- `nodes.v1.node.heartbeat.was_sent`
+
+Frontend clients do not consume PubSub directly. They receive filtered
+`domain_event` messages from `/ws` and recover missed data through HTTP reads.
+
 ## MongoDB State
 
-TODO: implement concrete repositories.
+Implemented state is split by context:
 
-Suggested collections:
-
-- `processed_domain_events`
-  - already used for consumer idempotency by `queueName:eventId`
-- `pubsub_sync_requests`
-  - request id, type, from node, status, expiration and retry count
-- `identity_sync_cursors`
-  - identity id, known version, known external identifier and last sync status
-- `conversation_sync_cursors`
-  - conversation id, known checkpoint, last requested at and last completed at
+- consumer idempotency is keyed by `queueName:eventId`
+- identity metadata indexes identity candidates by id, handle and external id
+- keychain metadata indexes candidates by owner identity and version
+- conversation metadata indexes conversations and message documents by
+  conversation id, message id, network id and invalidation state
+- node peer metadata stores last heartbeat per remote node
 
 ## Failure Modes
 
@@ -182,9 +234,7 @@ Offline node starts after a week:
 
 ## Cucumber Scenarios To Add
 
-- Identity sync returns the highest valid local version when no peer has newer
-  data.
-- Identity sync converges when only one peer has the latest valid version.
-- Conversation sync catches up after missed announcements.
-- Duplicate sync responses are ignored by persisted processing cursors.
-- Expired sync responses are ignored.
+- Identity, keychain, conversation and node heartbeat consumers have Cucumber
+  coverage under `tests/consumers/features`.
+- Two-node convergence and long-offline recovery still need higher-level
+  integration coverage with real independent nodes.

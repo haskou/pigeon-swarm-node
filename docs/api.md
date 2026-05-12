@@ -122,6 +122,11 @@ Connection acknowledgement:
 }
 ```
 
+The acknowledged `identityId` is normalized without PEM headers, footers or
+newlines. WebSocket routing uses that same normalized value for byte-for-byte
+recipient matching against event attributes such as `participantIds`,
+`recipientIdentityId` and `ownerIdentityId`.
+
 Domain event payload:
 
 ```json
@@ -155,6 +160,26 @@ Implemented:
   authenticated WebSocket clients on the local node
 - drop non-node events that do not carry enough identity information to route
   them safely
+
+Event contracts used by frontend:
+
+| Event type | Aggregate id | Attributes used by clients/routing |
+| --- | --- | --- |
+| `conversations.v1.conversation.was_created` | conversation id | `networkId`, `participantIds` |
+| `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
+| `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
+| `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
+| `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
+| `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
+| `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
+| `identities.v1.identity.was_created` | identity id | `networkIds` |
+| `identities.v1.identity.was_updated` | identity id | `networkIds` |
+| `keychains.v1.keychain.was_published` | owner identity id | owner is the aggregate id |
+| `nodes.v1.node.heartbeat.was_sent` | node id | `owner`, `networks` |
+| `nodes.v1.node.network.was_added` | node id | node/network metadata |
+
+For `conversations.v1.message.*`, use `event.aggregate_id` as
+`conversationId` and `event.attributes.messageId` as the message id to fetch.
 
 ## Node HTTP API
 
@@ -836,8 +861,8 @@ Implemented:
 - validate the signature against the canonical message payload
 - persist immutable message document in IPFS
 - persist message metadata in MongoDB
-- publish `ConversationMessageWasSentEvent` with `messageId`, `authorId` and
-  `participantIds`
+- publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
+  `networkId` and `participantIds`
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
 
@@ -881,7 +906,8 @@ Implemented:
 - use `previousMessageIds: [messageId]` for deletion signatures, so the client
   signs a deterministic payload based on the message being deleted
 - persist the immutable `deleted` tombstone in IPFS
-- publish `ConversationMessageWasDeletedEvent`
+- publish `ConversationMessageWasDeletedEvent` with `messageId`,
+  `targetMessageId`, `networkId` and `participantIds`
 - invalidate the target message metadata locally so it no longer appears in
   message reads
 - remove the target message block from local IPFS blockstores when present
@@ -995,93 +1021,6 @@ Planned:
 - define response when no peer has missing messages
 - define response when only one peer has missing messages
 - define sync cursor persistence
-
-### Realtime WebSocket Subscriptions
-
-```http
-GET /ws
-```
-
-Planned:
-
-- define reconnect behavior
-- define heartbeat/ping interval
-- define event ack format
-- define backpressure strategy
-
-### Subscribe to a conversation
-
-Client message:
-
-```json
-{
-  "type": "conversation.subscribe",
-  "conversationId": "<conversationId>"
-}
-```
-
-Server response:
-
-```json
-{
-  "type": "conversation.subscribed",
-  "conversationId": "<conversationId>"
-}
-```
-
-Planned:
-
-- reject subscriptions when the authenticated identity is not a participant
-- decide if subscribing triggers a sync
-- decide if subscriptions survive reconnect by session id
-
-### Conversation events
-
-Server messages:
-
-```json
-{
-  "type": "message.sent",
-  "conversationId": "<conversationId>",
-  "messageId": "<messageId>",
-  "externalIdentifier": "<externalIdentifier>"
-}
-```
-
-```json
-{
-  "type": "message.edited",
-  "conversationId": "<conversationId>",
-  "messageId": "<messageId>",
-  "targetMessageId": "<messageId>",
-  "externalIdentifier": "<externalIdentifier>"
-}
-```
-
-```json
-{
-  "type": "message.deleted",
-  "conversationId": "<conversationId>",
-  "messageId": "<messageId>",
-  "targetMessageId": "<messageId>",
-  "externalIdentifier": "<externalIdentifier>"
-}
-```
-
-```json
-{
-  "type": "conversation.synced",
-  "conversationId": "<conversationId>",
-  "newMessages": 0
-}
-```
-
-Planned:
-
-- define if events carry full projections or only identifiers
-- define ordering guarantees per conversation
-- define duplicate event handling
-- define missed event recovery through HTTP pagination
 
 ## Node-to-Node Flow
 

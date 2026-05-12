@@ -18,6 +18,12 @@ package "notifications" {
       +toPrimitives(): object
     }
 
+    note right of Notification
+      status: unread | read
+      state: pending | accepted | declined
+      No expiration flow is implemented.
+    end note
+
     class ConversationInvitationPayload {
       -conversationId: ConversationId
       -inviterIdentityId: IdentityId
@@ -26,6 +32,12 @@ package "notifications" {
       -inviterSignature: Signature
       +toPrimitives(): object
     }
+
+    note right of ConversationInvitationPayload
+      Encrypted conversation key is opaque.
+      Backend never decrypts private keys
+      or conversation keys.
+    end note
 
     class NotificationRepository <interface> {
       +findById(notificationId: NotificationId): Promise<Notification?>
