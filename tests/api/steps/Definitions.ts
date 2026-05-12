@@ -1126,7 +1126,7 @@ export default class Definitions {
       },
     );
 
-    if (this.response.data?.id) {
+    if (this.response?.data?.id) {
       this.createdIdentityId = this.response.data.id;
     }
   }
