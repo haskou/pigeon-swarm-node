@@ -2,6 +2,7 @@ import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttp
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -18,6 +19,12 @@ export abstract class CommunityRouteSupport extends Route {
 
   protected repository(): MongoCommunityRepository {
     return new MongoCommunityRepository(this.get<MongoDB>(MongoDB));
+  }
+
+  protected messageRepository(): MongoCommunityChannelMessageRepository {
+    return new MongoCommunityChannelMessageRepository(
+      this.get<MongoDB>(MongoDB),
+    );
   }
 
   protected async findCommunity(id: string): Promise<Community> {

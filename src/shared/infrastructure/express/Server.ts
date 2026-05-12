@@ -1,10 +1,12 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
+import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
 import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
 import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelRoute';
 import { PatchCommunityRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoute';
+import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
 import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
@@ -173,6 +175,8 @@ export default class Server {
           GetCommunityChannelsRoute,
           PostCommunityTextChannelRoute,
           PatchCommunityChannelRoute,
+          GetCommunityChannelMessagesRoute,
+          PostCommunityChannelMessageRoute,
         ],
         cors: true,
         defaultErrorHandler: false,

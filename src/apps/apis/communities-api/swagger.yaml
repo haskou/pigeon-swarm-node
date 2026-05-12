@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Communities API
   version: 1.0.0
-  description: Endpoints for private communities, members, and text channel metadata.
+  description: Endpoints for private communities, members, text channels, and encrypted channel messages.
 tags:
   - name: communities
 paths:
@@ -216,6 +216,73 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not the community owner or the channel does not exist.
+  /communities/{communityId}/channels/{channelId}/messages:
+    get:
+      tags:
+        - communities
+      summary: List encrypted private community text channel messages
+      description: Only community members can read channel messages. Payloads are client-encrypted and opaque to the backend.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: beforeMessageId
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Channel messages ordered from oldest to newest in the page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessagesResource'
+        '409':
+          description: Authenticated identity is not a member or the channel does not exist.
+    post:
+      tags:
+        - communities
+      summary: Send an encrypted private community text channel message
+      description: Only community members can send channel messages. The backend validates the message signature but never decrypts the payload.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityChannelMessageBody'
+      responses:
+        '200':
+          description: Message stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessageResource'
+        '409':
+          description: Authenticated identity is not a member, the channel does not exist, or the message signature is invalid.
 components:
   parameters:
     CommunityId:
@@ -334,6 +401,58 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityTextChannelResource'
+    CommunityChannelMessageResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - channelId
+        - authorIdentityId
+        - encryptedPayload
+        - signature
+        - attachmentExternalIdentifiers
+        - type
+        - createdAt
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        channelId:
+          type: string
+        authorIdentityId:
+          type: string
+        encryptedPayload:
+          type: string
+        signature:
+          type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string
+        type:
+          type: string
+          enum:
+            - sent
+        createdAt:
+          type: integer
+    CommunityChannelMessagesResource:
+      type: object
+      required:
+        - communityId
+        - channelId
+        - messages
+      properties:
+        communityId:
+          type: string
+        channelId:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityChannelMessageResource'
+        nextBeforeMessageId:
+          type: string
     PostCommunityBody:
       type: object
       required:
@@ -390,3 +509,24 @@ components:
         name:
           type: string
           maxLength: 80
+    PostCommunityChannelMessageBody:
+      type: object
+      required:
+        - id
+        - createdAt
+        - encryptedPayload
+        - signature
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: integer
+        encryptedPayload:
+          type: string
+          description: Client-encrypted payload. The backend stores it as opaque text.
+        signature:
+          type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string

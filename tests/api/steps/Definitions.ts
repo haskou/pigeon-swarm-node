@@ -16,7 +16,7 @@ import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
-import { generateKeyPairSync } from 'crypto';
+import { generateKeyPairSync, randomUUID } from 'crypto';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
@@ -589,6 +589,60 @@ export default class Definitions {
     await this.signCurrentRequest(
       'PATCH',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+    );
+  }
+
+  @given('I set an encrypted community channel message body')
+  public async iSetAnEncryptedCommunityChannelMessageBody(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const id = `community-message:${Date.now()}:${randomUUID()}`;
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      createdAt,
+      encryptedPayload: 'encrypted-community-channel-message-payload',
+      id,
+      type: 'sent',
+    };
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      createdAt,
+      encryptedPayload: 'encrypted-community-channel-message-payload',
+      id,
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
+  @given('I sign the current community channel message request')
+  public async iSignTheCurrentCommunityChannelMessageRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
+    );
+  }
+
+  @given('I sign the current community channel messages request')
+  public async iSignTheCurrentCommunityChannelMessagesRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
     );
   }
 
@@ -1177,6 +1231,31 @@ export default class Definitions {
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
+    );
+  }
+
+  @when('I POST a message to the current community text channel')
+  public async iPOSTAMessageToTheCurrentCommunityTextChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET messages from the current community text channel')
+  public async iGETMessagesFromTheCurrentCommunityTextChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?limit=50`,
+      this.headers,
     );
   }
 

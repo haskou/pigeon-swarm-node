@@ -108,6 +108,14 @@ export class Community extends AggregateRoot {
     channel?.rename(name);
   }
 
+  public assertHasTextChannel(channelId: CommunityChannelId): void {
+    const channel = this.textChannels.find((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
+
+    assert(channel, new CommunityChannelNotFoundError());
+  }
+
   public updateProfile(
     actor: IdentityId,
     name: CommunityName,

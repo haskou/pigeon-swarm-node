@@ -945,8 +945,9 @@ Signed HTTP request validation:
 ## Community HTTP API
 
 Communities are private in the current MVP. A community belongs to one network,
-has one owner, and contains member ids plus text channel metadata. Community
-text channels are not backed by conversation messages in this PR.
+has one owner, and contains member ids, text channel metadata and encrypted
+text channel messages. Community channels are not backed by `Conversation`;
+they live inside the `communities` context.
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
 `X-Timestamp`, `X-Nonce` and `X-Signature`.
@@ -1144,6 +1145,87 @@ Implemented:
 
 - require signed request auth from the community owner
 - rename an existing text channel
+
+### Send channel message
+
+```http
+POST /communities/{communityId}/channels/{channelId}/messages
+```
+
+Request:
+
+```json
+{
+  "id": "<clientGeneratedMessageId>",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
+  "signature": "<messageSignature>",
+  "attachmentExternalIdentifiers": ["<privateContentCid>"]
+}
+```
+
+Response:
+
+```json
+{
+  "id": "<messageId>",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "authorIdentityId": "<identityId>",
+  "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
+  "signature": "<messageSignature>",
+  "attachmentExternalIdentifiers": [],
+  "type": "sent",
+  "createdAt": 1773848829055
+}
+```
+
+Implemented:
+
+- require signed request auth from a community member
+- require the channel to exist in the community
+- store `encryptedPayload` as opaque client-encrypted text
+- store attachment CIDs only; private attachment bytes must be encrypted by the
+  client and published first with `POST /ipfs/private`
+- validate the message signature against this canonical payload:
+
+```json
+{
+  "attachmentExternalIdentifiers": [],
+  "authorIdentityId": "<identityId>",
+  "channelId": "<channelId>",
+  "communityId": "<communityId>",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
+  "id": "<messageId>",
+  "type": "sent"
+}
+```
+
+### List channel messages
+
+```http
+GET /communities/{communityId}/channels/{channelId}/messages?limit=50&beforeMessageId=<messageId>
+```
+
+Response:
+
+```json
+{
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "messages": [],
+  "nextBeforeMessageId": "<messageId>"
+}
+```
+
+Implemented:
+
+- require signed request auth from a community member
+- require the channel to exist in the community
+- return messages ordered from oldest to newest in the page
+- support `limit` from 1 to 100
+- when `beforeMessageId` is provided, return messages older than that message
 
 ## Notification HTTP API
 

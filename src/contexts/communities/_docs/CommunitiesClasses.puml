@@ -27,6 +27,18 @@ package "communities/domain" {
     + rename(name): void
   }
 
+  class CommunityChannelMessage {
+    - id: CommunityChannelMessageId
+    - communityId: CommunityId
+    - channelId: CommunityChannelId
+    - authorIdentityId: IdentityId
+    - encryptedPayload: CommunityChannelMessageEncryptedPayload
+    - signature: Signature
+    - createdAt: Timestamp
+    - attachmentExternalIdentifiers: CommunityChannelAttachmentId[]
+    + create(...): CommunityChannelMessage
+  }
+
   class CommunityProfile {
     - name: CommunityName
     - description: CommunityDescription
@@ -39,10 +51,18 @@ package "communities/domain" {
   class CommunityBanner
   class CommunityChannelId
   class CommunityChannelName
+  class CommunityChannelMessageId
+  class CommunityChannelMessageEncryptedPayload
+  class CommunityChannelAttachmentId
   interface CommunityRepository {
     + findById(id): Community?
     + findByMember(identityId): Community[]
     + save(community): void
+  }
+  interface CommunityChannelMessageRepository {
+    + findById(communityId, channelId, messageId): CommunityChannelMessage?
+    + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
+    + save(message): void
   }
 
   Community *-- CommunityTextChannel
@@ -53,12 +73,20 @@ package "communities/domain" {
   CommunityProfile --> CommunityBanner
   CommunityTextChannel --> CommunityChannelId
   CommunityTextChannel --> CommunityChannelName
+  CommunityChannelMessage --> CommunityChannelMessageId
+  CommunityChannelMessage --> CommunityId
+  CommunityChannelMessage --> CommunityChannelId
+  CommunityChannelMessage --> IdentityId
+  CommunityChannelMessage --> CommunityChannelMessageEncryptedPayload
+  CommunityChannelMessage --> CommunityChannelAttachmentId
   CommunityRepository ..> Community
+  CommunityChannelMessageRepository ..> CommunityChannelMessage
 }
 
 package "shared value objects" {
   class IdentityId
   class NetworkId
+  class Signature
   class Timestamp
 }
 
@@ -70,9 +98,13 @@ CommunityTextChannel --> Timestamp
 package "communities/infrastructure" {
   class MongoCommunityRepository
   class MongoCommunityDocument
+  class MongoCommunityChannelMessageRepository
+  class MongoCommunityChannelMessageDocument
 
   MongoCommunityRepository ..|> CommunityRepository
   MongoCommunityRepository --> MongoCommunityDocument
+  MongoCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
+  MongoCommunityChannelMessageRepository --> MongoCommunityChannelMessageDocument
 }
 
 package "communities-api" {
@@ -85,6 +117,8 @@ package "communities-api" {
   class GetCommunityChannelsRoute
   class PostCommunityTextChannelRoute
   class PatchCommunityChannelRoute
+  class PostCommunityChannelMessageRoute
+  class GetCommunityChannelMessagesRoute
 
   PostCommunityRoute ..> Community
   GetCommunitiesRoute ..> CommunityRepository
@@ -95,6 +129,10 @@ package "communities-api" {
   GetCommunityChannelsRoute ..> Community
   PostCommunityTextChannelRoute ..> Community
   PatchCommunityChannelRoute ..> Community
+  PostCommunityChannelMessageRoute ..> Community
+  PostCommunityChannelMessageRoute ..> CommunityChannelMessage
+  GetCommunityChannelMessagesRoute ..> Community
+  GetCommunityChannelMessagesRoute ..> CommunityChannelMessageRepository
 }
 
 note right of Community
@@ -103,7 +141,8 @@ note right of Community
   - one owner
   - owner administers profile,
     members and text channel metadata
-  - text channel messages are out of scope
+  - members can send/list encrypted
+    text channel messages
 end note
 
 @enduml
