@@ -12,6 +12,7 @@ import { PublicIPFS } from './PublicIPFS';
 
 export default class IPFSNetworkRegistry {
   private readonly networks: IPFSNetwork[] = [];
+  private readonly listeners: Array<(network: IPFSNetwork) => void> = [];
   private initialized: boolean = false;
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
@@ -141,8 +142,13 @@ export default class IPFSNetworkRegistry {
       sharedPrivateKey,
     );
     this.networks.push(network);
+    this.listeners.forEach((listener) => listener(network));
 
     return network;
+  }
+
+  public onNetworkRegistered(listener: (network: IPFSNetwork) => void): void {
+    this.listeners.push(listener);
   }
 
   public removeNetwork(name: string): void {
