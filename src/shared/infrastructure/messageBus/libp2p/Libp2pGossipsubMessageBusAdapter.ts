@@ -1,19 +1,26 @@
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Constructor } from '@app/shared/domain/Constructor';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTransport';
 
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
+import PubSubNetworkMessageCodec from './PubSubNetworkMessageCodec';
 import PubSubTopicResolver from './PubSubTopicResolver';
 
 export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
   private readonly topicResolver: PubSubTopicResolver;
+  private readonly codec: PubSubNetworkMessageCodec;
+  private readonly subscribedTopics = new Set<string>();
 
   constructor(
     private readonly transport: PubSubTransport,
+    private readonly networkRegistry?: IPFSNetworkRegistry,
     topicResolver?: PubSubTopicResolver,
   ) {
     this.topicResolver = topicResolver || new PubSubTopicResolver();
+    this.codec = new PubSubNetworkMessageCodec();
   }
 
   private instanceDomainEvent(
@@ -29,6 +36,41 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     );
   }
 
+  private networkTopic(routingKey: string, network: IPFSNetwork): string {
+    return this.topicResolver.fromRoutingKeyForNetwork(
+      routingKey,
+      network.getId(),
+    );
+  }
+
+  private async subscribeToNetwork(
+    bindingKey: string,
+    network: IPFSNetwork,
+    DomainEventInstance: Constructor<DomainEvent>,
+    handler: (event: DomainEvent) => Promise<void>,
+  ): Promise<void> {
+    const topic = this.networkTopic(bindingKey, network);
+    const subscriptionKey = `${topic}:${bindingKey}`;
+
+    if (this.subscribedTopics.has(subscriptionKey)) {
+      return;
+    }
+
+    this.subscribedTopics.add(subscriptionKey);
+
+    await this.transport.subscribe(topic, async (payload) => {
+      const message = JSON.parse(
+        this.codec.decode(payload, network),
+      ) as Message;
+
+      if (message.type !== bindingKey) {
+        return;
+      }
+
+      await handler(this.instanceDomainEvent(DomainEventInstance, message));
+    });
+  }
+
   public async consume(
     _queueName: string,
     bindingKey: string,
@@ -36,6 +78,32 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     _exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
+    if (this.networkRegistry) {
+      await Promise.all(
+        this.networkRegistry
+          .getAll()
+          .map((network) =>
+            this.subscribeToNetwork(
+              bindingKey,
+              network,
+              DomainEventInstance,
+              handler,
+            ),
+          ),
+      );
+
+      this.networkRegistry.onNetworkRegistered((network) => {
+        void this.subscribeToNetwork(
+          bindingKey,
+          network,
+          DomainEventInstance,
+          handler,
+        );
+      });
+
+      return;
+    }
+
     await this.transport.subscribe(
       this.topicResolver.fromRoutingKey(bindingKey),
       async (payload) => {
@@ -55,6 +123,25 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
   }
 
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
+    if (this.networkRegistry) {
+      const networks = this.networkRegistry.getAll();
+
+      if (networks.length > 0) {
+        await Promise.all(
+          domainEvents.flatMap((event) =>
+            networks.map((network) =>
+              this.transport.publish(
+                this.networkTopic(event.eventName(), network),
+                this.codec.encode(event.decode(), network),
+              ),
+            ),
+          ),
+        );
+
+        return;
+      }
+    }
+
     await Promise.all(
       domainEvents.map((event) =>
         this.transport.publish(

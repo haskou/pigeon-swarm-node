@@ -185,5 +185,41 @@ describe('IPFSNetworkRegistry', () => {
         ).networks,
       ).toEqual([existingNetwork, duplicatedNetwork]);
     });
+
+    it('should notify listeners when a network is registered', async () => {
+      const registry = new IPFSNetworkRegistry();
+      const network = mock<IPFSNetwork>();
+      const listener = jest.fn();
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockResolvedValue(network);
+
+      registry.onNetworkRegistered(listener);
+
+      await registry.register(
+        new IPFSNetworkConfig(
+          '550e8400-e29b-41d4-a716-446655440000',
+          'private_1',
+          new PrivateKey(validPem),
+        ),
+      );
+
+      expect(listener).toHaveBeenCalledWith(network);
+    });
   });
 });

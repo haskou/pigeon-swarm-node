@@ -290,6 +290,8 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19wdWJzdWJfX1B1YlN1YlRyYW5zcG9ydF9fUHViU3ViVHJhbnNwb3J0
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fbmV0d29ya3NfX0lQRlNOZXR3b3JrUmVnaXN0cnlfX0lQRlNOZXR3b3JrUmVnaXN0cnk=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX191aV9fY29uc3VtZXJzX19Db25zdW1lcl9fQ29uc3VtZXI=:

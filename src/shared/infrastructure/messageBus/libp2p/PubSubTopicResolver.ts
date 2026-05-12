@@ -16,4 +16,17 @@ export default class PubSubTopicResolver {
 
     return `${this.getPrefix()}.${context}.${version}.announcements`;
   }
+
+  public fromRoutingKeyForNetwork(
+    routingKey: string,
+    networkId: string,
+  ): string {
+    const [context, version] = routingKey.split('.');
+
+    if (!context || !version) {
+      return `${this.getPrefix()}.networks.${networkId}.${routingKey}`;
+    }
+
+    return `${this.getPrefix()}.networks.${networkId}.${context}.${version}.announcements`;
+  }
 }
