@@ -708,6 +708,20 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fYXBwbGljYXRpb25fX2NyZWF0ZS1ncm91cF9fR3JvdXBDb252ZXJzYXRpb25DcmVhdG9yX19Hcm91cENvbnZlcnNhdGlvbkNyZWF0b3I=:
+    class: >-
+      /contexts/conversations/application/create-group/GroupConversationCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19kb21haW5fX3JlcG9zaXRvcmllc19fS2V5Y2hhaW5SZXBvc2l0b3J5X19LZXljaGFpblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19kb21haW5fX3NlcnZpY2VzX19LZXljaGFpbkNhbmRpZGF0ZVZhbGlkYXRpb25Eb21haW5TZXJ2aWNlX19LZXljaGFpbkNhbmRpZGF0ZVZhbGlkYXRpb25Eb21haW5TZXJ2aWNl
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fYXBwbGljYXRpb25fX3NlbmQtbWVzc2FnZV9fTWVzc2FnZVNlbmRlcl9fTWVzc2FnZVNlbmRlcg==:
     class: /contexts/conversations/application/send-message/MessageSender
     arguments:

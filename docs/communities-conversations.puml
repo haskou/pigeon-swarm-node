@@ -1,0 +1,339 @@
+@startuml
+
+title Pigeon Swarm - Communities, Group Chats and Channels
+
+skinparam packageStyle rectangle
+
+package "shared.domain" {
+  class IdentityId <<ValueObject>>
+  class NetworkId <<ValueObject>>
+  class Timestamp <<ValueObject>>
+  class PublicContentCid <<ValueObject>>
+  class EncryptedKeyEnvelope <<ValueObject>>
+  class CommunityRef <<ValueObject>>
+  class ChannelRef <<ValueObject>>
+  class ConversationRef <<ValueObject>>
+  class CallRoomRef <<ValueObject>>
+}
+
+package "conversations.domain" {
+  abstract class Conversation <<AggregateRoot>> {
+    -id: ConversationId
+    -networkId: NetworkId
+    -type: ConversationType
+    -messages: Message[]
+    +sendMessage(...)
+    +editMessage(...)
+    +deleteMessage(...)
+    +registerMessage(message: Message): void
+  }
+
+  class OneToOneConversation {
+    -participantIds: IdentityId[2]
+    +create(first: IdentityId, second: IdentityId, networkId: NetworkId)
+  }
+
+  class GroupConversation {
+    -name: GroupConversationName
+    -participantIds: IdentityId[]
+    -visibility: ConversationVisibility
+    -keyEnvelopeIds: KeyEnvelopeId[]
+    -origin?: ConversationOrigin
+    +create(owner: IdentityId, participants: IdentityId[], networkId: NetworkId)
+    +rename(name: GroupConversationName, actor: IdentityId): void
+    +invite(inviter: IdentityId, invitee: IdentityId): void
+    +leave(identityId: IdentityId): void
+    +removeParticipant(actor: IdentityId, participant: IdentityId): void
+    +hasParticipant(identityId: IdentityId): boolean
+  }
+
+  enum ConversationType {
+    ONE_TO_ONE
+    GROUP
+  }
+
+  enum ConversationVisibility {
+    PUBLIC
+    PRIVATE
+  }
+
+  class ConversationId <<ValueObject>>
+  class GroupConversationName <<ValueObject>>
+  class KeyEnvelopeId <<ValueObject>>
+
+  class ConversationOrigin {
+    -community?: CommunityRef
+    -channel?: ChannelRef
+  }
+
+  abstract class Message <<Entity>> {
+    -metadata: MessageMetadata
+    +verify(): boolean
+  }
+
+  class MessageMetadata {
+    -id: MessageId
+    -conversationId: ConversationId
+    -authorId: IdentityId
+    -createdAt: Timestamp
+    -previousMessageIds: MessageId[]
+    -replyToMessageId?: MessageId
+    -targetMessageId?: MessageId
+    -signature: Signature
+  }
+
+  class MessageSent
+  class MessageEdited
+  class MessageDeleted
+
+  interface ConversationAccessPolicy {
+    +canRead(conversation: Conversation, identityId: IdentityId): boolean
+    +canWrite(conversation: Conversation, identityId: IdentityId): boolean
+    +canManage(conversation: Conversation, identityId: IdentityId): boolean
+  }
+
+  interface ConversationRepository {
+    +save(conversation: Conversation): Promise<void>
+    +findById(id: ConversationId): Promise<Conversation?>
+    +findOneToOne(a: IdentityId, b: IdentityId, networkId: NetworkId): Promise<OneToOneConversation?>
+    +findGroup(id: ConversationId): Promise<GroupConversation?>
+  }
+
+  Conversation <|-- OneToOneConversation
+  Conversation <|-- GroupConversation
+  Conversation --> NetworkId
+  Conversation --> ConversationType
+  Conversation *--> "0..*" Message
+  GroupConversation o--> "2..*" IdentityId
+  GroupConversation --> ConversationVisibility
+  GroupConversation --> GroupConversationName
+  GroupConversation --> ConversationOrigin
+  Message <|-- MessageSent
+  Message <|-- MessageEdited
+  Message <|-- MessageDeleted
+  Message *--> MessageMetadata
+  MessageMetadata --> ConversationId
+  MessageMetadata --> IdentityId
+  ConversationRepository --> Conversation
+  ConversationAccessPolicy --> Conversation
+
+  note right of GroupConversation
+    Standalone group chat.
+    It has a name and N identity participants.
+    Any participant can invite by default.
+    If it backs a community text channel,
+    it stores only opaque origin refs.
+  end note
+}
+
+package "communities.domain" {
+  class Community <<AggregateRoot>> {
+    -id: CommunityId
+    -networkId: NetworkId
+    -name: CommunityName
+    -description: CommunityDescription
+    -banner?: PublicContentCid
+    -visibility: CommunityVisibility
+    -members: CommunityMember[]
+    -roles: CommunityRole[]
+    -channels: CommunityChannel[]
+    -bans: CommunityBan[]
+    +create(owner: IdentityId, networkId: NetworkId, name: CommunityName)
+    +updateProfile(actor: IdentityId, profile: CommunityProfile): void
+    +addTextChannel(actor: IdentityId, name: ChannelName): TextChannel
+    +addVoiceChannel(actor: IdentityId, name: ChannelName): VoiceChannel
+    +renameChannel(actor: IdentityId, channelId: ChannelId, name: ChannelName): void
+    +createRole(actor: IdentityId, role: CommunityRole): void
+    +assignRole(actor: IdentityId, member: IdentityId, roleId: CommunityRoleId): void
+    +ban(actor: IdentityId, target: IdentityId, reason?: BanReason): void
+    +can(identityId: IdentityId, permission: CommunityPermission, channelId?: ChannelId): boolean
+  }
+
+  class CommunityProfile {
+    -name: CommunityName
+    -description: CommunityDescription
+    -banner?: PublicContentCid
+  }
+
+  class CommunityMember {
+    -identityId: IdentityId
+    -roleIds: CommunityRoleId[]
+    -joinedAt: Timestamp
+  }
+
+  class CommunityRole {
+    -id: CommunityRoleId
+    -name: RoleName
+    -permissions: CommunityPermission[]
+  }
+
+  enum CommunityPermission {
+    MANAGE_COMMUNITY
+    MANAGE_CHANNELS
+    MANAGE_ROLES
+    BAN_MEMBERS
+    VIEW_CHANNEL
+    WRITE_CHANNEL
+    JOIN_VOICE
+    SPEAK
+  }
+
+  abstract class CommunityChannel <<Entity>> {
+    -id: ChannelId
+    -name: ChannelName
+    -visibility: ChannelVisibility
+    -permissionOverrides: ChannelPermissionOverride[]
+    +rename(name: ChannelName): void
+    +can(roleIds: CommunityRoleId[], permission: CommunityPermission): boolean
+  }
+
+  class TextChannel {
+    -backingConversation: ConversationRef
+  }
+
+  class VoiceChannel {
+    -activeCallRoom?: CallRoomRef
+  }
+
+  class ChannelPermissionOverride {
+    -roleId: CommunityRoleId
+    -allow: CommunityPermission[]
+    -deny: CommunityPermission[]
+  }
+
+  class CommunityBan {
+    -identityId: IdentityId
+    -bannedBy: IdentityId
+    -reason?: BanReason
+    -createdAt: Timestamp
+  }
+
+  enum CommunityVisibility {
+    PUBLIC
+    PRIVATE
+  }
+
+  enum ChannelVisibility {
+    PUBLIC
+    PRIVATE
+  }
+
+  class CommunityId <<ValueObject>>
+  class CommunityName <<ValueObject>>
+  class CommunityDescription <<ValueObject>>
+  class CommunityRoleId <<ValueObject>>
+  class RoleName <<ValueObject>>
+  class ChannelId <<ValueObject>>
+  class ChannelName <<ValueObject>>
+  class BanReason <<ValueObject>>
+
+  interface CommunityRepository {
+    +save(community: Community): Promise<void>
+    +findById(id: CommunityId): Promise<Community?>
+    +findByNetwork(networkId: NetworkId): Promise<Community[]>
+    +findByMember(identityId: IdentityId): Promise<Community[]>
+  }
+
+  interface CommunityAccessPolicy {
+    +canViewChannel(community: Community, channel: CommunityChannel, identityId: IdentityId): boolean
+    +canWriteChannel(community: Community, channel: TextChannel, identityId: IdentityId): boolean
+    +canJoinVoice(community: Community, channel: VoiceChannel, identityId: IdentityId): boolean
+    +canManageChannel(community: Community, channel: CommunityChannel, identityId: IdentityId): boolean
+  }
+
+  Community --> NetworkId
+  Community *--> CommunityProfile
+  Community *--> "0..*" CommunityMember
+  Community *--> "0..*" CommunityRole
+  Community *--> "0..*" CommunityChannel
+  Community *--> "0..*" CommunityBan
+  Community --> CommunityVisibility
+  CommunityMember --> IdentityId
+  CommunityMember --> CommunityRoleId
+  CommunityRole --> CommunityRoleId
+  CommunityRole --> CommunityPermission
+  CommunityChannel <|-- TextChannel
+  CommunityChannel <|-- VoiceChannel
+  CommunityChannel --> ChannelVisibility
+  CommunityChannel *--> "0..*" ChannelPermissionOverride
+  ChannelPermissionOverride --> CommunityRoleId
+  ChannelPermissionOverride --> CommunityPermission
+  CommunityRepository --> Community
+  CommunityAccessPolicy --> Community
+
+  note right of TextChannel
+    Community text channels are backed
+    by group conversations through
+    opaque refs. Access remains
+    role-based in communities.
+  end note
+
+  note right of Community
+    A community belongs to exactly one network.
+    Public/private controls discovery and
+    whether clients must encrypt community
+    or channel payloads before publishing.
+  end note
+}
+
+package "calls.domain" {
+  class CallRoom <<AggregateRoot>> {
+    -id: CallRoomId
+    -networkId: NetworkId
+    -community?: CommunityRef
+    -channel?: ChannelRef
+    -conversation?: ConversationRef
+    -participants: IdentityId[]
+    -topology: CallTopology
+    +join(identityId: IdentityId): void
+    +leave(identityId: IdentityId): void
+  }
+
+  enum CallTopology {
+    MESH
+    RELAY
+  }
+
+  class CallRoomId <<ValueObject>>
+
+  CallRoom --> NetworkId
+  CallRoom --> IdentityId
+  CallRoom --> CallTopology
+}
+
+package "application / anti-corruption" {
+  class CommunityConversationAccessPolicy {
+    +canRead(conversation: ConversationRef, identityId: IdentityId): boolean
+    +canWrite(conversation: ConversationRef, identityId: IdentityId): boolean
+  }
+
+  class GroupConversationAccessPolicy {
+    +canRead(conversation: ConversationRef, identityId: IdentityId): boolean
+    +canWrite(conversation: ConversationRef, identityId: IdentityId): boolean
+  }
+
+  class CommunityChannelProjection {
+    -community: CommunityRef
+    -channel: ChannelRef
+    -backingConversation: ConversationRef
+    -activeCallRoom?: CallRoomRef
+  }
+
+  CommunityConversationAccessPolicy ..|> ConversationAccessPolicy
+  GroupConversationAccessPolicy ..|> ConversationAccessPolicy
+  CommunityConversationAccessPolicy --> CommunityRepository
+  CommunityConversationAccessPolicy --> CommunityAccessPolicy
+  CommunityChannelProjection --> CommunityRef
+  CommunityChannelProjection --> ChannelRef
+  CommunityChannelProjection --> ConversationRef
+  CommunityChannelProjection --> CallRoomRef
+}
+
+note bottom
+  No aggregate in one bounded context holds a direct object reference
+  to an aggregate from another bounded context.
+  Cross-context links are opaque refs and are resolved by application
+  services, projections or anti-corruption policies.
+end note
+
+@enduml
