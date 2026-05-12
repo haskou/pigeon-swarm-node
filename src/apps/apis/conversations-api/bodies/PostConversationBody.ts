@@ -11,6 +11,10 @@ export class PostConversationBody {
   @IsNotEmpty()
   public readonly keychainExternalIdentifier: string;
 
+  @IsString()
+  @IsNotEmpty()
+  public readonly networkId: string;
+
   @IsArray()
   @ArrayMinSize(2)
   @IsString({ each: true })

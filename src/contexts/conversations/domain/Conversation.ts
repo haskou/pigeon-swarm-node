@@ -1,4 +1,6 @@
+/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import {
   assert,
@@ -31,6 +33,7 @@ export class Conversation extends AggregateRoot {
   ): Conversation {
     return new Conversation(
       new ConversationId(primitives.id),
+      new NetworkId(primitives.networkId),
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
@@ -42,6 +45,7 @@ export class Conversation extends AggregateRoot {
 
   constructor(
     private readonly id: ConversationId,
+    private readonly networkId: NetworkId,
     private readonly participants: IdentityId[],
     private readonly messages: Message[] = [],
   ) {
@@ -148,6 +152,7 @@ export class Conversation extends AggregateRoot {
       new ConversationMessageWasSentEvent(this.id.valueOf(), {
         authorId: authorId.valueOf(),
         messageId: message.getId().valueOf(),
+        networkId: this.networkId.valueOf(),
         participantIds: this.toPrimitives().participantIds,
       }),
     );
@@ -194,6 +199,7 @@ export class Conversation extends AggregateRoot {
     this.record(
       new ConversationMessageWasEditedEvent(this.id.valueOf(), {
         messageId: message.getId().valueOf(),
+        networkId: this.networkId.valueOf(),
         participantIds: this.toPrimitives().participantIds,
         targetMessageId: targetMessageId.valueOf(),
       }),
@@ -225,6 +231,7 @@ export class Conversation extends AggregateRoot {
     this.record(
       new ConversationMessageWasDeletedEvent(this.id.valueOf(), {
         messageId: message.getId().valueOf(),
+        networkId: this.networkId.valueOf(),
         participantIds: this.toPrimitives().participantIds,
         targetMessageId: targetMessageId.valueOf(),
       }),
@@ -241,6 +248,10 @@ export class Conversation extends AggregateRoot {
     return this.id;
   }
 
+  public getNetworkId(): NetworkId {
+    return this.networkId;
+  }
+
   public hasParticipant(identityId: IdentityId): boolean {
     return this.participants.some((participant) =>
       participant.isEqual(identityId),
@@ -251,6 +262,7 @@ export class Conversation extends AggregateRoot {
     return {
       id: this.id.valueOf(),
       messages: this.messages.map((message) => message.toPrimitives()),
+      networkId: this.networkId.valueOf(),
       participantIds: this.participants.map((participant) =>
         participant.valueOf(),
       ),

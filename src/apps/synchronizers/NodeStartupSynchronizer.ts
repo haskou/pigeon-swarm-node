@@ -1,4 +1,5 @@
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
+import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import IdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
@@ -80,12 +81,13 @@ export default class NodeStartupSynchronizer {
   private conversationRequests(
     requestId: string,
     requesterNodeId: string,
-    conversationIds: string[],
+    conversationScopes: ConversationSyncScope[],
   ): DomainEvent[] {
-    return conversationIds.map(
-      (conversationId) =>
-        new ConversationSyncRequestedEvent(conversationId, {
-          conversationId,
+    return conversationScopes.map(
+      (scope) =>
+        new ConversationSyncRequestedEvent(scope.conversationId, {
+          conversationId: scope.conversationId,
+          networkId: scope.networkId,
           requesterNodeId,
           requestId,
         }),
@@ -99,11 +101,11 @@ export default class NodeStartupSynchronizer {
 
     await this.heartbeatSender.send();
 
-    const [identityMetadata, keychainMetadata, conversationIds] =
+    const [identityMetadata, keychainMetadata, conversationScopes] =
       await Promise.all([
         this.identityMetadataRepository.findAll(),
         this.keychainMetadataRepository.findAll(),
-        this.conversationRepository.findConversationIdsWithMessages(),
+        this.conversationRepository.findConversationSyncScopes(),
       ]);
     const identityVersions = this.getLatestVersions(
       identityMetadata,
@@ -116,7 +118,11 @@ export default class NodeStartupSynchronizer {
     const events = [
       ...this.identityRequests(requestId, requesterNodeId, identityVersions),
       ...this.keychainRequests(requestId, requesterNodeId, keychainVersions),
-      ...this.conversationRequests(requestId, requesterNodeId, conversationIds),
+      ...this.conversationRequests(
+        requestId,
+        requesterNodeId,
+        conversationScopes,
+      ),
     ];
 
     if (events.length > 0) {
@@ -124,7 +130,7 @@ export default class NodeStartupSynchronizer {
     }
 
     return {
-      conversationRequests: conversationIds.length,
+      conversationRequests: conversationScopes.length,
       identityRequests: identityVersions.size,
       keychainRequests: keychainVersions.size,
       requestId,

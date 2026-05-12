@@ -1,3 +1,4 @@
+/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 

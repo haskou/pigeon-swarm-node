@@ -676,6 +676,7 @@ Request:
 {
   "type": "one-to-one",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
+  "networkId": "<networkId>",
   "keychainExternalIdentifier": "<externalIdentifier>"
 }
 ```
@@ -685,6 +686,7 @@ Response:
 ```json
 {
   "id": "one-to-one:<deterministic-id>",
+  "networkId": "<networkId>",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "type": "one-to-one"
 }
@@ -693,6 +695,8 @@ Response:
 Implemented:
 
 - create the one-to-one conversation for the participant pair
+- require the conversation network id; messages and sync for this conversation
+  are published only through that network
 - validate that the keychain candidate belongs to the authenticated identity
 - persist conversation metadata in MongoDB
 - publish `ConversationWasCreatedEvent`

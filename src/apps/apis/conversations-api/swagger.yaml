@@ -228,6 +228,7 @@ components:
         - type
         - participantIds
         - keychainExternalIdentifier
+        - networkId
       properties:
         type:
           type: string
@@ -240,16 +241,23 @@ components:
             type: string
         keychainExternalIdentifier:
           type: string
+        networkId:
+          type: string
+          format: uuid
     ConversationResource:
       type: object
       required:
         - id
+        - networkId
         - participantIds
         - type
       properties:
         id:
           type: string
           example: one-to-one:3bd1...
+        networkId:
+          type: string
+          format: uuid
         participantIds:
           type: array
           items:

@@ -62,6 +62,7 @@ describe('Conversation', () => {
       expect(events[0].attributes).toEqual({
         authorId: author.valueOf(),
         messageId: message.getId().valueOf(),
+        networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
       });
     });
@@ -198,6 +199,7 @@ describe('Conversation', () => {
       expect(events).toEqual([expect.any(ConversationMessageWasEditedEvent)]);
       expect(events[0].attributes).toEqual({
         messageId: edited.getId().valueOf(),
+        networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
         targetMessageId: sent.getId().valueOf(),
       });
@@ -256,6 +258,7 @@ describe('Conversation', () => {
       expect(events).toEqual([expect.any(ConversationMessageWasDeletedEvent)]);
       expect(events[0].attributes).toEqual({
         messageId: deleted.getId().valueOf(),
+        networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
         targetMessageId: sent.getId().valueOf(),
       });

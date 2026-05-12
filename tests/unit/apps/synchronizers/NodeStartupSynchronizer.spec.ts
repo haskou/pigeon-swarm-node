@@ -86,8 +86,11 @@ describe('NodeStartupSynchronizer', () => {
         version: 3,
       },
     ]);
-    conversationRepository.findConversationIdsWithMessages.mockResolvedValue([
-      'one-to-one:conversation',
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([
+      {
+        conversationId: 'one-to-one:conversation',
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+      },
     ]);
 
     const result = await synchronizer.synchronize();
@@ -118,6 +121,7 @@ describe('NodeStartupSynchronizer', () => {
     });
     expect(publishedEvents[2].attributes).toMatchObject({
       conversationId: 'one-to-one:conversation',
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
       requestId: result.requestId,
     });

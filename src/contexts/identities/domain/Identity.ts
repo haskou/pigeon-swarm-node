@@ -1,3 +1,4 @@
+/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
@@ -78,7 +79,11 @@ export class Identity extends AggregateRoot {
 
     const identity = Identity.fromPrimitives(primitives);
 
-    identity.record(new IdentityWasCreatedEvent(primitives.id));
+    identity.record(
+      new IdentityWasCreatedEvent(primitives.id, {
+        networkIds: primitives.networks,
+      }),
+    );
 
     return identity;
   }
@@ -88,8 +93,12 @@ export class Identity extends AggregateRoot {
 
     identity.record(
       primitives.version === 1
-        ? new IdentityWasCreatedEvent(primitives.id)
-        : new IdentityWasUpdatedEvent(primitives.id),
+        ? new IdentityWasCreatedEvent(primitives.id, {
+            networkIds: primitives.networks,
+          })
+        : new IdentityWasUpdatedEvent(primitives.id, {
+            networkIds: primitives.networks,
+          }),
     );
 
     return identity;
@@ -188,7 +197,11 @@ export class Identity extends AggregateRoot {
     );
     const identity = Identity.fromPrimitives(primitives);
 
-    identity.record(new IdentityWasUpdatedEvent(primitives.id));
+    identity.record(
+      new IdentityWasUpdatedEvent(primitives.id, {
+        networkIds: primitives.networks,
+      }),
+    );
 
     return identity;
   }
@@ -211,7 +224,11 @@ export class Identity extends AggregateRoot {
     );
     const identity = Identity.fromPrimitives(primitives);
 
-    identity.record(new IdentityWasUpdatedEvent(primitives.id));
+    identity.record(
+      new IdentityWasUpdatedEvent(primitives.id, {
+        networkIds: primitives.networks,
+      }),
+    );
 
     return identity;
   }

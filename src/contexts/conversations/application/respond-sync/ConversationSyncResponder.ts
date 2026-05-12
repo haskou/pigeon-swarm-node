@@ -35,6 +35,7 @@ export default class ConversationSyncResponder {
     await this.eventPublisher.publish([
       new ConversationSyncAvailableEvent(message.conversationId.valueOf(), {
         messageCandidates,
+        networkId: message.networkId.valueOf(),
         requestId: message.requestId?.valueOf(),
       }),
     ]);

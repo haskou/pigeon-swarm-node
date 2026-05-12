@@ -43,6 +43,47 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     );
   }
 
+  private eventNetworkIds(event: DomainEvent): string[] {
+    const networkId = event.attributes.networkId;
+    const networkIds = event.attributes.networkIds;
+    const networks = event.attributes.networks;
+
+    if (typeof networkId === 'string') {
+      return [networkId];
+    }
+
+    if (Array.isArray(networkIds)) {
+      return networkIds.filter((id): id is string => typeof id === 'string');
+    }
+
+    if (Array.isArray(networks)) {
+      return networks
+        .map((network) =>
+          typeof network === 'object' && network !== null && 'id' in network
+            ? (network.id as unknown)
+            : undefined,
+        )
+        .filter((id): id is string => typeof id === 'string');
+    }
+
+    return [];
+  }
+
+  private networksForEvent(event: DomainEvent): IPFSNetwork[] {
+    if (!this.networkRegistry) {
+      return [];
+    }
+
+    const networks = this.networkRegistry.getAll();
+    const networkIds = this.eventNetworkIds(event);
+
+    if (networkIds.length === 0) {
+      return networks;
+    }
+
+    return networks.filter((network) => networkIds.includes(network.getId()));
+  }
+
   private async subscribeToNetwork(
     bindingKey: string,
     network: IPFSNetwork,
@@ -129,7 +170,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
       if (networks.length > 0) {
         await Promise.all(
           domainEvents.flatMap((event) =>
-            networks.map((network) =>
+            this.networksForEvent(event).map((network) =>
               this.transport.publish(
                 this.networkTopic(event.eventName(), network),
                 this.codec.encode(event.decode(), network),

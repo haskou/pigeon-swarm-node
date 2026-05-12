@@ -38,6 +38,7 @@ export default class Definitions {
   private identityKeyPair: KeyPair | undefined;
 
   private conversationId: string | undefined;
+  private currentNetworkId: string | undefined;
   private createdIdentityId: string | undefined;
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
@@ -59,6 +60,7 @@ export default class Definitions {
     this.headers = {};
     this.identityKeyPair = undefined;
     this.conversationId = undefined;
+    this.currentNetworkId = undefined;
     this.createdIdentityId = undefined;
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
@@ -106,7 +108,7 @@ export default class Definitions {
     await Promise.all(
       networkRegistry
         .getAll()
-        .map((network) => networkRegistry.removeNetwork(network.getName())),
+        .map((network) => networkRegistry.removeNetwork(network.getId())),
     );
   }
 
@@ -370,7 +372,11 @@ export default class Definitions {
 
     this.body = JSON.stringify({
       keychainExternalIdentifier: this.keychainExternalIdentifier,
-      participantIds: [ownerIdentityId.valueOf(), participantIdentityId.valueOf()],
+      networkId: this.currentNetworkId,
+      participantIds: [
+        ownerIdentityId.valueOf(),
+        participantIdentityId.valueOf(),
+      ],
       type: 'one-to-one',
     });
   }
@@ -794,7 +800,8 @@ export default class Definitions {
   public async iRegisterAnInMemoryIPFSNetwork(
     networkName: string,
   ): Promise<void> {
-    await this.ipfsDefinition.registerInMemoryNetwork(networkName);
+    this.currentNetworkId =
+      await this.ipfsDefinition.registerInMemoryNetwork(networkName);
   }
 
   @given(
@@ -804,7 +811,8 @@ export default class Definitions {
     networkId: string,
     networkName: string,
   ): Promise<void> {
-    await this.ipfsDefinition.registerInMemoryNetworkWithId(
+    this.currentNetworkId =
+      await this.ipfsDefinition.registerInMemoryNetworkWithId(
       networkId,
       networkName,
     );

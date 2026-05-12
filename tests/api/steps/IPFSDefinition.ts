@@ -1,6 +1,8 @@
 import * as fsSync from 'fs';
 import path from 'path';
 
+import { UUID } from '@haskou/value-objects';
+
 import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipfs/helia/HeliaIPFSParser';
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
@@ -153,22 +155,24 @@ export default class IPFSDefinition {
     }
   }
 
-  public async registerInMemoryNetwork(networkAlias: string): Promise<void> {
+  public async registerInMemoryNetwork(networkAlias: string): Promise<string> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkAlias}-${this.scenarioSuffix}`;
-    const networkId = `test-${scenarioNetworkName}`;
+    const networkId = UUID.generate().toString();
     const networkConfig = new IPFSNetworkConfig(networkId, scenarioNetworkName);
 
     await ipfs.registerNetwork(networkConfig);
     this.ipfsNetworkAliases[networkAlias] = scenarioNetworkName;
     this.ipfsNetworkIdAliases[networkAlias] = networkId;
     this.registeredNetworkIds.push(networkId);
+
+    return networkId;
   }
 
   public async registerInMemoryNetworkWithId(
     networkId: string,
     networkName: string,
-  ): Promise<void> {
+  ): Promise<string> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkName}-${this.scenarioSuffix}`;
     const networkConfig = new IPFSNetworkConfig(networkId, scenarioNetworkName);
@@ -177,6 +181,8 @@ export default class IPFSDefinition {
     this.ipfsNetworkAliases[networkName] = scenarioNetworkName;
     this.ipfsNetworkIdAliases[networkName] = networkId;
     this.registeredNetworkIds.push(networkId);
+
+    return networkId;
   }
 
   public async storeJSONInNetwork(
