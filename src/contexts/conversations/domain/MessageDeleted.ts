@@ -2,27 +2,32 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
+import { MessageMetadata } from './MessageMetadata';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageId } from './value-objects/MessageId';
 
+export type MessageDeletedCreateData = {
+  authorId: IdentityId;
+  conversationId: ConversationId;
+  createdAt?: Timestamp;
+  id?: MessageId;
+  previousMessageIds?: MessageId[];
+  signature: Signature;
+  targetMessageId: MessageId;
+};
+
 export class MessageDeleted extends Message {
-  public static create(
-    conversationId: ConversationId,
-    authorId: IdentityId,
-    targetMessageId: MessageId,
-    signature: Signature,
-    previousMessageIds: MessageId[] = [],
-    createdAt: Timestamp = Timestamp.now(),
-    id: MessageId = MessageId.generate(),
-  ): MessageDeleted {
+  public static create(data: MessageDeletedCreateData): MessageDeleted {
     return new MessageDeleted(
-      id,
-      conversationId,
-      authorId,
-      targetMessageId,
-      previousMessageIds,
-      createdAt,
-      signature,
+      new MessageMetadata(
+        data.id ?? MessageId.generate(),
+        data.conversationId,
+        data.authorId,
+        data.previousMessageIds ?? [],
+        data.createdAt ?? Timestamp.now(),
+        data.signature,
+      ),
+      data.targetMessageId,
     );
   }
 
@@ -30,35 +35,25 @@ export class MessageDeleted extends Message {
     primitives: PrimitiveOf<Message>,
   ): MessageDeleted {
     return new MessageDeleted(
-      new MessageId(primitives.id),
-      new ConversationId(primitives.conversationId),
-      new IdentityId(primitives.authorId),
-      new MessageId(primitives.targetMessageId as string),
-      primitives.previousMessageIds.map(
-        (messageId) => new MessageId(messageId),
+      new MessageMetadata(
+        new MessageId(primitives.id),
+        new ConversationId(primitives.conversationId),
+        new IdentityId(primitives.authorId),
+        primitives.previousMessageIds.map(
+          (messageId) => new MessageId(messageId),
+        ),
+        new Timestamp(primitives.createdAt),
+        new Signature(primitives.signature),
       ),
-      new Timestamp(primitives.createdAt),
-      new Signature(primitives.signature),
+      new MessageId(primitives.targetMessageId as string),
     );
   }
 
   constructor(
-    id: MessageId,
-    conversationId: ConversationId,
-    authorId: IdentityId,
+    metadata: MessageMetadata,
     private readonly targetMessageId: MessageId,
-    previousMessageIds: MessageId[],
-    createdAt: Timestamp,
-    signature: Signature,
   ) {
-    super(
-      id,
-      conversationId,
-      authorId,
-      previousMessageIds,
-      createdAt,
-      signature,
-    );
+    super(metadata);
   }
 
   public getType(): MessageType {

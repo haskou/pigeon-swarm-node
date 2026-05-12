@@ -38,6 +38,7 @@ export default class Definitions {
   private identityKeyPair: KeyPair | undefined;
 
   private conversationId: string | undefined;
+  private currentNetworkId: string | undefined;
   private createdIdentityId: string | undefined;
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
@@ -59,6 +60,7 @@ export default class Definitions {
     this.headers = {};
     this.identityKeyPair = undefined;
     this.conversationId = undefined;
+    this.currentNetworkId = undefined;
     this.createdIdentityId = undefined;
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
@@ -106,7 +108,7 @@ export default class Definitions {
     await Promise.all(
       networkRegistry
         .getAll()
-        .map((network) => networkRegistry.removeNetwork(network.getName())),
+        .map((network) => networkRegistry.removeNetwork(network.getId())),
     );
   }
 
@@ -181,7 +183,9 @@ export default class Definitions {
     const keyPair = await this.ensureIdentityKeyPair();
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
-    const networks = ['123e4567-e89b-12d3-a456-426614174000'];
+    const networks = [
+      this.currentNetworkId ?? '123e4567-e89b-12d3-a456-426614174000',
+    ];
     const normalizedHandle = handle.replace(/^@/, '').toLowerCase();
     const profile: {
       biography: string | undefined;
@@ -209,6 +213,37 @@ export default class Definitions {
       ...signaturePayload,
       signature,
     });
+  }
+
+  private async ensureAuthenticatedIdentityIsPublished(): Promise<void> {
+    const ownerIdentityId = this.ownerIdentityId ?? new IdentityId(
+      (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
+    );
+
+    if (this.createdIdentityId === ownerIdentityId.valueOf()) {
+      return;
+    }
+
+    await this.buildClientSignedIdentityBody(
+      'Test Identity',
+      'test-identity',
+      'Client-secret1!',
+    );
+    await this.signCurrentRequest('POST', '/identities/');
+
+    const response = await this.restClient.post(
+      '/identities/',
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Could not publish identity: ${JSON.stringify(response.data)}`,
+      );
+    }
+
+    this.createdIdentityId = response.data.id;
   }
 
   private async findCreatedIdentityExternalIdentifier(): Promise<string> {
@@ -260,6 +295,10 @@ export default class Definitions {
     if (!this.body) {
       throw new Error('Body must be set before signing the request.');
     }
+
+    const unsignedBody = this.body;
+    await this.ensureAuthenticatedIdentityIsPublished();
+    this.body = unsignedBody;
 
     const keyPair = await this.ensureIdentityKeyPair();
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
@@ -370,7 +409,11 @@ export default class Definitions {
 
     this.body = JSON.stringify({
       keychainExternalIdentifier: this.keychainExternalIdentifier,
-      participantIds: [ownerIdentityId.valueOf(), participantIdentityId.valueOf()],
+      networkId: this.currentNetworkId,
+      participantIds: [
+        ownerIdentityId.valueOf(),
+        participantIdentityId.valueOf(),
+      ],
       type: 'one-to-one',
     });
   }
@@ -794,7 +837,8 @@ export default class Definitions {
   public async iRegisterAnInMemoryIPFSNetwork(
     networkName: string,
   ): Promise<void> {
-    await this.ipfsDefinition.registerInMemoryNetwork(networkName);
+    this.currentNetworkId =
+      await this.ipfsDefinition.registerInMemoryNetwork(networkName);
   }
 
   @given(
@@ -804,7 +848,8 @@ export default class Definitions {
     networkId: string,
     networkName: string,
   ): Promise<void> {
-    await this.ipfsDefinition.registerInMemoryNetworkWithId(
+    this.currentNetworkId =
+      await this.ipfsDefinition.registerInMemoryNetworkWithId(
       networkId,
       networkName,
     );

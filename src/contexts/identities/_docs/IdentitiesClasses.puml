@@ -31,6 +31,17 @@ package "identities.domain" {
   class ProfileImage <<ValueObject>>
   class IdentityExternalIdentifier <<ValueObject>>
 
+  note right of ProfileHandle
+    Stored lowercase without @.
+    Allowed characters: letters,
+    numbers, dots, hyphens and underscores.
+  end note
+
+  note right of ProfileImage
+    Public IPFS CID for profile media.
+    Base64/data URLs are not stored here.
+  end note
+
   class IdentitySignatureDomainService {
     +generateSignature(payload, encryptedKeyPair, password): Promise<Signature>
     +isValidSignature(encryptedKeyPair, payload, signature): boolean
@@ -57,6 +68,12 @@ package "identities.domain" {
     +findById(identityId): Promise<Identity>
     +findByHandle(handle): Promise<Identity>
   }
+
+  note right of Identity
+    Identities can join new networks.
+    Updates that remove an existing
+    network are rejected.
+  end note
 
   class IdentityRegistrarService {
     +register(identityId): Promise<Identity>

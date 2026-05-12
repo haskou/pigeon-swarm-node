@@ -15,6 +15,7 @@ export default class MongoConversationMapper {
     return {
       _id: primitives.id,
       createdAt: createdAt.valueOf(),
+      networkId: primitives.networkId,
       participantIds: primitives.participantIds,
       type: 'one-to-one',
     };
@@ -27,6 +28,7 @@ export default class MongoConversationMapper {
     return OneToOneConversation.fromPrimitives({
       id: document._id,
       messages: messages.map((message) => message.toPrimitives()),
+      networkId: document.networkId,
       participantIds: document.participantIds,
     });
   }

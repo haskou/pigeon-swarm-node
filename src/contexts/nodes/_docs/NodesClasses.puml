@@ -28,6 +28,18 @@ package "nodes" {
       +eventName(): string
     }
 
+    class NodeHeartbeatWasSent <DomainEvent> {
+      +eventName(): string
+    }
+
+    class NodePeer {
+      -id: NodeId
+      -owner?: IdentityId
+      -networks: Network[]
+      -lastSeenAt: Timestamp
+      +toPrimitives(): object
+    }
+
     class NodeOwnerCanOnlyBeChangedByCurrentOwnerError <DomainError>
 
     class NetworkId
@@ -36,6 +48,8 @@ package "nodes" {
 
     Node o--> "0..N" Network
     Node ..> NodeNetworkWasAdded
+    NodePeer o--> "0..N" Network
+    NodePeer --> NodeId
     Node ..> NodeOwnerCanOnlyBeChangedByCurrentOwnerError
     Network *--> NetworkId
     Network *--> NetworkName
@@ -56,7 +70,13 @@ package "nodes" {
       +saveNode(node: Node): Promise<void>
     }
 
+    interface NodePeerRepository {
+      +save(peer: NodePeer): Promise<void>
+      +findActive(): Promise<NodePeer[]>
+    }
+
     NodeRepository o--> Node
+    NodePeerRepository o--> NodePeer
     NodeLoaderService --> NodeRepository
     NodeSaverService --> NodeRepository
   }
@@ -90,6 +110,18 @@ package "nodes" {
       +assignOwner(message: NodeOwnerAssignerMessage): Promise<void>
     }
 
+    class NodeHeartbeatSender {
+      +send(): Promise<void>
+    }
+
+    class NodePeerRegistrar {
+      +register(message: NodePeerRegisterMessage): Promise<void>
+    }
+
+    class NodePeersFinder {
+      +find(): Promise<NodePeer[]>
+    }
+
     NodeNetworkAdder --> NodeLoaderService
     NodeNetworkAdder --> NodeSaverService
     NodeNetworkAdder --> NodeNetworkAdderMessage
@@ -97,6 +129,10 @@ package "nodes" {
     NodeOwnerAssigner --> NodeLoaderService
     NodeOwnerAssigner --> NodeSaverService
     NodeOwnerAssigner --> NodeOwnerAssignerMessage
+    NodeHeartbeatSender --> NodeLoaderService
+    NodeHeartbeatSender ..> NodeHeartbeatWasSent
+    NodePeerRegistrar --> NodePeerRepository
+    NodePeersFinder --> NodePeerRepository
   }
 
   package "infrastructure" {
@@ -104,6 +140,11 @@ package "nodes" {
       -networkRegistry: IPFSNetworkRegistry
       +loadLocalNode(): Promise<Node>
       +saveLocalNode(node: Node): Promise<void>
+    }
+
+    class MongoNodePeerRepository {
+      +save(peer: NodePeer): Promise<void>
+      +findActive(): Promise<NodePeer[]>
     }
 
     note right of MongoNodeMetadataRepository
@@ -115,6 +156,7 @@ package "nodes" {
     end note
 
     MongoNodeMetadataRepository ..|> NodeRepository
+    MongoNodePeerRepository ..|> NodePeerRepository
   }
 }
 

@@ -25,8 +25,9 @@ package "keychains.domain" {
   class KeychainWasPublishedEvent <<DomainEvent>>
 
   interface KeychainRepository {
-    +save(keychain: Keychain): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
+    +republishLocalRoutingRecords(): Promise<number>
   }
 
   class KeychainSignatureDomainService {
@@ -38,6 +39,7 @@ package "keychains.domain" {
   }
 
   Keychain --> IdentityId
+  KeychainRepository --> NetworkId
   Keychain --> EncryptedKeychainPayload
   Keychain --> KeychainVersion
   Keychain --> KeychainExternalIdentifier
@@ -48,6 +50,43 @@ package "keychains.domain" {
   KeychainCandidateValidationDomainService --> KeychainSignatureDomainService
   KeychainCandidateValidationDomainService ..> Keychain
   KeychainRepository --> Keychain
+}
+
+package "keychains.application" {
+  class KeychainPublisher {
+    +publish(message): Promise<Keychain>
+  }
+
+  class CurrentKeychainFinder {
+    +find(message): Promise<object>
+  }
+
+  class KeychainCandidateRegistrar {
+    +register(message): Promise<void>
+  }
+
+  class KeychainSyncResponder {
+    +respond(message): Promise<void>
+  }
+
+  class KeychainSaverService {
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+  }
+
+  class IdentityRepository <<external>>
+
+  KeychainPublisher --> KeychainSaverService
+  KeychainPublisher --> IdentityRepository
+  KeychainSaverService --> KeychainRepository
+  CurrentKeychainFinder --> KeychainRepository
+  KeychainCandidateRegistrar --> KeychainRepository
+  KeychainSyncResponder --> CurrentKeychainFinder
+  KeychainSyncResponder ..> KeychainWasPublishedEvent
+
+  note right of KeychainPublisher
+    Resolves the owner identity and publishes
+    the keychain only in the owner's networks.
+  end note
 }
 
 package "keychains.infrastructure" {
@@ -70,8 +109,9 @@ package "keychains.infrastructure" {
   }
 
   class IpfsKeychainRepository {
-    +save(keychain: Keychain): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
+    +republishLocalRoutingRecords(): Promise<number>
   }
 
   class IpfsKeychainMapper {
@@ -91,6 +131,8 @@ package "keychains.infrastructure" {
   note right of IpfsKeychainRepository
     Encapsulates IPFS documents, MongoDB metadata,
     DHT record candidates and content addressing.
+    New keychain versions are published only in
+    the owner's identity networks.
     The domain only receives Keychain objects and
     opaque KeychainExternalIdentifier values.
   end note

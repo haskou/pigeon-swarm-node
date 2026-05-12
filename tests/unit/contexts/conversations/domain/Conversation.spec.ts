@@ -40,11 +40,13 @@ describe('Conversation', () => {
         author,
         new EncryptedMessagePayload('encrypted-payload'),
         signature(),
-        [
-          new AttachmentExternalIdentifier(
-            'bafybeigdyrzt5sfp7udm7hu76t5dp5whztr3v3gvl6wv4x7q5v2fi6c5mm',
-          ),
-        ],
+        {
+          attachmentExternalIdentifiers: [
+            new AttachmentExternalIdentifier(
+              'bafybeigdyrzt5sfp7udm7hu76t5dp5whztr3v3gvl6wv4x7q5v2fi6c5mm',
+            ),
+          ],
+        },
       );
 
       expect(message).toBeInstanceOf(MessageSent);
@@ -62,6 +64,7 @@ describe('Conversation', () => {
       expect(events[0].attributes).toEqual({
         authorId: author.valueOf(),
         messageId: message.getId().valueOf(),
+        networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
       });
     });
@@ -92,11 +95,10 @@ describe('Conversation', () => {
         recipient,
         new EncryptedMessagePayload('reply-payload'),
         signature(),
-        [],
-        undefined,
-        undefined,
-        target.getId(),
-        [newer.getId()],
+        {
+          previousMessageIds: [newer.getId()],
+          replyToMessageId: target.getId(),
+        },
       );
 
       expect(reply.getReplyToMessageId()?.valueOf()).toBe(
@@ -118,11 +120,10 @@ describe('Conversation', () => {
           author,
           new EncryptedMessagePayload('reply-payload'),
           signature(),
-          [],
-          undefined,
-          undefined,
-          MessageId.generate(),
-          [],
+          {
+            previousMessageIds: [],
+            replyToMessageId: MessageId.generate(),
+          },
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -133,11 +134,9 @@ describe('Conversation', () => {
           author,
           new EncryptedMessagePayload('message-payload'),
           signature(),
-          [],
-          undefined,
-          undefined,
-          undefined,
-          [MessageId.generate()],
+          {
+            previousMessageIds: [MessageId.generate()],
+          },
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -155,11 +154,10 @@ describe('Conversation', () => {
           recipient,
           new EncryptedMessagePayload('reply-payload'),
           signature(),
-          [],
-          undefined,
-          undefined,
-          target.getId(),
-          [],
+          {
+            previousMessageIds: [],
+            replyToMessageId: target.getId(),
+          },
         ),
       ).toThrow(MessageTargetAlreadyDeletedError);
     });
@@ -198,6 +196,7 @@ describe('Conversation', () => {
       expect(events).toEqual([expect.any(ConversationMessageWasEditedEvent)]);
       expect(events[0].attributes).toEqual({
         messageId: edited.getId().valueOf(),
+        networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
         targetMessageId: sent.getId().valueOf(),
       });
@@ -256,6 +255,7 @@ describe('Conversation', () => {
       expect(events).toEqual([expect.any(ConversationMessageWasDeletedEvent)]);
       expect(events[0].attributes).toEqual({
         messageId: deleted.getId().valueOf(),
+        networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
         targetMessageId: sent.getId().valueOf(),
       });

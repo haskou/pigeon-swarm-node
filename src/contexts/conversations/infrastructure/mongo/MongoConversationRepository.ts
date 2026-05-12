@@ -4,10 +4,12 @@ import {
   ConversationMessageCandidate,
   ConversationMessagesAround,
   ConversationRepository,
+  ConversationSyncScope,
 } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -336,6 +338,33 @@ export default class MongoConversationRepository implements Repository {
     return collection.distinct('conversationId', { valid: true });
   }
 
+  public async findConversationSyncScopes(): Promise<ConversationSyncScope[]> {
+    const documents = await (
+      await this.messageMetadataCollection()
+    )
+      .aggregate<ConversationSyncScope>([
+        { $match: { valid: true } },
+        {
+          $group: {
+            _id: {
+              conversationId: '$conversationId',
+              networkId: '$networkId',
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            conversationId: '$_id.conversationId',
+            networkId: '$_id.networkId',
+          },
+        },
+      ])
+      .toArray();
+
+    return documents.filter((document) => document.networkId);
+  }
+
   public async findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
@@ -373,15 +402,26 @@ export default class MongoConversationRepository implements Repository {
           await this.ipfsManager.getJSON<IpfsMessageDocument>(
             new IPFSId(metadata.cid),
           );
-        const cid = await this.ipfsManager.addJSONToAll(messageDocument);
+        const cid = metadata.networkId
+          ? await this.ipfsManager.addJSONToNetworks(messageDocument, [
+              metadata.networkId,
+            ])
+          : await this.ipfsManager.addJSONToAll(messageDocument);
 
-        await this.ipfsManager.putRecordToAll(
-          this.getMessageRoutingKey(
-            new ConversationId(metadata.conversationId),
-            new MessageId(metadata.messageId),
-          ),
-          cid.valueOf(),
+        const routingKey = this.getMessageRoutingKey(
+          new ConversationId(metadata.conversationId),
+          new MessageId(metadata.messageId),
         );
+
+        if (metadata.networkId) {
+          await this.ipfsManager.putRecordToNetworks(
+            routingKey,
+            cid.valueOf(),
+            [metadata.networkId],
+          );
+        } else {
+          await this.ipfsManager.putRecordToAll(routingKey, cid.valueOf());
+        }
         republished++;
       } catch {
         continue;
@@ -394,9 +434,14 @@ export default class MongoConversationRepository implements Repository {
   public async findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
+    networkId: NetworkId,
   ): Promise<Conversation | undefined> {
     return this.findById(
-      ConversationId.deterministic(firstIdentityId, secondIdentityId),
+      ConversationId.deterministic(
+        firstIdentityId,
+        secondIdentityId,
+        networkId,
+      ),
     );
   }
 
@@ -429,13 +474,16 @@ export default class MongoConversationRepository implements Repository {
         continue;
       }
 
-      const cid = await this.ipfsManager.addJSONToAll(
-        this.messageMapper.toDocument(domainMessage),
-      );
+      const messageDocument = this.messageMapper.toDocument(domainMessage);
+      const networkId = conversation.getNetworkId();
+      const cid = await this.ipfsManager.addJSONToNetworks(messageDocument, [
+        networkId.valueOf(),
+      ]);
       const metadata = this.metadataMapper.toDocument(
         domainMessage,
         cid,
         this.getRecipientIds(conversation, domainMessage),
+        networkId,
       );
 
       await (
@@ -445,12 +493,13 @@ export default class MongoConversationRepository implements Repository {
         { $setOnInsert: metadata },
         { upsert: true },
       );
-      await this.ipfsManager.putRecordToAll(
+      await this.ipfsManager.putRecordToNetworks(
         this.getMessageRoutingKey(
           new ConversationId(message.conversationId),
           new MessageId(message.id),
         ),
         cid.valueOf(),
+        [networkId.valueOf()],
       );
       await this.deleteTargetMessageContent(domainMessage);
     }

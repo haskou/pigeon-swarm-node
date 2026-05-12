@@ -257,11 +257,15 @@ export default class IpfsIdentityRepository implements IdentityRepository {
           await this.ipfsManager.getJSON<IpfsIdentityDocument>(
             new IPFSId(document.cid),
           );
-        const cid = await this.ipfsManager.addJSONToAll(identityDocument);
+        const cid = await this.ipfsManager.addJSONToNetworks(
+          identityDocument,
+          identityDocument.networks,
+        );
 
-        await this.ipfsManager.putRecordToAll(
+        await this.ipfsManager.putRecordToNetworks(
           this.ROUTING_KEY_PREFIX + document.identityId,
           cid.valueOf(),
+          identityDocument.networks,
         );
         republished++;
       } catch {

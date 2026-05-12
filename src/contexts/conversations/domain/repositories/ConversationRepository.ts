@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { Conversation } from '../Conversation';
 import { Message } from '../Message';
@@ -10,6 +11,11 @@ export interface ConversationMessageCandidate {
   createdAt: number;
   messageId: string;
   messageType: string;
+}
+
+export interface ConversationSyncScope {
+  conversationId: string;
+  networkId: string;
 }
 
 export interface ConversationMessagesAround {
@@ -51,6 +57,8 @@ export interface ConversationRepository {
   findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
+    networkId: NetworkId,
   ): Promise<Conversation | undefined>;
+  findConversationSyncScopes(): Promise<ConversationSyncScope[]>;
   save(conversation: Conversation): Promise<void>;
 }

@@ -5,6 +5,7 @@ import { ConversationRepository } from '@app/contexts/conversations/domain/repos
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ConversationSyncResponder', () => {
@@ -43,6 +44,7 @@ describe('ConversationSyncResponder', () => {
     await responder.respond(
       new ConversationSyncResponseMessage(
         conversationId.valueOf(),
+        UUID.generate().toString(),
         'request-3',
       ),
     );
@@ -63,6 +65,7 @@ describe('ConversationSyncResponder', () => {
     expect(eventPublisher.publish.mock.calls[0][0][0].attributes).toMatchObject(
       {
         messageCandidates,
+        networkId: expect.any(String),
         requestId: 'request-3',
       },
     );
@@ -74,6 +77,7 @@ describe('ConversationSyncResponder', () => {
     await responder.respond(
       new ConversationSyncResponseMessage(
         'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de',
+        UUID.generate().toString(),
         'request-3',
       ),
     );

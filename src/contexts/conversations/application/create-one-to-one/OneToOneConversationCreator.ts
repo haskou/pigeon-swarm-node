@@ -45,6 +45,7 @@ export default class OneToOneConversationCreator {
     const existing = await this.conversationRepository.findOneToOne(
       message.ownerIdentityId,
       message.participantIdentityId,
+      message.networkId,
     );
 
     if (existing) {
@@ -54,6 +55,7 @@ export default class OneToOneConversationCreator {
     const conversation = OneToOneConversation.create(
       message.ownerIdentityId,
       message.participantIdentityId,
+      message.networkId,
     );
 
     await this.conversationRepository.save(conversation);

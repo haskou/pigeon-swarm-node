@@ -51,35 +51,7 @@ Tests:
 - Cucumber: unauthorized conversation subscription is rejected.
 - Cucumber: reconnect recovers missed events through HTTP pagination or sync.
 
-## Next Slice 3: Node Startup Sync MVP
-
-Goal: when a node starts, ask peers for missing local data without making every
-peer respond at once.
-
-Steps:
-
-1. Add a startup synchronizer after Mongo, logs, IPFS networks and consumers are
-   ready.
-2. Send an immediate node heartbeat on startup.
-3. Publish sync requests for locally known identities, keychains and
-   conversations.
-4. Include `requestId`, requester node/peer id and known local version/candidate
-   hints in sync requests.
-5. Add responder suppression: deterministic delay, cancel if a sufficient
-   `sync_available` for the same `requestId` is observed first, and respond at
-   most once per `requestId/resource`.
-6. Add a signed `POST /node/sync` endpoint to trigger the same bootstrap sync
-   manually.
-7. Document the startup sync request/response contract.
-
-Tests:
-
-- Unit: startup synchronizer publishes heartbeat and scoped sync requests.
-- Unit: responders suppress duplicate responses for the same request.
-- Consumer: one peer responds when it has useful data.
-- Consumer: a second peer cancels when it sees an equivalent response first.
-
-## Later Slice: Node Startup Sync Final
+## Later Slice: Node Startup Sync Hardening
 
 Goal: make startup synchronization scalable, resumable and quiet on larger
 networks.
@@ -100,6 +72,20 @@ Steps:
 
 ## Later Slices
 
+- Voice calls:
+  - add a `calls` context for call state and signaling events
+  - scope calls to `conversationId` and `networkId`
+  - deliver WebRTC offer/answer/ICE candidates through the existing
+    network-scoped PubSub and client WebSocket bridge
+  - keep audio media peer-to-peer through `RTCPeerConnection`, not IPFS/Mongo
+  - require encrypted signaling payloads for conversation participants
+  - start with voice-only 1to1 calls and configurable STUN servers
+  - support small group calls with a peer-to-peer mesh and a hard participant
+    limit
+  - add a later relay/SFU topology where a `coordinatorNodeId` is selected from
+    available peers for larger or unstable group calls
+  - add optional TURN or libp2p relay support for hard NAT cases
+  - model missed calls as actionable notifications
 - Private attachments:
   - validate the frontend attachment flow with real 1to1 messages
   - document the encrypted attachment payload expected inside `encryptedPayload`

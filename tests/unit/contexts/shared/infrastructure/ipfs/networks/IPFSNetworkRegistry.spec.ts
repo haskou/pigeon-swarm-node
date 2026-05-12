@@ -186,6 +186,57 @@ describe('IPFSNetworkRegistry', () => {
       ).toEqual([existingNetwork, duplicatedNetwork]);
     });
 
+    it('should allow different network ids with the same name', async () => {
+      const registry = new IPFSNetworkRegistry();
+      const existingNetwork = mock<IPFSNetwork>();
+      const duplicatedNameNetwork = mock<IPFSNetwork>();
+
+      existingNetwork.getId.mockReturnValue('network-1');
+      existingNetwork.getName.mockReturnValue('shared-name');
+      duplicatedNameNetwork.getId.mockReturnValue('network-2');
+      duplicatedNameNetwork.getName.mockReturnValue('shared-name');
+
+      (
+        registry as unknown as {
+          networks: IPFSNetwork[];
+        }
+      ).networks = [existingNetwork];
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockResolvedValue(duplicatedNameNetwork);
+
+      await registry.register(
+        new IPFSNetworkConfig(
+          'network-2',
+          'shared-name',
+          new PrivateKey(validPem),
+        ),
+      );
+
+      expect(
+        (
+          registry as unknown as {
+            networks: IPFSNetwork[];
+          }
+        ).networks,
+      ).toEqual([existingNetwork, duplicatedNameNetwork]);
+    });
+
     it('should notify listeners when a network is registered', async () => {
       const registry = new IPFSNetworkRegistry();
       const network = mock<IPFSNetwork>();

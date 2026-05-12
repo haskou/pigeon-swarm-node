@@ -253,6 +253,7 @@ describe('PubSub sync consumers', () => {
 
     await consumer.handler(
       new ConversationSyncRequestedEvent(conversationId, {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
         requestId: 'request-3',
       }),
     );
@@ -262,6 +263,9 @@ describe('PubSub sync consumers', () => {
     );
     expect(responder.respond.mock.calls[0][0].conversationId.valueOf()).toBe(
       conversationId,
+    );
+    expect(responder.respond.mock.calls[0][0].networkId.valueOf()).toBe(
+      '123e4567-e89b-12d3-a456-426614174000',
     );
     expect(responder.respond.mock.calls[0][0].requestId?.valueOf()).toBe(
       'request-3',

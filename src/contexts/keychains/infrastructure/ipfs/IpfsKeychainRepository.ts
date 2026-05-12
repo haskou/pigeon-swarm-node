@@ -1,3 +1,5 @@
+import { IpfsIdentityDocument } from '@app/contexts/identities/infrastructure/ipfs/documents/IpfsIdentityDocument';
+import { KeychainOwnerNetworksNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainOwnerNetworksNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import {
   KeychainCandidate,
@@ -5,6 +7,7 @@ import {
 } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
@@ -15,6 +18,7 @@ import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 
 export default class IpfsKeychainRepository implements KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
+  private readonly IDENTITY_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -36,6 +40,59 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     } catch {
       return undefined;
     }
+  }
+
+  private async findOwnerNetworkIds(
+    ownerIdentityId: string,
+  ): Promise<string[]> {
+    const cidStrings = await this.ipfsManager.getRecordCandidates(
+      this.IDENTITY_ROUTING_KEY_PREFIX + ownerIdentityId,
+    );
+    const networkIds = new Set<string>();
+
+    for (const cidString of cidStrings) {
+      try {
+        const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+          new IPFSId(cidString),
+        );
+
+        document.networks.forEach((networkId) => networkIds.add(networkId));
+      } catch {
+        continue;
+      }
+    }
+
+    return [...networkIds];
+  }
+
+  private async addJSONToOwnerNetworks(
+    ownerIdentityId: string,
+    document: IpfsKeychainDocument,
+  ): Promise<IPFSId> {
+    const networkIds = await this.findOwnerNetworkIds(ownerIdentityId);
+
+    if (networkIds.length === 0) {
+      throw new KeychainOwnerNetworksNotFoundError();
+    }
+
+    return this.ipfsManager.addJSONToNetworks(document, networkIds);
+  }
+
+  private async putRecordToOwnerNetworks(
+    ownerIdentityId: string,
+    cid: IPFSId,
+  ): Promise<void> {
+    const networkIds = await this.findOwnerNetworkIds(ownerIdentityId);
+
+    if (networkIds.length === 0) {
+      throw new KeychainOwnerNetworksNotFoundError();
+    }
+
+    await this.ipfsManager.putRecordToNetworks(
+      this.ROUTING_KEY_PREFIX + ownerIdentityId,
+      cid.valueOf(),
+      networkIds,
+    );
   }
 
   public async findByExternalIdentifier(
@@ -96,14 +153,24 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     return candidates;
   }
 
-  public async save(keychain: Keychain): Promise<KeychainExternalIdentifier> {
+  public async save(
+    keychain: Keychain,
+    networkIds: NetworkId[],
+  ): Promise<KeychainExternalIdentifier> {
     const document = this.mapper.toDocument(keychain);
-    const cid = await this.ipfsManager.addJSONToAll(document);
+    const primitiveNetworkIds = networkIds.map((networkId) =>
+      networkId.valueOf(),
+    );
+    const cid = await this.ipfsManager.addJSONToNetworks(
+      document,
+      primitiveNetworkIds,
+    );
 
     await this.metadataRepository.save(keychain, cid);
-    await this.ipfsManager.putRecordToAll(
+    await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
+      primitiveNetworkIds,
     );
 
     return new KeychainExternalIdentifier(cid.valueOf());
@@ -128,12 +195,12 @@ export default class IpfsKeychainRepository implements KeychainRepository {
           await this.ipfsManager.getJSON<IpfsKeychainDocument>(
             new IPFSId(document.cid),
           );
-        const cid = await this.ipfsManager.addJSONToAll(keychainDocument);
-
-        await this.ipfsManager.putRecordToAll(
-          this.ROUTING_KEY_PREFIX + document.ownerIdentityId,
-          cid.valueOf(),
+        const cid = await this.addJSONToOwnerNetworks(
+          document.ownerIdentityId,
+          keychainDocument,
         );
+
+        await this.putRecordToOwnerNetworks(document.ownerIdentityId, cid);
         republished++;
       } catch {
         continue;

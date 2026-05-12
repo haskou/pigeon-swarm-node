@@ -33,14 +33,14 @@ describe('IpfsMessageMapper', () => {
 });
 
 function buildSentMessage(): MessageSent {
-  return MessageSent.create(
-    new ConversationId('conversation-a:conversation-b'),
-    new IdentityId(
+  return MessageSent.create({
+    authorId: new IdentityId(
       'MCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=',
     ),
-    new EncryptedMessagePayload('encrypted-payload'),
-    new Signature(
+    conversationId: new ConversationId('conversation-a:conversation-b'),
+    encryptedPayload: new EncryptedMessagePayload('encrypted-payload'),
+    signature: new Signature(
       'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
     ),
-  );
+  });
 }

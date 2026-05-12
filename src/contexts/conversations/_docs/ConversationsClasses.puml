@@ -5,6 +5,7 @@ title Pigeon Swarm - Conversations Context
 package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
+    -networkId: NetworkId
     -participants: IdentityId[]
     -messages: Message[]
     -createdAt: Timestamp
@@ -15,7 +16,7 @@ package "conversations.domain" {
   }
 
   class OneToOneConversation {
-    +create(first: IdentityId, second: IdentityId): OneToOneConversation
+    +create(first: IdentityId, second: IdentityId, networkId: NetworkId): OneToOneConversation
   }
 
   class ConversationWasCreatedEvent {
@@ -23,13 +24,19 @@ package "conversations.domain" {
   }
 
   abstract class Message <<Entity>> {
+    -metadata: MessageMetadata
+    +verify(): boolean
+  }
+
+  class MessageMetadata {
     -id: MessageId
+    -conversationId: ConversationId
     -authorId: IdentityId
     -createdAt: Timestamp
     -previousMessageIds: MessageId[]
     -replyToMessageId?: MessageId
+    -targetMessageId?: MessageId
     -signature: Signature
-    +verify(): boolean
   }
 
   class MessageSent {
@@ -46,6 +53,26 @@ package "conversations.domain" {
     -targetMessageId: MessageId
   }
 
+  class ConversationMessageWasSentEvent {
+    +eventName(): string
+  }
+
+  class ConversationMessageWasEditedEvent {
+    +eventName(): string
+  }
+
+  class ConversationMessageWasDeletedEvent {
+    +eventName(): string
+  }
+
+  class ConversationSyncRequestedEvent {
+    +eventName(): string
+  }
+
+  class ConversationSyncAvailableEvent {
+    +eventName(): string
+  }
+
   class MessageSignatureDomainService {
     +sign(message): Signature
     +verify(message): boolean
@@ -54,19 +81,21 @@ package "conversations.domain" {
   interface ConversationRepository {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
-    +findOneToOne(a: IdentityId, b: IdentityId): Promise<OneToOneConversation>
+    +findOneToOne(a: IdentityId, b: IdentityId, networkId: NetworkId): Promise<OneToOneConversation>
     +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
+    +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
+    +findSyncScopes(): Promise<object[]>
   }
 
   Conversation <|-- OneToOneConversation
   Conversation *--> "0..*" Message
+  Conversation --> NetworkId
   Message <|-- MessageSent
   Message <|-- MessageEdited
   Message <|-- MessageDeleted
+  Message *--> MessageMetadata
   Conversation o--> IdentityId
-  Message --> IdentityId
-  Message o--> MessageId
   MessageSent --> EncryptedPayload
   MessageSent o--> AttachmentExternalIdentifier
   MessageEdited --> MessageId
@@ -74,6 +103,9 @@ package "conversations.domain" {
   MessageSignatureDomainService ..> Message
   ConversationRepository --> Conversation
   OneToOneConversation ..> ConversationWasCreatedEvent
+  Conversation ..> ConversationMessageWasSentEvent
+  Conversation ..> ConversationMessageWasEditedEvent
+  Conversation ..> ConversationMessageWasDeletedEvent
 }
 
 package "conversations.application" {
@@ -105,6 +137,14 @@ package "conversations.application" {
     +sync(conversationId: ConversationId): Promise<void>
   }
 
+  class ConversationMessageRegistrar {
+    +register(message): Promise<void>
+  }
+
+  class ConversationSyncResponder {
+    +respond(message): Promise<void>
+  }
+
   class DomainEventPublisher {
     +publish(domainEvents): Promise<void>
   }
@@ -120,6 +160,11 @@ package "conversations.application" {
   MessageDeleter --> ConversationRepository
   MessageDeleter --> DomainEventPublisher
   ConversationSynchronizer --> ConversationRepository
+  ConversationSynchronizer --> DomainEventPublisher
+  ConversationMessageRegistrar --> ConversationRepository
+  ConversationSyncResponder --> ConversationRepository
+  ConversationSyncResponder --> DomainEventPublisher
+  ConversationSyncResponder ..> ConversationSyncAvailableEvent
 }
 
 package "conversations.infrastructure" {
@@ -128,6 +173,8 @@ package "conversations.infrastructure" {
     -conversationId: string
     -authorId: string
     -type: string
+    -replyToMessageId?: string
+    -targetMessageId?: string
     -payload: object
     -attachmentExternalIdentifiers: string[]
     -previousMessageIds: string[]
@@ -152,6 +199,7 @@ package "conversations.infrastructure" {
   class MongoConversationDocument {
     -_id: string
     -type: string
+    -networkId: string
     -participantIds: string[]
     -createdAt: number
   }

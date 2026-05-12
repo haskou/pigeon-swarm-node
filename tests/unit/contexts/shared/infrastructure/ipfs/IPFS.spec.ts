@@ -138,9 +138,14 @@ describe('IPFS', () => {
 
       mockNetwork.getJSON.mockResolvedValue(expected);
 
-      const result = await ipfs.getJSONFromNetwork(cid, 'my-network');
+      const result = await ipfs.getJSONFromNetwork(
+        cid,
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
 
-      expect(registry.find).toHaveBeenCalledWith('my-network');
+      expect(registry.find).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
       expect(result).toEqual(expected);
     });
   });
@@ -218,9 +223,14 @@ describe('IPFS', () => {
 
       mockNetwork.addJSON.mockResolvedValue(expectedCid);
 
-      const result = await ipfs.addJSON({ test: true }, 'my-network');
+      const result = await ipfs.addJSON(
+        { test: true },
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
 
-      expect(registry.find).toHaveBeenCalledWith('my-network');
+      expect(registry.find).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
       expect(mockNetwork.addJSON).toHaveBeenCalledWith({ test: true });
       expect(result).toEqual(expectedCid);
     });
@@ -266,9 +276,15 @@ describe('IPFS', () => {
 
   describe('putRecord', () => {
     it('should put record to a specific network', async () => {
-      await ipfs.putRecord('key', 'value', 'my-network');
+      await ipfs.putRecord(
+        'key',
+        'value',
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
 
-      expect(registry.find).toHaveBeenCalledWith('my-network');
+      expect(registry.find).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
       expect(mockNetwork.putRecord).toHaveBeenCalledWith('key', 'value');
     });
   });
@@ -299,9 +315,11 @@ describe('IPFS', () => {
 
   describe('removeNetwork', () => {
     it('should delegate to registry.removeNetwork', async () => {
-      await ipfs.removeNetwork('my-network');
+      await ipfs.removeNetwork('550e8400-e29b-41d4-a716-446655440000');
 
-      expect(registry.removeNetwork).toHaveBeenCalledWith('my-network');
+      expect(registry.removeNetwork).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
     });
   });
 });

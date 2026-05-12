@@ -34,7 +34,7 @@ describe('WebSocketEventHub', () => {
 
     expect(client.send).toHaveBeenCalledWith(
       JSON.stringify({
-        identityId: identityId.toString(),
+        identityId: identityId.valueOf(),
         type: 'connection_ack',
       }),
     );
@@ -65,7 +65,7 @@ describe('WebSocketEventHub', () => {
     const recipientClient = buildClient();
     const otherClient = buildClient();
     const event = new TestDomainEvent('aggregate-id', {
-      recipientIdentityId: recipientIdentityId.toString(),
+      recipientIdentityId: recipientIdentityId.valueOf(),
     });
 
     hub.register(recipientIdentityId, recipientClient);
@@ -90,7 +90,7 @@ describe('WebSocketEventHub', () => {
     const participantClient = buildClient();
     const otherClient = buildClient();
     const event = new TestDomainEvent('conversation-id', {
-      participantIds: [participantIdentityId.toString()],
+      participantIds: [participantIdentityId.valueOf()],
     });
 
     hub.register(participantIdentityId, participantClient);
@@ -114,7 +114,7 @@ describe('WebSocketEventHub', () => {
     const otherIdentityId = await generateIdentityId();
     const identityClient = buildClient();
     const otherClient = buildClient();
-    const event = new TestIdentityDomainEvent(identityId.toString());
+    const event = new TestIdentityDomainEvent(identityId.valueOf());
 
     hub.register(identityId, identityClient);
     hub.register(otherIdentityId, otherClient);

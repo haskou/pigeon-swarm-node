@@ -36,6 +36,7 @@ export default class RespondToConversationSyncRequest extends Consumer {
     await this.responder.respond(
       new ConversationSyncResponseMessage(
         String(event.attributes.conversationId || event.aggregateId),
+        String(event.attributes.networkId),
         event.attributes.requestId
           ? String(event.attributes.requestId)
           : undefined,

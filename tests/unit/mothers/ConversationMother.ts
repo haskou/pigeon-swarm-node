@@ -1,9 +1,11 @@
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/value-objects';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { KeyPair, UUID } from '@haskou/value-objects';
 
 export class ConversationMother {
   public author: IdentityId;
+  public networkId: NetworkId;
   public recipient: IdentityId;
 
   public static async create(): Promise<ConversationMother> {
@@ -19,8 +21,13 @@ export class ConversationMother {
     return new IdentityId(keyPair.toPrimitives().publicKey);
   }
 
-  constructor(author: IdentityId, recipient: IdentityId) {
+  constructor(
+    author: IdentityId,
+    recipient: IdentityId,
+    networkId: NetworkId = new NetworkId(UUID.generate().toString()),
+  ) {
     this.author = author;
+    this.networkId = networkId;
     this.recipient = recipient;
   }
 
@@ -36,7 +43,17 @@ export class ConversationMother {
     return this;
   }
 
+  public withNetworkId(networkId: NetworkId): this {
+    this.networkId = networkId;
+
+    return this;
+  }
+
   public build(): OneToOneConversation {
-    return OneToOneConversation.create(this.author, this.recipient);
+    return OneToOneConversation.create(
+      this.author,
+      this.recipient,
+      this.networkId,
+    );
   }
 }

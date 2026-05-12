@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { WebSocket } from 'ws';
 
@@ -40,6 +41,10 @@ const identityAttributeKeys = [
 export class WebSocketEventHub {
   private readonly clients = new Map<string, Set<WebSocket>>();
 
+  private debug(message: string): void {
+    Kernel.logger?.debug(message);
+  }
+
   private broadcast(
     event: DomainEvent,
     message: WebSocketRealtimeMessage,
@@ -49,6 +54,11 @@ export class WebSocketEventHub {
       recipients.size > 0
         ? [...recipients].map((recipient) => this.clients.get(recipient))
         : this.getNodeWideClients(event);
+    const connectedRecipients = targetClients.filter(Boolean).length;
+
+    this.debug(
+      `WebSocket domain event "${event.eventName()}" aggregate="${event.aggregateId}" recipients="${[...recipients].join(',')}" connectedRecipients=${connectedRecipients}`,
+    );
 
     for (const identityClients of targetClients) {
       if (!identityClients) {
@@ -145,11 +155,14 @@ export class WebSocketEventHub {
   }
 
   public register(identityId: IdentityId, client: WebSocket): void {
-    const identityIdValue = identityId.toString();
+    const identityIdValue = identityId.valueOf();
     const identityClients = this.clients.get(identityIdValue) || new Set();
 
     identityClients.add(client);
     this.clients.set(identityIdValue, identityClients);
+    this.debug(
+      `WebSocket client registered for identity "${identityIdValue}" connections=${identityClients.size}`,
+    );
 
     client.on('close', () => this.unregister(identityIdValue, client));
     client.on('error', () => this.unregister(identityIdValue, client));
