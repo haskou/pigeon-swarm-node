@@ -6,6 +6,8 @@ package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
     -networkId: NetworkId
+    -type: ConversationType
+    -name?: GroupConversationName
     -participants: IdentityId[]
     -messages: Message[]
     -createdAt: Timestamp
@@ -18,6 +20,13 @@ package "conversations.domain" {
   class OneToOneConversation {
     +create(first: IdentityId, second: IdentityId, networkId: NetworkId): OneToOneConversation
   }
+
+  class GroupConversation {
+    +create(name: GroupConversationName, participants: IdentityId[], networkId: NetworkId): GroupConversation
+  }
+
+  class ConversationType <<ValueObject>>
+  class GroupConversationName <<ValueObject>>
 
   class ConversationWasCreatedEvent {
     +eventName(): string
@@ -82,6 +91,7 @@ package "conversations.domain" {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId, networkId: NetworkId): Promise<OneToOneConversation>
+    +findGroup(id: ConversationId): Promise<GroupConversation>
     +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
     +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
@@ -89,8 +99,11 @@ package "conversations.domain" {
   }
 
   Conversation <|-- OneToOneConversation
+  Conversation <|-- GroupConversation
   Conversation *--> "0..*" Message
   Conversation --> NetworkId
+  Conversation --> ConversationType
+  Conversation --> GroupConversationName
   Message <|-- MessageSent
   Message <|-- MessageEdited
   Message <|-- MessageDeleted
@@ -103,6 +116,7 @@ package "conversations.domain" {
   MessageSignatureDomainService ..> Message
   ConversationRepository --> Conversation
   OneToOneConversation ..> ConversationWasCreatedEvent
+  GroupConversation ..> ConversationWasCreatedEvent
   Conversation ..> ConversationMessageWasSentEvent
   Conversation ..> ConversationMessageWasEditedEvent
   Conversation ..> ConversationMessageWasDeletedEvent
@@ -111,6 +125,10 @@ package "conversations.domain" {
 package "conversations.application" {
   class OneToOneConversationCreator {
     +create(command): Promise<OneToOneConversation>
+  }
+
+  class GroupConversationCreator {
+    +create(command): Promise<GroupConversation>
   }
 
   class MessageSender {
@@ -151,6 +169,8 @@ package "conversations.application" {
 
   OneToOneConversationCreator --> ConversationRepository
   OneToOneConversationCreator --> DomainEventPublisher
+  GroupConversationCreator --> ConversationRepository
+  GroupConversationCreator --> DomainEventPublisher
   MessageSender --> ConversationRepository
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository

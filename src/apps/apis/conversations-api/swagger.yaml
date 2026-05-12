@@ -233,7 +233,11 @@ components:
         type:
           type: string
           enum:
+            - group
             - one-to-one
+        name:
+          type: string
+          description: Required when type is group. Standalone group conversation name.
         participantIds:
           type: array
           minItems: 2
@@ -255,6 +259,9 @@ components:
         id:
           type: string
           example: one-to-one:3bd1...
+        name:
+          type: string
+          description: Present for standalone group conversations.
         networkId:
           type: string
           format: uuid
@@ -265,6 +272,7 @@ components:
         type:
           type: string
           enum:
+            - group
             - one-to-one
     ConversationsResource:
       type: object

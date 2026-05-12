@@ -418,6 +418,35 @@ export default class Definitions {
     });
   }
 
+  @given('I set a group conversation body for new participants')
+  public async iSetAGroupConversationBodyForNewParticipants(): Promise<void> {
+    if (!this.keychainExternalIdentifier) {
+      throw new Error('Keychain must be published first.');
+    }
+
+    const firstParticipantKeyPair = await KeyPair.generate();
+    const secondParticipantKeyPair = await KeyPair.generate();
+    const firstParticipantIdentityId = new IdentityId(
+      firstParticipantKeyPair.toPrimitives().publicKey,
+    );
+    const secondParticipantIdentityId = new IdentityId(
+      secondParticipantKeyPair.toPrimitives().publicKey,
+    );
+    const ownerIdentityId = this.ownerIdentityId as IdentityId;
+
+    this.body = JSON.stringify({
+      keychainExternalIdentifier: this.keychainExternalIdentifier,
+      name: 'api-group',
+      networkId: this.currentNetworkId,
+      participantIds: [
+        ownerIdentityId.valueOf(),
+        firstParticipantIdentityId.valueOf(),
+        secondParticipantIdentityId.valueOf(),
+      ],
+      type: 'group',
+    });
+  }
+
   @given('I sign the current one-to-one conversation request')
   public async iSignTheCurrentOneToOneConversationRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/conversations/');
@@ -898,7 +927,7 @@ export default class Definitions {
       },
     );
 
-    if (this.response.data?.id) {
+    if (this.response?.data?.id) {
       this.createdIdentityId = this.response.data.id;
     }
   }

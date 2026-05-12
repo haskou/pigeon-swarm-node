@@ -3,32 +3,39 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
-import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
+import { GroupConversationMustHaveTwoParticipantsError } from './errors/GroupConversationMustHaveAtLeastTwoParticipantsError';
 import { ConversationWasCreatedEvent } from './events/ConversationWasCreatedEvent';
 import { Message } from './Message';
 import { MessageFactory } from './MessageFactory';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
+import { GroupConversationName } from './value-objects/GroupConversationName';
 
-export class OneToOneConversation extends Conversation {
+export class GroupConversation extends Conversation {
+  private static hasAtLeastTwoDifferentParticipants(
+    participants: IdentityId[],
+  ): boolean {
+    return (
+      new Set(participants.map((participant) => participant.valueOf())).size >=
+      2
+    );
+  }
+
   public static create(
-    firstParticipant: IdentityId,
-    secondParticipant: IdentityId,
+    name: GroupConversationName,
+    participants: IdentityId[],
     networkId: NetworkId,
-  ): OneToOneConversation {
-    const conversation = new OneToOneConversation(
-      ConversationId.deterministic(
-        firstParticipant,
-        secondParticipant,
-        networkId,
-      ),
+  ): GroupConversation {
+    const conversation = new GroupConversation(
+      ConversationId.group(),
       networkId,
-      ConversationType.ONE_TO_ONE,
-      [firstParticipant, secondParticipant],
+      name,
+      participants,
     );
 
     conversation.record(
       new ConversationWasCreatedEvent(conversation.toPrimitives().id, {
+        name: conversation.toPrimitives().name,
         networkId: conversation.toPrimitives().networkId,
         participantIds: conversation.toPrimitives().participantIds,
       }),
@@ -39,15 +46,14 @@ export class OneToOneConversation extends Conversation {
 
   public static fromPrimitives(
     primitives: PrimitiveOf<Conversation>,
-  ): OneToOneConversation {
-    return new OneToOneConversation(
+  ): GroupConversation {
+    return new GroupConversation(
       new ConversationId(primitives.id),
       new NetworkId(primitives.networkId),
-      ConversationType.ONE_TO_ONE,
+      new GroupConversationName(primitives.name ?? ''),
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      undefined,
       primitives.messages.map((message) =>
         MessageFactory.fromPrimitives(message),
       ),
@@ -57,16 +63,15 @@ export class OneToOneConversation extends Conversation {
   constructor(
     id: ConversationId,
     networkId: NetworkId,
-    type: ConversationType,
+    name: GroupConversationName,
     participants: IdentityId[],
-    name: undefined = undefined,
     messages: Message[] = [],
   ) {
-    super(id, networkId, type, participants, name, messages);
+    super(id, networkId, ConversationType.GROUP, participants, name, messages);
 
     assert(
-      participants.length === 2 && participants[0].isNotEqual(participants[1]),
-      new ConversationMustHaveTwoDifferentParticipantsError(),
+      GroupConversation.hasAtLeastTwoDifferentParticipants(participants),
+      new GroupConversationMustHaveTwoParticipantsError(),
     );
   }
 }

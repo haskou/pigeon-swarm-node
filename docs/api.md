@@ -689,13 +689,13 @@ Implemented:
 - list conversations where the authenticated identity participates
 - support `limit` and `beforeConversationId`
 
-### Create a 1to1 conversation
+### Create a conversation
 
 ```http
 POST /conversations
 ```
 
-Request:
+1to1 request:
 
 ```json
 {
@@ -706,11 +706,28 @@ Request:
 }
 ```
 
+Standalone group request:
+
+```json
+{
+  "type": "group",
+  "name": "Project room",
+  "participantIds": [
+    "<authenticatedIdentityId>",
+    "<participantIdentityId>",
+    "<anotherParticipantIdentityId>"
+  ],
+  "networkId": "<networkId>",
+  "keychainExternalIdentifier": "<externalIdentifier>"
+}
+```
+
 Response:
 
 ```json
 {
   "id": "one-to-one:<deterministic-id>",
+  "name": "Project room",
   "networkId": "<networkId>",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "type": "one-to-one"
@@ -720,11 +737,17 @@ Response:
 Implemented:
 
 - create the one-to-one conversation for the participant pair
+- create standalone group conversations with a client-provided `name` and N
+  explicit participants
 - require the conversation network id; messages and sync for this conversation
   are published only through that network
 - validate that the keychain candidate belongs to the authenticated identity
 - persist conversation metadata in MongoDB
 - publish `ConversationWasCreatedEvent`
+
+Standalone group conversations are different from future community channels:
+groups use explicit `participantIds`, while community channel access will be
+based on community membership/roles.
 
 ### Get latest messages
 

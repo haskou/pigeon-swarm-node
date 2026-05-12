@@ -22,7 +22,9 @@ import { MessageFactory } from './MessageFactory';
 import { MessageSent } from './MessageSent';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
+import { ConversationType } from './value-objects/ConversationType';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
+import { GroupConversationName } from './value-objects/GroupConversationName';
 import { MessageId } from './value-objects/MessageId';
 import { MessageType } from './value-objects/MessageType';
 
@@ -41,9 +43,11 @@ export class Conversation extends AggregateRoot {
     return new Conversation(
       new ConversationId(primitives.id),
       new NetworkId(primitives.networkId),
+      new ConversationType(primitives.type),
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
+      primitives.name ? new GroupConversationName(primitives.name) : undefined,
       primitives.messages.map((message) =>
         MessageFactory.fromPrimitives(message),
       ),
@@ -53,7 +57,9 @@ export class Conversation extends AggregateRoot {
   constructor(
     private readonly id: ConversationId,
     private readonly networkId: NetworkId,
+    private readonly type: ConversationType,
     private readonly participants: IdentityId[],
+    private readonly name: GroupConversationName | undefined = undefined,
     private readonly messages: Message[] = [],
   ) {
     super();
@@ -265,10 +271,12 @@ export class Conversation extends AggregateRoot {
     return {
       id: this.id.valueOf(),
       messages: this.messages.map((message) => message.toPrimitives()),
+      name: this.name?.valueOf(),
       networkId: this.networkId.valueOf(),
       participantIds: this.participants.map((participant) =>
         participant.valueOf(),
       ),
+      type: this.type.valueOf(),
     };
   }
 }

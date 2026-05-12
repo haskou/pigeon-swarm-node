@@ -10,9 +10,10 @@ export class ConversationViewModel {
 
     return {
       id: primitives.id,
+      name: primitives.name,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
-      type: 'one-to-one',
+      type: primitives.type as 'group' | 'one-to-one',
     };
   }
 }
