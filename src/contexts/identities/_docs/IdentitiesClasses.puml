@@ -23,12 +23,14 @@ package "identities.domain" {
     -handle?: ProfileHandle
     -biography?: ProfileBiography
     -picture?: ProfileImage
+    -banner?: ProfileBanner
   }
 
   class ProfileName <<ValueObject>>
   class ProfileHandle <<ValueObject>>
   class ProfileBiography <<ValueObject>>
   class ProfileImage <<ValueObject>>
+  class ProfileBanner <<ValueObject>>
   class IdentityExternalIdentifier <<ValueObject>>
 
   note right of ProfileHandle
@@ -38,7 +40,12 @@ package "identities.domain" {
   end note
 
   note right of ProfileImage
-    Public IPFS CID for profile media.
+    Public IPFS CID for profile image/avatar.
+    Base64/data URLs are not stored here.
+  end note
+
+  note right of ProfileBanner
+    Public IPFS CID for profile banner.
     Base64/data URLs are not stored here.
   end note
 
@@ -86,6 +93,7 @@ package "identities.domain" {
   Profile --> ProfileHandle
   Profile --> ProfileBiography
   Profile --> ProfileImage
+  Profile --> ProfileBanner
   Identity ..> IdentitySignatureDomainService
   IdentityResolutionDomainService --> Identity
   IdentitySaverService --> IdentityRepository

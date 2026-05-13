@@ -24,6 +24,7 @@ export class PutIdentityBody {
 
   @IsObject()
   public readonly profile: {
+    banner?: string;
     biography?: string;
     handle?: string;
     name: string;
