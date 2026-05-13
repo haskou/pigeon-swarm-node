@@ -117,7 +117,7 @@ export abstract class CallRouteSupport extends Route {
 
     const channelId = new CommunityChannelId(body.channelId);
 
-    community.assertHasTextChannel(channelId);
+    community.assertHasVoiceChannel(channelId);
     const primitives = community.toPrimitives();
 
     return {

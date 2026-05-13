@@ -2,6 +2,7 @@ import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
 import { DeleteCallParticipantRoute } from '@app/apps/apis/calls-api/routes/DeleteCallParticipantRoute';
 import { DeleteCallRoute } from '@app/apps/apis/calls-api/routes/DeleteCallRoute';
 import { GetCallHistoryRoute } from '@app/apps/apis/calls-api/routes/GetCallHistoryRoute';
+import { GetCallIceServersRoute } from '@app/apps/apis/calls-api/routes/GetCallIceServersRoute';
 import { GetCallRoute } from '@app/apps/apis/calls-api/routes/GetCallRoute';
 import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
@@ -19,6 +20,7 @@ import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api
 import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
+import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
@@ -156,6 +158,7 @@ export default class Server {
           ConsumeDlxRoute,
           GetCallsRoute,
           GetCallHistoryRoute,
+          GetCallIceServersRoute,
           GetCallRoute,
           PostCallRoute,
           PostCallParticipantRoute,
@@ -193,6 +196,7 @@ export default class Server {
           PostCommunityMemberRoute,
           GetCommunityChannelsRoute,
           PostCommunityTextChannelRoute,
+          PostCommunityVoiceChannelRoute,
           PatchCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
           PostCommunityChannelMessageRoute,

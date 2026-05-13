@@ -1,6 +1,10 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
 
-import { CommunityChannelMessagesResource } from '../resources/CommunityChannelMessagesResource';
+import { CommunityChannelCallEventResource } from '../resources/CommunityChannelCallEventResource';
+import {
+  CommunityChannelMessagesResource,
+  CommunityChannelTimelineItemResource,
+} from '../resources/CommunityChannelMessagesResource';
 import { CommunityChannelMessageViewModel } from './CommunityChannelMessageViewModel';
 
 export class CommunityChannelMessagesViewModel {
@@ -8,6 +12,7 @@ export class CommunityChannelMessagesViewModel {
     private readonly communityId: string,
     private readonly channelId: string,
     private readonly messages: CommunityChannelMessage[],
+    private readonly callEvents: CommunityChannelCallEventResource[] = [],
   ) {}
 
   public toResource(): CommunityChannelMessagesResource {
@@ -15,11 +20,15 @@ export class CommunityChannelMessagesViewModel {
       new CommunityChannelMessageViewModel(message).toResource(),
     );
     const firstMessage = messageResources.at(0);
+    const timeline: CommunityChannelTimelineItemResource[] = [
+      ...messageResources,
+      ...this.callEvents,
+    ].sort((first, second) => first.createdAt - second.createdAt);
 
     return {
       channelId: this.channelId,
       communityId: this.communityId,
-      messages: messageResources,
+      messages: timeline,
       nextBeforeMessageId: firstMessage?.id,
     };
   }

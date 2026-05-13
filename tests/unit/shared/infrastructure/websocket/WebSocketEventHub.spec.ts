@@ -146,6 +146,59 @@ describe('WebSocketEventHub', () => {
     expect(otherParticipantClient.send).not.toHaveBeenCalled();
   });
 
+  it('emits conversation call events as timeline system items', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1770000000000,
+      endedAt: 1770000043000,
+      endedByIdentityId: participantIdentityId.valueOf(),
+      participantIds: [participantIdentityId.valueOf()],
+      scope: {
+        conversationId: 'one-to-one:conversation-id',
+        type: 'conversation',
+      },
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.call.ended');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
+      .map(([message]) => JSON.parse(message as string));
+    const callEventMessage = realtimeMessages.find(
+      (message) =>
+        message.event.type === 'conversations.v1.call.event.was_recorded',
+    );
+
+    expect(callEventMessage).toMatchObject({
+      event: {
+        aggregate_id: 'one-to-one:conversation-id',
+        attributes: {
+          message: {
+            actorIdentityId: participantIdentityId.valueOf(),
+            callEventType: 'ended',
+            callId: 'call-id',
+            conversationId: 'one-to-one:conversation-id',
+            createdAt: 1770000043000,
+            durationMs: 43000,
+            id: `call-event:call-id:ended:${participantIdentityId.valueOf()}`,
+            type: 'call_event',
+          },
+          participantIds: [participantIdentityId.valueOf()],
+        },
+        event_id: `${event.eventId}:conversation-call-event`,
+        occurred_on: event.occurredOn.getTime(),
+        type: 'conversations.v1.call.event.was_recorded',
+      },
+      type: 'domain_event',
+    });
+  });
+
   it('sends identity aggregate events only to that identity', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();

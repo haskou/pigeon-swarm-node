@@ -12,18 +12,47 @@ import { Timestamp } from '@haskou/value-objects';
 
 const callRingingTimeoutMs = 60_000;
 
+type CallTimeoutSchedulerDependencies = {
+  callRepository?: Pick<
+    MongoCallRepository,
+    'findTimedOutRingingCalls' | 'save'
+  >;
+  eventPublisher?: DomainEventPublisher;
+  notificationRepository?: Pick<MongoNotificationRepository, 'save'>;
+};
+
 export default class CallTimeoutScheduler extends Scheduler {
-  private readonly eventPublisher: DomainEventPublisher =
-    this.get<MessageBus>(MessageBus);
+  private readonly eventPublisher: DomainEventPublisher;
 
-  private readonly mongo: MongoDB = this.get<MongoDB>(MongoDB);
+  private readonly callRepository: Pick<
+    MongoCallRepository,
+    'findTimedOutRingingCalls' | 'save'
+  >;
 
-  private readonly callRepository = new MongoCallRepository(this.mongo);
+  private readonly notificationRepository: Pick<
+    MongoNotificationRepository,
+    'save'
+  >;
 
-  private readonly notificationRepository = new MongoNotificationRepository(
-    this.mongo,
-    new MongoNotificationMapper(),
-  );
+  constructor(dependencies: CallTimeoutSchedulerDependencies = {}) {
+    super();
+
+    const mongo =
+      dependencies.callRepository && dependencies.notificationRepository
+        ? undefined
+        : this.get<MongoDB>(MongoDB);
+
+    this.eventPublisher =
+      dependencies.eventPublisher || this.get<MessageBus>(MessageBus);
+    this.callRepository =
+      dependencies.callRepository || new MongoCallRepository(mongo as MongoDB);
+    this.notificationRepository =
+      dependencies.notificationRepository ||
+      new MongoNotificationRepository(
+        mongo as MongoDB,
+        new MongoNotificationMapper(),
+      );
+  }
 
   public async execute(): Promise<void> {
     const timeoutThreshold = new Timestamp(Date.now() - callRingingTimeoutMs);

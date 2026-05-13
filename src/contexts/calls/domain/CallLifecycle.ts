@@ -14,11 +14,13 @@ export class CallLifecycle {
     private status: CallStatus,
     private readonly createdAt: Timestamp,
     private endedAt?: Timestamp,
+    private endedByIdentityId?: string,
   ) {}
 
-  public end(): void {
+  public end(endedByIdentityId: string): void {
     this.status = new CallStatus(CallStatusEnum.ENDED);
     this.endedAt = Timestamp.now();
+    this.endedByIdentityId = endedByIdentityId;
   }
 
   public miss(): void {
@@ -32,6 +34,10 @@ export class CallLifecycle {
 
   public getEndedAt(): Timestamp | undefined {
     return this.endedAt;
+  }
+
+  public getEndedByIdentityId(): string | undefined {
+    return this.endedByIdentityId;
   }
 
   public getStatus(): CallStatus {

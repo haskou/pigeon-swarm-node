@@ -3,6 +3,7 @@ export interface MongoCallDocument {
   createdAt: number;
   creatorIdentityId: string;
   endedAt?: number;
+  endedByIdentityId?: string;
   networkId: string;
   participantIds: string[];
   scope: {

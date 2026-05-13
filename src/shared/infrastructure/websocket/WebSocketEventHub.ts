@@ -12,6 +12,15 @@ type WebSocketRealtimeMessage =
       event: unknown;
       type: 'domain_event';
     };
+type WebSocketDomainEvent = {
+  aggregate_id: string;
+  attributes: Record<string, unknown>;
+  causation_id?: string;
+  correlation_id?: string;
+  event_id: string;
+  occurred_on: number;
+  type: string;
+};
 
 const identityAttributeKeys = [
   'authorIdentityId',
@@ -120,6 +129,172 @@ export class WebSocketEventHub {
     return event.eventName().startsWith('nodes.');
   }
 
+  private createConversationCallEvent(
+    event: DomainEvent,
+  ): WebSocketDomainEvent | undefined {
+    const scope = event.attributes.scope as
+      | { conversationId?: string; type?: string }
+      | undefined;
+
+    if (scope?.type !== 'conversation' || !scope.conversationId) {
+      return undefined;
+    }
+
+    const message = this.createConversationCallEventMessage(event, {
+      conversationId: scope.conversationId,
+    });
+
+    if (!message) {
+      return undefined;
+    }
+
+    return {
+      aggregate_id: scope.conversationId,
+      attributes: {
+        message,
+        participantIds: event.attributes.participantIds,
+      },
+      event_id: `${event.eventId}:conversation-call-event`,
+      occurred_on: event.occurredOn.getTime(),
+      type: 'conversations.v1.call.event.was_recorded',
+    };
+  }
+
+  private createCommunityChannelCallEvent(
+    event: DomainEvent,
+  ): WebSocketDomainEvent | undefined {
+    const scope = event.attributes.scope as
+      | { channelId?: string; communityId?: string; type?: string }
+      | undefined;
+
+    if (
+      scope?.type !== 'community_channel' ||
+      !scope.communityId ||
+      !scope.channelId
+    ) {
+      return undefined;
+    }
+
+    const message = this.createCommunityChannelCallEventMessage(event, {
+      channelId: scope.channelId,
+      communityId: scope.communityId,
+    });
+
+    if (!message) {
+      return undefined;
+    }
+
+    return {
+      aggregate_id: scope.communityId,
+      attributes: {
+        message,
+        participantIds: event.attributes.participantIds,
+      },
+      event_id: `${event.eventId}:community-channel-call-event`,
+      occurred_on: event.occurredOn.getTime(),
+      type: 'communities.v1.call.event.was_recorded',
+    };
+  }
+
+  private createCommunityChannelCallEventMessage(
+    event: DomainEvent,
+    scope: { channelId: string; communityId: string },
+  ): Record<string, unknown> | undefined {
+    const message = this.createCallEventMessage(event);
+
+    if (!message) {
+      return undefined;
+    }
+
+    return {
+      ...message,
+      channelId: scope.channelId,
+      communityId: scope.communityId,
+    };
+  }
+
+  private createConversationCallEventMessage(
+    event: DomainEvent,
+    scope: { conversationId: string },
+  ): Record<string, unknown> | undefined {
+    const message = this.createCallEventMessage(event);
+
+    if (!message) {
+      return undefined;
+    }
+
+    return {
+      ...message,
+      conversationId: scope.conversationId,
+    };
+  }
+
+  private createCallEventMessage(
+    event: DomainEvent,
+  ): Record<string, unknown> | undefined {
+    const callEventType = this.getCallEventType(event);
+
+    if (!callEventType) {
+      return undefined;
+    }
+
+    const callId = String(event.attributes.callId || event.aggregateId);
+    const createdAt = Number(
+      event.attributes.endedAt || event.occurredOn.getTime(),
+    );
+    const startedAt = Number(event.attributes.createdAt || createdAt);
+    const actorIdentityId = this.getCallEventActor(event, callEventType);
+
+    return {
+      actorIdentityId,
+      callEventType,
+      callId,
+      createdAt,
+      durationMs: Math.max(createdAt - startedAt, 0),
+      id: `call-event:${callId}:${callEventType}:${actorIdentityId}`,
+      type: 'call_event',
+    };
+  }
+
+  private getCallEventType(
+    event: DomainEvent,
+  ): 'declined' | 'ended' | 'missed' | undefined {
+    const eventName = event.eventName();
+
+    if (eventName === 'calls.v1.call.ended') {
+      return 'ended';
+    }
+
+    if (eventName === 'calls.v1.call.missed') {
+      return 'missed';
+    }
+
+    if (eventName === 'calls.v1.participant.declined') {
+      return 'declined';
+    }
+
+    return undefined;
+  }
+
+  private getCallEventActor(
+    event: DomainEvent,
+    callEventType: 'declined' | 'ended' | 'missed',
+  ): string {
+    if (callEventType === 'declined') {
+      return String(event.attributes.declinedIdentityId || '');
+    }
+
+    if (callEventType === 'ended') {
+      return String(
+        event.attributes.endedByIdentityId ||
+          event.attributes.creatorIdentityId ||
+          '',
+      );
+    }
+
+    return String(event.attributes.creatorIdentityId || '');
+  }
+
   private collectIdentityValues(value: unknown, recipients: Set<string>): void {
     if (typeof value === 'string' && value.length > 0) {
       recipients.add(value);
@@ -166,6 +341,23 @@ export class WebSocketEventHub {
         event: JSON.parse(event.decode()),
         type: 'domain_event',
       });
+      const conversationCallEvent = this.createConversationCallEvent(event);
+
+      if (conversationCallEvent) {
+        this.broadcast(event, {
+          event: conversationCallEvent,
+          type: 'domain_event',
+        });
+      }
+      const communityChannelCallEvent =
+        this.createCommunityChannelCallEvent(event);
+
+      if (communityChannelCallEvent) {
+        this.broadcast(event, {
+          event: communityChannelCallEvent,
+          type: 'domain_event',
+        });
+      }
     }
   }
 

@@ -184,6 +184,33 @@ paths:
                 $ref: '#/components/schemas/CommunityTextChannelResource'
         '409':
           description: Authenticated identity is not the community owner.
+  /communities/{communityId}/channels/voice:
+    post:
+      tags:
+        - communities
+      summary: Create a private community voice channel
+      description: Only the community owner can create voice channels. Voice channel presence is derived from active calls scoped to that channel.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityVoiceChannelBody'
+      responses:
+        '200':
+          description: Voice channel created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityVoiceChannelResource'
+        '409':
+          description: Authenticated identity is not the community owner.
   /communities/{communityId}/channels/{channelId}:
     patch:
       tags:
@@ -221,7 +248,7 @@ paths:
       tags:
         - communities
       summary: List encrypted private community text channel messages
-      description: Only community members can read channel messages. Payloads are client-encrypted and opaque to the backend.
+      description: Only community members can read channel messages. Payloads are client-encrypted and opaque to the backend. The timeline also includes non-encrypted call_event system items for calls scoped to this channel.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -371,6 +398,30 @@ components:
             - text
         createdAt:
           type: integer
+    CommunityVoiceChannelResource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - createdAt
+        - connectedIdentityIds
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - voice
+        createdAt:
+          type: integer
+        connectedIdentityIds:
+          type: array
+          description: Identities currently joined to the active call for this voice channel.
+          items:
+            type: string
     CommunityResource:
       type: object
       required:
@@ -381,6 +432,7 @@ components:
         - description
         - memberIds
         - textChannels
+        - voiceChannels
         - visibility
         - createdAt
       properties:
@@ -408,6 +460,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityTextChannelResource'
+        voiceChannels:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityVoiceChannelResource'
         visibility:
           type: string
           enum:
@@ -440,7 +496,9 @@ components:
         channels:
           type: array
           items:
-            $ref: '#/components/schemas/CommunityTextChannelResource'
+            oneOf:
+              - $ref: '#/components/schemas/CommunityTextChannelResource'
+              - $ref: '#/components/schemas/CommunityVoiceChannelResource'
     CommunityChannelMessageResource:
       type: object
       required:
@@ -490,9 +548,48 @@ components:
         messages:
           type: array
           items:
-            $ref: '#/components/schemas/CommunityChannelMessageResource'
+            oneOf:
+              - $ref: '#/components/schemas/CommunityChannelMessageResource'
+              - $ref: '#/components/schemas/CommunityChannelCallEventResource'
         nextBeforeMessageId:
           type: string
+    CommunityChannelCallEventResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - channelId
+        - type
+        - callId
+        - callEventType
+        - actorIdentityId
+        - createdAt
+        - durationMs
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        channelId:
+          type: string
+        type:
+          type: string
+          enum:
+            - call_event
+        callId:
+          type: string
+        callEventType:
+          type: string
+          enum:
+            - declined
+            - ended
+            - missed
+        actorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        durationMs:
+          type: integer
     DeletedCommunityChannelMessageResource:
       type: object
       required:
@@ -564,6 +661,14 @@ components:
         identityId:
           type: string
     PostCommunityTextChannelBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 80
+    PostCommunityVoiceChannelBody:
       type: object
       required:
         - name

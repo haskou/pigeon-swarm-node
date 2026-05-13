@@ -1,5 +1,8 @@
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Timestamp } from '@haskou/value-objects';
@@ -25,6 +28,7 @@ export class MongoCallRepository {
       createdAt: primitives.createdAt,
       creatorIdentityId: primitives.creatorIdentityId,
       endedAt: primitives.endedAt,
+      endedByIdentityId: primitives.endedByIdentityId,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
       participants: primitives.participants,
@@ -38,6 +42,7 @@ export class MongoCallRepository {
       createdAt: document.createdAt,
       creatorIdentityId: document.creatorIdentityId,
       endedAt: document.endedAt,
+      endedByIdentityId: document.endedByIdentityId,
       id: document._id,
       networkId: document.networkId,
       participantIds: document.participantIds,
@@ -86,6 +91,57 @@ export class MongoCallRepository {
         participantIds: participantId.valueOf(),
       })
       .sort({ createdAt: -1 })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findByConversationId(
+    conversationId: ConversationId,
+  ): Promise<Call[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        'scope.conversationId': conversationId.valueOf(),
+        'scope.type': 'conversation',
+      })
+      .sort({ createdAt: 1 })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        'scope.channelId': channelId.valueOf(),
+        'scope.communityId': communityId.valueOf(),
+        'scope.type': 'community_channel',
+      })
+      .sort({ createdAt: 1 })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findActiveByCommunity(
+    communityId: CommunityId,
+  ): Promise<Call[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        'scope.communityId': communityId.valueOf(),
+        'scope.type': 'community_channel',
+        status: 'active',
+      })
+      .sort({ createdAt: 1 })
       .toArray();
 
     return documents.map((document) => this.toDomain(document));

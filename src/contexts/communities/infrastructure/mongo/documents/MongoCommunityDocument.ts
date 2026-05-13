@@ -5,6 +5,13 @@ export interface MongoCommunityTextChannelDocument {
   type: 'text';
 }
 
+export interface MongoCommunityVoiceChannelDocument {
+  createdAt: number;
+  id: string;
+  name: string;
+  type: 'voice';
+}
+
 export interface MongoCommunityDocument {
   _id: string;
   avatar?: string;
@@ -17,4 +24,5 @@ export interface MongoCommunityDocument {
   ownerIdentityId: string;
   textChannels: MongoCommunityTextChannelDocument[];
   visibility: 'private';
+  voiceChannels?: MongoCommunityVoiceChannelDocument[];
 }

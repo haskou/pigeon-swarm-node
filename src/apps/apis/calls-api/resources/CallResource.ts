@@ -2,6 +2,7 @@ export interface CallResource {
   createdAt: number;
   creatorIdentityId: string;
   endedAt?: number;
+  endedByIdentityId?: string;
   id: string;
   networkId: string;
   participantIds: string[];

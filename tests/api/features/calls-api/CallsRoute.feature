@@ -40,10 +40,23 @@ Feature: Calls API
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status | ended |
+    And I sign the current latest conversation messages request
+    When I GET latest messages from the current conversation
+    Then response code is equal to 200
+    And response body should contain "call_event"
+    And response body should contain "ended"
     And I sign the current call history request
     When I GET current call history
     Then response code is equal to 200
     And response body should contain the current call
+
+  Scenario: Read TURN configuration for calls
+    Given calls use a test TURN server
+    And I sign the current call ICE servers request
+    When I GET call ICE servers
+    Then response code is equal to 200
+    And response body should contain "turn:test-turn.local:3478?transport=udp"
+    And response body should contain "relay"
 
   Scenario: Start a group conversation call
     Given I register an in-memory IPFS network "api-calls-group-network"
@@ -63,11 +76,11 @@ Feature: Calls API
     When I POST to "/communities/"
     Then response code is equal to 200
     And I remember the current community
-    And I set a community text channel body
-    And I sign the current community text channel request
-    When I POST a text channel to the current community
+    And I set a community voice channel body
+    And I sign the current community voice channel request
+    When I POST a voice channel to the current community
     Then response code is equal to 200
-    And I remember the current community text channel
+    And I remember the current community voice channel
     And I set a community channel call body
     And I sign the current call start request
     When I POST to "/calls/"
@@ -75,6 +88,10 @@ Feature: Calls API
     And response contains a valid resource with the following fields
       | status     | active            |
       | scope.type | community_channel |
+    And I sign the current community channels request
+    When I GET channels from the current community
+    Then response code is equal to 200
+    And response body should contain "connectedIdentityIds"
 
   Scenario: Reject signalling to an identity outside the call
     Given I register an in-memory IPFS network "api-calls-invalid-signal-network"

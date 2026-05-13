@@ -149,6 +149,7 @@ describe('NodeStartupSynchronizer', () => {
       ownerIdentityId: 'identity-1',
       textChannels: [],
       visibility: 'private',
+      voiceChannels: [],
     };
 
     identityMetadataRepository.findAll.mockResolvedValue([]);

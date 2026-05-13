@@ -1,6 +1,9 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -16,6 +19,7 @@ import {
 import { GetConversationMessageRequest } from '../requests/GetConversationMessageRequest';
 import { GetConversationMessagesAroundRequest } from '../requests/GetConversationMessagesAroundRequest';
 import { GetConversationMessagesRequest } from '../requests/GetConversationMessagesRequest';
+import { ConversationCallEventViewModel } from '../view-model/ConversationCallEventViewModel';
 import { MessagesAroundViewModel } from '../view-model/MessagesAroundViewModel';
 import { MessagesViewModel } from '../view-model/MessagesViewModel';
 import { MessageViewModel } from '../view-model/MessageViewModel';
@@ -27,6 +31,10 @@ export class GetConversationMessagesRoute extends Route {
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  private callRepository(): MongoCallRepository {
+    return new MongoCallRepository(this.get<MongoDB>(MongoDB));
+  }
 
   @Get('/:conversationId/messages')
   public async getMessages(
@@ -46,10 +54,22 @@ export class GetConversationMessagesRoute extends Route {
         beforeMessageId,
       ).getMessage(),
     );
+    const calls = await this.callRepository().findByConversationId(
+      new ConversationId(conversationId),
+    );
+    const callEvents = calls.flatMap((call) =>
+      ConversationCallEventViewModel.fromCall(call),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new MessagesViewModel(conversationId, messages).toResource());
+      .send(
+        new MessagesViewModel(
+          conversationId,
+          messages,
+          callEvents,
+        ).toResource(),
+      );
   }
 
   @Get('/:conversationId/messages/:messageId')

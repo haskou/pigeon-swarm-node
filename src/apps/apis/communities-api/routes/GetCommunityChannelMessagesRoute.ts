@@ -1,6 +1,8 @@
+import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -12,11 +14,16 @@ import {
   Res,
 } from 'routing-controllers';
 
+import { CommunityChannelCallEventViewModel } from '../view-model/CommunityChannelCallEventViewModel';
 import { CommunityChannelMessagesViewModel } from '../view-model/CommunityChannelMessagesViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
+  private callRepository(): MongoCallRepository {
+    return new MongoCallRepository(this.get<MongoDB>(MongoDB));
+  }
+
   @Get('/:communityId/channels/:channelId/messages')
   public async getMessages(
     @Param('communityId') communityId: string,
@@ -42,6 +49,13 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
         ? new CommunityChannelMessageId(beforeMessageId)
         : undefined,
     );
+    const calls = await this.callRepository().findByCommunityChannel(
+      new CommunityId(communityId),
+      communityChannelId,
+    );
+    const callEvents = calls.flatMap((call) =>
+      CommunityChannelCallEventViewModel.fromCall(call),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -50,6 +64,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
           communityId,
           channelId,
           messages,
+          callEvents,
         ).toResource(),
       );
   }

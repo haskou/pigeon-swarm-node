@@ -24,6 +24,7 @@ type CallPrimitives = {
   createdAt: number;
   creatorIdentityId: string;
   endedAt?: number;
+  endedByIdentityId?: string;
   id: string;
   networkId: string;
   participantIds: string[];
@@ -83,6 +84,7 @@ export class Call extends AggregateRoot {
         new CallStatus(primitives.status),
         new Timestamp(primitives.createdAt),
         primitives.endedAt ? new Timestamp(primitives.endedAt) : undefined,
+        primitives.endedByIdentityId,
       ),
     );
   }
@@ -114,6 +116,10 @@ export class Call extends AggregateRoot {
 
     return {
       callId: primitives.id,
+      createdAt: primitives.createdAt,
+      creatorIdentityId: primitives.creatorIdentityId,
+      endedAt: primitives.endedAt,
+      endedByIdentityId: primitives.endedByIdentityId,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
       participants: primitives.participants,
@@ -191,7 +197,7 @@ export class Call extends AggregateRoot {
   public end(identityId: IdentityId): void {
     this.assertActive();
     assert(this.hasParticipant(identityId), new CallParticipantNotFoundError());
-    this.lifecycle.end();
+    this.lifecycle.end(identityId.valueOf());
     this.record(
       new CallEndedEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
@@ -271,6 +277,7 @@ export class Call extends AggregateRoot {
       createdAt: this.lifecycle.getCreatedAt().valueOf(),
       creatorIdentityId: this.creatorIdentityId.valueOf(),
       endedAt: this.lifecycle.getEndedAt()?.valueOf(),
+      endedByIdentityId: this.lifecycle.getEndedByIdentityId(),
       id: this.id.valueOf(),
       networkId: this.networkId.valueOf(),
       participantIds: participants.map((participant) => participant.identityId),

@@ -3,9 +3,10 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannels } from './CommunityChannels';
 import { CommunityProfile } from './CommunityProfile';
 import { CommunityTextChannel } from './CommunityTextChannel';
-import { CommunityChannelNotFoundError } from './errors/CommunityChannelNotFoundError';
+import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
 import { CommunityAvatar } from './value-objects/CommunityAvatar';
@@ -31,7 +32,7 @@ export class Community extends AggregateRoot {
       ownerIdentityId,
       new CommunityProfile(name, description, avatar, banner),
       [ownerIdentityId],
-      [],
+      new CommunityChannels([], []),
       Timestamp.now(),
     );
   }
@@ -48,8 +49,13 @@ export class Community extends AggregateRoot {
         primitives.banner ? new CommunityBanner(primitives.banner) : undefined,
       ),
       primitives.memberIds.map((memberId) => new IdentityId(memberId)),
-      primitives.textChannels.map((channel) =>
-        CommunityTextChannel.fromPrimitives(channel),
+      new CommunityChannels(
+        primitives.textChannels.map((channel) =>
+          CommunityTextChannel.fromPrimitives(channel),
+        ),
+        (primitives.voiceChannels || []).map((channel) =>
+          CommunityVoiceChannel.fromPrimitives(channel),
+        ),
       ),
       new Timestamp(primitives.createdAt),
     );
@@ -61,7 +67,7 @@ export class Community extends AggregateRoot {
     private readonly ownerIdentityId: IdentityId,
     private profile: CommunityProfile,
     private readonly members: IdentityId[],
-    private readonly textChannels: CommunityTextChannel[],
+    private readonly channels: CommunityChannels,
     private readonly createdAt: Timestamp,
   ) {
     super();
@@ -94,33 +100,33 @@ export class Community extends AggregateRoot {
   ): CommunityTextChannel {
     this.assertOwner(actor);
 
-    const channel = CommunityTextChannel.create(name);
-
-    this.textChannels.push(channel);
-
-    return channel;
+    return this.channels.addText(name);
   }
 
-  public renameTextChannel(
+  public addVoiceChannel(
+    actor: IdentityId,
+    name: CommunityChannelName,
+  ): CommunityVoiceChannel {
+    this.assertOwner(actor);
+
+    return this.channels.addVoice(name);
+  }
+
+  public renameChannel(
     actor: IdentityId,
     channelId: CommunityChannelId,
     name: CommunityChannelName,
   ): void {
     this.assertOwner(actor);
-    const channel = this.textChannels.find((candidate) =>
-      candidate.getId().isEqual(channelId),
-    );
-
-    assert(channel, new CommunityChannelNotFoundError());
-    channel?.rename(name);
+    this.channels.rename(channelId, name);
   }
 
   public assertHasTextChannel(channelId: CommunityChannelId): void {
-    const channel = this.textChannels.find((candidate) =>
-      candidate.getId().isEqual(channelId),
-    );
+    this.channels.assertHasText(channelId);
+  }
 
-    assert(channel, new CommunityChannelNotFoundError());
+  public assertHasVoiceChannel(channelId: CommunityChannelId): void {
+    this.channels.assertHasVoice(channelId);
   }
 
   public updateProfile(
@@ -151,6 +157,8 @@ export class Community extends AggregateRoot {
   }
 
   public toPrimitives() {
+    const channels = this.channels.toPrimitives();
+
     return {
       avatar: this.profile.getAvatar()?.valueOf(),
       banner: this.profile.getBanner()?.valueOf(),
@@ -161,8 +169,9 @@ export class Community extends AggregateRoot {
       name: this.profile.getName().valueOf(),
       networkId: this.networkId.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),
-      textChannels: this.textChannels.map((channel) => channel.toPrimitives()),
+      textChannels: channels.textChannels,
       visibility: this.visibility(),
+      voiceChannels: channels.voiceChannels,
     };
   }
 }

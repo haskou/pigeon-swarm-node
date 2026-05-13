@@ -32,6 +32,7 @@ export class MongoCommunityRepository implements CommunityRepository {
       ownerIdentityId: primitives.ownerIdentityId,
       textChannels: primitives.textChannels,
       visibility: primitives.visibility,
+      voiceChannels: primitives.voiceChannels,
     };
   }
 
@@ -48,6 +49,7 @@ export class MongoCommunityRepository implements CommunityRepository {
       ownerIdentityId: document.ownerIdentityId,
       textChannels: document.textChannels,
       visibility: document.visibility,
+      voiceChannels: document.voiceChannels || [],
     });
   }
 

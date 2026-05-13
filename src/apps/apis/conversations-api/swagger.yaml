@@ -408,9 +408,45 @@ components:
         messages:
           type: array
           items:
-            $ref: '#/components/schemas/MessageResource'
+            oneOf:
+              - $ref: '#/components/schemas/MessageResource'
+              - $ref: '#/components/schemas/ConversationCallEventResource'
         nextBeforeMessageId:
           type: string
+    ConversationCallEventResource:
+      type: object
+      required:
+        - id
+        - conversationId
+        - type
+        - callId
+        - callEventType
+        - actorIdentityId
+        - createdAt
+        - durationMs
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        type:
+          type: string
+          enum:
+            - call_event
+        callId:
+          type: string
+        callEventType:
+          type: string
+          enum:
+            - declined
+            - ended
+            - missed
+        actorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        durationMs:
+          type: integer
     MessagesAroundResource:
       type: object
       required:

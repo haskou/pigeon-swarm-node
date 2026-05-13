@@ -1,5 +1,7 @@
+import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -12,6 +14,7 @@ import {
 } from 'routing-controllers';
 
 import { PostCallSignalBody } from '../bodies/PostCallSignalBody';
+import { CallSignalRateLimiter } from '../CallSignalRateLimiter';
 import { CallViewModel } from '../view-model/CallViewModel';
 import { CallRouteSupport } from './CallRouteSupport';
 
@@ -27,6 +30,10 @@ export class PostCallSignalRoute extends CallRouteSupport {
     const senderIdentityId = await this.authenticate(request);
     const call = await this.findCall(callId);
 
+    await new CallSignalRateLimiter(this.get<MongoDB>(MongoDB)).consume(
+      new CallId(callId),
+      senderIdentityId,
+    );
     call.sendSignal(
       senderIdentityId,
       new IdentityId(body.recipientIdentityId),

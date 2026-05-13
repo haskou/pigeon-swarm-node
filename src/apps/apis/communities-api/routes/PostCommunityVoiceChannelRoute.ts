@@ -1,4 +1,3 @@
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -6,37 +5,35 @@ import {
   Body,
   JsonController,
   Param,
-  Patch,
+  Post,
   Req,
   Res,
 } from 'routing-controllers';
 
-import { PatchCommunityChannelBody } from '../bodies/PatchCommunityChannelBody';
-import { CommunityViewModel } from '../view-model/CommunityViewModel';
+import { PostCommunityVoiceChannelBody } from '../bodies/PostCommunityVoiceChannelBody';
+import { CommunityVoiceChannelViewModel } from '../view-model/CommunityVoiceChannelViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-export class PatchCommunityChannelRoute extends CommunityRouteSupport {
-  @Patch('/:communityId/channels/:channelId')
-  public async renameChannel(
+export class PostCommunityVoiceChannelRoute extends CommunityRouteSupport {
+  @Post('/:communityId/channels/voice')
+  public async addVoiceChannel(
     @Param('communityId') communityId: string,
-    @Param('channelId') channelId: string,
-    @Body() body: PatchCommunityChannelBody,
+    @Body() body: PostCommunityVoiceChannelBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
-
-    community.renameChannel(
+    const channel = community.addVoiceChannel(
       actorIdentityId,
-      new CommunityChannelId(channelId),
       new CommunityChannelName(body.name),
     );
+
     await this.repository().save(community);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CommunityViewModel(community).toResource());
+      .send(new CommunityVoiceChannelViewModel(channel).toResource());
   }
 }

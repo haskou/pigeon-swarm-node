@@ -205,7 +205,7 @@ authenticated participants.
 ## Calls HTTP API
 
 Calls can be scoped to a one-to-one conversation, a group conversation or a
-community text channel. All endpoints require signed request authentication.
+community voice channel. All endpoints require signed request authentication.
 
 ### List active calls
 
@@ -233,6 +233,53 @@ GET /calls/{callId}
 Returns a single call when the authenticated identity is a participant.
 Frontend can use this after any `calls.v1.*` WebSocket event where
 `event.aggregate_id` is the call id.
+
+### Get ICE servers
+
+```http
+GET /calls/ice-servers
+```
+
+Response:
+
+```json
+{
+  "iceServers": [
+    {
+      "urls": [
+        "turn:turn.example.com:3478?transport=udp",
+        "turn:turn.example.com:3478?transport=tcp"
+      ],
+      "username": "<expiresAtUnix>:<identityId>",
+      "credential": "<temporaryHmacCredential>"
+    }
+  ],
+  "iceTransportPolicy": "relay"
+}
+```
+
+Implemented:
+
+- require signed request auth before exposing relay credentials
+- read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
+- when `CALLS_TURN_SHARED_SECRET` is configured, generate temporary coturn REST
+  credentials per authenticated identity:
+  `username=<expiresAtUnix>:<identityId>` and
+  `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
+- use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
+  lifetime; it defaults to `3600`
+- keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
+  fallback when no shared secret is configured
+- default `iceTransportPolicy` to `relay`, so production clients can avoid
+  exposing peer IPs through direct ICE candidates
+- include STUN servers only when `CALLS_STUN_URLS` is explicitly configured
+- allow `CALLS_ICE_TRANSPORT_POLICY=all` for development or trusted networks
+
+TURN improves NAT traversal and hides peer IPs from the other participant, but
+it does not make large group calls cheap. A mesh group call still creates one
+peer connection per participant pair. For large groups, add an SFU/media relay
+later so every client uploads one media stream and receives only the streams it
+needs.
 
 ### Start call
 
@@ -263,7 +310,7 @@ Implemented:
 
 - one-to-one calls use an existing one-to-one conversation id
 - group calls use an existing group conversation id
-- community channel calls use an existing community text channel id
+- community channel calls use an existing community voice channel id
 - caller must be a conversation participant or community member
 - start emits `calls.v1.call.started` to the call participants
 - the creator starts as `joined`; other participants start as `ringing`
@@ -317,6 +364,9 @@ Implemented:
 - `signalType` is one of `offer`, `answer` or `ice_candidate`
 - sender and recipient must both be current call participants
 - backend does not inspect SDP/ICE payloads
+- signalling is rate-limited per `(callId, senderIdentityId)` with
+  `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; `0` disables the
+  limit for local/debug runs
 - sending a signal emits `calls.v1.signal.sent` only to
   `recipientIdentityId`
 
@@ -933,6 +983,16 @@ Response:
       "previousMessageIds": [],
       "replyToMessageId": "<messageId>",
       "attachmentExternalIdentifiers": []
+    },
+    {
+      "id": "call-event:<callId>:ended:<identityId>",
+      "conversationId": "one-to-one:<deterministic-id>",
+      "type": "call_event",
+      "callId": "<callId>",
+      "callEventType": "ended",
+      "actorIdentityId": "<identityId>",
+      "createdAt": 1773848869055,
+      "durationMs": 40000
     }
   ],
   "nextBeforeMessageId": "<messageId>"
@@ -943,6 +1003,8 @@ Implemented:
 
 - require signed request auth
 - return the latest messages ordered from oldest to newest in the page
+- include non-encrypted `call_event` system items for calls scoped to the
+  conversation, with `callEventType` equal to `ended`, `declined` or `missed`
 - when `beforeMessageId` is provided, return messages older than that message
 
 ### Get one message
@@ -1299,6 +1361,13 @@ Response:
       "name": "general",
       "type": "text",
       "createdAt": 1773848829055
+    },
+    {
+      "id": "<channelId>",
+      "name": "Voice",
+      "type": "voice",
+      "createdAt": 1773848829055,
+      "connectedIdentityIds": ["<identityId>"]
     }
   ]
 }
@@ -1308,6 +1377,9 @@ Implemented:
 
 - require signed request auth
 - only allow community members to list channel metadata
+- return both text and voice channels
+- include `connectedIdentityIds` for voice channels, derived from identities
+  currently `joined` to the active call scoped to that voice channel
 
 ### Create text channel
 
@@ -1327,7 +1399,27 @@ Implemented:
 
 - require signed request auth from the community owner
 - create text channel metadata in the community
-- keep channel messages out of scope for this MVP
+
+### Create voice channel
+
+```http
+POST /communities/{communityId}/channels/voice
+```
+
+Request:
+
+```json
+{
+  "name": "Voice"
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- create voice channel metadata in the community
+- voice channels do not accept text messages
+- calls scoped to community channels must target a voice channel
 
 ### Rename channel
 
@@ -1346,7 +1438,7 @@ Request:
 Implemented:
 
 - require signed request auth from the community owner
-- rename an existing text channel
+- rename an existing text or voice channel
 
 ### Send channel message
 
@@ -1421,7 +1513,19 @@ Response:
 {
   "communityId": "<communityId>",
   "channelId": "<channelId>",
-  "messages": [],
+  "messages": [
+    {
+      "id": "call-event:<callId>:missed:<identityId>",
+      "communityId": "<communityId>",
+      "channelId": "<channelId>",
+      "type": "call_event",
+      "callId": "<callId>",
+      "callEventType": "missed",
+      "actorIdentityId": "<identityId>",
+      "createdAt": 1773848869055,
+      "durationMs": 40000
+    }
+  ],
   "nextBeforeMessageId": "<messageId>"
 }
 ```
@@ -1431,6 +1535,9 @@ Implemented:
 - require signed request auth from a community member
 - require the channel to exist in the community
 - return messages ordered from oldest to newest in the page
+- include non-encrypted `call_event` system items for calls scoped to this
+  community channel, with `callEventType` equal to `ended`, `declined` or
+  `missed`
 - support `limit` from 1 to 100
 - when `beforeMessageId` is provided, return messages older than that message
 

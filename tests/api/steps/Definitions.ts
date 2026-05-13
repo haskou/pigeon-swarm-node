@@ -549,6 +549,13 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community voice channel body')
+  public iSetACommunityVoiceChannelBody(): void {
+    this.body = JSON.stringify({
+      name: 'voice',
+    });
+  }
+
   @given('I sign the current community text channel request')
   public async iSignTheCurrentCommunityTextChannelRequest(): Promise<void> {
     if (!this.communityId) {
@@ -558,6 +565,18 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/channels/text`,
+    );
+  }
+
+  @given('I sign the current community voice channel request')
+  public async iSignTheCurrentCommunityVoiceChannelRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/channels/voice`,
     );
   }
 
@@ -587,6 +606,15 @@ export default class Definitions {
     this.communityChannelId = this.response.data.id;
   }
 
+  @given('I remember the current community voice channel')
+  public iRememberTheCurrentCommunityVoiceChannel(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community channel response id not found.');
+    }
+
+    this.communityChannelId = this.response.data.id;
+  }
+
   @given('I set a community text channel rename body')
   public iSetACommunityTextChannelRenameBody(): void {
     this.body = JSON.stringify({
@@ -603,6 +631,19 @@ export default class Definitions {
     await this.signCurrentRequest(
       'PATCH',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+    );
+  }
+
+  @given('I sign the current community channels request')
+  public async iSignTheCurrentCommunityChannelsRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/channels`,
     );
   }
 
@@ -843,6 +884,21 @@ export default class Definitions {
 
     this.body = undefined;
     await this.signCurrentRequest('GET', `/calls/${this.callId}`);
+  }
+
+  @given('calls use a test TURN server')
+  public callsUseATestTurnServer(): void {
+    delete process.env.CALLS_TURN_CREDENTIAL;
+    delete process.env.CALLS_TURN_USERNAME;
+    process.env.CALLS_TURN_CREDENTIAL_TTL_SECONDS = '600';
+    process.env.CALLS_TURN_SHARED_SECRET = 'test-turn-secret';
+    process.env.CALLS_TURN_URLS = 'turn:test-turn.local:3478?transport=udp';
+  }
+
+  @given('I sign the current call ICE servers request')
+  public async iSignTheCurrentCallIceServersRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/calls/ice-servers');
   }
 
   @given('the other identity signs the current call join request')
@@ -1558,6 +1614,14 @@ export default class Definitions {
     );
   }
 
+  @when('I GET call ICE servers')
+  public async iGETCallIceServers(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/calls/ice-servers',
+      this.headers,
+    );
+  }
+
   @when('I POST a signal to the current call')
   public async iPOSTASignalToTheCurrentCall(): Promise<void> {
     if (!this.callId) {
@@ -1632,6 +1696,31 @@ export default class Definitions {
       `/communities/${this.communityId}/channels/text`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
+    );
+  }
+
+  @when('I POST a voice channel to the current community')
+  public async iPOSTAVoiceChannelToTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/voice`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET channels from the current community')
+  public async iGETChannelsFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels`,
+      this.headers,
     );
   }
 

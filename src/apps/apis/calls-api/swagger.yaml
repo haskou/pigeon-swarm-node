@@ -51,18 +51,6 @@ paths:
                 $ref: '#/components/schemas/CallResource'
         '409':
           description: Call not found or not visible to the authenticated identity.
-  /calls/history:
-    get:
-      tags:
-        - calls
-      summary: List call history for the authenticated identity
-      responses:
-        '200':
-          description: Active and finished calls for the authenticated identity.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CallsResource'
     delete:
       tags:
         - calls
@@ -76,6 +64,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+  /calls/ice-servers:
+    get:
+      tags:
+        - calls
+      summary: Get ICE servers for WebRTC calls
+      description: Returns the node-configured TURN/STUN servers. Production nodes should use CALLS_TURN_SHARED_SECRET so credentials are generated temporarily per authenticated identity, and prefer iceTransportPolicy relay.
+      responses:
+        '200':
+          description: ICE server configuration for the authenticated client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallIceServersResource'
+  /calls/history:
+    get:
+      tags:
+        - calls
+      summary: List call history for the authenticated identity
+      responses:
+        '200':
+          description: Active and finished calls for the authenticated identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsResource'
   /calls/{callId}/participants:
     post:
       tags:
@@ -124,6 +137,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+        '429':
+          description: Signal rate limit exceeded.
 components:
   parameters:
     CallId:
@@ -154,7 +169,7 @@ components:
         channelId:
           type: string
           format: uuid
-          description: Required when scopeType is community_channel.
+          description: Required when scopeType is community_channel. Must be a community voice channel.
         invitedParticipantIds:
           type: array
           description: Optional extra recipients for the start event.
@@ -228,6 +243,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CallResource'
+    CallIceServersResource:
+      type: object
+      required:
+        - iceServers
+        - iceTransportPolicy
+      properties:
+        iceServers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallIceServer'
+        iceTransportPolicy:
+          type: string
+          enum:
+            - all
+            - relay
+    CallIceServer:
+      type: object
+      required:
+        - urls
+      properties:
+        urls:
+          type: array
+          items:
+            type: string
+        username:
+          type: string
+          description: Temporary coturn REST username when CALLS_TURN_SHARED_SECRET is configured.
+        credential:
+          type: string
+          description: Temporary coturn REST HMAC credential when CALLS_TURN_SHARED_SECRET is configured.
     CallScope:
       type: object
       required:
