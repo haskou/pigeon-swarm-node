@@ -13,6 +13,7 @@ import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversatio
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
+import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
 import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
@@ -28,6 +29,8 @@ import { MongoCommunityChannelMessageRepository } from '@app/contexts/communitie
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
+import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -74,6 +77,10 @@ async function init() {
       MongoConversationRepository,
     );
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
+  const identityMetadataRepository =
+    Kernel.di.getService<MongoIdentityMetadataRepository>(
+      MongoIdentityMetadataRepository,
+    );
   const communityRepository = new MongoCommunityRepository(mongo);
   const communityMessageRepository = new MongoCommunityChannelMessageRepository(
     mongo,
@@ -83,6 +90,10 @@ async function init() {
     new MarkMessagesReadWhenAnnounced(
       messageBus,
       new MessagesReadRegistrar(conversationRepository),
+    ),
+    new RespondToIdentityNetworkSyncRequest(
+      messageBus,
+      new IdentityNetworkSyncResponder(identityMetadataRepository, messageBus),
     ),
     new RegisterCommunityChannelMessageWhenAnnounced(
       messageBus,
@@ -136,7 +147,11 @@ async function init() {
   console.timeEnd('Republish local routing records');
 
   console.time('Node startup sync');
-  await createNodeStartupSynchronizer().synchronize();
+  const nodeStartupSynchronizer = createNodeStartupSynchronizer();
+  const startupSyncResult = await nodeStartupSynchronizer.synchronize();
+
+  console.info('Node startup sync result', startupSyncResult);
+  nodeStartupSynchronizer.scheduleRetries();
   console.timeEnd('Node startup sync');
 
   console.info('Ready!');

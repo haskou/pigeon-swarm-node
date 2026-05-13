@@ -167,7 +167,16 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   public async findByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity | undefined> {
-    return this.findPreviousIdentity(externalIdentifier);
+    const identity = await this.findPreviousIdentity(externalIdentifier);
+
+    if (identity) {
+      await this.saveMetadata(
+        identity,
+        new IPFSId(externalIdentifier.valueOf()),
+      );
+    }
+
+    return identity;
   }
 
   public async findCandidateReferencesById(
@@ -261,7 +270,9 @@ export default class IpfsIdentityRepository implements IdentityRepository {
           identityDocument,
           identityDocument.networks,
         );
+        const identity = this.mapper.toDomain(identityDocument);
 
+        await this.saveMetadata(identity, cid);
         await this.ipfsManager.putRecordToNetworks(
           this.ROUTING_KEY_PREFIX + document.identityId,
           cid.valueOf(),

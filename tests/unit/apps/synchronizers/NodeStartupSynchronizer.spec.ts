@@ -4,6 +4,7 @@ import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/ev
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import { IdentityNetworkSyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentityNetworkSyncRequestedEvent';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
@@ -70,6 +71,7 @@ describe('NodeStartupSynchronizer', () => {
         _id: 'identity-1-v1',
         cid: 'bafyidentity1v1',
         identityId: 'identity-1',
+        networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
         previousCid: undefined,
         receivedAt: 1,
         version: 1,
@@ -78,6 +80,7 @@ describe('NodeStartupSynchronizer', () => {
         _id: 'identity-1-v2',
         cid: 'bafyidentity1v2',
         identityId: 'identity-1',
+        networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
         previousCid: 'bafyidentity1v1',
         receivedAt: 2,
         version: 2,
@@ -108,27 +111,34 @@ describe('NodeStartupSynchronizer', () => {
     expect(result).toMatchObject({
       conversationRequests: 1,
       communityRequests: 0,
+      identityNetworkRequests: 1,
       identityRequests: 1,
       keychainRequests: 1,
     });
     expect(publishedEvents).toEqual([
+      expect.any(IdentityNetworkSyncRequestedEvent),
       expect.any(IdentitySyncRequestedEvent),
       expect.any(KeychainSyncRequestedEvent),
       expect.any(ConversationSyncRequestedEvent),
     ]);
     expect(publishedEvents[0].attributes).toMatchObject({
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+      requesterNodeId: nodeId,
+      requestId: result.requestId,
+    });
+    expect(publishedEvents[1].attributes).toMatchObject({
       identityId: 'identity-1',
       knownVersion: 2,
       requesterNodeId: nodeId,
       requestId: result.requestId,
     });
-    expect(publishedEvents[1].attributes).toMatchObject({
+    expect(publishedEvents[2].attributes).toMatchObject({
       knownVersion: 3,
       ownerIdentityId: 'identity-1',
       requesterNodeId: nodeId,
       requestId: result.requestId,
     });
-    expect(publishedEvents[2].attributes).toMatchObject({
+    expect(publishedEvents[3].attributes).toMatchObject({
       conversationId: 'one-to-one:conversation',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
@@ -167,11 +177,20 @@ describe('NodeStartupSynchronizer', () => {
     expect(result).toMatchObject({
       communityRequests: 1,
       conversationRequests: 0,
+      identityNetworkRequests: 1,
       identityRequests: 0,
       keychainRequests: 0,
     });
-    expect(publishedEvents).toEqual([expect.any(CommunitySyncRequestedEvent)]);
+    expect(publishedEvents).toEqual([
+      expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunitySyncRequestedEvent),
+    ]);
     expect(publishedEvents[0].attributes).toMatchObject({
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+      requesterNodeId: nodeId,
+      requestId: result.requestId,
+    });
+    expect(publishedEvents[1].attributes).toMatchObject({
       communityId: '550e8400-e29b-41d4-a716-446655440020',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
