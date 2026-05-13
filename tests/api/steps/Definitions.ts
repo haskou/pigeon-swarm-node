@@ -894,6 +894,11 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/ipfs/private');
   }
 
+  @given('I sign the current secure IPFS content request')
+  public async iSignTheCurrentSecureIPFSContentRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/ipfs/secure');
+  }
+
   @given('I sign the current conversations request')
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;

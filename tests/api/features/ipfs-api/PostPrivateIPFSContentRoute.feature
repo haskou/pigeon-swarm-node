@@ -16,3 +16,17 @@ Feature: Post private IPFS content route
       | encrypted   | true                     |
       | filename    | avatar.png               |
       | size        | 19                       |
+
+  Scenario: Publish encrypted private content through the secure alias
+    Given I am an anonymous user
+    And I register an in-memory IPFS network "api-test-secure-network"
+    And I set raw IPFS content with content type "application/octet-stream" and text "encrypted-by-client"
+    And I sign the current secure IPFS content request
+    When I POST to "/ipfs/secure"
+    Then response code is equal to 201
+    And response body should contain "cid"
+    And response contains a valid resource with the following fields
+      | contentType | application/octet-stream |
+      | encrypted   | true                     |
+      | filename    | avatar.png               |
+      | size        | 19                       |
