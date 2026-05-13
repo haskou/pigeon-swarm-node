@@ -14,8 +14,6 @@ export type CommunityChannelMessagePrimitives = ReturnType<
 >;
 
 export class CommunityChannelMessage {
-  private static readonly TYPE: 'sent' = 'sent';
-
   public static create(
     metadata: CommunityChannelMessageMetadata,
     encryptedPayload: CommunityChannelMessageEncryptedPayload,
@@ -57,6 +55,10 @@ export class CommunityChannelMessage {
     private readonly attachmentExternalIdentifiers: Attachments,
   ) {}
 
+  private type(): 'sent' {
+    return 'sent';
+  }
+
   public toPrimitives() {
     return {
       attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
@@ -69,7 +71,7 @@ export class CommunityChannelMessage {
       encryptedPayload: this.encryptedPayload.valueOf(),
       id: this.metadata.getId().valueOf(),
       signature: this.signature.valueOf(),
-      type: CommunityChannelMessage.TYPE,
+      type: this.type(),
     };
   }
 }

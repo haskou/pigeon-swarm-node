@@ -17,8 +17,6 @@ import { CommunityId } from './value-objects/CommunityId';
 import { CommunityName } from './value-objects/CommunityName';
 
 export class Community extends AggregateRoot {
-  private static readonly VISIBILITY: 'private' = 'private';
-
   public static create(
     ownerIdentityId: IdentityId,
     networkId: NetworkId,
@@ -74,6 +72,10 @@ export class Community extends AggregateRoot {
       this.ownerIdentityId.isEqual(identityId),
       new CommunityOwnerMismatchError(),
     );
+  }
+
+  private visibility(): 'private' {
+    return 'private';
   }
 
   public addMember(actor: IdentityId, member: IdentityId): void {
@@ -160,7 +162,7 @@ export class Community extends AggregateRoot {
       networkId: this.networkId.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),
       textChannels: this.textChannels.map((channel) => channel.toPrimitives()),
-      visibility: Community.VISIBILITY,
+      visibility: this.visibility(),
     };
   }
 }
