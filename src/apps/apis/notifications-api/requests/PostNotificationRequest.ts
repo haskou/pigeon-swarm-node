@@ -7,10 +7,12 @@ export class PostNotificationRequest {
 
   public getMessage(): NotificationCreateMessage {
     return new NotificationCreateMessage(
-      this.body.conversationId,
+      this.body.conversationId || '',
+      this.body.communityId,
       this.body.inviterIdentityId,
       this.body.recipientIdentityId,
-      this.body.encryptedConversationKey,
+      this.body.encryptedConversationKey || '',
+      this.body.encryptedCommunityKey,
       this.body.inviterSignature,
     );
   }

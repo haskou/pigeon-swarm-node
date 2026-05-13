@@ -1,13 +1,25 @@
-import { IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class PostNotificationBody {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  public readonly conversationId: string;
+  public readonly communityId?: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  public readonly encryptedConversationKey: string;
+  public readonly conversationId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly encryptedCommunityKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly encryptedConversationKey?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -22,6 +34,6 @@ export class PostNotificationBody {
   public readonly inviterSignature: string;
 
   @IsString()
-  @IsIn(['conversation_invitation'])
-  public readonly type: 'conversation_invitation';
+  @IsIn(['community_invitation', 'conversation_invitation'])
+  public readonly type: 'community_invitation' | 'conversation_invitation';
 }

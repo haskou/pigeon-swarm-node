@@ -1,0 +1,615 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Communities API
+  version: 1.0.0
+  description: Endpoints for private communities, members, text channels, and encrypted channel messages.
+tags:
+  - name: communities
+paths:
+  /communities/:
+    get:
+      tags:
+        - communities
+      summary: List private communities for the authenticated member
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Communities where the authenticated identity is a member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunitiesResource'
+    post:
+      tags:
+        - communities
+      summary: Create a private community
+      description: The authenticated identity becomes the owner and first member.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityBody'
+      responses:
+        '200':
+          description: Community created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+  /communities/{communityId}:
+    get:
+      tags:
+        - communities
+      summary: Get a private community
+      description: Only community members can read the community.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not a community member.
+    patch:
+      tags:
+        - communities
+      summary: Update private community profile
+      description: Only the community owner can update the name, description, or banner CID.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchCommunityBody'
+      responses:
+        '200':
+          description: Community updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner.
+  /communities/{communityId}/members:
+    get:
+      tags:
+        - communities
+      summary: List private community members
+      description: Only community members can list members.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMembersResource'
+    post:
+      tags:
+        - communities
+      summary: Add a member to a private community
+      description: Only the community owner can add members. Adding an existing member is idempotent.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityMemberBody'
+      responses:
+        '200':
+          description: Member added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner.
+  /communities/{communityId}/channels:
+    get:
+      tags:
+        - communities
+      summary: List private community channels
+      description: Only community members can list text channel metadata.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community text channels.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelsResource'
+  /communities/{communityId}/channels/text:
+    post:
+      tags:
+        - communities
+      summary: Create a private community text channel
+      description: Only the community owner can create text channels.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityTextChannelBody'
+      responses:
+        '200':
+          description: Text channel created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityTextChannelResource'
+        '409':
+          description: Authenticated identity is not the community owner.
+  /communities/{communityId}/channels/{channelId}:
+    patch:
+      tags:
+        - communities
+      summary: Rename a private community text channel
+      description: Only the community owner can rename text channels.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchCommunityChannelBody'
+      responses:
+        '200':
+          description: Channel renamed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner or the channel does not exist.
+  /communities/{communityId}/channels/{channelId}/messages:
+    get:
+      tags:
+        - communities
+      summary: List encrypted private community text channel messages
+      description: Only community members can read channel messages. Payloads are client-encrypted and opaque to the backend.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: beforeMessageId
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Channel messages ordered from oldest to newest in the page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessagesResource'
+        '409':
+          description: Authenticated identity is not a member or the channel does not exist.
+    post:
+      tags:
+        - communities
+      summary: Send an encrypted private community text channel message
+      description: Only community members can send channel messages. The backend validates the message signature but never decrypts the payload.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityChannelMessageBody'
+      responses:
+        '200':
+          description: Message stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessageResource'
+        '409':
+          description: Authenticated identity is not a member, the channel does not exist, or the message signature is invalid.
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}:
+    delete:
+      tags:
+        - communities
+      summary: Delete an encrypted private community text channel message
+      description: Only community members can delete channel messages. The deletion is announced through realtime and pubsub events.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteCommunityChannelMessageBody'
+      responses:
+        '200':
+          description: Message deleted locally.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedCommunityChannelMessageResource'
+        '409':
+          description: Authenticated identity is not a member, the channel does not exist, or the deletion signature is invalid.
+components:
+  parameters:
+    CommunityId:
+      in: path
+      name: communityId
+      required: true
+      schema:
+        type: string
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    CommunityTextChannelResource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - createdAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - text
+        createdAt:
+          type: integer
+    CommunityResource:
+      type: object
+      required:
+        - id
+        - networkId
+        - ownerIdentityId
+        - name
+        - description
+        - memberIds
+        - textChannels
+        - visibility
+        - createdAt
+      properties:
+        id:
+          type: string
+        networkId:
+          type: string
+        ownerIdentityId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        avatar:
+          type: string
+          description: Public IPFS CID for the community avatar/icon.
+        banner:
+          type: string
+          description: Public IPFS CID for the community banner.
+        memberIds:
+          type: array
+          items:
+            type: string
+        textChannels:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityTextChannelResource'
+        visibility:
+          type: string
+          enum:
+            - private
+        createdAt:
+          type: integer
+    CommunitiesResource:
+      type: object
+      required:
+        - communities
+      properties:
+        communities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityResource'
+    CommunityMembersResource:
+      type: object
+      required:
+        - memberIds
+      properties:
+        memberIds:
+          type: array
+          items:
+            type: string
+    CommunityChannelsResource:
+      type: object
+      required:
+        - channels
+      properties:
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityTextChannelResource'
+    CommunityChannelMessageResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - channelId
+        - authorIdentityId
+        - encryptedPayload
+        - signature
+        - attachmentExternalIdentifiers
+        - type
+        - createdAt
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        channelId:
+          type: string
+        authorIdentityId:
+          type: string
+        encryptedPayload:
+          type: string
+        signature:
+          type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string
+        type:
+          type: string
+          enum:
+            - sent
+        createdAt:
+          type: integer
+    CommunityChannelMessagesResource:
+      type: object
+      required:
+        - communityId
+        - channelId
+        - messages
+      properties:
+        communityId:
+          type: string
+        channelId:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityChannelMessageResource'
+        nextBeforeMessageId:
+          type: string
+    DeletedCommunityChannelMessageResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - channelId
+        - targetMessageId
+        - deletedByIdentityId
+        - type
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        channelId:
+          type: string
+        targetMessageId:
+          type: string
+        deletedByIdentityId:
+          type: string
+        type:
+          type: string
+          enum:
+            - deleted
+    PostCommunityBody:
+      type: object
+      required:
+        - networkId
+        - name
+        - description
+      properties:
+        networkId:
+          type: string
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+        avatar:
+          type: string
+          description: Optional public IPFS CID for the community avatar/icon.
+        banner:
+          type: string
+          description: Optional public IPFS CID for the community banner.
+    PatchCommunityBody:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+        avatar:
+          type: string
+          description: Optional public IPFS CID. Omit it to remove the avatar.
+        banner:
+          type: string
+          description: Optional public IPFS CID. Omit it to remove the banner.
+    PostCommunityMemberBody:
+      type: object
+      required:
+        - identityId
+      properties:
+        identityId:
+          type: string
+    PostCommunityTextChannelBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 80
+    PatchCommunityChannelBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 80
+    PostCommunityChannelMessageBody:
+      type: object
+      required:
+        - id
+        - createdAt
+        - encryptedPayload
+        - signature
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: integer
+        encryptedPayload:
+          type: string
+          description: Client-encrypted payload. The backend stores it as opaque text.
+        signature:
+          type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string
+    DeleteCommunityChannelMessageBody:
+      type: object
+      required:
+        - id
+        - createdAt
+        - signature
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: integer
+        signature:
+          type: string

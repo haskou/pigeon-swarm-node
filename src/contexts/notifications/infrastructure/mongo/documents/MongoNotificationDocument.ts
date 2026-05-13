@@ -9,11 +9,20 @@ export type MongoConversationInvitationPayloadDocument = {
   inviterSignature: string;
   recipientIdentityId: string;
 };
+export type MongoCommunityInvitationPayloadDocument = {
+  communityId: string;
+  encryptedCommunityKey: string;
+  inviterIdentityId: string;
+  inviterSignature: string;
+  recipientIdentityId: string;
+};
 
 export type MongoNotificationDocument = {
   _id: string;
   createdAt: number;
-  payload: MongoConversationInvitationPayloadDocument;
+  payload:
+    | MongoCommunityInvitationPayloadDocument
+    | MongoConversationInvitationPayloadDocument;
   recipientIdentityId: string;
   state: NotificationStateValue;
   status: NotificationStatusValue;

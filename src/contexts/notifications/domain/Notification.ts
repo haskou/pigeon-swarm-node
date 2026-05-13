@@ -2,6 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityInvitationPayload } from './CommunityInvitationPayload';
 import { ConversationInvitationPayload } from './ConversationInvitationPayload';
 import { NotificationWasAcceptedEvent } from './events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from './events/NotificationWasCreatedEvent';
@@ -12,6 +13,31 @@ import { NotificationStatus } from './value-objects/NotificationStatus';
 import { NotificationType } from './value-objects/NotificationType';
 
 export class Notification extends AggregateRoot {
+  public static communityInvitation(
+    payload: CommunityInvitationPayload,
+    createdAt: Timestamp = Timestamp.now(),
+    id: NotificationId = NotificationId.generate(),
+  ): Notification {
+    const notification = new Notification(
+      id,
+      NotificationType.COMMUNITY_INVITATION,
+      payload.getRecipientIdentityId(),
+      NotificationStatus.UNREAD,
+      NotificationState.PENDING,
+      payload,
+      createdAt,
+    );
+
+    notification.record(
+      new NotificationWasCreatedEvent(notification.toPrimitives().id, {
+        recipientIdentityId: notification.toPrimitives().recipientIdentityId,
+        type: notification.toPrimitives().type,
+      }),
+    );
+
+    return notification;
+  }
+
   public static conversationInvitation(
     payload: ConversationInvitationPayload,
     createdAt: Timestamp = Timestamp.now(),
@@ -46,7 +72,9 @@ export class Notification extends AggregateRoot {
       new IdentityId(primitives.recipientIdentityId),
       new NotificationStatus(primitives.status),
       new NotificationState(primitives.state),
-      ConversationInvitationPayload.fromPrimitives(primitives.payload),
+      'communityId' in primitives.payload
+        ? CommunityInvitationPayload.fromPrimitives(primitives.payload)
+        : ConversationInvitationPayload.fromPrimitives(primitives.payload),
       new Timestamp(primitives.createdAt),
     );
   }
@@ -57,7 +85,7 @@ export class Notification extends AggregateRoot {
     private readonly recipientIdentityId: IdentityId,
     private status: NotificationStatus,
     private state: NotificationState,
-    private payload: ConversationInvitationPayload,
+    private payload: CommunityInvitationPayload | ConversationInvitationPayload,
     private readonly createdAt: Timestamp,
   ) {
     super();

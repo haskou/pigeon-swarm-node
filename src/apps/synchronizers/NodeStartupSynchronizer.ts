@@ -1,3 +1,5 @@
+import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
+import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
@@ -14,6 +16,7 @@ import { UUID } from '@haskou/value-objects';
 type LatestVersionByResource = Map<string, number>;
 
 export interface NodeStartupSyncResult {
+  communityRequests: number;
   conversationRequests: number;
   identityRequests: number;
   keychainRequests: number;
@@ -27,6 +30,7 @@ export default class NodeStartupSynchronizer {
     private readonly identityMetadataRepository: IdentityMetadataRepository,
     private readonly keychainMetadataRepository: KeychainMetadataRepository,
     private readonly conversationRepository: MongoConversationRepository,
+    private readonly communityRepository: MongoCommunityRepository,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
@@ -94,6 +98,24 @@ export default class NodeStartupSynchronizer {
     );
   }
 
+  private async communityRequests(
+    requestId: string,
+    requesterNodeId: string,
+  ): Promise<DomainEvent[]> {
+    const communities = await this.communityRepository.findAll();
+
+    return communities.map((community) => {
+      const primitives = community.toPrimitives();
+
+      return new CommunitySyncRequestedEvent(primitives.id, {
+        communityId: primitives.id,
+        networkId: primitives.networkId,
+        requesterNodeId,
+        requestId,
+      });
+    });
+  }
+
   public async synchronize(): Promise<NodeStartupSyncResult> {
     const requestId = UUID.generate().toString();
     const node = await this.nodeLoader.loadNode();
@@ -115,6 +137,10 @@ export default class NodeStartupSynchronizer {
       keychainMetadata,
       (document) => document.ownerIdentityId,
     );
+    const communityRequests = await this.communityRequests(
+      requestId,
+      requesterNodeId,
+    );
     const events = [
       ...this.identityRequests(requestId, requesterNodeId, identityVersions),
       ...this.keychainRequests(requestId, requesterNodeId, keychainVersions),
@@ -123,6 +149,7 @@ export default class NodeStartupSynchronizer {
         requesterNodeId,
         conversationScopes,
       ),
+      ...communityRequests,
     ];
 
     if (events.length > 0) {
@@ -130,6 +157,7 @@ export default class NodeStartupSynchronizer {
     }
 
     return {
+      communityRequests: communityRequests.length,
       conversationRequests: conversationScopes.length,
       identityRequests: identityVersions.size,
       keychainRequests: keychainVersions.size,

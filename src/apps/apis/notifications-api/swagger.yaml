@@ -34,7 +34,7 @@ paths:
     post:
       tags:
         - notifications
-      summary: Create a conversation invitation notification
+      summary: Create a conversation or community invitation notification
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -131,6 +131,25 @@ components:
           type: string
         inviterSignature:
           type: string
+    CommunityInvitationPayload:
+      type: object
+      required:
+        - communityId
+        - inviterIdentityId
+        - recipientIdentityId
+        - encryptedCommunityKey
+        - inviterSignature
+      properties:
+        communityId:
+          type: string
+        inviterIdentityId:
+          type: string
+        recipientIdentityId:
+          type: string
+        encryptedCommunityKey:
+          type: string
+        inviterSignature:
+          type: string
     NotificationResource:
       type: object
       required:
@@ -147,6 +166,7 @@ components:
         type:
           type: string
           enum:
+            - community_invitation
             - conversation_invitation
         recipientIdentityId:
           type: string
@@ -164,7 +184,9 @@ components:
         createdAt:
           type: integer
         payload:
-          $ref: '#/components/schemas/ConversationInvitationPayload'
+          oneOf:
+            - $ref: '#/components/schemas/CommunityInvitationPayload'
+            - $ref: '#/components/schemas/ConversationInvitationPayload'
     NotificationsResource:
       type: object
       required:
@@ -175,16 +197,27 @@ components:
           items:
             $ref: '#/components/schemas/NotificationResource'
     PostNotificationBody:
-      allOf:
-        - $ref: '#/components/schemas/ConversationInvitationPayload'
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - conversation_invitation
+      oneOf:
+        - allOf:
+            - $ref: '#/components/schemas/ConversationInvitationPayload'
+            - type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - conversation_invitation
+        - allOf:
+            - $ref: '#/components/schemas/CommunityInvitationPayload'
+            - type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - community_invitation
     PatchNotificationBody:
       type: object
       required:

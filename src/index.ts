@@ -1,6 +1,10 @@
 /* eslint-disable no-console */
 import 'module-alias/register';
 import 'reflect-metadata';
+import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced';
+import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
+import RegisterCommunityMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
+import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
@@ -18,7 +22,11 @@ import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/no
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
+import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import Kernel from '@app/Kernel';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
 
@@ -55,6 +63,36 @@ async function init() {
     RespondToConversationSyncRequest,
     RegisterMessagesWhenSyncAvailable,
     RegisterNodePeerWhenHeartbeatReceived,
+  );
+  const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
+  const mongo = Kernel.di.getService<MongoDB>(MongoDB);
+  const communityRepository = new MongoCommunityRepository(mongo);
+  const communityMessageRepository = new MongoCommunityChannelMessageRepository(
+    mongo,
+  );
+
+  kernel.addConsumerInstances(
+    new RegisterCommunityChannelMessageWhenAnnounced(
+      messageBus,
+      communityRepository,
+      communityMessageRepository,
+    ),
+    new DeleteCommunityChannelMessageWhenAnnounced(
+      messageBus,
+      communityRepository,
+      communityMessageRepository,
+    ),
+    new RespondToCommunitySyncRequest(
+      messageBus,
+      communityRepository,
+      communityMessageRepository,
+      messageBus,
+    ),
+    new RegisterCommunityMessagesWhenSyncAvailable(
+      messageBus,
+      communityRepository,
+      communityMessageRepository,
+    ),
   );
   await kernel.runConsumers();
   console.timeEnd('Run consumers');

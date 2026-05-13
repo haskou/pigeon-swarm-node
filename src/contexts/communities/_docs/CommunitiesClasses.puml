@@ -1,0 +1,151 @@
+@startuml CommunitiesClasses
+
+skinparam classAttributeIconSize 0
+
+package "communities/domain" {
+  class Community {
+    - id: CommunityId
+    - networkId: NetworkId
+    - ownerIdentityId: IdentityId
+    - profile: CommunityProfile
+    - members: IdentityId[]
+    - textChannels: CommunityTextChannel[]
+    - createdAt: Timestamp
+    + create(ownerIdentityId, networkId, name, description, banner?): Community
+    + addMember(actor, member): void
+    + addTextChannel(actor, name): CommunityTextChannel
+    + renameTextChannel(actor, channelId, name): void
+    + updateProfile(actor, name, description, banner?): void
+    + assertIsMember(identityId): void
+  }
+
+  class CommunityTextChannel {
+    - id: CommunityChannelId
+    - name: CommunityChannelName
+    - createdAt: Timestamp
+    + create(name): CommunityTextChannel
+    + rename(name): void
+  }
+
+  class CommunityChannelMessage {
+    - id: CommunityChannelMessageId
+    - communityId: CommunityId
+    - channelId: CommunityChannelId
+    - authorIdentityId: IdentityId
+    - encryptedPayload: CommunityChannelMessageEncryptedPayload
+    - signature: Signature
+    - createdAt: Timestamp
+    - attachmentExternalIdentifiers: CommunityChannelAttachmentId[]
+    + create(...): CommunityChannelMessage
+  }
+
+  class CommunityProfile {
+    - name: CommunityName
+    - description: CommunityDescription
+    - avatar: CommunityAvatar?
+    - banner: CommunityBanner?
+  }
+
+  class CommunityId
+  class CommunityName
+  class CommunityDescription
+  class CommunityAvatar
+  class CommunityBanner
+  class CommunityChannelId
+  class CommunityChannelName
+  class CommunityChannelMessageId
+  class CommunityChannelMessageEncryptedPayload
+  class CommunityChannelAttachmentId
+  interface CommunityRepository {
+    + findById(id): Community?
+    + findByMember(identityId): Community[]
+    + save(community): void
+  }
+  interface CommunityChannelMessageRepository {
+    + findById(communityId, channelId, messageId): CommunityChannelMessage?
+    + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
+    + save(message): void
+  }
+
+  Community *-- CommunityTextChannel
+  Community *-- CommunityProfile
+  Community --> CommunityId
+  CommunityProfile --> CommunityName
+  CommunityProfile --> CommunityDescription
+  CommunityProfile --> CommunityAvatar
+  CommunityProfile --> CommunityBanner
+  CommunityTextChannel --> CommunityChannelId
+  CommunityTextChannel --> CommunityChannelName
+  CommunityChannelMessage --> CommunityChannelMessageId
+  CommunityChannelMessage --> CommunityId
+  CommunityChannelMessage --> CommunityChannelId
+  CommunityChannelMessage --> IdentityId
+  CommunityChannelMessage --> CommunityChannelMessageEncryptedPayload
+  CommunityChannelMessage --> CommunityChannelAttachmentId
+  CommunityRepository ..> Community
+  CommunityChannelMessageRepository ..> CommunityChannelMessage
+}
+
+package "shared value objects" {
+  class IdentityId
+  class NetworkId
+  class Signature
+  class Timestamp
+}
+
+Community --> IdentityId : owner + members
+Community --> NetworkId
+Community --> Timestamp
+CommunityTextChannel --> Timestamp
+
+package "communities/infrastructure" {
+  class MongoCommunityRepository
+  class MongoCommunityDocument
+  class MongoCommunityChannelMessageRepository
+  class MongoCommunityChannelMessageDocument
+
+  MongoCommunityRepository ..|> CommunityRepository
+  MongoCommunityRepository --> MongoCommunityDocument
+  MongoCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
+  MongoCommunityChannelMessageRepository --> MongoCommunityChannelMessageDocument
+}
+
+package "communities-api" {
+  class PostCommunityRoute
+  class GetCommunitiesRoute
+  class GetCommunityRoute
+  class PatchCommunityRoute
+  class GetCommunityMembersRoute
+  class PostCommunityMemberRoute
+  class GetCommunityChannelsRoute
+  class PostCommunityTextChannelRoute
+  class PatchCommunityChannelRoute
+  class PostCommunityChannelMessageRoute
+  class GetCommunityChannelMessagesRoute
+
+  PostCommunityRoute ..> Community
+  GetCommunitiesRoute ..> CommunityRepository
+  GetCommunityRoute ..> CommunityRepository
+  PatchCommunityRoute ..> Community
+  GetCommunityMembersRoute ..> Community
+  PostCommunityMemberRoute ..> Community
+  GetCommunityChannelsRoute ..> Community
+  PostCommunityTextChannelRoute ..> Community
+  PatchCommunityChannelRoute ..> Community
+  PostCommunityChannelMessageRoute ..> Community
+  PostCommunityChannelMessageRoute ..> CommunityChannelMessage
+  GetCommunityChannelMessagesRoute ..> Community
+  GetCommunityChannelMessagesRoute ..> CommunityChannelMessageRepository
+}
+
+note right of Community
+  MVP scope:
+  - private communities only
+  - one owner
+  - owner administers profile,
+    members and text channel metadata
+  - members can send/list encrypted
+    text channel messages
+end note
+
+@enduml
