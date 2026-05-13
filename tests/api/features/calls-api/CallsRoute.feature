@@ -40,7 +40,7 @@ Feature: Calls API
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status | ended |
-    And I sign the current calls request
+    And I sign the current call history request
     When I GET current call history
     Then response code is equal to 200
     And response body should contain the current call

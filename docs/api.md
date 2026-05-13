@@ -172,6 +172,7 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
+| `conversations.v1.messages.were_read` | conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` |
 | `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
 | `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
 | `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
@@ -193,6 +194,8 @@ Event contracts used by frontend:
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
+For `conversations.v1.messages.were_read`, use `event.aggregate_id` as
+`conversationId` and refresh the conversation unread counters if needed.
 
 For `calls.v1.*`, use `event.aggregate_id` as `callId`. Calls are signalling
 only: audio/video media is negotiated by frontend with WebRTC. The backend
@@ -846,6 +849,7 @@ Implemented:
 - require signed request auth
 - list conversations where the authenticated identity participates
 - support `limit` and `beforeConversationId`
+- include `unreadCount` for the authenticated identity
 
 ### Create a conversation
 
@@ -888,7 +892,8 @@ Response:
   "name": "Project room",
   "networkId": "<networkId>",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
-  "type": "one-to-one"
+  "type": "one-to-one",
+  "unreadCount": 0
 }
 ```
 
@@ -1044,8 +1049,41 @@ Implemented:
 - persist message metadata in MongoDB
 - publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
   `networkId` and `participantIds`
+- create Mongo-only unread flags for every participant except the author
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
+
+### Mark messages as read
+
+```http
+PUT /conversations/{conversationId}/messages/read-until
+```
+
+Request:
+
+```json
+{
+  "messageId": "<messageId>"
+}
+```
+
+Response:
+
+```json
+{
+  "status": "read"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- delete Mongo-only unread flags for the authenticated identity up to and
+  including `messageId`
+- publish `ConversationMessagesWereReadEvent` with `messageId`,
+  `readerIdentityId`, `networkId` and `participantIds`
+- consuming nodes apply the same unread-flag deletion locally
 
 ### Delete message
 
@@ -1091,6 +1129,7 @@ Implemented:
   `targetMessageId`, `networkId` and `participantIds`
 - invalidate the target message metadata locally so it no longer appears in
   message reads
+- remove unread flags for the deleted target message
 - remove the target message block from local IPFS blockstores when present
 - apply the same invalidation/removal when a deletion event is consumed from
   another node

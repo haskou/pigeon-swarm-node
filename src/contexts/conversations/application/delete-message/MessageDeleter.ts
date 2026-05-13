@@ -43,6 +43,10 @@ export default class MessageDeleter {
     }
 
     await this.conversationRepository.save(conversation);
+    await this.conversationRepository.registerUnreadForMessage(
+      conversation,
+      deletedMessage,
+    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return deletedMessage;

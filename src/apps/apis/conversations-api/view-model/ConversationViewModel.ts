@@ -3,7 +3,10 @@ import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { ConversationResource } from '../resources/ConversationResource';
 
 export class ConversationViewModel {
-  constructor(private readonly conversation: Conversation) {}
+  constructor(
+    private readonly conversation: Conversation,
+    private readonly unreadCount = 0,
+  ) {}
 
   public toResource(): ConversationResource {
     const primitives = this.conversation.toPrimitives();
@@ -14,6 +17,7 @@ export class ConversationViewModel {
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
       type: primitives.type as 'group' | 'one-to-one',
+      unreadCount: this.unreadCount,
     };
   }
 }

@@ -45,6 +45,8 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
   /conversations/{conversationId}/messages:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages'
+  /conversations/{conversationId}/messages/read-until:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1read-until'
   /conversations/{conversationId}/messages/{messageId}:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}'
   /conversations/{conversationId}/messages/{messageId}/around:

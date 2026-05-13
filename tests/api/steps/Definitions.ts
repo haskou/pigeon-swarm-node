@@ -829,6 +829,12 @@ export default class Definitions {
     await this.signCurrentRequest('GET', '/calls/');
   }
 
+  @given('I sign the current call history request')
+  public async iSignTheCurrentCallHistoryRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/calls/history');
+  }
+
   @given('I sign the current call request')
   public async iSignTheCurrentCallRequest(): Promise<void> {
     if (!this.callId) {
@@ -1074,6 +1080,48 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest('GET', '/conversations/');
+  }
+
+  @given('the other identity signs the current conversations request')
+  public async theOtherIdentitySignsTheCurrentConversationsRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/conversations/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I set a read conversation messages body')
+  public iSetAReadConversationMessagesBody(): void {
+    if (!this.messageId) {
+      throw new Error('Message must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      messageId: this.messageId,
+    });
+  }
+
+  @given('the other identity signs the current read conversation messages request')
+  public async theOtherIdentitySignsTheCurrentReadConversationMessagesRequest(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'PUT',
+      `/conversations/${this.conversationId}/messages/read-until`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
   }
 
   @given('I sign the current conversations request with an expired timestamp')
@@ -1414,6 +1462,19 @@ export default class Definitions {
   public async iPUT(path: string): Promise<void> {
     this.response = await this.restClient.put(
       path,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT the current conversation messages read marker')
+  public async iPUTTheCurrentConversationMessagesReadMarker(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    this.response = await this.restClient.put(
+      `/conversations/${this.conversationId}/messages/read-until`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

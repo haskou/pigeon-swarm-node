@@ -104,6 +104,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagesResource'
+  /conversations/{conversationId}/messages/read-until:
+    put:
+      tags:
+        - conversations
+      summary: Mark conversation messages as read up to a message
+      description: Deletes local unread flags for the authenticated identity up to and including the given message id, then publishes a read event so other nodes can apply the same projection update.
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutConversationMessagesReadUntilBody'
+      responses:
+        '200':
+          description: Messages marked as read.
   /conversations/{conversationId}/messages/{messageId}:
     get:
       tags:
@@ -255,6 +276,7 @@ components:
         - networkId
         - participantIds
         - type
+        - unreadCount
       properties:
         id:
           type: string
@@ -274,6 +296,9 @@ components:
           enum:
             - group
             - one-to-one
+        unreadCount:
+          type: integer
+          minimum: 0
     ConversationsResource:
       type: object
       required:
@@ -329,6 +354,14 @@ components:
         signature:
           type: string
           description: Signature of the deleted-message canonical payload, using previousMessageIds equal to the path messageId.
+    PutConversationMessagesReadUntilBody:
+      type: object
+      required:
+        - messageId
+      properties:
+        messageId:
+          type: string
+          description: Message id up to and including which unread flags should be removed for the authenticated identity.
     MessageResource:
       type: object
       required:

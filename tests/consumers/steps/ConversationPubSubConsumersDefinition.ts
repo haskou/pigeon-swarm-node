@@ -2,12 +2,15 @@ import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/con
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
+import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
+import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
@@ -24,6 +27,9 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
   private readonly messageId = '507f1f77bcf86cd799439011';
 
   private readonly networkId = '123e4567-e89b-12d3-a456-426614174000';
+
+  private readonly readerIdentityId =
+    'MCowBQYDK2VwAyEAeLMrMAfBRHdSU4eI1qpIUsqyfkXtR4FGjLhFzaWlfsI=';
 
   @before()
   public async reset(): Promise<void> {
@@ -107,6 +113,21 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     );
   }
 
+  @when('the messages read consumer handles a read announcement')
+  public async messagesReadConsumerHandlesAReadAnnouncement(): Promise<void> {
+    const consumer = new MarkMessagesReadWhenAnnounced(
+      this.eventConsumer(),
+      this.fakeUseCase<MessagesReadRegistrar>('register'),
+    );
+
+    await consumer.handler(
+      new ConversationMessagesWereReadEvent(this.conversationId, {
+        messageId: this.messageId,
+        readerIdentityId: this.readerIdentityId,
+      }),
+    );
+  }
+
   @then('the conversation message registrar should receive that message')
   public conversationMessageRegistrarShouldReceiveThatMessage(): void {
     const message = this.lastMessage<{
@@ -142,5 +163,18 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
         type: 'conversation',
       },
     ]);
+  }
+
+  @then('the messages read registrar should receive that read marker')
+  public messagesReadRegistrarShouldReceiveThatReadMarker(): void {
+    const message = this.lastMessage<{
+      conversationId: { valueOf(): string };
+      messageId: { valueOf(): string };
+      readerIdentityId: { valueOf(): string };
+    }>();
+
+    expect(message.conversationId.valueOf()).to.equal(this.conversationId);
+    expect(message.messageId.valueOf()).to.equal(this.messageId);
+    expect(message.readerIdentityId.valueOf()).to.equal(this.readerIdentityId);
   }
 }

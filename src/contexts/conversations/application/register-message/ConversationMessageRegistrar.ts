@@ -58,5 +58,6 @@ export default class ConversationMessageRegistrar {
 
     conversation.registerMessage(candidate);
     await this.repository.save(conversation);
+    await this.repository.registerUnreadForMessage(conversation, candidate);
   }
 }

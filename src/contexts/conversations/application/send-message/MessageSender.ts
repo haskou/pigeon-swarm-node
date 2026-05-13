@@ -48,6 +48,10 @@ export default class MessageSender {
     }
 
     await this.conversationRepository.save(conversation);
+    await this.conversationRepository.registerUnreadForMessage(
+      conversation,
+      sentMessage,
+    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return sentMessage;

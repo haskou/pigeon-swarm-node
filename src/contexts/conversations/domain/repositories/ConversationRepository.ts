@@ -54,11 +54,24 @@ export interface ConversationRepository {
     before: number,
     after: number,
   ): Promise<ConversationMessagesAround>;
+  countUnreadByRecipient(
+    recipientIdentityId: IdentityId,
+    conversationIds: ConversationId[],
+  ): Promise<Map<string, number>>;
   findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
     networkId: NetworkId,
   ): Promise<Conversation | undefined>;
   findConversationSyncScopes(): Promise<ConversationSyncScope[]>;
+  markReadUntil(
+    conversationId: ConversationId,
+    recipientIdentityId: IdentityId,
+    messageId: MessageId,
+  ): Promise<void>;
+  registerUnreadForMessage(
+    conversation: Conversation,
+    message: Message,
+  ): Promise<void>;
   save(conversation: Conversation): Promise<void>;
 }

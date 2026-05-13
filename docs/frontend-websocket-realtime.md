@@ -143,6 +143,7 @@ Frontend should switch on `event.type`.
 | `conversations.v1.message.was_sent` | Conversation id | `messageId`, `authorId`, `networkId`, `participantIds` | Identities in `participantIds` | Fetch `GET /conversations/{conversationId}/messages/{messageId}` and reconcile optimistic sends by `messageId`. |
 | `conversations.v1.message.was_edited` | Conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` | Identities in `participantIds` | Fetch the edited message by `messageId`, then update the target projection. |
 | `conversations.v1.message.was_deleted` | Conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` | Identities in `participantIds` | Fetch the deletion tombstone by `messageId` or remove the target from the visible list. |
+| `conversations.v1.messages.were_read` | Conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` | Identities in `participantIds` | Refresh conversation list or clear unread indicators for `readerIdentityId` up to `messageId`. |
 | `calls.v1.call.started` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` or add the call from event attributes. |
 | `calls.v1.participant.joined` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` and update participant UI. |
 | `calls.v1.participant.left` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` or remove the identity from active participant UI. |
@@ -198,6 +199,7 @@ Dropped:
 | `notifications.` | Refetch notifications. |
 | `conversations.v1.conversation.` | Refetch conversation list. |
 | `conversations.v1.message.` | Fetch the announced message with `GET /conversations/{conversationId}/messages/{messageId}`. |
+| `conversations.v1.messages.` | Refresh conversation unread counters. |
 | `calls.v1.call.` | Fetch `GET /calls/{callId}` unless the event already has enough data for the current view. |
 | `calls.v1.participant.` | Fetch `GET /calls/{callId}` and update active participant UI. |
 | `calls.v1.signal.` | If `recipientIdentityId` is the current identity, feed `payload` into the local WebRTC peer connection. |

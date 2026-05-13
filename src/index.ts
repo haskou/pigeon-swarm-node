@@ -5,6 +5,7 @@ import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubs
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
 import RegisterCommunityMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
+import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
@@ -25,6 +26,8 @@ import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler'
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -66,6 +69,10 @@ async function init() {
     RegisterNodePeerWhenHeartbeatReceived,
   );
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
+  const conversationRepository =
+    Kernel.di.getService<MongoConversationRepository>(
+      MongoConversationRepository,
+    );
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
   const communityRepository = new MongoCommunityRepository(mongo);
   const communityMessageRepository = new MongoCommunityChannelMessageRepository(
@@ -73,6 +80,10 @@ async function init() {
   );
 
   kernel.addConsumerInstances(
+    new MarkMessagesReadWhenAnnounced(
+      messageBus,
+      new MessagesReadRegistrar(conversationRepository),
+    ),
     new RegisterCommunityChannelMessageWhenAnnounced(
       messageBus,
       communityRepository,
