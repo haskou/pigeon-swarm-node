@@ -1345,6 +1345,19 @@ Request:
 }
 ```
 
+Group conversation invitation request:
+
+```json
+{
+  "type": "group_conversation_invitation",
+  "conversationId": "group:<deterministic-id>",
+  "inviterIdentityId": "<aliceIdentityId>",
+  "recipientIdentityId": "<bobIdentityId>",
+  "encryptedConversationKey": "<encryptedForBob>",
+  "inviterSignature": "<inviterSignature>"
+}
+```
+
 Community invitation request:
 
 ```json
@@ -1364,6 +1377,8 @@ Implemented:
 - persist the notification in MongoDB
 - store encrypted key material as opaque payload only
 - keep private keys and decrypted conversation keys out of the backend
+- group conversation invitations use the same encrypted conversation key payload
+  as 1to1 invitations; the `type` tells the client which UX to show
 
 ### Update a notification
 

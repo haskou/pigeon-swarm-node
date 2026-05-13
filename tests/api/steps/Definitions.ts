@@ -978,6 +978,23 @@ export default class Definitions {
     });
   }
 
+  @given('I set a group conversation invitation notification body')
+  public async iSetAGroupConversationInvitationNotificationBody(): Promise<void> {
+    const inviterKeyPair = await this.ensureIdentityKeyPair();
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      conversationId: 'group:notification-api-conversation',
+      encryptedConversationKey: 'encrypted-group-conversation-key',
+      inviterIdentityId: this.ownerIdentityId?.valueOf(),
+      inviterSignature: inviterKeyPair
+        .sign('group-conversation-invitation')
+        .valueOf(),
+      recipientIdentityId: this.otherIdentityId?.valueOf(),
+      type: 'group_conversation_invitation',
+    });
+  }
+
   @given('I sign the current notification creation request')
   public async iSignTheCurrentNotificationCreationRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/notifications/');

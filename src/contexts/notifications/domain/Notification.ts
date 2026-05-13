@@ -63,6 +63,31 @@ export class Notification extends AggregateRoot {
     return notification;
   }
 
+  public static groupConversationInvitation(
+    payload: ConversationInvitationPayload,
+    createdAt: Timestamp = Timestamp.now(),
+    id: NotificationId = NotificationId.generate(),
+  ): Notification {
+    const notification = new Notification(
+      id,
+      NotificationType.GROUP_CONVERSATION_INVITATION,
+      payload.getRecipientIdentityId(),
+      NotificationStatus.UNREAD,
+      NotificationState.PENDING,
+      payload,
+      createdAt,
+    );
+
+    notification.record(
+      new NotificationWasCreatedEvent(notification.toPrimitives().id, {
+        recipientIdentityId: notification.toPrimitives().recipientIdentityId,
+        type: notification.toPrimitives().type,
+      }),
+    );
+
+    return notification;
+  }
+
   public static fromPrimitives(
     primitives: PrimitiveOf<Notification>,
   ): Notification {

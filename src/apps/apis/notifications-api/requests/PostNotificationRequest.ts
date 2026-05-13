@@ -6,14 +6,33 @@ export class PostNotificationRequest {
   constructor(private readonly body: PostNotificationBody) {}
 
   public getMessage(): NotificationCreateMessage {
-    return new NotificationCreateMessage(
-      this.body.conversationId || '',
-      this.body.communityId,
-      this.body.inviterIdentityId,
-      this.body.recipientIdentityId,
-      this.body.encryptedConversationKey || '',
-      this.body.encryptedCommunityKey,
-      this.body.inviterSignature,
-    );
+    const messageFactories = {
+      community_invitation: (): NotificationCreateMessage =>
+        NotificationCreateMessage.communityInvitation(
+          this.body.communityId || '',
+          this.body.inviterIdentityId,
+          this.body.recipientIdentityId,
+          this.body.encryptedCommunityKey || '',
+          this.body.inviterSignature,
+        ),
+      conversation_invitation: (): NotificationCreateMessage =>
+        NotificationCreateMessage.conversationInvitation(
+          this.body.conversationId || '',
+          this.body.inviterIdentityId,
+          this.body.recipientIdentityId,
+          this.body.encryptedConversationKey || '',
+          this.body.inviterSignature,
+        ),
+      group_conversation_invitation: (): NotificationCreateMessage =>
+        NotificationCreateMessage.groupConversationInvitation(
+          this.body.conversationId || '',
+          this.body.inviterIdentityId,
+          this.body.recipientIdentityId,
+          this.body.encryptedConversationKey || '',
+          this.body.inviterSignature,
+        ),
+    };
+
+    return messageFactories[this.body.type]();
   }
 }
