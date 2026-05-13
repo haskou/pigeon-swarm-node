@@ -194,11 +194,13 @@ export default class Definitions {
     ];
     const normalizedHandle = handle.replace(/^@/, '').toLowerCase();
     const profile: {
+      banner: string | undefined;
       biography: string | undefined;
       handle: string;
       name: string;
       picture: string | undefined;
     } = {
+      banner: undefined,
       biography: undefined,
       handle: normalizedHandle,
       name,

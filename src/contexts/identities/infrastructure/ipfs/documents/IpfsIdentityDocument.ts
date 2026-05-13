@@ -7,9 +7,10 @@ export interface IpfsIdentityDocument {
   networks: string[];
   previousCid: string | undefined;
   profile: {
-    name: string;
+    banner: string | undefined;
     biography: string | undefined;
     handle: string | undefined;
+    name: string;
     picture: string | undefined;
   };
   timestamp: number;

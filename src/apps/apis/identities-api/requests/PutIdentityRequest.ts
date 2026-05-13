@@ -13,6 +13,7 @@ export class PutIdentityRequest {
       previousIdentityExternalIdentifier:
         this.body.previousIdentityExternalIdentifier,
       profile: {
+        banner: this.body.profile.banner,
         biography: this.body.profile.biography,
         handle: this.body.profile.handle,
         name: this.body.profile.name,

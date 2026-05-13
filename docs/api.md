@@ -354,14 +354,14 @@ POST /ipfs/public
 
 Requires signed request headers. The authenticated identity does not need to be
 published yet, so clients can generate a keypair locally, sign this request, get
-a CID, and then publish the identity with `profile.picture` or a message with
+a CID, and then publish the identity with `profile.picture`, `profile.banner` or a message with
 `attachmentExternalIdentifiers`.
 
 Request body is the raw binary content. Send metadata as headers:
 
 ```http
 Content-Type: image/png
-X-Filename: avatar.png
+X-Filename: profile-image.png
 ```
 
 Response:
@@ -370,7 +370,7 @@ Response:
 {
   "cid": "<publicContentCid>",
   "contentType": "image/png",
-  "filename": "avatar.png",
+  "filename": "profile-image.png",
   "size": 215040
 }
 ```
@@ -474,7 +474,8 @@ Response:
   "profile": {
     "name": "Alice",
     "handle": "alice",
-    "picture": "<publicImageCid>"
+    "picture": "<publicImageCid>",
+    "banner": "<publicBannerCid>"
   },
   "previousIdentityExternalIdentifier": null,
   "timestamp": 1773848829055,
@@ -537,8 +538,8 @@ Implemented:
   and one symbol
 - return `identityExternalIdentifier`, which is the current published identity
   CID to send as `previousIdentityExternalIdentifier` in the next update
-- store `profile.picture` as a public IPFS image CID, not as base64 or a data
-  URL
+- store `profile.picture` and `profile.banner` as public IPFS image CIDs, not as
+  base64 or data URLs
 
 Client-signed identity signatures must cover the canonical identity payload:
 
@@ -549,10 +550,11 @@ Client-signed identity signatures must cover the canonical identity payload:
   "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": null,
   "profile": {
+    "picture": "<publicImageCid>",
+    "banner": "<publicBannerCid>",
     "biography": null,
     "handle": "alice",
-    "name": "Alice",
-    "picture": "<publicImageCid>"
+    "name": "Alice"
   },
   "timestamp": 1773848829055,
   "version": 1
@@ -582,7 +584,8 @@ Request:
   "profile": {
     "name": "Alice Updated",
     "handle": "alice_new",
-    "picture": "<newPublicContentCid>"
+    "picture": "<newPublicImageCid>",
+    "banner": "<newPublicBannerCid>"
   },
   "timestamp": 1773848829056,
   "signature": "<identitySignature>",
@@ -593,7 +596,7 @@ Request:
 Implemented:
 
 - require signed request auth from the identity owner
-- accept profile changes, profile image removal and handle changes as signed
+- accept profile changes, profile image/banner removal and handle changes as signed
   identity updates
 - accept encrypted keypair changes, including client-side password changes
 - allow adding networks, but reject signed identity updates that remove any
@@ -602,8 +605,8 @@ Implemented:
   publishing
 - return the new `identityExternalIdentifier` for the just-published identity
   version
-- store `profile.picture` as a public IPFS image CID; omit it or send `null`
-  in the signed profile to remove the profile image
+- store `profile.picture` and `profile.banner` as public IPFS image CIDs; omit
+  them or send `null` in the signed profile to remove the media
 
 ## Keychain HTTP API
 

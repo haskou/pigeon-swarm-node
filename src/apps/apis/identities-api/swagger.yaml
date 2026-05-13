@@ -165,8 +165,13 @@ components:
             picture:
               type: string
               nullable: true
-              description: Public IPFS content CID returned by POST /ipfs/public.
+              description: Public IPFS content CID for the profile image/avatar returned by POST /ipfs/public.
               example: bafybeigdyrztomockimagecid
+            banner:
+              type: string
+              nullable: true
+              description: Public IPFS content CID for the profile banner returned by POST /ipfs/public.
+              example: bafybeigdyrztomockbannercid
         timestamp:
           type: number
         signature:
@@ -232,8 +237,13 @@ components:
             picture:
               type: string
               nullable: true
-              description: Public IPFS content CID returned by POST /ipfs/public.
+              description: Public IPFS content CID for the profile image/avatar returned by POST /ipfs/public.
               example: bafybeigdyrztomockimagecid
+            banner:
+              type: string
+              nullable: true
+              description: Public IPFS content CID for the profile banner returned by POST /ipfs/public.
+              example: bafybeigdyrztomockbannercid
         timestamp:
           type: number
         signature:

@@ -1,6 +1,7 @@
 import { IdentityCannotLeaveNetworkError } from '@app/contexts/identities/domain/errors/IdentityCannotLeaveNetworkError';
 import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
+import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
@@ -200,15 +201,28 @@ describe('Identity', () => {
   });
 
   describe('profile image', () => {
-    it('should reject embedded data URLs', () => {
+    it('should reject embedded data URL profile images', () => {
       expect(() =>
         Profile.fromPrimitives({
+          banner: undefined,
           biography: undefined,
           handle: undefined,
           name: 'Jane',
           picture: 'data:image/png;base64,aGVsbG8=',
         }),
       ).toThrow(InvalidProfileImageError);
+    });
+
+    it('should reject embedded data URL banners', () => {
+      expect(() =>
+        Profile.fromPrimitives({
+          banner: 'data:image/png;base64,aGVsbG8=',
+          biography: undefined,
+          handle: undefined,
+          name: 'Jane',
+          picture: undefined,
+        }),
+      ).toThrow(InvalidProfileBannerError);
     });
   });
 

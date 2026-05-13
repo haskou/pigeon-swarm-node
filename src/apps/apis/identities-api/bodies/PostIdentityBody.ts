@@ -40,6 +40,7 @@ export class PostIdentityBody {
   @IsOptional()
   @IsObject()
   public readonly profile?: {
+    banner?: string;
     biography?: string;
     handle?: string;
     name: string;

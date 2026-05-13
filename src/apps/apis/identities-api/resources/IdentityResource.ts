@@ -6,9 +6,10 @@ export interface IdentityResource {
   };
   networks: string[];
   profile: {
-    name: string;
+    banner: string | undefined;
     biography: string | undefined;
     handle: string | undefined;
+    name: string;
     picture: string | undefined;
   };
   timestamp: number;
