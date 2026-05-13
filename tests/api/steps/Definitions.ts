@@ -943,6 +943,26 @@ export default class Definitions {
     );
   }
 
+  @given('another identity signs the current node networks request')
+  public async anotherIdentitySignsTheCurrentNodeNetworksRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/node/networks/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current node networks request')
+  public async iSignTheCurrentNodeNetworksRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/node/networks/');
+  }
+
   @given('I sign the current node network request')
   public async iSignTheCurrentNodeNetworkRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/node/networks/');
@@ -975,6 +995,23 @@ export default class Definitions {
       inviterSignature: inviterKeyPair.sign('community-invitation').valueOf(),
       recipientIdentityId: this.otherIdentityId?.valueOf(),
       type: 'community_invitation',
+    });
+  }
+
+  @given('I set a group conversation invitation notification body')
+  public async iSetAGroupConversationInvitationNotificationBody(): Promise<void> {
+    const inviterKeyPair = await this.ensureIdentityKeyPair();
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      conversationId: 'group:notification-api-conversation',
+      encryptedConversationKey: 'encrypted-group-conversation-key',
+      inviterIdentityId: this.ownerIdentityId?.valueOf(),
+      inviterSignature: inviterKeyPair
+        .sign('group-conversation-invitation')
+        .valueOf(),
+      recipientIdentityId: this.otherIdentityId?.valueOf(),
+      type: 'group_conversation_invitation',
     });
   }
 

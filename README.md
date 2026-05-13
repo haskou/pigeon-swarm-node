@@ -1,91 +1,159 @@
 <p align="center">
-  <img src="./docs/logo.png">
+  <img src="./docs/logo.png" alt="pigeon-swarm logo">
 </p>
-A weird little experiment in building a **fully decentralized chat**.
 
-No central servers.
-No platform controlling the network.
-No giant company holding your messages hostage.
+# pigeon-swarm-node
 
-Just nodes talking to each other.
+`pigeon-swarm-node` is the backend node for a Discord-ish, peer-to-peer
+communication platform designed to be hard to censor, hard to capture, and easy
+to self-host.
 
----
+There is no central server that owns the graph, no platform account that can be
+switched off from the outside, and no single database holding every message
+hostage. Each node exposes a local HTTP/WebSocket API, stores local state,
+publishes content to IPFS networks, and exchanges domain events with other
+nodes through libp2p GossipSub.
 
-## What is this?
+Think of it as a self-hosted chat and community node with a little BitTorrent
+energy, a little Discord shape, and a stubborn preference for user-owned keys.
 
-**pigeon-swarm** is a peer-to-peer messaging system where every node can run the whole thing:
+## Why pigeons?
 
-* login
-* chats
-* groups
-* media
-* syncing with other nodes
+Carrier pigeons are low-tech, decentralized message delivery with excellent
+branding. They do not need a corporate inbox, a central timeline, or a blessed
+server to know where they are going. The name is partly a joke, partly a design
+reminder: messages should move through the swarm without asking permission from
+one big place.
 
-Each node is standalone. Run one and you’re part of the network.
+The goal is not anonymity magic or a promise that nothing can ever be blocked.
+The goal is a practical architecture where communities can run their own nodes,
+share networks deliberately, keep private material client-side, and continue
+communicating even when individual nodes disappear.
 
-Messages and media are distributed across peers and replicated automatically so the system keeps working even when nodes disappear.
+## Capabilities
 
-Think of it like:
+- Local identity publishing and profile updates, including handles, avatar and
+  banner CIDs.
+- Client-owned encrypted keychains for conversations and communities.
+- One-to-one and group conversations with encrypted messages, replies,
+  attachments and deletion tombstones.
+- Private communities with owners, members, text channels and encrypted channel
+  messages.
+- Actionable notifications for conversation, group conversation and community
+  invitations.
+- Public and private IPFS uploads for profile media and encrypted attachments.
+- Node ownership, network management, peer heartbeats and startup
+  synchronization.
+- WebSocket delivery for routed domain events.
+- Realtime call signalling for one-to-one, group and community channel calls.
 
-* self-hosted Discord
-* mixed with BitTorrent
-* sprinkled with IPFS
-* held together by cryptography and stubborn optimism.
+## Architecture
 
----
+The backend is organized around bounded contexts:
 
-## Why?
+- `identities`: public identity documents, profiles and network membership.
+- `keychains`: encrypted client keychain publications.
+- `conversations`: one-to-one and group chat state.
+- `communities`: private communities, members, channels and channel messages.
+- `notifications`: invitation notifications and recipient actions.
+- `calls`: call lifecycle and WebRTC signalling events.
+- `nodes`: local node metadata, ownership, networks, peers and sync.
+- `shared`: IPFS, MongoDB, message bus, HTTP, WebSocket and common value
+  objects.
 
-Because the internet used to be weird and decentralized.
+The backend does not receive private keys or decrypted conversation/community
+keys. Clients generate identity material, encrypt local secrets, sign domain
+payloads and publish encrypted keychain updates.
 
-Now everything is five apps owned by three companies.
+## API Surface
 
-This project is an attempt by four nerds to see if we can push things back in the other direction.
+Primary API documentation:
 
-No promises. Just curiosity.
+- [HTTP API](./docs/api.md)
+- [WebSocket realtime contract](./docs/frontend-websocket-realtime.md)
+- [PubSub sync protocol](./docs/pubsub-sync-protocol.md)
+- [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
 
----
+When the server is running, Swagger UI is available at:
 
-## Goals
+```http
+GET /swagger
+```
 
-* fully decentralized network
-* end-to-end encrypted messaging
-* groups and media sharing
-* resilient to node failures
-* no central authority
-* nodes discover and sync with each other
+## Development
 
----
+Install dependencies:
 
-## Status
+```bash
+yarn
+```
 
-Early experiment.
+Create a local `.env` from the documented configuration and choose how nodes
+exchange events:
 
-Things will break.
-APIs will change.
-The name will probably change too.
+- `TRANSPORT_DSN=in-memory` for local tests and single-node development.
+- `TRANSPORT_DSN=libp2p-gossipsub` for node-to-node gossip event exchange.
 
----
+See [docs/INSTALLATION.md](./docs/INSTALLATION.md) for the full environment
+setup.
 
-## Installation
+Common commands:
 
-Setup instructions and environment variables are documented in:
+```bash
+yarn lint
+yarn build
+yarn test
+yarn test:unit
+yarn test:api
+yarn test:consumer
+```
 
-- `docs/INSTALLATION.md`
+Docker helpers are available through the `Makefile`:
 
----
+```bash
+make build
+make start
+make stop
+make test
+make log
+```
 
-## Who is behind this?
+## Runtime Dependencies
 
-A nerd who thought this sounded like a fun idea.
+The node expects:
 
-That’s it.
+- MongoDB for local persistent state.
+- IPFS network configuration for content publication and retrieval.
+- Libp2p GossipSub transport for node-to-node event propagation.
+- Signed HTTP/WebSocket requests from clients.
 
----
+For local development, the repository includes Docker Compose configuration and
+test-friendly in-memory network helpers.
 
-## Name
+## Security Model
 
-**pigeon-swarm** is a temporary name.
+Clients are responsible for:
 
-Carrier pigeons seemed appropriate.
-They don’t need servers either.
+- generating identity keypairs;
+- keeping passwords and private keys local;
+- encrypting keychains before publication;
+- encrypting private attachments before IPFS upload;
+- signing HTTP requests and domain payloads.
+
+The backend is responsible for:
+
+- verifying signed HTTP/WebSocket requests;
+- validating domain invariants;
+- storing opaque encrypted payloads;
+- routing events only to related identities;
+- syncing public domain metadata across configured networks.
+
+## Project Status
+
+This is active development software. APIs are becoming more stable, but schema
+and domain contracts may still change as conversations, communities, calls and
+sync behavior mature.
+
+For current implementation priorities, see:
+
+- [Action plan](./docs/action-plan.md)

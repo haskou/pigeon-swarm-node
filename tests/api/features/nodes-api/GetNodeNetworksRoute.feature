@@ -38,7 +38,7 @@ Feature: Get node networks
     When I POST to "/node/networks/"
     Then response code is equal to 200
 
-    Given another identity signs the current node network request
+    Given another identity signs the current node networks request
     When I GET "/node/networks/"
     Then response code is equal to 200
     And response body should not contain "key"
@@ -54,6 +54,7 @@ Feature: Get node networks
     When I POST to "/node/networks/"
     Then response code is equal to 200
 
+    Given I sign the current node networks request
     When I GET "/node/networks/"
     Then response code is equal to 200
     And response body should contain "key"

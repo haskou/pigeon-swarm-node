@@ -1,45 +1,86 @@
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { EncryptedCommunityKey } from '@app/contexts/notifications/domain/value-objects/EncryptedCommunityKey';
-import { EncryptedConversationKey } from '@app/contexts/notifications/domain/value-objects/EncryptedConversationKey';
+import { CommunityInvitationPayload } from '@app/contexts/notifications/domain/CommunityInvitationPayload';
+import { ConversationInvitationPayload } from '@app/contexts/notifications/domain/ConversationInvitationPayload';
+import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/value-objects';
 
 export class NotificationCreateMessage {
-  public readonly conversationId: ConversationId | undefined;
-  public readonly communityId: CommunityId | undefined;
-  public readonly encryptedCommunityKey: EncryptedCommunityKey | undefined;
-  public readonly encryptedConversationKey:
-    | EncryptedConversationKey
-    | undefined;
+  public static communityInvitation(
+    communityId: string,
+    inviterIdentityId: string,
+    recipientIdentityId: string,
+    encryptedCommunityKey: string,
+    inviterSignature: string,
+  ): NotificationCreateMessage {
+    return new NotificationCreateMessage(
+      NotificationType.COMMUNITY_INVITATION,
+      new IdentityId(inviterIdentityId),
+      undefined,
+      CommunityInvitationPayload.fromPrimitives({
+        communityId,
+        encryptedCommunityKey,
+        inviterIdentityId,
+        inviterSignature,
+        recipientIdentityId,
+      }),
+    );
+  }
 
-  public readonly inviterSignature: Signature;
-
-  public readonly inviterIdentityId: IdentityId;
-
-  public readonly recipientIdentityId: IdentityId;
-
-  constructor(
+  public static conversationInvitation(
     conversationId: string,
-    communityId: string | undefined,
     inviterIdentityId: string,
     recipientIdentityId: string,
     encryptedConversationKey: string,
-    encryptedCommunityKey: string | undefined,
     inviterSignature: string,
-  ) {
-    this.conversationId = conversationId
-      ? new ConversationId(conversationId)
-      : undefined;
-    this.communityId = communityId ? new CommunityId(communityId) : undefined;
-    this.encryptedCommunityKey = encryptedCommunityKey
-      ? new EncryptedCommunityKey(encryptedCommunityKey)
-      : undefined;
-    this.encryptedConversationKey = encryptedConversationKey
-      ? new EncryptedConversationKey(encryptedConversationKey)
-      : undefined;
-    this.inviterIdentityId = new IdentityId(inviterIdentityId);
-    this.inviterSignature = new Signature(inviterSignature);
-    this.recipientIdentityId = new IdentityId(recipientIdentityId);
+  ): NotificationCreateMessage {
+    return new NotificationCreateMessage(
+      NotificationType.CONVERSATION_INVITATION,
+      new IdentityId(inviterIdentityId),
+      ConversationInvitationPayload.fromPrimitives({
+        conversationId,
+        encryptedConversationKey,
+        inviterIdentityId,
+        inviterSignature,
+        recipientIdentityId,
+      }),
+      undefined,
+    );
+  }
+
+  public static groupConversationInvitation(
+    conversationId: string,
+    inviterIdentityId: string,
+    recipientIdentityId: string,
+    encryptedConversationKey: string,
+    inviterSignature: string,
+  ): NotificationCreateMessage {
+    return new NotificationCreateMessage(
+      NotificationType.GROUP_CONVERSATION_INVITATION,
+      new IdentityId(inviterIdentityId),
+      ConversationInvitationPayload.fromPrimitives({
+        conversationId,
+        encryptedConversationKey,
+        inviterIdentityId,
+        inviterSignature,
+        recipientIdentityId,
+      }),
+      undefined,
+    );
+  }
+
+  constructor(
+    public readonly type: NotificationType,
+    public readonly inviterIdentityId: IdentityId,
+    public readonly conversationPayload:
+      | ConversationInvitationPayload
+      | undefined,
+    public readonly communityPayload: CommunityInvitationPayload | undefined,
+  ) {}
+
+  public isCommunityInvitation(): boolean {
+    return this.type.isEqual(NotificationType.COMMUNITY_INVITATION);
+  }
+
+  public isGroupConversationInvitation(): boolean {
+    return this.type.isEqual(NotificationType.GROUP_CONVERSATION_INVITATION);
   }
 }

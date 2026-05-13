@@ -34,7 +34,7 @@ paths:
     post:
       tags:
         - notifications
-      summary: Create a conversation or community invitation notification
+      summary: Create a conversation, group conversation or community invitation notification
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -168,6 +168,7 @@ components:
           enum:
             - community_invitation
             - conversation_invitation
+            - group_conversation_invitation
         recipientIdentityId:
           type: string
         status:
@@ -208,6 +209,16 @@ components:
                   type: string
                   enum:
                     - conversation_invitation
+        - allOf:
+            - $ref: '#/components/schemas/ConversationInvitationPayload'
+            - type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - group_conversation_invitation
         - allOf:
             - $ref: '#/components/schemas/CommunityInvitationPayload'
             - type: object
