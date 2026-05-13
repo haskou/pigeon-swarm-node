@@ -36,6 +36,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/CallResource'
   /calls/{callId}:
+    get:
+      tags:
+        - calls
+      summary: Get one active or ended call by id
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call found for the authenticated participant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+        '409':
+          description: Call not found or not visible to the authenticated identity.
     delete:
       tags:
         - calls

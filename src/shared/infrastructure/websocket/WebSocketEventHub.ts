@@ -76,6 +76,15 @@ export class WebSocketEventHub {
   private getEventRecipients(event: DomainEvent): Set<string> {
     const recipients = new Set<string>();
 
+    if (this.isCallSignalEvent(event)) {
+      this.collectIdentityValues(
+        event.attributes.recipientIdentityId,
+        recipients,
+      );
+
+      return recipients;
+    }
+
     for (const key of identityAttributeKeys) {
       this.collectIdentityValues(event.attributes[key], recipients);
     }
@@ -101,6 +110,10 @@ export class WebSocketEventHub {
 
   private isKeychainEvent(event: DomainEvent): boolean {
     return event.eventName().startsWith('keychains.');
+  }
+
+  private isCallSignalEvent(event: DomainEvent): boolean {
+    return event.eventName() === 'calls.v1.signal.sent';
   }
 
   private isNodeWideEvent(event: DomainEvent): boolean {

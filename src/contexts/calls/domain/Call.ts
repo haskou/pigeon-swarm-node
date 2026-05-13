@@ -96,14 +96,7 @@ export class Call extends AggregateRoot {
 
   public join(identityId: IdentityId): void {
     this.assertActive();
-
-    if (
-      this.participantIds.some((participant) => participant.isEqual(identityId))
-    ) {
-      return;
-    }
-
-    this.participantIds.push(identityId);
+    assert(this.hasParticipant(identityId), new CallParticipantNotFoundError());
     this.record(
       new CallParticipantJoinedEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
@@ -184,6 +177,12 @@ export class Call extends AggregateRoot {
 
   public getId(): CallId {
     return this.id;
+  }
+
+  public hasParticipant(identityId: IdentityId): boolean {
+    return this.participantIds.some((participant) =>
+      participant.isEqual(identityId),
+    );
   }
 
   public toPrimitives() {

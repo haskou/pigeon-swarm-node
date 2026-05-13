@@ -35,11 +35,10 @@ describe('Call', () => {
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallStartedEvent);
   });
 
-  it('should join a call once', () => {
-    const call = Call.start(creator, networkId, scope, []);
+  it('should emit a joined event for an invited participant', () => {
+    const call = Call.start(creator, networkId, scope, [recipient]);
 
     call.pullDomainEvents();
-    call.join(recipient);
     call.join(recipient);
 
     expect(call.toPrimitives().participantIds).toEqual([

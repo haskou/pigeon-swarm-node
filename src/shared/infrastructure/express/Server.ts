@@ -1,6 +1,7 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
 import { DeleteCallParticipantRoute } from '@app/apps/apis/calls-api/routes/DeleteCallParticipantRoute';
 import { DeleteCallRoute } from '@app/apps/apis/calls-api/routes/DeleteCallRoute';
+import { GetCallRoute } from '@app/apps/apis/calls-api/routes/GetCallRoute';
 import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
@@ -152,6 +153,7 @@ export default class Server {
           HealthRoute,
           ConsumeDlxRoute,
           GetCallsRoute,
+          GetCallRoute,
           PostCallRoute,
           PostCallParticipantRoute,
           DeleteCallParticipantRoute,

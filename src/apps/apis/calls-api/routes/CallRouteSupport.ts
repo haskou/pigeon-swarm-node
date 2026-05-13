@@ -59,6 +59,19 @@ export abstract class CallRouteSupport extends Route {
     return call;
   }
 
+  protected async findAccessibleCall(
+    callId: string,
+    requesterIdentityId: IdentityId,
+  ): Promise<Call> {
+    const call = await this.findCall(callId);
+
+    if (!call.hasParticipant(requesterIdentityId)) {
+      throw new CallNotFoundError();
+    }
+
+    return call;
+  }
+
   private async validateConversationScope(
     requesterIdentityId: IdentityId,
     body: PostCallBody,

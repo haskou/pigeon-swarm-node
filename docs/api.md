@@ -178,7 +178,7 @@ Event contracts used by frontend:
 | `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
 | `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
 | `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
-| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`; delivered only to `recipientIdentityId` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
 | `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
 | `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
@@ -207,6 +207,16 @@ GET /calls
 ```
 
 Returns active calls where the authenticated identity is a participant.
+
+### Get call
+
+```http
+GET /calls/{callId}
+```
+
+Returns one call when the authenticated identity is a participant. Frontend can
+use this after receiving any `calls.v1.*` WebSocket event where
+`event.aggregate_id` is the call id.
 
 ### Start call
 
@@ -290,8 +300,7 @@ Implemented:
 
 - sender and recipient must both be current call participants
 - backend does not inspect SDP/ICE payloads
-- emits `calls.v1.signal.sent`; frontend should only process signals where
-  `recipientIdentityId` matches the current identity
+- emits `calls.v1.signal.sent` only to the signal `recipientIdentityId`
 
 ## Node HTTP API
 
