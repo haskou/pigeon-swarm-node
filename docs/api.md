@@ -382,7 +382,7 @@ Implemented:
 - store content as a JSON IPFS document with `contentType`, base64 `data`,
   optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
 - preserve the original filename through `X-Filename`
-- limit content size to 10 MiB
+- limit content size to 50 MiB
 - return the CID to store in signed identity profiles or posts
 
 ### Publish private content
@@ -390,6 +390,9 @@ Implemented:
 ```http
 POST /ipfs/private
 ```
+
+`POST /ipfs/secure` is accepted as a backwards-compatible alias for
+`POST /ipfs/private`. New clients should use `/ipfs/private`.
 
 Requires signed request headers. The backend never encrypts, decrypts or
 inspects the original private file. Clients must encrypt the file bytes locally
@@ -424,7 +427,7 @@ Implemented:
   `uploadedAt` and `uploadedByIdentityId`
 - preserve `X-Filename` when provided; do not send a sensitive clear-text
   filename here if it should remain private
-- limit encrypted content size to 10 MiB
+- limit encrypted content size to 50 MiB
 - return the CID to place in `attachmentExternalIdentifiers` for encrypted
   conversation messages
 

@@ -27,6 +27,12 @@ type FormattedValidationError = {
   details: string[];
 };
 
+type PayloadTooLargeError = Error & {
+  status?: number;
+  statusCode?: number;
+  type?: string;
+};
+
 @Middleware({ type: 'after' })
 export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
   private readonly OUTPUT_ERROR_LOG_ENVS = ['local', 'test'];
@@ -51,6 +57,14 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
     return formattedErrors;
   }
 
+  private isPayloadTooLargeError(error: PayloadTooLargeError): boolean {
+    return (
+      error.type === 'entity.too.large' ||
+      error.status === HttpRouteStatusEnum.PAYLOAD_TOO_LARGE ||
+      error.statusCode === HttpRouteStatusEnum.PAYLOAD_TOO_LARGE
+    );
+  }
+
   // eslint-disable-next-line complexity
   public error(
     error: Error,
@@ -62,6 +76,16 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
       response.status(HttpRouteStatusEnum.BAD_REQUEST).json({
         code: 'SyntaxError',
         message: 'Malformed JSON',
+      });
+
+      return;
+    }
+
+    if (this.isPayloadTooLargeError(error)) {
+      response.status(HttpRouteStatusEnum.PAYLOAD_TOO_LARGE).json({
+        code: 'PayloadTooLargeError',
+        httpStatus: HttpRouteStatusEnum.PAYLOAD_TOO_LARGE,
+        message: 'Request entity too large.',
       });
 
       return;

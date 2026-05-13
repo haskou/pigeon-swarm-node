@@ -43,7 +43,46 @@ paths:
                 $ref: '#/components/schemas/PrivateIPFSContentResource'
         '401':
           description: Invalid signed request.
-        '422':
+        '413':
+          description: Private content is too large.
+  /ipfs/secure:
+    post:
+      tags:
+        - ipfs
+      summary: Publish encrypted private content to IPFS
+      description: Deprecated alias for POST /ipfs/private. Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document, and returns the CID to reference from encrypted message payloads and attachmentExternalIdentifiers.
+      security:
+        - signedRequest: []
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+          example: application/octet-stream
+        - name: X-Filename
+          in: header
+          required: false
+          schema:
+            type: string
+          example: encrypted-photo.bin
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Private encrypted content stored in IPFS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateIPFSContentResource'
+        '401':
+          description: Invalid signed request.
+        '413':
           description: Private content is too large.
   /ipfs/public:
     post:
@@ -82,7 +121,7 @@ paths:
                 $ref: '#/components/schemas/PublicIPFSContentResource'
         '401':
           description: Invalid signed request.
-        '422':
+        '413':
           description: Public content is too large.
   /ipfs/{cid}:
     get:

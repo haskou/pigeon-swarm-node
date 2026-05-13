@@ -4,7 +4,7 @@ import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRo
 export class IPFSContentTooLargeError extends CustomHttpError {
   constructor(maxSizeBytes: number) {
     super(
-      HttpRouteStatusEnum.UNPROCESSABLE_ENTITY,
+      HttpRouteStatusEnum.PAYLOAD_TOO_LARGE,
       422030,
       `IPFS content is too large. Maximum size is ${maxSizeBytes} bytes.`,
     );
