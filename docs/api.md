@@ -974,7 +974,7 @@ Response:
       "ownerIdentityId": "<identityId>",
       "name": "Pigeon Lab",
       "description": "Private workspace",
-      "picture": "<publicImageCid>",
+      "avatar": "<publicAvatarCid>",
       "banner": "<publicBannerCid>",
       "memberIds": ["<identityId>"],
       "textChannels": [],
@@ -1048,7 +1048,7 @@ Request:
 Implemented:
 
 - require signed request auth from the community owner
-- update name, description and optional profile image/banner CIDs
+- update name, description and optional avatar/banner CIDs
 - omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
 
