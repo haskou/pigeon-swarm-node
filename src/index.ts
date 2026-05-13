@@ -110,7 +110,8 @@ async function init() {
   console.timeEnd('Run consumers');
 
   console.time('Run Schedulers');
-  kernel.addSchedulers(NodeHeartbeatScheduler, CallTimeoutScheduler);
+  kernel.addSchedulers(NodeHeartbeatScheduler);
+  kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
   await kernel.runSchedulers();
   console.timeEnd('Run Schedulers');
 
