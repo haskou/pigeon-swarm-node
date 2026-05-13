@@ -4,6 +4,7 @@ info:
   version: 1.0.0
   description: Aggregated OpenAPI document built with references to each API file. The WebSocket realtime upgrade endpoint is documented in docs/api.md.
 tags:
+  - name: calls
   - name: communities
   - name: conversations
   - name: identities
@@ -12,6 +13,16 @@ tags:
   - name: nodes
   - name: notifications
 paths:
+  /calls/:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1'
+  /calls/{callId}:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}'
+  /calls/{callId}/participants:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants'
+  /calls/{callId}/participants/me:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me'
+  /calls/{callId}/signals:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1signals'
   /communities/:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1'
   /communities/{communityId}:

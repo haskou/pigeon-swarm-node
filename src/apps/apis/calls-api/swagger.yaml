@@ -1,0 +1,215 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Calls API
+  version: 1.0.0
+  description: Signalling endpoints for one-to-one, group and community channel calls.
+tags:
+  - name: calls
+paths:
+  /calls/:
+    get:
+      tags:
+        - calls
+      summary: List active calls for the authenticated identity
+      responses:
+        '200':
+          description: Active calls.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsResource'
+    post:
+      tags:
+        - calls
+      summary: Start a call
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCallBody'
+      responses:
+        '200':
+          description: Call started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}:
+    delete:
+      tags:
+        - calls
+      summary: End a call
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call ended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}/participants:
+    post:
+      tags:
+        - calls
+      summary: Join an active call
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call joined.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}/participants/me:
+    delete:
+      tags:
+        - calls
+      summary: Leave an active call
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call left.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}/signals:
+    post:
+      tags:
+        - calls
+      summary: Send WebRTC signalling data to another call participant
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCallSignalBody'
+      responses:
+        '200':
+          description: Signal accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+components:
+  parameters:
+    CallId:
+      in: path
+      name: callId
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    PostCallBody:
+      type: object
+      required:
+        - scopeType
+      properties:
+        scopeType:
+          type: string
+          enum:
+            - conversation
+            - community_channel
+        conversationId:
+          type: string
+          description: Required when scopeType is conversation. Supports one-to-one and group conversations.
+        communityId:
+          type: string
+          format: uuid
+          description: Required when scopeType is community_channel.
+        channelId:
+          type: string
+          format: uuid
+          description: Required when scopeType is community_channel.
+        invitedParticipantIds:
+          type: array
+          description: Optional extra recipients for the start event.
+          items:
+            type: string
+    PostCallSignalBody:
+      type: object
+      required:
+        - recipientIdentityId
+        - signalType
+        - payload
+      properties:
+        recipientIdentityId:
+          type: string
+        signalType:
+          type: string
+          enum:
+            - offer
+            - answer
+            - ice_candidate
+        payload:
+          type: object
+          additionalProperties: true
+    CallResource:
+      type: object
+      required:
+        - id
+        - networkId
+        - creatorIdentityId
+        - participantIds
+        - scope
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        networkId:
+          type: string
+          format: uuid
+        creatorIdentityId:
+          type: string
+        participantIds:
+          type: array
+          items:
+            type: string
+        scope:
+          $ref: '#/components/schemas/CallScope'
+        status:
+          type: string
+          enum:
+            - active
+            - ended
+        createdAt:
+          type: number
+        endedAt:
+          type: number
+          nullable: true
+    CallsResource:
+      type: object
+      required:
+        - calls
+      properties:
+        calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallResource'
+    CallScope:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - conversation
+            - community_channel
+        conversationId:
+          type: string
+        communityId:
+          type: string
+          format: uuid
+        channelId:
+          type: string
+          format: uuid

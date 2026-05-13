@@ -156,6 +156,9 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
+- deliver call events only to call participants when the event carries
+  `participantIds`; call signals also carry `senderIdentityId` and
+  `recipientIdentityId`
 - deliver node-wide events, such as heartbeat/peer updates, to all
   authenticated WebSocket clients on the local node
 - drop non-node events that do not carry enough identity information to route
@@ -171,6 +174,11 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
+| `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
+| `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
+| `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
+| `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
+| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
 | `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
 | `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
@@ -182,6 +190,108 @@ Event contracts used by frontend:
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
+
+For `calls.v1.*`, `event.aggregate_id` is the `callId`. Calls are signalling
+only: audio/video media must be negotiated by frontend with WebRTC. The backend
+stores active call state and routes lifecycle/signalling events to participants.
+
+## Calls HTTP API
+
+Calls can be scoped to a one-to-one conversation, a group conversation or a
+community text channel. All endpoints require signed request auth.
+
+### List active calls
+
+```http
+GET /calls
+```
+
+Returns active calls where the authenticated identity is a participant.
+
+### Start call
+
+```http
+POST /calls
+```
+
+Conversation call request:
+
+```json
+{
+  "scopeType": "conversation",
+  "conversationId": "<conversationId>"
+}
+```
+
+Community channel call request:
+
+```json
+{
+  "scopeType": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>"
+}
+```
+
+Implemented:
+
+- one-to-one calls use the existing one-to-one conversation id
+- group calls use the existing group conversation id
+- community channel calls use the community id and text channel id
+- caller must be a conversation participant or community member
+- start emits `calls.v1.call.started` to `participantIds`
+
+### Join and leave call
+
+```http
+POST /calls/{callId}/participants
+DELETE /calls/{callId}/participants/me
+```
+
+Implemented:
+
+- joining adds the authenticated identity as a participant
+- leaving removes the authenticated identity from the active call
+- events emitted: `calls.v1.participant.joined` and
+  `calls.v1.participant.left`
+
+### End call
+
+```http
+DELETE /calls/{callId}
+```
+
+Implemented:
+
+- any current call participant may end the call
+- ended calls reject further join/leave/signal operations
+- emits `calls.v1.call.ended`
+
+### Send WebRTC signal
+
+```http
+POST /calls/{callId}/signals
+```
+
+Request:
+
+```json
+{
+  "recipientIdentityId": "<identityId>",
+  "signalType": "offer",
+  "payload": {}
+}
+```
+
+`signalType` may be `offer`, `answer` or `ice_candidate`. The payload is an
+opaque JSON object for frontend WebRTC signalling data.
+
+Implemented:
+
+- sender and recipient must both be current call participants
+- backend does not inspect SDP/ICE payloads
+- emits `calls.v1.signal.sent`; frontend should only process signals where
+  `recipientIdentityId` matches the current identity
 
 ## Node HTTP API
 

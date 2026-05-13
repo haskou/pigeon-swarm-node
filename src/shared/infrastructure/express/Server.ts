@@ -1,4 +1,10 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { DeleteCallParticipantRoute } from '@app/apps/apis/calls-api/routes/DeleteCallParticipantRoute';
+import { DeleteCallRoute } from '@app/apps/apis/calls-api/routes/DeleteCallRoute';
+import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
+import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
+import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
+import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
@@ -145,6 +151,12 @@ export default class Server {
         controllers: [
           HealthRoute,
           ConsumeDlxRoute,
+          GetCallsRoute,
+          PostCallRoute,
+          PostCallParticipantRoute,
+          DeleteCallParticipantRoute,
+          DeleteCallRoute,
+          PostCallSignalRoute,
           GetIdentityRoute,
           PostIdentityRoute,
           PutIdentityRoute,
