@@ -839,16 +839,6 @@ export default class Definitions {
     await this.signCurrentRequest('GET', `/calls/${this.callId}`);
   }
 
-  @given('I sign the current call join request')
-  public async iSignTheCurrentCallJoinRequest(): Promise<void> {
-    if (!this.callId) {
-      throw new Error('Call must be created first.');
-    }
-
-    this.body = undefined;
-    await this.signCurrentRequest('POST', `/calls/${this.callId}/participants`);
-  }
-
   @given('the other identity signs the current call join request')
   public async theOtherIdentitySignsTheCurrentCallJoinRequest(): Promise<void> {
     if (!this.callId) {
@@ -864,19 +854,6 @@ export default class Definitions {
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
-    );
-  }
-
-  @given('I sign the current call leave request')
-  public async iSignTheCurrentCallLeaveRequest(): Promise<void> {
-    if (!this.callId) {
-      throw new Error('Call must be created first.');
-    }
-
-    this.body = undefined;
-    await this.signCurrentRequest(
-      'DELETE',
-      `/calls/${this.callId}/participants/me`,
     );
   }
 
@@ -1070,6 +1047,11 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/ipfs/private');
   }
 
+  @given('I sign the current secure IPFS content request')
+  public async iSignTheCurrentSecureIPFSContentRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/ipfs/secure');
+  }
+
   @given('I sign the current conversations request')
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
@@ -1119,6 +1101,26 @@ export default class Definitions {
     );
   }
 
+  @given('another identity signs the current node networks request')
+  public async anotherIdentitySignsTheCurrentNodeNetworksRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/node/networks/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current node networks request')
+  public async iSignTheCurrentNodeNetworksRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/node/networks/');
+  }
+
   @given('I sign the current node network request')
   public async iSignTheCurrentNodeNetworkRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/node/networks/');
@@ -1151,6 +1153,23 @@ export default class Definitions {
       inviterSignature: inviterKeyPair.sign('community-invitation').valueOf(),
       recipientIdentityId: this.otherIdentityId?.valueOf(),
       type: 'community_invitation',
+    });
+  }
+
+  @given('I set a group conversation invitation notification body')
+  public async iSetAGroupConversationInvitationNotificationBody(): Promise<void> {
+    const inviterKeyPair = await this.ensureIdentityKeyPair();
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      conversationId: 'group:notification-api-conversation',
+      encryptedConversationKey: 'encrypted-group-conversation-key',
+      inviterIdentityId: this.ownerIdentityId?.valueOf(),
+      inviterSignature: inviterKeyPair
+        .sign('group-conversation-invitation')
+        .valueOf(),
+      recipientIdentityId: this.otherIdentityId?.valueOf(),
+      type: 'group_conversation_invitation',
     });
   }
 
@@ -1476,19 +1495,6 @@ export default class Definitions {
 
     this.response = await this.restClient.post(
       `/calls/${this.callId}/participants`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I DELETE the current call participant')
-  public async iDELETETheCurrentCallParticipant(): Promise<void> {
-    if (!this.callId) {
-      throw new Error('Call must be created first.');
-    }
-
-    this.response = await this.restClient.delete(
-      `/calls/${this.callId}/participants/me`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

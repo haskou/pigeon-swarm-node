@@ -34,6 +34,13 @@ export class PostNotificationBody {
   public readonly inviterSignature: string;
 
   @IsString()
-  @IsIn(['community_invitation', 'conversation_invitation'])
-  public readonly type: 'community_invitation' | 'conversation_invitation';
+  @IsIn([
+    'community_invitation',
+    'conversation_invitation',
+    'group_conversation_invitation',
+  ])
+  public readonly type:
+    | 'community_invitation'
+    | 'conversation_invitation'
+    | 'group_conversation_invitation';
 }

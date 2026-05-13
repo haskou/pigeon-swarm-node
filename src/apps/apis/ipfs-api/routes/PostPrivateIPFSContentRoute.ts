@@ -14,6 +14,7 @@ import {
 } from 'routing-controllers';
 
 import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
+import { maxIPFSContentSizeBytes } from '../IPFSContentLimits';
 
 interface PrivateIPFSContentDocument {
   contentType: string;
@@ -27,17 +28,16 @@ interface PrivateIPFSContentDocument {
 
 @JsonController('/ipfs')
 export class PostPrivateIPFSContentRoute extends Route {
-  private static readonly MAX_CONTENT_SIZE_BYTES = 10 * 1024 * 1024;
-
   private readonly ipfs: IPFS = this.get<IPFS>(IPFS);
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   @Post('/private')
+  @Post('/secure')
   @UseBefore(
     express.raw({
-      limit: `${PostPrivateIPFSContentRoute.MAX_CONTENT_SIZE_BYTES}b`,
+      limit: `${maxIPFSContentSizeBytes}b`,
       type: '*/*',
     }),
   )
@@ -51,10 +51,8 @@ export class PostPrivateIPFSContentRoute extends Route {
       await this.signedRequestAuthenticator.authenticate(request);
     const body = Buffer.isBuffer(request.body) ? request.body : Buffer.from([]);
 
-    if (body.length > PostPrivateIPFSContentRoute.MAX_CONTENT_SIZE_BYTES) {
-      throw new IPFSContentTooLargeError(
-        PostPrivateIPFSContentRoute.MAX_CONTENT_SIZE_BYTES,
-      );
+    if (body.length > maxIPFSContentSizeBytes) {
+      throw new IPFSContentTooLargeError(maxIPFSContentSizeBytes);
     }
 
     const document: PrivateIPFSContentDocument = {

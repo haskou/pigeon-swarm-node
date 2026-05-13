@@ -156,9 +156,9 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
-- deliver call events only to call participants when the event carries
-  `participantIds`; call signals also carry `senderIdentityId` and
-  `recipientIdentityId`
+- deliver call lifecycle events only to call participants when the event
+  carries `participantIds`
+- deliver call signals only to `recipientIdentityId`
 - deliver node-wide events, such as heartbeat/peer updates, to all
   authenticated WebSocket clients on the local node
 - drop non-node events that do not carry enough identity information to route
@@ -172,13 +172,13 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
-| `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
-| `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
 | `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
 | `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
 | `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
 | `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
-| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`; delivered only to `recipientIdentityId` |
+| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
+| `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
 | `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
 | `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
@@ -191,14 +191,15 @@ Event contracts used by frontend:
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
 
-For `calls.v1.*`, `event.aggregate_id` is the `callId`. Calls are signalling
-only: audio/video media must be negotiated by frontend with WebRTC. The backend
-stores active call state and routes lifecycle/signalling events to participants.
+For `calls.v1.*`, use `event.aggregate_id` as `callId`. Calls are signalling
+only: audio/video media is negotiated by frontend with WebRTC. The backend
+stores active call state and routes lifecycle/signalling events to the
+authenticated participants.
 
 ## Calls HTTP API
 
 Calls can be scoped to a one-to-one conversation, a group conversation or a
-community text channel. All endpoints require signed request auth.
+community text channel. All endpoints require signed request authentication.
 
 ### List active calls
 
@@ -214,8 +215,8 @@ Returns active calls where the authenticated identity is a participant.
 GET /calls/{callId}
 ```
 
-Returns one call when the authenticated identity is a participant. Frontend can
-use this after receiving any `calls.v1.*` WebSocket event where
+Returns a single call when the authenticated identity is a participant.
+Frontend can use this after any `calls.v1.*` WebSocket event where
 `event.aggregate_id` is the call id.
 
 ### Start call
@@ -228,8 +229,10 @@ Conversation call request:
 
 ```json
 {
-  "scopeType": "conversation",
-  "conversationId": "<conversationId>"
+  "scope": {
+    "type": "conversation",
+    "conversationId": "<conversationId>"
+  }
 }
 ```
 
@@ -237,19 +240,21 @@ Community channel call request:
 
 ```json
 {
-  "scopeType": "community_channel",
-  "communityId": "<communityId>",
-  "channelId": "<channelId>"
+  "scope": {
+    "type": "community-channel",
+    "communityId": "<communityId>",
+    "channelId": "<textChannelId>"
+  }
 }
 ```
 
 Implemented:
 
-- one-to-one calls use the existing one-to-one conversation id
-- group calls use the existing group conversation id
-- community channel calls use the community id and text channel id
+- one-to-one calls use an existing one-to-one conversation id
+- group calls use an existing group conversation id
+- community channel calls use an existing community text channel id
 - caller must be a conversation participant or community member
-- start emits `calls.v1.call.started` to `participantIds`
+- start emits `calls.v1.call.started` to the call participants
 
 ### Join and leave call
 
@@ -260,10 +265,11 @@ DELETE /calls/{callId}/participants/me
 
 Implemented:
 
-- joining adds the authenticated identity as a participant
+- joining requires the authenticated identity to be an allowed participant for
+  the call scope
 - leaving removes the authenticated identity from the active call
-- events emitted: `calls.v1.participant.joined` and
-  `calls.v1.participant.left`
+- joins emit `calls.v1.participant.joined`
+- leaves emit `calls.v1.participant.left`
 
 ### End call
 
@@ -273,9 +279,8 @@ DELETE /calls/{callId}
 
 Implemented:
 
-- any current call participant may end the call
-- ended calls reject further join/leave/signal operations
-- emits `calls.v1.call.ended`
+- only an active call participant can end the call
+- ending the call emits `calls.v1.call.ended` to the current participants
 
 ### Send WebRTC signal
 
@@ -293,14 +298,13 @@ Request:
 }
 ```
 
-`signalType` may be `offer`, `answer` or `ice_candidate`. The payload is an
-opaque JSON object for frontend WebRTC signalling data.
-
 Implemented:
 
+- `signalType` is one of `offer`, `answer` or `ice_candidate`
 - sender and recipient must both be current call participants
 - backend does not inspect SDP/ICE payloads
-- emits `calls.v1.signal.sent` only to the signal `recipientIdentityId`
+- sending a signal emits `calls.v1.signal.sent` only to
+  `recipientIdentityId`
 
 ## Node HTTP API
 
@@ -501,7 +505,7 @@ Implemented:
 - store content as a JSON IPFS document with `contentType`, base64 `data`,
   optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
 - preserve the original filename through `X-Filename`
-- limit content size to 10 MiB
+- limit content size to 50 MiB
 - return the CID to store in signed identity profiles or posts
 
 ### Publish private content
@@ -509,6 +513,9 @@ Implemented:
 ```http
 POST /ipfs/private
 ```
+
+`POST /ipfs/secure` is accepted as a backwards-compatible alias for
+`POST /ipfs/private`. New clients should use `/ipfs/private`.
 
 Requires signed request headers. The backend never encrypts, decrypts or
 inspects the original private file. Clients must encrypt the file bytes locally
@@ -543,7 +550,7 @@ Implemented:
   `uploadedAt` and `uploadedByIdentityId`
 - preserve `X-Filename` when provided; do not send a sensitive clear-text
   filename here if it should remain private
-- limit encrypted content size to 10 MiB
+- limit encrypted content size to 50 MiB
 - return the CID to place in `attachmentExternalIdentifiers` for encrypted
   conversation messages
 
@@ -1093,7 +1100,7 @@ Response:
       "ownerIdentityId": "<identityId>",
       "name": "Pigeon Lab",
       "description": "Private workspace",
-      "picture": "<publicImageCid>",
+      "avatar": "<publicAvatarCid>",
       "banner": "<publicBannerCid>",
       "memberIds": ["<identityId>"],
       "textChannels": [],
@@ -1167,7 +1174,7 @@ Request:
 Implemented:
 
 - require signed request auth from the community owner
-- update name, description and optional profile image/banner CIDs
+- update name, description and optional avatar/banner CIDs
 - omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
 
@@ -1464,6 +1471,19 @@ Request:
 }
 ```
 
+Group conversation invitation request:
+
+```json
+{
+  "type": "group_conversation_invitation",
+  "conversationId": "group:<deterministic-id>",
+  "inviterIdentityId": "<aliceIdentityId>",
+  "recipientIdentityId": "<bobIdentityId>",
+  "encryptedConversationKey": "<encryptedForBob>",
+  "inviterSignature": "<inviterSignature>"
+}
+```
+
 Community invitation request:
 
 ```json
@@ -1483,6 +1503,8 @@ Implemented:
 - persist the notification in MongoDB
 - store encrypted key material as opaque payload only
 - keep private keys and decrypted conversation keys out of the backend
+- group conversation invitations use the same encrypted conversation key payload
+  as 1to1 invitations; the `type` tells the client which UX to show
 
 ### Update a notification
 

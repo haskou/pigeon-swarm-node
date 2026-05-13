@@ -25,13 +25,11 @@ describe('NotificationCreator', () => {
     );
 
     const notification = await creator.create(
-      new NotificationCreateMessage(
+      NotificationCreateMessage.conversationInvitation(
         'one-to-one:notification-test',
-        undefined,
         inviterIdentityId.valueOf(),
         recipientIdentityId.valueOf(),
         'encrypted-conversation-key',
-        undefined,
         'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
       ),
     );
@@ -46,6 +44,35 @@ describe('NotificationCreator', () => {
       state: 'pending',
       status: 'unread',
       type: 'conversation_invitation',
+    });
+  });
+
+  it('should create a group conversation invitation notification', async () => {
+    const inviterIdentityId = new IdentityMother().id;
+    const recipientIdentityId = new IdentityId(
+      'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
+    );
+
+    const notification = await creator.create(
+      NotificationCreateMessage.groupConversationInvitation(
+        'group:notification-test',
+        inviterIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+        'encrypted-group-conversation-key',
+        'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
+      ),
+    );
+
+    expect(repository.save).toHaveBeenCalledWith(notification);
+    expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
+    expect(notification.toPrimitives()).toMatchObject({
+      payload: {
+        encryptedConversationKey: 'encrypted-group-conversation-key',
+      },
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      state: 'pending',
+      status: 'unread',
+      type: 'group_conversation_invitation',
     });
   });
 });
