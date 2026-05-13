@@ -5,6 +5,14 @@ export interface CallResource {
   id: string;
   networkId: string;
   participantIds: string[];
+  participants: Array<{
+    declinedAt?: number;
+    identityId: string;
+    joinedAt?: number;
+    leftAt?: number;
+    missedAt?: number;
+    status: string;
+  }>;
   scope: {
     channelId?: string;
     communityId?: string;

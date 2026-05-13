@@ -21,6 +21,11 @@ export class CallLifecycle {
     this.endedAt = Timestamp.now();
   }
 
+  public miss(): void {
+    this.status = new CallStatus(CallStatusEnum.MISSED);
+    this.endedAt = Timestamp.now();
+  }
+
   public getCreatedAt(): Timestamp {
     return this.createdAt;
   }

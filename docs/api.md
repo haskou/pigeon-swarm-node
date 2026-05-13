@@ -175,7 +175,10 @@ Event contracts used by frontend:
 | `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
 | `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
 | `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
+| `calls.v1.participant.declined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `declinedIdentityId`, `status` |
+| `calls.v1.participant.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status` |
 | `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
+| `calls.v1.call.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` |
 | `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
@@ -209,6 +212,15 @@ GET /calls
 
 Returns active calls where the authenticated identity is a participant.
 
+### List call history
+
+```http
+GET /calls/history
+```
+
+Returns active and finished calls where the authenticated identity is a
+participant. Use this for call history UI.
+
 ### Get call
 
 ```http
@@ -229,10 +241,8 @@ Conversation call request:
 
 ```json
 {
-  "scope": {
-    "type": "conversation",
-    "conversationId": "<conversationId>"
-  }
+  "scopeType": "conversation",
+  "conversationId": "<conversationId>"
 }
 ```
 
@@ -240,11 +250,9 @@ Community channel call request:
 
 ```json
 {
-  "scope": {
-    "type": "community-channel",
-    "communityId": "<communityId>",
-    "channelId": "<textChannelId>"
-  }
+  "scopeType": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<textChannelId>"
 }
 ```
 
@@ -255,6 +263,7 @@ Implemented:
 - community channel calls use an existing community text channel id
 - caller must be a conversation participant or community member
 - start emits `calls.v1.call.started` to the call participants
+- the creator starts as `joined`; other participants start as `ringing`
 
 ### Join and leave call
 
@@ -268,8 +277,10 @@ Implemented:
 - joining requires the authenticated identity to be an allowed participant for
   the call scope
 - leaving removes the authenticated identity from the active call
+- deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
 - leaves emit `calls.v1.participant.left`
+- declines emit `calls.v1.participant.declined`
 
 ### End call
 
@@ -305,6 +316,22 @@ Implemented:
 - backend does not inspect SDP/ICE payloads
 - sending a signal emits `calls.v1.signal.sent` only to
   `recipientIdentityId`
+
+### Missed calls
+
+The node runs a call timeout scheduler once per minute. Ringing participants
+that have not joined before the timeout are marked as `missed`; the call status
+becomes `missed`; and each missed participant receives an unread
+`missed_call` notification.
+
+Implemented:
+
+- missed participant state is persisted in MongoDB
+- missed calls stay available through `GET /calls/history`
+- timeout emits `calls.v1.participant.missed`
+- timeout emits `calls.v1.call.missed`
+- missed call notifications use payload fields `callId`, `callerIdentityId`,
+  `networkId` and `recipientIdentityId`
 
 ## Node HTTP API
 
@@ -1437,8 +1464,8 @@ Recommended MVP flow:
 ## Notification HTTP API
 
 Notifications are for actionable events that require client-side identity
-material, such as accepting a conversation invitation. Message delivery does
-not create notifications.
+material, such as accepting a conversation invitation, and for durable UX
+alerts such as missed calls. Message delivery does not create notifications.
 
 ### List notifications
 
@@ -1451,6 +1478,7 @@ Implemented:
 - require signed request auth
 - return notifications where the authenticated identity is the recipient
 - support `limit` and `beforeNotificationId`
+- can include backend-created `missed_call` notifications
 
 ### Create an invitation notification
 
@@ -1505,6 +1533,8 @@ Implemented:
 - keep private keys and decrypted conversation keys out of the backend
 - group conversation invitations use the same encrypted conversation key payload
   as 1to1 invitations; the `type` tells the client which UX to show
+- `missed_call` notifications are not client-created; the call timeout
+  scheduler creates them when ringing participants time out
 
 ### Update a notification
 

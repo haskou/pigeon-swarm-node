@@ -51,6 +51,18 @@ paths:
                 $ref: '#/components/schemas/CallResource'
         '409':
           description: Call not found or not visible to the authenticated identity.
+  /calls/history:
+    get:
+      tags:
+        - calls
+      summary: List call history for the authenticated identity
+      responses:
+        '200':
+          description: Active and finished calls for the authenticated identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsResource'
     delete:
       tags:
         - calls
@@ -173,6 +185,7 @@ components:
         - networkId
         - creatorIdentityId
         - participantIds
+        - participants
         - scope
         - status
         - createdAt
@@ -196,6 +209,11 @@ components:
           enum:
             - active
             - ended
+            - missed
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallParticipant'
         createdAt:
           type: number
         endedAt:
@@ -228,3 +246,27 @@ components:
         channelId:
           type: string
           format: uuid
+    CallParticipant:
+      type: object
+      required:
+        - identityId
+        - status
+      properties:
+        identityId:
+          type: string
+        status:
+          type: string
+          enum:
+            - ringing
+            - joined
+            - left
+            - declined
+            - missed
+        joinedAt:
+          type: number
+        leftAt:
+          type: number
+        declinedAt:
+          type: number
+        missedAt:
+          type: number

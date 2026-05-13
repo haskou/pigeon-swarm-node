@@ -146,7 +146,10 @@ Frontend should switch on `event.type`.
 | `calls.v1.call.started` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` or add the call from event attributes. |
 | `calls.v1.participant.joined` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` and update participant UI. |
 | `calls.v1.participant.left` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` or remove the identity from active participant UI. |
+| `calls.v1.participant.declined` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `declinedIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` and show the participant as declined. |
+| `calls.v1.participant.missed` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` and show the participant as missed. |
 | `calls.v1.call.ended` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` | Identities in `participantIds` | Mark the call ended and close local media/signalling state. |
+| `calls.v1.call.missed` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` | Identities in `participantIds` | Mark the call missed and close local ringing/signalling state. |
 | `calls.v1.signal.sent` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` | `recipientIdentityId` only | Pass `payload` to the local WebRTC peer connection. |
 | `notifications.v1.notification.was_created` | Notification id | `recipientIdentityId`, `type` | `recipientIdentityId` | Refetch notifications. |
 | `notifications.v1.notification.was_accepted` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications and related conversation/keychain state. |

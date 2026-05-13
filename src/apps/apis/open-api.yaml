@@ -17,6 +17,8 @@ paths:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1'
   /calls/{callId}:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}'
+  /calls/history:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1history'
   /calls/{callId}/participants:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants'
   /calls/{callId}/participants/me:

@@ -867,6 +867,24 @@ export default class Definitions {
     await this.signCurrentRequest('DELETE', `/calls/${this.callId}`);
   }
 
+  @given('the other identity signs the current call leave request')
+  public async theOtherIdentitySignsTheCurrentCallLeaveRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/calls/${this.callId}/participants/me`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current call signal request')
   public async iSignTheCurrentCallSignalRequest(): Promise<void> {
     if (!this.callId) {
@@ -1462,6 +1480,11 @@ export default class Definitions {
     this.response = await this.restClient.get('/calls/', this.headers);
   }
 
+  @when('I GET current call history')
+  public async iGETCurrentCallHistory(): Promise<void> {
+    this.response = await this.restClient.get('/calls/history', this.headers);
+  }
+
   @when('I GET the current call')
   public async iGETTheCurrentCall(): Promise<void> {
     if (!this.callId) {
@@ -1508,6 +1531,19 @@ export default class Definitions {
 
     this.response = await this.restClient.delete(
       `/calls/${this.callId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current call participant')
+  public async iDELETETheCurrentCallParticipant(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/calls/${this.callId}/participants/me`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

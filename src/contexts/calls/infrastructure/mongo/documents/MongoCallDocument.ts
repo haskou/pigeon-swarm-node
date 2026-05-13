@@ -11,5 +11,13 @@ export interface MongoCallDocument {
     conversationId: string | undefined;
     type: string;
   };
+  participants?: Array<{
+    declinedAt?: number;
+    identityId: string;
+    joinedAt?: number;
+    leftAt?: number;
+    missedAt?: number;
+    status: string;
+  }>;
   status: string;
 }

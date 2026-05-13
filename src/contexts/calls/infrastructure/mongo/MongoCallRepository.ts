@@ -2,6 +2,7 @@ import { Call } from '@app/contexts/calls/domain/Call';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import { Timestamp } from '@haskou/value-objects';
 
 import { MongoCallDocument } from './documents/MongoCallDocument';
 
@@ -26,6 +27,7 @@ export class MongoCallRepository {
       endedAt: primitives.endedAt,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
+      participants: primitives.participants,
       scope: primitives.scope,
       status: primitives.status,
     };
@@ -39,6 +41,7 @@ export class MongoCallRepository {
       id: document._id,
       networkId: document.networkId,
       participantIds: document.participantIds,
+      participants: document.participants,
       scope: document.scope,
       status: document.status,
     });
@@ -61,10 +64,44 @@ export class MongoCallRepository {
       await this.collection()
     )
       .find({
-        participantIds: participantId.valueOf(),
+        participants: {
+          $elemMatch: {
+            identityId: participantId.valueOf(),
+            status: { $in: ['joined', 'ringing'] },
+          },
+        },
         status: 'active',
       })
       .sort({ createdAt: -1 })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        participantIds: participantId.valueOf(),
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findTimedOutRingingCalls(
+    timeoutThreshold: Timestamp,
+  ): Promise<Call[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        createdAt: { $lte: timeoutThreshold.valueOf() },
+        'participants.status': 'ringing',
+        status: 'active',
+      })
       .toArray();
 
     return documents.map((document) => this.toDomain(document));

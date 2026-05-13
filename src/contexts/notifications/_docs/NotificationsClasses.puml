@@ -10,7 +10,7 @@ package "notifications" {
       -recipientIdentityId: IdentityId
       -status: NotificationStatus
       -state: NotificationState
-      -payload: ConversationInvitationPayload
+      -payload: ConversationInvitationPayload | CommunityInvitationPayload | MissedCallPayload
       -createdAt: Timestamp
       +accept(): void
       +decline(): void
@@ -21,7 +21,8 @@ package "notifications" {
     note right of Notification
       status: unread | read
       state: pending | accepted | declined
-      No expiration flow is implemented.
+      Missed call notifications are created by the
+      call timeout scheduler.
     end note
 
     class ConversationInvitationPayload {
@@ -30,6 +31,23 @@ package "notifications" {
       -recipientIdentityId: IdentityId
       -encryptedConversationKey: EncryptedConversationKey
       -inviterSignature: Signature
+      +toPrimitives(): object
+    }
+
+    class CommunityInvitationPayload {
+      -communityId: CommunityId
+      -inviterIdentityId: IdentityId
+      -recipientIdentityId: IdentityId
+      -encryptedCommunityKey: EncryptedCommunityKey
+      -inviterSignature: Signature
+      +toPrimitives(): object
+    }
+
+    class MissedCallPayload {
+      -callId: MissedCallId
+      -callerIdentityId: IdentityId
+      -networkId: NetworkId
+      -recipientIdentityId: IdentityId
       +toPrimitives(): object
     }
 
@@ -46,6 +64,8 @@ package "notifications" {
     }
 
     Notification *--> ConversationInvitationPayload
+    Notification *--> CommunityInvitationPayload
+    Notification *--> MissedCallPayload
     NotificationRepository o--> Notification
   }
 

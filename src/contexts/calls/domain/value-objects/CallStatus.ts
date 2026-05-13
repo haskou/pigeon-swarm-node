@@ -5,6 +5,7 @@ import { InactiveCallError } from '../errors/InactiveCallError';
 export enum CallStatusEnum {
   ACTIVE = 'active',
   ENDED = 'ended',
+  MISSED = 'missed',
 }
 
 export class CallStatus extends StringValueObject {
