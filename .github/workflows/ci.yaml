@@ -40,33 +40,8 @@ jobs:
       - name: Lint
         run: yarn lint
 
+      - name: Build
+        run: yarn build
+
       - name: Test
-        run: yarn run test:coverage:all
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-
-      - name: Push Coverage Comment
-        uses: MishaKav/jest-coverage-comment@main
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          title: Unit | Api | Command |
-          coverage-title: All files coverage
-          coverage-path: ./coverage/coverage-summary.txt
-          summary-title: Summary
-          coverage-summary-path: ./coverage/coverage-summary.json
-          badge-title: Coverage
-          hide-comment: false
-          hide-summary: false
-
-      - name: Push Coverage Comment
-        uses: MishaKav/jest-coverage-comment@main
-        with:
-          github-token: ${{ github.token }}
-          title: Unit | Api | Command |
-          coverage-title: All files coverage
-          coverage-path: ./coverage/coverage-summary.txt
-          summary-title: Summary
-          coverage-summary-path: ./coverage/coverage-summary.json
-          badge-title: Coverage
-          hide-comment: false
-          hide-summary: false
+        run: yarn test:ci

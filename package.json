@@ -18,6 +18,7 @@
     "test:consumer:only": "NODE_ENV=test cucumber-js -p consumer --publish-quiet --tags @Only",
     "test:scheduler": "NODE_ENV=test cucumber-js -p scheduler --publish-quiet",
     "test:scheduler:only": "NODE_ENV=test cucumber-js -p scheduler --publish-quiet --tags @Only",
+    "test:ci": "npm-run-all test:unit test:api test:consumer test:scheduler",
     "test:coverage:all": "yarn test:coverage:clean && yarn test:coverage:unit && yarn test:coverage:api && yarn test:coverage:consumer && yarn test:coverage:report",
     "test:coverage:clean": "rm -rf coverage/*",
     "test:coverage:unit": "jest --collect-coverage --runInBand && mv coverage/unit/coverage-final.json coverage/coverage-unit.json",
@@ -25,7 +26,8 @@
     "test:coverage:consumer": "nyc --reporter=json --report-dir coverage/consumer cucumber-js -p consumer --publish-quiet && mv coverage/consumer/coverage-final.json coverage/coverage-consumer.json",
     "test:coverage:report": "nyc report -t coverage --reporter=json-summary --reporter=text --report-dir=coverage > coverage/coverage-summary.txt",
     "test:coverage:report:html": "nyc report -t coverage --reporter=html --report-dir=coverage/html",
-    "test:coverage:all:html": "yarn test:coverage:clean && yarn test:coverage:unit && yarn test:coverage:api && yarn test:coverage:command && yarn test:coverage:report:html"
+    "test:coverage:all:html": "yarn test:coverage:clean && yarn test:coverage:unit && yarn test:coverage:api && yarn test:coverage:command && yarn test:coverage:report:html",
+    "test:api:feature": "NODE_ENV=test cucumber-js -p api_support --publish-quiet"
   },
   "keywords": [],
   "author": "",

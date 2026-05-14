@@ -5,11 +5,16 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request } from 'express';
 
 export abstract class CommunityRouteSupport extends Route {
+  protected readonly eventPublisher: DomainEventPublisher =
+    this.get<MessageBus>(MessageBus);
+
   protected readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 

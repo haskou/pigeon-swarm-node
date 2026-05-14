@@ -31,6 +31,7 @@ export class PostCommunityVoiceChannelRoute extends CommunityRouteSupport {
     );
 
     await this.repository().save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

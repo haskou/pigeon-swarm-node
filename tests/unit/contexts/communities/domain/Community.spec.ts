@@ -1,0 +1,127 @@
+import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasCreatedEvent';
+import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
+import { CommunityChannelWasRenamedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasRenamedEvent';
+import { CommunityMemberWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasAddedEvent';
+import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
+import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
+import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
+import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
+import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
+import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+
+describe('Community', () => {
+  const owner = new IdentityId(
+    'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
+  );
+  const member = new IdentityId(
+    'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
+  );
+  const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
+
+  it('records channel metadata events for members', () => {
+    const community = createCommunity();
+    const channel = community.addTextChannel(
+      owner,
+      new CommunityChannelName('general'),
+    );
+
+    community.renameChannel(
+      owner,
+      channel.getId(),
+      new CommunityChannelName('announcements'),
+    );
+    community.deleteChannel(owner, channel.getId());
+
+    const events = community.pullDomainEvents();
+
+    expect(events).toHaveLength(3);
+    expect(events[0]).toBeInstanceOf(CommunityChannelWasCreatedEvent);
+    expect(events[0].attributes).toMatchObject({
+      channel: {
+        id: channel.getId().valueOf(),
+        name: 'general',
+        type: 'text',
+      },
+      communityId: community.getId().valueOf(),
+      memberIds: [owner.valueOf()],
+      networkId: networkId.valueOf(),
+    });
+    expect(events[1]).toBeInstanceOf(CommunityChannelWasRenamedEvent);
+    expect(events[1].attributes).toMatchObject({
+      channelId: channel.getId().valueOf(),
+      name: 'announcements',
+    });
+    expect(events[2]).toBeInstanceOf(CommunityChannelWasDeletedEvent);
+    expect(events[2].attributes).toMatchObject({
+      channelId: channel.getId().valueOf(),
+    });
+  });
+
+  it('records voice channel creation with empty connected identities', () => {
+    const community = createCommunity();
+    const channel = community.addVoiceChannel(
+      owner,
+      new CommunityChannelName('voice'),
+    );
+    const event = community.pullDomainEvents()[0];
+
+    expect(event).toBeInstanceOf(CommunityChannelWasCreatedEvent);
+    expect(event.attributes).toMatchObject({
+      channel: {
+        connectedIdentityIds: [],
+        id: channel.getId().valueOf(),
+        name: 'voice',
+        type: 'voice',
+      },
+    });
+  });
+
+  it('records member and profile metadata events', () => {
+    const community = createCommunity();
+
+    community.addMember(owner, member);
+    community.updateProfile(
+      owner,
+      new CommunityName('Renamed'),
+      new CommunityDescription('Updated description'),
+      new CommunityAvatar('bafybeigavatar'),
+      new CommunityBanner('bafybeigbanner'),
+    );
+
+    const events = community.pullDomainEvents();
+
+    expect(events[0]).toBeInstanceOf(CommunityMemberWasAddedEvent);
+    expect(events[0].attributes).toMatchObject({
+      community: {
+        id: community.getId().valueOf(),
+        memberIds: [owner.valueOf(), member.valueOf()],
+      },
+      identityId: member.valueOf(),
+      memberIds: [owner.valueOf(), member.valueOf()],
+    });
+    expect(events[1]).toBeInstanceOf(CommunityWasUpdatedEvent);
+    expect(events[1].attributes).toMatchObject({
+      community: {
+        avatar: 'bafybeigavatar',
+        banner: 'bafybeigbanner',
+        description: 'Updated description',
+        id: community.getId().valueOf(),
+        memberIds: [owner.valueOf(), member.valueOf()],
+        name: 'Renamed',
+      },
+      memberIds: [owner.valueOf(), member.valueOf()],
+    });
+  });
+
+  function createCommunity(): Community {
+    return Community.create(
+      owner,
+      networkId,
+      new CommunityName('Community'),
+      new CommunityDescription('Private community'),
+    );
+  }
+});

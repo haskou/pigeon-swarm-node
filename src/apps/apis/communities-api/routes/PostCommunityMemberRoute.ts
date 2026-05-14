@@ -28,6 +28,7 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
 
     community.addMember(actorIdentityId, new IdentityId(body.identityId));
     await this.repository().save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

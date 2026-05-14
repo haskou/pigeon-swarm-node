@@ -181,6 +181,11 @@ Event contracts used by frontend:
 | `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
 | `calls.v1.call.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` |
 | `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `communities.v1.channel.was_created` | community id | `communityId`, `networkId`, `memberIds`, `channel` |
+| `communities.v1.channel.was_renamed` | community id | `communityId`, `networkId`, `memberIds`, `channelId`, `name` |
+| `communities.v1.channel.was_deleted` | community id | `communityId`, `networkId`, `memberIds`, `channelId` |
+| `communities.v1.community.was_updated` | community id | `communityId`, `networkId`, `memberIds`, `community` |
+| `communities.v1.member.was_added` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
@@ -1478,6 +1483,41 @@ Implemented:
 - delete an existing text or voice channel from the community metadata
 - when deleting a text channel, delete all stored messages for that channel
 - return the updated community resource
+
+### Community realtime metadata events
+
+Community metadata changes are published as WebSocket domain events and routed
+to every connected identity in `memberIds`.
+
+Channel creation:
+
+```json
+{
+  "type": "communities.v1.channel.was_created",
+  "aggregate_id": "<communityId>",
+  "attributes": {
+    "communityId": "<communityId>",
+    "networkId": "<networkId>",
+    "memberIds": ["<identityId>"],
+    "channel": {
+      "id": "<channelId>",
+      "name": "General",
+      "type": "text",
+      "createdAt": 1773848829055
+    }
+  }
+}
+```
+
+Voice channel creation uses the same payload and adds
+`connectedIdentityIds: []` inside `channel`.
+
+Other metadata events:
+
+- `communities.v1.channel.was_renamed`: `channelId`, `name`
+- `communities.v1.channel.was_deleted`: `channelId`
+- `communities.v1.community.was_updated`: full `community`
+- `communities.v1.member.was_added`: `identityId` and full updated `community`
 
 ### Send channel message
 

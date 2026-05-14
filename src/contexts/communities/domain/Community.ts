@@ -9,6 +9,11 @@ import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
+import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
+import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
+import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEvent';
+import { CommunityWasUpdatedEvent } from './events/CommunityWasUpdatedEvent';
 import { CommunityAvatar } from './value-objects/CommunityAvatar';
 import { CommunityBanner } from './value-objects/CommunityBanner';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
@@ -84,6 +89,27 @@ export class Community extends AggregateRoot {
     return 'private';
   }
 
+  private eventAttributes() {
+    const primitives = this.toPrimitives();
+
+    return {
+      communityId: primitives.id,
+      memberIds: primitives.memberIds,
+      networkId: primitives.networkId,
+    };
+  }
+
+  private voiceChannelEventPrimitives(
+    channel: CommunityVoiceChannel,
+  ): ReturnType<CommunityVoiceChannel['toPrimitives']> & {
+    connectedIdentityIds: string[];
+  } {
+    return {
+      ...channel.toPrimitives(),
+      connectedIdentityIds: [],
+    };
+  }
+
   public addMember(actor: IdentityId, member: IdentityId): void {
     this.assertOwner(actor);
 
@@ -92,6 +118,13 @@ export class Community extends AggregateRoot {
     }
 
     this.members.push(member);
+    this.record(
+      new CommunityMemberWasAddedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+        identityId: member.valueOf(),
+      }),
+    );
   }
 
   public addTextChannel(
@@ -100,7 +133,16 @@ export class Community extends AggregateRoot {
   ): CommunityTextChannel {
     this.assertOwner(actor);
 
-    return this.channels.addText(name);
+    const channel = this.channels.addText(name);
+
+    this.record(
+      new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channel: channel.toPrimitives(),
+      }),
+    );
+
+    return channel;
   }
 
   public addVoiceChannel(
@@ -109,7 +151,16 @@ export class Community extends AggregateRoot {
   ): CommunityVoiceChannel {
     this.assertOwner(actor);
 
-    return this.channels.addVoice(name);
+    const channel = this.channels.addVoice(name);
+
+    this.record(
+      new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channel: this.voiceChannelEventPrimitives(channel),
+      }),
+    );
+
+    return channel;
   }
 
   public renameChannel(
@@ -119,6 +170,13 @@ export class Community extends AggregateRoot {
   ): void {
     this.assertOwner(actor);
     this.channels.rename(channelId, name);
+    this.record(
+      new CommunityChannelWasRenamedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channelId: channelId.valueOf(),
+        name: name.valueOf(),
+      }),
+    );
   }
 
   public deleteChannel(
@@ -127,7 +185,16 @@ export class Community extends AggregateRoot {
   ): 'text' | 'voice' {
     this.assertOwner(actor);
 
-    return this.channels.remove(channelId);
+    const channelType = this.channels.remove(channelId);
+
+    this.record(
+      new CommunityChannelWasDeletedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channelId: channelId.valueOf(),
+      }),
+    );
+
+    return channelType;
   }
 
   public assertHasTextChannel(channelId: CommunityChannelId): void {
@@ -147,6 +214,12 @@ export class Community extends AggregateRoot {
   ): void {
     this.assertOwner(actor);
     this.profile = new CommunityProfile(name, description, avatar, banner);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
   }
 
   public getId(): CommunityId {

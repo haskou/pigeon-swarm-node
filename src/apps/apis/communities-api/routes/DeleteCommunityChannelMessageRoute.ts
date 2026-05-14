@@ -5,7 +5,6 @@ import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/com
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { PublicKey, Signature } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -25,8 +24,6 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
   private readonly signatureService =
     new CommunityChannelMessageSignatureDomainService();
-
-  private readonly eventPublisher = this.get<MessageBus>(MessageBus);
 
   @Delete('/:communityId/channels/:channelId/messages/:messageId')
   public async deleteMessage(

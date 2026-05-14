@@ -153,6 +153,11 @@ Frontend should switch on `event.type`.
 | `calls.v1.call.missed` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` | Identities in `participantIds` | Mark the call missed and close local ringing/signalling state. |
 | `calls.v1.signal.sent` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` | `recipientIdentityId` only | Pass `payload` to the local WebRTC peer connection. |
 | `conversations.v1.call.event.was_recorded` | Conversation id | `message` | Conversation participants | Insert or update the `call_event` system item in the conversation timeline. |
+| `communities.v1.channel.was_created` | Community id | `communityId`, `networkId`, `memberIds`, `channel` | Community `memberIds` | Insert the text or voice channel in local community state. |
+| `communities.v1.channel.was_renamed` | Community id | `communityId`, `networkId`, `memberIds`, `channelId`, `name` | Community `memberIds` | Update the channel name in local community state. |
+| `communities.v1.channel.was_deleted` | Community id | `communityId`, `networkId`, `memberIds`, `channelId` | Community `memberIds` | Remove the channel locally and choose another active channel if needed. |
+| `communities.v1.community.was_updated` | Community id | `communityId`, `networkId`, `memberIds`, `community` | Community `memberIds` | Replace the local community metadata with `community`. |
+| `communities.v1.member.was_added` | Community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` | Community `memberIds` | Update the member list or replace the local community with `community`. |
 | `notifications.v1.notification.was_created` | Notification id | `recipientIdentityId`, `type` | `recipientIdentityId` | Refetch notifications. |
 | `notifications.v1.notification.was_accepted` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications and related conversation/keychain state. |
 | `notifications.v1.notification.was_declined` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications. |
@@ -206,6 +211,9 @@ Dropped:
 | `conversations.v1.conversation.` | Refetch conversation list. |
 | `conversations.v1.message.` | Fetch the announced message with `GET /conversations/{conversationId}/messages/{messageId}`. |
 | `conversations.v1.messages.` | Refresh conversation unread counters. |
+| `communities.v1.channel.` | Apply the metadata delta locally or refetch `GET /communities/{communityId}`. |
+| `communities.v1.community.` | Replace or refetch the community metadata. |
+| `communities.v1.member.` | Update member state or refetch the community metadata. |
 | `calls.v1.call.` | Fetch `GET /calls/{callId}` unless the event already has enough data for the current view. |
 | `calls.v1.participant.` | Fetch `GET /calls/{callId}` and update active participant UI. |
 | `calls.v1.signal.` | If `recipientIdentityId` is the current identity, feed `payload` into the local WebRTC peer connection. |
@@ -237,6 +245,9 @@ For call events, `event.aggregate_id` is the call id. Calls are signalling only:
 the backend stores active call state and routes lifecycle/signalling events, but
 browser clients still own microphone/camera capture, peer connection creation,
 SDP offers/answers and ICE candidate handling.
+
+For community metadata events, `event.aggregate_id` is the community id. The
+event is routed to every connected identity listed in `event.attributes.memberIds`.
 
 ## Reconnect Strategy
 

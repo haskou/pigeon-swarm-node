@@ -24,6 +24,7 @@ export class DeleteCommunityChannelRoute extends CommunityRouteSupport {
     );
 
     await this.repository().save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     if (channelType === 'text') {
       await this.messageRepository().deleteByChannel(
