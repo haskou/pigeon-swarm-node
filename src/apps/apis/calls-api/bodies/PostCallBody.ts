@@ -21,6 +21,7 @@ export class PostCallBody {
   @IsString()
   public readonly channelId?: string;
 
+  @ValidateIf((body: PostCallBody) => body.scopeType === 'conversation')
   @IsOptional()
   @IsString({ each: true })
   public readonly invitedParticipantIds?: string[];

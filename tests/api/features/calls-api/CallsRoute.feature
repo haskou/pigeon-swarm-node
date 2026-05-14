@@ -93,6 +93,27 @@ Feature: Calls API
     Then response code is equal to 200
     And response body should contain "connectedIdentityIds"
 
+  Scenario: Ignore extra invitees for a community channel call
+    Given I register an in-memory IPFS network "api-calls-community-extra-invitee-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community voice channel body
+    And I sign the current community voice channel request
+    When I POST a voice channel to the current community
+    Then response code is equal to 200
+    And I remember the current community voice channel
+    And I set a community channel call body with an outside invitee
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 200
+    And response contains a valid resource with the following fields
+      | status     | active            |
+      | scope.type | community_channel |
+    And response body should not contain "MCowBQYDK2VwAyEAA0YLLSFyAaDRgmbqSTJ2gTeRCJq6QfP9RNHHp0/qbtY="
+
   Scenario: Reuse an active community channel call
     Given I register an in-memory IPFS network "api-calls-community-reuse-network"
     And I set a private community body

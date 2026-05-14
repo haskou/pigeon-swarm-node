@@ -173,7 +173,7 @@ components:
           description: Required when scopeType is community_channel. Must be a community voice channel.
         invitedParticipantIds:
           type: array
-          description: Optional extra recipients for conversation call start events. Community voice channel calls do not create missed-call notifications or text timeline call events.
+          description: Optional extra recipients for conversation call start events. Ignored for community channel calls, whose participants are derived from community members.
           items:
             type: string
     PostCallSignalBody:

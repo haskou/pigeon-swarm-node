@@ -316,6 +316,8 @@ Implemented:
 - one-to-one calls use an existing one-to-one conversation id
 - group calls use an existing group conversation id
 - community channel calls use an existing community voice channel id
+- `invitedParticipantIds` is only used for conversation calls; community
+  channel call participants are always derived from current community members
 - community channel call start is idempotent by `(communityId, channelId)`:
   when an active call already exists for that voice channel, `POST /calls`
   returns the existing call instead of creating a second one

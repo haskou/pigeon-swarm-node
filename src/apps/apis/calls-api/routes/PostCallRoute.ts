@@ -43,12 +43,14 @@ export class PostCallRoute extends CallRouteSupport {
       }
     }
 
-    const participantIds = [
-      ...validatedScope.participantIds,
-      ...(body.invitedParticipantIds ?? []).map(
-        (participantId) => new IdentityId(participantId),
-      ),
-    ];
+    const participantIds = validatedScope.scope.isConversation()
+      ? [
+          ...validatedScope.participantIds,
+          ...(body.invitedParticipantIds ?? []).map(
+            (participantId) => new IdentityId(participantId),
+          ),
+        ]
+      : validatedScope.participantIds;
     const call = Call.start(
       creatorIdentityId,
       validatedScope.networkId,

@@ -850,6 +850,22 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community channel call body with an outside invitee')
+  public iSetACommunityChannelCallBodyWithAnOutsideInvitee(): void {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      invitedParticipantIds: [
+        'MCowBQYDK2VwAyEAA0YLLSFyAaDRgmbqSTJ2gTeRCJq6QfP9RNHHp0/qbtY=',
+      ],
+      scopeType: 'community_channel',
+    });
+  }
+
   @given('I remember the current call')
   public iRememberTheCurrentCall(): void {
     if (!this.response?.data?.id) {
