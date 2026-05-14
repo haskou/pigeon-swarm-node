@@ -17,4 +17,5 @@ export interface IPFSConnection {
   blockPeer(peerId: string): Promise<void>;
   getPeers(): string[];
   getPeerId(): string;
+  stop(): Promise<void>;
 }

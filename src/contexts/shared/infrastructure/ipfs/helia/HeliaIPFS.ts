@@ -62,7 +62,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   constructor(
     private readonly heliaCore: HeliaInstance,
-    private readonly options: IPFSOptions,
+    protected readonly options: IPFSOptions,
     pinningStrategy?: HeliaPinningStrategy,
   ) {
     this.pinningStrategy = pinningStrategy ?? new HeliaPinningStrategy();
@@ -269,5 +269,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   public getPeerId(): string {
     return this.heliaCore.libp2p.peerId.toString();
+  }
+
+  public async stop(): Promise<void> {
+    await this.heliaCore.stop();
   }
 }

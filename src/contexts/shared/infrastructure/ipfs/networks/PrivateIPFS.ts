@@ -31,4 +31,9 @@ export class PrivateIPFS extends HeliaIPFS {
 
     return new PrivateIPFS(heliaCore, options);
   }
+
+  public async stop(): Promise<void> {
+    await super.stop();
+    delete PrivateIPFS.connectionPool[JSON.stringify(this.options)];
+  }
 }

@@ -55,6 +55,7 @@ describe('MongoNodeMetadataRepository', () => {
     const config = IPFSNetworkConfig.fromPrimitives(primitives);
 
     mockNetwork.getName.mockReturnValue(config.getName());
+    mockNetwork.getId.mockReturnValue(config.getId());
     mockNetwork.getConfig.mockReturnValue(config);
     mockNetwork.toPrimitives.mockReturnValue(primitives);
 
@@ -184,19 +185,20 @@ describe('MongoNodeMetadataRepository', () => {
         owner: undefined,
       });
       const obsoleteNetwork = mock<IPFSNetwork>();
+      const obsoleteNetworkId =
+        '550e8400-e29b-41d4-a716-446655440002';
+
+      obsoleteNetwork.getId.mockReturnValue(obsoleteNetworkId);
       obsoleteNetwork.getName.mockReturnValue('private_legacy');
       obsoleteNetwork.getConfig.mockReturnValue(
-        new IPFSNetworkConfig(
-          new NetworkId('550e8400-e29b-41d4-a716-446655440002').valueOf(),
-          'private_legacy',
-        ),
+        new IPFSNetworkConfig(obsoleteNetworkId, 'private_legacy'),
       );
       networkRegistry.getAll.mockReturnValue([obsoleteNetwork]);
 
       await repository.saveLocalNode(node);
 
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
-        'private_legacy',
+        obsoleteNetworkId,
       );
     });
 
@@ -225,7 +227,9 @@ describe('MongoNodeMetadataRepository', () => {
 
       await repository.saveLocalNode(node);
 
-      expect(networkRegistry.removeNetwork).toHaveBeenCalledWith('private_0');
+      expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
+        privateNetworkId.valueOf(),
+      );
       expect(networkRegistry.register).toHaveBeenCalledTimes(1);
       expect(networkRegistry.register.mock.calls[0][0].toPrimitives()).toEqual(
         targetNetworkMother.build().toPrimitives(),
