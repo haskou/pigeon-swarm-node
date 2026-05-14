@@ -129,78 +129,115 @@ export class WebSocketEventHub {
     return event.eventName().startsWith('nodes.');
   }
 
-  private createConversationCallEvent(
+  private createConversationCallEvents(
     event: DomainEvent,
-  ): WebSocketDomainEvent | undefined {
+  ): WebSocketDomainEvent[] {
     const scope = event.attributes.scope as
       | { conversationId?: string; type?: string }
       | undefined;
 
     if (scope?.type !== 'conversation' || !scope.conversationId) {
-      return undefined;
+      return [];
     }
 
-    const message = this.createConversationCallEventMessage(event, {
+    const messages = this.createConversationCallEventMessages(event, {
       conversationId: scope.conversationId,
     });
 
-    if (!message) {
-      return undefined;
-    }
-
-    return {
+    return messages.map((message) => ({
       aggregate_id: scope.conversationId,
       attributes: {
         message,
         participantIds: event.attributes.participantIds,
       },
-      event_id: `${event.eventId}:conversation-call-event`,
+      event_id: `${event.eventId}:conversation-call-event:${message.id}`,
       occurred_on: event.occurredOn.getTime(),
       type: 'conversations.v1.call.event.was_recorded',
-    };
+    }));
   }
 
-  private createConversationCallEventMessage(
+  private createConversationCallEventMessages(
     event: DomainEvent,
     scope: { conversationId: string },
-  ): Record<string, unknown> | undefined {
-    const message = this.createCallEventMessage(event);
-
-    if (!message) {
-      return undefined;
-    }
-
-    return {
+  ): Array<Record<string, unknown>> {
+    return this.createCallEventMessages(event).map((message) => ({
       ...message,
       conversationId: scope.conversationId,
-    };
+    }));
   }
 
-  private createCallEventMessage(
+  private createCallEventMessages(
     event: DomainEvent,
-  ): Record<string, unknown> | undefined {
+  ): Array<Record<string, unknown>> {
     const callEventType = this.getCallEventType(event);
 
     if (!callEventType) {
-      return undefined;
+      return [];
     }
 
     const callId = String(event.attributes.callId || event.aggregateId);
-    const createdAt = Number(
-      event.attributes.endedAt || event.occurredOn.getTime(),
+    const startedAt = Number(
+      event.attributes.createdAt || event.occurredOn.getTime(),
     );
-    const startedAt = Number(event.attributes.createdAt || createdAt);
-    const actorIdentityId = this.getCallEventActor(event, callEventType);
+    const actorIdentityIds = this.getCallEventActors(event, callEventType);
 
-    return {
-      actorIdentityId,
-      callEventType,
-      callId,
-      createdAt,
-      durationMs: Math.max(createdAt - startedAt, 0),
-      id: `call-event:${callId}:${callEventType}:${actorIdentityId}`,
-      type: 'call_event',
-    };
+    return actorIdentityIds.map((actorIdentityId) => {
+      const createdAt = this.getCallEventCreatedAt(
+        event,
+        callEventType,
+        actorIdentityId,
+      );
+
+      return {
+        actorIdentityId,
+        callEventType,
+        callId,
+        createdAt,
+        durationMs: Math.max(createdAt - startedAt, 0),
+        id: `call-event:${callId}:${callEventType}:${actorIdentityId}`,
+        type: 'call_event',
+      };
+    });
+  }
+
+  private getCallEventCreatedAt(
+    event: DomainEvent,
+    callEventType: 'declined' | 'ended' | 'missed',
+    actorIdentityId: string,
+  ): number {
+    if (callEventType === 'ended') {
+      return Number(event.attributes.endedAt || event.occurredOn.getTime());
+    }
+
+    const participant = this.getCallEventParticipant(event, actorIdentityId);
+
+    if (callEventType === 'declined' && participant?.declinedAt) {
+      return Number(participant.declinedAt);
+    }
+
+    if (callEventType === 'missed' && participant?.missedAt) {
+      return Number(participant.missedAt);
+    }
+
+    return event.occurredOn.getTime();
+  }
+
+  private getCallEventParticipant(
+    event: DomainEvent,
+    actorIdentityId: string,
+  ): Record<string, unknown> | undefined {
+    const participants = event.attributes.participants;
+
+    if (!Array.isArray(participants)) {
+      return undefined;
+    }
+
+    return participants.find(
+      (participant): participant is Record<string, unknown> =>
+        typeof participant === 'object' &&
+        participant !== null &&
+        String(participant.identityId || '') === actorIdentityId,
+    );
   }
 
   private getCallEventType(
@@ -223,23 +260,33 @@ export class WebSocketEventHub {
     return undefined;
   }
 
-  private getCallEventActor(
+  private getCallEventActors(
     event: DomainEvent,
     callEventType: 'declined' | 'ended' | 'missed',
-  ): string {
+  ): string[] {
     if (callEventType === 'declined') {
-      return String(event.attributes.declinedIdentityId || '');
-    }
-
-    if (callEventType === 'ended') {
-      return String(
-        event.attributes.endedByIdentityId ||
-          event.attributes.creatorIdentityId ||
-          '',
+      return [String(event.attributes.declinedIdentityId || '')].filter(
+        Boolean,
       );
     }
 
-    return String(event.attributes.creatorIdentityId || '');
+    if (callEventType === 'ended') {
+      return [
+        String(
+          event.attributes.endedByIdentityId ||
+            event.attributes.creatorIdentityId ||
+            '',
+        ),
+      ].filter(Boolean);
+    }
+
+    if (Array.isArray(event.attributes.missedIdentityIds)) {
+      return event.attributes.missedIdentityIds
+        .map((identityId) => String(identityId || ''))
+        .filter(Boolean);
+    }
+
+    return [];
   }
 
   private collectIdentityValues(value: unknown, recipients: Set<string>): void {
@@ -288,9 +335,9 @@ export class WebSocketEventHub {
         event: JSON.parse(event.decode()),
         type: 'domain_event',
       });
-      const conversationCallEvent = this.createConversationCallEvent(event);
+      const conversationCallEvents = this.createConversationCallEvents(event);
 
-      if (conversationCallEvent) {
+      for (const conversationCallEvent of conversationCallEvents) {
         this.broadcast(event, {
           event: conversationCallEvent,
           type: 'domain_event',

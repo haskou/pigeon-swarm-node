@@ -191,8 +191,74 @@ describe('WebSocketEventHub', () => {
           },
           participantIds: [participantIdentityId.valueOf()],
         },
-        event_id: `${event.eventId}:conversation-call-event`,
+        event_id: `${event.eventId}:conversation-call-event:call-event:call-id:ended:${participantIdentityId.valueOf()}`,
         occurred_on: event.occurredOn.getTime(),
+        type: 'conversations.v1.call.event.was_recorded',
+      },
+      type: 'domain_event',
+    });
+  });
+
+  it('emits missed call events with the missed participant as actor', async () => {
+    const hub = new WebSocketEventHub();
+    const creatorIdentityId = await generateIdentityId();
+    const missedIdentityId = await generateIdentityId();
+    const creatorClient = buildClient();
+    const missedClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1770000000000,
+      creatorIdentityId: creatorIdentityId.valueOf(),
+      missedIdentityIds: [missedIdentityId.valueOf()],
+      participantIds: [creatorIdentityId.valueOf(), missedIdentityId.valueOf()],
+      participants: [
+        {
+          identityId: creatorIdentityId.valueOf(),
+          joinedAt: 1770000000000,
+          status: 'joined',
+        },
+        {
+          identityId: missedIdentityId.valueOf(),
+          missedAt: 1770000060000,
+          status: 'missed',
+        },
+      ],
+      scope: {
+        conversationId: 'one-to-one:conversation-id',
+        type: 'conversation',
+      },
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.call.missed');
+    hub.register(creatorIdentityId, creatorClient);
+    hub.register(missedIdentityId, missedClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    const realtimeMessages = (creatorClient.send as jest.Mock).mock.calls.map(
+      ([message]) => JSON.parse(message as string),
+    );
+    const callEventMessage = realtimeMessages.find(
+      (message) =>
+        message.event.type === 'conversations.v1.call.event.was_recorded',
+    );
+
+    expect(callEventMessage).toMatchObject({
+      event: {
+        aggregate_id: 'one-to-one:conversation-id',
+        attributes: {
+          message: {
+            actorIdentityId: missedIdentityId.valueOf(),
+            callEventType: 'missed',
+            callId: 'call-id',
+            conversationId: 'one-to-one:conversation-id',
+            createdAt: 1770000060000,
+            durationMs: 60000,
+            id: `call-event:call-id:missed:${missedIdentityId.valueOf()}`,
+            type: 'call_event',
+          },
+        },
         type: 'conversations.v1.call.event.was_recorded',
       },
       type: 'domain_event',

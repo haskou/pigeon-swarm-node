@@ -226,7 +226,9 @@ export class Call extends AggregateRoot {
 
   public end(identityId: IdentityId): void {
     this.assertActive();
-    assert(this.hasParticipant(identityId), new CallParticipantNotFoundError());
+    const participant = this.findParticipant(identityId);
+
+    assert(participant?.isJoined(), new CallParticipantNotFoundError());
     this.lifecycle.end(identityId.valueOf());
     this.record(
       new CallEndedEvent(this.id.valueOf(), {

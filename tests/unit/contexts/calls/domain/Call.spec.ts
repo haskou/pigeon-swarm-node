@@ -9,6 +9,7 @@ import { CallParticipantMissedEvent } from '@app/contexts/calls/domain/events/Ca
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
 import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
 import { InactiveCallError } from '@app/contexts/calls/domain/errors/InactiveCallError';
+import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
 import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -134,6 +135,24 @@ describe('Call', () => {
         { sdp: 'answer-sdp' },
       ),
     ).toThrow(InactiveCallError);
+  });
+
+  it('should reject ending an active call by a declined participant', () => {
+    const call = Call.start(creator, networkId, scope, [
+      recipient,
+      lateParticipant,
+    ]);
+
+    call.pullDomainEvents();
+    call.join(recipient);
+    call.pullDomainEvents();
+    call.leave(lateParticipant);
+
+    expect(call.toPrimitives().status).toBe('active');
+    expect(() => call.end(lateParticipant)).toThrow(
+      CallParticipantNotFoundError,
+    );
+    expect(call.toPrimitives().status).toBe('active');
   });
 
   it('should emit participant declined events for ringing participants', () => {
