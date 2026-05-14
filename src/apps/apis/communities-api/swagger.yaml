@@ -143,7 +143,7 @@ paths:
       tags:
         - communities
       summary: List private community channels
-      description: Only community members can list text channel metadata.
+      description: Only community members can list text and voice channel metadata.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -152,7 +152,7 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
-          description: Community text channels.
+          description: Community channels.
           content:
             application/json:
               schema:
@@ -237,6 +237,31 @@ paths:
       responses:
         '200':
           description: Channel renamed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not the community owner or the channel does not exist.
+    delete:
+      tags:
+        - communities
+      summary: Delete a private community channel
+      description: Only the community owner can delete text or voice channels. Deleting a text channel also deletes its stored channel messages.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Channel deleted.
           content:
             application/json:
               schema:

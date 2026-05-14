@@ -120,6 +120,7 @@ package "communities-api" {
   class GetCommunityChannelsRoute
   class PostCommunityTextChannelRoute
   class PatchCommunityChannelRoute
+  class DeleteCommunityChannelRoute
   class PostCommunityChannelMessageRoute
   class GetCommunityChannelMessagesRoute
 
@@ -132,6 +133,8 @@ package "communities-api" {
   GetCommunityChannelsRoute ..> Community
   PostCommunityTextChannelRoute ..> Community
   PatchCommunityChannelRoute ..> Community
+  DeleteCommunityChannelRoute ..> Community
+  DeleteCommunityChannelRoute ..> CommunityChannelMessageRepository
   PostCommunityChannelMessageRoute ..> Community
   PostCommunityChannelMessageRoute ..> CommunityChannelMessage
   GetCommunityChannelMessagesRoute ..> Community

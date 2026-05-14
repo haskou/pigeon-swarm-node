@@ -22,6 +22,8 @@ export default class MongoIdentityMetadataRepository {
   ): Promise<MongoIdentityMetadataDocument[]> {
     // Version is the primary ordering; receivedAt only breaks ties.
     // eslint-disable-next-line perfectionist/sort-objects
+    // Version is the primary ordering; receivedAt only breaks ties.
+    // eslint-disable-next-line perfectionist/sort-objects
     const sortCriteria: Sort = { version: -1, receivedAt: -1 };
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(

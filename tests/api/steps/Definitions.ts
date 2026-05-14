@@ -634,6 +634,37 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current community channel deletion request')
+  public async iSignTheCurrentCommunityChannelDeletionRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+    );
+  }
+
+  @given('another identity signs the current community channel deletion request')
+  public async anotherIdentitySignsTheCurrentCommunityChannelDeletionRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current community channels request')
   public async iSignTheCurrentCommunityChannelsRequest(): Promise<void> {
     if (!this.communityId) {
@@ -1733,6 +1764,19 @@ export default class Definitions {
     this.response = await this.restClient.patch(
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
       this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current community channel')
+  public async iDELETETheCurrentCommunityChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+      undefined,
       { headers: this.headers },
     );
   }

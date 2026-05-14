@@ -121,6 +121,15 @@ export class Community extends AggregateRoot {
     this.channels.rename(channelId, name);
   }
 
+  public deleteChannel(
+    actor: IdentityId,
+    channelId: CommunityChannelId,
+  ): 'text' | 'voice' {
+    this.assertOwner(actor);
+
+    return this.channels.remove(channelId);
+  }
+
   public assertHasTextChannel(channelId: CommunityChannelId): void {
     this.channels.assertHasText(channelId);
   }

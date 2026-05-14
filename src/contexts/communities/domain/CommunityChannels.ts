@@ -60,6 +60,30 @@ export class CommunityChannels {
     channel?.rename(name);
   }
 
+  public remove(channelId: CommunityChannelId): 'text' | 'voice' {
+    const textChannelIndex = this.textChannels.findIndex((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
+
+    if (textChannelIndex !== -1) {
+      this.textChannels.splice(textChannelIndex, 1);
+
+      return 'text';
+    }
+
+    const voiceChannelIndex = this.voiceChannels.findIndex((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
+
+    if (voiceChannelIndex !== -1) {
+      this.voiceChannels.splice(voiceChannelIndex, 1);
+
+      return 'voice';
+    }
+
+    throw new CommunityChannelNotFoundError();
+  }
+
   public toPrimitives() {
     return {
       textChannels: this.textChannels.map((channel) => channel.toPrimitives()),

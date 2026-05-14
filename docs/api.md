@@ -1440,6 +1440,36 @@ Implemented:
 - require signed request auth from the community owner
 - rename an existing text or voice channel
 
+### Delete channel
+
+```http
+DELETE /communities/{communityId}/channels/{channelId}
+```
+
+Response:
+
+```json
+{
+  "id": "<communityId>",
+  "networkId": "<networkId>",
+  "ownerIdentityId": "<identityId>",
+  "name": "Pigeon Lab",
+  "description": "Private workspace",
+  "memberIds": ["<identityId>"],
+  "textChannels": [],
+  "voiceChannels": [],
+  "visibility": "private",
+  "createdAt": 1773848829055
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- delete an existing text or voice channel from the community metadata
+- when deleting a text channel, delete all stored messages for that channel
+- return the updated community resource
+
 ### Send channel message
 
 ```http
