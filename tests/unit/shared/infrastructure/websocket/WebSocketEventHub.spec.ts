@@ -199,6 +199,40 @@ describe('WebSocketEventHub', () => {
     });
   });
 
+  it('does not emit community channel call events as timeline system items', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1770000000000,
+      endedAt: 1770000043000,
+      endedByIdentityId: participantIdentityId.valueOf(),
+      participantIds: [participantIdentityId.valueOf()],
+      scope: {
+        channelId: 'channel-id',
+        communityId: 'community-id',
+        type: 'community_channel',
+      },
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.call.ended');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
+      .map(([message]) => JSON.parse(message as string));
+
+    expect(
+      realtimeMessages.some(
+        (message) =>
+          message.event.type === 'communities.v1.call.event.was_recorded',
+      ),
+    ).toBe(false);
+  });
+
   it('sends identity aggregate events only to that identity', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();

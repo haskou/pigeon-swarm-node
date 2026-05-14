@@ -60,6 +60,10 @@ export default class CallTimeoutScheduler extends Scheduler {
       await this.callRepository.findTimedOutRingingCalls(timeoutThreshold);
 
     for (const call of calls) {
+      if (!call.shouldRecordMissedCall()) {
+        continue;
+      }
+
       const missedParticipants = call.markTimedOut(Timestamp.now());
       const primitives = call.toPrimitives();
 

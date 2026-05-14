@@ -302,7 +302,7 @@ Community channel call request:
 {
   "scopeType": "community_channel",
   "communityId": "<communityId>",
-  "channelId": "<textChannelId>"
+  "channelId": "<voiceChannelId>"
 }
 ```
 
@@ -314,6 +314,9 @@ Implemented:
 - caller must be a conversation participant or community member
 - start emits `calls.v1.call.started` to the call participants
 - the creator starts as `joined`; other participants start as `ringing`
+- community channel calls are voice-channel presence state; they do not create
+  chat timeline `call_event` items and do not generate missed-call
+  notifications
 
 ### Join and leave call
 
@@ -372,10 +375,10 @@ Implemented:
 
 ### Missed calls
 
-The node runs a call timeout scheduler once per minute. Ringing participants
-that have not joined before the timeout are marked as `missed`; the call status
-becomes `missed`; and each missed participant receives an unread
-`missed_call` notification.
+The node runs a call timeout scheduler once per minute for calls scoped to
+conversations. Ringing participants that have not joined before the timeout are
+marked as `missed`; the call status becomes `missed`; and each missed
+participant receives an unread `missed_call` notification.
 
 Implemented:
 
@@ -385,6 +388,7 @@ Implemented:
 - timeout emits `calls.v1.call.missed`
 - missed call notifications use payload fields `callId`, `callerIdentityId`,
   `networkId` and `recipientIdentityId`
+- community voice channel calls are excluded from missed-call timeout handling
 
 ## Node HTTP API
 
@@ -1545,15 +1549,13 @@ Response:
   "channelId": "<channelId>",
   "messages": [
     {
-      "id": "call-event:<callId>:missed:<identityId>",
+      "id": "<messageId>",
       "communityId": "<communityId>",
       "channelId": "<channelId>",
-      "type": "call_event",
-      "callId": "<callId>",
-      "callEventType": "missed",
-      "actorIdentityId": "<identityId>",
+      "authorIdentityId": "<identityId>",
       "createdAt": 1773848869055,
-      "durationMs": 40000
+      "encryptedPayload": "<encryptedMessagePayload>",
+      "type": "sent"
     }
   ],
   "nextBeforeMessageId": "<messageId>"
@@ -1565,9 +1567,8 @@ Implemented:
 - require signed request auth from a community member
 - require the channel to exist in the community
 - return messages ordered from oldest to newest in the page
-- include non-encrypted `call_event` system items for calls scoped to this
-  community channel, with `callEventType` equal to `ended`, `declined` or
-  `missed`
+- do not include call lifecycle system items; community voice channels expose
+  active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
 - when `beforeMessageId` is provided, return messages older than that message
 
@@ -1654,7 +1655,8 @@ Implemented:
 - require signed request auth
 - return notifications where the authenticated identity is the recipient
 - support `limit` and `beforeNotificationId`
-- can include backend-created `missed_call` notifications
+- can include backend-created `missed_call` notifications for conversation
+  calls
 
 ### Create an invitation notification
 
@@ -1710,7 +1712,8 @@ Implemented:
 - group conversation invitations use the same encrypted conversation key payload
   as 1to1 invitations; the `type` tells the client which UX to show
 - `missed_call` notifications are not client-created; the call timeout
-  scheduler creates them when ringing participants time out
+  scheduler creates them when ringing participants time out in conversation
+  calls
 
 ### Update a notification
 

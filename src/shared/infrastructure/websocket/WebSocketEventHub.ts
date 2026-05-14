@@ -160,59 +160,6 @@ export class WebSocketEventHub {
     };
   }
 
-  private createCommunityChannelCallEvent(
-    event: DomainEvent,
-  ): WebSocketDomainEvent | undefined {
-    const scope = event.attributes.scope as
-      | { channelId?: string; communityId?: string; type?: string }
-      | undefined;
-
-    if (
-      scope?.type !== 'community_channel' ||
-      !scope.communityId ||
-      !scope.channelId
-    ) {
-      return undefined;
-    }
-
-    const message = this.createCommunityChannelCallEventMessage(event, {
-      channelId: scope.channelId,
-      communityId: scope.communityId,
-    });
-
-    if (!message) {
-      return undefined;
-    }
-
-    return {
-      aggregate_id: scope.communityId,
-      attributes: {
-        message,
-        participantIds: event.attributes.participantIds,
-      },
-      event_id: `${event.eventId}:community-channel-call-event`,
-      occurred_on: event.occurredOn.getTime(),
-      type: 'communities.v1.call.event.was_recorded',
-    };
-  }
-
-  private createCommunityChannelCallEventMessage(
-    event: DomainEvent,
-    scope: { channelId: string; communityId: string },
-  ): Record<string, unknown> | undefined {
-    const message = this.createCallEventMessage(event);
-
-    if (!message) {
-      return undefined;
-    }
-
-    return {
-      ...message,
-      channelId: scope.channelId,
-      communityId: scope.communityId,
-    };
-  }
-
   private createConversationCallEventMessage(
     event: DomainEvent,
     scope: { conversationId: string },
@@ -346,15 +293,6 @@ export class WebSocketEventHub {
       if (conversationCallEvent) {
         this.broadcast(event, {
           event: conversationCallEvent,
-          type: 'domain_event',
-        });
-      }
-      const communityChannelCallEvent =
-        this.createCommunityChannelCallEvent(event);
-
-      if (communityChannelCallEvent) {
-        this.broadcast(event, {
-          event: communityChannelCallEvent,
           type: 'domain_event',
         });
       }

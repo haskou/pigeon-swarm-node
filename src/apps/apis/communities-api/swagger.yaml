@@ -273,7 +273,7 @@ paths:
       tags:
         - communities
       summary: List encrypted private community text channel messages
-      description: Only community members can read channel messages. Payloads are client-encrypted and opaque to the backend. The timeline also includes non-encrypted call_event system items for calls scoped to this channel.
+      description: Only community members can read text channel messages. Payloads are client-encrypted and opaque to the backend. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -573,48 +573,9 @@ components:
         messages:
           type: array
           items:
-            oneOf:
-              - $ref: '#/components/schemas/CommunityChannelMessageResource'
-              - $ref: '#/components/schemas/CommunityChannelCallEventResource'
+            $ref: '#/components/schemas/CommunityChannelMessageResource'
         nextBeforeMessageId:
           type: string
-    CommunityChannelCallEventResource:
-      type: object
-      required:
-        - id
-        - communityId
-        - channelId
-        - type
-        - callId
-        - callEventType
-        - actorIdentityId
-        - createdAt
-        - durationMs
-      properties:
-        id:
-          type: string
-        communityId:
-          type: string
-        channelId:
-          type: string
-        type:
-          type: string
-          enum:
-            - call_event
-        callId:
-          type: string
-        callEventType:
-          type: string
-          enum:
-            - declined
-            - ended
-            - missed
-        actorIdentityId:
-          type: string
-        createdAt:
-          type: integer
-        durationMs:
-          type: integer
     DeletedCommunityChannelMessageResource:
       type: object
       required:

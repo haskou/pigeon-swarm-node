@@ -268,6 +268,10 @@ export class Call extends AggregateRoot {
     return missedParticipants.map((participant) => participant.getIdentityId());
   }
 
+  public shouldRecordMissedCall(): boolean {
+    return this.scope.isConversation();
+  }
+
   public toPrimitives() {
     const participants = this.participants.map((participant) =>
       participant.toPrimitives(),

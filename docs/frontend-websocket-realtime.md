@@ -153,7 +153,6 @@ Frontend should switch on `event.type`.
 | `calls.v1.call.missed` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` | Identities in `participantIds` | Mark the call missed and close local ringing/signalling state. |
 | `calls.v1.signal.sent` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` | `recipientIdentityId` only | Pass `payload` to the local WebRTC peer connection. |
 | `conversations.v1.call.event.was_recorded` | Conversation id | `message` | Conversation participants | Insert or update the `call_event` system item in the conversation timeline. |
-| `communities.v1.call.event.was_recorded` | Community id | `message` | Community call participants | Insert or update the `call_event` system item in the channel timeline. |
 | `notifications.v1.notification.was_created` | Notification id | `recipientIdentityId`, `type` | `recipientIdentityId` | Refetch notifications. |
 | `notifications.v1.notification.was_accepted` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications and related conversation/keychain state. |
 | `notifications.v1.notification.was_declined` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications. |
@@ -167,6 +166,11 @@ Sync events such as `*.sync_requested` and `*.sync_available` are node-to-node
 coordination hints. They can pass through the same event envelope when produced
 locally, but frontend clients should treat them as internal and prefer the
 recommended refetch actions above.
+
+Voice channels are presence rooms, not conversation calls. Community channel
+call lifecycle events update the active call/channel presence UI only; they do
+not create `call_event` timeline items and they do not produce missed-call
+notifications.
 
 ## Routing Guarantees
 
