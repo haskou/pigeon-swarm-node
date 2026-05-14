@@ -67,7 +67,10 @@ export default class MongoIdentityMetadataRepository {
   public async findLatestByNetworkId(
     networkId: NetworkId,
   ): Promise<MongoIdentityMetadataDocument[]> {
-    const sortCriteria: Sort = { version: -1, receivedAt: -1 };
+    const sortCriteria: Sort = [
+      ['version', -1],
+      ['receivedAt', -1],
+    ];
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
         MongoIdentityMetadataRepository.COLLECTION_NAME,
