@@ -152,6 +152,14 @@ export class Call extends AggregateRoot {
     return this.participants.find((participant) => participant.is(identityId));
   }
 
+  private hasActiveReceiver(): boolean {
+    return this.participants.some(
+      (participant) =>
+        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
+        participant.isActiveReceiver(),
+    );
+  }
+
   public join(identityId: IdentityId): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
@@ -275,7 +283,7 @@ export class Call extends AggregateRoot {
       );
     }
 
-    if (missedParticipants.length > 0) {
+    if (missedParticipants.length > 0 && !this.hasActiveReceiver()) {
       this.lifecycle.miss();
       this.record(
         new CallMissedEvent(this.id.valueOf(), {

@@ -67,6 +67,10 @@ export class CallParticipant {
     return this.status.isJoined();
   }
 
+  public isActiveReceiver(): boolean {
+    return this.status.isActiveReceiver();
+  }
+
   public isRinging(): boolean {
     return this.status.isRinging();
   }

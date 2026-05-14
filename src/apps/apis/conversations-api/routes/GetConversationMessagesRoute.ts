@@ -26,6 +26,9 @@ import { MessageViewModel } from '../view-model/MessageViewModel';
 
 @JsonController('/conversations')
 export class GetConversationMessagesRoute extends Route {
+  private static readonly DEFAULT_LIMIT = 50;
+  private static readonly MAX_LIMIT = 100;
+
   private readonly finder: LatestMessagesFinder =
     this.get<LatestMessagesFinder>(LatestMessagesFinder);
 
@@ -54,12 +57,19 @@ export class GetConversationMessagesRoute extends Route {
         beforeMessageId,
       ).getMessage(),
     );
+    const safeLimit = Math.min(
+      Math.max(Number(limit) || GetConversationMessagesRoute.DEFAULT_LIMIT, 1),
+      GetConversationMessagesRoute.MAX_LIMIT,
+    );
     const calls = await this.callRepository().findByConversationId(
       new ConversationId(conversationId),
     );
-    const callEvents = calls.flatMap((call) =>
-      ConversationCallEventViewModel.fromCall(call),
-    );
+    const callEvents =
+      beforeMessageId && messages.length === 0
+        ? []
+        : calls.flatMap((call) =>
+            ConversationCallEventViewModel.fromCall(call),
+          );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -68,6 +78,7 @@ export class GetConversationMessagesRoute extends Route {
           conversationId,
           messages,
           callEvents,
+          safeLimit,
         ).toResource(),
       );
   }

@@ -38,24 +38,49 @@ export class CallSignalRateLimiter {
     callId: CallId,
     senderIdentityId: IdentityId,
   ): Promise<void> {
-    const id = this.id(callId, senderIdentityId);
-    const collection = await this.collection();
-    const document = await collection.findOne({ _id: id });
-    const next = this.policy.consume(document || undefined, Date.now());
-
-    if (!next.allowed) {
-      throw new CallSignalRateLimitExceededError(this.policy.getLimit());
+    if (this.policy.getLimit() === 0) {
+      return;
     }
 
-    await collection.updateOne(
+    const id = this.id(callId, senderIdentityId);
+    const collection = await this.collection();
+    const now = Date.now();
+    const resetAt = now + CallSignalRatePolicy.WINDOW_MS;
+    const result = await collection.findOneAndUpdate(
       { _id: id },
-      {
-        $set: {
-          count: next.bucket.count,
-          resetAt: next.bucket.resetAt,
+      [
+        {
+          $set: {
+            count: {
+              $cond: [
+                {
+                  $or: [{ $not: ['$count'] }, { $lte: ['$resetAt', now] }],
+                },
+                1,
+                { $add: ['$count', 1] },
+              ],
+            },
+            resetAt: {
+              $cond: [
+                {
+                  $or: [{ $not: ['$resetAt'] }, { $lte: ['$resetAt', now] }],
+                },
+                resetAt,
+                '$resetAt',
+              ],
+            },
+          },
         },
+      ],
+      {
+        returnDocument: 'after',
+        upsert: true,
       },
-      { upsert: true },
     );
+    const document = result || undefined;
+
+    if (!document || document.count > this.policy.getLimit()) {
+      throw new CallSignalRateLimitExceededError(this.policy.getLimit());
+    }
   }
 }

@@ -189,4 +189,35 @@ describe('Call', () => {
     expect(events[0]).toBeInstanceOf(CallParticipantMissedEvent);
     expect(events[1]).toBeInstanceOf(CallMissedEvent);
   });
+
+  it('should keep an active group call alive when only ringing invitees timeout', () => {
+    const call = Call.start(creator, networkId, scope, [
+      recipient,
+      lateParticipant,
+    ]);
+
+    call.pullDomainEvents();
+    call.join(recipient);
+    call.pullDomainEvents();
+    const missedParticipants = call.markTimedOut(
+      new Timestamp(1770000000000),
+    );
+    const events = call.pullDomainEvents();
+
+    expect(missedParticipants).toEqual([lateParticipant]);
+    expect(call.toPrimitives()).toMatchObject({
+      status: 'active',
+      participants: [
+        { identityId: creator.valueOf(), status: 'joined' },
+        { identityId: recipient.valueOf(), status: 'joined' },
+        {
+          identityId: lateParticipant.valueOf(),
+          missedAt: 1770000000000,
+          status: 'missed',
+        },
+      ],
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toBeInstanceOf(CallParticipantMissedEvent);
+  });
 });

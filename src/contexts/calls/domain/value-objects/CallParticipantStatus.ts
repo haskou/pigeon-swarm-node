@@ -56,6 +56,13 @@ export class CallParticipantStatus extends StringValueObject {
     return this.valueOf() === CallParticipantStatusEnum.JOINED;
   }
 
+  public isActiveReceiver(): boolean {
+    return (
+      this.valueOf() === CallParticipantStatusEnum.JOINED ||
+      this.valueOf() === CallParticipantStatusEnum.RINGING
+    );
+  }
+
   public isRinging(): boolean {
     return this.valueOf() === CallParticipantStatusEnum.RINGING;
   }
