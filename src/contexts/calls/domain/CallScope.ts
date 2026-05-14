@@ -55,6 +55,10 @@ export class CallScope {
     return this.type.isConversation();
   }
 
+  public isCommunityChannel(): boolean {
+    return this.type.isCommunityChannel();
+  }
+
   public toPrimitives() {
     return {
       channelId: this.channelId?.valueOf(),

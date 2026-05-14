@@ -93,6 +93,32 @@ Feature: Calls API
     Then response code is equal to 200
     And response body should contain "connectedIdentityIds"
 
+  Scenario: Reuse an active community channel call
+    Given I register an in-memory IPFS network "api-calls-community-reuse-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community member body for another identity
+    And I sign the current community member request
+    When I POST to the current community members
+    Then response code is equal to 200
+    And I set a community voice channel body
+    And I sign the current community voice channel request
+    When I POST a voice channel to the current community
+    Then response code is equal to 200
+    And I remember the current community voice channel
+    And I set a community channel call body
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 200
+    And I remember the current call
+    And the community member signs the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 200
+    And response body should contain the current call
+
   Scenario: Reject signalling to an identity outside the call
     Given I register an in-memory IPFS network "api-calls-invalid-signal-network"
     And I have created a one-to-one conversation

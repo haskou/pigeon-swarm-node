@@ -24,4 +24,8 @@ export class CallScopeType extends StringValueObject {
   public isConversation(): boolean {
     return this.valueOf() === CallScopeTypeEnum.CONVERSATION;
   }
+
+  public isCommunityChannel(): boolean {
+    return this.valueOf() === CallScopeTypeEnum.COMMUNITY_CHANNEL;
+  }
 }

@@ -895,6 +895,19 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/calls/');
   }
 
+  @given('the community member signs the current call start request')
+  public async theCommunityMemberSignsTheCurrentCallStartRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/calls/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current calls request')
   public async iSignTheCurrentCallsRequest(): Promise<void> {
     this.body = undefined;

@@ -166,6 +166,28 @@ export class Call extends AggregateRoot {
     );
   }
 
+  public joinOrAdd(identityId: IdentityId): void {
+    this.assertActive();
+    const participant = this.findParticipant(identityId);
+
+    if (participant?.isJoined()) {
+      return;
+    }
+
+    if (participant) {
+      participant.join();
+    } else {
+      this.participants.push(CallParticipant.joined(identityId));
+    }
+
+    this.record(
+      new CallParticipantJoinedEvent(this.id.valueOf(), {
+        ...this.baseEventAttributes(),
+        joinedIdentityId: identityId.valueOf(),
+      }),
+    );
+  }
+
   public leave(identityId: IdentityId): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);

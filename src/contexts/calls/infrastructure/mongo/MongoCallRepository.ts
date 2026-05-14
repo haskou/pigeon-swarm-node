@@ -130,6 +130,27 @@ export class MongoCallRepository {
     return documents.map((document) => this.toDomain(document));
   }
 
+  public async findActiveByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call | undefined> {
+    const document = await (
+      await this.collection()
+    ).findOne(
+      {
+        'scope.channelId': channelId.valueOf(),
+        'scope.communityId': communityId.valueOf(),
+        'scope.type': 'community_channel',
+        status: 'active',
+      },
+      {
+        sort: { createdAt: -1 },
+      },
+    );
+
+    return document ? this.toDomain(document) : undefined;
+  }
+
   public async findActiveByCommunity(
     communityId: CommunityId,
   ): Promise<Call[]> {

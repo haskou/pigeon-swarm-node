@@ -311,6 +311,11 @@ Implemented:
 - one-to-one calls use an existing one-to-one conversation id
 - group calls use an existing group conversation id
 - community channel calls use an existing community voice channel id
+- community channel call start is idempotent by `(communityId, channelId)`:
+  when an active call already exists for that voice channel, `POST /calls`
+  returns the existing call instead of creating a second one
+- when returning an existing community channel call, the authenticated caller is
+  joined or added as a joined participant when needed
 - caller must be a conversation participant or community member
 - start emits `calls.v1.call.started` to the call participants
 - the creator starts as `joined`; other participants start as `ringing`

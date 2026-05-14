@@ -22,6 +22,9 @@ describe('Call', () => {
   const recipient = new IdentityId(
     'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
   );
+  const lateParticipant = new IdentityId(
+    'MCowBQYDK2VwAyEACQNoYYTvUcCZYb3jBDUqqp/ZrcLEhWy0pYsEZ1kkgJg=',
+  );
   const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
   const scope = CallScope.conversation(
     new ConversationId('one-to-one:call-test'),
@@ -57,6 +60,40 @@ describe('Call', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toBeInstanceOf(CallParticipantJoinedEvent);
+  });
+
+  it('should add and join a late participant', () => {
+    const call = Call.start(creator, networkId, scope, [recipient]);
+
+    call.pullDomainEvents();
+    call.joinOrAdd(lateParticipant);
+
+    expect(call.toPrimitives().participants).toMatchObject([
+      { identityId: creator.valueOf(), status: 'joined' },
+      { identityId: recipient.valueOf(), status: 'ringing' },
+      { identityId: lateParticipant.valueOf(), status: 'joined' },
+    ]);
+    const events = call.pullDomainEvents();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toBeInstanceOf(CallParticipantJoinedEvent);
+    expect(events[0].attributes).toMatchObject({
+      joinedIdentityId: lateParticipant.valueOf(),
+      participantIds: [
+        creator.valueOf(),
+        recipient.valueOf(),
+        lateParticipant.valueOf(),
+      ],
+    });
+  });
+
+  it('should not emit a joined event when the participant is already joined', () => {
+    const call = Call.start(creator, networkId, scope, [recipient]);
+
+    call.pullDomainEvents();
+    call.joinOrAdd(creator);
+
+    expect(call.pullDomainEvents()).toHaveLength(0);
   });
 
   it('should send a signal between participants', () => {
