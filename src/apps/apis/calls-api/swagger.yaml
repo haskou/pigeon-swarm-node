@@ -22,7 +22,11 @@ paths:
       tags:
         - calls
       summary: Start a call
-      description: Conversation calls create a new call. Community channel calls are idempotent by (communityId, channelId): if the voice channel already has an active call, the API returns that call and joins/adds the authenticated caller when needed.
+      description: |
+        Conversation calls create a new call. Community channel calls are
+        idempotent by (communityId, channelId): if the voice channel already
+        has an active call, the API returns that call and joins/adds the
+        authenticated caller when needed.
       requestBody:
         required: true
         content:
