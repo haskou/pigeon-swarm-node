@@ -19,6 +19,8 @@ import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetComm
 import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelRoute';
 import { PatchCommunityRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoute';
 import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
+import { PostCommunityInviteAcceptRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteAcceptRoute';
+import { PostCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteRoute';
 import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
@@ -203,6 +205,8 @@ export default class Server {
           GetCommunityMembersRoute,
           PostCommunityMemberRoute,
           DeleteCommunityMemberRoute,
+          PostCommunityInviteRoute,
+          PostCommunityInviteAcceptRoute,
           GetCommunityChannelsRoute,
           PostCommunityTextChannelRoute,
           PostCommunityVoiceChannelRoute,

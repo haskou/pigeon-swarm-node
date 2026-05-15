@@ -159,6 +159,58 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not a community member or is the community owner.
+  /communities/{communityId}/invites:
+    post:
+      tags:
+        - communities
+      summary: Create a private community invite link token
+      description: Only the community owner can create invite link tokens. The token is bearer-style; anyone with a valid token can accept it with their signed identity. Community keys are not sent to the backend and should travel in the frontend URL fragment.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityInviteBody'
+      responses:
+        '200':
+          description: Invite token created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInviteResource'
+        '409':
+          description: Authenticated identity is not the community owner or the invite body is invalid.
+  /communities/invites/{inviteToken}/accept:
+    post:
+      tags:
+        - communities
+      summary: Accept a private community invite link token
+      description: The authenticated identity consumes the bearer invite token and joins the linked community. The backend does not receive or decrypt community keys.
+      parameters:
+        - in: path
+          name: inviteToken
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Invite accepted and community updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Invite token was not found, expired, or has no uses left.
   /communities/{communityId}/channels:
     get:
       tags:
@@ -534,6 +586,21 @@ components:
           type: array
           items:
             type: string
+    CommunityInviteResource:
+      type: object
+      required:
+        - inviteToken
+        - communityId
+        - maxUses
+      properties:
+        inviteToken:
+          type: string
+        communityId:
+          type: string
+        expiresAt:
+          type: integer
+        maxUses:
+          type: integer
     CommunityChannelsResource:
       type: object
       required:
@@ -667,6 +734,16 @@ components:
       properties:
         identityId:
           type: string
+    PostCommunityInviteBody:
+      type: object
+      properties:
+        expiresAt:
+          type: integer
+          description: Optional millisecond timestamp after which the invite cannot be accepted.
+        maxUses:
+          type: integer
+          minimum: 1
+          default: 1
     PostCommunityTextChannelBody:
       type: object
       required:
