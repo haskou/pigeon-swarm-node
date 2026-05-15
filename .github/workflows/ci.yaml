@@ -45,3 +45,5 @@ jobs:
 
       - name: Test
         run: yarn test:ci
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
