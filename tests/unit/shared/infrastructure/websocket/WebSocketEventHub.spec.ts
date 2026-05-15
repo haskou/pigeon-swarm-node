@@ -40,6 +40,43 @@ describe('WebSocketEventHub', () => {
     );
   });
 
+  it('answers identity heartbeat messages on the same websocket client', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const now = 1770000000000;
+
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    jest.clearAllMocks();
+    messageHandler(Buffer.from(JSON.stringify({ type: 'identity_heartbeat' })));
+
+    expect(client.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        identityId: identityId.valueOf(),
+        timestamp: now,
+        type: 'heartbeat_ack',
+      }),
+    );
+  });
+
+  it('ignores unknown websocket client messages', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    jest.clearAllMocks();
+    messageHandler(Buffer.from(JSON.stringify({ type: 'unknown' })));
+    messageHandler(Buffer.from('not-json'));
+
+    expect(client.send).not.toHaveBeenCalled();
+  });
+
   it('broadcasts node-wide events to connected websocket clients', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
@@ -360,4 +397,16 @@ function buildClient(readyState: number = WebSocket.OPEN): WebSocket {
     readyState,
     send: jest.fn(),
   } as unknown as WebSocket;
+}
+
+function getClientMessageHandler(client: WebSocket): (message: Buffer) => void {
+  const messageHandler = (client.on as jest.Mock).mock.calls.find(
+    ([eventName]) => eventName === 'message',
+  )?.[1];
+
+  if (!messageHandler) {
+    throw new Error('Message handler not registered.');
+  }
+
+  return messageHandler;
 }

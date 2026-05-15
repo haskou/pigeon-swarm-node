@@ -34,6 +34,12 @@ paths:
 
         `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
 
+        Clients may send `{ "type": "identity_heartbeat" }` over the open
+        socket. The server answers
+        `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
+        Heartbeat messages are not signed because the WebSocket upgrade already
+        authenticated the connection.
+
         Subsequent messages use:
 
         `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`

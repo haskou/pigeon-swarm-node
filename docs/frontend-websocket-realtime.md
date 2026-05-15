@@ -114,6 +114,35 @@ against event attributes such as `participantIds`, `recipientIdentityId` and
 If the signature is invalid, stale or replayed, the upgrade is rejected with
 `401 Unauthorized`.
 
+## Heartbeat
+
+After `connection_ack`, the frontend may keep the socket fresh with:
+
+```json
+{
+  "type": "identity_heartbeat"
+}
+```
+
+The node answers on the same socket:
+
+```json
+{
+  "type": "heartbeat_ack",
+  "identityId": "<identityId>",
+  "timestamp": 1770000000000
+}
+```
+
+Rules:
+
+- send every 30 seconds while the socket is open
+- do not sign heartbeat messages
+- do not rotate nonce/timestamp for heartbeat messages
+- reconnect with a fresh signed WebSocket URL if no `heartbeat_ack` arrives
+  within 2 intervals
+- backend ignores unknown or malformed client messages
+
 ## Event Envelope
 
 Realtime domain events are delivered as:

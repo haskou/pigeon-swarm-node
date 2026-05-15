@@ -127,6 +127,31 @@ newlines. WebSocket routing uses that same normalized value for byte-for-byte
 recipient matching against event attributes such as `participantIds`,
 `recipientIdentityId` and `ownerIdentityId`.
 
+Client heartbeat:
+
+```json
+{
+  "type": "identity_heartbeat"
+}
+```
+
+Heartbeat acknowledgement:
+
+```json
+{
+  "type": "heartbeat_ack",
+  "identityId": "<identityId>",
+  "timestamp": 1770000000000
+}
+```
+
+Heartbeat messages do not need a new signature; the WebSocket upgrade already
+authenticated the connection. The backend ignores any client-sent `identityId`
+and answers with the identity bound to the socket. Unknown or malformed client
+messages are ignored. Recommended client interval: 30 seconds, reconnecting
+with a fresh signed WebSocket URL if no `heartbeat_ack` arrives within 2
+intervals.
+
 Domain event payload:
 
 ```json
