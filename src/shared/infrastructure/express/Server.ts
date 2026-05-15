@@ -47,7 +47,6 @@ import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/
 import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/PostNotificationRoute';
 import * as express from 'express';
 import * as shttp from 'http';
-import path from 'path';
 import { createExpressServer } from 'routing-controllers';
 
 import { ServerNotRunningError } from '../errors/ServerNotRunningError';
@@ -55,6 +54,8 @@ import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
 import { WebSocketRealtimeServer } from '../websocket/WebSocketRealtimeServer';
 import { HttpErrorHandler } from './HttpErrorHandler';
+import { PublicStaticContent } from './PublicStaticContent';
+import { RoutePrefix } from './RoutePrefix';
 
 type HttpApp = express.Application;
 type HttpServer = shttp.Server;
@@ -64,69 +65,6 @@ export default class Server {
   private _app: HttpApp | undefined;
   private _server: HttpServer | undefined;
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
-
-  private normalizeRoutePrefix(routePrefix: string | undefined): string {
-    if (!routePrefix || routePrefix === '/') {
-      return '';
-    }
-
-    const normalizedPrefix = routePrefix
-      .trim()
-      .replace(/^\/+/, '')
-      .replace(/\/+$/, '');
-
-    return normalizedPrefix ? `/${normalizedPrefix}` : '';
-  }
-
-  private servesRoutePrefix(requestPath: string, routePrefix: string): boolean {
-    return (
-      routePrefix.length > 0 &&
-      (requestPath === routePrefix || requestPath.startsWith(`${routePrefix}/`))
-    );
-  }
-
-  private serveStaticContent(routePrefix: string): void {
-    const publicPath = path.resolve(process.cwd(), 'public');
-    const staticMiddleware = express.static(publicPath);
-    const indexPath = path.join(publicPath, 'index.html');
-    const sendIndexIfAvailable: express.RequestHandler = (
-      _request,
-      response,
-      next,
-    ) => {
-      return response.sendFile(indexPath, (error) => {
-        if (error) {
-          next();
-        }
-      });
-    };
-
-    if (routePrefix) {
-      this.app.use((request, response, next) => {
-        if (this.servesRoutePrefix(request.path, routePrefix)) {
-          next();
-
-          return;
-        }
-
-        staticMiddleware(request, response, next);
-      });
-      this.app.get('*', (request, response, next) => {
-        if (this.servesRoutePrefix(request.path, routePrefix)) {
-          next();
-
-          return;
-        }
-
-        sendIndexIfAvailable(request, response, next);
-      });
-
-      return;
-    }
-
-    this.app.use(staticMiddleware);
-    this.app.get('*', sendIndexIfAvailable);
-  }
 
   private buildSwaggerHtml(
     routePrefix: string,
@@ -210,12 +148,16 @@ export default class Server {
 
   public run(): Promise<void> {
     return new Promise((resolve) => {
-      const routePrefix = this.normalizeRoutePrefix(process.env.ROUTE_PREFIX);
+      const routePrefix = RoutePrefix.fromEnvironment(process.env.ROUTE_PREFIX);
+      const routePrefixValue = routePrefix.toString();
       const swaggerFactory = new ApiSwaggerFactory();
       const swaggerByApi = swaggerFactory.createByApi();
       const aggregatedSwagger = swaggerFactory.createAggregatedSpec();
-      const swaggerRoutes = swaggerFactory.createRouteByApi(routePrefix);
-      const swaggerHtml = this.buildSwaggerHtml(routePrefix, swaggerRoutes);
+      const swaggerRoutes = swaggerFactory.createRouteByApi(routePrefixValue);
+      const swaggerHtml = this.buildSwaggerHtml(
+        routePrefixValue,
+        swaggerRoutes,
+      );
 
       this._app = createExpressServer({
         controllers: [
@@ -271,17 +213,17 @@ export default class Server {
         cors: true,
         defaultErrorHandler: false,
         middlewares: [HttpErrorHandler],
-        routePrefix,
+        routePrefix: routePrefixValue,
       });
 
       this.app.get(
-        `${routePrefix}/swagger/open-api.yaml`,
+        `${routePrefixValue}/swagger/open-api.yaml`,
         (_request, response) => {
           return response.type('application/yaml').send(aggregatedSwagger);
         },
       );
 
-      this.app.get(`${routePrefix}/swagger`, (_request, response) => {
+      this.app.get(`${routePrefixValue}/swagger`, (_request, response) => {
         return response.type('text/html').send(swaggerHtml);
       });
 
@@ -291,12 +233,15 @@ export default class Server {
         });
       }
 
-      this.serveStaticContent(routePrefix);
+      new PublicStaticContent(routePrefix).register(this.app);
 
       this._server = this.app.listen(process.env.API_PORT || 8080, () => {
         resolve();
       });
-      this.webSocketRealtimeServer.attach(this._server, `${routePrefix}/ws`);
+      this.webSocketRealtimeServer.attach(
+        this._server,
+        `${routePrefixValue}/ws`,
+      );
     });
   }
 }
