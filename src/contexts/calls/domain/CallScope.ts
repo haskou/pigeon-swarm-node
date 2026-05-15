@@ -1,13 +1,12 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import {
   CallScopeType,
   CallScopeTypeEnum,
 } from './value-objects/CallScopeType';
-
-type CallScopePrimitives = ReturnType<CallScope['toPrimitives']>;
 
 export class CallScope {
   public static conversation(conversationId: ConversationId): CallScope {
@@ -29,7 +28,7 @@ export class CallScope {
     );
   }
 
-  public static fromPrimitives(primitives: CallScopePrimitives): CallScope {
+  public static fromPrimitives(primitives: PrimitiveOf<CallScope>): CallScope {
     return new CallScope(
       new CallScopeType(primitives.type),
       primitives.conversationId

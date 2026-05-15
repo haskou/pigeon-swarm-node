@@ -1,15 +1,16 @@
 import { Call } from '@app/contexts/calls/domain/Call';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import {
   ConversationCallEventResource,
   ConversationCallEventType,
 } from '../resources/ConversationCallEventResource';
 
-type CallPrimitives = ReturnType<Call['toPrimitives']>;
-type CallParticipantPrimitives = CallPrimitives['participants'][number];
-
 export class ConversationCallEventViewModel {
-  private static durationMs(call: CallPrimitives, createdAt: number): number {
+  private static durationMs(
+    call: PrimitiveOf<Call>,
+    createdAt: number,
+  ): number {
     return Math.max(createdAt - call.createdAt, 0);
   }
 
@@ -21,17 +22,21 @@ export class ConversationCallEventViewModel {
     return `call-event:${callId}:${eventType}:${actorIdentityId}`;
   }
 
+  private static conversationId(call: PrimitiveOf<Call>): string {
+    return call.scope.conversationId || '';
+  }
+
   private static fromParticipant(
-    call: CallPrimitives,
+    call: PrimitiveOf<Call>,
     eventType: Extract<ConversationCallEventType, 'declined' | 'missed'>,
-    participant: CallParticipantPrimitives,
+    participant: PrimitiveOf<Call>['participants'][number],
     createdAt: number,
   ): ConversationCallEventResource {
     return {
       actorIdentityId: participant.identityId,
       callEventType: eventType,
       callId: call.id,
-      conversationId: call.scope.conversationId as string,
+      conversationId: this.conversationId(call),
       createdAt,
       durationMs: this.durationMs(call, createdAt),
       id: this.eventId(call.id, eventType, participant.identityId),
@@ -55,7 +60,7 @@ export class ConversationCallEventViewModel {
         actorIdentityId,
         callEventType: 'ended',
         callId: primitives.id,
-        conversationId: primitives.scope.conversationId as string,
+        conversationId: this.conversationId(primitives),
         createdAt: primitives.endedAt,
         durationMs: this.durationMs(primitives, primitives.endedAt),
         id: this.eventId(primitives.id, 'ended', actorIdentityId),

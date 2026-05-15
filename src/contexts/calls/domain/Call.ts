@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
-import { assert, Timestamp } from '@haskou/value-objects';
+import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CallLifecycle } from './CallLifecycle';
 import { CallParticipant } from './CallParticipant';
@@ -19,26 +19,6 @@ import { CallStartedEvent } from './events/CallStartedEvent';
 import { CallId } from './value-objects/CallId';
 import { CallSignalType } from './value-objects/CallSignalType';
 import { CallStatus } from './value-objects/CallStatus';
-
-type CallPrimitives = {
-  createdAt: number;
-  creatorIdentityId: string;
-  endedAt?: number;
-  endedByIdentityId?: string;
-  id: string;
-  networkId: string;
-  participantIds: string[];
-  participants?: Array<{
-    declinedAt?: number;
-    identityId: string;
-    joinedAt?: number;
-    leftAt?: number;
-    missedAt?: number;
-    status: string;
-  }>;
-  scope: ReturnType<CallScope['toPrimitives']>;
-  status: string;
-};
 
 export class Call extends AggregateRoot {
   public static start(
@@ -67,19 +47,15 @@ export class Call extends AggregateRoot {
     return call;
   }
 
-  public static fromPrimitives(primitives: CallPrimitives): Call {
+  public static fromPrimitives(primitives: PrimitiveOf<Call>): Call {
     return new Call(
       new CallId(primitives.id),
       new NetworkId(primitives.networkId),
       CallScope.fromPrimitives(primitives.scope),
       new IdentityId(primitives.creatorIdentityId),
-      primitives.participants
-        ? primitives.participants.map((participant) =>
-            CallParticipant.fromPrimitives(participant),
-          )
-        : primitives.participantIds.map((participantId) =>
-            CallParticipant.joined(new IdentityId(participantId)),
-          ),
+      primitives.participants.map((participant) =>
+        CallParticipant.fromPrimitives(participant),
+      ),
       new CallLifecycle(
         new CallStatus(primitives.status),
         new Timestamp(primitives.createdAt),

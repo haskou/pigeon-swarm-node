@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Timestamp } from '@haskou/value-objects';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CallParticipantStatus } from './value-objects/CallParticipantStatus';
 
@@ -19,14 +19,9 @@ export class CallParticipant {
     return new CallParticipant(identityId, CallParticipantStatus.RINGING);
   }
 
-  public static fromPrimitives(primitives: {
-    declinedAt?: number;
-    identityId: string;
-    joinedAt?: number;
-    leftAt?: number;
-    missedAt?: number;
-    status: string;
-  }): CallParticipant {
+  public static fromPrimitives(
+    primitives: PrimitiveOf<CallParticipant>,
+  ): CallParticipant {
     return new CallParticipant(
       new IdentityId(primitives.identityId),
       new CallParticipantStatus(primitives.status),
@@ -92,11 +87,11 @@ export class CallParticipant {
 
   public toPrimitives() {
     return {
-      declinedAt: this.declinedAt?.valueOf(),
       identityId: this.identityId.valueOf(),
-      joinedAt: this.joinedAt?.valueOf(),
-      leftAt: this.leftAt?.valueOf(),
-      missedAt: this.missedAt?.valueOf(),
+      ...(this.declinedAt ? { declinedAt: this.declinedAt.valueOf() } : {}),
+      ...(this.joinedAt ? { joinedAt: this.joinedAt.valueOf() } : {}),
+      ...(this.leftAt ? { leftAt: this.leftAt.valueOf() } : {}),
+      ...(this.missedAt ? { missedAt: this.missedAt.valueOf() } : {}),
       status: this.status.valueOf(),
     };
   }
