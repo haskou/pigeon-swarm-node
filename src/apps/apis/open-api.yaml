@@ -33,6 +33,8 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}'
   /communities/{communityId}/members:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members'
+  /communities/{communityId}/members/me:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1me'
   /communities/{communityId}/channels:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels'
   /communities/{communityId}/channels/text:

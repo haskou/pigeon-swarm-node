@@ -13,6 +13,7 @@ package "communities/domain" {
     - createdAt: Timestamp
     + create(ownerIdentityId, networkId, name, description, banner?): Community
     + addMember(actor, member): void
+    + leave(member): void
     + addTextChannel(actor, name): CommunityTextChannel
     + renameTextChannel(actor, channelId, name): void
     + updateProfile(actor, name, description, banner?): void
@@ -117,6 +118,7 @@ package "communities-api" {
   class PatchCommunityRoute
   class GetCommunityMembersRoute
   class PostCommunityMemberRoute
+  class DeleteCommunityMemberRoute
   class GetCommunityChannelsRoute
   class PostCommunityTextChannelRoute
   class PatchCommunityChannelRoute
@@ -130,6 +132,7 @@ package "communities-api" {
   PatchCommunityRoute ..> Community
   GetCommunityMembersRoute ..> Community
   PostCommunityMemberRoute ..> Community
+  DeleteCommunityMemberRoute ..> Community
   GetCommunityChannelsRoute ..> Community
   PostCommunityTextChannelRoute ..> Community
   PatchCommunityChannelRoute ..> Community
@@ -147,6 +150,7 @@ note right of Community
   - one owner
   - owner administers profile,
     members and text channel metadata
+  - non-owner members can leave
   - members can send/list encrypted
     text channel messages
 end note

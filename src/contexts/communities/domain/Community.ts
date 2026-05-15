@@ -8,11 +8,13 @@ import { CommunityProfile } from './CommunityProfile';
 import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
+import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
 import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEvent';
+import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
 import { CommunityWasUpdatedEvent } from './events/CommunityWasUpdatedEvent';
 import { CommunityAvatar } from './value-objects/CommunityAvatar';
 import { CommunityBanner } from './value-objects/CommunityBanner';
@@ -120,6 +122,27 @@ export class Community extends AggregateRoot {
     this.members.push(member);
     this.record(
       new CommunityMemberWasAddedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+        identityId: member.valueOf(),
+      }),
+    );
+  }
+
+  public leave(member: IdentityId): void {
+    this.assertIsMember(member);
+    assert(
+      !this.ownerIdentityId.isEqual(member),
+      new CommunityOwnerCannotLeaveError(),
+    );
+
+    const memberIndex = this.members.findIndex((currentMember) =>
+      currentMember.isEqual(member),
+    );
+
+    this.members.splice(memberIndex, 1);
+    this.record(
+      new CommunityMemberWasLeftEvent(this.id.valueOf(), {
         ...this.eventAttributes(),
         community: this.toPrimitives(),
         identityId: member.valueOf(),

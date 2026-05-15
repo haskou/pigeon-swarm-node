@@ -3,6 +3,7 @@ import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domai
 import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasRenamedEvent';
 import { CommunityMemberWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasAddedEvent';
+import { CommunityMemberWasLeftEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasLeftEvent';
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
 import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
@@ -114,6 +115,34 @@ describe('Community', () => {
       },
       memberIds: [owner.valueOf(), member.valueOf()],
     });
+  });
+
+  it('records member leave metadata events', () => {
+    const community = createCommunity();
+
+    community.addMember(owner, member);
+    community.pullDomainEvents();
+    community.leave(member);
+
+    const events = community.pullDomainEvents();
+
+    expect(events[0]).toBeInstanceOf(CommunityMemberWasLeftEvent);
+    expect(events[0].attributes).toMatchObject({
+      community: {
+        id: community.getId().valueOf(),
+        memberIds: [owner.valueOf()],
+      },
+      identityId: member.valueOf(),
+      memberIds: [owner.valueOf()],
+    });
+  });
+
+  it('does not allow the owner to leave the community', () => {
+    const community = createCommunity();
+
+    expect(() => community.leave(owner)).toThrow(
+      'Community owner cannot leave the community',
+    );
   });
 
   function createCommunity(): Community {

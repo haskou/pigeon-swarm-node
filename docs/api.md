@@ -186,6 +186,7 @@ Event contracts used by frontend:
 | `communities.v1.channel.was_deleted` | community id | `communityId`, `networkId`, `memberIds`, `channelId` |
 | `communities.v1.community.was_updated` | community id | `communityId`, `networkId`, `memberIds`, `community` |
 | `communities.v1.member.was_added` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
+| `communities.v1.member.was_left` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
@@ -1361,6 +1362,19 @@ Implemented:
 - add the identity id as a member
 - treat adding an existing member as idempotent
 
+### Leave community
+
+```http
+DELETE /communities/{communityId}/members/me
+```
+
+Implemented:
+
+- require signed request auth from the member that is leaving
+- remove the authenticated identity from `memberIds`
+- publish `communities.v1.member.was_left` with the updated community
+- reject the community owner until ownership transfer or community deletion exists
+
 ### List community channels
 
 ```http
@@ -1520,6 +1534,7 @@ Other metadata events:
 - `communities.v1.channel.was_deleted`: `channelId`
 - `communities.v1.community.was_updated`: full `community`
 - `communities.v1.member.was_added`: `identityId` and full updated `community`
+- `communities.v1.member.was_left`: `identityId` and full updated `community`
 
 ### Send channel message
 

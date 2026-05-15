@@ -158,6 +158,7 @@ Frontend should switch on `event.type`.
 | `communities.v1.channel.was_deleted` | Community id | `communityId`, `networkId`, `memberIds`, `channelId` | Community `memberIds` | Remove the channel locally and choose another active channel if needed. |
 | `communities.v1.community.was_updated` | Community id | `communityId`, `networkId`, `memberIds`, `community` | Community `memberIds` | Replace the local community metadata with `community`. |
 | `communities.v1.member.was_added` | Community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` | Community `memberIds` | Update the member list or replace the local community with `community`. |
+| `communities.v1.member.was_left` | Community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` | Community `memberIds` | Remove the identity from the local member list or replace the local community with `community`. |
 | `notifications.v1.notification.was_created` | Notification id | `recipientIdentityId`, `type` | `recipientIdentityId` | Refetch notifications. |
 | `notifications.v1.notification.was_accepted` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications and related conversation/keychain state. |
 | `notifications.v1.notification.was_declined` | Notification id | `recipientIdentityId` | `recipientIdentityId` | Refetch notifications. |
@@ -187,6 +188,7 @@ Delivered to the connected identity:
 - `keychains.*` events for that keychain owner.
 - `notifications.*` events where the identity is `recipientIdentityId`.
 - `conversations.*` events where the identity is in `participantIds`.
+- `communities.*` events where the identity is in `memberIds`.
 - `calls.*` lifecycle events where the identity is in `participantIds`.
 - `calls.v1.signal.sent` only when the identity is `recipientIdentityId`.
 

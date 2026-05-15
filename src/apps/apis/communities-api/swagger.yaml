@@ -138,6 +138,27 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not the community owner.
+  /communities/{communityId}/members/me:
+    delete:
+      tags:
+        - communities
+      summary: Leave a private community
+      description: The authenticated member leaves the community. The owner cannot leave until ownership transfer or community deletion exists.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Member removed from the community.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity is not a community member or is the community owner.
   /communities/{communityId}/channels:
     get:
       tags:

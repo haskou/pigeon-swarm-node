@@ -542,6 +542,37 @@ export default class Definitions {
     );
   }
 
+  @given('the community member signs the current community leave request')
+  public async theCommunityMemberSignsTheCurrentCommunityLeaveRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/members/me`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current community leave request')
+  public async iSignTheCurrentCommunityLeaveRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/members/me`,
+    );
+  }
+
   @given('I set a community text channel body')
   public iSetACommunityTextChannelBody(): void {
     this.body = JSON.stringify({
@@ -1644,6 +1675,19 @@ export default class Definitions {
     );
   }
 
+  @when('I DELETE my membership from the current community')
+  public async iDELETEMyMembershipFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/members/me`,
+      undefined,
+      { headers: this.headers },
+    );
+  }
+
   @when('I GET current communities')
   public async iGETCurrentCommunities(): Promise<void> {
     this.response = await this.restClient.get(
@@ -1986,6 +2030,17 @@ export default class Definitions {
   @then('response body should not contain {string}')
   public responseBodyShouldnotContain(textToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.not.contain(textToContain);
+  }
+
+  @then('response body should not contain the other identity id')
+  public responseBodyShouldNotContainTheOtherIdentityId(): void {
+    if (!this.otherIdentityId) {
+      throw new Error('Other identity must exist first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.otherIdentityId.valueOf(),
+    );
   }
 
   @then('response body is an array with length of {int}')
