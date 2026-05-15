@@ -137,8 +137,18 @@ describe('Community', () => {
     });
   });
 
-  it('does not allow the owner to leave the community', () => {
+  it('allows the owner to leave when they are the only member', () => {
     const community = createCommunity();
+
+    community.leave(owner);
+
+    expect(community.toPrimitives().memberIds).toEqual([]);
+  });
+
+  it('does not allow the owner to leave while other members remain', () => {
+    const community = createCommunity();
+
+    community.addMember(owner, member);
 
     expect(() => community.leave(owner)).toThrow(
       'Community owner cannot leave the community',

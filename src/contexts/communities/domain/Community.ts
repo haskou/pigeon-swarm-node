@@ -132,7 +132,7 @@ export class Community extends AggregateRoot {
   public leave(member: IdentityId): void {
     this.assertIsMember(member);
     assert(
-      !this.ownerIdentityId.isEqual(member),
+      !this.ownerIdentityId.isEqual(member) || this.members.length === 1,
       new CommunityOwnerCannotLeaveError(),
     );
 
