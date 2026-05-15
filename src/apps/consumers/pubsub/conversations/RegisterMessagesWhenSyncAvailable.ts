@@ -1,5 +1,7 @@
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
+import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
+import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
@@ -10,6 +12,13 @@ type MessageCandidate = {
   messageId: string;
 };
 
+type ReactionCandidate = {
+  authorId: string;
+  createdAt: number;
+  emoji: string;
+  messageId: string;
+};
+
 export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.register-messages-when-sync-available';
@@ -17,6 +26,7 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   constructor(
     consumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
+    private readonly reactionRegistrar: MessageReactionRegistrar,
     private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
@@ -49,6 +59,23 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     );
   }
 
+  private isReactionCandidate(
+    candidate: unknown,
+  ): candidate is ReactionCandidate {
+    if (typeof candidate !== 'object' || candidate === null) {
+      return false;
+    }
+
+    const candidateRecord = candidate as Record<string, unknown>;
+
+    return (
+      typeof candidateRecord.authorId === 'string' &&
+      typeof candidateRecord.createdAt === 'number' &&
+      typeof candidateRecord.emoji === 'string' &&
+      typeof candidateRecord.messageId === 'string'
+    );
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     this.tracker.markAvailable(
       'conversation',
@@ -67,6 +94,26 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     for (const candidate of candidates) {
       await this.registrar.register(
         new RegisterConversationMessage(event.aggregateId, candidate.messageId),
+      );
+    }
+
+    const reactionCandidates = Array.isArray(
+      event.attributes.reactionCandidates,
+    )
+      ? event.attributes.reactionCandidates.filter((candidate) =>
+          this.isReactionCandidate(candidate),
+        )
+      : [];
+
+    for (const candidate of reactionCandidates) {
+      await this.reactionRegistrar.register(
+        new RegisterMessageReaction(
+          event.aggregateId,
+          candidate.messageId,
+          candidate.authorId,
+          candidate.emoji,
+          candidate.createdAt,
+        ),
       );
     }
   }

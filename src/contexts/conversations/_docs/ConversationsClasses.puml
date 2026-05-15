@@ -78,6 +78,24 @@ package "conversations.domain" {
     +eventName(): string
   }
 
+  class MessageReaction {
+    -conversationId: ConversationId
+    -messageId: MessageId
+    -authorId: IdentityId
+    -emoji: MessageReactionEmoji
+    -createdAt: Timestamp
+  }
+
+  class MessageReactionEmoji <<ValueObject>>
+
+  class ConversationMessageReactionWasAddedEvent {
+    +eventName(): string
+  }
+
+  class ConversationMessageReactionWasRemovedEvent {
+    +eventName(): string
+  }
+
   class ConversationSyncRequestedEvent {
     +eventName(): string
   }
@@ -105,6 +123,13 @@ package "conversations.domain" {
     +registerUnreadForMessage(conversation: Conversation, message: Message): Promise<void>
   }
 
+  interface MessageReactionRepository {
+    +save(reaction: MessageReaction): Promise<void>
+    +delete(reaction: MessageReaction): Promise<void>
+    +findByMessageIds(conversationId: ConversationId, messageIds: MessageId[]): Promise<MessageReaction[]>
+    +findCandidates(conversationId: ConversationId): Promise<MessageReaction[]>
+  }
+
   Conversation <|-- OneToOneConversation
   Conversation <|-- GroupConversation
   Conversation *--> "0..*" Message
@@ -121,13 +146,20 @@ package "conversations.domain" {
   MessageEdited --> MessageId
   MessageDeleted --> MessageId
   MessageSignatureDomainService ..> Message
+  MessageReaction --> ConversationId
+  MessageReaction --> MessageId
+  MessageReaction --> IdentityId
+  MessageReaction --> MessageReactionEmoji
   ConversationRepository --> Conversation
+  MessageReactionRepository --> MessageReaction
   OneToOneConversation ..> ConversationWasCreatedEvent
   GroupConversation ..> ConversationWasCreatedEvent
   Conversation ..> ConversationMessageWasSentEvent
   Conversation ..> ConversationMessageWasEditedEvent
   Conversation ..> ConversationMessageWasDeletedEvent
   ConversationRepository ..> ConversationMessagesWereReadEvent
+  MessageReaction ..> ConversationMessageReactionWasAddedEvent
+  MessageReaction ..> ConversationMessageReactionWasRemovedEvent
 }
 
 package "conversations.application" {
@@ -159,6 +191,14 @@ package "conversations.application" {
     +delete(command): Promise<MessageId>
   }
 
+  class MessageReactionAdder {
+    +add(command): Promise<MessageReaction>
+  }
+
+  class MessageReactionRemover {
+    +remove(command): Promise<MessageReaction>
+  }
+
   class ConversationSynchronizer {
     +sync(conversationId: ConversationId): Promise<void>
   }
@@ -173,6 +213,11 @@ package "conversations.application" {
 
   class MessagesReadRegistrar {
     +register(message): Promise<void>
+  }
+
+  class MessageReactionRegistrar {
+    +register(message): Promise<void>
+    +unregister(message): Promise<void>
   }
 
   class ConversationSyncResponder {
@@ -191,17 +236,27 @@ package "conversations.application" {
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository
   LatestMessagesFinder --> ConversationRepository
+  LatestMessagesFinder --> MessageReactionRepository
   MessageEditor --> ConversationRepository
   MessageEditor --> DomainEventPublisher
   MessageDeleter --> ConversationRepository
   MessageDeleter --> DomainEventPublisher
+  MessageReactionAdder --> ConversationRepository
+  MessageReactionAdder --> MessageReactionRepository
+  MessageReactionAdder --> DomainEventPublisher
+  MessageReactionRemover --> ConversationRepository
+  MessageReactionRemover --> MessageReactionRepository
+  MessageReactionRemover --> DomainEventPublisher
   ConversationSynchronizer --> ConversationRepository
   ConversationSynchronizer --> DomainEventPublisher
   ConversationMessageRegistrar --> ConversationRepository
   MessagesReadMarker --> ConversationRepository
   MessagesReadMarker --> DomainEventPublisher
   MessagesReadRegistrar --> ConversationRepository
+  MessageReactionRegistrar --> ConversationRepository
+  MessageReactionRegistrar --> MessageReactionRepository
   ConversationSyncResponder --> ConversationRepository
+  ConversationSyncResponder --> MessageReactionRepository
   ConversationSyncResponder --> DomainEventPublisher
   ConversationSyncResponder ..> ConversationSyncAvailableEvent
 }
@@ -244,6 +299,15 @@ package "conversations.infrastructure" {
   }
 
   class MongoConversationRepository
+  class MongoMessageReactionRepository
+  class MongoMessageReactionDocument {
+    -_id: string
+    -conversationId: string
+    -messageId: string
+    -authorId: string
+    -emoji: string
+    -createdAt: number
+  }
   class MongoConversationDocument {
     -_id: string
     -type: string
@@ -267,6 +331,8 @@ package "conversations.infrastructure" {
   MongoConversationRepository ..> IpfsMessageDocument
   MongoConversationRepository --> MongoMessageDocumentIndex
   MongoConversationRepository --> MongoUnreadConversationMessageDocument
+  MongoMessageReactionRepository ..|> MessageReactionRepository
+  MongoMessageReactionRepository --> MongoMessageReactionDocument
   Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
 }
 

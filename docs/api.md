@@ -198,6 +198,8 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.messages.were_read` | conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` |
+| `conversations.v1.message.reaction.was_added` | conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` |
+| `conversations.v1.message.reaction.was_removed` | conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` |
 | `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
 | `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
 | `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
@@ -1024,7 +1026,14 @@ Response:
       "encryptedPayload": "<encryptedMessagePayload>",
       "previousMessageIds": [],
       "replyToMessageId": "<messageId>",
-      "attachmentExternalIdentifiers": []
+      "attachmentExternalIdentifiers": [],
+      "reactions": [
+        {
+          "authorIdentityId": "<identityId>",
+          "createdAt": 1773848829055,
+          "emoji": "👍"
+        }
+      ]
     },
     {
       "id": "call-event:<callId>:ended:<identityId>",
@@ -1067,7 +1076,8 @@ Response:
   "encryptedPayload": "<encryptedMessagePayload>",
   "previousMessageIds": [],
   "replyToMessageId": "<messageId>",
-  "attachmentExternalIdentifiers": []
+  "attachmentExternalIdentifiers": [],
+  "reactions": []
 }
 ```
 
@@ -1135,7 +1145,8 @@ Response:
   "encryptedPayload": "<encryptedMessagePayload>",
   "previousMessageIds": [],
   "replyToMessageId": "<messageId>",
-  "attachmentExternalIdentifiers": []
+  "attachmentExternalIdentifiers": [],
+  "reactions": []
 }
 ```
 
@@ -1189,6 +1200,76 @@ Implemented:
   `readerIdentityId`, `networkId` and `participantIds`
 - consuming nodes apply the same unread-flag deletion locally
 
+### Add message reaction
+
+```http
+POST /conversations/{conversationId}/messages/{messageId}/reactions
+```
+
+Request:
+
+```json
+{
+  "emoji": "👍"
+}
+```
+
+Response:
+
+```json
+{
+  "authorIdentityId": "<identityId>",
+  "createdAt": 1773848829055,
+  "emoji": "👍"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- require the target message to exist and be visible locally
+- store reactions in MongoDB only; message IPFS documents are not rewritten
+- keep reactions unique by conversation id, message id, author id and emoji
+- include reactions in `GET /conversations/{conversationId}/messages`,
+  `GET /conversations/{conversationId}/messages/{messageId}` and
+  `GET /conversations/{conversationId}/messages/{messageId}/around`
+- publish `conversations.v1.message.reaction.was_added` with `messageId`,
+  `authorId`, `emoji`, `createdAt`, `networkId` and `participantIds`
+
+### Remove message reaction
+
+```http
+DELETE /conversations/{conversationId}/messages/{messageId}/reactions
+```
+
+Request:
+
+```json
+{
+  "emoji": "👍"
+}
+```
+
+Response:
+
+```json
+{
+  "authorIdentityId": "<identityId>",
+  "createdAt": 1773848829055,
+  "emoji": "👍"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- remove only the authenticated participant reaction for the provided emoji
+- publish `conversations.v1.message.reaction.was_removed` with `messageId`,
+  `authorId`, `emoji`, `createdAt`, `networkId` and `participantIds`
+- synchronize the removal with other nodes through the conversation PubSub
+  consumers
+
 ### Delete message
 
 ```http
@@ -1216,6 +1297,7 @@ Response:
   "createdAt": 1773848829055,
   "previousMessageIds": ["<deletedMessageId>"],
   "attachmentExternalIdentifiers": [],
+  "reactions": [],
   "targetMessageId": "<deletedMessageId>"
 }
 ```

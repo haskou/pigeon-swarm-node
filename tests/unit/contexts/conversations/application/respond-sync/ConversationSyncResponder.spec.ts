@@ -2,6 +2,7 @@ import ConversationSyncResponder from '@app/contexts/conversations/application/r
 import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { MessageReactionRepository } from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -10,17 +11,20 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ConversationSyncResponder', () => {
   let repository: MockProxy<ConversationRepository>;
+  let reactionRepository: MockProxy<MessageReactionRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let suppressionTracker: MockProxy<SyncResponseSuppressionTracker>;
   let responder: ConversationSyncResponder;
 
   beforeEach(() => {
     repository = mock<ConversationRepository>();
+    reactionRepository = mock<MessageReactionRepository>();
     eventPublisher = mock<DomainEventPublisher>();
     suppressionTracker = mock<SyncResponseSuppressionTracker>();
     suppressionTracker.shouldRespond.mockResolvedValue(true);
     responder = new ConversationSyncResponder(
       repository,
+      reactionRepository,
       eventPublisher,
       suppressionTracker,
     );
@@ -40,6 +44,7 @@ describe('ConversationSyncResponder', () => {
     ];
 
     repository.findMessageCandidates.mockResolvedValue(messageCandidates);
+    reactionRepository.findCandidates.mockResolvedValue([]);
 
     await responder.respond(
       new ConversationSyncResponseMessage(
@@ -59,6 +64,9 @@ describe('ConversationSyncResponder', () => {
       100,
     );
     expect(repository.findById).not.toHaveBeenCalled();
+    expect(reactionRepository.findCandidates).toHaveBeenCalledWith(
+      conversationId,
+    );
     expect(eventPublisher.publish).toHaveBeenCalledWith([
       expect.any(ConversationSyncAvailableEvent),
     ]);
@@ -66,6 +74,7 @@ describe('ConversationSyncResponder', () => {
       {
         messageCandidates,
         networkId: expect.any(String),
+        reactionCandidates: [],
         requestId: 'request-3',
       },
     );
@@ -83,6 +92,7 @@ describe('ConversationSyncResponder', () => {
     );
 
     expect(repository.findMessageCandidates).not.toHaveBeenCalled();
+    expect(reactionRepository.findCandidates).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 });

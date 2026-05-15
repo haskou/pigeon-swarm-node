@@ -1149,6 +1149,13 @@ export default class Definitions {
     });
   }
 
+  @given('I set a conversation message reaction body')
+  public iSetAConversationMessageReactionBody(): void {
+    this.body = JSON.stringify({
+      emoji: '👍',
+    });
+  }
+
   @given('I sign the current conversation message request')
   public async iSignTheCurrentConversationMessageRequest(): Promise<void> {
     if (!this.conversationId) {
@@ -1170,6 +1177,30 @@ export default class Definitions {
     await this.signCurrentRequest(
       'DELETE',
       `/conversations/${this.conversationId}/messages/${this.messageId}`,
+    );
+  }
+
+  @given('I sign the current conversation message reaction request')
+  public async iSignTheCurrentConversationMessageReactionRequest(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
+    );
+  }
+
+  @given('I sign the current conversation message reaction removal request')
+  public async iSignTheCurrentConversationMessageReactionRemovalRequest(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'DELETE',
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
     );
   }
 
@@ -1533,6 +1564,25 @@ export default class Definitions {
     }
 
     this.messageId = this.response.data.id;
+  }
+
+  @given('I have reacted to the sent message')
+  public async iHaveReactedToTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not react to message: ${JSON.stringify(this.response.data)}`,
+      );
+    }
   }
 
   @given('I register an in-memory IPFS network {string}')
@@ -1989,6 +2039,32 @@ export default class Definitions {
 
     this.response = await this.restClient.delete(
       `/conversations/${this.conversationId}/messages/${this.messageId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST the reaction to the sent message')
+  public async iPOSTTheReactionToTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the reaction from the sent message')
+  public async iDELETETheReactionFromTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

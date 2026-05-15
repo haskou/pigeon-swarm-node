@@ -8,6 +8,8 @@ import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communitie
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
+import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
+import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
@@ -67,6 +69,8 @@ async function init() {
     RegisterMessageWhenAnnounced,
     RegisterMessageEditionWhenAnnounced,
     RegisterMessageDeletionWhenAnnounced,
+    RegisterMessageReactionWhenAdded,
+    RegisterMessageReactionWhenRemoved,
     RespondToConversationSyncRequest,
     RegisterMessagesWhenSyncAvailable,
     RegisterNodePeerWhenHeartbeatReceived,

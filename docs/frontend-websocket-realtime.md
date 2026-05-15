@@ -173,6 +173,8 @@ Frontend should switch on `event.type`.
 | `conversations.v1.message.was_edited` | Conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` | Identities in `participantIds` | Fetch the edited message by `messageId`, then update the target projection. |
 | `conversations.v1.message.was_deleted` | Conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` | Identities in `participantIds` | Fetch the deletion tombstone by `messageId` or remove the target from the visible list. |
 | `conversations.v1.messages.were_read` | Conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` | Identities in `participantIds` | Refresh conversation list or clear unread indicators for `readerIdentityId` up to `messageId`. |
+| `conversations.v1.message.reaction.was_added` | Conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` | Identities in `participantIds` | Add or refetch reactions for the affected message. `GET /conversations/{conversationId}/messages/{messageId}` returns the full message with reactions. |
+| `conversations.v1.message.reaction.was_removed` | Conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` | Identities in `participantIds` | Remove that author/emoji reaction locally or refetch the affected message. |
 | `calls.v1.call.started` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` or add the call from event attributes. |
 | `calls.v1.participant.joined` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` and update participant UI. |
 | `calls.v1.participant.left` | Call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` | Identities in `participantIds` | Fetch `GET /calls/{callId}` or remove the identity from active participant UI. |
@@ -255,6 +257,12 @@ For sent-message events, `event.attributes.messageId` is the message id and
 `event.attributes.authorId` is the author identity id. Clients can ignore or
 reconcile optimistic messages from the current identity by comparing `authorId`
 and `messageId`.
+
+For reaction events, `event.aggregate_id` is the conversation id,
+`event.attributes.messageId` is the target message id,
+`event.attributes.authorId` is the reacting identity id and
+`event.attributes.emoji` is the added/removed emoji. Reactions are stored in
+MongoDB only and are included in message HTTP resources under `reactions`.
 
 When a reply points to a message that is not loaded, use:
 

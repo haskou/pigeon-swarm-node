@@ -177,6 +177,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+  /conversations/{conversationId}/messages/{messageId}/reactions:
+    post:
+      tags:
+        - conversations
+      summary: React to a conversation message
+      description: Stores a message reaction in MongoDB only and publishes a realtime/sync event to the other conversation participants.
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationMessageReactionBody'
+      responses:
+        '200':
+          description: Reaction stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageReactionResource'
+    delete:
+      tags:
+        - conversations
+      summary: Remove a conversation message reaction
+      description: Removes the authenticated participant reaction from MongoDB and publishes a realtime/sync event to the other conversation participants.
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationMessageReactionBody'
+      responses:
+        '200':
+          description: Reaction removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageReactionResource'
   /conversations/{conversationId}/messages/{messageId}/around:
     get:
       tags:
@@ -362,6 +421,28 @@ components:
         messageId:
           type: string
           description: Message id up to and including which unread flags should be removed for the authenticated identity.
+    ConversationMessageReactionBody:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+          description: Emoji reaction to add or remove. Reactions are unique by conversation, message, author and emoji.
+          example: 👍
+    MessageReactionResource:
+      type: object
+      required:
+        - authorIdentityId
+        - createdAt
+        - emoji
+      properties:
+        authorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        emoji:
+          type: string
     MessageResource:
       type: object
       required:
@@ -389,6 +470,11 @@ components:
           type: array
           items:
             type: string
+        reactions:
+          type: array
+          description: MongoDB-only reactions synchronized by conversation events.
+          items:
+            $ref: '#/components/schemas/MessageReactionResource'
         replyToMessageId:
           type: string
         attachmentExternalIdentifiers:

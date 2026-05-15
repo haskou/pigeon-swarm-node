@@ -1,12 +1,17 @@
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
+import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
+import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
+import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
+import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
+import { ConversationMessageReactionWasRemovedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasRemovedEvent';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
@@ -30,6 +35,13 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
 
   private readonly readerIdentityId =
     'MCowBQYDK2VwAyEAeLMrMAfBRHdSU4eI1qpIUsqyfkXtR4FGjLhFzaWlfsI=';
+
+  private readonly reactionAuthorId =
+    'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+
+  private readonly reactionCreatedAt = 1778513696020;
+
+  private readonly reactionEmoji = '👍';
 
   @before()
   public async reset(): Promise<void> {
@@ -78,6 +90,42 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     );
   }
 
+  @when('the message reaction added consumer handles a reaction announcement')
+  public async messageReactionAddedConsumerHandlesAReactionAnnouncement(): Promise<void> {
+    const consumer = new RegisterMessageReactionWhenAdded(
+      this.eventConsumer(),
+      this.fakeUseCase<MessageReactionRegistrar>('register'),
+    );
+
+    await consumer.handler(
+      new ConversationMessageReactionWasAddedEvent(this.conversationId, {
+        authorId: this.reactionAuthorId,
+        createdAt: this.reactionCreatedAt,
+        emoji: this.reactionEmoji,
+        messageId: this.messageId,
+      }),
+    );
+  }
+
+  @when(
+    'the message reaction removed consumer handles a reaction announcement',
+  )
+  public async messageReactionRemovedConsumerHandlesAReactionAnnouncement(): Promise<void> {
+    const consumer = new RegisterMessageReactionWhenRemoved(
+      this.eventConsumer(),
+      this.fakeUseCase<MessageReactionRegistrar>('unregister'),
+    );
+
+    await consumer.handler(
+      new ConversationMessageReactionWasRemovedEvent(this.conversationId, {
+        authorId: this.reactionAuthorId,
+        createdAt: this.reactionCreatedAt,
+        emoji: this.reactionEmoji,
+        messageId: this.messageId,
+      }),
+    );
+  }
+
   @when('the conversation sync request consumer handles a sync request')
   public async conversationSyncRequestConsumerHandlesASyncRequest(): Promise<void> {
     const consumer = new RespondToConversationSyncRequest(
@@ -98,6 +146,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     const consumer = new RegisterMessagesWhenSyncAvailable(
       this.eventConsumer(),
       this.fakeUseCase<ConversationMessageRegistrar>('register'),
+      this.fakeUseCase<MessageReactionRegistrar>('register'),
       this.suppressionTracker as unknown as SyncResponseSuppressionTracker,
     );
 
@@ -107,6 +156,15 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
           { messageId: this.messageId },
           { messageId: 123 },
           null,
+        ],
+        reactionCandidates: [
+          {
+            authorId: this.reactionAuthorId,
+            createdAt: this.reactionCreatedAt,
+            emoji: this.reactionEmoji,
+            messageId: this.messageId,
+          },
+          { messageId: this.messageId },
         ],
         requestId: this.requestId,
       }),
@@ -126,6 +184,32 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
         readerIdentityId: this.readerIdentityId,
       }),
     );
+  }
+
+  @then(
+    'the conversation message reaction registrar should receive that reaction',
+  )
+  public conversationMessageReactionRegistrarShouldReceiveThatReaction(): void {
+    const message = this.lastMessage<{
+      authorId: { valueOf(): string };
+      conversationId: { valueOf(): string };
+      createdAt: { valueOf(): number };
+      emoji: { valueOf(): string };
+      messageId: { valueOf(): string };
+    }>();
+
+    expect(message.conversationId.valueOf()).to.equal(this.conversationId);
+    expect(message.messageId.valueOf()).to.equal(this.messageId);
+    expect(message.authorId.valueOf()).to.equal(this.reactionAuthorId);
+    expect(message.emoji.valueOf()).to.equal(this.reactionEmoji);
+    expect(message.createdAt.valueOf()).to.equal(this.reactionCreatedAt);
+  }
+
+  @then(
+    'the conversation message reaction registrar should remove that reaction',
+  )
+  public conversationMessageReactionRegistrarShouldRemoveThatReaction(): void {
+    this.conversationMessageReactionRegistrarShouldReceiveThatReaction();
   }
 
   @then('the conversation message registrar should receive that message')
@@ -154,8 +238,14 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
 
   @then('the conversation message registrar should receive the valid sync messages')
   public conversationMessageRegistrarShouldReceiveTheValidSyncMessages(): void {
-    expect(this.calls).to.have.length(1);
-    this.conversationMessageRegistrarShouldReceiveThatMessage();
+    expect(this.calls).to.have.length(2);
+    const message = this.calls[0].message as {
+      conversationId: { valueOf(): string };
+      messageId: { valueOf(): string };
+    };
+
+    expect(message.conversationId.valueOf()).to.equal(this.conversationId);
+    expect(message.messageId.valueOf()).to.equal(this.messageId);
     expect(this.suppressionTracker.available).to.deep.equal([
       {
         aggregateId: this.conversationId,
@@ -176,5 +266,24 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     expect(message.conversationId.valueOf()).to.equal(this.conversationId);
     expect(message.messageId.valueOf()).to.equal(this.messageId);
     expect(message.readerIdentityId.valueOf()).to.equal(this.readerIdentityId);
+  }
+
+  @then(
+    'the conversation message reaction registrar should receive the valid sync reactions',
+  )
+  public conversationMessageReactionRegistrarShouldReceiveTheValidSyncReactions(): void {
+    const message = this.calls[1].message as {
+      authorId: { valueOf(): string };
+      conversationId: { valueOf(): string };
+      createdAt: { valueOf(): number };
+      emoji: { valueOf(): string };
+      messageId: { valueOf(): string };
+    };
+
+    expect(message.conversationId.valueOf()).to.equal(this.conversationId);
+    expect(message.messageId.valueOf()).to.equal(this.messageId);
+    expect(message.authorId.valueOf()).to.equal(this.reactionAuthorId);
+    expect(message.emoji.valueOf()).to.equal(this.reactionEmoji);
+    expect(message.createdAt.valueOf()).to.equal(this.reactionCreatedAt);
   }
 }

@@ -23,6 +23,7 @@ import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
 import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
+import { ConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessageReactionRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
@@ -181,6 +182,7 @@ export default class Server {
           PostConversationRoute,
           GetConversationsRoute,
           PostConversationMessageRoute,
+          ConversationMessageReactionRoute,
           DeleteConversationMessageRoute,
           PutConversationMessagesReadUntilRoute,
           GetConversationMessagesRoute,

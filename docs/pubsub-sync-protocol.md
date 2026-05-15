@@ -163,6 +163,7 @@ Attributes:
 - `conversationId`
 - `networkId`
 - `messageCandidates`
+- `reactionCandidates`
 - `requestId`
 
 Each `messageCandidates` item contains:
@@ -173,6 +174,17 @@ The message id is enough for the receiver to fetch the immutable message
 document through the conversation repository/IPFS path and validate it against
 the conversation aggregate.
 
+Each `reactionCandidates` item contains MongoDB-only reaction metadata:
+
+- `messageId`
+- `authorId`
+- `emoji`
+- `createdAt`
+
+Reaction candidates are not fetched from IPFS. They are accepted only after the
+receiver verifies that the conversation exists locally, the author is a
+participant and the target message is present.
+
 Receiver behavior:
 
 1. Mark the `requestId` as available for the conversation to suppress duplicate
@@ -182,6 +194,8 @@ Receiver behavior:
 4. Validate signature, participant membership, message type and edit/delete
    target rules.
 5. Store message metadata and update local projections only after validation.
+6. Register valid reaction candidates in MongoDB without rewriting message IPFS
+   documents.
 
 ## Announcements And Realtime Bridge
 
@@ -196,6 +210,8 @@ WebSocket clients after they are accepted locally:
 - `conversations.v1.message.was_edited`
 - `conversations.v1.message.was_deleted`
 - `conversations.v1.messages.were_read`
+- `conversations.v1.message.reaction.was_added`
+- `conversations.v1.message.reaction.was_removed`
 - `nodes.v1.node.heartbeat.was_sent`
 
 Frontend clients do not consume PubSub directly. They receive filtered
@@ -213,6 +229,8 @@ Implemented state is split by context:
 - unread conversation message flags are Mongo-only projections keyed by
   conversation id, recipient identity id and message id; read announcements
   delete those flags locally and on consuming nodes
+- conversation message reactions are MongoDB-only and indexed by conversation
+  id, message id, author id and emoji
 - node peer metadata stores last heartbeat per remote node
 
 ## Failure Modes

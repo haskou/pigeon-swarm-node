@@ -70,6 +70,15 @@ export class GetConversationMessagesRoute extends Route {
         : calls.flatMap((call) =>
             ConversationCallEventViewModel.fromCall(call),
           );
+    const reactions = await this.finder.findReactionsFor(
+      new GetConversationMessagesRequest(
+        conversationId,
+        requesterIdentityId,
+        limit,
+        beforeMessageId,
+      ).getMessage().conversationId,
+      messages,
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -79,6 +88,7 @@ export class GetConversationMessagesRoute extends Route {
           messages,
           callEvents,
           safeLimit,
+          reactions,
         ).toResource(),
       );
   }
@@ -103,10 +113,18 @@ export class GetConversationMessagesRoute extends Route {
     if (!message) {
       throw new MessageTargetNotFoundError();
     }
+    const reactions = await this.finder.findReactionsFor(
+      new GetConversationMessageRequest(
+        conversationId,
+        messageId,
+        requesterIdentityId,
+      ).getMessage().conversationId,
+      [message],
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new MessageViewModel(message).toResource());
+      .send(new MessageViewModel(message, reactions).toResource());
   }
 
   @Get('/:conversationId/messages/:messageId/around')
@@ -129,9 +147,19 @@ export class GetConversationMessagesRoute extends Route {
         after,
       ).getMessage(),
     );
+    const reactions = await this.finder.findReactionsFor(
+      new GetConversationMessagesAroundRequest(
+        conversationId,
+        messageId,
+        requesterIdentityId,
+        before,
+        after,
+      ).getMessage().conversationId,
+      messages.messages,
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new MessagesAroundViewModel(messages).toResource());
+      .send(new MessagesAroundViewModel(messages, reactions).toResource());
   }
 }

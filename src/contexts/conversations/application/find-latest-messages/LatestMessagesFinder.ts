@@ -1,10 +1,12 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { Message } from '@app/contexts/conversations/domain/Message';
+import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
 import {
   ConversationMessagesAround,
   ConversationRepository,
 } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { MessageReactionRepository } from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 
 import { LatestMessagesFindMessage } from './messages/LatestMessagesFindMessage';
 import { MessageFindMessage } from './messages/MessageFindMessage';
@@ -13,6 +15,7 @@ import { MessagesAroundFindMessage } from './messages/MessagesAroundFindMessage'
 export default class LatestMessagesFinder {
   constructor(
     private readonly conversationRepository: ConversationRepository,
+    private readonly reactionRepository: MessageReactionRepository,
   ) {}
 
   private async ensureRequesterCanReadConversation(
@@ -38,6 +41,16 @@ export default class LatestMessagesFinder {
       message.conversationId,
       message.limit,
       message.beforeMessageId,
+    );
+  }
+
+  public async findReactionsFor(
+    conversationId: LatestMessagesFindMessage['conversationId'],
+    messages: Message[],
+  ): Promise<MessageReaction[]> {
+    return this.reactionRepository.findByMessageIds(
+      conversationId,
+      messages.map((message) => message.getId()),
     );
   }
 
