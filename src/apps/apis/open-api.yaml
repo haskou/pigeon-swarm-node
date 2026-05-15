@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm APIs
   version: 1.0.0
-  description: Aggregated OpenAPI document built with references to each API file. The WebSocket realtime upgrade endpoint is documented in docs/api.md.
+  description: Aggregated OpenAPI document built with references to each API file.
 tags:
   - name: calls
   - name: communities
@@ -12,7 +12,81 @@ tags:
   - name: keychains
   - name: nodes
   - name: notifications
+  - name: realtime
 paths:
+  /ws:
+    get:
+      tags:
+        - realtime
+      summary: Open a signed WebSocket realtime connection
+      description: |
+        WebSocket upgrade endpoint for realtime domain events.
+
+        Browser clients authenticate with query parameters because custom
+        WebSocket headers are not available in browsers. Non-browser clients may
+        send the same credentials as headers.
+
+        The signed canonical request is `GET /ws` with an empty body `{}`. When
+        `ROUTE_PREFIX` is configured, sign the prefixed path, for example
+        `GET /api/ws`.
+
+        On success the server sends:
+
+        `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
+
+        Subsequent messages use:
+
+        `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`
+      parameters:
+        - in: query
+          name: identityId
+          required: false
+          schema:
+            type: string
+          description: Identity id/public key without PEM wrapping. Browser auth parameter equivalent to `X-Identity-Id`.
+        - in: query
+          name: timestamp
+          required: false
+          schema:
+            type: string
+          description: Millisecond timestamp. Browser auth parameter equivalent to `X-Timestamp`.
+        - in: query
+          name: nonce
+          required: false
+          schema:
+            type: string
+          description: One-time nonce. Browser auth parameter equivalent to `X-Nonce`.
+        - in: query
+          name: signature
+          required: false
+          schema:
+            type: string
+          description: Signature over the canonical signed request. Browser auth parameter equivalent to `X-Signature`.
+        - in: header
+          name: X-Identity-Id
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Timestamp
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Nonce
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: false
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket upgrade accepted.
+        '401':
+          description: Signed WebSocket handshake is missing, stale, replayed, or invalid.
   /calls/:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1'
   /calls/{callId}:
