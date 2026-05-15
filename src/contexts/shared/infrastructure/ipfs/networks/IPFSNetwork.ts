@@ -93,6 +93,10 @@ export class IPFSNetwork {
     return this.connection.getPeerId();
   }
 
+  public async stop(): Promise<void> {
+    await this.connection.stop();
+  }
+
   public toPrimitives() {
     return this.config.toPrimitives();
   }

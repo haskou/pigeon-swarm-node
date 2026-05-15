@@ -3,12 +3,21 @@ import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
 
 export default class IPFSContentRacer {
-  private readonly TIMEOUT_MS = 3000;
+  private readonly timeoutMs: number;
+
+  constructor(timeoutMs?: number) {
+    this.timeoutMs =
+      timeoutMs ??
+      Number(
+        process.env.IPFS_CONTENT_TIMEOUT_MS ??
+          (process.env.NODE_ENV === 'test' ? 500 : 3000),
+      );
+  }
 
   private startTimeout(
     controller: AbortController,
   ): ReturnType<typeof setTimeout> {
-    return setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+    return setTimeout(() => controller.abort(), this.timeoutMs);
   }
 
   public async raceGetJSON<T>(

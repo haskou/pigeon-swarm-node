@@ -3,6 +3,7 @@ import { MongoCommunityRepository } from '@app/contexts/communities/infrastructu
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import { IdentityNetworkSyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentityNetworkSyncRequestedEvent';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import IdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
@@ -18,6 +19,7 @@ type LatestVersionByResource = Map<string, number>;
 export interface NodeStartupSyncResult {
   communityRequests: number;
   conversationRequests: number;
+  identityNetworkRequests: number;
   identityRequests: number;
   keychainRequests: number;
   requestId: string;
@@ -60,6 +62,21 @@ export default class NodeStartupSynchronizer {
         new IdentitySyncRequestedEvent(identityId, {
           identityId,
           knownVersion,
+          requesterNodeId,
+          requestId,
+        }),
+    );
+  }
+
+  private identityNetworkRequests(
+    requestId: string,
+    requesterNodeId: string,
+    networkIds: string[],
+  ): DomainEvent[] {
+    return networkIds.map(
+      (networkId) =>
+        new IdentityNetworkSyncRequestedEvent(networkId, {
+          networkId,
           requesterNodeId,
           requestId,
         }),
@@ -119,7 +136,9 @@ export default class NodeStartupSynchronizer {
   public async synchronize(): Promise<NodeStartupSyncResult> {
     const requestId = UUID.generate().toString();
     const node = await this.nodeLoader.loadNode();
-    const requesterNodeId = node.toPrimitives().id;
+    const nodePrimitives = node.toPrimitives();
+    const requesterNodeId = nodePrimitives.id;
+    const networkIds = Object.keys(nodePrimitives.networks);
 
     await this.heartbeatSender.send();
 
@@ -142,6 +161,7 @@ export default class NodeStartupSynchronizer {
       requesterNodeId,
     );
     const events = [
+      ...this.identityNetworkRequests(requestId, requesterNodeId, networkIds),
       ...this.identityRequests(requestId, requesterNodeId, identityVersions),
       ...this.keychainRequests(requestId, requesterNodeId, keychainVersions),
       ...this.conversationRequests(
@@ -159,9 +179,22 @@ export default class NodeStartupSynchronizer {
     return {
       communityRequests: communityRequests.length,
       conversationRequests: conversationScopes.length,
+      identityNetworkRequests: networkIds.length,
       identityRequests: identityVersions.size,
       keychainRequests: keychainVersions.size,
       requestId,
     };
+  }
+
+  public scheduleRetries(
+    delaysMs: number[] = [5000, 15000, 30000, 60000],
+  ): void {
+    for (const delayMs of delaysMs) {
+      const timer = setTimeout(() => {
+        void this.synchronize().catch((): void => undefined);
+      }, delayMs);
+
+      timer.unref?.();
+    }
   }
 }

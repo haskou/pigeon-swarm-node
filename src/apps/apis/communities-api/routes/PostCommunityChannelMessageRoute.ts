@@ -9,7 +9,6 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageEncryptedPayload } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { PublicKey, Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -29,8 +28,6 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
   private readonly signatureService =
     new CommunityChannelMessageSignatureDomainService();
-
-  private readonly eventPublisher = this.get<MessageBus>(MessageBus);
 
   @Post('/:communityId/channels/:channelId/messages')
   public async sendMessage(

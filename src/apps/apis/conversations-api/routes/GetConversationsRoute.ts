@@ -33,9 +33,15 @@ export class GetConversationsRoute extends Route {
         beforeConversationId,
       ).getMessage(),
     );
+    const unreadCounts = await this.finder.countUnread(
+      requesterIdentityId,
+      conversations,
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new ConversationsViewModel(conversations).toResource());
+      .send(
+        new ConversationsViewModel(conversations, unreadCounts).toResource(),
+      );
   }
 }

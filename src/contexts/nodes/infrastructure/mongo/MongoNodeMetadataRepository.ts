@@ -76,17 +76,17 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
     await this.networkRegistry.initialize();
 
     const targetConfigs = this.buildNetworkConfigs(node);
-    const targetConfigsByName = new Map(
-      targetConfigs.map((config) => [config.getName(), config]),
+    const targetConfigsById = new Map(
+      targetConfigs.map((config) => [config.getId(), config]),
     );
     const currentNetworks = this.networkRegistry.getAll();
 
     for (const currentNetwork of currentNetworks) {
-      const name = currentNetwork.getName();
-      const targetConfig = targetConfigsByName.get(name);
+      const id = currentNetwork.getId();
+      const targetConfig = targetConfigsById.get(id);
 
       if (!targetConfig) {
-        await this.networkRegistry.removeNetwork(name);
+        await this.networkRegistry.removeNetwork(id);
         continue;
       }
 
@@ -94,16 +94,16 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
       const targetKey = targetConfig.getKey()?.valueOf();
 
       if (currentKey !== targetKey) {
-        await this.networkRegistry.removeNetwork(name);
+        await this.networkRegistry.removeNetwork(id);
         await this.networkRegistry.register(targetConfig);
-        targetConfigsByName.delete(name);
+        targetConfigsById.delete(id);
         continue;
       }
 
-      targetConfigsByName.delete(name);
+      targetConfigsById.delete(id);
     }
 
-    for (const config of targetConfigsByName.values()) {
+    for (const config of targetConfigsById.values()) {
       await this.networkRegistry.register(config);
     }
   }

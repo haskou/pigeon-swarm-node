@@ -1,0 +1,84 @@
+@startuml
+
+title Pigeon-swarm - Calls Context
+
+package "calls" {
+  package "domain" {
+    class Call <AggregateRoot> {
+      -id: CallId
+      -networkId: NetworkId
+      -scope: CallScope
+      -creatorIdentityId: IdentityId
+      -participants: CallParticipant[]
+      -lifecycle: CallLifecycle
+      +join(identityId: IdentityId): void
+      +leave(identityId: IdentityId): void
+      +end(identityId: IdentityId): void
+      +sendSignal(senderIdentityId: IdentityId, recipientIdentityId: IdentityId, signalType: CallSignalType, payload: unknown): void
+      +markTimedOut(timeout: Timestamp): IdentityId[]
+      +toPrimitives(): object
+    }
+
+    class CallParticipant {
+      -identityId: IdentityId
+      -status: CallParticipantStatus
+      -joinedAt?: Timestamp
+      -leftAt?: Timestamp
+      -declinedAt?: Timestamp
+      -missedAt?: Timestamp
+      +join(): void
+      +leave(): void
+      +decline(): void
+      +miss(timeout: Timestamp): void
+      +canReceiveSignal(): boolean
+    }
+
+    class CallLifecycle {
+      -status: CallStatus
+      -createdAt: Timestamp
+      -endedAt?: Timestamp
+      +end(): void
+      +miss(): void
+    }
+
+    class CallScope {
+      -type: CallScopeType
+      -conversationId?: ConversationId
+      -communityId?: CommunityId
+      -channelId?: CommunityChannelId
+    }
+
+    interface MongoCallRepository {
+      +findById(id: CallId): Promise<Call?>
+      +findActiveByParticipant(participantId: IdentityId): Promise<Call[]>
+      +findByParticipant(participantId: IdentityId): Promise<Call[]>
+      +findTimedOutRingingCalls(timeoutThreshold: Timestamp): Promise<Call[]>
+      +save(call: Call): Promise<void>
+    }
+
+    Call *--> CallParticipant
+    Call *--> CallLifecycle
+    Call *--> CallScope
+    MongoCallRepository o--> Call
+  }
+
+  package "events" {
+    class CallStartedEvent
+    class CallParticipantJoinedEvent
+    class CallParticipantLeftEvent
+    class CallParticipantDeclinedEvent
+    class CallParticipantMissedEvent
+    class CallEndedEvent
+    class CallMissedEvent
+    class CallSignalSentEvent
+  }
+
+  note right of Call
+    Calls are persisted in MongoDB only.
+    They do not publish media or signalling payloads to IPFS.
+    Frontend uses these records to drive ringing,
+    active call UI, missed calls and call history.
+  end note
+}
+
+@enduml

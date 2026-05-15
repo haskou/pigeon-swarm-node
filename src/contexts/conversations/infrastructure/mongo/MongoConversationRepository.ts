@@ -8,6 +8,7 @@ import {
 } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -18,14 +19,20 @@ import { IpfsMessageDocument } from '../ipfs/documents/IpfsMessageDocument';
 import IpfsMessageMapper from '../ipfs/mappers/IpfsMessageMapper';
 import { MongoConversationDocument } from './documents/MongoConversationDocument';
 import { MongoMessageMetadataDocument } from './documents/MongoMessageMetadataDocument';
+import { MongoUnreadConversationMessageDocument } from './documents/MongoUnreadConversationMessageDocument';
 import MongoConversationMapper from './mappers/MongoConversationMapper';
 import MongoMessageMetadataMapper from './mappers/MongoMessageMetadataMapper';
 
 type Repository = ConversationRepository;
+type UnreadCount = {
+  conversationId: string;
+  unreadCount: number;
+};
 
 export default class MongoConversationRepository implements Repository {
   private static readonly COLLECTION = 'conversations';
   private static readonly MESSAGES_COLLECTION = 'conversation_messages';
+  private static readonly UNREAD_COLLECTION = 'conversation_unread_messages';
   private static readonly MESSAGE_ROUTING_KEY_PREFIX =
     'pigeon-swarm_conversation-message-';
 
@@ -46,6 +53,12 @@ export default class MongoConversationRepository implements Repository {
   private async messageMetadataCollection() {
     return this.mongo.getCollection<MongoMessageMetadataDocument>(
       MongoConversationRepository.MESSAGES_COLLECTION,
+    );
+  }
+
+  private async unreadCollection() {
+    return this.mongo.getCollection<MongoUnreadConversationMessageDocument>(
+      MongoConversationRepository.UNREAD_COLLECTION,
     );
   }
 
@@ -104,6 +117,18 @@ export default class MongoConversationRepository implements Repository {
     } catch {
       return undefined;
     }
+  }
+
+  private async removeUnreadForMessage(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<void> {
+    await (
+      await this.unreadCollection()
+    ).deleteMany({
+      conversationId: conversationId.valueOf(),
+      messageId: messageId.valueOf(),
+    });
   }
 
   private getRecipientIds(
@@ -246,6 +271,49 @@ export default class MongoConversationRepository implements Repository {
     });
 
     return metadata ? this.findMessageFromMetadata(metadata) : undefined;
+  }
+
+  public async countUnreadByRecipient(
+    recipientIdentityId: IdentityId,
+    conversationIds: ConversationId[],
+  ): Promise<Map<string, number>> {
+    if (conversationIds.length === 0) {
+      return new Map();
+    }
+
+    const counts = await (
+      await this.unreadCollection()
+    )
+      .aggregate<UnreadCount>([
+        {
+          $match: {
+            conversationId: {
+              $in: conversationIds.map((conversationId) =>
+                conversationId.valueOf(),
+              ),
+            },
+            recipientIdentityId: recipientIdentityId.valueOf(),
+          },
+        },
+        {
+          $group: {
+            _id: '$conversationId',
+            unreadCount: { $sum: 1 },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            conversationId: '$_id',
+            unreadCount: 1,
+          },
+        },
+      ])
+      .toArray();
+
+    return new Map(
+      counts.map((count) => [count.conversationId, count.unreadCount]),
+    );
   }
 
   public async findMessagesAround(
@@ -443,6 +511,79 @@ export default class MongoConversationRepository implements Repository {
         networkId,
       ),
     );
+  }
+
+  public async markReadUntil(
+    conversationId: ConversationId,
+    recipientIdentityId: IdentityId,
+    messageId: MessageId,
+  ): Promise<void> {
+    const target = await (
+      await this.messageMetadataCollection()
+    ).findOne({
+      conversationId: conversationId.valueOf(),
+      messageId: messageId.valueOf(),
+      valid: true,
+    });
+
+    if (!target) {
+      return;
+    }
+
+    await (
+      await this.unreadCollection()
+    ).deleteMany({
+      conversationId: conversationId.valueOf(),
+      createdAt: { $lte: target.createdAt },
+      recipientIdentityId: recipientIdentityId.valueOf(),
+    });
+  }
+
+  public async registerUnreadForMessage(
+    conversation: Conversation,
+    message: Message,
+  ): Promise<void> {
+    if (message.getType().isEqual(MessageType.DELETED)) {
+      const targetMessageId = message.getTargetMessageId();
+
+      if (targetMessageId) {
+        await this.removeUnreadForMessage(
+          message.getConversationId(),
+          targetMessageId,
+        );
+      }
+
+      return;
+    }
+
+    if (!message.getType().isEqual(MessageType.SENT)) {
+      return;
+    }
+
+    const conversationPrimitives = conversation.toPrimitives();
+    const messagePrimitives = message.toPrimitives();
+    const recipientIds = conversationPrimitives.participantIds.filter(
+      (participantId) => participantId !== messagePrimitives.authorId,
+    );
+
+    for (const recipientId of recipientIds) {
+      const document = {
+        _id: `${messagePrimitives.conversationId}:${recipientId}:${messagePrimitives.id}`,
+        conversationId: messagePrimitives.conversationId,
+        createdAt: messagePrimitives.createdAt,
+        messageId: messagePrimitives.id,
+        networkId: conversationPrimitives.networkId,
+        recipientIdentityId: recipientId,
+      };
+
+      await (
+        await this.unreadCollection()
+      ).updateOne(
+        { _id: document._id },
+        { $setOnInsert: document },
+        { upsert: true },
+      );
+    }
   }
 
   public async save(conversation: Conversation): Promise<void> {

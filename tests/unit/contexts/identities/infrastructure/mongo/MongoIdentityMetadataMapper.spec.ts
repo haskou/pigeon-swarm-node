@@ -22,7 +22,9 @@ describe('MongoIdentityMetadataMapper', () => {
     expect(mapper.toDocument(identity, cid, receivedAt)).toEqual({
       _id: `${primitives.id}:${cid.valueOf()}`,
       cid: cid.valueOf(),
+      handle: primitives.profile.handle,
       identityId: primitives.id,
+      networkIds: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,
       receivedAt: receivedAt.valueOf(),
       version: primitives.version,

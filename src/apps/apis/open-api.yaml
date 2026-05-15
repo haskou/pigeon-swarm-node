@@ -2,8 +2,9 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm APIs
   version: 1.0.0
-  description: Aggregated OpenAPI document built with references to each API file. The WebSocket realtime upgrade endpoint is documented in docs/api.md.
+  description: Aggregated OpenAPI document built with references to each API file.
 tags:
+  - name: calls
   - name: communities
   - name: conversations
   - name: identities
@@ -11,17 +12,115 @@ tags:
   - name: keychains
   - name: nodes
   - name: notifications
+  - name: realtime
 paths:
+  /ws:
+    get:
+      tags:
+        - realtime
+      summary: Open a signed WebSocket realtime connection
+      description: |
+        WebSocket upgrade endpoint for realtime domain events.
+
+        Browser clients authenticate with query parameters because custom
+        WebSocket headers are not available in browsers. Non-browser clients may
+        send the same credentials as headers.
+
+        The signed canonical request is `GET /ws` with an empty body `{}`. When
+        `ROUTE_PREFIX` is configured, sign the prefixed path, for example
+        `GET /api/ws`.
+
+        On success the server sends:
+
+        `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
+
+        Clients may send `{ "type": "identity_heartbeat" }` over the open
+        socket. The server answers
+        `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
+        Heartbeat messages are not signed because the WebSocket upgrade already
+        authenticated the connection.
+
+        Subsequent messages use:
+
+        `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`
+      parameters:
+        - in: query
+          name: identityId
+          required: false
+          schema:
+            type: string
+          description: Identity id/public key without PEM wrapping. Browser auth parameter equivalent to `X-Identity-Id`.
+        - in: query
+          name: timestamp
+          required: false
+          schema:
+            type: string
+          description: Millisecond timestamp. Browser auth parameter equivalent to `X-Timestamp`.
+        - in: query
+          name: nonce
+          required: false
+          schema:
+            type: string
+          description: One-time nonce. Browser auth parameter equivalent to `X-Nonce`.
+        - in: query
+          name: signature
+          required: false
+          schema:
+            type: string
+          description: Signature over the canonical signed request. Browser auth parameter equivalent to `X-Signature`.
+        - in: header
+          name: X-Identity-Id
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Timestamp
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Nonce
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: false
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket upgrade accepted.
+        '401':
+          description: Signed WebSocket handshake is missing, stale, replayed, or invalid.
+  /calls/:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1'
+  /calls/{callId}:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}'
+  /calls/ice-servers:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1ice-servers'
+  /calls/history:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1history'
+  /calls/{callId}/participants:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants'
+  /calls/{callId}/participants/me:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me'
+  /calls/{callId}/signals:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1signals'
   /communities/:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1'
   /communities/{communityId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}'
   /communities/{communityId}/members:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members'
+  /communities/{communityId}/members/me:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1me'
   /communities/{communityId}/channels:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels'
   /communities/{communityId}/channels/text:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1text'
+  /communities/{communityId}/channels/voice:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1voice'
   /communities/{communityId}/channels/{channelId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}'
   /communities/{communityId}/channels/{channelId}/messages:
@@ -32,6 +131,8 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
   /conversations/{conversationId}/messages:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages'
+  /conversations/{conversationId}/messages/read-until:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1read-until'
   /conversations/{conversationId}/messages/{messageId}:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}'
   /conversations/{conversationId}/messages/{messageId}/around:

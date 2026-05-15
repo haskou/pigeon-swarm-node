@@ -4,6 +4,7 @@ import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conver
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
+import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
 import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
@@ -24,8 +25,11 @@ import IdentityCandidateRegistrar from '@app/contexts/identities/application/reg
 import { RegisterIdentityCandidateMessage } from '@app/contexts/identities/application/register-candidate/messages/RegisterIdentityCandidateMessage';
 import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
 import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
+import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
+import { IdentityNetworkSyncResponseMessage } from '@app/contexts/identities/application/respond-network-sync/messages/IdentityNetworkSyncResponseMessage';
 import IdentitySyncResponder from '@app/contexts/identities/application/respond-sync/IdentitySyncResponder';
 import { IdentitySyncResponseMessage } from '@app/contexts/identities/application/respond-sync/messages/IdentitySyncResponseMessage';
+import { IdentityNetworkSyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentityNetworkSyncRequestedEvent';
 import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
@@ -102,6 +106,29 @@ describe('PubSub sync consumers', () => {
     );
     expect(responder.respond.mock.calls[0][0].identityId.valueOf()).toBe(
       identityId,
+    );
+    expect(responder.respond.mock.calls[0][0].requestId).toBe('request-1');
+  });
+
+  it('responds to identity network sync requests', async () => {
+    const responder = mock<IdentityNetworkSyncResponder>();
+    const consumer = new RespondToIdentityNetworkSyncRequest(
+      eventConsumer,
+      responder,
+    );
+
+    await consumer.handler(
+      new IdentityNetworkSyncRequestedEvent(
+        '123e4567-e89b-12d3-a456-426614174000',
+        { requestId: 'request-1' },
+      ),
+    );
+
+    expect(responder.respond).toHaveBeenCalledWith(
+      expect.any(IdentityNetworkSyncResponseMessage),
+    );
+    expect(responder.respond.mock.calls[0][0].networkId.valueOf()).toBe(
+      '123e4567-e89b-12d3-a456-426614174000',
     );
     expect(responder.respond.mock.calls[0][0].requestId).toBe('request-1');
   });

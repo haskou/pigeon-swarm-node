@@ -5,6 +5,7 @@ import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubs
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
 import RegisterCommunityMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
+import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
@@ -12,6 +13,7 @@ import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversatio
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
+import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
 import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
@@ -19,11 +21,16 @@ import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keycha
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
+import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
+import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -65,13 +72,29 @@ async function init() {
     RegisterNodePeerWhenHeartbeatReceived,
   );
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
+  const conversationRepository =
+    Kernel.di.getService<MongoConversationRepository>(
+      MongoConversationRepository,
+    );
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
+  const identityMetadataRepository =
+    Kernel.di.getService<MongoIdentityMetadataRepository>(
+      MongoIdentityMetadataRepository,
+    );
   const communityRepository = new MongoCommunityRepository(mongo);
   const communityMessageRepository = new MongoCommunityChannelMessageRepository(
     mongo,
   );
 
   kernel.addConsumerInstances(
+    new MarkMessagesReadWhenAnnounced(
+      messageBus,
+      new MessagesReadRegistrar(conversationRepository),
+    ),
+    new RespondToIdentityNetworkSyncRequest(
+      messageBus,
+      new IdentityNetworkSyncResponder(identityMetadataRepository, messageBus),
+    ),
     new RegisterCommunityChannelMessageWhenAnnounced(
       messageBus,
       communityRepository,
@@ -99,6 +122,7 @@ async function init() {
 
   console.time('Run Schedulers');
   kernel.addSchedulers(NodeHeartbeatScheduler);
+  kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
   await kernel.runSchedulers();
   console.timeEnd('Run Schedulers');
 
@@ -123,7 +147,11 @@ async function init() {
   console.timeEnd('Republish local routing records');
 
   console.time('Node startup sync');
-  await createNodeStartupSynchronizer().synchronize();
+  const nodeStartupSynchronizer = createNodeStartupSynchronizer();
+  const startupSyncResult = await nodeStartupSynchronizer.synchronize();
+
+  console.info('Node startup sync result', startupSyncResult);
+  nodeStartupSynchronizer.scheduleRetries();
   console.timeEnd('Node startup sync');
 
   console.info('Ready!');

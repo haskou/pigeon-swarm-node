@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Sort } from 'mongodb';
@@ -19,6 +20,8 @@ export default class MongoIdentityMetadataRepository {
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<MongoIdentityMetadataDocument[]> {
+    // Version is the primary ordering; receivedAt only breaks ties.
+    // eslint-disable-next-line perfectionist/sort-objects
     // Version is the primary ordering; receivedAt only breaks ties.
     // eslint-disable-next-line perfectionist/sort-objects
     const sortCriteria: Sort = { version: -1, receivedAt: -1 };
@@ -61,6 +64,34 @@ export default class MongoIdentityMetadataRepository {
     return collection.find().toArray();
   }
 
+  public async findLatestByNetworkId(
+    networkId: NetworkId,
+  ): Promise<MongoIdentityMetadataDocument[]> {
+    const sortCriteria: Sort = [
+      ['version', -1],
+      ['receivedAt', -1],
+    ];
+    const collection =
+      await this.mongo.getCollection<MongoIdentityMetadataDocument>(
+        MongoIdentityMetadataRepository.COLLECTION_NAME,
+      );
+    const documents = await collection
+      .find({
+        networkIds: networkId.valueOf(),
+      })
+      .sort(sortCriteria)
+      .toArray();
+    const latestDocuments = new Map<string, MongoIdentityMetadataDocument>();
+
+    for (const document of documents) {
+      if (!latestDocuments.has(document.identityId)) {
+        latestDocuments.set(document.identityId, document);
+      }
+    }
+
+    return [...latestDocuments.values()];
+  }
+
   public async save(identity: Identity, cid: IPFSId): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
@@ -75,6 +106,7 @@ export default class MongoIdentityMetadataRepository {
           cid: document.cid,
           handle: document.handle,
           identityId: document.identityId,
+          networkIds: document.networkIds,
           previousCid: document.previousCid,
           receivedAt: document.receivedAt,
           version: document.version,

@@ -61,6 +61,33 @@ describe('ConversationMessageRegistrar', () => {
 
     expect(signatureService.isValidSignature).toHaveBeenCalledTimes(1);
     expect(repository.save).toHaveBeenCalledWith(conversation);
+    expect(repository.registerUnreadForMessage).toHaveBeenCalledWith(
+      conversation,
+      candidate,
+    );
+    expect(conversation.toPrimitives().messages).toHaveLength(1);
+  });
+
+  it('does not recreate unread flags for already registered messages', async () => {
+    const conversation = mother.build();
+    const conversationId = conversation.getId();
+    const messageId = MessageId.generate();
+    const candidate = buildCandidate(conversationId, messageId);
+
+    conversation.registerMessage(candidate);
+    repository.findById.mockResolvedValue(conversation);
+    repository.findCandidateMessageById.mockResolvedValue(candidate);
+    signatureService.isValidSignature.mockReturnValue(true);
+
+    await registrar.register(
+      new RegisterConversationMessage(
+        conversationId.valueOf(),
+        messageId.valueOf(),
+      ),
+    );
+
+    expect(repository.save).toHaveBeenCalledWith(conversation);
+    expect(repository.registerUnreadForMessage).not.toHaveBeenCalled();
     expect(conversation.toPrimitives().messages).toHaveLength(1);
   });
 

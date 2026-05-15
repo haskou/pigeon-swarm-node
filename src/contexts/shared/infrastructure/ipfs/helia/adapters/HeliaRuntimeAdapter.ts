@@ -165,6 +165,27 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private withoutNetwork(defaults: Libp2pDefaults): Libp2pDefaults {
+    const config = defaults as unknown as {
+      addresses?: {
+        listen?: string[];
+      };
+      peerDiscovery?: unknown[];
+      services?: Record<string, unknown>;
+      transports?: unknown[];
+    };
+
+    config.addresses = {
+      ...(config.addresses || {}),
+      listen: [],
+    };
+    config.peerDiscovery = [];
+    config.services = {};
+    config.transports = [];
+
+    return defaults;
+  }
+
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
@@ -203,14 +224,22 @@ export class HeliaRuntimeAdapter {
     return pnetModule.preSharedKey(config);
   }
 
-  public async getLibp2pDefaults(): Promise<Libp2pDefaults> {
+  public async getLibp2pDefaults(options?: {
+    offline?: boolean;
+  }): Promise<Libp2pDefaults> {
     const heliaModule = await this.loadHeliaModule();
 
     if (typeof heliaModule.libp2pDefaults !== 'function') {
       return {} as Libp2pDefaults;
     }
 
-    return this.withoutWebRtcTransports(heliaModule.libp2pDefaults());
+    const defaults = this.withoutWebRtcTransports(heliaModule.libp2pDefaults());
+
+    if (options?.offline) {
+      return this.withoutNetwork(defaults);
+    }
+
+    return defaults;
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {

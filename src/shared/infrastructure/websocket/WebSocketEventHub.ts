@@ -1,7 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import { WebSocket } from 'ws';
+import { RawData, WebSocket } from 'ws';
+
+import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
 
 type WebSocketRealtimeMessage =
   | {
@@ -9,9 +11,18 @@ type WebSocketRealtimeMessage =
       type: 'connection_ack';
     }
   | {
+      identityId: string;
+      timestamp: number;
+      type: 'heartbeat_ack';
+    }
+  | {
       event: unknown;
       type: 'domain_event';
     };
+
+type WebSocketClientMessage = {
+  type?: string;
+};
 
 const identityAttributeKeys = [
   'authorIdentityId',
@@ -41,6 +52,9 @@ const identityAttributeKeys = [
 ];
 
 export class WebSocketEventHub {
+  private readonly conversationCallEventMapper =
+    new ConversationCallEventRealtimeMapper();
+
   private readonly clients = new Map<string, Set<WebSocket>>();
 
   private debug(message: string): void {
@@ -76,6 +90,15 @@ export class WebSocketEventHub {
   private getEventRecipients(event: DomainEvent): Set<string> {
     const recipients = new Set<string>();
 
+    if (this.isCallSignalEvent(event)) {
+      this.collectIdentityValues(
+        event.attributes.recipientIdentityId,
+        recipients,
+      );
+
+      return recipients;
+    }
+
     for (const key of identityAttributeKeys) {
       this.collectIdentityValues(event.attributes[key], recipients);
     }
@@ -101,6 +124,10 @@ export class WebSocketEventHub {
 
   private isKeychainEvent(event: DomainEvent): boolean {
     return event.eventName().startsWith('keychains.');
+  }
+
+  private isCallSignalEvent(event: DomainEvent): boolean {
+    return event.eventName() === 'calls.v1.signal.sent';
   }
 
   private isNodeWideEvent(event: DomainEvent): boolean {
@@ -129,6 +156,34 @@ export class WebSocketEventHub {
     client.send(JSON.stringify(message));
   }
 
+  private handleClientMessage(
+    identityId: string,
+    client: WebSocket,
+    rawMessage: RawData,
+  ): void {
+    const message = this.parseClientMessage(rawMessage);
+
+    if (message?.type !== 'identity_heartbeat') {
+      return;
+    }
+
+    this.send(client, {
+      identityId,
+      timestamp: Date.now(),
+      type: 'heartbeat_ack',
+    });
+  }
+
+  private parseClientMessage(
+    rawMessage: RawData,
+  ): WebSocketClientMessage | undefined {
+    try {
+      return JSON.parse(rawMessage.toString()) as WebSocketClientMessage;
+    } catch {
+      return undefined;
+    }
+  }
+
   private unregister(identityId: string, client: WebSocket): void {
     const identityClients = this.clients.get(identityId);
 
@@ -153,6 +208,15 @@ export class WebSocketEventHub {
         event: JSON.parse(event.decode()),
         type: 'domain_event',
       });
+      const conversationCallEvents =
+        this.conversationCallEventMapper.toEvents(event);
+
+      for (const conversationCallEvent of conversationCallEvents) {
+        this.broadcast(event, {
+          event: conversationCallEvent,
+          type: 'domain_event',
+        });
+      }
     }
   }
 
@@ -168,6 +232,9 @@ export class WebSocketEventHub {
 
     client.on('close', () => this.unregister(identityIdValue, client));
     client.on('error', () => this.unregister(identityIdValue, client));
+    client.on('message', (message) =>
+      this.handleClientMessage(identityIdValue, client, message),
+    );
     this.send(client, {
       identityId: identityIdValue,
       type: 'connection_ack',

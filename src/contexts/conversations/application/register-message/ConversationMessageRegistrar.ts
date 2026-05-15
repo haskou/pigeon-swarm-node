@@ -47,6 +47,7 @@ export default class ConversationMessageRegistrar {
     );
 
     this.assertCandidateMatchesAnnouncement(message, candidate);
+    const isAlreadyRegistered = conversation.findMessageById(message.messageId);
 
     const isValidSignature = this.signatureService.isValidSignature(
       PublicKey.fromPEM(candidate.getAuthorId().toString()),
@@ -58,5 +59,9 @@ export default class ConversationMessageRegistrar {
 
     conversation.registerMessage(candidate);
     await this.repository.save(conversation);
+
+    if (!isAlreadyRegistered) {
+      await this.repository.registerUnreadForMessage(conversation, candidate);
+    }
   }
 }

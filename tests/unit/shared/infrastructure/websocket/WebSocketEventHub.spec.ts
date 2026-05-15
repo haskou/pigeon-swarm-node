@@ -40,6 +40,43 @@ describe('WebSocketEventHub', () => {
     );
   });
 
+  it('answers identity heartbeat messages on the same websocket client', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const now = 1770000000000;
+
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    jest.clearAllMocks();
+    messageHandler(Buffer.from(JSON.stringify({ type: 'identity_heartbeat' })));
+
+    expect(client.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        identityId: identityId.valueOf(),
+        timestamp: now,
+        type: 'heartbeat_ack',
+      }),
+    );
+  });
+
+  it('ignores unknown websocket client messages', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    jest.clearAllMocks();
+    messageHandler(Buffer.from(JSON.stringify({ type: 'unknown' })));
+    messageHandler(Buffer.from('not-json'));
+
+    expect(client.send).not.toHaveBeenCalled();
+  });
+
   it('broadcasts node-wide events to connected websocket clients', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
@@ -108,6 +145,197 @@ describe('WebSocketEventHub', () => {
     expect(otherClient.send).not.toHaveBeenCalled();
   });
 
+  it('sends call signals only to the signal recipient', async () => {
+    const hub = new WebSocketEventHub();
+    const senderIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const otherParticipantIdentityId = await generateIdentityId();
+    const senderClient = buildClient();
+    const recipientClient = buildClient();
+    const otherParticipantClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      participantIds: [
+        senderIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+        otherParticipantIdentityId.valueOf(),
+      ],
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      senderIdentityId: senderIdentityId.valueOf(),
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('calls.v1.signal.sent');
+    hub.register(senderIdentityId, senderClient);
+    hub.register(recipientIdentityId, recipientClient);
+    hub.register(otherParticipantIdentityId, otherParticipantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(recipientClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(senderClient.send).not.toHaveBeenCalled();
+    expect(otherParticipantClient.send).not.toHaveBeenCalled();
+  });
+
+  it('emits conversation call events as timeline system items', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1770000000000,
+      endedAt: 1770000043000,
+      endedByIdentityId: participantIdentityId.valueOf(),
+      participantIds: [participantIdentityId.valueOf()],
+      scope: {
+        conversationId: 'one-to-one:conversation-id',
+        type: 'conversation',
+      },
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.call.ended');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
+      .map(([message]) => JSON.parse(message as string));
+    const callEventMessage = realtimeMessages.find(
+      (message) =>
+        message.event.type === 'conversations.v1.call.event.was_recorded',
+    );
+
+    expect(callEventMessage).toMatchObject({
+      event: {
+        aggregate_id: 'one-to-one:conversation-id',
+        attributes: {
+          message: {
+            actorIdentityId: participantIdentityId.valueOf(),
+            callEventType: 'ended',
+            callId: 'call-id',
+            conversationId: 'one-to-one:conversation-id',
+            createdAt: 1770000043000,
+            durationMs: 43000,
+            id: `call-event:call-id:ended:${participantIdentityId.valueOf()}`,
+            type: 'call_event',
+          },
+          participantIds: [participantIdentityId.valueOf()],
+        },
+        event_id: `${event.eventId}:conversation-call-event:call-event:call-id:ended:${participantIdentityId.valueOf()}`,
+        occurred_on: event.occurredOn.getTime(),
+        type: 'conversations.v1.call.event.was_recorded',
+      },
+      type: 'domain_event',
+    });
+  });
+
+  it('emits missed call events with the missed participant as actor', async () => {
+    const hub = new WebSocketEventHub();
+    const creatorIdentityId = await generateIdentityId();
+    const missedIdentityId = await generateIdentityId();
+    const creatorClient = buildClient();
+    const missedClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1770000000000,
+      creatorIdentityId: creatorIdentityId.valueOf(),
+      missedIdentityIds: [missedIdentityId.valueOf()],
+      participantIds: [creatorIdentityId.valueOf(), missedIdentityId.valueOf()],
+      participants: [
+        {
+          identityId: creatorIdentityId.valueOf(),
+          joinedAt: 1770000000000,
+          status: 'joined',
+        },
+        {
+          identityId: missedIdentityId.valueOf(),
+          missedAt: 1770000060000,
+          status: 'missed',
+        },
+      ],
+      scope: {
+        conversationId: 'one-to-one:conversation-id',
+        type: 'conversation',
+      },
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.call.missed');
+    hub.register(creatorIdentityId, creatorClient);
+    hub.register(missedIdentityId, missedClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    const realtimeMessages = (creatorClient.send as jest.Mock).mock.calls.map(
+      ([message]) => JSON.parse(message as string),
+    );
+    const callEventMessage = realtimeMessages.find(
+      (message) =>
+        message.event.type === 'conversations.v1.call.event.was_recorded',
+    );
+
+    expect(callEventMessage).toMatchObject({
+      event: {
+        aggregate_id: 'one-to-one:conversation-id',
+        attributes: {
+          message: {
+            actorIdentityId: missedIdentityId.valueOf(),
+            callEventType: 'missed',
+            callId: 'call-id',
+            conversationId: 'one-to-one:conversation-id',
+            createdAt: 1770000060000,
+            durationMs: 60000,
+            id: `call-event:call-id:missed:${missedIdentityId.valueOf()}`,
+            type: 'call_event',
+          },
+        },
+        type: 'conversations.v1.call.event.was_recorded',
+      },
+      type: 'domain_event',
+    });
+  });
+
+  it('does not emit community channel call events as timeline system items', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1770000000000,
+      endedAt: 1770000043000,
+      endedByIdentityId: participantIdentityId.valueOf(),
+      participantIds: [participantIdentityId.valueOf()],
+      scope: {
+        channelId: 'channel-id',
+        communityId: 'community-id',
+        type: 'community_channel',
+      },
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.call.ended');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
+      .map(([message]) => JSON.parse(message as string));
+
+    expect(
+      realtimeMessages.some(
+        (message) =>
+          message.event.type === 'communities.v1.call.event.was_recorded',
+      ),
+    ).toBe(false);
+  });
+
   it('sends identity aggregate events only to that identity', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
@@ -169,4 +397,16 @@ function buildClient(readyState: number = WebSocket.OPEN): WebSocket {
     readyState,
     send: jest.fn(),
   } as unknown as WebSocket;
+}
+
+function getClientMessageHandler(client: WebSocket): (message: Buffer) => void {
+  const messageHandler = (client.on as jest.Mock).mock.calls.find(
+    ([eventName]) => eventName === 'message',
+  )?.[1];
+
+  if (!messageHandler) {
+    throw new Error('Message handler not registered.');
+  }
+
+  return messageHandler;
 }

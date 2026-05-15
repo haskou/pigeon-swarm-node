@@ -17,6 +17,7 @@ export default class MongoIdentityMetadataMapper {
       cid: cid.valueOf(),
       handle: primitives.profile.handle,
       identityId: primitives.id,
+      networkIds: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,
       receivedAt: receivedAt.valueOf(),
       version: primitives.version,

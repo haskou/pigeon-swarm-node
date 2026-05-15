@@ -22,4 +22,9 @@ export class PublicIPFS extends HeliaIPFS {
   constructor(core: HeliaInstance, options: IPFSOptions) {
     super(core, options);
   }
+
+  public async stop(): Promise<void> {
+    await super.stop();
+    delete PublicIPFS.connectionPool[JSON.stringify(this.options)];
+  }
 }

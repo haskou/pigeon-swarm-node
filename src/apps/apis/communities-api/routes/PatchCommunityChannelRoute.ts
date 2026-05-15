@@ -28,12 +28,13 @@ export class PatchCommunityChannelRoute extends CommunityRouteSupport {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
-    community.renameTextChannel(
+    community.renameChannel(
       actorIdentityId,
       new CommunityChannelId(channelId),
       new CommunityChannelName(body.name),
     );
     await this.repository().save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

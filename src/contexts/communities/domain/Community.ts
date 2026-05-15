@@ -3,11 +3,19 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannels } from './CommunityChannels';
 import { CommunityProfile } from './CommunityProfile';
 import { CommunityTextChannel } from './CommunityTextChannel';
-import { CommunityChannelNotFoundError } from './errors/CommunityChannelNotFoundError';
+import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
+import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
+import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
+import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
+import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEvent';
+import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
+import { CommunityWasUpdatedEvent } from './events/CommunityWasUpdatedEvent';
 import { CommunityAvatar } from './value-objects/CommunityAvatar';
 import { CommunityBanner } from './value-objects/CommunityBanner';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
@@ -31,7 +39,7 @@ export class Community extends AggregateRoot {
       ownerIdentityId,
       new CommunityProfile(name, description, avatar, banner),
       [ownerIdentityId],
-      [],
+      new CommunityChannels([], []),
       Timestamp.now(),
     );
   }
@@ -48,8 +56,13 @@ export class Community extends AggregateRoot {
         primitives.banner ? new CommunityBanner(primitives.banner) : undefined,
       ),
       primitives.memberIds.map((memberId) => new IdentityId(memberId)),
-      primitives.textChannels.map((channel) =>
-        CommunityTextChannel.fromPrimitives(channel),
+      new CommunityChannels(
+        primitives.textChannels.map((channel) =>
+          CommunityTextChannel.fromPrimitives(channel),
+        ),
+        (primitives.voiceChannels || []).map((channel) =>
+          CommunityVoiceChannel.fromPrimitives(channel),
+        ),
       ),
       new Timestamp(primitives.createdAt),
     );
@@ -61,7 +74,7 @@ export class Community extends AggregateRoot {
     private readonly ownerIdentityId: IdentityId,
     private profile: CommunityProfile,
     private readonly members: IdentityId[],
-    private readonly textChannels: CommunityTextChannel[],
+    private readonly channels: CommunityChannels,
     private readonly createdAt: Timestamp,
   ) {
     super();
@@ -78,6 +91,27 @@ export class Community extends AggregateRoot {
     return 'private';
   }
 
+  private eventAttributes() {
+    const primitives = this.toPrimitives();
+
+    return {
+      communityId: primitives.id,
+      memberIds: primitives.memberIds,
+      networkId: primitives.networkId,
+    };
+  }
+
+  private voiceChannelEventPrimitives(
+    channel: CommunityVoiceChannel,
+  ): ReturnType<CommunityVoiceChannel['toPrimitives']> & {
+    connectedIdentityIds: string[];
+  } {
+    return {
+      ...channel.toPrimitives(),
+      connectedIdentityIds: [],
+    };
+  }
+
   public addMember(actor: IdentityId, member: IdentityId): void {
     this.assertOwner(actor);
 
@@ -86,6 +120,34 @@ export class Community extends AggregateRoot {
     }
 
     this.members.push(member);
+    this.record(
+      new CommunityMemberWasAddedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+        identityId: member.valueOf(),
+      }),
+    );
+  }
+
+  public leave(member: IdentityId): void {
+    this.assertIsMember(member);
+    assert(
+      !this.ownerIdentityId.isEqual(member) || this.members.length === 1,
+      new CommunityOwnerCannotLeaveError(),
+    );
+
+    const memberIndex = this.members.findIndex((currentMember) =>
+      currentMember.isEqual(member),
+    );
+
+    this.members.splice(memberIndex, 1);
+    this.record(
+      new CommunityMemberWasLeftEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+        identityId: member.valueOf(),
+      }),
+    );
   }
 
   public addTextChannel(
@@ -94,33 +156,76 @@ export class Community extends AggregateRoot {
   ): CommunityTextChannel {
     this.assertOwner(actor);
 
-    const channel = CommunityTextChannel.create(name);
+    const channel = this.channels.addText(name);
 
-    this.textChannels.push(channel);
+    this.record(
+      new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channel: channel.toPrimitives(),
+      }),
+    );
 
     return channel;
   }
 
-  public renameTextChannel(
+  public addVoiceChannel(
+    actor: IdentityId,
+    name: CommunityChannelName,
+  ): CommunityVoiceChannel {
+    this.assertOwner(actor);
+
+    const channel = this.channels.addVoice(name);
+
+    this.record(
+      new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channel: this.voiceChannelEventPrimitives(channel),
+      }),
+    );
+
+    return channel;
+  }
+
+  public renameChannel(
     actor: IdentityId,
     channelId: CommunityChannelId,
     name: CommunityChannelName,
   ): void {
     this.assertOwner(actor);
-    const channel = this.textChannels.find((candidate) =>
-      candidate.getId().isEqual(channelId),
+    this.channels.rename(channelId, name);
+    this.record(
+      new CommunityChannelWasRenamedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channelId: channelId.valueOf(),
+        name: name.valueOf(),
+      }),
+    );
+  }
+
+  public deleteChannel(
+    actor: IdentityId,
+    channelId: CommunityChannelId,
+  ): 'text' | 'voice' {
+    this.assertOwner(actor);
+
+    const channelType = this.channels.remove(channelId);
+
+    this.record(
+      new CommunityChannelWasDeletedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channelId: channelId.valueOf(),
+      }),
     );
 
-    assert(channel, new CommunityChannelNotFoundError());
-    channel?.rename(name);
+    return channelType;
   }
 
   public assertHasTextChannel(channelId: CommunityChannelId): void {
-    const channel = this.textChannels.find((candidate) =>
-      candidate.getId().isEqual(channelId),
-    );
+    this.channels.assertHasText(channelId);
+  }
 
-    assert(channel, new CommunityChannelNotFoundError());
+  public assertHasVoiceChannel(channelId: CommunityChannelId): void {
+    this.channels.assertHasVoice(channelId);
   }
 
   public updateProfile(
@@ -132,6 +237,12 @@ export class Community extends AggregateRoot {
   ): void {
     this.assertOwner(actor);
     this.profile = new CommunityProfile(name, description, avatar, banner);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
   }
 
   public getId(): CommunityId {
@@ -151,6 +262,8 @@ export class Community extends AggregateRoot {
   }
 
   public toPrimitives() {
+    const channels = this.channels.toPrimitives();
+
     return {
       avatar: this.profile.getAvatar()?.valueOf(),
       banner: this.profile.getBanner()?.valueOf(),
@@ -161,8 +274,9 @@ export class Community extends AggregateRoot {
       name: this.profile.getName().valueOf(),
       networkId: this.networkId.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),
-      textChannels: this.textChannels.map((channel) => channel.toPrimitives()),
+      textChannels: channels.textChannels,
       visibility: this.visibility(),
+      voiceChannels: channels.voiceChannels,
     };
   }
 }

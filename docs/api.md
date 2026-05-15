@@ -127,6 +127,31 @@ newlines. WebSocket routing uses that same normalized value for byte-for-byte
 recipient matching against event attributes such as `participantIds`,
 `recipientIdentityId` and `ownerIdentityId`.
 
+Client heartbeat:
+
+```json
+{
+  "type": "identity_heartbeat"
+}
+```
+
+Heartbeat acknowledgement:
+
+```json
+{
+  "type": "heartbeat_ack",
+  "identityId": "<identityId>",
+  "timestamp": 1770000000000
+}
+```
+
+Heartbeat messages do not need a new signature; the WebSocket upgrade already
+authenticated the connection. The backend ignores any client-sent `identityId`
+and answers with the identity bound to the socket. Unknown or malformed client
+messages are ignored. Recommended client interval: 30 seconds, reconnecting
+with a fresh signed WebSocket URL if no `heartbeat_ack` arrives within 2
+intervals.
+
 Domain event payload:
 
 ```json
@@ -156,6 +181,9 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
+- deliver call lifecycle events only to call participants when the event
+  carries `participantIds`
+- deliver call signals only to `recipientIdentityId`
 - deliver node-wide events, such as heartbeat/peer updates, to all
   authenticated WebSocket clients on the local node
 - drop non-node events that do not carry enough identity information to route
@@ -169,6 +197,21 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
+| `conversations.v1.messages.were_read` | conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` |
+| `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
+| `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
+| `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
+| `calls.v1.participant.declined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `declinedIdentityId`, `status` |
+| `calls.v1.participant.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status` |
+| `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
+| `calls.v1.call.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` |
+| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `communities.v1.channel.was_created` | community id | `communityId`, `networkId`, `memberIds`, `channel` |
+| `communities.v1.channel.was_renamed` | community id | `communityId`, `networkId`, `memberIds`, `channelId`, `name` |
+| `communities.v1.channel.was_deleted` | community id | `communityId`, `networkId`, `memberIds`, `channelId` |
+| `communities.v1.community.was_updated` | community id | `communityId`, `networkId`, `memberIds`, `community` |
+| `communities.v1.member.was_added` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
+| `communities.v1.member.was_left` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
@@ -182,6 +225,208 @@ Event contracts used by frontend:
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
+For `conversations.v1.messages.were_read`, use `event.aggregate_id` as
+`conversationId` and refresh the conversation unread counters if needed.
+
+For `calls.v1.*`, use `event.aggregate_id` as `callId`. Calls are signalling
+only: audio/video media is negotiated by frontend with WebRTC. The backend
+stores active call state and routes lifecycle/signalling events to the
+authenticated participants.
+
+## Calls HTTP API
+
+Calls can be scoped to a one-to-one conversation, a group conversation or a
+community voice channel. All endpoints require signed request authentication.
+
+### List active calls
+
+```http
+GET /calls
+```
+
+Returns active calls where the authenticated identity is a participant.
+
+### List call history
+
+```http
+GET /calls/history
+```
+
+Returns active and finished calls where the authenticated identity is a
+participant. Use this for call history UI.
+
+### Get call
+
+```http
+GET /calls/{callId}
+```
+
+Returns a single call when the authenticated identity is a participant.
+Frontend can use this after any `calls.v1.*` WebSocket event where
+`event.aggregate_id` is the call id.
+
+### Get ICE servers
+
+```http
+GET /calls/ice-servers
+```
+
+Response:
+
+```json
+{
+  "iceServers": [
+    {
+      "urls": [
+        "turn:turn.example.com:3478?transport=udp",
+        "turn:turn.example.com:3478?transport=tcp"
+      ],
+      "username": "<expiresAtUnix>:<identityId>",
+      "credential": "<temporaryHmacCredential>"
+    }
+  ],
+  "iceTransportPolicy": "relay"
+}
+```
+
+Implemented:
+
+- require signed request auth before exposing relay credentials
+- read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
+- when `CALLS_TURN_SHARED_SECRET` is configured, generate temporary coturn REST
+  credentials per authenticated identity:
+  `username=<expiresAtUnix>:<identityId>` and
+  `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
+- use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
+  lifetime; it defaults to `3600`
+- keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
+  fallback when no shared secret is configured
+- default `iceTransportPolicy` to `relay`, so production clients can avoid
+  exposing peer IPs through direct ICE candidates
+- include STUN servers only when `CALLS_STUN_URLS` is explicitly configured
+- allow `CALLS_ICE_TRANSPORT_POLICY=all` for development or trusted networks
+
+TURN improves NAT traversal and hides peer IPs from the other participant, but
+it does not make large group calls cheap. A mesh group call still creates one
+peer connection per participant pair. For large groups, add an SFU/media relay
+later so every client uploads one media stream and receives only the streams it
+needs.
+
+### Start call
+
+```http
+POST /calls
+```
+
+Conversation call request:
+
+```json
+{
+  "scopeType": "conversation",
+  "conversationId": "<conversationId>"
+}
+```
+
+Community channel call request:
+
+```json
+{
+  "scopeType": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<voiceChannelId>"
+}
+```
+
+Implemented:
+
+- one-to-one calls use an existing one-to-one conversation id
+- group calls use an existing group conversation id
+- community channel calls use an existing community voice channel id
+- `invitedParticipantIds` is only used for conversation calls; community
+  channel call participants are always derived from current community members
+- community channel call start is idempotent by `(communityId, channelId)`:
+  when an active call already exists for that voice channel, `POST /calls`
+  returns the existing call instead of creating a second one
+- when returning an existing community channel call, the authenticated caller is
+  joined or added as a joined participant when needed
+- caller must be a conversation participant or community member
+- start emits `calls.v1.call.started` to the call participants
+- the creator starts as `joined`; other participants start as `ringing`
+- community channel calls are voice-channel presence state; they do not create
+  chat timeline `call_event` items and do not generate missed-call
+  notifications
+
+### Join and leave call
+
+```http
+POST /calls/{callId}/participants
+DELETE /calls/{callId}/participants/me
+```
+
+Implemented:
+
+- joining requires the authenticated identity to be an allowed participant for
+  the call scope
+- leaving removes the authenticated identity from the active call
+- deleting yourself while `ringing` declines the call instead of leaving it
+- joins emit `calls.v1.participant.joined`
+- leaves emit `calls.v1.participant.left`
+- declines emit `calls.v1.participant.declined`
+
+### End call
+
+```http
+DELETE /calls/{callId}
+```
+
+Implemented:
+
+- only an active call participant can end the call
+- ending the call emits `calls.v1.call.ended` to the current participants
+
+### Send WebRTC signal
+
+```http
+POST /calls/{callId}/signals
+```
+
+Request:
+
+```json
+{
+  "recipientIdentityId": "<identityId>",
+  "signalType": "offer",
+  "payload": {}
+}
+```
+
+Implemented:
+
+- `signalType` is one of `offer`, `answer` or `ice_candidate`
+- sender and recipient must both be current call participants
+- backend does not inspect SDP/ICE payloads
+- signalling is rate-limited per `(callId, senderIdentityId)` with
+  `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; `0` disables the
+  limit for local/debug runs
+- sending a signal emits `calls.v1.signal.sent` only to
+  `recipientIdentityId`
+
+### Missed calls
+
+The node runs a call timeout scheduler once per minute for calls scoped to
+conversations. Ringing participants that have not joined before the timeout are
+marked as `missed`; the call status becomes `missed`; and each missed
+participant receives an unread `missed_call` notification.
+
+Implemented:
+
+- missed participant state is persisted in MongoDB
+- missed calls stay available through `GET /calls/history`
+- timeout emits `calls.v1.participant.missed`
+- timeout emits `calls.v1.call.missed`
+- missed call notifications use payload fields `callId`, `callerIdentityId`,
+  `networkId` and `recipientIdentityId`
+- community voice channel calls are excluded from missed-call timeout handling
 
 ## Node HTTP API
 
@@ -696,6 +941,7 @@ Implemented:
 - require signed request auth
 - list conversations where the authenticated identity participates
 - support `limit` and `beforeConversationId`
+- include `unreadCount` for the authenticated identity
 
 ### Create a conversation
 
@@ -738,7 +984,8 @@ Response:
   "name": "Project room",
   "networkId": "<networkId>",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
-  "type": "one-to-one"
+  "type": "one-to-one",
+  "unreadCount": 0
 }
 ```
 
@@ -778,6 +1025,16 @@ Response:
       "previousMessageIds": [],
       "replyToMessageId": "<messageId>",
       "attachmentExternalIdentifiers": []
+    },
+    {
+      "id": "call-event:<callId>:ended:<identityId>",
+      "conversationId": "one-to-one:<deterministic-id>",
+      "type": "call_event",
+      "callId": "<callId>",
+      "callEventType": "ended",
+      "actorIdentityId": "<identityId>",
+      "createdAt": 1773848869055,
+      "durationMs": 40000
     }
   ],
   "nextBeforeMessageId": "<messageId>"
@@ -788,6 +1045,8 @@ Implemented:
 
 - require signed request auth
 - return the latest messages ordered from oldest to newest in the page
+- include non-encrypted `call_event` system items for calls scoped to the
+  conversation, with `callEventType` equal to `ended`, `declined` or `missed`
 - when `beforeMessageId` is provided, return messages older than that message
 
 ### Get one message
@@ -894,8 +1153,41 @@ Implemented:
 - persist message metadata in MongoDB
 - publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
   `networkId` and `participantIds`
+- create Mongo-only unread flags for every participant except the author
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
+
+### Mark messages as read
+
+```http
+PUT /conversations/{conversationId}/messages/read-until
+```
+
+Request:
+
+```json
+{
+  "messageId": "<messageId>"
+}
+```
+
+Response:
+
+```json
+{
+  "status": "read"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- delete Mongo-only unread flags for the authenticated identity up to and
+  including `messageId`
+- publish `ConversationMessagesWereReadEvent` with `messageId`,
+  `readerIdentityId`, `networkId` and `participantIds`
+- consuming nodes apply the same unread-flag deletion locally
 
 ### Delete message
 
@@ -941,6 +1233,7 @@ Implemented:
   `targetMessageId`, `networkId` and `participantIds`
 - invalidate the target message metadata locally so it no longer appears in
   message reads
+- remove unread flags for the deleted target message
 - remove the target message block from local IPFS blockstores when present
 - apply the same invalidation/removal when a deletion event is consumed from
   another node
@@ -1094,6 +1387,19 @@ Implemented:
 - add the identity id as a member
 - treat adding an existing member as idempotent
 
+### Leave community
+
+```http
+DELETE /communities/{communityId}/members/me
+```
+
+Implemented:
+
+- require signed request auth from the member that is leaving
+- remove the authenticated identity from `memberIds`
+- publish `communities.v1.member.was_left` with the updated community
+- reject the community owner until ownership transfer or community deletion exists
+
 ### List community channels
 
 ```http
@@ -1110,6 +1416,13 @@ Response:
       "name": "general",
       "type": "text",
       "createdAt": 1773848829055
+    },
+    {
+      "id": "<channelId>",
+      "name": "Voice",
+      "type": "voice",
+      "createdAt": 1773848829055,
+      "connectedIdentityIds": ["<identityId>"]
     }
   ]
 }
@@ -1119,6 +1432,9 @@ Implemented:
 
 - require signed request auth
 - only allow community members to list channel metadata
+- return both text and voice channels
+- include `connectedIdentityIds` for voice channels, derived from identities
+  currently `joined` to the active call scoped to that voice channel
 
 ### Create text channel
 
@@ -1138,7 +1454,27 @@ Implemented:
 
 - require signed request auth from the community owner
 - create text channel metadata in the community
-- keep channel messages out of scope for this MVP
+
+### Create voice channel
+
+```http
+POST /communities/{communityId}/channels/voice
+```
+
+Request:
+
+```json
+{
+  "name": "Voice"
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- create voice channel metadata in the community
+- voice channels do not accept text messages
+- calls scoped to community channels must target a voice channel
 
 ### Rename channel
 
@@ -1157,7 +1493,73 @@ Request:
 Implemented:
 
 - require signed request auth from the community owner
-- rename an existing text channel
+- rename an existing text or voice channel
+
+### Delete channel
+
+```http
+DELETE /communities/{communityId}/channels/{channelId}
+```
+
+Response:
+
+```json
+{
+  "id": "<communityId>",
+  "networkId": "<networkId>",
+  "ownerIdentityId": "<identityId>",
+  "name": "Pigeon Lab",
+  "description": "Private workspace",
+  "memberIds": ["<identityId>"],
+  "textChannels": [],
+  "voiceChannels": [],
+  "visibility": "private",
+  "createdAt": 1773848829055
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- delete an existing text or voice channel from the community metadata
+- when deleting a text channel, delete all stored messages for that channel
+- return the updated community resource
+
+### Community realtime metadata events
+
+Community metadata changes are published as WebSocket domain events and routed
+to every connected identity in `memberIds`.
+
+Channel creation:
+
+```json
+{
+  "type": "communities.v1.channel.was_created",
+  "aggregate_id": "<communityId>",
+  "attributes": {
+    "communityId": "<communityId>",
+    "networkId": "<networkId>",
+    "memberIds": ["<identityId>"],
+    "channel": {
+      "id": "<channelId>",
+      "name": "General",
+      "type": "text",
+      "createdAt": 1773848829055
+    }
+  }
+}
+```
+
+Voice channel creation uses the same payload and adds
+`connectedIdentityIds: []` inside `channel`.
+
+Other metadata events:
+
+- `communities.v1.channel.was_renamed`: `channelId`, `name`
+- `communities.v1.channel.was_deleted`: `channelId`
+- `communities.v1.community.was_updated`: full `community`
+- `communities.v1.member.was_added`: `identityId` and full updated `community`
+- `communities.v1.member.was_left`: `identityId` and full updated `community`
 
 ### Send channel message
 
@@ -1232,7 +1634,17 @@ Response:
 {
   "communityId": "<communityId>",
   "channelId": "<channelId>",
-  "messages": [],
+  "messages": [
+    {
+      "id": "<messageId>",
+      "communityId": "<communityId>",
+      "channelId": "<channelId>",
+      "authorIdentityId": "<identityId>",
+      "createdAt": 1773848869055,
+      "encryptedPayload": "<encryptedMessagePayload>",
+      "type": "sent"
+    }
+  ],
   "nextBeforeMessageId": "<messageId>"
 }
 ```
@@ -1242,6 +1654,8 @@ Implemented:
 - require signed request auth from a community member
 - require the channel to exist in the community
 - return messages ordered from oldest to newest in the page
+- do not include call lifecycle system items; community voice channels expose
+  active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
 - when `beforeMessageId` is provided, return messages older than that message
 
@@ -1314,8 +1728,8 @@ Recommended MVP flow:
 ## Notification HTTP API
 
 Notifications are for actionable events that require client-side identity
-material, such as accepting a conversation invitation. Message delivery does
-not create notifications.
+material, such as accepting a conversation invitation, and for durable UX
+alerts such as missed calls. Message delivery does not create notifications.
 
 ### List notifications
 
@@ -1328,6 +1742,8 @@ Implemented:
 - require signed request auth
 - return notifications where the authenticated identity is the recipient
 - support `limit` and `beforeNotificationId`
+- can include backend-created `missed_call` notifications for conversation
+  calls
 
 ### Create an invitation notification
 
@@ -1382,6 +1798,9 @@ Implemented:
 - keep private keys and decrypted conversation keys out of the backend
 - group conversation invitations use the same encrypted conversation key payload
   as 1to1 invitations; the `type` tells the client which UX to show
+- `missed_call` notifications are not client-created; the call timeout
+  scheduler creates them when ringing participants time out in conversation
+  calls
 
 ### Update a notification
 

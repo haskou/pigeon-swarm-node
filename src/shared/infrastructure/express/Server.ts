@@ -1,5 +1,16 @@
 import { ApiSwaggerFactory } from '@app/apps/apis/ApiSwaggerFactory';
+import { DeleteCallParticipantRoute } from '@app/apps/apis/calls-api/routes/DeleteCallParticipantRoute';
+import { DeleteCallRoute } from '@app/apps/apis/calls-api/routes/DeleteCallRoute';
+import { GetCallHistoryRoute } from '@app/apps/apis/calls-api/routes/GetCallHistoryRoute';
+import { GetCallIceServersRoute } from '@app/apps/apis/calls-api/routes/GetCallIceServersRoute';
+import { GetCallRoute } from '@app/apps/apis/calls-api/routes/GetCallRoute';
+import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
+import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
+import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
+import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
+import { DeleteCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelRoute';
+import { DeleteCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberRoute';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
@@ -11,11 +22,13 @@ import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api
 import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
+import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
 import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageRoute';
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
+import { PutConversationMessagesReadUntilRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessagesReadUntilRoute';
 import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdentityRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
@@ -42,6 +55,8 @@ import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
 import { WebSocketRealtimeServer } from '../websocket/WebSocketRealtimeServer';
 import { HttpErrorHandler } from './HttpErrorHandler';
+import { PublicStaticContent } from './PublicStaticContent';
+import { RoutePrefix } from './RoutePrefix';
 
 type HttpApp = express.Application;
 type HttpServer = shttp.Server;
@@ -134,17 +149,30 @@ export default class Server {
 
   public run(): Promise<void> {
     return new Promise((resolve) => {
-      const routePrefix = process.env.ROUTE_PREFIX || '';
+      const routePrefix = RoutePrefix.fromEnvironment(process.env.ROUTE_PREFIX);
+      const routePrefixValue = routePrefix.toString();
       const swaggerFactory = new ApiSwaggerFactory();
       const swaggerByApi = swaggerFactory.createByApi();
       const aggregatedSwagger = swaggerFactory.createAggregatedSpec();
-      const swaggerRoutes = swaggerFactory.createRouteByApi(routePrefix);
-      const swaggerHtml = this.buildSwaggerHtml(routePrefix, swaggerRoutes);
+      const swaggerRoutes = swaggerFactory.createRouteByApi(routePrefixValue);
+      const swaggerHtml = this.buildSwaggerHtml(
+        routePrefixValue,
+        swaggerRoutes,
+      );
 
       this._app = createExpressServer({
         controllers: [
           HealthRoute,
           ConsumeDlxRoute,
+          GetCallsRoute,
+          GetCallHistoryRoute,
+          GetCallIceServersRoute,
+          GetCallRoute,
+          PostCallRoute,
+          PostCallParticipantRoute,
+          DeleteCallParticipantRoute,
+          DeleteCallRoute,
+          PostCallSignalRoute,
           GetIdentityRoute,
           PostIdentityRoute,
           PutIdentityRoute,
@@ -154,6 +182,7 @@ export default class Server {
           GetConversationsRoute,
           PostConversationMessageRoute,
           DeleteConversationMessageRoute,
+          PutConversationMessagesReadUntilRoute,
           GetConversationMessagesRoute,
           GetIPFSContentRoute,
           PostPrivateIPFSContentRoute,
@@ -173,9 +202,12 @@ export default class Server {
           PatchCommunityRoute,
           GetCommunityMembersRoute,
           PostCommunityMemberRoute,
+          DeleteCommunityMemberRoute,
           GetCommunityChannelsRoute,
           PostCommunityTextChannelRoute,
+          PostCommunityVoiceChannelRoute,
           PatchCommunityChannelRoute,
+          DeleteCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
           PostCommunityChannelMessageRoute,
           DeleteCommunityChannelMessageRoute,
@@ -183,17 +215,17 @@ export default class Server {
         cors: true,
         defaultErrorHandler: false,
         middlewares: [HttpErrorHandler],
-        routePrefix,
+        routePrefix: routePrefixValue,
       });
 
       this.app.get(
-        `${routePrefix}/swagger/open-api.yaml`,
+        `${routePrefixValue}/swagger/open-api.yaml`,
         (_request, response) => {
           return response.type('application/yaml').send(aggregatedSwagger);
         },
       );
 
-      this.app.get(`${routePrefix}/swagger`, (_request, response) => {
+      this.app.get(`${routePrefixValue}/swagger`, (_request, response) => {
         return response.type('text/html').send(swaggerHtml);
       });
 
@@ -203,10 +235,15 @@ export default class Server {
         });
       }
 
+      new PublicStaticContent(routePrefix).register(this.app);
+
       this._server = this.app.listen(process.env.API_PORT || 8080, () => {
         resolve();
       });
-      this.webSocketRealtimeServer.attach(this._server, `${routePrefix}/ws`);
+      this.webSocketRealtimeServer.attach(
+        this._server,
+        `${routePrefixValue}/ws`,
+      );
     });
   }
 }

@@ -12,6 +12,7 @@ describe('ApiSwaggerFactory', () => {
       const specs = factory.createByApi();
 
       expect(Object.keys(specs)).toEqual([
+        'calls-api',
         'communities-api',
         'conversations-api',
         'identities-api',
@@ -20,6 +21,7 @@ describe('ApiSwaggerFactory', () => {
         'nodes-api',
         'notifications-api',
       ]);
+      expect(specs['calls-api']).toContain('/calls/:');
       expect(specs['communities-api']).toContain('/communities/:');
       expect(specs['conversations-api']).toContain('/conversations:');
       expect(specs['identities-api']).toContain('/identities/:');
@@ -35,6 +37,9 @@ describe('ApiSwaggerFactory', () => {
       const spec = factory.createAggregatedSpec();
 
       expect(spec).toContain('title: Pigeon-swarm APIs');
+      expect(spec).toContain(
+        "$ref: './calls-api/swagger.yaml#/paths/~1calls~1'",
+      );
       expect(spec).toContain(
         "$ref: './conversations-api/swagger.yaml#/paths/~1conversations'",
       );
@@ -61,6 +66,7 @@ describe('ApiSwaggerFactory', () => {
       const routes = factory.createRouteByApi('/api');
 
       expect(routes).toEqual({
+        'calls-api': '/api/swagger/calls-api/swagger.yaml',
         'communities-api': '/api/swagger/communities-api/swagger.yaml',
         'conversations-api': '/api/swagger/conversations-api/swagger.yaml',
         'identities-api': '/api/swagger/identities-api/swagger.yaml',

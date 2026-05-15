@@ -1,6 +1,9 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -16,17 +19,25 @@ import {
 import { GetConversationMessageRequest } from '../requests/GetConversationMessageRequest';
 import { GetConversationMessagesAroundRequest } from '../requests/GetConversationMessagesAroundRequest';
 import { GetConversationMessagesRequest } from '../requests/GetConversationMessagesRequest';
+import { ConversationCallEventViewModel } from '../view-model/ConversationCallEventViewModel';
 import { MessagesAroundViewModel } from '../view-model/MessagesAroundViewModel';
 import { MessagesViewModel } from '../view-model/MessagesViewModel';
 import { MessageViewModel } from '../view-model/MessageViewModel';
 
 @JsonController('/conversations')
 export class GetConversationMessagesRoute extends Route {
+  private static readonly DEFAULT_LIMIT = 50;
+  private static readonly MAX_LIMIT = 100;
+
   private readonly finder: LatestMessagesFinder =
     this.get<LatestMessagesFinder>(LatestMessagesFinder);
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  private callRepository(): MongoCallRepository {
+    return new MongoCallRepository(this.get<MongoDB>(MongoDB));
+  }
 
   @Get('/:conversationId/messages')
   public async getMessages(
@@ -46,10 +57,30 @@ export class GetConversationMessagesRoute extends Route {
         beforeMessageId,
       ).getMessage(),
     );
+    const safeLimit = Math.min(
+      Math.max(Number(limit) || GetConversationMessagesRoute.DEFAULT_LIMIT, 1),
+      GetConversationMessagesRoute.MAX_LIMIT,
+    );
+    const calls = await this.callRepository().findByConversationId(
+      new ConversationId(conversationId),
+    );
+    const callEvents =
+      beforeMessageId && messages.length === 0
+        ? []
+        : calls.flatMap((call) =>
+            ConversationCallEventViewModel.fromCall(call),
+          );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new MessagesViewModel(conversationId, messages).toResource());
+      .send(
+        new MessagesViewModel(
+          conversationId,
+          messages,
+          callEvents,
+          safeLimit,
+        ).toResource(),
+      );
   }
 
   @Get('/:conversationId/messages/:messageId')

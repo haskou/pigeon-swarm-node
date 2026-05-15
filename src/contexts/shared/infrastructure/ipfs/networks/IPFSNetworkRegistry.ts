@@ -152,14 +152,16 @@ export default class IPFSNetworkRegistry {
     this.listeners.push(listener);
   }
 
-  public removeNetwork(id: string): void {
+  public async removeNetwork(id: string): Promise<void> {
     const index = this.networks.findIndex((network) => network.getId() === id);
 
     if (index === -1) {
       return;
     }
 
-    this.networks.splice(index, 1);
+    const [network] = this.networks.splice(index, 1);
+
+    await network.stop();
   }
 
   public find(id: string): IPFSNetwork {

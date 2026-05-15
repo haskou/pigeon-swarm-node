@@ -15,6 +15,12 @@ export type NotificationResource = {
         inviterIdentityId: string;
         inviterSignature: string;
         recipientIdentityId: string;
+      }
+    | {
+        callId: string;
+        callerIdentityId: string;
+        networkId: string;
+        recipientIdentityId: string;
       };
   recipientIdentityId: string;
   state: string;

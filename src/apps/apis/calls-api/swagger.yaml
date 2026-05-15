@@ -1,0 +1,322 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Calls API
+  version: 1.0.0
+  description: Signalling endpoints for one-to-one, group and community channel calls.
+tags:
+  - name: calls
+paths:
+  /calls/:
+    get:
+      tags:
+        - calls
+      summary: List active calls for the authenticated identity
+      responses:
+        '200':
+          description: Active calls.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsResource'
+    post:
+      tags:
+        - calls
+      summary: Start a call
+      description: |
+        Conversation calls create a new call. Community channel calls are
+        idempotent by (communityId, channelId): if the voice channel already
+        has an active call, the API returns that call and joins/adds the
+        authenticated caller when needed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCallBody'
+      responses:
+        '200':
+          description: Call started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}:
+    get:
+      tags:
+        - calls
+      summary: Get one active or ended call by id
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call found for the authenticated participant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+        '409':
+          description: Call not found or not visible to the authenticated identity.
+    delete:
+      tags:
+        - calls
+      summary: End a call
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call ended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/ice-servers:
+    get:
+      tags:
+        - calls
+      summary: Get ICE servers for WebRTC calls
+      description: Returns the node-configured TURN/STUN servers. Production nodes should use CALLS_TURN_SHARED_SECRET so credentials are generated temporarily per authenticated identity, and prefer iceTransportPolicy relay.
+      responses:
+        '200':
+          description: ICE server configuration for the authenticated client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallIceServersResource'
+  /calls/history:
+    get:
+      tags:
+        - calls
+      summary: List call history for the authenticated identity
+      responses:
+        '200':
+          description: Active and finished calls for the authenticated identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsResource'
+  /calls/{callId}/participants:
+    post:
+      tags:
+        - calls
+      summary: Join an active call
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call joined.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}/participants/me:
+    delete:
+      tags:
+        - calls
+      summary: Leave an active call
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Call left.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+  /calls/{callId}/signals:
+    post:
+      tags:
+        - calls
+      summary: Send WebRTC signalling data to another call participant
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCallSignalBody'
+      responses:
+        '200':
+          description: Signal accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
+        '429':
+          description: Signal rate limit exceeded.
+components:
+  parameters:
+    CallId:
+      in: path
+      name: callId
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    PostCallBody:
+      type: object
+      required:
+        - scopeType
+      properties:
+        scopeType:
+          type: string
+          enum:
+            - conversation
+            - community_channel
+        conversationId:
+          type: string
+          description: Required when scopeType is conversation. Supports one-to-one and group conversations.
+        communityId:
+          type: string
+          format: uuid
+          description: Required when scopeType is community_channel.
+        channelId:
+          type: string
+          format: uuid
+          description: Required when scopeType is community_channel. Must be a community voice channel.
+        invitedParticipantIds:
+          type: array
+          description: Optional extra recipients for conversation call start events. Ignored for community channel calls, whose participants are derived from community members.
+          items:
+            type: string
+    PostCallSignalBody:
+      type: object
+      required:
+        - recipientIdentityId
+        - signalType
+        - payload
+      properties:
+        recipientIdentityId:
+          type: string
+        signalType:
+          type: string
+          enum:
+            - offer
+            - answer
+            - ice_candidate
+        payload:
+          type: object
+          additionalProperties: true
+    CallResource:
+      type: object
+      required:
+        - id
+        - networkId
+        - creatorIdentityId
+        - participantIds
+        - participants
+        - scope
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        networkId:
+          type: string
+          format: uuid
+        creatorIdentityId:
+          type: string
+        participantIds:
+          type: array
+          items:
+            type: string
+        scope:
+          $ref: '#/components/schemas/CallScope'
+        status:
+          type: string
+          enum:
+            - active
+            - ended
+            - missed
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallParticipant'
+        createdAt:
+          type: number
+        endedAt:
+          type: number
+          nullable: true
+    CallsResource:
+      type: object
+      required:
+        - calls
+      properties:
+        calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallResource'
+    CallIceServersResource:
+      type: object
+      required:
+        - iceServers
+        - iceTransportPolicy
+      properties:
+        iceServers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallIceServer'
+        iceTransportPolicy:
+          type: string
+          enum:
+            - all
+            - relay
+    CallIceServer:
+      type: object
+      required:
+        - urls
+      properties:
+        urls:
+          type: array
+          items:
+            type: string
+        username:
+          type: string
+          description: Temporary coturn REST username when CALLS_TURN_SHARED_SECRET is configured.
+        credential:
+          type: string
+          description: Temporary coturn REST HMAC credential when CALLS_TURN_SHARED_SECRET is configured.
+    CallScope:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - conversation
+            - community_channel
+        conversationId:
+          type: string
+        communityId:
+          type: string
+          format: uuid
+        channelId:
+          type: string
+          format: uuid
+    CallParticipant:
+      type: object
+      required:
+        - identityId
+        - status
+      properties:
+        identityId:
+          type: string
+        status:
+          type: string
+          enum:
+            - ringing
+            - joined
+            - left
+            - declined
+            - missed
+        joinedAt:
+          type: number
+        leftAt:
+          type: number
+        declinedAt:
+          type: number
+        missedAt:
+          type: number

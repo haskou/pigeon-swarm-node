@@ -33,6 +33,7 @@ let kernel: Kernel | null = null;
 export default class Definitions {
   private binaryBody: Buffer | undefined;
   private body: string | undefined;
+  private callId: string | undefined;
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
   private communityId: string | undefined;
@@ -59,6 +60,7 @@ export default class Definitions {
   public resetScenarioState(): void {
     this.binaryBody = undefined;
     this.body = undefined;
+    this.callId = undefined;
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
     this.communityId = undefined;
@@ -413,6 +415,10 @@ export default class Definitions {
     const participantIdentityId = new IdentityId(
       participantKeyPair.toPrimitives().publicKey,
     );
+
+    this.otherIdentityKeyPair = participantKeyPair;
+    this.otherIdentityId = participantIdentityId;
+
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
 
     this.body = JSON.stringify({
@@ -441,6 +447,9 @@ export default class Definitions {
       secondParticipantKeyPair.toPrimitives().publicKey,
     );
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
+
+    this.otherIdentityKeyPair = firstParticipantKeyPair;
+    this.otherIdentityId = firstParticipantIdentityId;
 
     this.body = JSON.stringify({
       keychainExternalIdentifier: this.keychainExternalIdentifier,
@@ -533,10 +542,48 @@ export default class Definitions {
     );
   }
 
+  @given('the community member signs the current community leave request')
+  public async theCommunityMemberSignsTheCurrentCommunityLeaveRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/members/me`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current community leave request')
+  public async iSignTheCurrentCommunityLeaveRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/members/me`,
+    );
+  }
+
   @given('I set a community text channel body')
   public iSetACommunityTextChannelBody(): void {
     this.body = JSON.stringify({
       name: 'general',
+    });
+  }
+
+  @given('I set a community voice channel body')
+  public iSetACommunityVoiceChannelBody(): void {
+    this.body = JSON.stringify({
+      name: 'voice',
     });
   }
 
@@ -549,6 +596,18 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/channels/text`,
+    );
+  }
+
+  @given('I sign the current community voice channel request')
+  public async iSignTheCurrentCommunityVoiceChannelRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/channels/voice`,
     );
   }
 
@@ -578,6 +637,15 @@ export default class Definitions {
     this.communityChannelId = this.response.data.id;
   }
 
+  @given('I remember the current community voice channel')
+  public iRememberTheCurrentCommunityVoiceChannel(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community channel response id not found.');
+    }
+
+    this.communityChannelId = this.response.data.id;
+  }
+
   @given('I set a community text channel rename body')
   public iSetACommunityTextChannelRenameBody(): void {
     this.body = JSON.stringify({
@@ -594,6 +662,50 @@ export default class Definitions {
     await this.signCurrentRequest(
       'PATCH',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+    );
+  }
+
+  @given('I sign the current community channel deletion request')
+  public async iSignTheCurrentCommunityChannelDeletionRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+    );
+  }
+
+  @given('another identity signs the current community channel deletion request')
+  public async anotherIdentitySignsTheCurrentCommunityChannelDeletionRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current community channels request')
+  public async iSignTheCurrentCommunityChannelsRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/channels`,
     );
   }
 
@@ -721,6 +833,218 @@ export default class Definitions {
     }
 
     this.conversationId = this.response.data.id;
+  }
+
+  @given('I have created a group conversation')
+  public async iHaveCreatedAGroupConversation(): Promise<void> {
+    await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
+    await this.iSetAGroupConversationBodyForNewParticipants();
+    await this.iSignTheCurrentOneToOneConversationRequest();
+
+    this.response = await this.restClient.post(
+      '/conversations/',
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not create group conversation: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.conversationId = this.response.data.id;
+  }
+
+  @given('I set a conversation call body')
+  public iSetAConversationCallBody(): void {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      conversationId: this.conversationId,
+      scopeType: 'conversation',
+    });
+  }
+
+  @given('I set a community channel call body')
+  public iSetACommunityChannelCallBody(): void {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      scopeType: 'community_channel',
+    });
+  }
+
+  @given('I set a community channel call body with an outside invitee')
+  public iSetACommunityChannelCallBodyWithAnOutsideInvitee(): void {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      invitedParticipantIds: [
+        'MCowBQYDK2VwAyEAA0YLLSFyAaDRgmbqSTJ2gTeRCJq6QfP9RNHHp0/qbtY=',
+      ],
+      scopeType: 'community_channel',
+    });
+  }
+
+  @given('I remember the current call')
+  public iRememberTheCurrentCall(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Call response id not found.');
+    }
+
+    this.callId = this.response.data.id;
+  }
+
+  @given('I set a call signal body for the other identity')
+  public iSetACallSignalBodyForTheOtherIdentity(): void {
+    if (!this.otherIdentityId) {
+      throw new Error('Other identity must exist first.');
+    }
+
+    this.body = JSON.stringify({
+      payload: {
+        sdp: 'api-offer-sdp',
+      },
+      recipientIdentityId: this.otherIdentityId.valueOf(),
+      signalType: 'offer',
+    });
+  }
+
+  @given('I set a call signal body for an unrelated identity')
+  public async iSetACallSignalBodyForAnUnrelatedIdentity(): Promise<void> {
+    const unrelatedKeyPair = await KeyPair.generate();
+    const unrelatedIdentityId = new IdentityId(
+      unrelatedKeyPair.toPrimitives().publicKey,
+    );
+
+    this.body = JSON.stringify({
+      payload: {
+        sdp: 'api-offer-sdp',
+      },
+      recipientIdentityId: unrelatedIdentityId.valueOf(),
+      signalType: 'offer',
+    });
+  }
+
+  @given('I sign the current call start request')
+  public async iSignTheCurrentCallStartRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/calls/');
+  }
+
+  @given('the community member signs the current call start request')
+  public async theCommunityMemberSignsTheCurrentCallStartRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/calls/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current calls request')
+  public async iSignTheCurrentCallsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/calls/');
+  }
+
+  @given('I sign the current call history request')
+  public async iSignTheCurrentCallHistoryRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/calls/history');
+  }
+
+  @given('I sign the current call request')
+  public async iSignTheCurrentCallRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest('GET', `/calls/${this.callId}`);
+  }
+
+  @given('calls use a test TURN server')
+  public callsUseATestTurnServer(): void {
+    delete process.env.CALLS_TURN_CREDENTIAL;
+    delete process.env.CALLS_TURN_USERNAME;
+    process.env.CALLS_TURN_CREDENTIAL_TTL_SECONDS = '600';
+    process.env.CALLS_TURN_SHARED_SECRET = 'test-turn-secret';
+    process.env.CALLS_TURN_URLS = 'turn:test-turn.local:3478?transport=udp';
+  }
+
+  @given('I sign the current call ICE servers request')
+  public async iSignTheCurrentCallIceServersRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/calls/ice-servers');
+  }
+
+  @given('the other identity signs the current call join request')
+  public async theOtherIdentitySignsTheCurrentCallJoinRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'POST',
+      `/calls/${this.callId}/participants`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current call end request')
+  public async iSignTheCurrentCallEndRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest('DELETE', `/calls/${this.callId}`);
+  }
+
+  @given('the other identity signs the current call leave request')
+  public async theOtherIdentitySignsTheCurrentCallLeaveRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/calls/${this.callId}/participants/me`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current call signal request')
+  public async iSignTheCurrentCallSignalRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    await this.signCurrentRequest('POST', `/calls/${this.callId}/signals`);
   }
 
   @given('I set an encrypted conversation message body')
@@ -903,6 +1227,48 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest('GET', '/conversations/');
+  }
+
+  @given('the other identity signs the current conversations request')
+  public async theOtherIdentitySignsTheCurrentConversationsRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/conversations/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I set a read conversation messages body')
+  public iSetAReadConversationMessagesBody(): void {
+    if (!this.messageId) {
+      throw new Error('Message must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      messageId: this.messageId,
+    });
+  }
+
+  @given('the other identity signs the current read conversation messages request')
+  public async theOtherIdentitySignsTheCurrentReadConversationMessagesRequest(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'PUT',
+      `/conversations/${this.conversationId}/messages/read-until`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
   }
 
   @given('I sign the current conversations request with an expired timestamp')
@@ -1248,6 +1614,19 @@ export default class Definitions {
     );
   }
 
+  @when('I PUT the current conversation messages read marker')
+  public async iPUTTheCurrentConversationMessagesReadMarker(): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    this.response = await this.restClient.put(
+      `/conversations/${this.conversationId}/messages/read-until`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
   @when('I PUT the created identity')
   public async iPUTTheCreatedIdentity(): Promise<void> {
     if (!this.createdIdentityId) {
@@ -1296,11 +1675,106 @@ export default class Definitions {
     );
   }
 
+  @when('I DELETE my membership from the current community')
+  public async iDELETEMyMembershipFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/members/me`,
+      undefined,
+      { headers: this.headers },
+    );
+  }
+
   @when('I GET current communities')
   public async iGETCurrentCommunities(): Promise<void> {
     this.response = await this.restClient.get(
       '/communities/',
       this.headers,
+    );
+  }
+
+  @when('I GET current calls')
+  public async iGETCurrentCalls(): Promise<void> {
+    this.response = await this.restClient.get('/calls/', this.headers);
+  }
+
+  @when('I GET current call history')
+  public async iGETCurrentCallHistory(): Promise<void> {
+    this.response = await this.restClient.get('/calls/history', this.headers);
+  }
+
+  @when('I GET the current call')
+  public async iGETTheCurrentCall(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/calls/${this.callId}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET call ICE servers')
+  public async iGETCallIceServers(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/calls/ice-servers',
+      this.headers,
+    );
+  }
+
+  @when('I POST a signal to the current call')
+  public async iPOSTASignalToTheCurrentCall(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/calls/${this.callId}/signals`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST a participant join to the current call')
+  public async iPOSTAParticipantJoinToTheCurrentCall(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/calls/${this.callId}/participants`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current call')
+  public async iDELETETheCurrentCall(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/calls/${this.callId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current call participant')
+  public async iDELETETheCurrentCallParticipant(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/calls/${this.callId}/participants/me`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
     );
   }
 
@@ -1329,6 +1803,31 @@ export default class Definitions {
     );
   }
 
+  @when('I POST a voice channel to the current community')
+  public async iPOSTAVoiceChannelToTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/voice`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET channels from the current community')
+  public async iGETChannelsFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels`,
+      this.headers,
+    );
+  }
+
   @when('I PATCH the current community text channel')
   public async iPATCHTheCurrentCommunityTextChannel(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -1338,6 +1837,19 @@ export default class Definitions {
     this.response = await this.restClient.patch(
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
       this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current community channel')
+  public async iDELETETheCurrentCommunityChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}`,
+      undefined,
       { headers: this.headers },
     );
   }
@@ -1498,6 +2010,18 @@ export default class Definitions {
     );
   }
 
+  @then('response body should contain the current call')
+  public responseBodyShouldContainTheCurrentCall(): void {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.contain(
+      this.callId,
+      JSON.stringify(this.response.data),
+    );
+  }
+
   @then('response body should contain')
   public responseBodyShouldContainObject(objectToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.contain(objectToContain);
@@ -1506,6 +2030,17 @@ export default class Definitions {
   @then('response body should not contain {string}')
   public responseBodyShouldnotContain(textToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.not.contain(textToContain);
+  }
+
+  @then('response body should not contain the other identity id')
+  public responseBodyShouldNotContainTheOtherIdentityId(): void {
+    if (!this.otherIdentityId) {
+      throw new Error('Other identity must exist first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.otherIdentityId.valueOf(),
+    );
   }
 
   @then('response body is an array with length of {int}')

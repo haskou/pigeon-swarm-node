@@ -74,6 +74,10 @@ package "conversations.domain" {
     +eventName(): string
   }
 
+  class ConversationMessagesWereReadEvent {
+    +eventName(): string
+  }
+
   class ConversationSyncRequestedEvent {
     +eventName(): string
   }
@@ -96,6 +100,9 @@ package "conversations.domain" {
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
     +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
     +findSyncScopes(): Promise<object[]>
+    +countUnreadByRecipient(recipientIdentityId: IdentityId, conversationIds: ConversationId[]): Promise<Map<string, number>>
+    +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId): Promise<void>
+    +registerUnreadForMessage(conversation: Conversation, message: Message): Promise<void>
   }
 
   Conversation <|-- OneToOneConversation
@@ -120,6 +127,7 @@ package "conversations.domain" {
   Conversation ..> ConversationMessageWasSentEvent
   Conversation ..> ConversationMessageWasEditedEvent
   Conversation ..> ConversationMessageWasDeletedEvent
+  ConversationRepository ..> ConversationMessagesWereReadEvent
 }
 
 package "conversations.application" {
@@ -159,6 +167,14 @@ package "conversations.application" {
     +register(message): Promise<void>
   }
 
+  class MessagesReadMarker {
+    +mark(message): Promise<void>
+  }
+
+  class MessagesReadRegistrar {
+    +register(message): Promise<void>
+  }
+
   class ConversationSyncResponder {
     +respond(message): Promise<void>
   }
@@ -182,6 +198,9 @@ package "conversations.application" {
   ConversationSynchronizer --> ConversationRepository
   ConversationSynchronizer --> DomainEventPublisher
   ConversationMessageRegistrar --> ConversationRepository
+  MessagesReadMarker --> ConversationRepository
+  MessagesReadMarker --> DomainEventPublisher
+  MessagesReadRegistrar --> ConversationRepository
   ConversationSyncResponder --> ConversationRepository
   ConversationSyncResponder --> DomainEventPublisher
   ConversationSyncResponder ..> ConversationSyncAvailableEvent
@@ -215,6 +234,15 @@ package "conversations.infrastructure" {
     -targetMessageId?: string
   }
 
+  class MongoUnreadConversationMessageDocument {
+    -_id: string
+    -conversationId: string
+    -messageId: string
+    -recipientIdentityId: string
+    -networkId?: string
+    -createdAt: number
+  }
+
   class MongoConversationRepository
   class MongoConversationDocument {
     -_id: string
@@ -230,12 +258,15 @@ package "conversations.infrastructure" {
     Reconstitutes and persists the Conversation
     aggregate. Message storage is an
     infrastructure detail inside this repository.
+    Unread flags are Mongo-only projections,
+    never IPFS documents.
   end note
 
   MongoConversationRepository ..|> ConversationRepository
   MongoConversationRepository --> MongoConversationDocument
   MongoConversationRepository ..> IpfsMessageDocument
   MongoConversationRepository --> MongoMessageDocumentIndex
+  MongoConversationRepository --> MongoUnreadConversationMessageDocument
   Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
 }
 

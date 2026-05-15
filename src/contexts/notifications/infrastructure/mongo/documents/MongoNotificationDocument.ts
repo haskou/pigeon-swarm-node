@@ -16,13 +16,20 @@ export type MongoCommunityInvitationPayloadDocument = {
   inviterSignature: string;
   recipientIdentityId: string;
 };
+export type MongoMissedCallPayloadDocument = {
+  callId: string;
+  callerIdentityId: string;
+  networkId: string;
+  recipientIdentityId: string;
+};
 
 export type MongoNotificationDocument = {
   _id: string;
   createdAt: number;
   payload:
     | MongoCommunityInvitationPayloadDocument
-    | MongoConversationInvitationPayloadDocument;
+    | MongoConversationInvitationPayloadDocument
+    | MongoMissedCallPayloadDocument;
   recipientIdentityId: string;
   state: NotificationStateValue;
   status: NotificationStatusValue;

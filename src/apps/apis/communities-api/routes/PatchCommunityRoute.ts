@@ -37,6 +37,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
       body.banner ? new CommunityBanner(body.banner) : undefined,
     );
     await this.repository().save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

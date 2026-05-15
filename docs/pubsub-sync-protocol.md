@@ -195,6 +195,7 @@ WebSocket clients after they are accepted locally:
 - `conversations.v1.message.was_sent`
 - `conversations.v1.message.was_edited`
 - `conversations.v1.message.was_deleted`
+- `conversations.v1.messages.were_read`
 - `nodes.v1.node.heartbeat.was_sent`
 
 Frontend clients do not consume PubSub directly. They receive filtered
@@ -209,6 +210,9 @@ Implemented state is split by context:
 - keychain metadata indexes candidates by owner identity and version
 - conversation metadata indexes conversations and message documents by
   conversation id, message id, network id and invalidation state
+- unread conversation message flags are Mongo-only projections keyed by
+  conversation id, recipient identity id and message id; read announcements
+  delete those flags locally and on consuming nodes
 - node peer metadata stores last heartbeat per remote node
 
 ## Failure Modes

@@ -40,7 +40,9 @@ describe('MongoIdentityMetadataRepository', () => {
       {
         $set: {
           cid: expectedDocument.cid,
+          handle: expectedDocument.handle,
           identityId: expectedDocument.identityId,
+          networkIds: expectedDocument.networkIds,
           previousCid: expectedDocument.previousCid,
           receivedAt: expect.any(Number),
           version: expectedDocument.version,

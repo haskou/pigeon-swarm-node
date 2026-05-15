@@ -1,8 +1,13 @@
+import { ConversationCallEventResource } from './ConversationCallEventResource';
 import { MessageResource } from './MessageResource';
+
+export type ConversationTimelineItemResource =
+  | ConversationCallEventResource
+  | MessageResource;
 
 export interface MessagesResource {
   conversationId: string;
-  messages: MessageResource[];
+  messages: ConversationTimelineItemResource[];
   nextBeforeMessageId?: string;
 }
 

@@ -5,6 +5,14 @@ export interface CommunityTextChannelResource {
   type: 'text';
 }
 
+export interface CommunityVoiceChannelResource {
+  connectedIdentityIds?: string[];
+  createdAt: number;
+  id: string;
+  name: string;
+  type: 'voice';
+}
+
 export interface CommunityResource {
   avatar?: string;
   banner?: string;
@@ -17,4 +25,5 @@ export interface CommunityResource {
   ownerIdentityId: string;
   textChannels: CommunityTextChannelResource[];
   visibility: 'private';
+  voiceChannels: CommunityVoiceChannelResource[];
 }

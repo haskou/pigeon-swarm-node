@@ -150,6 +150,24 @@ components:
           type: string
         inviterSignature:
           type: string
+    MissedCallPayload:
+      type: object
+      required:
+        - callId
+        - callerIdentityId
+        - networkId
+        - recipientIdentityId
+      properties:
+        callId:
+          type: string
+          format: uuid
+        callerIdentityId:
+          type: string
+        networkId:
+          type: string
+          format: uuid
+        recipientIdentityId:
+          type: string
     NotificationResource:
       type: object
       required:
@@ -169,6 +187,7 @@ components:
             - community_invitation
             - conversation_invitation
             - group_conversation_invitation
+            - missed_call
         recipientIdentityId:
           type: string
         status:
@@ -188,6 +207,7 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CommunityInvitationPayload'
             - $ref: '#/components/schemas/ConversationInvitationPayload'
+            - $ref: '#/components/schemas/MissedCallPayload'
     NotificationsResource:
       type: object
       required:
