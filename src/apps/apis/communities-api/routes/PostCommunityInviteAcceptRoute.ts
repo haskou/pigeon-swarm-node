@@ -24,13 +24,11 @@ export class PostCommunityInviteAcceptRoute extends CommunityRouteSupport {
       throw new CommunityInviteNotFoundError();
     }
 
-    const community = await this.findCommunity(
-      invite.getCommunityId().valueOf(),
-    );
+    const communityId = invite.getCommunityId().valueOf();
+    const community = await this.findCommunity(communityId);
 
-    invite.accept();
+    await this.inviteRepository().consume(invite);
     community.joinWithInvite(actorIdentityId);
-    await this.inviteRepository().save(invite);
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
 

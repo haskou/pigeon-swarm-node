@@ -1,6 +1,7 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { CommunityInvite } from '../../domain/CommunityInvite';
+import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
 import { CommunityInviteRepository as InviteRepository } from '../../domain/repositories/CommunityInviteRepository';
 import { CommunityInviteToken } from '../../domain/value-objects/CommunityInviteToken';
 import { MongoCommunityInviteDocument } from './documents/MongoCommunityInviteDocument';
@@ -50,6 +51,39 @@ export class MongoCommunityInviteRepository implements InviteRepository {
     ).findOne({ _id: token.valueOf() });
 
     return document ? this.toDomain(document) : undefined;
+  }
+
+  public async consume(invite: CommunityInvite): Promise<CommunityInvite> {
+    const now = Date.now();
+    const primitives = invite.toPrimitives();
+    const result = await (
+      await this.collection()
+    ).updateOne(
+      {
+        _id: primitives.token,
+        $or: [
+          { expiresAt: { $exists: false } },
+          { expiresAt: null },
+          { expiresAt: { $gt: now } },
+        ],
+        uses: { $lt: primitives.maxUses },
+      },
+      { $inc: { uses: 1 } },
+    );
+
+    if (result.modifiedCount === 1) {
+      return (await this.findByToken(invite.getToken())) as CommunityInvite;
+    }
+
+    const currentInvite = await this.findByToken(invite.getToken());
+
+    if (!currentInvite) {
+      throw new CommunityInviteNotFoundError();
+    }
+
+    currentInvite.accept();
+
+    return currentInvite;
   }
 
   public async save(invite: CommunityInvite): Promise<void> {
