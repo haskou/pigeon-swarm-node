@@ -14,6 +14,8 @@ import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
+import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
+import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
 import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
@@ -301,9 +303,11 @@ describe('PubSub sync consumers', () => {
 
   it('registers valid messages announced by conversation sync responses', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
+    const reactionRegistrar = mock<MessageReactionRegistrar>();
     const consumer = new RegisterMessagesWhenSyncAvailable(
       eventConsumer,
       registrar,
+      reactionRegistrar,
       suppressionTracker,
     );
 
@@ -325,6 +329,41 @@ describe('PubSub sync consumers', () => {
     expect(registrar.register.mock.calls[0][0].messageId.valueOf()).toBe(
       messageId,
     );
+    expect(reactionRegistrar.register).not.toHaveBeenCalled();
+  });
+
+  it('registers valid reactions announced by conversation sync responses', async () => {
+    const registrar = mock<ConversationMessageRegistrar>();
+    const reactionRegistrar = mock<MessageReactionRegistrar>();
+    const consumer = new RegisterMessagesWhenSyncAvailable(
+      eventConsumer,
+      registrar,
+      reactionRegistrar,
+      suppressionTracker,
+    );
+
+    await consumer.handler(
+      new ConversationSyncAvailableEvent(conversationId, {
+        reactionCandidates: [
+          {
+            authorId: 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+            createdAt: 1778513696020,
+            emoji: '👍',
+            messageId,
+          },
+          { messageId },
+        ],
+      }),
+    );
+
+    expect(registrar.register).not.toHaveBeenCalled();
+    expect(reactionRegistrar.register).toHaveBeenCalledTimes(1);
+    expect(reactionRegistrar.register).toHaveBeenCalledWith(
+      expect.any(RegisterMessageReaction),
+    );
+    expect(
+      reactionRegistrar.register.mock.calls[0][0].messageId.valueOf(),
+    ).toBe(messageId);
   });
 
   it('registers node peers announced by heartbeat events', async () => {
