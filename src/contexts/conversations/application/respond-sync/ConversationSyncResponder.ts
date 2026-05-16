@@ -36,14 +36,17 @@ export default class ConversationSyncResponder {
     const reactionCandidates = await this.reactionRepository.findCandidates(
       message.conversationId,
     );
+    const messageCandidateIds = new Set(
+      messageCandidates.map((candidate) => candidate.messageId),
+    );
 
     await this.eventPublisher.publish([
       new ConversationSyncAvailableEvent(message.conversationId.valueOf(), {
         messageCandidates,
         networkId: message.networkId.valueOf(),
-        reactionCandidates: reactionCandidates.map((reaction) =>
-          reaction.toPrimitives(),
-        ),
+        reactionCandidates: reactionCandidates
+          .map((reaction) => reaction.toPrimitives())
+          .filter((reaction) => messageCandidateIds.has(reaction.messageId)),
         requestId: message.requestId?.valueOf(),
       }),
     ]);

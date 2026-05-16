@@ -80,6 +80,58 @@ describe('ConversationSyncResponder', () => {
     );
   });
 
+  it('should only publish reactions for announced message candidates', async () => {
+    const conversationId = new ConversationId(
+      'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de',
+    );
+    const messageCandidates = [
+      {
+        authorIdentityId: 'author-id',
+        createdAt: 1778513696020,
+        messageId: 'synced-message-id',
+        messageType: 'sent',
+      },
+    ];
+    const syncedReaction = {
+      toPrimitives: () => ({
+        authorId: 'author-id',
+        conversationId: conversationId.valueOf(),
+        createdAt: 1778513696021,
+        emoji: '👍',
+        messageId: 'synced-message-id',
+      }),
+    };
+    const staleReaction = {
+      toPrimitives: () => ({
+        authorId: 'author-id',
+        conversationId: conversationId.valueOf(),
+        createdAt: 1778513696022,
+        emoji: '🔥',
+        messageId: 'older-message-id',
+      }),
+    };
+
+    repository.findMessageCandidates.mockResolvedValue(messageCandidates);
+    reactionRepository.findCandidates.mockResolvedValue([
+      syncedReaction,
+      staleReaction,
+    ] as never);
+
+    await responder.respond(
+      new ConversationSyncResponseMessage(
+        conversationId.valueOf(),
+        UUID.generate().toString(),
+        'request-3',
+      ),
+    );
+
+    expect(eventPublisher.publish.mock.calls[0][0][0].attributes).toMatchObject(
+      {
+        reactionCandidates: [syncedReaction.toPrimitives()],
+      },
+    );
+  });
+
   it('should not publish when another peer already announced the same sync response', async () => {
     suppressionTracker.shouldRespond.mockResolvedValue(false);
 
