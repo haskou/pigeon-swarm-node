@@ -6,6 +6,11 @@ export interface MessageResource {
   encryptedPayload?: string;
   id: string;
   previousMessageIds: string[];
+  reactions: {
+    authorIdentityId: string;
+    createdAt: number;
+    emoji: string;
+  }[];
   replyToMessageId?: string;
   targetMessageId?: string;
   type: string;

@@ -865,6 +865,47 @@ export default class Definitions {
     );
   }
 
+  @given('I set a community channel message reaction body')
+  public iSetACommunityChannelMessageReactionBody(): void {
+    this.body = JSON.stringify({
+      emoji: '👍',
+    });
+  }
+
+  @given('I sign the current community channel message reaction request')
+  public async iSignTheCurrentCommunityChannelMessageReactionRequest(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/reactions`,
+    );
+  }
+
+  @given(
+    'I sign the current community channel message reaction removal request',
+  )
+  public async iSignTheCurrentCommunityChannelMessageReactionRemovalRequest(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/reactions`,
+    );
+  }
+
   @given('I sign the current one-to-one conversation request')
   public async iSignTheCurrentOneToOneConversationRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/conversations/');
@@ -1205,6 +1246,13 @@ export default class Definitions {
     });
   }
 
+  @given('I set a conversation message reaction body')
+  public iSetAConversationMessageReactionBody(): void {
+    this.body = JSON.stringify({
+      emoji: '👍',
+    });
+  }
+
   @given('I sign the current conversation message request')
   public async iSignTheCurrentConversationMessageRequest(): Promise<void> {
     if (!this.conversationId) {
@@ -1226,6 +1274,30 @@ export default class Definitions {
     await this.signCurrentRequest(
       'DELETE',
       `/conversations/${this.conversationId}/messages/${this.messageId}`,
+    );
+  }
+
+  @given('I sign the current conversation message reaction request')
+  public async iSignTheCurrentConversationMessageReactionRequest(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
+    );
+  }
+
+  @given('I sign the current conversation message reaction removal request')
+  public async iSignTheCurrentConversationMessageReactionRemovalRequest(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'DELETE',
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
     );
   }
 
@@ -1589,6 +1661,96 @@ export default class Definitions {
     }
 
     this.messageId = this.response.data.id;
+  }
+
+  @given('I have reacted to the sent message')
+  public async iHaveReactedToTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not react to message: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+  }
+
+  @given('I have created a private community text channel')
+  public async iHaveCreatedAPrivateCommunityTextChannel(): Promise<void> {
+    this.iSetAPrivateCommunityBody();
+    await this.iSignTheCurrentCommunityCreationRequest();
+
+    this.response = await this.restClient.post(
+      '/communities/',
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not create community: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.iRememberTheCurrentCommunity();
+    this.iSetACommunityTextChannelBody();
+    await this.iSignTheCurrentCommunityTextChannelRequest();
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/text`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not create community channel: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.iRememberTheCurrentCommunityTextChannel();
+  }
+
+  @given('I have sent an encrypted community channel message')
+  public async iHaveSentAnEncryptedCommunityChannelMessage(): Promise<void> {
+    await this.iSetAnEncryptedCommunityChannelMessageBody();
+    await this.iSignTheCurrentCommunityChannelMessageRequest();
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not send community channel message: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+
+    this.communityChannelMessageId = this.response.data.id;
+  }
+
+  @given('I have reacted to the current community channel message')
+  public async iHaveReactedToTheCurrentCommunityChannelMessage(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/reactions`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not react to community channel message: ${JSON.stringify(this.response.data)}`,
+      );
+    }
   }
 
   @given('I register an in-memory IPFS network {string}')
@@ -1980,6 +2142,40 @@ export default class Definitions {
     );
   }
 
+  @when('I POST the reaction to the current community channel message')
+  public async iPOSTTheReactionToTheCurrentCommunityChannelMessage(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/reactions`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the reaction from the current community channel message')
+  public async iDELETETheReactionFromTheCurrentCommunityChannelMessage(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/reactions`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
   @when('I GET {string}')
   public async iGET(path: string): Promise<void> {
     this.response = await this.restClient.get(path, this.headers);
@@ -2071,6 +2267,32 @@ export default class Definitions {
 
     this.response = await this.restClient.delete(
       `/conversations/${this.conversationId}/messages/${this.messageId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST the reaction to the sent message')
+  public async iPOSTTheReactionToTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the reaction from the sent message')
+  public async iDELETETheReactionFromTheSentMessage(): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

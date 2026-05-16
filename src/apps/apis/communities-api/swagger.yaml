@@ -445,6 +445,79 @@ paths:
                 $ref: '#/components/schemas/DeletedCommunityChannelMessageResource'
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the deletion signature is invalid.
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}/reactions:
+    post:
+      tags:
+        - communities
+      summary: Add a reaction to a private community text channel message
+      description: Reactions are MongoDB-only metadata synchronized by community events. The encrypted message document is not rewritten.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityChannelMessageReactionBody'
+      responses:
+        '200':
+          description: Reaction stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessageReactionResource'
+        '409':
+          description: Authenticated identity is not a member, the channel does not exist, or the message does not exist.
+    delete:
+      tags:
+        - communities
+      summary: Remove a reaction from a private community text channel message
+      description: Removes the authenticated member reaction for the provided emoji.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityChannelMessageReactionBody'
+      responses:
+        '200':
+          description: Reaction removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessageReactionResource'
+        '409':
+          description: Authenticated identity is not a member, the channel does not exist, or the message does not exist.
 components:
   parameters:
     CommunityId:
@@ -622,6 +695,7 @@ components:
         - encryptedPayload
         - signature
         - attachmentExternalIdentifiers
+        - reactions
         - type
         - createdAt
       properties:
@@ -647,6 +721,24 @@ components:
             - sent
         createdAt:
           type: integer
+        reactions:
+          type: array
+          description: MongoDB-only reactions synchronized by community events.
+          items:
+            $ref: '#/components/schemas/CommunityChannelMessageReactionResource'
+    CommunityChannelMessageReactionResource:
+      type: object
+      required:
+        - authorIdentityId
+        - createdAt
+        - emoji
+      properties:
+        authorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        emoji:
+          type: string
     CommunityChannelMessagesResource:
       type: object
       required:
@@ -802,3 +894,13 @@ components:
           type: integer
         signature:
           type: string
+    CommunityChannelMessageReactionBody:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+          description: Emoji reaction to add or remove. Unique by community, channel, message, author and emoji.
+          maxLength: 64
+          example: 👍

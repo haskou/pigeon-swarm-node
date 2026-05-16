@@ -1,4 +1,5 @@
 import { Message } from '@app/contexts/conversations/domain/Message';
+import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
 
 import { ConversationCallEventResource } from '../resources/ConversationCallEventResource';
 import {
@@ -13,11 +14,18 @@ export class MessagesViewModel {
     private readonly messages: Message[],
     private readonly callEvents: ConversationCallEventResource[] = [],
     private readonly limit: number = 50,
+    private readonly reactions: MessageReaction[] = [],
   ) {}
+
+  private reactionsFor(message: Message): MessageReaction[] {
+    return this.reactions.filter((reaction) =>
+      reaction.getMessageId().isEqual(message.getId()),
+    );
+  }
 
   public toResource(): MessagesResource {
     const messages = this.messages.map((message) =>
-      new MessageViewModel(message).toResource(),
+      new MessageViewModel(message, this.reactionsFor(message)).toResource(),
     );
     const lowerBound = messages.at(0)?.createdAt;
     const upperBound = messages.at(-1)?.createdAt;

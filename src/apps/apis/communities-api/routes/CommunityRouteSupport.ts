@@ -2,6 +2,7 @@ import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttp
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityInviteRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityInviteRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
@@ -29,6 +30,12 @@ export abstract class CommunityRouteSupport extends Route {
 
   protected messageRepository(): MongoCommunityChannelMessageRepository {
     return new MongoCommunityChannelMessageRepository(
+      this.get<MongoDB>(MongoDB),
+    );
+  }
+
+  protected reactions(): MongoCommunityMessageReactionRepository {
+    return new MongoCommunityMessageReactionRepository(
       this.get<MongoDB>(MongoDB),
     );
   }

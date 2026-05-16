@@ -1,9 +1,14 @@
 import { Message } from '@app/contexts/conversations/domain/Message';
+import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
 
 import { MessageResource } from '../resources/MessageResource';
+import { MessageReactionViewModel } from './MessageReactionViewModel';
 
 export class MessageViewModel {
-  constructor(private readonly message: Message) {}
+  constructor(
+    private readonly message: Message,
+    private readonly reactions: MessageReaction[] = [],
+  ) {}
 
   public toResource(): MessageResource {
     const primitives = this.message.toPrimitives();
@@ -20,6 +25,9 @@ export class MessageViewModel {
           : undefined,
       id: primitives.id,
       previousMessageIds: primitives.previousMessageIds,
+      reactions: this.reactions.map((reaction) =>
+        new MessageReactionViewModel(reaction).toResource(),
+      ),
       replyToMessageId: primitives.replyToMessageId,
       targetMessageId: primitives.targetMessageId,
       type: primitives.type,

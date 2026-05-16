@@ -3,6 +3,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import { ConversationSyncAvailableEvent } from '../../domain/events/ConversationSyncAvailableEvent';
 import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
+import { MessageReactionRepository } from '../../domain/repositories/MessageReactionRepository';
 import { ConversationSyncResponseMessage } from './messages/ConversationSyncResponseMessage';
 
 export default class ConversationSyncResponder {
@@ -10,6 +11,7 @@ export default class ConversationSyncResponder {
 
   constructor(
     private readonly repository: ConversationRepository,
+    private readonly reactionRepository: MessageReactionRepository,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {}
@@ -31,11 +33,20 @@ export default class ConversationSyncResponder {
       message.conversationId,
       ConversationSyncResponder.MESSAGE_CANDIDATE_LIMIT,
     );
+    const reactionCandidates = await this.reactionRepository.findCandidates(
+      message.conversationId,
+    );
+    const messageCandidateIds = new Set(
+      messageCandidates.map((candidate) => candidate.messageId),
+    );
 
     await this.eventPublisher.publish([
       new ConversationSyncAvailableEvent(message.conversationId.valueOf(), {
         messageCandidates,
         networkId: message.networkId.valueOf(),
+        reactionCandidates: reactionCandidates
+          .map((reaction) => reaction.toPrimitives())
+          .filter((reaction) => messageCandidateIds.has(reaction.messageId)),
         requestId: message.requestId?.valueOf(),
       }),
     ]);

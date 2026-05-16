@@ -2,12 +2,16 @@
 import 'module-alias/register';
 import 'reflect-metadata';
 import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced';
+import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
+import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
 import RegisterCommunityMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
+import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
+import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
@@ -25,6 +29,7 @@ import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
+import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
@@ -67,6 +72,8 @@ async function init() {
     RegisterMessageWhenAnnounced,
     RegisterMessageEditionWhenAnnounced,
     RegisterMessageDeletionWhenAnnounced,
+    RegisterMessageReactionWhenAdded,
+    RegisterMessageReactionWhenRemoved,
     RespondToConversationSyncRequest,
     RegisterMessagesWhenSyncAvailable,
     RegisterNodePeerWhenHeartbeatReceived,
@@ -85,6 +92,8 @@ async function init() {
   const communityMessageRepository = new MongoCommunityChannelMessageRepository(
     mongo,
   );
+  const communityMessageReactionRepository =
+    new MongoCommunityMessageReactionRepository(mongo);
 
   kernel.addConsumerInstances(
     new MarkMessagesReadWhenAnnounced(
@@ -109,12 +118,22 @@ async function init() {
       messageBus,
       communityRepository,
       communityMessageRepository,
+      communityMessageReactionRepository,
       messageBus,
     ),
     new RegisterCommunityMessagesWhenSyncAvailable(
       messageBus,
       communityRepository,
       communityMessageRepository,
+      communityMessageReactionRepository,
+    ),
+    new RegisterCommunityReactionWhenAdded(
+      messageBus,
+      communityMessageReactionRepository,
+    ),
+    new RegisterCommunityReactionWhenRemoved(
+      messageBus,
+      communityMessageReactionRepository,
     ),
   );
   await kernel.runConsumers();

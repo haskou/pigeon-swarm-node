@@ -42,6 +42,15 @@ package "communities/domain" {
     + create(...): CommunityChannelMessage
   }
 
+  class CommunityChannelMessageReaction {
+    - communityId: CommunityId
+    - channelId: CommunityChannelId
+    - messageId: CommunityChannelMessageId
+    - authorIdentityId: IdentityId
+    - emoji: CommunityChannelMessageReactionEmoji
+    - createdAt: Timestamp
+  }
+
   class CommunityProfile {
     - name: CommunityName
     - description: CommunityDescription
@@ -71,9 +80,11 @@ package "communities/domain" {
   class CommunityChannelMessageId
   class CommunityChannelMessageEncryptedPayload
   class CommunityChannelAttachmentId
+  class CommunityChannelMessageReactionEmoji
   class CommunityInviteToken
   class CommunityInviteMaxUses
   class CommunityInviteUses
+
   interface CommunityRepository {
     + findById(id): Community?
     + findByMember(identityId): Community[]
@@ -84,6 +95,13 @@ package "communities/domain" {
     + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
     + save(message): void
   }
+
+  interface CommunityChannelMessageReactionRepository {
+    + findByMessageIds(communityId, channelId, messageIds): CommunityChannelMessageReaction[]
+    + save(reaction): void
+    + delete(reaction): void
+  }
+
   interface CommunityInviteRepository {
     + findByToken(token): CommunityInvite?
     + save(invite): void
@@ -104,6 +122,11 @@ package "communities/domain" {
   CommunityChannelMessage --> IdentityId
   CommunityChannelMessage --> CommunityChannelMessageEncryptedPayload
   CommunityChannelMessage --> CommunityChannelAttachmentId
+  CommunityChannelMessageReaction --> CommunityId
+  CommunityChannelMessageReaction --> CommunityChannelId
+  CommunityChannelMessageReaction --> CommunityChannelMessageId
+  CommunityChannelMessageReaction --> IdentityId
+  CommunityChannelMessageReaction --> CommunityChannelMessageReactionEmoji
   CommunityInvite --> CommunityId
   CommunityInvite --> IdentityId
   CommunityInvite --> CommunityInviteToken
@@ -111,6 +134,7 @@ package "communities/domain" {
   CommunityInvite --> CommunityInviteUses
   CommunityRepository ..> Community
   CommunityChannelMessageRepository ..> CommunityChannelMessage
+  CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
   CommunityInviteRepository ..> CommunityInvite
 }
 
@@ -131,6 +155,8 @@ package "communities/infrastructure" {
   class MongoCommunityDocument
   class MongoCommunityChannelMessageRepository
   class MongoCommunityChannelMessageDocument
+  class MongoCommunityChannelMessageReactionRepository
+  class MongoCommunityChannelMessageReactionDocument
   class MongoCommunityInviteRepository
   class MongoCommunityInviteDocument
 
@@ -138,6 +164,8 @@ package "communities/infrastructure" {
   MongoCommunityRepository --> MongoCommunityDocument
   MongoCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
   MongoCommunityChannelMessageRepository --> MongoCommunityChannelMessageDocument
+  MongoCommunityChannelMessageReactionRepository ..|> CommunityChannelMessageReactionRepository
+  MongoCommunityChannelMessageReactionRepository --> MongoCommunityChannelMessageReactionDocument
   MongoCommunityInviteRepository ..|> CommunityInviteRepository
   MongoCommunityInviteRepository --> MongoCommunityInviteDocument
 }
@@ -158,6 +186,7 @@ package "communities-api" {
   class DeleteCommunityChannelRoute
   class PostCommunityChannelMessageRoute
   class GetCommunityChannelMessagesRoute
+  class CommunityChannelMessageReactionRoute
 
   PostCommunityRoute ..> Community
   GetCommunitiesRoute ..> CommunityRepository
@@ -178,6 +207,9 @@ package "communities-api" {
   PostCommunityChannelMessageRoute ..> CommunityChannelMessage
   GetCommunityChannelMessagesRoute ..> Community
   GetCommunityChannelMessagesRoute ..> CommunityChannelMessageRepository
+  GetCommunityChannelMessagesRoute ..> CommunityChannelMessageReactionRepository
+  CommunityChannelMessageReactionRoute ..> Community
+  CommunityChannelMessageReactionRoute ..> CommunityChannelMessageReaction
 }
 
 note right of Community
@@ -190,6 +222,8 @@ note right of Community
   - owner can create bearer invite links
   - members can send/list encrypted
     text channel messages
+  - channel message reactions are
+    Mongo-only synchronized metadata
 end note
 
 @enduml

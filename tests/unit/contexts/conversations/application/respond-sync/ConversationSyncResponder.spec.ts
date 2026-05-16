@@ -2,6 +2,7 @@ import ConversationSyncResponder from '@app/contexts/conversations/application/r
 import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { MessageReactionRepository } from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -10,17 +11,20 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ConversationSyncResponder', () => {
   let repository: MockProxy<ConversationRepository>;
+  let reactionRepository: MockProxy<MessageReactionRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let suppressionTracker: MockProxy<SyncResponseSuppressionTracker>;
   let responder: ConversationSyncResponder;
 
   beforeEach(() => {
     repository = mock<ConversationRepository>();
+    reactionRepository = mock<MessageReactionRepository>();
     eventPublisher = mock<DomainEventPublisher>();
     suppressionTracker = mock<SyncResponseSuppressionTracker>();
     suppressionTracker.shouldRespond.mockResolvedValue(true);
     responder = new ConversationSyncResponder(
       repository,
+      reactionRepository,
       eventPublisher,
       suppressionTracker,
     );
@@ -40,6 +44,7 @@ describe('ConversationSyncResponder', () => {
     ];
 
     repository.findMessageCandidates.mockResolvedValue(messageCandidates);
+    reactionRepository.findCandidates.mockResolvedValue([]);
 
     await responder.respond(
       new ConversationSyncResponseMessage(
@@ -59,6 +64,9 @@ describe('ConversationSyncResponder', () => {
       100,
     );
     expect(repository.findById).not.toHaveBeenCalled();
+    expect(reactionRepository.findCandidates).toHaveBeenCalledWith(
+      conversationId,
+    );
     expect(eventPublisher.publish).toHaveBeenCalledWith([
       expect.any(ConversationSyncAvailableEvent),
     ]);
@@ -66,7 +74,60 @@ describe('ConversationSyncResponder', () => {
       {
         messageCandidates,
         networkId: expect.any(String),
+        reactionCandidates: [],
         requestId: 'request-3',
+      },
+    );
+  });
+
+  it('should only publish reactions for announced message candidates', async () => {
+    const conversationId = new ConversationId(
+      'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de',
+    );
+    const messageCandidates = [
+      {
+        authorIdentityId: 'author-id',
+        createdAt: 1778513696020,
+        messageId: 'synced-message-id',
+        messageType: 'sent',
+      },
+    ];
+    const syncedReaction = {
+      toPrimitives: () => ({
+        authorId: 'author-id',
+        conversationId: conversationId.valueOf(),
+        createdAt: 1778513696021,
+        emoji: '👍',
+        messageId: 'synced-message-id',
+      }),
+    };
+    const staleReaction = {
+      toPrimitives: () => ({
+        authorId: 'author-id',
+        conversationId: conversationId.valueOf(),
+        createdAt: 1778513696022,
+        emoji: '🔥',
+        messageId: 'older-message-id',
+      }),
+    };
+
+    repository.findMessageCandidates.mockResolvedValue(messageCandidates);
+    reactionRepository.findCandidates.mockResolvedValue([
+      syncedReaction,
+      staleReaction,
+    ] as never);
+
+    await responder.respond(
+      new ConversationSyncResponseMessage(
+        conversationId.valueOf(),
+        UUID.generate().toString(),
+        'request-3',
+      ),
+    );
+
+    expect(eventPublisher.publish.mock.calls[0][0][0].attributes).toMatchObject(
+      {
+        reactionCandidates: [syncedReaction.toPrimitives()],
       },
     );
   });
@@ -83,6 +144,7 @@ describe('ConversationSyncResponder', () => {
     );
 
     expect(repository.findMessageCandidates).not.toHaveBeenCalled();
+    expect(reactionRepository.findCandidates).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 });

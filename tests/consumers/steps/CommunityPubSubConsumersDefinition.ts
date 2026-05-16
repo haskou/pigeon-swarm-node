@@ -1,0 +1,128 @@
+import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
+import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
+import RegisterCommunityMessagesWhenSync from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
+import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
+import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
+import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
+import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
+import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import { expect } from 'chai';
+import { before, binding, then, when } from 'cucumber-tsflow';
+
+import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
+
+class FakeCommunityReactionRepository {
+  public deleted: CommunityChannelMessageReaction[] = [];
+  public saved: CommunityChannelMessageReaction[] = [];
+
+  public async save(reaction: CommunityChannelMessageReaction): Promise<void> {
+    this.saved.push(reaction);
+  }
+
+  public async delete(
+    reaction: CommunityChannelMessageReaction,
+  ): Promise<void> {
+    this.deleted.push(reaction);
+  }
+}
+
+@binding()
+export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTestContext {
+  private readonly channelId = 'community-channel-1';
+  private readonly communityId = 'community-1';
+  private readonly emoji = '👍';
+  private readonly messageId = 'community-message-1';
+  private readonly reactionCreatedAt = 1778513696020;
+
+  private reactionRepository = new FakeCommunityReactionRepository();
+
+  @before()
+  public async reset(): Promise<void> {
+    await this.resetConsumerTestContext();
+    this.reactionRepository = new FakeCommunityReactionRepository();
+  }
+
+  private reactionAttributes() {
+    return {
+      authorIdentityId: this.ownerIdentityId(),
+      channelId: this.channelId,
+      communityId: this.communityId,
+      createdAt: this.reactionCreatedAt,
+      emoji: this.emoji,
+      messageId: this.messageId,
+    };
+  }
+
+  @when(
+    'the community message reaction added consumer handles a reaction announcement',
+  )
+  public async addedConsumerHandlesAReactionAnnouncement(): Promise<void> {
+    const consumer = new RegisterCommunityReactionWhenAdded(
+      this.eventConsumer(),
+      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+    );
+
+    await consumer.handler(
+      new CommunityChannelMessageReactionWasAddedEvent(
+        this.communityId,
+        this.reactionAttributes(),
+      ),
+    );
+  }
+
+  @when(
+    'the community message reaction removed consumer handles a reaction announcement',
+  )
+  public async removedConsumerHandlesAReactionAnnouncement(): Promise<void> {
+    const consumer = new RegisterCommunityReactionWhenRemoved(
+      this.eventConsumer(),
+      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+    );
+
+    await consumer.handler(
+      new CommunityChannelMessageReactionRemovedEvent(
+        this.communityId,
+        this.reactionAttributes(),
+      ),
+    );
+  }
+
+  @when(
+    'the community sync available consumer handles a reaction sync response',
+  )
+  public async syncAvailableConsumerHandlesAReactionSyncResponse(): Promise<void> {
+    const consumer = new RegisterCommunityMessagesWhenSync(
+      this.eventConsumer(),
+      {
+        save: async (): Promise<void> => undefined,
+      } as unknown as MongoCommunityRepository,
+      {
+        save: async (): Promise<void> => undefined,
+      } as unknown as MongoCommunityChannelMessageRepository,
+      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+    );
+
+    await consumer.handler(
+      new CommunitySyncAvailableEvent(this.communityId, {
+        communityId: this.communityId,
+        reactionCandidates: [this.reactionAttributes(), { messageId: 123 }],
+      }),
+    );
+  }
+
+  @then('the community message reaction repository should save that reaction')
+  public repositoryShouldSaveThatReaction(): void {
+    const reaction = this.reactionRepository.saved.at(-1);
+
+    expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
+  }
+
+  @then('the community message reaction repository should delete that reaction')
+  public repositoryShouldDeleteThatReaction(): void {
+    const reaction = this.reactionRepository.deleted.at(-1);
+
+    expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
+  }
+}

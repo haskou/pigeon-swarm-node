@@ -42,6 +42,13 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
         ? new CommunityChannelMessageId(beforeMessageId)
         : undefined,
     );
+    const reactions = await this.reactions().findByMessageIds(
+      new CommunityId(communityId),
+      communityChannelId,
+      messages.map(
+        (message) => new CommunityChannelMessageId(message.toPrimitives().id),
+      ),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -50,6 +57,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
           communityId,
           channelId,
           messages,
+          reactions,
         ).toResource(),
       );
   }
