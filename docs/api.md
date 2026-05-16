@@ -73,8 +73,9 @@ Realtime events are exposed through a WebSocket upgrade endpoint:
 GET /ws
 ```
 
-This endpoint is intentionally documented here instead of in OpenAPI because it
-is an HTTP upgrade, not a regular request/response endpoint.
+This endpoint is also listed in OpenAPI so Swagger consumers can discover the
+realtime entrypoint, although the actual interaction is an HTTP upgrade rather
+than a regular request/response flow.
 
 Browser clients cannot set custom headers in the native `WebSocket` constructor,
 so they must authenticate with signed query parameters:
@@ -1482,7 +1483,57 @@ Implemented:
 - require signed request auth from the member that is leaving
 - remove the authenticated identity from `memberIds`
 - publish `communities.v1.member.was_left` with the updated community
-- reject the community owner until ownership transfer or community deletion exists
+- allow the owner to leave only when they are the last community member
+- reject the owner while other members remain
+
+### Create community invite link token
+
+```http
+POST /communities/{communityId}/invites
+```
+
+Request:
+
+```json
+{
+  "expiresAt": 1770000000000,
+  "maxUses": 1
+}
+```
+
+Response:
+
+```json
+{
+  "inviteToken": "<inviteToken>",
+  "communityId": "<communityId>",
+  "expiresAt": 1770000000000,
+  "maxUses": 1
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner
+- create a bearer invite token for the community
+- default `maxUses` to `1`
+- keep community keys out of the backend; frontend should carry key material in
+  the URL fragment, which is not sent to the server
+
+### Accept community invite link token
+
+```http
+POST /communities/invites/{inviteToken}/accept
+```
+
+Implemented:
+
+- require signed request auth from the identity accepting the invite
+- reject missing, expired or exhausted invite tokens
+- consume one invite use
+- add the authenticated identity as a community member
+- publish `communities.v1.member.was_added` with the updated community
+- never receive or decrypt the community key
 
 ### List community channels
 

@@ -37,6 +37,7 @@ export default class Definitions {
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
   private communityId: string | undefined;
+  private communityInviteToken: string | undefined;
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -64,6 +65,7 @@ export default class Definitions {
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
     this.communityId = undefined;
+    this.communityInviteToken = undefined;
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -498,6 +500,21 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community invite body')
+  public iSetACommunityInviteBody(): void {
+    this.body = JSON.stringify({
+      maxUses: 1,
+    });
+  }
+
+  @given('I set an expired community invite body')
+  public iSetAnExpiredCommunityInviteBody(): void {
+    this.body = JSON.stringify({
+      expiresAt: Date.now() - 1_000,
+      maxUses: 1,
+    });
+  }
+
   @given('I sign the current community member request')
   public async iSignTheCurrentCommunityMemberRequest(): Promise<void> {
     if (!this.communityId) {
@@ -508,6 +525,27 @@ export default class Definitions {
       'POST',
       `/communities/${this.communityId}/members`,
     );
+  }
+
+  @given('I sign the current community invite request')
+  public async iSignTheCurrentCommunityInviteRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/invites`,
+    );
+  }
+
+  @given('I remember the current community invite')
+  public iRememberTheCurrentCommunityInvite(): void {
+    if (!this.response?.data?.inviteToken) {
+      throw new Error('Community invite token not found.');
+    }
+
+    this.communityInviteToken = this.response.data.inviteToken;
   }
 
   @given('the community member signs the current communities request')
@@ -554,6 +592,24 @@ export default class Definitions {
     await this.signCurrentRequest(
       'DELETE',
       `/communities/${this.communityId}/members/me`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current community invite accept request')
+  public async theCommunityMemberSignsTheCurrentCommunityInviteAcceptRequest(): Promise<void> {
+    if (!this.communityInviteToken) {
+      throw new Error('Community invite must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/invites/${this.communityInviteToken}/accept`,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -1837,6 +1893,32 @@ export default class Definitions {
     );
   }
 
+  @when('I POST to the current community invites')
+  public async iPOSTToTheCurrentCommunityInvites(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/invites`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST to accept the current community invite')
+  public async iPOSTToAcceptTheCurrentCommunityInvite(): Promise<void> {
+    if (!this.communityInviteToken) {
+      throw new Error('Community invite must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/invites/${this.communityInviteToken}/accept`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
   @when('I DELETE my membership from the current community')
   public async iDELETEMyMembershipFromTheCurrentCommunity(): Promise<void> {
     if (!this.communityId) {
@@ -2261,6 +2343,17 @@ export default class Definitions {
     }
 
     expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.otherIdentityId.valueOf(),
+    );
+  }
+
+  @then('response body should contain the other identity id')
+  public responseBodyShouldContainTheOtherIdentityId(): void {
+    if (!this.otherIdentityId) {
+      throw new Error('Other identity must exist first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.contain(
       this.otherIdentityId.valueOf(),
     );
   }

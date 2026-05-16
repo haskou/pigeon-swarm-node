@@ -4,6 +4,7 @@ import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import { MongoCommunityInviteRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityInviteRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -37,6 +38,10 @@ export abstract class CommunityRouteSupport extends Route {
     return new MongoCommunityMessageReactionRepository(
       this.get<MongoDB>(MongoDB),
     );
+  }
+
+  protected inviteRepository(): MongoCommunityInviteRepository {
+    return new MongoCommunityInviteRepository(this.get<MongoDB>(MongoDB));
   }
 
   protected async findCommunity(id: string): Promise<Community> {

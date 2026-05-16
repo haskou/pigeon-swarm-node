@@ -112,9 +112,7 @@ export class Community extends AggregateRoot {
     };
   }
 
-  public addMember(actor: IdentityId, member: IdentityId): void {
-    this.assertOwner(actor);
-
+  private join(member: IdentityId): void {
     if (this.isMember(member)) {
       return;
     }
@@ -127,6 +125,19 @@ export class Community extends AggregateRoot {
         identityId: member.valueOf(),
       }),
     );
+  }
+
+  public addMember(actor: IdentityId, member: IdentityId): void {
+    this.assertOwner(actor);
+    this.join(member);
+  }
+
+  public joinWithInvite(member: IdentityId): void {
+    this.join(member);
+  }
+
+  public assertCanCreateInvite(identityId: IdentityId): void {
+    this.assertOwner(identityId);
   }
 
   public leave(member: IdentityId): void {

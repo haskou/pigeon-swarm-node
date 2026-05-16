@@ -13,7 +13,9 @@ package "communities/domain" {
     - createdAt: Timestamp
     + create(ownerIdentityId, networkId, name, description, banner?): Community
     + addMember(actor, member): void
+    + joinWithInvite(member): void
     + leave(member): void
+    + assertCanCreateInvite(identityId): void
     + addTextChannel(actor, name): CommunityTextChannel
     + renameTextChannel(actor, channelId, name): void
     + updateProfile(actor, name, description, banner?): void
@@ -56,6 +58,18 @@ package "communities/domain" {
     - banner: CommunityBanner?
   }
 
+  class CommunityInvite {
+    - token: CommunityInviteToken
+    - communityId: CommunityId
+    - creatorIdentityId: IdentityId
+    - createdAt: Timestamp
+    - expiresAt: Timestamp?
+    - maxUses: CommunityInviteMaxUses
+    - uses: CommunityInviteUses
+    + create(communityId, creatorIdentityId, expiresAt?, maxUses?): CommunityInvite
+    + accept(now?): void
+  }
+
   class CommunityId
   class CommunityName
   class CommunityDescription
@@ -67,6 +81,10 @@ package "communities/domain" {
   class CommunityChannelMessageEncryptedPayload
   class CommunityChannelAttachmentId
   class CommunityChannelMessageReactionEmoji
+  class CommunityInviteToken
+  class CommunityInviteMaxUses
+  class CommunityInviteUses
+
   interface CommunityRepository {
     + findById(id): Community?
     + findByMember(identityId): Community[]
@@ -77,10 +95,16 @@ package "communities/domain" {
     + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
     + save(message): void
   }
+
   interface CommunityChannelMessageReactionRepository {
     + findByMessageIds(communityId, channelId, messageIds): CommunityChannelMessageReaction[]
     + save(reaction): void
     + delete(reaction): void
+  }
+
+  interface CommunityInviteRepository {
+    + findByToken(token): CommunityInvite?
+    + save(invite): void
   }
 
   Community *-- CommunityTextChannel
@@ -103,9 +127,15 @@ package "communities/domain" {
   CommunityChannelMessageReaction --> CommunityChannelMessageId
   CommunityChannelMessageReaction --> IdentityId
   CommunityChannelMessageReaction --> CommunityChannelMessageReactionEmoji
+  CommunityInvite --> CommunityId
+  CommunityInvite --> IdentityId
+  CommunityInvite --> CommunityInviteToken
+  CommunityInvite --> CommunityInviteMaxUses
+  CommunityInvite --> CommunityInviteUses
   CommunityRepository ..> Community
   CommunityChannelMessageRepository ..> CommunityChannelMessage
   CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
+  CommunityInviteRepository ..> CommunityInvite
 }
 
 package "shared value objects" {
@@ -127,6 +157,8 @@ package "communities/infrastructure" {
   class MongoCommunityChannelMessageDocument
   class MongoCommunityChannelMessageReactionRepository
   class MongoCommunityChannelMessageReactionDocument
+  class MongoCommunityInviteRepository
+  class MongoCommunityInviteDocument
 
   MongoCommunityRepository ..|> CommunityRepository
   MongoCommunityRepository --> MongoCommunityDocument
@@ -134,6 +166,8 @@ package "communities/infrastructure" {
   MongoCommunityChannelMessageRepository --> MongoCommunityChannelMessageDocument
   MongoCommunityChannelMessageReactionRepository ..|> CommunityChannelMessageReactionRepository
   MongoCommunityChannelMessageReactionRepository --> MongoCommunityChannelMessageReactionDocument
+  MongoCommunityInviteRepository ..|> CommunityInviteRepository
+  MongoCommunityInviteRepository --> MongoCommunityInviteDocument
 }
 
 package "communities-api" {
@@ -144,6 +178,8 @@ package "communities-api" {
   class GetCommunityMembersRoute
   class PostCommunityMemberRoute
   class DeleteCommunityMemberRoute
+  class PostCommunityInviteRoute
+  class PostCommunityInviteAcceptRoute
   class GetCommunityChannelsRoute
   class PostCommunityTextChannelRoute
   class PatchCommunityChannelRoute
@@ -159,6 +195,9 @@ package "communities-api" {
   GetCommunityMembersRoute ..> Community
   PostCommunityMemberRoute ..> Community
   DeleteCommunityMemberRoute ..> Community
+  PostCommunityInviteRoute ..> CommunityInvite
+  PostCommunityInviteAcceptRoute ..> CommunityInviteRepository
+  PostCommunityInviteAcceptRoute ..> Community
   GetCommunityChannelsRoute ..> Community
   PostCommunityTextChannelRoute ..> Community
   PatchCommunityChannelRoute ..> Community
@@ -180,6 +219,7 @@ note right of Community
   - owner administers profile,
     members and text channel metadata
   - non-owner members can leave
+  - owner can create bearer invite links
   - members can send/list encrypted
     text channel messages
   - channel message reactions are
