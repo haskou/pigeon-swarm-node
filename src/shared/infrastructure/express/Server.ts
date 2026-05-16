@@ -8,6 +8,7 @@ import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
 import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
+import { CommunityMessageReactionRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelMessageReactionRoute';
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
 import { DeleteCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelRoute';
 import { DeleteCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberRoute';
@@ -212,6 +213,7 @@ export default class Server {
           DeleteCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
           PostCommunityChannelMessageRoute,
+          CommunityMessageReactionRoute,
           DeleteCommunityChannelMessageRoute,
         ],
         cors: true,

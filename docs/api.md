@@ -216,6 +216,8 @@ Event contracts used by frontend:
 | `communities.v1.member.was_left` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
+| `communities.v1.channel.message.reaction.was_added` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds` |
+| `communities.v1.channel.message.reaction.was_removed` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
 | `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
 | `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
@@ -1672,6 +1674,7 @@ Response:
   "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
   "signature": "<messageSignature>",
   "attachmentExternalIdentifiers": [],
+  "reactions": [],
   "type": "sent",
   "createdAt": 1773848829055
 }
@@ -1724,6 +1727,13 @@ Response:
       "authorIdentityId": "<identityId>",
       "createdAt": 1773848869055,
       "encryptedPayload": "<encryptedMessagePayload>",
+      "reactions": [
+        {
+          "authorIdentityId": "<identityId>",
+          "createdAt": 1773848829055,
+          "emoji": "👍"
+        }
+      ],
       "type": "sent"
     }
   ],
@@ -1736,10 +1746,78 @@ Implemented:
 - require signed request auth from a community member
 - require the channel to exist in the community
 - return messages ordered from oldest to newest in the page
+- include MongoDB-only reactions for each message
 - do not include call lifecycle system items; community voice channels expose
   active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
 - when `beforeMessageId` is provided, return messages older than that message
+
+### Add channel message reaction
+
+```http
+POST /communities/{communityId}/channels/{channelId}/messages/{messageId}/reactions
+```
+
+Request:
+
+```json
+{
+  "emoji": "👍"
+}
+```
+
+Response:
+
+```json
+{
+  "authorIdentityId": "<identityId>",
+  "createdAt": 1773848829055,
+  "emoji": "👍"
+}
+```
+
+Implemented:
+
+- require signed request auth from a community member
+- require the channel and target message to exist
+- store reactions in MongoDB only; encrypted message documents are not rewritten
+- keep reactions unique by community id, channel id, message id, author id and
+  emoji
+- publish `communities.v1.channel.message.reaction.was_added` to community
+  members
+
+### Remove channel message reaction
+
+```http
+DELETE /communities/{communityId}/channels/{channelId}/messages/{messageId}/reactions
+```
+
+Request:
+
+```json
+{
+  "emoji": "👍"
+}
+```
+
+Response:
+
+```json
+{
+  "authorIdentityId": "<identityId>",
+  "createdAt": 1773848829055,
+  "emoji": "👍"
+}
+```
+
+Implemented:
+
+- require signed request auth from a community member
+- remove only the authenticated member reaction for the provided emoji
+- publish `communities.v1.channel.message.reaction.was_removed` to community
+  members
+- synchronize add/remove events with other nodes through community PubSub
+  consumers
 
 ### Delete channel message
 

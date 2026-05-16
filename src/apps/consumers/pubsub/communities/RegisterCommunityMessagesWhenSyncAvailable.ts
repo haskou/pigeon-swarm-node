@@ -1,6 +1,8 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
+import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
@@ -8,7 +10,10 @@ import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
 import { isCommunityChannelMessagePrimitive } from './isCommunityChannelMessagePrimitive';
+import { isCommunityChannelMessageReactionPrimitive } from './isCommunityChannelMessageReactionPrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
+
+type ReactionRepository = MongoCommunityMessageReactionRepository;
 
 export default class RegisterCommunityMessagesWhenSync extends Consumer {
   public static QUEUE_NAME =
@@ -18,6 +23,7 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
     consumer: DomainEventConsumer,
     private readonly communityRepository: MongoCommunityRepository,
     private readonly messageRepository: MongoCommunityChannelMessageRepository,
+    private readonly reactionRepository: ReactionRepository,
   ) {
     super(consumer);
   }
@@ -56,6 +62,22 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
 
       await this.messageRepository.save(
         CommunityChannelMessage.fromPrimitives(candidate),
+      );
+    }
+
+    const reactionCandidates = Array.isArray(
+      event.attributes.reactionCandidates,
+    )
+      ? event.attributes.reactionCandidates
+      : [];
+
+    for (const candidate of reactionCandidates) {
+      if (!isCommunityChannelMessageReactionPrimitive(candidate)) {
+        continue;
+      }
+
+      await this.reactionRepository.save(
+        CommunityChannelMessageReaction.fromPrimitives(candidate),
       );
     }
   }

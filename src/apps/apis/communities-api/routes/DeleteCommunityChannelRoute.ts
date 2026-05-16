@@ -31,6 +31,10 @@ export class DeleteCommunityChannelRoute extends CommunityRouteSupport {
         new CommunityId(communityId),
         new CommunityChannelId(channelId),
       );
+      await this.reactions().deleteByChannel(
+        new CommunityId(communityId),
+        new CommunityChannelId(channelId),
+      );
     }
 
     return response

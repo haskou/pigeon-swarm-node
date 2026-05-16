@@ -1,12 +1,15 @@
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+
+type ReactionRepository = MongoCommunityMessageReactionRepository;
 
 export default class RespondToCommunitySyncRequest extends Consumer {
   private static readonly MESSAGE_CANDIDATE_LIMIT = 100;
@@ -16,6 +19,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     consumer: DomainEventConsumer,
     private readonly communityRepository: MongoCommunityRepository,
     private readonly messageRepository: MongoCommunityChannelMessageRepository,
+    private readonly reactionRepository: ReactionRepository,
     private readonly eventPublisher: DomainEventPublisher,
   ) {
     super(consumer);
@@ -41,9 +45,13 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
     );
-    const [community, messages] = await Promise.all([
+    const [community, messages, reactions] = await Promise.all([
       this.communityRepository.findById(communityId),
       this.messageRepository.findByCommunity(
+        communityId,
+        RespondToCommunitySyncRequest.MESSAGE_CANDIDATE_LIMIT,
+      ),
+      this.reactionRepository.findByCommunity(
         communityId,
         RespondToCommunitySyncRequest.MESSAGE_CANDIDATE_LIMIT,
       ),
@@ -55,6 +63,9 @@ export default class RespondToCommunitySyncRequest extends Consumer {
         communityId: event.aggregateId,
         messageCandidates: messages.map((message) => message.toPrimitives()),
         networkId: String(event.attributes.networkId),
+        reactionCandidates: reactions.map((reaction) =>
+          reaction.toPrimitives(),
+        ),
         requestId: event.attributes.requestId
           ? String(event.attributes.requestId)
           : undefined,

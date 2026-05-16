@@ -212,6 +212,8 @@ WebSocket clients after they are accepted locally:
 - `conversations.v1.messages.were_read`
 - `conversations.v1.message.reaction.was_added`
 - `conversations.v1.message.reaction.was_removed`
+- `communities.v1.channel.message.reaction.was_added`
+- `communities.v1.channel.message.reaction.was_removed`
 - `nodes.v1.node.heartbeat.was_sent`
 
 Frontend clients do not consume PubSub directly. They receive filtered
@@ -231,6 +233,9 @@ Implemented state is split by context:
   delete those flags locally and on consuming nodes
 - conversation message reactions are MongoDB-only and indexed by conversation
   id, message id, author id and emoji
+- community channel message reactions are MongoDB-only and indexed by community
+  id, channel id, message id, author id and emoji; community sync responses
+  include `reactionCandidates`
 - node peer metadata stores last heartbeat per remote node
 
 ## Failure Modes
