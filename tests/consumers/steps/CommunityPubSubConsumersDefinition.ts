@@ -1,13 +1,17 @@
 import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityMessagesWhenSync from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
+import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
+import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
@@ -28,6 +32,14 @@ class FakeCommunityReactionRepository {
   }
 }
 
+class FakeEventPublisher implements DomainEventPublisher {
+  public publishedEvents: DomainEvent[][] = [];
+
+  public async publish(events: DomainEvent[]): Promise<void> {
+    this.publishedEvents.push(events);
+  }
+}
+
 @binding()
 export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTestContext {
   private readonly channelId = 'community-channel-1';
@@ -36,11 +48,13 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   private readonly messageId = 'community-message-1';
   private readonly reactionCreatedAt = 1778513696020;
 
+  private eventPublisher = new FakeEventPublisher();
   private reactionRepository = new FakeCommunityReactionRepository();
 
   @before()
   public async reset(): Promise<void> {
     await this.resetConsumerTestContext();
+    this.eventPublisher = new FakeEventPublisher();
     this.reactionRepository = new FakeCommunityReactionRepository();
   }
 
@@ -112,6 +126,33 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     );
   }
 
+  @when(
+    'the community sync request consumer handles a request without local data',
+  )
+  public async syncRequestConsumerHandlesARequestWithoutLocalData(): Promise<void> {
+    const consumer = new RespondToCommunitySyncRequest(
+      this.eventConsumer(),
+      {
+        findById: async (): Promise<undefined> => undefined,
+      } as unknown as MongoCommunityRepository,
+      {
+        findByCommunity: async (): Promise<[]> => [],
+      } as unknown as MongoCommunityChannelMessageRepository,
+      {
+        findByCommunity: async (): Promise<[]> => [],
+      } as unknown as MongoCommunityMessageReactionRepository,
+      this.eventPublisher,
+    );
+
+    await consumer.handler(
+      new CommunitySyncRequestedEvent(this.communityId, {
+        communityId: this.communityId,
+        networkId: 'community-network',
+        requestId: this.requestId,
+      }),
+    );
+  }
+
   @then('the community message reaction repository should save that reaction')
   public repositoryShouldSaveThatReaction(): void {
     const reaction = this.reactionRepository.saved.at(-1);
@@ -124,5 +165,10 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     const reaction = this.reactionRepository.deleted.at(-1);
 
     expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
+  }
+
+  @then('no community sync response should be published')
+  public noCommunitySyncResponseShouldBePublished(): void {
+    expect(this.eventPublisher.publishedEvents).to.deep.equal([]);
   }
 }

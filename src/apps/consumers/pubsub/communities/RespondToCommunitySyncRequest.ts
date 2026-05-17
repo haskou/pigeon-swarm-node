@@ -50,16 +50,6 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     const requestId = event.attributes.requestId
       ? String(event.attributes.requestId)
       : undefined;
-    const shouldRespond = await this.tracker.shouldRespond(
-      'community',
-      communityId.valueOf(),
-      requestId,
-    );
-
-    if (!shouldRespond) {
-      return;
-    }
-
     const [community, messages, reactions] = await Promise.all([
       this.communityRepository.findById(communityId),
       this.messageRepository.findByCommunity(
@@ -71,6 +61,20 @@ export default class RespondToCommunitySyncRequest extends Consumer {
         RespondToCommunitySyncRequest.MESSAGE_CANDIDATE_LIMIT,
       ),
     ]);
+
+    if (!community && messages.length === 0 && reactions.length === 0) {
+      return;
+    }
+
+    const shouldRespond = await this.tracker.shouldRespond(
+      'community',
+      communityId.valueOf(),
+      requestId,
+    );
+
+    if (!shouldRespond) {
+      return;
+    }
 
     await this.eventPublisher.publish([
       new CommunitySyncAvailableEvent(event.aggregateId, {
