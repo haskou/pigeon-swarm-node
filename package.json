@@ -12,7 +12,7 @@
     "local:start": "node --inspect=0.0.0.0:9229 -r ts-node/register -r tsconfig-paths/register src/index.ts",
     "test": "npm-run-all lint test:unit test:api test:consumer test:scheduler",
     "test:unit": "jest --passWithNoTests",
-    "test:api": "find tests/api/features -name '*.feature' -print | sort | while read feature; do yarn test:api:feature \"$feature\" || exit 1; done",
+    "test:api": "NODE_ENV=test cucumber-js -p api --publish-quiet",
     "test:api:only": "NODE_ENV=test cucumber-js -p api --publish-quiet --tags @Only",
     "test:consumer": "NODE_ENV=test cucumber-js -p consumer --publish-quiet",
     "test:consumer:only": "NODE_ENV=test cucumber-js -p consumer --publish-quiet --tags @Only",
