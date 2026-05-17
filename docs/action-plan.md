@@ -1,26 +1,106 @@
 # Pigeon Swarm Action Plan
 
-Last updated: 2026-05-12.
+Last updated: 2026-05-17.
 
-Keep this file short. Completed slices should move into Git history, API docs
-and tests instead of staying here as long-form notes.
+Keep this file short. Completed slices should live in Git history, API docs,
+OpenAPI, context docs and tests instead of remaining here as stale backlog.
 
-## Current Slice: Conversation Remote Validation
+## Current Slice: Call Presence Hardening
 
-Goal: make node-to-node conversation synchronization trustworthy before remote
-message candidates are cached locally.
+Goal: make voice-channel and call presence converge quickly when a client drops
+without leaving explicitly.
 
 Status:
 
-- [x] Reject candidates whose `conversationId` does not match the announcement.
-- [x] Reject candidates whose `messageId` does not match the announcement.
-- [x] Validate remote message signatures before registering candidates.
-- [x] Validate participant and edit/delete target rules in the conversation
-  aggregate.
-- [ ] Validate remote attachment policy once attachment metadata is modeled.
-- [ ] Add end-to-end validation with two nodes.
+- [x] Add call participant heartbeat endpoint.
+- [x] Expire stale joined participants after a short timeout.
+- [x] Emit realtime participant-left events when a stale participant is
+  expired.
+- [ ] Let CI pass and merge the heartbeat PR.
+- [ ] Validate with two browser clients against one node.
+- [ ] Validate with two nodes on the same network.
 
-## Next Slice 1: Node Network Management
+## Next Slice: Sticker Packs
+
+Goal: support Telegram-like sticker packs created inside Pigeon Swarm, synced
+between nodes and usable in chats without depending on external sticker
+providers.
+
+Scope:
+
+1. Add a `stickers` context with `StickerPack`, `Sticker` and authenticated
+   identity sticker libraries.
+2. Store sticker media in IPFS through the existing public upload flow and keep
+   messages referencing CIDs, not embedded binaries.
+3. Add HTTP API:
+   - `POST /sticker-packs`
+   - `GET /sticker-packs/{packId}`
+   - `PATCH /sticker-packs/{packId}`
+   - `DELETE /sticker-packs/{packId}`
+   - `POST /sticker-packs/{packId}/stickers`
+   - `DELETE /sticker-packs/{packId}/stickers/{stickerId}`
+   - `GET /stickers/library`
+   - `POST /stickers/library/{packId}`
+   - `DELETE /stickers/library/{packId}`
+4. Add optional discovery for public packs by network only if the first product
+   flow needs it.
+5. Emit websocket and PubSub events for pack changes and library changes.
+6. Document how frontend sends a sticker as encrypted message content using
+   `packId`, `stickerId` and `mediaExternalIdentifier`.
+7. Enforce sticker media constraints:
+   - static stickers: max 512 KB and max 512x512 pixels
+   - animated stickers: max 64 KB and max 512x512 pixels
+   - video stickers: max 256 KB and max 512x512 pixels
+   - every sticker must have at least one associated emoji
+8. Add API, unit and consumer coverage with acceptance tests split by route.
+
+Out of scope for the first sticker PR:
+
+- Telegram pack compatibility.
+- Marketplace/ranking.
+- Private sticker packs with per-recipient encrypted media.
+
+## Next Slice: Identity Presence
+
+Goal: expose identity connection state to clients and other nodes without
+storing volatile presence in IPFS.
+
+Scope:
+
+1. Add a `presence` or `identity-presence` context backed by MongoDB only.
+2. Track per-identity heartbeat and activity timestamps:
+   - frontend heartbeat interval: 10 seconds
+   - backend marks an identity disconnected when heartbeat expires
+   - backend derives idle state after 5 minutes without user activity while
+     heartbeat is still active
+3. Support connection statuses:
+   - `available`
+   - `away`
+   - `busy`
+   - `disconnected`
+   - `invisible`
+   - `custom`
+4. Support a separate optional custom status message:
+   - max 50 characters
+   - can be set, replaced or removed
+   - does not live in IPFS or identity profile metadata
+5. Add signed HTTP API for explicit user-selected state:
+   - `GET /presence/{identityId}`
+   - `GET /presence?identityIds=...`
+   - `PUT /presence/me`
+   - `DELETE /presence/me/custom-message`
+6. Extend WebSocket client messages with a signed or connection-authenticated
+   identity presence heartbeat.
+7. Emit WebSocket events when visible presence changes.
+8. Synchronize presence events between nodes through network-scoped PubSub:
+   - do not publish presence to unrelated networks
+   - do not publish invisible as `invisible` to other identities; expose it as
+     `disconnected` outside the authenticated identity's own sessions
+9. Add a scheduler for heartbeat expiration and derived status transitions.
+10. Add API, unit, scheduler and consumer coverage with acceptance tests split
+    by route.
+
+## Next Slice: Node Network Management
 
 Goal: let node owners fully manage local IPFS networks.
 
@@ -32,26 +112,7 @@ Steps:
 4. Synchronize the runtime IPFS network registry after removal.
 5. Add API Cucumber coverage and OpenAPI/docs.
 
-## Next Slice 2: Client Realtime
-
-Goal: expose chat updates to clients without leaking node-to-node PubSub as the
-client contract.
-
-Steps:
-
-1. Implement WebSocket subscriptions for authenticated clients.
-2. Emit WebSocket events only after domain validation and persistence.
-3. Filter subscriptions by authenticated identity and known conversations.
-4. Recover missed events through HTTP pagination or sync.
-
-Tests:
-
-- Cucumber: client sends an encrypted 1to1 message and another connected client
-  receives it by WebSocket.
-- Cucumber: unauthorized conversation subscription is rejected.
-- Cucumber: reconnect recovers missed events through HTTP pagination or sync.
-
-## Later Slice: Node Startup Sync Hardening
+## Later Slice: Startup Sync Hardening
 
 Goal: make startup synchronization scalable, resumable and quiet on larger
 networks.
@@ -59,55 +120,39 @@ networks.
 Steps:
 
 1. Persist per-context sync cursors and `lastSyncAt` metadata.
-2. Add paginated conversation sync with `limit`, `since`, `before/after` or
-   known-message hints.
-3. Return only IPFS candidates/references in sync responses, not large payloads.
-4. Add requester-side cutoffs: timeout, max responses and “good enough”
+2. Add paginated sync with `limit`, `since`, `before/after` or known-resource
+   hints where contexts can grow indefinitely.
+3. Return only IPFS candidates/references in sync responses when payloads may be
+   large.
+4. Add requester-side cutoffs: timeout, max responses and "good enough"
    completion criteria per resource.
 5. Add responder-side rate limits per requester/peer and network.
-6. Add discovery for conversations not yet known locally, using invitation,
-   participant or index events without exposing unrelated conversations.
-7. Emit WebSocket updates when bootstrap sync registers new local data.
-8. Add two-real-node end-to-end coverage for cold start recovery.
+6. Emit WebSocket updates when bootstrap sync registers new local data.
+7. Add two-real-node end-to-end coverage for cold start recovery.
 
 ## Later Slices
 
-- Voice calls:
-  - add a `calls` context for call state and signaling events
-  - scope calls to `conversationId` and `networkId`
-  - deliver WebRTC offer/answer/ICE candidates through the existing
-    network-scoped PubSub and client WebSocket bridge
-  - keep audio media peer-to-peer through `RTCPeerConnection`, not IPFS/Mongo
-  - require encrypted signaling payloads for conversation participants
-  - start with voice-only 1to1 calls and configurable STUN servers
-  - support small group calls with a peer-to-peer mesh and a hard participant
-    limit
-  - add a later relay/SFU topology where a `coordinatorNodeId` is selected from
-    available peers for larger or unstable group calls
-  - add optional TURN or libp2p relay support for hard NAT cases
-  - model missed calls as actionable notifications
-- Private attachments:
-  - validate the frontend attachment flow with real 1to1 messages
-  - document the encrypted attachment payload expected inside `encryptedPayload`
-- Node peer heartbeats:
-  - validate the flow with two real nodes running on separate networks
-- Conversation message deletion:
-  - validate deletion synchronization with two real nodes
 - Posts:
   - publish encrypted or public post payloads through IPFS
   - model author, visibility, attachments and timeline reads
   - reuse identity handles and IPFS media references
-- Conversation invitations/notifications:
-  - keep invitation notifications actionable
-  - include encrypted conversation-key envelopes per invitee
-  - let invitees accept or decline before joining
+- Large group calls:
+  - keep current 1to1/group call signaling as the baseline
+  - add a relay/SFU topology for larger or unstable group calls
+  - select a coordinator node from available peers
+  - keep TURN configuration compatible with that future topology
+- Community roles and moderation:
+  - add roles and channel permissions
+  - add bans and moderation events
+  - keep the current community owner model as the MVP baseline
 - Identity profile polish:
   - decide whether handles need reservation/conflict policies across nodes
-  - add profile search/listing if product flow needs discovery beyond exact
+  - add profile listing/search if product flow needs discovery beyond exact
     handle lookup
 
 ## Verification
 
 ```bash
+PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn lint
 PATH=/home/hasko/.nvm/versions/node/v24.15.0/bin:$PATH yarn test
 ```
