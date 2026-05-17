@@ -5,22 +5,7 @@ Last updated: 2026-05-17.
 Keep this file short. Completed slices should live in Git history, API docs,
 OpenAPI, context docs and tests instead of remaining here as stale backlog.
 
-## Current Slice: Call Presence Hardening
-
-Goal: make voice-channel and call presence converge quickly when a client drops
-without leaving explicitly.
-
-Status:
-
-- [x] Add call participant heartbeat endpoint.
-- [x] Expire stale joined participants after a short timeout.
-- [x] Emit realtime participant-left events when a stale participant is
-  expired.
-- [ ] Let CI pass and merge the heartbeat PR.
-- [ ] Validate with two browser clients against one node.
-- [ ] Validate with two nodes on the same network.
-
-## Next Slice: Sticker Packs
+## Current Slice: Sticker Packs
 
 Goal: support Telegram-like sticker packs created inside Pigeon Swarm, synced
 between nodes and usable in chats without depending on external sticker
@@ -124,6 +109,7 @@ Already improved:
 - Startup sync schedules retries for late peer discovery.
 - Response suppression covers identities, keychains, conversations and
   communities.
+- Startup sync exposes a richer startup summary for diagnostics.
 
 Steps:
 
@@ -140,6 +126,10 @@ Steps:
 
 ## Later Slices
 
+- Call presence validation:
+  - validate call participant heartbeat with two browser clients against one
+    node
+  - validate call participant heartbeat with two nodes on the same network
 - Posts:
   - publish encrypted or public post payloads through IPFS
   - model author, visibility, attachments and timeline reads
