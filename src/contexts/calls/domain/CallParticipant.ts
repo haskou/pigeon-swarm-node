@@ -12,6 +12,7 @@ export class CallParticipant {
       identityId,
       CallParticipantStatus.JOINED,
       joinedAt,
+      joinedAt,
     );
   }
 
@@ -26,6 +27,11 @@ export class CallParticipant {
       new IdentityId(primitives.identityId),
       new CallParticipantStatus(primitives.status),
       primitives.joinedAt ? new Timestamp(primitives.joinedAt) : undefined,
+      primitives.lastSeenAt
+        ? new Timestamp(primitives.lastSeenAt)
+        : primitives.joinedAt
+          ? new Timestamp(primitives.joinedAt)
+          : undefined,
       primitives.leftAt ? new Timestamp(primitives.leftAt) : undefined,
       primitives.declinedAt ? new Timestamp(primitives.declinedAt) : undefined,
       primitives.missedAt ? new Timestamp(primitives.missedAt) : undefined,
@@ -36,6 +42,7 @@ export class CallParticipant {
     private readonly identityId: IdentityId,
     private status: CallParticipantStatus,
     private joinedAt?: Timestamp,
+    private lastSeenAt?: Timestamp,
     private leftAt?: Timestamp,
     private declinedAt?: Timestamp,
     private missedAt?: Timestamp,
@@ -62,6 +69,14 @@ export class CallParticipant {
     return this.status.isJoined();
   }
 
+  public hasTimedOut(timeoutThreshold: Timestamp): boolean {
+    if (!this.lastSeenAt) {
+      return false;
+    }
+
+    return this.isJoined() && this.lastSeenAt.isBeforeOrEqual(timeoutThreshold);
+  }
+
   public isActiveReceiver(): boolean {
     return this.status.isActiveReceiver();
   }
@@ -73,6 +88,7 @@ export class CallParticipant {
   public join(now: Timestamp = Timestamp.now()): void {
     this.status = CallParticipantStatus.JOINED;
     this.joinedAt = now;
+    this.lastSeenAt = now;
   }
 
   public leave(now: Timestamp = Timestamp.now()): void {
@@ -85,11 +101,17 @@ export class CallParticipant {
     this.missedAt = now;
   }
 
+  public recordHeartbeat(now: Timestamp = Timestamp.now()): void {
+    this.status = CallParticipantStatus.JOINED;
+    this.lastSeenAt = now;
+  }
+
   public toPrimitives() {
     return {
       identityId: this.identityId.valueOf(),
       ...(this.declinedAt ? { declinedAt: this.declinedAt.valueOf() } : {}),
       ...(this.joinedAt ? { joinedAt: this.joinedAt.valueOf() } : {}),
+      ...(this.lastSeenAt ? { lastSeenAt: this.lastSeenAt.valueOf() } : {}),
       ...(this.leftAt ? { leftAt: this.leftAt.valueOf() } : {}),
       ...(this.missedAt ? { missedAt: this.missedAt.valueOf() } : {}),
       status: this.status.valueOf(),

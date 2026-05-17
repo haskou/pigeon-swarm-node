@@ -365,6 +365,7 @@ Implemented:
 
 ```http
 POST /calls/{callId}/participants
+POST /calls/{callId}/participants/me/heartbeat
 DELETE /calls/{callId}/participants/me
 ```
 
@@ -372,9 +373,14 @@ Implemented:
 
 - joining requires the authenticated identity to be an allowed participant for
   the call scope
+- joined participants should send a signed heartbeat while media is active
+- heartbeat updates `participants[].lastSeenAt`
+- participants with no heartbeat for about 5 seconds are marked as `left` by
+  the call timeout scheduler
 - leaving removes the authenticated identity from the active call
 - deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
+- heartbeat timeout emits `calls.v1.participant.left`
 - leaves emit `calls.v1.participant.left`
 - declines emit `calls.v1.participant.declined`
 

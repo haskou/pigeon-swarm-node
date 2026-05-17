@@ -11,11 +11,12 @@ import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCr
 import { Timestamp } from '@haskou/value-objects';
 
 const callRingingTimeoutMs = 60_000;
+const callParticipantHeartbeatTimeoutMs = 5_000;
 
 type CallTimeoutSchedulerDependencies = {
   callRepository?: Pick<
     MongoCallRepository,
-    'findTimedOutRingingCalls' | 'save'
+    'findTimedOutJoinedCalls' | 'findTimedOutRingingCalls' | 'save'
   >;
   eventPublisher?: DomainEventPublisher;
   notificationRepository?: Pick<MongoNotificationRepository, 'save'>;
@@ -26,7 +27,7 @@ export default class CallTimeoutScheduler extends Scheduler {
 
   private readonly callRepository: Pick<
     MongoCallRepository,
-    'findTimedOutRingingCalls' | 'save'
+    'findTimedOutJoinedCalls' | 'findTimedOutRingingCalls' | 'save'
   >;
 
   private readonly notificationRepository: Pick<
@@ -54,10 +55,27 @@ export default class CallTimeoutScheduler extends Scheduler {
       );
   }
 
-  public async execute(): Promise<void> {
-    const timeoutThreshold = new Timestamp(Date.now() - callRingingTimeoutMs);
-    const calls =
-      await this.callRepository.findTimedOutRingingCalls(timeoutThreshold);
+  private async markTimedOutJoinedParticipants(): Promise<void> {
+    const threshold = new Timestamp(
+      Date.now() - callParticipantHeartbeatTimeoutMs,
+    );
+    const calls = await this.callRepository.findTimedOutJoinedCalls(threshold);
+
+    for (const call of calls) {
+      const leftParticipants = call.markInactiveParticipants(threshold);
+
+      if (leftParticipants.length === 0) {
+        continue;
+      }
+
+      await this.callRepository.save(call);
+      await this.eventPublisher.publish(call.pullDomainEvents());
+    }
+  }
+
+  private async markTimedOutRingingParticipants(): Promise<void> {
+    const threshold = new Timestamp(Date.now() - callRingingTimeoutMs);
+    const calls = await this.callRepository.findTimedOutRingingCalls(threshold);
 
     for (const call of calls) {
       if (!call.shouldRecordMissedCall()) {
@@ -86,10 +104,14 @@ export default class CallTimeoutScheduler extends Scheduler {
     }
   }
 
+  public async execute(): Promise<void> {
+    await this.markTimedOutJoinedParticipants();
+    await this.markTimedOutRingingParticipants();
+  }
+
   public getCronExpression(): CronExpression {
     return {
-      minute: '*',
-      second: 0,
+      second: '*/5',
     };
   }
 

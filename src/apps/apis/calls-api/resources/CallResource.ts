@@ -10,6 +10,7 @@ export interface CallResource {
     declinedAt?: number;
     identityId: string;
     joinedAt?: number;
+    lastSeenAt?: number;
     leftAt?: number;
     missedAt?: number;
     status: string;

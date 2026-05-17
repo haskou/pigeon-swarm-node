@@ -1,0 +1,26 @@
+import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { Request, Response } from 'express';
+import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
+
+import { CallViewModel } from '../view-model/CallViewModel';
+import { CallRouteSupport } from './CallRouteSupport';
+
+@JsonController('/calls')
+export class PostCallParticipantHeartbeatRoute extends CallRouteSupport {
+  @Post('/:callId/participants/me/heartbeat')
+  public async heartbeat(
+    @Param('callId') callId: string,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<Response> {
+    const participantIdentityId = await this.authenticate(request);
+    const call = await this.findCall(callId);
+
+    call.recordParticipantHeartbeat(participantIdentityId);
+    await this.callRepository().save(call);
+
+    return response
+      .status(HttpRouteStatusEnum.OK)
+      .send(new CallViewModel(call).toResource());
+  }
+}
