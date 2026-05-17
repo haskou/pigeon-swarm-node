@@ -38,13 +38,15 @@ export default abstract class Scheduler {
     }
     cron.schedule(parsedCronExpression, async () => {
       try {
-        Kernel.logger.debug?.(`Scheduler: Executing ${this.getProcessName()}`);
+        Kernel.logger?.debug?.(`Scheduler: Executing ${this.getProcessName()}`);
         await this.execute();
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        throw new ScheduledExecutionError(
+        const error = new ScheduledExecutionError(
           `Error on ${this.getProcessName()}: ${errorMessage}`,
         );
+
+        Kernel.logger?.error?.(error.message);
       }
     });
   }
