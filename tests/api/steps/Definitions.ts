@@ -1475,6 +1475,28 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/ipfs/secure');
   }
 
+  @given('I sign the current IPFS replication status request')
+  public async iSignTheCurrentIPFSReplicationStatusRequest(): Promise<void> {
+    this.binaryBody = undefined;
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/ipfs/replication/status');
+  }
+
+  @given('another identity signs the current IPFS replication status request')
+  public async anotherIdentitySignsTheCurrentIPFSReplicationStatusRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.binaryBody = undefined;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/ipfs/replication/status',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current conversations request')
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;

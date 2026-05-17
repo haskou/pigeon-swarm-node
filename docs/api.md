@@ -634,6 +634,7 @@ Response:
 Implemented:
 
 - publish public content to every configured IPFS network
+- register the returned CID in local MongoDB replication metadata
 - accept raw request bytes instead of wrapping the content in JSON/base64
 - store content as a JSON IPFS document with `contentType`, base64 `data`,
   optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
@@ -676,6 +677,7 @@ Response:
 Implemented:
 
 - publish client-encrypted private content to every configured IPFS network
+- register the returned CID in local MongoDB replication metadata
 - accept raw encrypted request bytes instead of wrapping the content in
   JSON/base64
 - store content as a JSON IPFS document with `encrypted: true`,
@@ -697,6 +699,71 @@ Implemented:
 
 - read JSON content by CID from any configured IPFS network
 - return `404` when the CID is not found
+
+### Get IPFS replication status
+
+```http
+GET /ipfs/replication/status
+```
+
+Requires signed request headers. This endpoint reports local replication
+metadata and the deterministic responsibility plan for known CIDs.
+
+The current policy is intentionally conservative:
+
+- with 1 to 5 active nodes in a network, every active node remains responsible
+  for every known CID
+- with more than 5 active nodes, desired replicas are the larger of 5 nodes or
+  40% of active nodes, capped by the active node count
+- responsibility is selected deterministically from `networkId`, `cid` and
+  `nodeId`, so nodes can independently agree who should keep a CID
+- the background maintenance job only releases local replicas when the network
+  has more than 5 active nodes, the local node is not responsible for that CID,
+  and every responsible node has already claimed that replica
+
+Response:
+
+```json
+{
+  "localNodeId": "<nodeId>",
+  "contents": [
+    {
+      "cid": "<cid>",
+      "context": "ipfs_private_upload",
+      "sizeBytes": 215040,
+      "priority": "normal",
+      "ownerIdentityId": "<identityId>",
+      "createdAt": 1770000000000,
+      "updatedAt": 1770000000000,
+      "networks": [
+        {
+          "networkId": "<networkId>",
+          "activeNodeCount": 2,
+          "desiredReplicas": 2,
+          "knownReplicas": 1,
+          "knownReplicaNodeIds": ["<nodeId>"],
+          "localResponsible": true,
+          "releaseLocalReplica": false,
+          "responsibleNodeIds": ["<nodeId>", "<peerNodeId>"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Implemented:
+
+- track CIDs created through `POST /ipfs/public`, `POST /ipfs/private` and
+  `POST /ipfs/secure`
+- record replica claims when a local or remote node announces that it has a CID
+- derive active node counts from node heartbeat peer metadata
+- keep generous replica margins to avoid losing half the data when there are
+  only a few nodes
+- expose the planned responsible nodes per CID/network
+- periodically pin missing local responsibilities and release safe extra local
+  replicas
+- avoid automatic unpin/garbage collection until replica claims are modeled
 
 ## Identity HTTP API
 

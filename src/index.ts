@@ -20,12 +20,14 @@ import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identi
 import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
 import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
+import RegisterIPFSReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicaClaimWhenClaimed';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
+import IPFSReplicationMaintenanceScheduler from '@app/apps/schedulers/IPFSReplicationMaintenanceScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
@@ -36,6 +38,8 @@ import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/application/register-claim/IPFSContentReplicaClaimRegistrar';
+import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -94,6 +98,9 @@ async function init() {
   );
   const communityMessageReactionRepository =
     new MongoCommunityMessageReactionRepository(mongo);
+  const ipfsReplicaClaimRepository = new MongoIPFSContentReplicaClaimRepository(
+    mongo,
+  );
 
   kernel.addConsumerInstances(
     new MarkMessagesReadWhenAnnounced(
@@ -135,6 +142,10 @@ async function init() {
       messageBus,
       communityMessageReactionRepository,
     ),
+    new RegisterIPFSReplicaClaimWhenClaimed(
+      messageBus,
+      new IPFSContentReplicaClaimRegistrar(ipfsReplicaClaimRepository),
+    ),
   );
   await kernel.runConsumers();
   console.timeEnd('Run consumers');
@@ -142,6 +153,9 @@ async function init() {
   console.time('Run Schedulers');
   kernel.addSchedulers(NodeHeartbeatScheduler);
   kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
+  kernel.addAcceptanceInstanceScheduler(
+    new IPFSReplicationMaintenanceScheduler(),
+  );
   await kernel.runSchedulers();
   console.timeEnd('Run Schedulers');
 
