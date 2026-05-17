@@ -9,15 +9,17 @@ import IdentityMetadataRepository from '@app/contexts/identities/infrastructure/
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
 import KeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
-import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { UUID } from '@haskou/value-objects';
+
+import NodeStartupSyncReadiness from './NodeStartupSyncReadiness';
 
 type LatestVersionByResource = Map<string, number>;
 
 export interface NodeStartupSyncResult {
   communityRequests: number;
+  connectedPeerCount: number;
   conversationRequests: number;
   identityNetworkRequests: number;
   identityRequests: number;
@@ -28,7 +30,7 @@ export interface NodeStartupSyncResult {
 export default class NodeStartupSynchronizer {
   constructor(
     private readonly nodeLoader: NodeLoader,
-    private readonly heartbeatSender: NodeHeartbeatSender,
+    private readonly readiness: NodeStartupSyncReadiness,
     private readonly identityMetadataRepository: IdentityMetadataRepository,
     private readonly keychainMetadataRepository: KeychainMetadataRepository,
     private readonly conversationRepository: MongoConversationRepository,
@@ -140,7 +142,7 @@ export default class NodeStartupSynchronizer {
     const requesterNodeId = nodePrimitives.id;
     const networkIds = Object.keys(nodePrimitives.networks);
 
-    await this.heartbeatSender.send();
+    const connectedPeerCount = await this.readiness.prepare();
 
     const [identityMetadata, keychainMetadata, conversationScopes] =
       await Promise.all([
@@ -178,6 +180,7 @@ export default class NodeStartupSynchronizer {
 
     return {
       communityRequests: communityRequests.length,
+      connectedPeerCount,
       conversationRequests: conversationScopes.length,
       identityNetworkRequests: networkIds.length,
       identityRequests: identityVersions.size,

@@ -4,6 +4,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -21,6 +22,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     private readonly messageRepository: MongoCommunityChannelMessageRepository,
     private readonly reactionRepository: ReactionRepository,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
   }
@@ -45,6 +47,9 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
     );
+    const requestId = event.attributes.requestId
+      ? String(event.attributes.requestId)
+      : undefined;
     const [community, messages, reactions] = await Promise.all([
       this.communityRepository.findById(communityId),
       this.messageRepository.findByCommunity(
@@ -57,6 +62,20 @@ export default class RespondToCommunitySyncRequest extends Consumer {
       ),
     ]);
 
+    if (!community && messages.length === 0 && reactions.length === 0) {
+      return;
+    }
+
+    const shouldRespond = await this.tracker.shouldRespond(
+      'community',
+      communityId.valueOf(),
+      requestId,
+    );
+
+    if (!shouldRespond) {
+      return;
+    }
+
     await this.eventPublisher.publish([
       new CommunitySyncAvailableEvent(event.aggregateId, {
         community: community?.toPrimitives(),
@@ -66,9 +85,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
         reactionCandidates: reactions.map((reaction) =>
           reaction.toPrimitives(),
         ),
-        requestId: event.attributes.requestId
-          ? String(event.attributes.requestId)
-          : undefined,
+        requestId,
       }),
     ]);
   }

@@ -5,6 +5,7 @@ import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/ev
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
@@ -24,6 +25,7 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
     private readonly communityRepository: MongoCommunityRepository,
     private readonly messageRepository: MongoCommunityChannelMessageRepository,
     private readonly reactionRepository: ReactionRepository,
+    private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
   }
@@ -44,13 +46,25 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
     return process.env.SERVICE_NAME || 'pigeon-swarm';
   }
 
-  public async handler(event: DomainEvent): Promise<void> {
+  private markSyncAvailable(event: DomainEvent): void {
+    this.tracker.markAvailable(
+      'community',
+      String(event.attributes.communityId || event.aggregateId),
+      event.attributes.requestId
+        ? String(event.attributes.requestId)
+        : undefined,
+    );
+  }
+
+  private async registerCommunity(event: DomainEvent): Promise<void> {
     if (isCommunityPrimitive(event.attributes.community)) {
       await this.communityRepository.save(
         Community.fromPrimitives(event.attributes.community),
       );
     }
+  }
 
+  private async registerMessages(event: DomainEvent): Promise<void> {
     const candidates = Array.isArray(event.attributes.messageCandidates)
       ? event.attributes.messageCandidates
       : [];
@@ -64,7 +78,9 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
         CommunityChannelMessage.fromPrimitives(candidate),
       );
     }
+  }
 
+  private async registerReactions(event: DomainEvent): Promise<void> {
     const reactionCandidates = Array.isArray(
       event.attributes.reactionCandidates,
     )
@@ -80,5 +96,12 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
         CommunityChannelMessageReaction.fromPrimitives(candidate),
       );
     }
+  }
+
+  public async handler(event: DomainEvent): Promise<void> {
+    this.markSyncAvailable(event);
+    await this.registerCommunity(event);
+    await this.registerMessages(event);
+    await this.registerReactions(event);
   }
 }
