@@ -74,10 +74,7 @@ export class CallParticipant {
       return false;
     }
 
-    const lastSeenAt = this.lastSeenAt.valueOf();
-    const timeout = timeoutThreshold.valueOf();
-
-    return this.isJoined() && lastSeenAt <= timeout;
+    return this.isJoined() && this.lastSeenAt.isBeforeOrEqual(timeoutThreshold);
   }
 
   public isActiveReceiver(): boolean {

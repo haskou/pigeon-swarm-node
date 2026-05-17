@@ -50,7 +50,10 @@ export class MongoCallRepository {
       participants:
         document.participants ??
         document.participantIds.map((participantId) =>
-          CallParticipant.joined(new IdentityId(participantId)).toPrimitives(),
+          CallParticipant.joined(
+            new IdentityId(participantId),
+            new Timestamp(document.createdAt),
+          ).toPrimitives(),
         ),
       scope: document.scope,
       status: document.status,
@@ -196,12 +199,30 @@ export class MongoCallRepository {
       await this.collection()
     )
       .find({
-        participants: {
-          $elemMatch: {
-            lastSeenAt: { $lte: timeoutThreshold.valueOf() },
-            status: 'joined',
+        $or: [
+          {
+            participants: {
+              $elemMatch: {
+                lastSeenAt: { $lte: timeoutThreshold.valueOf() },
+                status: 'joined',
+              },
+            },
           },
-        },
+          {
+            participants: {
+              $elemMatch: {
+                joinedAt: { $lte: timeoutThreshold.valueOf() },
+                lastSeenAt: { $exists: false },
+                status: 'joined',
+              },
+            },
+          },
+          {
+            createdAt: { $lte: timeoutThreshold.valueOf() },
+            participantIds: { $exists: true, $ne: [] },
+            participants: { $exists: false },
+          },
+        ],
         status: 'active',
       })
       .toArray();
