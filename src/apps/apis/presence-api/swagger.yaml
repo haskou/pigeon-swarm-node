@@ -1,0 +1,173 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Presence API
+  version: 1.0.0
+  description: Mongo-only identity presence, custom status and heartbeat state.
+tags:
+  - name: presence
+paths:
+  /presence/:
+    get:
+      tags:
+        - presence
+      summary: List identity presence states
+      description: |
+        Returns presence for the requested identity ids. Invisible identities are
+        exposed as `disconnected` unless the authenticated viewer is asking for
+        their own identity.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+        - in: query
+          name: identityIds
+          required: true
+          schema:
+            type: string
+          description: Comma-separated identity ids/public keys without PEM wrapping.
+      responses:
+        '200':
+          description: Presence states.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IdentityPresenceResource'
+  /presence/{identityId}:
+    get:
+      tags:
+        - presence
+      summary: Read one identity presence state
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: URL-encoded identity id/public key without PEM wrapping.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Presence state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityPresenceResource'
+  /presence/me:
+    put:
+      tags:
+        - presence
+      summary: Update authenticated identity presence preferences
+      description: |
+        Sets the authenticated identity selected status and optional custom
+        message. `disconnected` cannot be selected; it is derived by heartbeat
+        timeout. `available`/`away` are normal online states, while `busy`,
+        `custom` and `invisible` override automatic away/available derivation.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutPresenceBody'
+      responses:
+        '200':
+          description: Presence updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityPresenceResource'
+  /presence/me/custom-message:
+    delete:
+      tags:
+        - presence
+      summary: Clear authenticated identity custom status message
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Custom message removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityPresenceResource'
+components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    IdentityPresenceResource:
+      type: object
+      required:
+        - identityId
+        - status
+        - updatedAt
+      properties:
+        identityId:
+          type: string
+        status:
+          type: string
+          enum:
+            - available
+            - away
+            - busy
+            - custom
+            - disconnected
+            - invisible
+        customMessage:
+          type: string
+          maxLength: 50
+        lastHeartbeatAt:
+          type: integer
+        lastActivityAt:
+          type: integer
+        updatedAt:
+          type: integer
+    PutPresenceBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - available
+            - away
+            - busy
+            - custom
+            - invisible
+        customMessage:
+          type: string
+          maxLength: 50

@@ -1,0 +1,62 @@
+@startuml PresenceClasses
+
+skinparam classAttributeIconSize 0
+
+package "presence/domain" {
+  class IdentityPresence {
+    - identityId: IdentityId
+    - status: PresenceStatus
+    - customMessage: PresenceCustomMessage
+    - lastHeartbeatAt: Timestamp
+    - lastActivityAt: Timestamp
+    - updatedAt: Timestamp
+    + recordHeartbeat(activityDetected, networkIds)
+    + update(status, customMessage, networkIds)
+    + clearCustomMessage(networkIds)
+    + refreshDerivedStatus(networkIds)
+    + visiblePrimitivesFor(viewerIdentityId)
+  }
+
+  class PresenceStatus {
+    + available
+    + away
+    + busy
+    + custom
+    + disconnected
+    + invisible
+    + visibleForOthers()
+  }
+
+  class PresenceCustomMessage {
+    + maxLength: 50
+  }
+
+  class IdentityPresenceWasUpdatedEvent {
+    + EVENT_NAME: presence.v1.identity_presence.was_updated
+  }
+}
+
+package "presence/application" {
+  class IdentityPresenceFinder
+  class IdentityPresenceUpdater
+  class IdentityPresenceHeartbeatRecorder
+  class IdentityPresenceExpirationRegistrar
+  class IdentityPresenceNetworkResolver
+}
+
+package "presence/infrastructure" {
+  class MongoIdentityPresenceRepository
+}
+
+IdentityPresence --> PresenceStatus
+IdentityPresence --> PresenceCustomMessage
+IdentityPresence --> IdentityPresenceWasUpdatedEvent
+IdentityPresenceFinder --> MongoIdentityPresenceRepository
+IdentityPresenceUpdater --> MongoIdentityPresenceRepository
+IdentityPresenceUpdater --> IdentityPresenceNetworkResolver
+IdentityPresenceHeartbeatRecorder --> MongoIdentityPresenceRepository
+IdentityPresenceHeartbeatRecorder --> IdentityPresenceNetworkResolver
+IdentityPresenceExpirationRegistrar --> MongoIdentityPresenceRepository
+IdentityPresenceExpirationRegistrar --> IdentityPresenceNetworkResolver
+
+@enduml

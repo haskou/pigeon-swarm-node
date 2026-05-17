@@ -30,8 +30,8 @@ export class PostPublicIPFSContentRoute extends IPFSContentUploadRoute {
   ): Promise<Response> {
     const published = await this.publisher().publishPublic({
       body: this.bodyFrom(request),
-      filename,
       contentType,
+      filename,
       ownerIdentityId: await this.authenticate(request),
     });
 

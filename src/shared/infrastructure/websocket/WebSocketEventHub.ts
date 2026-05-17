@@ -1,6 +1,11 @@
+import { MongoIdentityMetadataRepository } from '@app/contexts/identities/infrastructure/mongo';
+import { IdentityPresenceServicesFactory } from '@app/contexts/presence/application/IdentityPresenceServicesFactory';
+import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/application/record-heartbeat/messages/IdentityPresenceHeartbeatMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { RawData, WebSocket } from 'ws';
 
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
@@ -21,6 +26,7 @@ type WebSocketRealtimeMessage =
     };
 
 type WebSocketClientMessage = {
+  active?: boolean;
   type?: string;
 };
 
@@ -29,6 +35,7 @@ const identityAttributeKeys = [
   'creatorIdentityId',
   'deletedBy',
   'editedBy',
+  'identityId',
   'inviteeIdentityId',
   'inviterIdentityId',
   'memberIds',
@@ -41,6 +48,7 @@ const identityAttributeKeys = [
   'creator_id',
   'deleted_by',
   'edited_by',
+  'identity_id',
   'invitee_id',
   'inviter_id',
   'member_ids',
@@ -167,11 +175,35 @@ export class WebSocketEventHub {
       return;
     }
 
+    this.recordIdentityHeartbeat(identityId, Boolean(message.active)).catch(
+      (error: unknown) => {
+        Kernel.logger?.error(
+          `WebSocket identity heartbeat failed for "${identityId}": ${String(error)}`,
+        );
+      },
+    );
     this.send(client, {
       identityId,
       timestamp: Date.now(),
       type: 'heartbeat_ack',
     });
+  }
+
+  private async recordIdentityHeartbeat(
+    identityId: string,
+    active: boolean,
+  ): Promise<void> {
+    const recorder = new IdentityPresenceServicesFactory(
+      Kernel.di.getService<MongoDB>(MongoDB),
+      Kernel.di.getService<MongoIdentityMetadataRepository>(
+        MongoIdentityMetadataRepository,
+      ),
+      Kernel.di.getService<MessageBus>(MessageBus),
+    ).heartbeatRecorder();
+
+    await recorder.record(
+      new IdentityPresenceHeartbeatMessage(identityId, active),
+    );
   }
 
   private parseClientMessage(

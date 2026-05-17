@@ -55,6 +55,9 @@ import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerR
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
 import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/PatchNotificationRoute';
 import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/PostNotificationRoute';
+import { DeletePresenceCustomMessageRoute } from '@app/apps/apis/presence-api/routes/DeletePresenceCustomMessageRoute';
+import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresenceRoute';
+import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresenceRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -207,6 +210,9 @@ export default class Server {
           GetNotificationsRoute,
           PostNotificationRoute,
           PatchNotificationRoute,
+          GetPresenceRoute,
+          PutPresenceRoute,
+          DeletePresenceCustomMessageRoute,
           GetCommunitiesRoute,
           GetCommunityDiscoveryRoute,
           GetCommunityMembershipRequestsRoute,

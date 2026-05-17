@@ -193,8 +193,8 @@ export default class NodeStartupSynchronizer {
       keychainRequests: keychainVersions.size,
       networkIds,
       publishedEvents: totalRequests,
-      requestId,
       requesterNodeId,
+      requestId,
       totalRequests,
     };
   }
