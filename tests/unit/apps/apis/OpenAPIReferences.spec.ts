@@ -45,29 +45,47 @@ function referencesFrom(file: string): OpenAPIReference[] {
   return references;
 }
 
-function pathExists(content: string, path: string): boolean {
-  return new RegExp(`^  ${escapeRegExp(path)}:\\s*$`, 'm').test(content);
+function keyLinePattern(key: string, indent: number): RegExp {
+  return new RegExp(`^\\s{${indent}}${escapeRegExp(key)}:\\s*(?:$|[^{])`);
 }
 
-function componentExists(content: string, componentName: string): boolean {
-  return new RegExp(`^\\s{4}${escapeRegExp(componentName)}:\\s*$`, 'm').test(
-    content,
-  );
+function findKeyLine(
+  lines: string[],
+  key: string,
+  indent: number,
+  startLine: number,
+): number | undefined {
+  const pattern = keyLinePattern(key, indent);
+
+  for (let lineNumber = startLine; lineNumber < lines.length; lineNumber += 1) {
+    if (pattern.test(lines[lineNumber])) {
+      return lineNumber;
+    }
+  }
+
+  return undefined;
 }
 
 function pointerExists(file: string, pointer: string): boolean {
-  const content = readFile(file);
-  const [, section, subsection, rawName] = pointer.split('/');
+  const lines = readFile(file).split('\n');
+  const tokens = pointer
+    .split('/')
+    .filter((token) => token.length > 0)
+    .map(decodePointerToken);
+  let startLine = 0;
 
-  if (section === 'paths' && subsection) {
-    return pathExists(content, decodePointerToken(subsection));
+  for (const [index, token] of tokens.entries()) {
+    const indent = index * 2;
+    const lineNumber = findKeyLine(lines, token, indent, startLine);
+
+    if (lineNumber === undefined) {
+      return false;
+    }
+
+    startLine = lineNumber + 1;
   }
 
-  if (section === 'components' && rawName) {
-    return componentExists(content, decodePointerToken(rawName));
-  }
-
-  return false;
+  return tokens.length > 0;
 }
 
 function referencedFile(reference: OpenAPIReference): {
@@ -90,13 +108,32 @@ function referencedFile(reference: OpenAPIReference): {
 }
 
 describe('OpenAPI references', () => {
+  it('should validate complete nested pointers', () => {
+    const callsSwagger = join(apisRoot, 'calls-api/swagger.yaml');
+
+    expect(
+      pointerExists(
+        callsSwagger,
+        '/components/schemas/CallsResource/properties/calls/items',
+      ),
+    ).toBe(true);
+    expect(
+      pointerExists(
+        callsSwagger,
+        '/components/schemas/CallsResource/properties/notReal/items',
+      ),
+    ).toBe(false);
+  });
+
   it('should resolve every local and external reference', () => {
     const unresolvedReferences = openAPIFiles
       .flatMap((file) => referencesFrom(file))
       .filter((reference) => {
         const target = referencedFile(reference);
 
-        return !existsSync(target.file) || !pointerExists(target.file, target.pointer);
+        return (
+          !existsSync(target.file) || !pointerExists(target.file, target.pointer)
+        );
       })
       .map((reference) => `${reference.file}: ${reference.ref}`);
 
