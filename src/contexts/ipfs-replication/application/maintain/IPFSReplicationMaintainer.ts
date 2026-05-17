@@ -14,8 +14,12 @@ import IPFSReplicationStatusFinder, {
 
 export type IPFSReplicationMaintenanceResult = {
   claimedReplicas: number;
+  failedClaims: number;
+  failedReleases: number;
   releasedReplicas: number;
 };
+type IPFSContentNetworkReplicationStatus =
+  IPFSContentReplicationStatus['networks'][number];
 
 export default class IPFSReplicationMaintainer {
   constructor(
@@ -56,9 +60,30 @@ export default class IPFSReplicationMaintainer {
     return knownReplicaNodeIds.includes(localNodeId);
   }
 
+  private emptyResult(): IPFSReplicationMaintenanceResult {
+    return {
+      claimedReplicas: 0,
+      failedClaims: 0,
+      failedReleases: 0,
+      releasedReplicas: 0,
+    };
+  }
+
+  private combineResults(
+    current: IPFSReplicationMaintenanceResult,
+    next: IPFSReplicationMaintenanceResult,
+  ): IPFSReplicationMaintenanceResult {
+    return {
+      claimedReplicas: current.claimedReplicas + next.claimedReplicas,
+      failedClaims: current.failedClaims + next.failedClaims,
+      failedReleases: current.failedReleases + next.failedReleases,
+      releasedReplicas: current.releasedReplicas + next.releasedReplicas,
+    };
+  }
+
   private async maintainResponsibleReplica(
     content: IPFSContentReplicationStatus,
-    network: IPFSContentReplicationStatus['networks'][number],
+    network: IPFSContentNetworkReplicationStatus,
     localNodeId: string,
   ): Promise<number> {
     const cid = new IPFSId(content.cid);
@@ -80,7 +105,7 @@ export default class IPFSReplicationMaintainer {
 
   private async releaseExtraReplica(
     content: IPFSContentReplicationStatus,
-    network: IPFSContentReplicationStatus['networks'][number],
+    network: IPFSContentNetworkReplicationStatus,
   ): Promise<number> {
     if (!network.releaseLocalReplica) {
       return 0;
@@ -94,27 +119,52 @@ export default class IPFSReplicationMaintainer {
     return 1;
   }
 
+  private async maintainNetwork(
+    content: IPFSContentReplicationStatus,
+    network: IPFSContentNetworkReplicationStatus,
+    localNodeId: string,
+  ): Promise<IPFSReplicationMaintenanceResult> {
+    const result = this.emptyResult();
+
+    if (network.localResponsible) {
+      try {
+        result.claimedReplicas = await this.maintainResponsibleReplica(
+          content,
+          network,
+          localNodeId,
+        );
+      } catch {
+        result.failedClaims = 1;
+      }
+
+      return result;
+    }
+
+    try {
+      result.releasedReplicas = await this.releaseExtraReplica(
+        content,
+        network,
+      );
+    } catch {
+      result.failedReleases = 1;
+    }
+
+    return result;
+  }
+
   public async maintain(): Promise<IPFSReplicationMaintenanceResult> {
     const status = await this.finder.find();
-    let claimedReplicas = 0;
-    let releasedReplicas = 0;
+    let result = this.emptyResult();
 
     for (const content of status.contents) {
       for (const network of content.networks) {
-        if (network.localResponsible) {
-          claimedReplicas += await this.maintainResponsibleReplica(
-            content,
-            network,
-            status.localNodeId,
-          );
-
-          continue;
-        }
-
-        releasedReplicas += await this.releaseExtraReplica(content, network);
+        result = this.combineResults(
+          result,
+          await this.maintainNetwork(content, network, status.localNodeId),
+        );
       }
     }
 
-    return { claimedReplicas, releasedReplicas };
+    return result;
   }
 }

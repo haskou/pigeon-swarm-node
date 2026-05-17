@@ -72,6 +72,18 @@ export class IPFSContentReplication {
     return this.networkIds;
   }
 
+  public addNetworkIds(networkIds: NetworkId[]): void {
+    for (const networkId of networkIds) {
+      const alreadyRegistered = this.networkIds.some((registeredNetworkId) =>
+        registeredNetworkId.isEqual(networkId),
+      );
+
+      if (!alreadyRegistered) {
+        this.networkIds.push(networkId);
+      }
+    }
+  }
+
   public touch(updatedAt: Timestamp = Timestamp.now()): void {
     this.updatedAt = updatedAt;
   }

@@ -33,7 +33,7 @@ export default class IPFSReplicationMaintenanceScheduler extends Scheduler {
     const result = await this.maintainer().maintain();
 
     Kernel.logger.info(
-      `Maintained IPFS replication: claimed=${result.claimedReplicas}, released=${result.releasedReplicas}`,
+      `Maintained IPFS replication: claimed=${result.claimedReplicas}, released=${result.releasedReplicas}, failedClaims=${result.failedClaims}, failedReleases=${result.failedReleases}`,
     );
   }
 

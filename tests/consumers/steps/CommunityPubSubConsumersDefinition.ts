@@ -2,6 +2,7 @@ import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/commu
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityMessagesWhenSync from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
+import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
@@ -46,6 +47,8 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   private readonly communityId = 'community-1';
   private readonly emoji = '👍';
   private readonly messageId = 'community-message-1';
+  private readonly networkId = '550e8400-e29b-41d4-a716-446655440001';
+  private readonly otherNetworkId = '550e8400-e29b-41d4-a716-446655440002';
   private readonly reactionCreatedAt = 1778513696020;
 
   private eventPublisher = new FakeEventPublisher();
@@ -147,7 +150,77 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     await consumer.handler(
       new CommunitySyncRequestedEvent(this.communityId, {
         communityId: this.communityId,
-        networkId: 'community-network',
+        networkId: this.networkId,
+        requestId: this.requestId,
+      }),
+    );
+  }
+
+  @when(
+    'the community sync request consumer handles a request with orphan local messages',
+  )
+  public async syncRequestConsumerHandlesARequestWithOrphanMessages(): Promise<void> {
+    const consumer = new RespondToCommunitySyncRequest(
+      this.eventConsumer(),
+      {
+        findById: async (): Promise<undefined> => undefined,
+      } as unknown as MongoCommunityRepository,
+      {
+        findByCommunity: async (): Promise<unknown[]> => [
+          { toPrimitives: (): object => ({ id: this.messageId }) },
+        ],
+      } as unknown as MongoCommunityChannelMessageRepository,
+      {
+        findByCommunity: async (): Promise<[]> => [],
+      } as unknown as MongoCommunityMessageReactionRepository,
+      this.eventPublisher,
+    );
+
+    await consumer.handler(
+      new CommunitySyncRequestedEvent(this.communityId, {
+        communityId: this.communityId,
+        networkId: this.networkId,
+        requestId: this.requestId,
+      }),
+    );
+  }
+
+  @when(
+    'the community sync request consumer handles a request for a community in another network',
+  )
+  public async syncRequestConsumerHandlesARequestForAnotherNetwork(): Promise<void> {
+    const consumer = new RespondToCommunitySyncRequest(
+      this.eventConsumer(),
+      {
+        findById: async (): Promise<Community> =>
+          Community.fromPrimitives({
+            avatar: undefined,
+            banner: undefined,
+            createdAt: 1778513696020,
+            description: 'Community description',
+            id: this.communityId,
+            memberIds: [this.ownerIdentityId()],
+            name: 'Community',
+            networkId: this.otherNetworkId,
+            ownerIdentityId: this.ownerIdentityId(),
+            textChannels: [],
+            visibility: 'private',
+            voiceChannels: [],
+          }),
+      } as unknown as MongoCommunityRepository,
+      {
+        findByCommunity: async (): Promise<[]> => [],
+      } as unknown as MongoCommunityChannelMessageRepository,
+      {
+        findByCommunity: async (): Promise<[]> => [],
+      } as unknown as MongoCommunityMessageReactionRepository,
+      this.eventPublisher,
+    );
+
+    await consumer.handler(
+      new CommunitySyncRequestedEvent(this.communityId, {
+        communityId: this.communityId,
+        networkId: this.networkId,
         requestId: this.requestId,
       }),
     );

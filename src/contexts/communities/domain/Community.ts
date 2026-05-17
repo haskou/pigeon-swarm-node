@@ -268,6 +268,10 @@ export class Community extends AggregateRoot {
     return this.members.some((member) => member.isEqual(identityId));
   }
 
+  public belongsToNetwork(networkId: NetworkId): boolean {
+    return this.networkId.isEqual(networkId);
+  }
+
   public isOwner(identityId: IdentityId): boolean {
     return this.ownerIdentityId.isEqual(identityId);
   }
