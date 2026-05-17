@@ -46,6 +46,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
+  /communities/discover:
+    get:
+      tags:
+        - communities
+      summary: Discover private communities by public metadata
+      description: Returns searchable community metadata without exposing channels or encrypted content. The authenticated identity receives its current membership state for each result.
+      parameters:
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: networkId
+          required: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Discoverable communities.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityDiscoveryResource'
+  /communities/membership-requests:
+    get:
+      tags:
+        - communities
+      summary: List community invitations and join requests
+      description: Returns requests created by the authenticated identity, targeting the authenticated identity, or belonging to communities owned by the authenticated identity.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community membership requests.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMembershipRequestsResource'
+  /communities/membership-requests/{requestId}:
+    patch:
+      tags:
+        - communities
+      summary: Accept or decline a community invitation or join request
+      description: Invited identities can accept or decline invitations. Community owners can accept or decline join requests. Accepted requests add the target identity to memberIds.
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchCommunityMembershipRequestBody'
+      responses:
+        '200':
+          description: Membership request updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMembershipRequestResource'
   /communities/{communityId}:
     get:
       tags:
@@ -115,8 +190,8 @@ paths:
     post:
       tags:
         - communities
-      summary: Add a member to a private community
-      description: Only the community owner can add members. Adding an existing member is idempotent.
+      summary: Invite an identity to a private community
+      description: Only the community owner can create direct membership invitations. The invited identity is not added to memberIds until they accept the invitation.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -131,11 +206,11 @@ paths:
               $ref: '#/components/schemas/PostCommunityMemberBody'
       responses:
         '200':
-          description: Member added.
+          description: Pending invitation created.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CommunityResource'
+                $ref: '#/components/schemas/CommunityMembershipRequestResource'
         '409':
           description: Authenticated identity is not the community owner.
   /communities/{communityId}/members/me:
@@ -186,6 +261,25 @@ paths:
                 $ref: '#/components/schemas/CommunityInviteResource'
         '409':
           description: Authenticated identity is not the community owner or the invite body is invalid.
+  /communities/{communityId}/join-requests:
+    post:
+      tags:
+        - communities
+      summary: Request to join a private community
+      description: Creates a pending join request. The requester is not added to memberIds until the community owner accepts the request.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Pending join request created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMembershipRequestResource'
   /communities/invites/{inviteToken}/accept:
     post:
       tags:
@@ -650,6 +744,110 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityResource'
+    CommunityDiscoveryResource:
+      type: object
+      required:
+        - communities
+      properties:
+        communities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityDiscoveryItemResource'
+    CommunityDiscoveryItemResource:
+      type: object
+      required:
+        - id
+        - networkId
+        - ownerIdentityId
+        - name
+        - description
+        - memberCount
+        - membershipStatus
+        - visibility
+      properties:
+        id:
+          type: string
+        networkId:
+          type: string
+        ownerIdentityId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        avatar:
+          type: string
+        banner:
+          type: string
+        memberCount:
+          type: integer
+        membershipStatus:
+          type: string
+          enum:
+            - invited
+            - member
+            - none
+            - requested
+        membershipRequest:
+          $ref: '#/components/schemas/CommunityMembershipRequestResource'
+        visibility:
+          type: string
+          enum:
+            - private
+    PatchCommunityMembershipRequestBody:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - accepted
+            - declined
+    CommunityMembershipRequestResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - creatorIdentityId
+        - identityId
+        - type
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        creatorIdentityId:
+          type: string
+        identityId:
+          type: string
+        type:
+          type: string
+          enum:
+            - invitation
+            - request
+        status:
+          type: string
+          enum:
+            - accepted
+            - declined
+            - pending
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+    CommunityMembershipRequestsResource:
+      type: object
+      required:
+        - requests
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityMembershipRequestResource'
     CommunityMembersResource:
       type: object
       required:
