@@ -19,3 +19,13 @@ Feature: Get IPFS replication status route
     And response body should contain "knownReplicas"
     And response body should contain "releaseLocalReplica"
     And response body should contain "localResponsible"
+
+  Scenario: Reject replication status from a non-owner
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given another identity signs the current IPFS replication status request
+    When I GET "/ipfs/replication/status"
+    Then response code is equal to 403
