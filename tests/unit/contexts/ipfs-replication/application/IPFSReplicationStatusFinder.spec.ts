@@ -1,0 +1,73 @@
+import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
+import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
+import { IPFSContentReplicationRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
+import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
+import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
+import { IPFSContentSize } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentSize';
+import { Node } from '@app/contexts/nodes/domain/Node';
+import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
+import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
+import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { Timestamp } from '@haskou/value-objects';
+
+describe('IPFSReplicationStatusFinder', () => {
+  const networkId = '550e8400-e29b-41d4-a716-446655440001';
+  const localNodeId = '550e8400-e29b-41d4-a716-446655440010';
+  const peerNodeId = '550e8400-e29b-41d4-a716-446655440011';
+
+  it('should assign every active node while the network is small', async () => {
+    const content = IPFSContentReplication.create(
+      new IPFSId('bafy-content'),
+      new IPFSContentReplicationContext('ipfs_private_upload'),
+      [new NetworkId(networkId)],
+      new IPFSContentSize(128),
+      undefined,
+      IPFSContentReplicationPriority.NORMAL,
+      new Timestamp(1770000000000),
+    );
+    const contentRepository: IPFSContentReplicationRepository = {
+      findAll: () => Promise.resolve([content]),
+      findByCid: () => Promise.resolve(undefined),
+      save: () => Promise.resolve(),
+    };
+    const nodeRepository: NodeRepository = {
+      loadLocalNode: () =>
+        Promise.resolve(
+          Node.fromPrimitives({
+            id: localNodeId,
+            networks: {},
+            owner: undefined,
+          }),
+        ),
+      saveLocalNode: () => Promise.resolve(),
+    };
+    const nodePeerRepository: NodePeerRepository = {
+      findActive: () =>
+        Promise.resolve([
+          NodePeer.fromPrimitives({
+            id: peerNodeId,
+            lastSeenAt: 1770000000000,
+            networks: [{ id: networkId, name: 'private' }],
+            owner: undefined,
+          }),
+        ]),
+      save: () => Promise.resolve(),
+    };
+
+    const status = await new IPFSReplicationStatusFinder(
+      contentRepository,
+      nodeRepository,
+      nodePeerRepository,
+    ).find();
+
+    expect(status.contents[0].networks[0]).toMatchObject({
+      activeNodeCount: 2,
+      desiredReplicas: 2,
+      localResponsible: true,
+      networkId,
+      responsibleNodeIds: [localNodeId, peerNodeId],
+    });
+  });
+});

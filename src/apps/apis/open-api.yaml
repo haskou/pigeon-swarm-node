@@ -159,6 +159,8 @@ paths:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1private'
   /ipfs/public:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1public'
+  /ipfs/replication/status:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1replication~1status'
   /ipfs/{cid}:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'
   /keychains/:

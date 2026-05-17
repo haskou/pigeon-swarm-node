@@ -1,5 +1,9 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
+import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
+import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import * as express from 'express';
@@ -32,6 +36,12 @@ export class PostPublicIPFSContentRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
+  private replicationRegistrar(): IPFSContentReplicationRegistrar {
+    return new IPFSContentReplicationRegistrar(
+      new MongoIPFSContentReplicationRepository(this.get<MongoDB>(MongoDB)),
+    );
+  }
+
   @Post('/public')
   @UseBefore(
     express.raw({
@@ -62,6 +72,18 @@ export class PostPublicIPFSContentRoute extends Route {
       uploadedByIdentityId: authenticatedIdentityId.valueOf(),
     };
     const cid = await this.ipfs.addJSONToAll(document);
+    const networkIds = (await this.ipfs.getNetworks()).map((network) =>
+      network.getId(),
+    );
+
+    await this.replicationRegistrar().register({
+      cid: cid.valueOf(),
+      context: 'ipfs_public_upload',
+      networkIds,
+      ownerIdentityId: authenticatedIdentityId.valueOf(),
+      priority: IPFSContentReplicationPriority.NORMAL,
+      sizeBytes: body.length,
+    });
 
     return response.status(HttpRouteStatusEnum.CREATED).json({
       cid: cid.valueOf(),
