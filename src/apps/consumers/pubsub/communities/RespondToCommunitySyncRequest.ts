@@ -76,23 +76,15 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     return { community, messages, reactions };
   }
 
-  private hasNoLocalData(syncData: CommunitySyncData): boolean {
-    return (
-      !syncData.community &&
-      syncData.messages.length === 0 &&
-      syncData.reactions.length === 0
-    );
+  private hasNoSyncableCommunity(syncData: CommunitySyncData): boolean {
+    return !syncData.community;
   }
 
   private belongsToRequestedNetwork(
     syncData: CommunitySyncData,
     networkId: NetworkId,
   ): boolean {
-    if (!syncData.community) {
-      return true;
-    }
-
-    return syncData.community.belongsToNetwork(networkId);
+    return syncData.community?.belongsToNetwork(networkId) ?? false;
   }
 
   public async handler(event: DomainEvent): Promise<void> {
@@ -104,7 +96,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     const syncData = await this.findSyncData(communityId);
 
     if (
-      this.hasNoLocalData(syncData) ||
+      this.hasNoSyncableCommunity(syncData) ||
       !this.belongsToRequestedNetwork(syncData, networkId)
     ) {
       return;

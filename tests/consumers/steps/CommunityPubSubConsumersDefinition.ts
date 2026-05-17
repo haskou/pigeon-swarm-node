@@ -157,6 +157,35 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   }
 
   @when(
+    'the community sync request consumer handles a request with orphan local messages',
+  )
+  public async syncRequestConsumerHandlesARequestWithOrphanMessages(): Promise<void> {
+    const consumer = new RespondToCommunitySyncRequest(
+      this.eventConsumer(),
+      {
+        findById: async (): Promise<undefined> => undefined,
+      } as unknown as MongoCommunityRepository,
+      {
+        findByCommunity: async (): Promise<unknown[]> => [
+          { toPrimitives: (): object => ({ id: this.messageId }) },
+        ],
+      } as unknown as MongoCommunityChannelMessageRepository,
+      {
+        findByCommunity: async (): Promise<[]> => [],
+      } as unknown as MongoCommunityMessageReactionRepository,
+      this.eventPublisher,
+    );
+
+    await consumer.handler(
+      new CommunitySyncRequestedEvent(this.communityId, {
+        communityId: this.communityId,
+        networkId: this.networkId,
+        requestId: this.requestId,
+      }),
+    );
+  }
+
+  @when(
     'the community sync request consumer handles a request for a community in another network',
   )
   public async syncRequestConsumerHandlesARequestForAnotherNetwork(): Promise<void> {
