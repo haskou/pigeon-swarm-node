@@ -8,6 +8,7 @@ import { MongoCommunityDocument } from './documents/MongoCommunityDocument';
 
 export class MongoCommunityRepository implements CommunityRepository {
   private static readonly COLLECTION = 'communities';
+  private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
   constructor(private readonly mongo: MongoDB) {}
 
@@ -53,6 +54,13 @@ export class MongoCommunityRepository implements CommunityRepository {
     });
   }
 
+  private escapeRegex(value: string): string {
+    return value.replace(
+      MongoCommunityRepository.REGEX_SPECIAL_CHARACTERS,
+      '\\$&',
+    );
+  }
+
   public async findById(id: CommunityId): Promise<Community | undefined> {
     const document = await (
       await this.collection()
@@ -75,9 +83,11 @@ export class MongoCommunityRepository implements CommunityRepository {
     }
 
     if (query) {
+      const escapedQuery = this.escapeRegex(query);
+
       filter.$or = [
-        { name: { $options: 'i', $regex: query } },
-        { description: { $options: 'i', $regex: query } },
+        { name: { $options: 'i', $regex: escapedQuery } },
+        { description: { $options: 'i', $regex: escapedQuery } },
       ];
     }
 
