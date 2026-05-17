@@ -83,7 +83,6 @@ async function init() {
     RespondToConversationSyncRequest,
     RegisterMessagesWhenSyncAvailable,
     RegisterNodePeerWhenHeartbeatReceived,
-    RegisterIdentityPresenceWhenUpdated,
   );
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
   const conversationRepository =
@@ -149,13 +148,16 @@ async function init() {
       messageBus,
       new IPFSContentReplicaClaimRegistrar(ipfsReplicaClaimRepository),
     ),
+    new RegisterIdentityPresenceWhenUpdated(messageBus),
   );
   await kernel.runConsumers();
   console.timeEnd('Run consumers');
 
   console.time('Run Schedulers');
   kernel.addSchedulers(NodeHeartbeatScheduler);
-  kernel.addSchedulers(IdentityPresenceExpirationScheduler);
+  kernel.addAcceptanceInstanceScheduler(
+    new IdentityPresenceExpirationScheduler(),
+  );
   kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
   kernel.addAcceptanceInstanceScheduler(
     new IPFSReplicationMaintenanceScheduler(),
