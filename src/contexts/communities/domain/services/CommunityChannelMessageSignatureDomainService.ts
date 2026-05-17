@@ -47,13 +47,17 @@ export class CommunityChannelMessageSignatureDomainService {
     };
   }
 
+  public serializePayload(payload: CommunityChannelSignaturePayload): string {
+    return JSON.stringify(this.getCanonicalPayload(payload));
+  }
+
   public isValidSignature(
     publicKey: PublicKey,
     payload: CommunityChannelSignaturePayload,
     signature: Signature,
   ): boolean {
     return publicKey.isValidSignature(
-      JSON.stringify(this.getCanonicalPayload(payload)),
+      this.serializePayload(payload),
       signature,
     );
   }
