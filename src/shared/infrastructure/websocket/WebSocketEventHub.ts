@@ -35,6 +35,7 @@ const identityAttributeKeys = [
   'creatorIdentityId',
   'deletedBy',
   'editedBy',
+  'identityId',
   'inviteeIdentityId',
   'inviterIdentityId',
   'memberIds',
@@ -47,6 +48,7 @@ const identityAttributeKeys = [
   'creator_id',
   'deleted_by',
   'edited_by',
+  'identity_id',
   'invitee_id',
   'inviter_id',
   'member_ids',
@@ -173,19 +175,18 @@ export class WebSocketEventHub {
       return;
     }
 
-    this.recordIdentityHeartbeat(identityId, Boolean(message.active))
-      .catch((error: unknown) => {
+    this.recordIdentityHeartbeat(identityId, Boolean(message.active)).catch(
+      (error: unknown) => {
         Kernel.logger?.error(
           `WebSocket identity heartbeat failed for "${identityId}": ${String(error)}`,
         );
-      })
-      .finally(() => {
-        this.send(client, {
-          identityId,
-          timestamp: Date.now(),
-          type: 'heartbeat_ack',
-        });
-      });
+      },
+    );
+    this.send(client, {
+      identityId,
+      timestamp: Date.now(),
+      type: 'heartbeat_ack',
+    });
   }
 
   private async recordIdentityHeartbeat(

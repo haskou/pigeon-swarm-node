@@ -145,6 +145,36 @@ describe('WebSocketEventHub', () => {
     expect(otherClient.send).not.toHaveBeenCalled();
   });
 
+  it('sends presence updates only to the updated identity', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const identityClient = buildClient();
+    const otherClient = buildClient();
+    const event = new TestDomainEvent(identityId.valueOf(), {
+      identityId: identityId.valueOf(),
+      networkIds: ['network-id'],
+      status: 'available',
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('presence.v1.identity_presence.was_updated');
+    hub.register(identityId, identityClient);
+    hub.register(otherIdentityId, otherClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(identityClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(otherClient.send).not.toHaveBeenCalled();
+  });
+
   it('sends call signals only to the signal recipient', async () => {
     const hub = new WebSocketEventHub();
     const senderIdentityId = await generateIdentityId();
