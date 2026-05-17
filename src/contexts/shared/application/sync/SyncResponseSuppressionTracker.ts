@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-type SyncResourceKind = 'conversation' | 'identity' | 'keychain';
+type SyncResourceKind = 'community' | 'conversation' | 'identity' | 'keychain';
 
 export default class SyncResponseSuppressionTracker {
   private static readonly MAX_DELAY_MS = 750;

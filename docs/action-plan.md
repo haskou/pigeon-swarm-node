@@ -117,6 +117,14 @@ Steps:
 Goal: make startup synchronization scalable, resumable and quiet on larger
 networks.
 
+Already improved:
+
+- Startup sync sends heartbeat, waits briefly for peer discovery and then
+  publishes sync requests.
+- Startup sync schedules retries for late peer discovery.
+- Response suppression covers identities, keychains, conversations and
+  communities.
+
 Steps:
 
 1. Persist per-context sync cursors and `lastSyncAt` metadata.

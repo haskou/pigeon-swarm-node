@@ -41,6 +41,8 @@ Stable topics stay context/version based:
 - `pigeon-swarm.keychains.v1.sync`
 - `pigeon-swarm.conversations.v1.announcements`
 - `pigeon-swarm.conversations.v1.sync`
+- `pigeon-swarm.communities.v1.announcements`
+- `pigeon-swarm.communities.v1.sync`
 - `pigeon-swarm.nodes.v1.announcements`
 
 The message `type` field selects the concrete event/request inside the topic.
@@ -68,6 +70,12 @@ Optional attributes:
 suppression tracker to wait a deterministic short delay, cancel their response
 when an equivalent `sync_available` is observed first, and respond at most once
 per `requestId` and resource.
+
+At process startup the node sends a heartbeat, waits briefly for libp2p peer
+discovery, then publishes sync requests. The wait is controlled by
+`STARTUP_SYNC_PEER_WAIT_MS`; when unset it defaults to `10000` outside tests and
+`0` in tests. Startup sync also schedules retries because peer discovery and
+gossip subscription propagation are eventually consistent.
 
 ## Identity Sync
 
@@ -197,6 +205,47 @@ Receiver behavior:
 6. Register valid reaction candidates in MongoDB without rewriting message IPFS
    documents.
 
+## Community Sync
+
+### `communities.v1.community.sync_requested`
+
+Sent when a node starts, reconnects or wants to recover a known community.
+
+Attributes:
+
+- `communityId`
+- `networkId`
+- `requestId`
+- `requesterNodeId`
+
+Community sync is network-specific. The `networkId` is mandatory and the request
+is published only in that network.
+
+### `communities.v1.community.sync_available`
+
+Sent by one node that can provide the community snapshot and recent channel
+activity. Responders use the same suppression tracker as identities, keychains
+and conversations, keyed by `communityId` and `requestId`, to avoid every node
+answering the same request.
+
+Attributes:
+
+- `communityId`
+- `networkId`
+- `community`
+- `messageCandidates`
+- `reactionCandidates`
+- `requestId`
+
+Receiver behavior:
+
+1. Mark the `requestId` as available for the community to suppress duplicate
+   local responses.
+2. Validate the community primitive shape before saving it.
+3. Validate community channel message and reaction primitive shapes before
+   storing them.
+4. Ignore malformed candidates.
+
 ## Announcements And Realtime Bridge
 
 Announcement events are also domain events and can be forwarded to local
@@ -254,10 +303,12 @@ Only one peer has the latest identity:
 
 Offline node starts after a week:
 
-- The node loads local MongoDB cursors.
-- It publishes sync requests for owned identities and known conversations.
+- The node sends a heartbeat and waits briefly for peer discovery.
+- It publishes sync requests for known identities, identity networks,
+  keychains, conversations and communities.
 - Responses are treated as candidates and validated normally.
-- If no responses arrive before expiry, cursors remain stale but readable.
+- If no responses arrive, scheduled startup retries send the same class of
+  requests again as peers become available.
 
 ## Cucumber Scenarios To Add
 
