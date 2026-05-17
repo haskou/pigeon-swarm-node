@@ -283,6 +283,8 @@ components:
       required:
         - activeNodeCount
         - desiredReplicas
+        - knownReplicaNodeIds
+        - knownReplicas
         - localResponsible
         - networkId
         - responsibleNodeIds
@@ -293,6 +295,13 @@ components:
         desiredReplicas:
           type: number
           example: 2
+        knownReplicaNodeIds:
+          type: array
+          items:
+            type: string
+        knownReplicas:
+          type: number
+          example: 1
         localResponsible:
           type: boolean
           example: true

@@ -20,6 +20,7 @@ import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identi
 import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
 import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
+import RegisterIPFSReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicaClaimWhenClaimed';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
@@ -36,6 +37,8 @@ import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/application/register-claim/IPFSContentReplicaClaimRegistrar';
+import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -94,6 +97,9 @@ async function init() {
   );
   const communityMessageReactionRepository =
     new MongoCommunityMessageReactionRepository(mongo);
+  const ipfsReplicaClaimRepository = new MongoIPFSContentReplicaClaimRepository(
+    mongo,
+  );
 
   kernel.addConsumerInstances(
     new MarkMessagesReadWhenAnnounced(
@@ -134,6 +140,10 @@ async function init() {
     new RegisterCommunityReactionWhenRemoved(
       messageBus,
       communityMessageReactionRepository,
+    ),
+    new RegisterIPFSReplicaClaimWhenClaimed(
+      messageBus,
+      new IPFSContentReplicaClaimRegistrar(ipfsReplicaClaimRepository),
     ),
   );
   await kernel.runConsumers();

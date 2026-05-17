@@ -1,5 +1,6 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
+import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
@@ -21,6 +22,7 @@ export class GetIPFSReplicationStatusRoute extends Route {
 
     return new IPFSReplicationStatusFinder(
       new MongoIPFSContentReplicationRepository(mongo),
+      new MongoIPFSContentReplicaClaimRepository(mongo),
       this.get<MongoNodeMetadataRepository>(MongoNodeMetadataRepository),
       new MongoNodePeerRepository(mongo),
     );

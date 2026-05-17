@@ -1,8 +1,12 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
+import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -37,8 +41,12 @@ export class PostPublicIPFSContentRoute extends Route {
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   private replicationRegistrar(): IPFSContentReplicationRegistrar {
+    const mongo = this.get<MongoDB>(MongoDB);
+
     return new IPFSContentReplicationRegistrar(
-      new MongoIPFSContentReplicationRepository(this.get<MongoDB>(MongoDB)),
+      new MongoIPFSContentReplicationRepository(mongo),
+      new MongoIPFSContentReplicaClaimRepository(mongo),
+      this.get<MessageBus>(MessageBus) as DomainEventPublisher,
     );
   }
 
@@ -75,10 +83,14 @@ export class PostPublicIPFSContentRoute extends Route {
     const networkIds = (await this.ipfs.getNetworks()).map((network) =>
       network.getId(),
     );
+    const localNode = await this.get<MongoNodeMetadataRepository>(
+      MongoNodeMetadataRepository,
+    ).loadLocalNode();
 
     await this.replicationRegistrar().register({
       cid: cid.valueOf(),
       context: 'ipfs_public_upload',
+      localNodeId: localNode.toPrimitives().id,
       networkIds,
       ownerIdentityId: authenticatedIdentityId.valueOf(),
       priority: IPFSContentReplicationPriority.NORMAL,

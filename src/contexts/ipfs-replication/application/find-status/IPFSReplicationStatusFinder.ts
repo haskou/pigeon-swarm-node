@@ -3,13 +3,17 @@ import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/Node
 import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { createHash } from 'crypto';
 
+import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
 import { IPFSReplicationPolicy } from '../../domain/IPFSReplicationPolicy';
+import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
 
 type NetworkReplicationStatus = {
   activeNodeCount: number;
   desiredReplicas: number;
+  knownReplicaNodeIds: string[];
+  knownReplicas: number;
   localResponsible: boolean;
   networkId: string;
   responsibleNodeIds: string[];
@@ -38,6 +42,7 @@ export default class IPFSReplicationStatusFinder {
 
   constructor(
     private readonly contentRepository: IPFSContentReplicationRepository,
+    private readonly claimRepository: IPFSContentReplicaClaimRepository,
     private readonly nodeRepository: NodeRepository,
     private readonly nodePeerRepository: NodePeerRepository,
     policy?: IPFSReplicationPolicy,
@@ -97,6 +102,7 @@ export default class IPFSReplicationStatusFinder {
 
   private buildContentStatus(
     content: IPFSContentReplication,
+    claims: IPFSContentReplicaClaim[],
     localNodeId: string,
     activeNodeIdsByNetwork: Map<string, string[]>,
   ): IPFSContentReplicationStatus {
@@ -110,10 +116,20 @@ export default class IPFSReplicationStatusFinder {
         networkId,
         activeNodeIds,
       );
+      const knownReplicaNodeIds = claims
+        .map((claim) => claim.toPrimitives())
+        .filter(
+          (claim) =>
+            claim.cid === primitives.cid && claim.networkId === networkId,
+        )
+        .map((claim) => claim.nodeId)
+        .sort();
 
       return {
         activeNodeCount: activeNodeIds.length,
         desiredReplicas: this.policy.desiredReplicas(activeNodeIds.length),
+        knownReplicaNodeIds,
+        knownReplicas: knownReplicaNodeIds.length,
         localResponsible: responsibleNodeIds.includes(localNodeId),
         networkId,
         responsibleNodeIds,
@@ -133,8 +149,11 @@ export default class IPFSReplicationStatusFinder {
   }
 
   public async find(): Promise<IPFSReplicationStatus> {
-    const [contents, localNode, activePeers] = await Promise.all([
-      this.contentRepository.findAll(),
+    const contents = await this.contentRepository.findAll();
+    const [claims, localNode, activePeers] = await Promise.all([
+      this.claimRepository.findByCids(
+        contents.map((content) => content.getCid()),
+      ),
       this.nodeRepository.loadLocalNode(),
       this.nodePeerRepository.findActive(
         new Date(
@@ -150,7 +169,12 @@ export default class IPFSReplicationStatusFinder {
 
     return {
       contents: contents.map((content) =>
-        this.buildContentStatus(content, localNodeId, activeNodeIdsByNetwork),
+        this.buildContentStatus(
+          content,
+          claims,
+          localNodeId,
+          activeNodeIdsByNetwork,
+        ),
       ),
       localNodeId,
     };

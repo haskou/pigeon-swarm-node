@@ -16,4 +16,5 @@ Feature: Get IPFS replication status route
     Then response code is equal to 200
     And response body should contain "ipfs_public_upload"
     And response body should contain "desiredReplicas"
+    And response body should contain "knownReplicas"
     And response body should contain "localResponsible"

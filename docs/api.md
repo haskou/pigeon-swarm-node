@@ -738,6 +738,8 @@ Response:
           "networkId": "<networkId>",
           "activeNodeCount": 2,
           "desiredReplicas": 2,
+          "knownReplicas": 1,
+          "knownReplicaNodeIds": ["<nodeId>"],
           "localResponsible": true,
           "responsibleNodeIds": ["<nodeId>", "<peerNodeId>"]
         }
@@ -751,6 +753,7 @@ Implemented:
 
 - track CIDs created through `POST /ipfs/public`, `POST /ipfs/private` and
   `POST /ipfs/secure`
+- record replica claims when a local or remote node announces that it has a CID
 - derive active node counts from node heartbeat peer metadata
 - keep generous replica margins to avoid losing half the data when there are
   only a few nodes

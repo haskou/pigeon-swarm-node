@@ -6,6 +6,8 @@ export type IPFSReplicationStatusResource = {
     networks: Array<{
       activeNodeCount: number;
       desiredReplicas: number;
+      knownReplicaNodeIds: string[];
+      knownReplicas: number;
       localResponsible: boolean;
       networkId: string;
       responsibleNodeIds: string[];

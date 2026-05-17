@@ -1,5 +1,7 @@
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
+import { IPFSContentReplicaClaim } from '@app/contexts/ipfs-replication/domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
+import { IPFSContentReplicaClaimRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
@@ -9,6 +11,7 @@ import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -30,6 +33,18 @@ describe('IPFSReplicationStatusFinder', () => {
     const contentRepository: IPFSContentReplicationRepository = {
       findAll: () => Promise.resolve([content]),
       findByCid: () => Promise.resolve(undefined),
+      save: () => Promise.resolve(),
+    };
+    const claimRepository: IPFSContentReplicaClaimRepository = {
+      findByCids: () =>
+        Promise.resolve([
+          IPFSContentReplicaClaim.create(
+            new IPFSId('bafy-content'),
+            new NetworkId(networkId),
+            new NodeId(localNodeId),
+            new Timestamp(1770000000000),
+          ),
+        ]),
       save: () => Promise.resolve(),
     };
     const nodeRepository: NodeRepository = {
@@ -58,6 +73,7 @@ describe('IPFSReplicationStatusFinder', () => {
 
     const status = await new IPFSReplicationStatusFinder(
       contentRepository,
+      claimRepository,
       nodeRepository,
       nodePeerRepository,
     ).find();
@@ -65,6 +81,8 @@ describe('IPFSReplicationStatusFinder', () => {
     expect(status.contents[0].networks[0]).toMatchObject({
       activeNodeCount: 2,
       desiredReplicas: 2,
+      knownReplicaNodeIds: [localNodeId],
+      knownReplicas: 1,
       localResponsible: true,
       networkId,
       responsibleNodeIds: [localNodeId, peerNodeId],
