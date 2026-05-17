@@ -268,6 +268,10 @@ export class Community extends AggregateRoot {
     return this.members.some((member) => member.isEqual(identityId));
   }
 
+  public isOwner(identityId: IdentityId): boolean {
+    return this.ownerIdentityId.isEqual(identityId);
+  }
+
   public assertIsMember(identityId: IdentityId): void {
     assert(this.isMember(identityId), new CommunityMemberNotFoundError());
   }

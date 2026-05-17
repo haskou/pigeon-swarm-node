@@ -111,6 +111,12 @@ paths:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1signals'
   /communities/:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1'
+  /communities/discover:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1discover'
+  /communities/membership-requests:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1membership-requests'
+  /communities/membership-requests/{requestId}:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1membership-requests~1{requestId}'
   /communities/{communityId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}'
   /communities/{communityId}/members:
@@ -119,6 +125,8 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1me'
   /communities/{communityId}/invites:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invites'
+  /communities/{communityId}/join-requests:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1join-requests'
   /communities/invites/{inviteToken}/accept:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1invites~1{inviteToken}~1accept'
   /communities/{communityId}/channels:

@@ -6,6 +6,7 @@ import { MongoCommunityMessageReactionRepository } from '@app/contexts/communiti
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityInviteRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityInviteRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import { MongoCommunityRequestStore } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRequestStore';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
@@ -42,6 +43,10 @@ export abstract class CommunityRouteSupport extends Route {
 
   protected inviteRepository(): MongoCommunityInviteRepository {
     return new MongoCommunityInviteRepository(this.get<MongoDB>(MongoDB));
+  }
+
+  protected membershipRequests(): MongoCommunityRequestStore {
+    return new MongoCommunityRequestStore(this.get<MongoDB>(MongoDB));
   }
 
   protected async findCommunity(id: string): Promise<Community> {
