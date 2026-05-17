@@ -60,12 +60,12 @@ export class MongoCommunityInviteRepository implements InviteRepository {
       await this.collection()
     ).updateOne(
       {
-        _id: primitives.token,
         $or: [
           { expiresAt: { $exists: false } },
           { expiresAt: null },
           { expiresAt: { $gt: now } },
         ],
+        _id: primitives.token,
         uses: { $lt: primitives.maxUses },
       },
       { $inc: { uses: 1 } },

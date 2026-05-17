@@ -38,6 +38,7 @@ export default class Definitions {
   private communityChannelMessageId: string | undefined;
   private communityId: string | undefined;
   private communityInviteToken: string | undefined;
+  private communityMembershipRequestId: string | undefined;
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -66,6 +67,7 @@ export default class Definitions {
     this.communityChannelMessageId = undefined;
     this.communityId = undefined;
     this.communityInviteToken = undefined;
+    this.communityMembershipRequestId = undefined;
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -548,6 +550,29 @@ export default class Definitions {
     this.communityInviteToken = this.response.data.inviteToken;
   }
 
+  @given('I remember the current community membership request')
+  public iRememberTheCurrentCommunityMembershipRequest(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community membership request id not found.');
+    }
+
+    this.communityMembershipRequestId = this.response.data.id;
+  }
+
+  @given('I set an accepted community membership request body')
+  public iSetAnAcceptedCommunityMembershipRequestBody(): void {
+    this.body = JSON.stringify({
+      status: 'accepted',
+    });
+  }
+
+  @given('I set a declined community membership request body')
+  public iSetADeclinedCommunityMembershipRequestBody(): void {
+    this.body = JSON.stringify({
+      status: 'declined',
+    });
+  }
+
   @given('the community member signs the current communities request')
   public async theCommunityMemberSignsTheCurrentCommunitiesRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
@@ -556,6 +581,34 @@ export default class Definitions {
     await this.signCurrentRequest(
       'GET',
       '/communities/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the community membership requests request')
+  public async theCommunityMemberSignsTheCommunityMembershipRequestsRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/communities/membership-requests',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current community discovery request')
+  public async theCommunityMemberSignsTheCurrentCommunityDiscoveryRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/communities/discover',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -613,6 +666,59 @@ export default class Definitions {
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current community join request')
+  public async theCommunityMemberSignsTheCurrentCommunityJoinRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/join-requests`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current membership request update')
+  public async theCommunityMemberSignsTheCurrentMembershipRequestUpdate(): Promise<void> {
+    if (!this.communityMembershipRequestId) {
+      throw new Error('Community membership request must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/membership-requests/${this.communityMembershipRequestId}`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current community membership requests request')
+  public async iSignTheCurrentCommunityMembershipRequestsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/communities/membership-requests');
+  }
+
+  @given('I sign the current membership request update')
+  public async iSignTheCurrentMembershipRequestUpdate(): Promise<void> {
+    if (!this.communityMembershipRequestId) {
+      throw new Error('Community membership request must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/membership-requests/${this.communityMembershipRequestId}`,
     );
   }
 
@@ -1906,6 +2012,19 @@ export default class Definitions {
     );
   }
 
+  @when('I POST to request joining the current community')
+  public async iPOSTToRequestJoiningTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/join-requests`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
   @when('I POST to accept the current community invite')
   public async iPOSTToAcceptTheCurrentCommunityInvite(): Promise<void> {
     if (!this.communityInviteToken) {
@@ -1937,6 +2056,35 @@ export default class Definitions {
     this.response = await this.restClient.get(
       '/communities/',
       this.headers,
+    );
+  }
+
+  @when('I GET discoverable communities')
+  public async iGETDiscoverableCommunities(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/communities/discover?query=API',
+      this.headers,
+    );
+  }
+
+  @when('I GET community membership requests')
+  public async iGETCommunityMembershipRequests(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/communities/membership-requests',
+      this.headers,
+    );
+  }
+
+  @when('I PATCH the current community membership request')
+  public async iPATCHTheCurrentCommunityMembershipRequest(): Promise<void> {
+    if (!this.communityMembershipRequestId) {
+      throw new Error('Community membership request must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/communities/membership-requests/${this.communityMembershipRequestId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
     );
   }
 

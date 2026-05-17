@@ -63,6 +63,33 @@ export class MongoCommunityRepository implements CommunityRepository {
     return document ? this.toDomain(document) : undefined;
   }
 
+  public async findDiscoverable(options: {
+    networkId?: string;
+    query?: string;
+  }): Promise<Community[]> {
+    const filter: Record<string, unknown> = {};
+    const query = options.query?.trim();
+
+    if (options.networkId) {
+      filter.networkId = options.networkId;
+    }
+
+    if (query) {
+      filter.$or = [
+        { name: { $options: 'i', $regex: query } },
+        { description: { $options: 'i', $regex: query } },
+      ];
+    }
+
+    const documents = await (await this.collection())
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
     const documents = await (await this.collection())
       .find({ memberIds: identityId.valueOf() })

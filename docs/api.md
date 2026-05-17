@@ -1372,6 +1372,55 @@ Implemented:
 - list only communities where the authenticated identity is a member
 - return private community metadata, member ids and text channel metadata
 
+### Discover communities
+
+```http
+GET /communities/discover?query=Pigeon&networkId=<networkId>
+```
+
+The request is signed as `GET /communities/discover`; query string values are
+not part of the signed canonical path because Express verifies `request.path`.
+
+Response:
+
+```json
+{
+  "communities": [
+    {
+      "id": "<communityId>",
+      "networkId": "<networkId>",
+      "ownerIdentityId": "<identityId>",
+      "name": "Pigeon Lab",
+      "description": "Private workspace",
+      "avatar": "<publicAvatarCid>",
+      "banner": "<publicBannerCid>",
+      "memberCount": 4,
+      "membershipStatus": "none",
+      "membershipRequest": {
+        "id": "<requestId>",
+        "communityId": "<communityId>",
+        "creatorIdentityId": "<identityId>",
+        "identityId": "<identityId>",
+        "type": "request",
+        "status": "pending",
+        "createdAt": 1773848829055,
+        "updatedAt": 1773848829055
+      },
+      "visibility": "private"
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- search private community metadata by `name` or `description`
+- optionally scope results with `networkId`
+- do not return channel metadata or encrypted content
+- include the authenticated identity membership state:
+  `none`, `member`, `requested` or `invited`
+
 ### Create community
 
 ```http
@@ -1452,7 +1501,7 @@ Implemented:
 - require signed request auth
 - only allow community members to list members
 
-### Add community member
+### Invite community member
 
 ```http
 POST /communities/{communityId}/members
@@ -1466,11 +1515,76 @@ Request:
 }
 ```
 
+Response:
+
+```json
+{
+  "id": "<requestId>",
+  "communityId": "<communityId>",
+  "creatorIdentityId": "<ownerIdentityId>",
+  "identityId": "<invitedIdentityId>",
+  "type": "invitation",
+  "status": "pending",
+  "createdAt": 1773848829055,
+  "updatedAt": 1773848829055
+}
+```
+
 Implemented:
 
 - require signed request auth from the community owner
-- add the identity id as a member
-- treat adding an existing member as idempotent
+- create a pending invitation
+- do not add the invited identity to `memberIds` until they accept
+- return an existing pending invitation for the same identity idempotently
+
+### Request community membership
+
+```http
+POST /communities/{communityId}/join-requests
+```
+
+Implemented:
+
+- require signed request auth from the requester
+- create a pending `request`
+- do not add the requester to `memberIds` until the owner accepts
+- return an existing pending request for the same requester idempotently
+
+### List community membership requests
+
+```http
+GET /communities/membership-requests
+```
+
+Implemented:
+
+- require signed request auth
+- return requests created by the authenticated identity
+- return invitations targeting the authenticated identity
+- return requests/invitations for communities owned by the authenticated
+  identity
+
+### Accept or decline community membership request
+
+```http
+PATCH /communities/membership-requests/{requestId}
+```
+
+Request:
+
+```json
+{
+  "status": "accepted"
+}
+```
+
+Implemented:
+
+- accepted statuses add the request `identityId` to `memberIds`
+- invited identities can accept or decline `invitation` requests
+- community owners can accept or decline `request` join requests
+- requesters can decline their own pending join request
+- owners can decline invitations they created
 
 ### Leave community
 
@@ -1695,6 +1809,16 @@ Other metadata events:
 - `communities.v1.community.was_updated`: full `community`
 - `communities.v1.member.was_added`: `identityId` and full updated `community`
 - `communities.v1.member.was_left`: `identityId` and full updated `community`
+- `communities.v1.membership_request.was_created`: `request`, `requestId`,
+  `identityId`, `creatorIdentityId`
+- `communities.v1.membership_request.was_accepted`: same request payload after
+  state changes to `accepted`
+- `communities.v1.membership_request.was_declined`: same request payload after
+  state changes to `declined`
+
+Membership request events include identity attributes for WebSocket routing:
+`identityId`, `creatorIdentityId`, `requesterIdentityId` and
+`ownerIdentityId`.
 
 ### Send channel message
 

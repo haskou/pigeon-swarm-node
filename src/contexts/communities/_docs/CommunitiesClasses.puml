@@ -12,7 +12,6 @@ package "communities/domain" {
     - textChannels: CommunityTextChannel[]
     - createdAt: Timestamp
     + create(ownerIdentityId, networkId, name, description, banner?): Community
-    + addMember(actor, member): void
     + joinWithInvite(member): void
     + leave(member): void
     + assertCanCreateInvite(identityId): void
@@ -70,6 +69,20 @@ package "communities/domain" {
     + accept(now?): void
   }
 
+  class CommunityMembershipRequest {
+    - id: CommunityRequestId
+    - communityId: CommunityId
+    - type: CommunityRequestType
+    - status: CommunityRequestStatus
+    - creatorIdentityId: IdentityId
+    - identityId: IdentityId
+    - timestamps: CommunityMembershipRequestTimestamps
+    + invitation(communityId, creatorIdentityId, identityId): CommunityMembershipRequest
+    + request(communityId, requesterIdentityId): CommunityMembershipRequest
+    + accept(actorIdentityId, ownerIdentityId): void
+    + decline(actorIdentityId, ownerIdentityId): void
+  }
+
   class CommunityId
   class CommunityName
   class CommunityDescription
@@ -84,8 +97,13 @@ package "communities/domain" {
   class CommunityInviteToken
   class CommunityInviteMaxUses
   class CommunityInviteUses
+  class CommunityRequestId
+  class CommunityRequestStatus
+  class CommunityRequestType
+  class CommunityMembershipRequestTimestamps
 
   interface CommunityRepository {
+    + findDiscoverable(options): Community[]
     + findById(id): Community?
     + findByMember(identityId): Community[]
     + save(community): void
@@ -105,6 +123,14 @@ package "communities/domain" {
   interface CommunityInviteRepository {
     + findByToken(token): CommunityInvite?
     + save(invite): void
+  }
+
+  interface CommunityRequestStore {
+    + findByCommunityAndIdentity(communityId, identityId): CommunityMembershipRequest[]
+    + findById(id): CommunityMembershipRequest?
+    + findByIdentity(identityId): CommunityMembershipRequest[]
+    + findByOwnedCommunities(ownerIdentityId): CommunityMembershipRequest[]
+    + save(request): void
   }
 
   Community *-- CommunityTextChannel
@@ -132,10 +158,17 @@ package "communities/domain" {
   CommunityInvite --> CommunityInviteToken
   CommunityInvite --> CommunityInviteMaxUses
   CommunityInvite --> CommunityInviteUses
+  CommunityMembershipRequest --> CommunityId
+  CommunityMembershipRequest --> IdentityId
+  CommunityMembershipRequest --> CommunityRequestId
+  CommunityMembershipRequest --> CommunityRequestStatus
+  CommunityMembershipRequest --> CommunityRequestType
+  CommunityMembershipRequest --> CommunityMembershipRequestTimestamps
   CommunityRepository ..> Community
   CommunityChannelMessageRepository ..> CommunityChannelMessage
   CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
   CommunityInviteRepository ..> CommunityInvite
+  CommunityRequestStore ..> CommunityMembershipRequest
 }
 
 package "shared value objects" {
@@ -159,6 +192,8 @@ package "communities/infrastructure" {
   class MongoCommunityChannelMessageReactionDocument
   class MongoCommunityInviteRepository
   class MongoCommunityInviteDocument
+  class MongoCommunityRequestStore
+  class MongoCommunityRequestDocument
 
   MongoCommunityRepository ..|> CommunityRepository
   MongoCommunityRepository --> MongoCommunityDocument
@@ -168,15 +203,21 @@ package "communities/infrastructure" {
   MongoCommunityChannelMessageReactionRepository --> MongoCommunityChannelMessageReactionDocument
   MongoCommunityInviteRepository ..|> CommunityInviteRepository
   MongoCommunityInviteRepository --> MongoCommunityInviteDocument
+  MongoCommunityRequestStore ..|> CommunityRequestStore
+  MongoCommunityRequestStore --> MongoCommunityRequestDocument
 }
 
 package "communities-api" {
   class PostCommunityRoute
   class GetCommunitiesRoute
   class GetCommunityRoute
+  class GetCommunityDiscoveryRoute
+  class GetCommunityMembershipRequestsRoute
   class PatchCommunityRoute
+  class PatchCommunityRequestRoute
   class GetCommunityMembersRoute
   class PostCommunityMemberRoute
+  class PostCommunityJoinRequestRoute
   class DeleteCommunityMemberRoute
   class PostCommunityInviteRoute
   class PostCommunityInviteAcceptRoute
@@ -190,10 +231,16 @@ package "communities-api" {
 
   PostCommunityRoute ..> Community
   GetCommunitiesRoute ..> CommunityRepository
+  GetCommunityDiscoveryRoute ..> CommunityRepository
+  GetCommunityDiscoveryRoute ..> CommunityRequestStore
   GetCommunityRoute ..> CommunityRepository
   PatchCommunityRoute ..> Community
   GetCommunityMembersRoute ..> Community
-  PostCommunityMemberRoute ..> Community
+  GetCommunityMembershipRequestsRoute ..> CommunityRequestStore
+  PostCommunityMemberRoute ..> CommunityMembershipRequest
+  PostCommunityJoinRequestRoute ..> CommunityMembershipRequest
+  PatchCommunityRequestRoute ..> CommunityMembershipRequest
+  PatchCommunityRequestRoute ..> Community
   DeleteCommunityMemberRoute ..> Community
   PostCommunityInviteRoute ..> CommunityInvite
   PostCommunityInviteAcceptRoute ..> CommunityInviteRepository
@@ -220,6 +267,11 @@ note right of Community
     members and text channel metadata
   - non-owner members can leave
   - owner can create bearer invite links
+  - owner can invite identities as
+    pending membership requests
+  - non-members can request to join
+  - pending requests become members
+    only when accepted
   - members can send/list encrypted
     text channel messages
   - channel message reactions are

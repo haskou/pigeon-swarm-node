@@ -1,39 +1,26 @@
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
-import {
-  Body,
-  JsonController,
-  Param,
-  Post,
-  Req,
-  Res,
-} from 'routing-controllers';
+import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
 
-import { PostCommunityMemberBody } from '../bodies/PostCommunityMemberBody';
 import { CommunityMembershipRequestViewModel } from '../view-model/CommunityMembershipRequestViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-export class PostCommunityMemberRoute extends CommunityRouteSupport {
-  @Post('/:communityId/members')
-  public async addMember(
+export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
+  @Post('/:communityId/join-requests')
+  public async requestJoin(
     @Param('communityId') communityId: string,
-    @Body() body: PostCommunityMemberBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
-    const invitedIdentityId = new IdentityId(body.identityId);
-
-    community.assertCanCreateInvite(actorIdentityId);
-
     const requests = this.membershipRequests();
     const existingRequests = await requests.findByCommunityAndIdentity(
-      community.getId(),
-      invitedIdentityId,
+      new CommunityId(communityId),
+      actorIdentityId,
     );
     const pendingRequest = existingRequests.find((existingRequest) =>
       existingRequest.isPending(),
@@ -47,10 +34,9 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
         );
     }
 
-    const membershipRequest = CommunityMembershipRequest.invitation(
+    const membershipRequest = CommunityMembershipRequest.request(
       community.getId(),
       actorIdentityId,
-      invitedIdentityId,
       community.getOwnerIdentityId(),
     );
 

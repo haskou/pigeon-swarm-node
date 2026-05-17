@@ -81,6 +81,11 @@ Feature: Start calls
     And I sign the current community member request
     When I POST to the current community members
     Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And the community member signs the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
     And I set a community voice channel body
     And I sign the current community voice channel request
     When I POST a voice channel to the current community

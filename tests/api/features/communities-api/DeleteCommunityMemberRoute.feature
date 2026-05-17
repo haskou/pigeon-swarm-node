@@ -15,6 +15,11 @@ Feature: Delete community member API
     And I sign the current community member request
     When I POST to the current community members
     Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And the community member signs the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
     And the community member signs the current community leave request
     When I DELETE my membership from the current community
     Then response code is equal to 200
@@ -49,6 +54,11 @@ Feature: Delete community member API
     And I set a community member body for another identity
     And I sign the current community member request
     When I POST to the current community members
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And the community member signs the current membership request update
+    When I PATCH the current community membership request
     Then response code is equal to 200
     And I sign the current community leave request
     When I DELETE my membership from the current community
