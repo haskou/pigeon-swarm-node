@@ -116,6 +116,10 @@ describe('NodeStartupSynchronizer', () => {
       identityNetworkRequests: 1,
       identityRequests: 1,
       keychainRequests: 1,
+      networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+      publishedEvents: 4,
+      requesterNodeId: nodeId,
+      totalRequests: 4,
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
@@ -183,6 +187,10 @@ describe('NodeStartupSynchronizer', () => {
       identityNetworkRequests: 1,
       identityRequests: 0,
       keychainRequests: 0,
+      networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+      publishedEvents: 2,
+      requesterNodeId: nodeId,
+      totalRequests: 2,
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),

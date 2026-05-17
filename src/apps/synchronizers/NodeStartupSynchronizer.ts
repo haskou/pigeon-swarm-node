@@ -24,7 +24,11 @@ export interface NodeStartupSyncResult {
   identityNetworkRequests: number;
   identityRequests: number;
   keychainRequests: number;
+  networkIds: string[];
+  publishedEvents: number;
   requestId: string;
+  requesterNodeId: string;
+  totalRequests: number;
 }
 
 export default class NodeStartupSynchronizer {
@@ -174,7 +178,9 @@ export default class NodeStartupSynchronizer {
       ...communityRequests,
     ];
 
-    if (events.length > 0) {
+    const totalRequests = events.length;
+
+    if (totalRequests > 0) {
       await this.eventPublisher.publish(events);
     }
 
@@ -185,7 +191,11 @@ export default class NodeStartupSynchronizer {
       identityNetworkRequests: networkIds.length,
       identityRequests: identityVersions.size,
       keychainRequests: keychainVersions.size,
+      networkIds,
+      publishedEvents: totalRequests,
       requestId,
+      requesterNodeId,
+      totalRequests,
     };
   }
 
