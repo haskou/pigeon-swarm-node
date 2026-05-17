@@ -7,7 +7,7 @@
 - Do not revert user changes. If the worktree is dirty, inspect it and work around unrelated changes.
 - Make incremental commits when a coherent slice is done.
 - PR comments are addressed as actionable engineering feedback unless they are clearly informational.
-- When replying in PRs, make it obvious the response is from Codex.
+- When replying in PRs, make it obvious the response is from Codex. Use the same language as the comment you are answering.
 
 ## Non-Negotiable Engineering Rules
 
@@ -41,6 +41,14 @@ docs(calls): 📝 Fix calls OpenAPI refs
 ## Architecture Rules
 
 - Keep application messages at the application boundary. They receive primitives and convert them to value objects.
+- Every use case must receive an explicit application message object/class, placed in a `messages/` folder under the action folder when the input comes from primitives. The message owns primitive-to-Value-Object conversion and validation. Do not pass anonymous primitive input bags directly to a use case.
+- Use cases must expose a ubiquitous-language method (`find`, `create`, `send`, `reconcile`, `accept`, `update`, etc.). Do not use generic `execute`.
+- A class named `Factory`, `Mapper`, `Projector`, `Catalog`, `Resolver`, or `Cipher` is not a use case by default. Put it in the layer that matches its responsibility: domain when it creates or enforces domain concepts, infrastructure when it adapts external contracts/serialization/crypto/transport, and presentation when it builds view models. Do not keep these classes in `application/<action>` just to satisfy folder shape.
+- Application messages may receive primitives; domain objects, entities, aggregates, policies, and domain services must receive Value Objects or domain objects.
+- Application messages are mandatory for every application entrypoint that receives external primitives or DTOs. The folder must be exactly `application/<action-name>/messages/<MessageClassName>.ts`; do not create empty `messages/` folders, shared generic `application/messages`, or message classes whose filename differs from the exported class.
+- Primitive-to-Value-Object transformations belong in application messages or infrastructure mappers. Do not hide this conversion inside arbitrary private methods on use cases.
+- Private methods in application services are only for orchestration mechanics. If a private method validates a domain concept, maps a lifecycle/status, chooses a business branch, compares domain values, or names a domain rule, move that behavior into a Value Object, entity, aggregate, domain service, policy, or an application message.
+- Do not model domain/application decisions as plain enums when a cohesive Value Object can express the concept and behavior. Prefer a Value Object such as `IncomingOneToOneCallDecision` over `enum IncomingOneToOneCallDecision`.
 - Domain constructors should receive value objects, not primitive `props` bags.
 - Do not use `as` casts in application/domain code unless there is no sane alternative.
 - Prefer `PrimitiveOf<T>` over custom primitive type aliases.
@@ -49,6 +57,14 @@ docs(calls): 📝 Fix calls OpenAPI refs
 - Keep persistence models, API DTOs, OpenAPI schemas, and pub/sub payloads out of the domain model.
 - Domain services are only for behavior that genuinely spans multiple domain objects. Do not use them as dumping grounds for logic that belongs in an entity or Value Object.
 - Application services orchestrate use cases. They should not contain domain rules that belong inside aggregates, entities, or Value Objects.
+- Do not add an application port unless there is a real outbound dependency needed by a use case. A port must not be a mirror of an HTTP gateway, SDK, repository, or pass-through adapter. If a class only forwards to another adapter, either remove it or move the real implementation into the owning context infrastructure.
+- Ports must speak ubiquitous language and accept Value Objects, domain objects, or explicit application messages/results. They must not force use cases to call `.toPrimitives()`, `.toString()`, or `.valueOf()` just to satisfy primitive API-shaped signatures.
+- Application may depend on ports it owns, but infrastructure owns serialization to API DTOs, HTTP payloads, worker messages, browser objects, and SDK contracts. Do not put API-shaped interfaces in `application/ports` only because a concrete adapter exists.
+- Context infrastructure adapters must live inside the owning context when the behavior belongs to that context. Shared infrastructure is only for genuinely generic HTTP, storage, realtime transport, or composition primitives.
+- Folder shape should follow backend style where possible: `application/<action-name>/Class.ts` and `application/<action-name>/messages/Message.ts`, not generic `application/use-cases` or context-name duplication such as `application/notifications`.
+- Do not leave root-level `types`, `utils`, `dto`, `messages`, `services`, or `ports` folders inside a context unless they are explicitly layer-owned and named by business language. Generic technical buckets are architecture debt.
+- A context is not considered finished unless every non-trivial domain/application/infrastructure class in the touched slice has direct unit coverage, and verification scripts check for architecture regressions.
+- Never claim a context/slice is finished while `yarn lint`, `yarn typecheck`, and the relevant tests fail. If any fail, say exactly what fails and keep fixing.
 
 ## @haskou/value-objects
 
