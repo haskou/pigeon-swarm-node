@@ -14,13 +14,15 @@ export class KeychainSignatureDomainService {
     };
   }
 
+  public serializePayload(payload: KeychainSignaturePayload): string {
+    return JSON.stringify(this.getCanonicalPayload(payload));
+  }
+
   public isValidSignature(keychain: Keychain): boolean {
     return keychain
       .getOwnerPublicKey()
       .isValidSignature(
-        JSON.stringify(
-          this.getCanonicalPayload(keychain.getSignaturePayload()),
-        ),
+        this.serializePayload(keychain.getSignaturePayload()),
         keychain.getSignature(),
       );
   }

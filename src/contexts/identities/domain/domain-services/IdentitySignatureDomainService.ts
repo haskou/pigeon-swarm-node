@@ -25,15 +25,16 @@ export class IdentitySignatureDomainService {
     };
   }
 
+  public serializePayload(payload: IdentitySignaturePayload): string {
+    return JSON.stringify(this.getCanonicalPayload(payload));
+  }
+
   public async generateSignature(
     payload: IdentitySignaturePayload,
     encryptedKeyPair: EncryptedKeyPair,
     password: Password,
   ): Promise<Signature> {
-    return encryptedKeyPair.sign(
-      JSON.stringify(this.getCanonicalPayload(payload)),
-      password,
-    );
+    return encryptedKeyPair.sign(this.serializePayload(payload), password);
   }
 
   public isValidSignature(
@@ -42,7 +43,7 @@ export class IdentitySignatureDomainService {
     signature: Signature,
   ): boolean {
     return encryptedKeyPair.isValidSignature(
-      JSON.stringify(this.getCanonicalPayload(payload)),
+      this.serializePayload(payload),
       signature,
     );
   }
