@@ -15,3 +15,7 @@ Feature: Community PubSub consumers
   Scenario: Skip empty community sync responses
     When the community sync request consumer handles a request without local data
     Then no community sync response should be published
+
+  Scenario: Skip community sync responses for a different network
+    When the community sync request consumer handles a request for a community in another network
+    Then no community sync response should be published
