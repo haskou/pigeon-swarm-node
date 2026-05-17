@@ -65,8 +65,12 @@ export default class IPFSContentReplicationRegistrar {
   }): Promise<IPFSContentReplication> {
     const cid = new IPFSId(params.cid);
     const existing = await this.repository.findByCid(cid);
+    const networkIds = params.networkIds.map(
+      (networkId) => new NetworkId(networkId),
+    );
 
     if (existing) {
+      existing.addNetworkIds(networkIds);
       existing.touch();
       await this.repository.save(existing);
       await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
@@ -77,7 +81,7 @@ export default class IPFSContentReplicationRegistrar {
     const content = IPFSContentReplication.create(
       cid,
       new IPFSContentReplicationContext(params.context),
-      params.networkIds.map((networkId) => new NetworkId(networkId)),
+      networkIds,
       new IPFSContentSize(params.sizeBytes),
       params.ownerIdentityId
         ? new IdentityId(params.ownerIdentityId)
