@@ -105,6 +105,8 @@ paths:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants'
   /calls/{callId}/participants/me:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me'
+  /calls/{callId}/participants/me/heartbeat:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me~1heartbeat'
   /calls/{callId}/signals:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1signals'
   /communities/:

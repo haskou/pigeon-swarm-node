@@ -23,6 +23,7 @@ describe('CallTimeoutScheduler', () => {
       [recipient],
     );
     const callRepository = {
+      findTimedOutJoinedCalls: jest.fn().mockResolvedValue([]),
       findTimedOutRingingCalls: jest.fn().mockResolvedValue([call]),
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -58,6 +59,7 @@ describe('CallTimeoutScheduler', () => {
       [recipient],
     );
     const callRepository = {
+      findTimedOutJoinedCalls: jest.fn().mockResolvedValue([]),
       findTimedOutRingingCalls: jest.fn().mockResolvedValue([call]),
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -80,5 +82,62 @@ describe('CallTimeoutScheduler', () => {
     expect(notificationRepository.save).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
     expect(call.toPrimitives().status).toBe('active');
+  });
+
+  it('should mark joined participants as left when heartbeat times out', async () => {
+    const call = Call.fromPrimitives({
+      createdAt: Date.now() - 10_000,
+      endedAt: undefined,
+      endedByIdentityId: undefined,
+      creatorIdentityId: creator.valueOf(),
+      id: '550e8400-e29b-41d4-a716-446655440020',
+      networkId: '550e8400-e29b-41d4-a716-446655440000',
+      participantIds: [creator.valueOf(), recipient.valueOf()],
+      participants: [
+        {
+          identityId: creator.valueOf(),
+          joinedAt: Date.now() - 10_000,
+          lastSeenAt: Date.now() - 10_000,
+          status: 'joined',
+        },
+        {
+          identityId: recipient.valueOf(),
+          status: 'ringing',
+        },
+      ],
+      scope: {
+        channelId: undefined,
+        communityId: undefined,
+        conversationId: 'one-to-one:call-timeout',
+        type: 'conversation',
+      },
+      status: 'active',
+    });
+    const callRepository = {
+      findTimedOutJoinedCalls: jest.fn().mockResolvedValue([call]),
+      findTimedOutRingingCalls: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const eventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+    const notificationRepository = {
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const scheduler = new CallTimeoutScheduler({
+      callRepository,
+      eventPublisher,
+      notificationRepository,
+    });
+
+    call.pullDomainEvents();
+    await scheduler.execute();
+
+    expect(callRepository.save).toHaveBeenCalledWith(call);
+    expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(call.toPrimitives().participants[0]).toMatchObject({
+      identityId: creator.valueOf(),
+      status: 'left',
+    });
   });
 });

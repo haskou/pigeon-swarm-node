@@ -5,6 +5,7 @@ import { GetCallHistoryRoute } from '@app/apps/apis/calls-api/routes/GetCallHist
 import { GetCallIceServersRoute } from '@app/apps/apis/calls-api/routes/GetCallIceServersRoute';
 import { GetCallRoute } from '@app/apps/apis/calls-api/routes/GetCallRoute';
 import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
+import { PostCallParticipantHeartbeatRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantHeartbeatRoute';
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
 import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
@@ -174,6 +175,7 @@ export default class Server {
           GetCallRoute,
           PostCallRoute,
           PostCallParticipantRoute,
+          PostCallParticipantHeartbeatRoute,
           DeleteCallParticipantRoute,
           DeleteCallRoute,
           PostCallSignalRoute,

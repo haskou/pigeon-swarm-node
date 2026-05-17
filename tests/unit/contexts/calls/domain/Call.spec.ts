@@ -186,6 +186,40 @@ describe('Call', () => {
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallParticipantLeftEvent);
   });
 
+  it('should refresh participant heartbeat', () => {
+    const call = Call.start(creator, networkId, scope, [recipient]);
+
+    call.recordParticipantHeartbeat(creator);
+
+    expect(call.toPrimitives().participants[0]).toMatchObject({
+      identityId: creator.valueOf(),
+      status: 'joined',
+    });
+    expect(call.toPrimitives().participants[0].lastSeenAt).toBeDefined();
+  });
+
+  it('should mark joined participants inactive after heartbeat timeout', () => {
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+    );
+
+    call.pullDomainEvents();
+    const leftParticipants = call.markInactiveParticipants(
+      new Timestamp(Date.now() + 1),
+    );
+    const events = call.pullDomainEvents();
+
+    expect(leftParticipants).toEqual([creator]);
+    expect(call.toPrimitives().participants[0]).toMatchObject({
+      identityId: creator.valueOf(),
+      status: 'left',
+    });
+    expect(events[0]).toBeInstanceOf(CallParticipantLeftEvent);
+  });
+
   it('should mark ringing participants as missed', () => {
     const call = Call.start(creator, networkId, scope, [recipient]);
 

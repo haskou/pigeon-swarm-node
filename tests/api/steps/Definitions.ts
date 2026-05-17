@@ -1107,6 +1107,24 @@ export default class Definitions {
     );
   }
 
+  @given('the other identity signs the current call heartbeat request')
+  public async theOtherIdentitySignsTheCurrentCallHeartbeatRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'POST',
+      `/calls/${this.callId}/participants/me/heartbeat`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current call end request')
   public async iSignTheCurrentCallEndRequest(): Promise<void> {
     if (!this.callId) {
@@ -1991,6 +2009,19 @@ export default class Definitions {
 
     this.response = await this.restClient.post(
       `/calls/${this.callId}/participants`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST a participant heartbeat to the current call')
+  public async iPOSTAParticipantHeartbeatToTheCurrentCall(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/calls/${this.callId}/participants/me/heartbeat`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

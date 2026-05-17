@@ -122,6 +122,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+  /calls/{callId}/participants/me/heartbeat:
+    post:
+      tags:
+        - calls
+      summary: Refresh the authenticated participant heartbeat
+      description: Joined participants should call this endpoint while media is active. If no heartbeat is received for roughly 5 seconds, the scheduler marks the participant as left and emits calls.v1.participant.left.
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Participant heartbeat recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallResource'
   /calls/{callId}/signals:
     post:
       tags:
@@ -313,6 +328,8 @@ components:
             - declined
             - missed
         joinedAt:
+          type: number
+        lastSeenAt:
           type: number
         leftAt:
           type: number

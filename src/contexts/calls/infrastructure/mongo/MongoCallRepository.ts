@@ -189,6 +189,26 @@ export class MongoCallRepository {
     return documents.map((document) => this.toDomain(document));
   }
 
+  public async findTimedOutJoinedCalls(
+    timeoutThreshold: Timestamp,
+  ): Promise<Call[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        participants: {
+          $elemMatch: {
+            lastSeenAt: { $lte: timeoutThreshold.valueOf() },
+            status: 'joined',
+          },
+        },
+        status: 'active',
+      })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
   public async save(call: Call): Promise<void> {
     const document = this.toDocument(call);
 
