@@ -16,6 +16,7 @@ type NetworkReplicationStatus = {
   knownReplicas: number;
   localResponsible: boolean;
   networkId: string;
+  releaseLocalReplica: boolean;
   responsibleNodeIds: string[];
 };
 
@@ -132,6 +133,12 @@ export default class IPFSReplicationStatusFinder {
         knownReplicas: knownReplicaNodeIds.length,
         localResponsible: responsibleNodeIds.includes(localNodeId),
         networkId,
+        releaseLocalReplica: this.policy.canReleaseLocalReplica({
+          activeNodeCount: activeNodeIds.length,
+          knownReplicaNodeIds,
+          localNodeId,
+          responsibleNodeIds,
+        }),
         responsibleNodeIds,
       };
     });

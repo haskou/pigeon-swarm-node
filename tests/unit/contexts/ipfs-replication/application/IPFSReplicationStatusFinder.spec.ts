@@ -85,6 +85,7 @@ describe('IPFSReplicationStatusFinder', () => {
       knownReplicas: 1,
       localResponsible: true,
       networkId,
+      releaseLocalReplica: false,
       responsibleNodeIds: [localNodeId, peerNodeId],
     });
   });

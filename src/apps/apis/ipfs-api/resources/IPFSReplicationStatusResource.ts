@@ -10,6 +10,7 @@ export type IPFSReplicationStatusResource = {
       knownReplicas: number;
       localResponsible: boolean;
       networkId: string;
+      releaseLocalReplica: boolean;
       responsibleNodeIds: string[];
     }>;
     ownerIdentityId?: string;

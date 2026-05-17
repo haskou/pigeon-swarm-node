@@ -27,6 +27,7 @@ import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/R
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
+import IPFSReplicationMaintenanceScheduler from '@app/apps/schedulers/IPFSReplicationMaintenanceScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
@@ -152,6 +153,9 @@ async function init() {
   console.time('Run Schedulers');
   kernel.addSchedulers(NodeHeartbeatScheduler);
   kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
+  kernel.addAcceptanceInstanceScheduler(
+    new IPFSReplicationMaintenanceScheduler(),
+  );
   await kernel.runSchedulers();
   console.timeEnd('Run Schedulers');
 

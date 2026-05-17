@@ -20,4 +20,26 @@ export class IPFSReplicationPolicy {
       ),
     );
   }
+
+  public canReleaseLocalReplica(params: {
+    activeNodeCount: number;
+    knownReplicaNodeIds: string[];
+    localNodeId: string;
+    responsibleNodeIds: string[];
+  }): boolean {
+    const fullReplicationLimit =
+      IPFSReplicationPolicy.FULL_REPLICATION_NODE_LIMIT;
+
+    if (params.activeNodeCount <= fullReplicationLimit) {
+      return false;
+    }
+
+    if (params.responsibleNodeIds.includes(params.localNodeId)) {
+      return false;
+    }
+
+    return params.responsibleNodeIds.every((nodeId) =>
+      params.knownReplicaNodeIds.includes(nodeId),
+    );
+  }
 }

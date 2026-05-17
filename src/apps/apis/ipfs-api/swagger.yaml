@@ -128,7 +128,7 @@ paths:
       tags:
         - ipfs
       summary: Get local IPFS replication status
-      description: Returns locally known IPFS content metadata and the conservative replica responsibility plan for each network. This endpoint does not trigger unpinning; it is observability for the replication policy.
+      description: Returns locally known IPFS content metadata and the conservative replica responsibility plan for each network. A background maintenance job uses the same policy to pin missing responsibilities and release safe extra local replicas.
       security:
         - signedRequest: []
       responses:
@@ -287,6 +287,7 @@ components:
         - knownReplicas
         - localResponsible
         - networkId
+        - releaseLocalReplica
         - responsibleNodeIds
       properties:
         activeNodeCount:
@@ -308,6 +309,9 @@ components:
         networkId:
           type: string
           example: 550e8400-e29b-41d4-a716-446655440001
+        releaseLocalReplica:
+          type: boolean
+          example: false
         responsibleNodeIds:
           type: array
           items:

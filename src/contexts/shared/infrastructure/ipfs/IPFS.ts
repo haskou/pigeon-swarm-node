@@ -176,6 +176,17 @@ export default class IPFS {
     );
   }
 
+  public async removeJSONFromNetwork(
+    cid: IPFSId,
+    networkId: string,
+  ): Promise<void> {
+    await this.initialize();
+
+    const network = this.registry.find(networkId);
+
+    await network.removeJSON(cid);
+  }
+
   public async addJSONToNetworks(
     data: unknown,
     networkIds: string[],
