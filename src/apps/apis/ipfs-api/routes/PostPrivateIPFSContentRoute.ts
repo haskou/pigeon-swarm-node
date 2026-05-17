@@ -1,15 +1,4 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
-import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
-import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
-import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
-import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
-import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
 import * as express from 'express';
 import { Request, Response } from 'express';
 import {
@@ -21,36 +10,11 @@ import {
   UseBefore,
 } from 'routing-controllers';
 
-import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
 import { maxIPFSContentSizeBytes } from '../IPFSContentLimits';
-
-interface PrivateIPFSContentDocument {
-  contentType: string;
-  encryptedData: string;
-  encrypted: true;
-  filename?: string;
-  size: number;
-  uploadedAt: number;
-  uploadedByIdentityId: string;
-}
+import { IPFSContentUploadRoute } from './IPFSContentUploadRoute';
 
 @JsonController('/ipfs')
-export class PostPrivateIPFSContentRoute extends Route {
-  private readonly ipfs: IPFS = this.get<IPFS>(IPFS);
-
-  private readonly signedRequestAuthenticator =
-    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
-
-  private replicationRegistrar(): IPFSContentReplicationRegistrar {
-    const mongo = this.get<MongoDB>(MongoDB);
-
-    return new IPFSContentReplicationRegistrar(
-      new MongoIPFSContentReplicationRepository(mongo),
-      new MongoIPFSContentReplicaClaimRepository(mongo),
-      this.get<MessageBus>(MessageBus) as DomainEventPublisher,
-    );
-  }
-
+export class PostPrivateIPFSContentRoute extends IPFSContentUploadRoute {
   @Post('/private')
   @Post('/secure')
   @UseBefore(
@@ -65,47 +29,13 @@ export class PostPrivateIPFSContentRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const authenticatedIdentityId =
-      await this.signedRequestAuthenticator.authenticate(request);
-    const body = Buffer.isBuffer(request.body) ? request.body : Buffer.from([]);
-
-    if (body.length > maxIPFSContentSizeBytes) {
-      throw new IPFSContentTooLargeError(maxIPFSContentSizeBytes);
-    }
-
-    const document: PrivateIPFSContentDocument = {
-      contentType: contentType || 'application/octet-stream',
-      encrypted: true,
-      encryptedData: body.toString('base64'),
+    const published = await this.publisher().publishPrivate({
+      body: this.bodyFrom(request),
       filename,
-      size: body.length,
-      uploadedAt: Date.now(),
-      uploadedByIdentityId: authenticatedIdentityId.valueOf(),
-    };
-    const cid = await this.ipfs.addJSONToAll(document);
-    const networkIds = (await this.ipfs.getNetworks()).map((network) =>
-      network.getId(),
-    );
-    const localNode = await this.get<MongoNodeMetadataRepository>(
-      MongoNodeMetadataRepository,
-    ).loadLocalNode();
-
-    await this.replicationRegistrar().register({
-      cid: cid.valueOf(),
-      context: 'ipfs_private_upload',
-      localNodeId: localNode.toPrimitives().id,
-      networkIds,
-      ownerIdentityId: authenticatedIdentityId.valueOf(),
-      priority: IPFSContentReplicationPriority.NORMAL,
-      sizeBytes: body.length,
+      contentType,
+      ownerIdentityId: await this.authenticate(request),
     });
 
-    return response.status(HttpRouteStatusEnum.CREATED).json({
-      cid: cid.valueOf(),
-      contentType: document.contentType,
-      encrypted: true,
-      filename,
-      size: body.length,
-    });
+    return response.status(HttpRouteStatusEnum.CREATED).json(published);
   }
 }
