@@ -219,12 +219,21 @@ components:
     NodeSyncResource:
       type: object
       required:
+        - communityRequests
+        - connectedPeerCount
         - conversationRequests
+        - identityNetworkRequests
         - identityRequests
         - keychainRequests
         - requestId
       properties:
+        communityRequests:
+          type: integer
+        connectedPeerCount:
+          type: integer
         conversationRequests:
+          type: integer
+        identityNetworkRequests:
           type: integer
         identityRequests:
           type: integer

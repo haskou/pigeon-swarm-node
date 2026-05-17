@@ -547,17 +547,21 @@ Response:
 ```json
 {
   "requestId": "<syncRequestId>",
+  "connectedPeerCount": 2,
+  "identityNetworkRequests": 1,
   "identityRequests": 1,
   "keychainRequests": 1,
-  "conversationRequests": 1
+  "conversationRequests": 1,
+  "communityRequests": 1
 }
 ```
 
 Implemented:
 
 - publish an immediate node heartbeat
+- wait briefly for libp2p peer discovery before the first sync wave
 - publish scoped `sync_requested` events for locally known identities,
-  keychains and conversations
+  identity networks, keychains, conversations and communities
 - include `requestId`, `requesterNodeId` and known local version hints when
   available
 - use responder suppression so peers wait a deterministic short delay, cancel
