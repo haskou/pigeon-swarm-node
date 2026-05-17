@@ -26,7 +26,9 @@ import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keycha
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
+import RegisterIdentityPresenceWhenUpdated from '@app/apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated';
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
+import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
 import IPFSReplicationMaintenanceScheduler from '@app/apps/schedulers/IPFSReplicationMaintenanceScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
@@ -81,6 +83,7 @@ async function init() {
     RespondToConversationSyncRequest,
     RegisterMessagesWhenSyncAvailable,
     RegisterNodePeerWhenHeartbeatReceived,
+    RegisterIdentityPresenceWhenUpdated,
   );
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
   const conversationRepository =
@@ -152,6 +155,7 @@ async function init() {
 
   console.time('Run Schedulers');
   kernel.addSchedulers(NodeHeartbeatScheduler);
+  kernel.addSchedulers(IdentityPresenceExpirationScheduler);
   kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
   kernel.addAcceptanceInstanceScheduler(
     new IPFSReplicationMaintenanceScheduler(),

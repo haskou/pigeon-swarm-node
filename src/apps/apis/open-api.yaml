@@ -12,6 +12,7 @@ tags:
   - name: keychains
   - name: nodes
   - name: notifications
+  - name: presence
   - name: realtime
 paths:
   /ws:
@@ -35,7 +36,8 @@ paths:
         `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
 
         Clients may send `{ "type": "identity_heartbeat" }` over the open
-        socket. The server answers
+        socket every 10 seconds. Include `"active": true` when the user has
+        produced activity since the previous heartbeat. The server answers
         `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
         Heartbeat messages are not signed because the WebSocket upgrade already
         authenticated the connection.
@@ -179,3 +181,11 @@ paths:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'
   /notifications/{notificationId}:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1{notificationId}'
+  /presence/:
+    $ref: './presence-api/swagger.yaml#/paths/~1presence~1'
+  /presence/{identityId}:
+    $ref: './presence-api/swagger.yaml#/paths/~1presence~1{identityId}'
+  /presence/me:
+    $ref: './presence-api/swagger.yaml#/paths/~1presence~1me'
+  /presence/me/custom-message:
+    $ref: './presence-api/swagger.yaml#/paths/~1presence~1me~1custom-message'

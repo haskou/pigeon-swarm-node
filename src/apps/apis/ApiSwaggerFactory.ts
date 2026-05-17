@@ -12,6 +12,7 @@ const swaggerFileByApi: Record<string, string> = {
   'keychains-api': 'keychains-api/swagger.yaml',
   'nodes-api': 'nodes-api/swagger.yaml',
   'notifications-api': 'notifications-api/swagger.yaml',
+  'presence-api': 'presence-api/swagger.yaml',
 };
 
 export class ApiSwaggerFactory {

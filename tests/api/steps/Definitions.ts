@@ -383,6 +383,34 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current presence update request')
+  public async iSignTheCurrentPresenceUpdateRequest(): Promise<void> {
+    await this.signCurrentRequest('PUT', '/presence/me');
+  }
+
+  @given('I sign the current presence custom message deletion request')
+  public async iSignTheCurrentPresenceCustomMessageDeletionRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('DELETE', '/presence/me/custom-message');
+  }
+
+  @given('I sign the current presence list request')
+  public async iSignTheCurrentPresenceListRequest(): Promise<void> {
+    this.body = undefined;
+    await this.ensureIdentityKeyPair();
+    await this.signCurrentRequest('GET', '/presence/');
+  }
+
+  @given('I sign the current identity presence request')
+  public async iSignTheCurrentIdentityPresenceRequest(): Promise<void> {
+    this.body = undefined;
+    await this.ensureIdentityKeyPair();
+    await this.signCurrentRequest(
+      'GET',
+      `/presence/${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
+    );
+  }
+
   @given('I have published a keychain for the authenticated identity')
   public async iHavePublishedAKeychainForTheAuthenticatedIdentity(): Promise<void> {
     this.body = JSON.stringify({
@@ -2380,6 +2408,26 @@ export default class Definitions {
   @when('I GET {string}')
   public async iGET(path: string): Promise<void> {
     this.response = await this.restClient.get(path, this.headers);
+  }
+
+  @when('I GET the current identity presence')
+  public async iGETTheCurrentIdentityPresence(): Promise<void> {
+    await this.ensureIdentityKeyPair();
+
+    this.response = await this.restClient.get(
+      `/presence/${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current presence list')
+  public async iGETTheCurrentPresenceList(): Promise<void> {
+    await this.ensureIdentityKeyPair();
+
+    this.response = await this.restClient.get(
+      `/presence/?identityIds=${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
+      this.headers,
+    );
   }
 
   @when('I POST the message to the current conversation')

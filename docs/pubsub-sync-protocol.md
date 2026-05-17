@@ -112,6 +112,37 @@ Receiver behavior:
 3. Validate identity id, signature and version chain.
 4. Store metadata in MongoDB only after validation succeeds.
 
+## Identity Presence Sync
+
+Presence is volatile Mongo-only state. It is never written to IPFS. The local
+node publishes presence updates only to the networks attached to the identity
+metadata.
+
+### `presence.v1.identity_presence.was_updated`
+
+Sent when an identity heartbeat changes the visible status, when the user
+updates selected presence or custom message, or when the scheduler derives
+`away`/`disconnected`.
+
+Attributes:
+
+- `identityId`
+- `status`: `available`, `away`, `busy`, `custom`, `disconnected` or
+  `invisible`
+- `customMessage`
+- `lastHeartbeatAt`
+- `lastActivityAt`
+- `updatedAt`
+- `networkIds`
+
+Receiver behavior:
+
+1. Consume the event only on the encrypted/clear pubsub topic for a shared
+   network.
+2. Store the latest presence in MongoDB.
+3. Do not fetch or write IPFS content.
+4. Expose `invisible` as `disconnected` to identities other than the owner.
+
 ## Keychain Sync
 
 ### `keychains.v1.keychain.sync_requested`

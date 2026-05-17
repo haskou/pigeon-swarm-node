@@ -128,6 +128,31 @@ newlines. WebSocket routing uses that same normalized value for byte-for-byte
 recipient matching against event attributes such as `participantIds`,
 `recipientIdentityId` and `ownerIdentityId`.
 
+Identity presence heartbeat:
+
+```json
+{
+  "active": true,
+  "type": "identity_heartbeat"
+}
+```
+
+Send it every 10 seconds. `active: true` means the user interacted with the
+client since the previous heartbeat. Heartbeats are not individually signed
+because the WebSocket upgrade already authenticated the identity. Backend marks
+the identity `disconnected` after roughly 30 seconds without heartbeat and
+derives `away` after 5 minutes without activity while heartbeat is still active.
+
+Heartbeat acknowledgement:
+
+```json
+{
+  "type": "heartbeat_ack",
+  "identityId": "<identityId>",
+  "timestamp": 1770000000000
+}
+```
+
 Client heartbeat:
 
 ```json
@@ -731,6 +756,116 @@ Implemented:
 - periodically pin missing local responsibilities and release safe extra local
   replicas
 - avoid automatic unpin/garbage collection until replica claims are modeled
+
+## Identity Presence HTTP API
+
+Presence is Mongo-only runtime state. It is not stored in IPFS and it is
+synced through network-scoped pubsub events.
+
+Statuses:
+
+- `available`: heartbeat active and recent user activity.
+- `away`: heartbeat active, but no user activity for 5 minutes.
+- `busy`: selected by the user; clients should avoid audible notifications.
+- `invisible`: heartbeat active, but other identities see `disconnected`.
+- `custom`: selected custom connection state.
+- `disconnected`: derived by backend after heartbeat timeout.
+
+The custom status message is separate from connection state, max 50 characters,
+and can be removed.
+
+### Get identity presence
+
+```http
+GET /presence/{identityId}
+```
+
+Path parameters:
+
+- `identityId`: percent-encoded identity id/public key without PEM wrapping.
+
+Requires signed HTTP headers. Response:
+
+```json
+{
+  "identityId": "<identityId>",
+  "status": "available",
+  "customMessage": "Building the swarm",
+  "lastHeartbeatAt": 1770000000000,
+  "lastActivityAt": 1770000000000,
+  "updatedAt": 1770000000000
+}
+```
+
+If the target identity is invisible and the viewer is not the same identity,
+the response is:
+
+```json
+{
+  "identityId": "<identityId>",
+  "status": "disconnected",
+  "updatedAt": 1770000000000
+}
+```
+
+### Get multiple identity presences
+
+```http
+GET /presence/?identityIds=<idA>,<idB>
+```
+
+`identityIds` is a comma-separated list. Each id inside the query string must
+be URL encoded by the client as part of the full URL.
+
+### Update my presence
+
+```http
+PUT /presence/me
+```
+
+Request:
+
+```json
+{
+  "status": "busy",
+  "customMessage": "Recording"
+}
+```
+
+Allowed `status` values are `available`, `away`, `busy`, `custom` and
+`invisible`. `disconnected` cannot be selected; it is derived by heartbeat
+timeout.
+
+### Clear my custom message
+
+```http
+DELETE /presence/me/custom-message
+```
+
+Returns the updated presence resource.
+
+### WebSocket presence events
+
+When visible presence changes, backend emits:
+
+```json
+{
+  "type": "domain_event",
+  "event": {
+    "type": "presence.v1.identity_presence.was_updated",
+    "aggregate_id": "<identityId>",
+    "attributes": {
+      "identityId": "<identityId>",
+      "status": "away",
+      "customMessage": "Back soon",
+      "lastHeartbeatAt": 1770000000000,
+      "lastActivityAt": 1770000000000,
+      "updatedAt": 1770000000000,
+      "networkIds": ["<networkId>"]
+    }
+  }
+}
+```
 
 ## Identity HTTP API
 

@@ -45,46 +45,6 @@ Out of scope for the first sticker PR:
 - Marketplace/ranking.
 - Private sticker packs with per-recipient encrypted media.
 
-## Next Slice: Identity Presence
-
-Goal: expose identity connection state to clients and other nodes without
-storing volatile presence in IPFS.
-
-Scope:
-
-1. Add a `presence` or `identity-presence` context backed by MongoDB only.
-2. Track per-identity heartbeat and activity timestamps:
-   - frontend heartbeat interval: 10 seconds
-   - backend marks an identity disconnected when heartbeat expires
-   - backend derives idle state after 5 minutes without user activity while
-     heartbeat is still active
-3. Support connection statuses:
-   - `available`
-   - `away`
-   - `busy`
-   - `disconnected`
-   - `invisible`
-   - `custom`
-4. Support a separate optional custom status message:
-   - max 50 characters
-   - can be set, replaced or removed
-   - does not live in IPFS or identity profile metadata
-5. Add signed HTTP API for explicit user-selected state:
-   - `GET /presence/{identityId}`
-   - `GET /presence?identityIds=...`
-   - `PUT /presence/me`
-   - `DELETE /presence/me/custom-message`
-6. Extend WebSocket client messages with a signed or connection-authenticated
-   identity presence heartbeat.
-7. Emit WebSocket events when visible presence changes.
-8. Synchronize presence events between nodes through network-scoped PubSub:
-   - do not publish presence to unrelated networks
-   - do not publish invisible as `invisible` to other identities; expose it as
-     `disconnected` outside the authenticated identity's own sessions
-9. Add a scheduler for heartbeat expiration and derived status transitions.
-10. Add API, unit, scheduler and consumer coverage with acceptance tests split
-    by route.
-
 ## Next Slice: Node Network Management
 
 Goal: let node owners fully manage local IPFS networks.

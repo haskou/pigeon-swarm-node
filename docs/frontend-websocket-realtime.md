@@ -116,10 +116,11 @@ If the signature is invalid, stale or replayed, the upgrade is rejected with
 
 ## Heartbeat
 
-After `connection_ack`, the frontend may keep the socket fresh with:
+After `connection_ack`, the frontend should keep identity presence fresh with:
 
 ```json
 {
+  "active": true,
   "type": "identity_heartbeat"
 }
 ```
@@ -136,9 +137,17 @@ The node answers on the same socket:
 
 Rules:
 
-- send every 30 seconds while the socket is open
+- send every 10 seconds while the socket is open
+- send `active: true` when the user has interacted with the client since the
+  previous heartbeat; otherwise omit it or send `false`
 - do not sign heartbeat messages
 - do not rotate nonce/timestamp for heartbeat messages
+- the WebSocket handshake already authenticates the identity; the heartbeat is
+  bound to that authenticated connection
+- if no heartbeat is received for roughly 30 seconds, backend marks the
+  identity as `disconnected`
+- if heartbeat continues but no activity is seen for 5 minutes, backend derives
+  `away`
 - reconnect with a fresh signed WebSocket URL if no `heartbeat_ack` arrives
   within 2 intervals
 - backend ignores unknown or malformed client messages
@@ -200,6 +209,7 @@ Frontend should switch on `event.type`.
 | `keychains.v1.keychain.was_published` | Owner identity id | none | Owner identity id | Refetch current keychain if it belongs to the session identity. |
 | `nodes.v1.node.heartbeat.was_sent` | Node id | `owner`, `networks` | All authenticated clients on the local node | Refetch `GET /peers`. |
 | `nodes.v1.node.network.was_added` | Node id | implementation-specific node metadata | All authenticated clients on the local node | Refetch `GET /node/networks` and `GET /peers`. |
+| `presence.v1.identity_presence.was_updated` | Identity id | `identityId`, `status`, `customMessage`, `lastHeartbeatAt`, `lastActivityAt`, `updatedAt`, `networkIds` | `identityId` | Update cached presence for that identity or refetch `GET /presence/{identityId}`. |
 
 Sync events such as `*.sync_requested` and `*.sync_available` are node-to-node
 coordination hints. They can pass through the same event envelope when produced
@@ -224,6 +234,7 @@ Delivered to the connected identity:
 - `communities.*` events where the identity is in `memberIds`.
 - `calls.*` lifecycle events where the identity is in `participantIds`.
 - `calls.v1.signal.sent` only when the identity is `recipientIdentityId`.
+- `presence.*` events for that identity.
 
 Delivered to all authenticated clients connected to the local node:
 
@@ -253,6 +264,7 @@ Dropped:
 | `calls.v1.participant.` | Fetch `GET /calls/{callId}` and update active participant UI. |
 | `calls.v1.signal.` | If `recipientIdentityId` is the current identity, feed `payload` into the local WebRTC peer connection. |
 | `nodes.` | Refetch `GET /peers/`. |
+| `presence.` | Update identity presence in local caches or refetch `GET /presence/{identityId}`. |
 
 For conversation message events, `event.aggregate_id` is the conversation id.
 For sent-message events, `event.attributes.messageId` is the message id and
@@ -289,6 +301,10 @@ SDP offers/answers and ICE candidate handling.
 
 For community metadata events, `event.aggregate_id` is the community id. The
 event is routed to every connected identity listed in `event.attributes.memberIds`.
+
+For presence events, `event.aggregate_id` is the identity id whose presence
+changed. `invisible` is only visible to the same identity; other identities
+receive/read that identity as `disconnected`.
 
 ## Reconnect Strategy
 
