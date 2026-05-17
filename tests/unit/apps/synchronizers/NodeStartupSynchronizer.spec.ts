@@ -1,4 +1,5 @@
 import NodeStartupSynchronizer from '@app/apps/synchronizers/NodeStartupSynchronizer';
+import NodeStartupSyncReadiness from '@app/apps/synchronizers/NodeStartupSyncReadiness';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
@@ -10,7 +11,6 @@ import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastruc
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
 import MongoKeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
-import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
 import { Network } from '@app/contexts/nodes/domain/Network';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
@@ -26,20 +26,21 @@ describe('NodeStartupSynchronizer', () => {
   let conversationRepository: MockProxy<MongoConversationRepository>;
   let communityRepository: MockProxy<MongoCommunityRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
-  let heartbeatSender: MockProxy<NodeHeartbeatSender>;
   let identityMetadataRepository: MockProxy<MongoIdentityMetadataRepository>;
   let keychainMetadataRepository: MockProxy<MongoKeychainMetadataRepository>;
   let nodeLoader: MockProxy<NodeLoader>;
+  let readiness: MockProxy<NodeStartupSyncReadiness>;
   let synchronizer: NodeStartupSynchronizer;
 
   beforeEach(() => {
     conversationRepository = mock<MongoConversationRepository>();
     communityRepository = mock<MongoCommunityRepository>();
     eventPublisher = mock<DomainEventPublisher>();
-    heartbeatSender = mock<NodeHeartbeatSender>();
     identityMetadataRepository = mock<MongoIdentityMetadataRepository>();
     keychainMetadataRepository = mock<MongoKeychainMetadataRepository>();
     nodeLoader = mock<NodeLoader>();
+    readiness = mock<NodeStartupSyncReadiness>();
+    readiness.prepare.mockResolvedValue(2);
     nodeLoader.loadNode.mockResolvedValue(
       new Node(
         new NodeId(nodeId),
@@ -56,7 +57,7 @@ describe('NodeStartupSynchronizer', () => {
     );
     synchronizer = new NodeStartupSynchronizer(
       nodeLoader,
-      heartbeatSender,
+      readiness,
       identityMetadataRepository,
       keychainMetadataRepository,
       conversationRepository,
@@ -65,7 +66,7 @@ describe('NodeStartupSynchronizer', () => {
     );
   });
 
-  it('should send heartbeat and publish scoped startup sync requests', async () => {
+  it('should prepare and publish scoped startup sync requests', async () => {
     identityMetadataRepository.findAll.mockResolvedValue([
       {
         _id: 'identity-1-v1',
@@ -107,8 +108,9 @@ describe('NodeStartupSynchronizer', () => {
     const result = await synchronizer.synchronize();
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
-    expect(heartbeatSender.send).toHaveBeenCalledTimes(1);
+    expect(readiness.prepare).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
+      connectedPeerCount: 2,
       conversationRequests: 1,
       communityRequests: 0,
       identityNetworkRequests: 1,
@@ -175,6 +177,7 @@ describe('NodeStartupSynchronizer', () => {
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
     expect(result).toMatchObject({
+      connectedPeerCount: 2,
       communityRequests: 1,
       conversationRequests: 0,
       identityNetworkRequests: 1,

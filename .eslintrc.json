@@ -66,7 +66,8 @@
         ],
         "format": [
           "camelCase",
-          "PascalCase"
+          "PascalCase",
+          "UPPER_CASE"
         ],
         "leadingUnderscore": "allow"
       },
