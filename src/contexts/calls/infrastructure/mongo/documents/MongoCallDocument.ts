@@ -12,7 +12,7 @@ export interface MongoCallDocument {
     conversationId: string | undefined;
     type: string;
   };
-  participants?: Array<{
+  participants: Array<{
     declinedAt?: number;
     identityId: string;
     joinedAt?: number;
