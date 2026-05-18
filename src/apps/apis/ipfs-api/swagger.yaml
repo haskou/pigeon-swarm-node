@@ -128,7 +128,7 @@ paths:
       tags:
         - ipfs
       summary: Get local IPFS replication status
-      description: Returns locally known IPFS content metadata and the conservative replica responsibility plan for each network. A background maintenance job uses the same policy to pin missing responsibilities and release safe extra local replicas.
+      description: Returns IPFS content metadata known by the local node and the conservative replica responsibility plan for each network. Known content includes locally uploaded CIDs and CIDs announced by other nodes through network-scoped pubsub, even before the local node claims a replica. A background maintenance job uses the same policy to pin missing responsibilities and release safe extra local replicas.
       security:
         - signedRequest: []
       responses:
