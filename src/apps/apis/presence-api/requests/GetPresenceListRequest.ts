@@ -1,4 +1,5 @@
 import { IdentityPresenceFindMessage } from '@app/contexts/presence/application/find/messages/IdentityPresenceFindMessage';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 export class GetPresenceListRequest {
   constructor(
@@ -20,7 +21,18 @@ export class GetPresenceListRequest {
     return this.rawIdentityIds()
       .flatMap((identityIds) => identityIds.split(','))
       .map((identityId) => identityId.trim())
-      .filter((identityId) => identityId.length > 0);
+      .filter((identityId) => identityId.length > 0)
+      .filter((identityId) => this.isValidIdentityId(identityId));
+  }
+
+  private isValidIdentityId(identityId: string): boolean {
+    try {
+      new IdentityId(identityId);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   public getMessage(): IdentityPresenceFindMessage {
