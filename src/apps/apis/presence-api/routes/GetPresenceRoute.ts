@@ -6,14 +6,7 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
-import {
-  Get,
-  JsonController,
-  Param,
-  QueryParam,
-  Req,
-  Res,
-} from 'routing-controllers';
+import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 
 import { GetPresenceListRequest } from '../requests/GetPresenceListRequest';
 import { GetPresenceRequest } from '../requests/GetPresenceRequest';
@@ -35,9 +28,18 @@ export class GetPresenceRoute extends Route {
     );
   }
 
+  private identityIdsFrom(request: Request): string | string[] | undefined {
+    const { identityIds } = request.query;
+
+    if (Array.isArray(identityIds)) {
+      return identityIds.map(String);
+    }
+
+    return typeof identityIds === 'string' ? identityIds : undefined;
+  }
+
   @Get('/')
   public async getPresences(
-    @QueryParam('identityIds') identityIds: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -48,7 +50,7 @@ export class GetPresenceRoute extends Route {
       .find(
         new GetPresenceListRequest(
           viewerIdentityId.valueOf(),
-          identityIds,
+          this.identityIdsFrom(request),
         ).getMessage(),
       );
 

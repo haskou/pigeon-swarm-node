@@ -3,12 +3,22 @@ import { IdentityPresenceFindMessage } from '@app/contexts/presence/application/
 export class GetPresenceListRequest {
   constructor(
     private readonly viewerIdentityId: string,
-    private readonly identityIds?: string,
+    private readonly identityIds?: string | string[],
   ) {}
 
+  private rawIdentityIds(): string[] {
+    if (!this.identityIds) {
+      return [];
+    }
+
+    return Array.isArray(this.identityIds)
+      ? this.identityIds
+      : [this.identityIds];
+  }
+
   private getIdentityIds(): string[] {
-    return (this.identityIds || '')
-      .split(',')
+    return this.rawIdentityIds()
+      .flatMap((identityIds) => identityIds.split(','))
       .map((identityId) => identityId.trim())
       .filter((identityId) => identityId.length > 0);
   }
