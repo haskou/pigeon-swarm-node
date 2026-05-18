@@ -142,4 +142,12 @@ export class MongoCommunityChannelMessageRepository {
       communityId: communityId.valueOf(),
     });
   }
+
+  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
+    await (
+      await this.collection()
+    ).deleteMany({
+      communityId: communityId.valueOf(),
+    });
+  }
 }

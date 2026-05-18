@@ -134,4 +134,12 @@ export class MongoCommunityRequestStore implements CommunityRequestStore {
       await this.collection()
     ).updateOne({ _id: document._id }, { $set: document }, { upsert: true });
   }
+
+  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
+    await (
+      await this.collection()
+    ).deleteMany({
+      communityId: communityId.valueOf(),
+    });
+  }
 }

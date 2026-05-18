@@ -2606,6 +2606,17 @@ export default class Definitions {
     );
   }
 
+  @then('response body should not contain the current community id')
+  public responseBodyShouldNotContainTheCurrentCommunityId(): void {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.communityId,
+    );
+  }
+
   @then('response body should contain the other identity id')
   public responseBodyShouldContainTheOtherIdentityId(): void {
     if (!this.otherIdentityId) {

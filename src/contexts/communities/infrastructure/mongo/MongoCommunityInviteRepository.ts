@@ -3,6 +3,7 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { CommunityInvite } from '../../domain/CommunityInvite';
 import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
 import { CommunityInviteRepository as InviteRepository } from '../../domain/repositories/CommunityInviteRepository';
+import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '../../domain/value-objects/CommunityInviteToken';
 import { MongoCommunityInviteDocument } from './documents/MongoCommunityInviteDocument';
 
@@ -92,5 +93,13 @@ export class MongoCommunityInviteRepository implements InviteRepository {
     await (
       await this.collection()
     ).updateOne({ _id: document._id }, { $set: document }, { upsert: true });
+  }
+
+  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
+    await (
+      await this.collection()
+    ).deleteMany({
+      communityId: communityId.valueOf(),
+    });
   }
 }
