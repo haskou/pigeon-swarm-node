@@ -140,7 +140,7 @@ Identity presence heartbeat:
 Send it every 10 seconds. `active: true` means the user interacted with the
 client since the previous heartbeat. Heartbeats are not individually signed
 because the WebSocket upgrade already authenticated the identity. Backend marks
-the identity `disconnected` after roughly 30 seconds without heartbeat and
+the identity `disconnected` after roughly 10 seconds without heartbeat and
 derives `away` after 5 minutes without activity while heartbeat is still active.
 
 Heartbeat acknowledgement:
@@ -174,7 +174,7 @@ Heartbeat acknowledgement:
 Heartbeat messages do not need a new signature; the WebSocket upgrade already
 authenticated the connection. The backend ignores any client-sent `identityId`
 and answers with the identity bound to the socket. Unknown or malformed client
-messages are ignored. Recommended client interval: 30 seconds, reconnecting
+messages are ignored. Recommended client interval: 10 seconds, reconnecting
 with a fresh signed WebSocket URL if no `heartbeat_ack` arrives within 2
 intervals.
 

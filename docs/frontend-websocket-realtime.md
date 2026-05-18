@@ -144,7 +144,7 @@ Rules:
 - do not rotate nonce/timestamp for heartbeat messages
 - the WebSocket handshake already authenticates the identity; the heartbeat is
   bound to that authenticated connection
-- if no heartbeat is received for roughly 30 seconds, backend marks the
+- if no heartbeat is received for roughly 10 seconds, backend marks the
   identity as `disconnected`
 - if heartbeat continues but no activity is seen for 5 minutes, backend derives
   `away`

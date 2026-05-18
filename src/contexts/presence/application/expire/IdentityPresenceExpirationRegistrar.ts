@@ -5,7 +5,7 @@ import MongoIdentityPresenceRepository from '../../infrastructure/mongo/MongoIde
 import IdentityPresenceNetworkResolver from '../IdentityPresenceNetworkResolver';
 
 export default class IdentityPresenceExpirationRegistrar {
-  private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
+  private static readonly HEARTBEAT_TIMEOUT_MS = 10_000;
 
   constructor(
     private readonly repository: MongoIdentityPresenceRepository,

@@ -8,7 +8,7 @@ import { PresenceCustomMessage } from './value-objects/PresenceCustomMessage';
 import { PresenceStatus } from './value-objects/PresenceStatus';
 
 export class IdentityPresence extends AggregateRoot {
-  private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
+  private static readonly HEARTBEAT_TIMEOUT_MS = 10_000;
   private static readonly IDLE_TIMEOUT_MS = 300_000;
 
   public static disconnected(identityId: IdentityId): IdentityPresence {
@@ -54,7 +54,7 @@ export class IdentityPresence extends AggregateRoot {
   }
 
   private derivedStatus(now: Timestamp): PresenceStatus {
-    if (this.lastHeartbeatAt?.isBeforeOrEqual(this.timeoutThreshold(now))) {
+    if (this.lastHeartbeatAt?.isBefore(this.timeoutThreshold(now))) {
       return PresenceStatus.DISCONNECTED;
     }
 
