@@ -277,6 +277,55 @@ Receiver behavior:
    storing them.
 4. Ignore malformed candidates.
 
+## IPFS Replication Metadata Sync
+
+IPFS replication metadata is MongoDB state. It tracks which CIDs are known to
+the replication policy even when the local node is not currently responsible for
+holding a replica.
+
+### `ipfs.v1.content.replication.was_registered`
+
+Sent when a node publishes IPFS content and registers it with the replication
+policy.
+
+Attributes:
+
+- `cid`
+- `context`
+- `networkIds`
+- `ownerIdentityId`
+- `priority`
+- `sizeBytes`
+- `createdAt`
+- `updatedAt`
+
+Receiver behavior:
+
+1. Consume the event only on shared network topics.
+2. Store or update the CID metadata in MongoDB.
+3. Do not claim a local replica from this event.
+4. Let the replication maintenance scheduler decide later whether the local
+   node is responsible for fetching/pinning the CID.
+
+### `ipfs.v1.content.replication.was_claimed`
+
+Sent when a node confirms it has a local replica for a CID in one network.
+
+Attributes:
+
+- `cid`
+- `networkId`
+- `nodeId`
+- `claimedAt`
+
+Receiver behavior:
+
+1. Store the replica claim in MongoDB.
+2. Use claims only as availability metadata for diagnostics and policy
+   decisions.
+3. Do not trust the claim as content validation; fetching nodes still validate
+   the IPFS document through the owning context.
+
 ## Announcements And Realtime Bridge
 
 Announcement events are also domain events and can be forwarded to local
@@ -294,6 +343,8 @@ WebSocket clients after they are accepted locally:
 - `conversations.v1.message.reaction.was_removed`
 - `communities.v1.channel.message.reaction.was_added`
 - `communities.v1.channel.message.reaction.was_removed`
+- `ipfs.v1.content.replication.was_registered`
+- `ipfs.v1.content.replication.was_claimed`
 - `nodes.v1.node.heartbeat.was_sent`
 
 Frontend clients do not consume PubSub directly. They receive filtered
@@ -316,6 +367,9 @@ Implemented state is split by context:
 - community channel message reactions are MongoDB-only and indexed by community
   id, channel id, message id, author id and emoji; community sync responses
   include `reactionCandidates`
+- IPFS replication content metadata stores known CIDs, replication context,
+  network ids, owner identity and size; replica claims store which node claims
+  each CID per network
 - node peer metadata stores last heartbeat per remote node
 
 ## Failure Modes

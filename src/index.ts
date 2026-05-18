@@ -21,6 +21,7 @@ import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/iden
 import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentitySyncRequest';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import RegisterIPFSReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicaClaimWhenClaimed';
+import RegisterIPFSContentReplicationWhenRegistered from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicationWhenRegistered';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
@@ -41,7 +42,9 @@ import MongoConversationRepository from '@app/contexts/conversations/infrastruct
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/application/register-claim/IPFSContentReplicaClaimRegistrar';
+import IPFSContentReplicationMetadataRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationMetadataRegistrar';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
+import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -103,6 +106,8 @@ async function init() {
   const ipfsReplicaClaimRepository = new MongoIPFSContentReplicaClaimRepository(
     mongo,
   );
+  const ipfsContentReplicationRepository =
+    new MongoIPFSContentReplicationRepository(mongo);
 
   kernel.addConsumerInstances(
     new MarkMessagesReadWhenAnnounced(
@@ -147,6 +152,12 @@ async function init() {
     new RegisterIPFSReplicaClaimWhenClaimed(
       messageBus,
       new IPFSContentReplicaClaimRegistrar(ipfsReplicaClaimRepository),
+    ),
+    new RegisterIPFSContentReplicationWhenRegistered(
+      messageBus,
+      new IPFSContentReplicationMetadataRegistrar(
+        ipfsContentReplicationRepository,
+      ),
     ),
     new RegisterIdentityPresenceWhenUpdated(messageBus),
   );

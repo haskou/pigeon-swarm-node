@@ -700,6 +700,10 @@ GET /ipfs/replication/status
 
 Requires signed request headers. This endpoint reports local replication
 metadata and the deterministic responsibility plan for known CIDs.
+Known CIDs include content uploaded through the local node and content metadata
+announced by other nodes through network-scoped pubsub events. A node can
+therefore report a CID even when it is not currently responsible for holding a
+local replica.
 
 The current policy is intentionally conservative:
 
@@ -748,6 +752,8 @@ Implemented:
 
 - track CIDs created through `POST /ipfs/public`, `POST /ipfs/private` and
   `POST /ipfs/secure`
+- track CIDs announced by other nodes, even before this node claims a local
+  replica
 - record replica claims when a local or remote node announces that it has a CID
 - derive active node counts from node heartbeat peer metadata
 - keep generous replica margins to avoid losing half the data when there are

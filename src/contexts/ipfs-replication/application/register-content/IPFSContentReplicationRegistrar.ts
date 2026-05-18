@@ -6,6 +6,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 import { Timestamp } from '@haskou/value-objects';
 
 import { IPFSContentReplicationWasClaimedEvent } from '../../domain/events/IPFSContentReplicationWasClaimedEvent';
+import { IPFSContentReplicationWasRegisteredEvent } from '../../domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
@@ -54,6 +55,25 @@ export default class IPFSContentReplicationRegistrar {
     );
   }
 
+  private async publishRegistration(
+    content: IPFSContentReplication,
+  ): Promise<void> {
+    const primitives = content.toPrimitives();
+
+    await this.eventPublisher.publish([
+      new IPFSContentReplicationWasRegisteredEvent(primitives.cid, {
+        cid: primitives.cid,
+        context: primitives.context,
+        createdAt: primitives.createdAt,
+        networkIds: primitives.networkIds,
+        ownerIdentityId: primitives.ownerIdentityId,
+        priority: primitives.priority,
+        sizeBytes: primitives.sizeBytes,
+        updatedAt: primitives.updatedAt,
+      }),
+    ]);
+  }
+
   public async register(params: {
     cid: string;
     context: string;
@@ -73,6 +93,7 @@ export default class IPFSContentReplicationRegistrar {
       existing.addNetworkIds(networkIds);
       existing.touch();
       await this.repository.save(existing);
+      await this.publishRegistration(existing);
       await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
 
       return existing;
@@ -90,6 +111,7 @@ export default class IPFSContentReplicationRegistrar {
     );
 
     await this.repository.save(content);
+    await this.publishRegistration(content);
     await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
 
     return content;
