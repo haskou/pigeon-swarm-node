@@ -42,6 +42,14 @@ paths:
         Heartbeat messages are not signed because the WebSocket upgrade already
         authenticated the connection.
 
+        Clients may also send ephemeral typing indicators. Conversation typing:
+        `{ "type": "typing", "scope": "conversation", "conversationId": "<conversationId>", "active": true }`.
+        Community text channel typing:
+        `{ "type": "typing", "scope": "community_channel", "communityId": "<communityId>", "channelId": "<channelId>", "active": true }`.
+        The server uses the authenticated WebSocket identity, validates access
+        to the conversation or text channel, excludes the sender, and relays a
+        `{ "type": "typing", ... }` message to the remaining recipients.
+
         Subsequent messages use:
 
         `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`

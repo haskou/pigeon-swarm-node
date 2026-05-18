@@ -153,30 +153,64 @@ Heartbeat acknowledgement:
 }
 ```
 
-Client heartbeat:
-
-```json
-{
-  "type": "identity_heartbeat"
-}
-```
-
-Heartbeat acknowledgement:
-
-```json
-{
-  "type": "heartbeat_ack",
-  "identityId": "<identityId>",
-  "timestamp": 1770000000000
-}
-```
-
 Heartbeat messages do not need a new signature; the WebSocket upgrade already
 authenticated the connection. The backend ignores any client-sent `identityId`
 and answers with the identity bound to the socket. Unknown or malformed client
 messages are ignored. Recommended client interval: 10 seconds, reconnecting
 with a fresh signed WebSocket URL if no `heartbeat_ack` arrives within 2
 intervals.
+
+Ephemeral typing indicators:
+
+```json
+{
+  "type": "typing",
+  "scope": "conversation",
+  "conversationId": "<conversationId>",
+  "active": true
+}
+```
+
+```json
+{
+  "type": "typing",
+  "scope": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "active": true
+}
+```
+
+Typing messages are not persisted and are never sent through IPFS/pubsub. The
+backend ignores client-sent identity fields and uses the identity authenticated
+by the WebSocket handshake. Conversation typing is relayed only to the other
+conversation participants. Community channel typing is relayed only to the
+other community members when the channel is a text channel.
+
+Delivered typing messages:
+
+```json
+{
+  "type": "typing",
+  "scope": "conversation",
+  "conversationId": "<conversationId>",
+  "identityId": "<senderIdentityId>",
+  "active": true,
+  "timestamp": 1770000000000
+}
+```
+
+```json
+{
+  "type": "typing",
+  "scope": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "identityId": "<senderIdentityId>",
+  "active": true,
+  "timestamp": 1770000000000
+}
+```
 
 Domain event payload:
 

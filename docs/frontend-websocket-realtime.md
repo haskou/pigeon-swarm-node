@@ -152,6 +152,74 @@ Rules:
   within 2 intervals
 - backend ignores unknown or malformed client messages
 
+## Typing Indicators
+
+Typing indicators are ephemeral WebSocket messages. They are not stored in
+MongoDB, published to IPFS, or replayed after reconnect.
+
+For one-to-one or group conversations, frontend sends:
+
+```json
+{
+  "type": "typing",
+  "scope": "conversation",
+  "conversationId": "<conversationId>",
+  "active": true
+}
+```
+
+For community text channels, frontend sends:
+
+```json
+{
+  "type": "typing",
+  "scope": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "active": true
+}
+```
+
+Backend ignores any client-sent `identityId`. The sender identity is always the
+identity authenticated by the WebSocket handshake.
+
+Conversation typing is relayed only when the connected identity is a
+participant of the conversation. Community channel typing is relayed only when
+the connected identity is a community member and the channel is a text channel.
+The sender identity is excluded from recipients.
+
+Conversation typing message delivered to other participants:
+
+```json
+{
+  "type": "typing",
+  "scope": "conversation",
+  "conversationId": "<conversationId>",
+  "identityId": "<senderIdentityId>",
+  "active": true,
+  "timestamp": 1770000000000
+}
+```
+
+Community text channel typing message delivered to other members:
+
+```json
+{
+  "type": "typing",
+  "scope": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "identityId": "<senderIdentityId>",
+  "active": true,
+  "timestamp": 1770000000000
+}
+```
+
+Frontend should throttle `active: true` messages, for example every 2-3 seconds
+while the user keeps typing, send `active: false` when the input is sent,
+cleared, blurred, or the user changes chat, and expire local typing indicators
+after roughly 5 seconds without renewal.
+
 ## Event Envelope
 
 Realtime domain events are delivered as:
