@@ -58,6 +58,9 @@ import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/P
 import { DeletePresenceCustomMessageRoute } from '@app/apps/apis/presence-api/routes/DeletePresenceCustomMessageRoute';
 import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresenceRoute';
 import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresenceRoute';
+import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/DeletePushSubscriptionRoute';
+import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
+import { PutPushSubscriptionRoute } from '@app/apps/apis/push-api/routes/PutPushSubscriptionRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -213,6 +216,9 @@ export default class Server {
           GetPresenceRoute,
           PutPresenceRoute,
           DeletePresenceCustomMessageRoute,
+          GetPushVapidPublicKeyRoute,
+          PutPushSubscriptionRoute,
+          DeletePushSubscriptionRoute,
           GetCommunitiesRoute,
           GetCommunityDiscoveryRoute,
           GetCommunityMembershipRequestsRoute,

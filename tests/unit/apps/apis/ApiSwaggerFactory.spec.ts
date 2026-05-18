@@ -21,6 +21,7 @@ describe('ApiSwaggerFactory', () => {
         'nodes-api',
         'notifications-api',
         'presence-api',
+        'push-api',
       ]);
       expect(specs['calls-api']).toContain('/calls/:');
       expect(specs['communities-api']).toContain('/communities/:');
@@ -31,6 +32,7 @@ describe('ApiSwaggerFactory', () => {
       expect(specs['nodes-api']).toContain('/node/:');
       expect(specs['notifications-api']).toContain('/notifications/:');
       expect(specs['presence-api']).toContain('/presence/:');
+      expect(specs['push-api']).toContain('/push/subscriptions:');
     });
   });
 
@@ -63,6 +65,9 @@ describe('ApiSwaggerFactory', () => {
       expect(spec).toContain(
         "$ref: './presence-api/swagger.yaml#/paths/~1presence~1'",
       );
+      expect(spec).toContain(
+        "$ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'",
+      );
     });
   });
 
@@ -80,6 +85,7 @@ describe('ApiSwaggerFactory', () => {
         'nodes-api': '/api/swagger/nodes-api/swagger.yaml',
         'notifications-api': '/api/swagger/notifications-api/swagger.yaml',
         'presence-api': '/api/swagger/presence-api/swagger.yaml',
+        'push-api': '/api/swagger/push-api/swagger.yaml',
       });
     });
   });

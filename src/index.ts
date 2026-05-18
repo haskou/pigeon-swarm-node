@@ -28,16 +28,20 @@ import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/R
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import RegisterIdentityPresenceWhenUpdated from '@app/apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated';
+import SendPushNotificationWhenEventReceived from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived';
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
 import IPFSReplicationMaintenanceScheduler from '@app/apps/schedulers/IPFSReplicationMaintenanceScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
+import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
+import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
@@ -45,6 +49,11 @@ import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/app
 import IPFSContentReplicationMetadataRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationMetadataRegistrar';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
+import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
+import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
+import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -108,6 +117,11 @@ async function init() {
   );
   const ipfsContentReplicationRepository =
     new MongoIPFSContentReplicationRepository(mongo);
+  const pushNotificationDispatcher = new PushNotificationDispatcher(
+    new MongoPushSubscriptionRepository(mongo),
+    new MongoIdentityPresenceRepository(mongo),
+    new WebPushNotificationDelivery(),
+  );
 
   kernel.addConsumerInstances(
     new MarkMessagesReadWhenAnnounced(
@@ -160,6 +174,34 @@ async function init() {
       ),
     ),
     new RegisterIdentityPresenceWhenUpdated(messageBus),
+    new SendPushNotificationWhenEventReceived(
+      messageBus,
+      ConversationMessageWasSentEvent,
+      ConversationMessageWasSentEvent.EVENT_NAME,
+      'pigeon-swarm.send-push-when-conversation-message-sent',
+      pushNotificationDispatcher,
+    ),
+    new SendPushNotificationWhenEventReceived(
+      messageBus,
+      CommunityChannelMessageWasSentEvent,
+      CommunityChannelMessageWasSentEvent.EVENT_NAME,
+      'pigeon-swarm.send-push-when-community-message-sent',
+      pushNotificationDispatcher,
+    ),
+    new SendPushNotificationWhenEventReceived(
+      messageBus,
+      NotificationWasCreatedEvent,
+      NotificationWasCreatedEvent.EVENT_NAME,
+      'pigeon-swarm.send-push-when-notification-created',
+      pushNotificationDispatcher,
+    ),
+    new SendPushNotificationWhenEventReceived(
+      messageBus,
+      CallStartedEvent,
+      CallStartedEvent.EVENT_NAME,
+      'pigeon-swarm.send-push-when-call-started',
+      pushNotificationDispatcher,
+    ),
   );
   await kernel.runConsumers();
   console.timeEnd('Run consumers');

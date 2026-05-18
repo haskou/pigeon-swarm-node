@@ -1,0 +1,143 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Push API
+  version: 1.0.0
+  description: Endpoints for PWA Web Push subscriptions.
+tags:
+  - name: push
+paths:
+  /push/vapid-public-key:
+    get:
+      tags:
+        - push
+      summary: Get the VAPID public key used for browser PushManager subscriptions
+      responses:
+        '200':
+          description: Push configuration status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushVapidPublicKeyResource'
+  /push/subscriptions:
+    put:
+      tags:
+        - push
+      summary: Register or replace a push subscription for the authenticated identity
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionBody'
+      responses:
+        '200':
+          description: Push subscription registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushSubscriptionResource'
+    delete:
+      tags:
+        - push
+      summary: Remove a push subscription from the authenticated identity
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionBody'
+      responses:
+        '200':
+          description: Push subscription removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - deleted
+                properties:
+                  deleted:
+                    type: boolean
+components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    PushVapidPublicKeyResource:
+      type: object
+      required:
+        - enabled
+        - publicKey
+      properties:
+        enabled:
+          type: boolean
+        publicKey:
+          nullable: true
+          type: string
+    PushSubscriptionBody:
+      type: object
+      required:
+        - endpoint
+        - keys
+      properties:
+        endpoint:
+          type: string
+        expirationTime:
+          nullable: true
+          type: integer
+        keys:
+          type: object
+          required:
+            - p256dh
+            - auth
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string
+    PushSubscriptionResource:
+      type: object
+      required:
+        - endpoint
+        - expirationTime
+        - identityId
+      properties:
+        endpoint:
+          type: string
+        expirationTime:
+          nullable: true
+          type: integer
+        identityId:
+          type: string

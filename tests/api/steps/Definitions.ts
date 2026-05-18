@@ -1736,6 +1736,16 @@ export default class Definitions {
     await this.signCurrentRequest('GET', '/notifications/');
   }
 
+  @given('I sign the current push subscription request')
+  public async iSignTheCurrentPushSubscriptionRequest(): Promise<void> {
+    await this.signCurrentRequest('PUT', '/push/subscriptions');
+  }
+
+  @given('I sign the current push subscription removal request')
+  public async iSignTheCurrentPushSubscriptionRemovalRequest(): Promise<void> {
+    await this.signCurrentRequest('DELETE', '/push/subscriptions');
+  }
+
   @given('the notification recipient signs the current notification patch request')
   public async notificationRecipientSignsTheCurrentNotificationPatchRequest(): Promise<void> {
     if (!this.notificationId) {

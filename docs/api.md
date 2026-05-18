@@ -21,6 +21,8 @@ contract.
 - Node-to-node missed-message recovery is documented separately in
   [PubSub Sync Protocol](pubsub-sync-protocol.md).
 - Keychain design is documented separately in [Keychains](keychains.md).
+- Frontend PWA push registration is documented separately in
+  [Frontend PWA Push Notifications](frontend-pwa-push-notifications.md).
 - Frontend WebSocket usage is documented separately in
   [Frontend Realtime WebSocket](frontend-websocket-realtime.md).
 
@@ -806,7 +808,8 @@ Statuses:
 
 - `available`: heartbeat active and recent user activity.
 - `away`: heartbeat active, but no user activity for 5 minutes.
-- `busy`: selected by the user; clients should avoid audible notifications.
+- `busy`: selected by the user; backend suppresses push notifications for
+  messages and calls, and clients should avoid audible notifications.
 - `invisible`: heartbeat active, but other identities see `disconnected`.
 - `custom`: selected custom connection state.
 - `disconnected`: derived by backend after heartbeat timeout.
@@ -2379,6 +2382,107 @@ Implemented:
 - require signed request auth from the recipient
 - allow recipient-only accept and decline
 - mark accepted or declined notifications as read
+
+## Push Notification HTTP API
+
+PWA Web Push is used only as a wake-up/UX channel for the browser. It does not
+replace WebSocket realtime and it does not carry decrypted message content.
+
+Backend sends push for:
+
+- conversation messages
+- community text channel messages
+- invitation notifications
+- missed-call notifications
+- incoming conversation calls
+
+When the recipient presence is `busy`, backend suppresses pushes for message
+and call categories. Invitation notifications are still delivered.
+
+Server operators must configure:
+
+```env
+PUSH_VAPID_PUBLIC_KEY=<base64urlPublicKey>
+PUSH_VAPID_PRIVATE_KEY=<base64urlPrivateKey>
+PUSH_VAPID_SUBJECT=mailto:admin@example.com
+```
+
+If VAPID keys are not configured, subscription endpoints still work but backend
+does not send outbound Web Push requests.
+
+### Get VAPID public key
+
+```http
+GET /push/vapid-public-key
+```
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "publicKey": "<base64urlPublicKey>"
+}
+```
+
+Frontend passes `publicKey` to
+`pushManager.subscribe({ applicationServerKey })`.
+`enabled` is `true` only when both public and private VAPID keys are configured.
+
+### Register push subscription
+
+```http
+PUT /push/subscriptions
+```
+
+Requires signed HTTP headers. The authenticated identity owns the subscription.
+
+Request body is the browser `PushSubscription.toJSON()` shape:
+
+```json
+{
+  "endpoint": "https://push.service/send/...",
+  "expirationTime": null,
+  "keys": {
+    "p256dh": "<browserP256dhKey>",
+    "auth": "<browserAuthSecret>"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "endpoint": "https://push.service/send/...",
+  "expirationTime": null,
+  "identityId": "<identityId>"
+}
+```
+
+Call this after login/session restore and whenever the browser gives frontend a
+new subscription.
+
+### Remove push subscription
+
+```http
+DELETE /push/subscriptions
+```
+
+Requires signed HTTP headers. Send the same body shape used to register the
+subscription. Backend removes only subscriptions belonging to the authenticated
+identity.
+
+Response:
+
+```json
+{
+  "deleted": true
+}
+```
+
+Backend also removes stale subscriptions automatically when the push provider
+returns `404` or `410`.
 
 ## Planned API
 

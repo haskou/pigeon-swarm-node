@@ -13,6 +13,7 @@ tags:
   - name: nodes
   - name: notifications
   - name: presence
+  - name: push
   - name: realtime
 paths:
   /ws:
@@ -197,3 +198,7 @@ paths:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1me'
   /presence/me/custom-message:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1me~1custom-message'
+  /push/vapid-public-key:
+    $ref: './push-api/swagger.yaml#/paths/~1push~1vapid-public-key'
+  /push/subscriptions:
+    $ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'
