@@ -1,4 +1,3 @@
-import { Type } from 'class-transformer';
 import {
   IsInt,
   IsNotEmpty,
@@ -21,6 +20,5 @@ export class PushSubscriptionBody {
 
   @IsObject()
   @ValidateNested()
-  @Type(() => PushSubscriptionKeysBody)
   public keys!: PushSubscriptionKeysBody;
 }
