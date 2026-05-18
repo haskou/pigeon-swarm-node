@@ -68,9 +68,14 @@ describe('IPFSContentReplicationRegistrar', () => {
     ]);
     expect(savedContents).toHaveLength(1);
     expect(savedClaims).toHaveLength(2);
-    expect(publishedEvents.flat()).toHaveLength(3);
-    expect(publishedEvents.flat()[0].eventName()).toBe(
+    expect(publishedEvents.flat()).toHaveLength(4);
+    expect(publishedEvents[0]).toHaveLength(2);
+    expect(publishedEvents[0][0].eventName()).toBe(
       IPFSContentReplicationWasRegisteredEvent.EVENT_NAME,
     );
+    expect(publishedEvents[0].map((event) => event.attributes.networkIds)).toEqual([
+      [firstNetworkId],
+      [secondNetworkId],
+    ]);
   });
 });

@@ -33,6 +33,14 @@ Feature: Delete community member API
     When I POST to "/communities/"
     Then response code is equal to 200
     And I remember the current community
+    And I set a community invite body
+    And I sign the current community invite request
+    When I POST to the current community invites
+    Then response code is equal to 200
+    And I remember the current community invite
+    And the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
     And I sign the current community leave request
     When I DELETE my membership from the current community
     Then response code is equal to 200
@@ -46,6 +54,13 @@ Feature: Delete community member API
     When I GET the current community
     Then response code is equal to 409
     And response body should contain "Community not found"
+    Given the community member signs the current community invite accept request
+    When I POST to accept the current community invite
+    Then response code is equal to 409
+    And response body should contain "Community invite not found"
+    Given the community member signs the community membership requests request
+    When I GET community membership requests
+    Then response body should not contain the current community id
 
   Scenario: Owner cannot leave a private community while other members remain
     Given I am an anonymous user

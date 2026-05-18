@@ -60,18 +60,21 @@ export default class IPFSContentReplicationRegistrar {
   ): Promise<void> {
     const primitives = content.toPrimitives();
 
-    await this.eventPublisher.publish([
-      new IPFSContentReplicationWasRegisteredEvent(primitives.cid, {
-        cid: primitives.cid,
-        context: primitives.context,
-        createdAt: primitives.createdAt,
-        networkIds: primitives.networkIds,
-        ownerIdentityId: primitives.ownerIdentityId,
-        priority: primitives.priority,
-        sizeBytes: primitives.sizeBytes,
-        updatedAt: primitives.updatedAt,
-      }),
-    ]);
+    await this.eventPublisher.publish(
+      primitives.networkIds.map(
+        (networkId) =>
+          new IPFSContentReplicationWasRegisteredEvent(primitives.cid, {
+            cid: primitives.cid,
+            context: primitives.context,
+            createdAt: primitives.createdAt,
+            networkIds: [networkId],
+            ownerIdentityId: primitives.ownerIdentityId,
+            priority: primitives.priority,
+            sizeBytes: primitives.sizeBytes,
+            updatedAt: primitives.updatedAt,
+          }),
+      ),
+    );
   }
 
   public async register(params: {

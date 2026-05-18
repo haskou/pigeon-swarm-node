@@ -286,7 +286,9 @@ holding a replica.
 ### `ipfs.v1.content.replication.was_registered`
 
 Sent when a node publishes IPFS content and registers it with the replication
-policy.
+policy. The publisher emits one event per target network. Each event carries
+only that delivery network in `networkIds`, so peers on a public/shared topic do
+not learn private network ids attached to the same CID.
 
 Attributes:
 
