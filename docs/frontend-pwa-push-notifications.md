@@ -20,7 +20,9 @@ GET /push/vapid-public-key
 }
 ```
 
-If `enabled` is `false`, do not call `pushManager.subscribe`.
+If `enabled` is `false`, do not call `pushManager.subscribe`. Backend only
+reports push as enabled when both public and private VAPID keys are configured,
+even though it only returns the public key to clients.
 
 Register the browser subscription after login/session restore:
 

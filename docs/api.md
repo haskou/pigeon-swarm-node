@@ -2393,6 +2393,7 @@ Response:
 
 Frontend passes `publicKey` to
 `pushManager.subscribe({ applicationServerKey })`.
+`enabled` is `true` only when both public and private VAPID keys are configured.
 
 ### Register push subscription
 

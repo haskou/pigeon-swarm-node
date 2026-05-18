@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 import { PushNotificationDelivery } from '../../application/send/PushNotificationDelivery';
 import { PushNotificationPayload } from '../../application/send/PushNotificationPayload';
 import { PushSubscription } from '../../domain/PushSubscription';
+import { PushVapidConfiguration } from './PushVapidConfiguration';
 
 type WebPushError = Error & {
   statusCode?: number;
@@ -26,19 +27,13 @@ type WebPushModule = {
 };
 
 export class WebPushNotificationDelivery implements PushNotificationDelivery {
-  private readonly publicKey = process.env.PUSH_VAPID_PUBLIC_KEY || '';
-  private readonly privateKey = process.env.PUSH_VAPID_PRIVATE_KEY || '';
-  private readonly subject =
-    process.env.PUSH_VAPID_SUBJECT || 'mailto:admin@localhost';
-
+  private readonly configuration = new PushVapidConfiguration();
   private readonly webPush = this.loadWebPush();
 
   constructor() {
     if (this.isConfigured() && this.webPush) {
-      this.webPush.setVapidDetails(
-        this.subject,
-        this.publicKey,
-        this.privateKey,
+      this.configuration.setVapidDetailsWith((subject, publicKey, privateKey) =>
+        this.webPush?.setVapidDetails(subject, publicKey, privateKey),
       );
     }
   }
@@ -60,7 +55,7 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
   }
 
   public isConfigured(): boolean {
-    return this.publicKey.length > 0 && this.privateKey.length > 0;
+    return this.configuration.isConfigured();
   }
 
   public async send(
