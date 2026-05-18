@@ -763,6 +763,16 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current community request')
+  public async iSignTheCurrentCommunityRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest('GET', `/communities/${this.communityId}`);
+  }
+
   @given('I set a community text channel body')
   public iSetACommunityTextChannelBody(): void {
     this.body = JSON.stringify({

@@ -17,7 +17,13 @@ export class DeleteCommunityMemberRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
 
     community.leave(actorIdentityId);
-    await this.repository().save(community);
+
+    if (community.hasMembers()) {
+      await this.repository().save(community);
+    } else {
+      await this.repository().delete(community);
+    }
+
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return response

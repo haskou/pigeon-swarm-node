@@ -71,6 +71,12 @@ export class MongoCommunityRepository implements CommunityRepository {
     return document ? this.toDomain(document) : undefined;
   }
 
+  public async delete(community: Community): Promise<void> {
+    await (
+      await this.collection()
+    ).deleteOne({ _id: community.getId().valueOf() });
+  }
+
   public async findDiscoverable(options: {
     networkId?: string;
     query?: string;
