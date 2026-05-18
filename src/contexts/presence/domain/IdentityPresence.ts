@@ -107,6 +107,10 @@ export class IdentityPresence extends AggregateRoot {
     return this.identityId.isEqual(identityId) || !this.status.isInvisible();
   }
 
+  public isBusy(): boolean {
+    return this.status.isBusy();
+  }
+
   public recordHeartbeat(
     activityDetected: boolean,
     networkIds: string[],
