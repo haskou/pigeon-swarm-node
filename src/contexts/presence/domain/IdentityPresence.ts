@@ -54,7 +54,7 @@ export class IdentityPresence extends AggregateRoot {
   }
 
   private derivedStatus(now: Timestamp): PresenceStatus {
-    if (this.lastHeartbeatAt?.isBeforeOrEqual(this.timeoutThreshold(now))) {
+    if (this.lastHeartbeatAt?.isBefore(this.timeoutThreshold(now))) {
       return PresenceStatus.DISCONNECTED;
     }
 
