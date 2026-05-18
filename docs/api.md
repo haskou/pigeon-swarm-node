@@ -140,7 +140,7 @@ Identity presence heartbeat:
 Send it every 10 seconds. `active: true` means the user interacted with the
 client since the previous heartbeat. Heartbeats are not individually signed
 because the WebSocket upgrade already authenticated the identity. Backend marks
-the identity `disconnected` after roughly 10 seconds without heartbeat and
+the identity `disconnected` after roughly 20 seconds without heartbeat and
 derives `away` after 5 minutes without activity while heartbeat is still active.
 
 Heartbeat acknowledgement:
