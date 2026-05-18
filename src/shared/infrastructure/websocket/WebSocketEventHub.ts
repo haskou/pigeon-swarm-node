@@ -6,6 +6,7 @@ import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import { Document } from 'mongodb';
 import { RawData, WebSocket } from 'ws';
 
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
@@ -23,11 +24,42 @@ type WebSocketRealtimeMessage =
   | {
       event: unknown;
       type: 'domain_event';
+    }
+  | {
+      active: boolean;
+      conversationId: string;
+      identityId: string;
+      scope: 'conversation';
+      timestamp: number;
+      type: 'typing';
+    }
+  | {
+      active: boolean;
+      channelId: string;
+      communityId: string;
+      identityId: string;
+      scope: 'community_channel';
+      timestamp: number;
+      type: 'typing';
     };
 
 type WebSocketClientMessage = {
   active?: boolean;
+  channelId?: string;
+  communityId?: string;
+  conversationId?: string;
+  scope?: string;
   type?: string;
+};
+
+type ConversationRoutingDocument = Document & {
+  _id: string;
+  participantIds?: string[];
+};
+
+type CommunityRoutingDocument = Document & {
+  _id: string;
+  memberIds?: string[];
 };
 
 const identityAttributeKeys = [
@@ -171,7 +203,21 @@ export class WebSocketEventHub {
   ): void {
     const message = this.parseClientMessage(rawMessage);
 
-    if (message?.type !== 'identity_heartbeat') {
+    if (!message) {
+      return;
+    }
+
+    if (message.type === 'typing') {
+      this.relayTypingIndicator(identityId, message).catch((error: unknown) => {
+        Kernel.logger?.error(
+          `WebSocket typing indicator failed for "${identityId}": ${String(error)}`,
+        );
+      });
+
+      return;
+    }
+
+    if (message.type !== 'identity_heartbeat') {
       return;
     }
 
@@ -187,6 +233,139 @@ export class WebSocketEventHub {
       timestamp: Date.now(),
       type: 'heartbeat_ack',
     });
+  }
+
+  private async relayTypingIndicator(
+    identityId: string,
+    message: WebSocketClientMessage,
+  ): Promise<void> {
+    if (message.scope === 'conversation') {
+      await this.relayConversationTypingIndicator(identityId, message);
+
+      return;
+    }
+
+    if (message.scope === 'community_channel') {
+      await this.relayCommunityChannelTypingIndicator(identityId, message);
+    }
+  }
+
+  private async relayConversationTypingIndicator(
+    identityId: string,
+    message: WebSocketClientMessage,
+  ): Promise<void> {
+    if (typeof message.conversationId !== 'string') {
+      return;
+    }
+
+    const recipients = await this.findConversationTypingRecipients(
+      identityId,
+      message.conversationId,
+    );
+
+    this.sendToRecipients(recipients, {
+      active: Boolean(message.active),
+      conversationId: message.conversationId,
+      identityId,
+      scope: 'conversation',
+      timestamp: Date.now(),
+      type: 'typing',
+    });
+  }
+
+  private async relayCommunityChannelTypingIndicator(
+    identityId: string,
+    message: WebSocketClientMessage,
+  ): Promise<void> {
+    if (
+      typeof message.communityId !== 'string' ||
+      typeof message.channelId !== 'string'
+    ) {
+      return;
+    }
+
+    const recipients = await this.findCommunityChannelTypingRecipients(
+      identityId,
+      message.communityId,
+      message.channelId,
+    );
+
+    this.sendToRecipients(recipients, {
+      active: Boolean(message.active),
+      channelId: message.channelId,
+      communityId: message.communityId,
+      identityId,
+      scope: 'community_channel',
+      timestamp: Date.now(),
+      type: 'typing',
+    });
+  }
+
+  private async findConversationTypingRecipients(
+    identityId: string,
+    conversationId: string,
+  ): Promise<string[]> {
+    const collection = await Kernel.di
+      .getService<MongoDB>(MongoDB)
+      .getCollection<ConversationRoutingDocument>('conversations');
+    const conversation = await collection.findOne(
+      {
+        _id: conversationId,
+        participantIds: identityId,
+      },
+      {
+        projection: {
+          participantIds: 1,
+        },
+      },
+    );
+
+    return this.excludeIdentity(conversation?.participantIds || [], identityId);
+  }
+
+  private async findCommunityChannelTypingRecipients(
+    identityId: string,
+    communityId: string,
+    channelId: string,
+  ): Promise<string[]> {
+    const collection = await Kernel.di
+      .getService<MongoDB>(MongoDB)
+      .getCollection<CommunityRoutingDocument>('communities');
+    const community = await collection.findOne(
+      {
+        _id: communityId,
+        memberIds: identityId,
+        'textChannels.id': channelId,
+      },
+      {
+        projection: {
+          memberIds: 1,
+        },
+      },
+    );
+
+    return this.excludeIdentity(community?.memberIds || [], identityId);
+  }
+
+  private excludeIdentity(identityIds: string[], identityId: string): string[] {
+    return identityIds.filter((candidate) => candidate !== identityId);
+  }
+
+  private sendToRecipients(
+    recipients: string[],
+    message: WebSocketRealtimeMessage,
+  ): void {
+    for (const recipient of recipients) {
+      const recipientClients = this.clients.get(recipient);
+
+      if (!recipientClients) {
+        continue;
+      }
+
+      for (const recipientClient of recipientClients) {
+        this.send(recipientClient, message);
+      }
+    }
   }
 
   private async recordIdentityHeartbeat(
