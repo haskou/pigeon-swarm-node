@@ -254,7 +254,7 @@ export class WebSocketEventHub {
     identityId: string,
     message: WebSocketClientMessage,
   ): Promise<void> {
-    if (!message.conversationId) {
+    if (typeof message.conversationId !== 'string') {
       return;
     }
 
@@ -277,7 +277,10 @@ export class WebSocketEventHub {
     identityId: string,
     message: WebSocketClientMessage,
   ): Promise<void> {
-    if (!message.communityId || !message.channelId) {
+    if (
+      typeof message.communityId !== 'string' ||
+      typeof message.channelId !== 'string'
+    ) {
       return;
     }
 

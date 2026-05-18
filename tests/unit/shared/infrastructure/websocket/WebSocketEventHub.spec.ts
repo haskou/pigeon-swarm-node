@@ -213,6 +213,65 @@ describe('WebSocketEventHub', () => {
     expect(recipientClient.send).not.toHaveBeenCalled();
   });
 
+  it('ignores typing indicators with non-string conversation ids', async () => {
+    const hub = new WebSocketEventHub();
+    const senderIdentityId = await generateIdentityId();
+    const senderClient = buildClient();
+    const conversations = {
+      findOne: jest.fn(),
+    };
+
+    mockWebSocketMongo({ conversations });
+    hub.register(senderIdentityId, senderClient);
+    const messageHandler = getClientMessageHandler(senderClient);
+
+    jest.clearAllMocks();
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          active: true,
+          conversationId: { $ne: null },
+          scope: 'conversation',
+          type: 'typing',
+        }),
+      ),
+    );
+    await flushPromises();
+
+    expect(conversations.findOne).not.toHaveBeenCalled();
+    expect(senderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('ignores typing indicators with non-string community channel ids', async () => {
+    const hub = new WebSocketEventHub();
+    const senderIdentityId = await generateIdentityId();
+    const senderClient = buildClient();
+    const communities = {
+      findOne: jest.fn(),
+    };
+
+    mockWebSocketMongo({ communities });
+    hub.register(senderIdentityId, senderClient);
+    const messageHandler = getClientMessageHandler(senderClient);
+
+    jest.clearAllMocks();
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          active: true,
+          channelId: { $ne: null },
+          communityId: 'community-id',
+          scope: 'community_channel',
+          type: 'typing',
+        }),
+      ),
+    );
+    await flushPromises();
+
+    expect(communities.findOne).not.toHaveBeenCalled();
+    expect(senderClient.send).not.toHaveBeenCalled();
+  });
+
   it('broadcasts node-wide events to connected websocket clients', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
