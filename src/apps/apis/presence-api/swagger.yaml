@@ -24,8 +24,14 @@ paths:
           name: identityIds
           required: true
           schema:
-            type: string
-          description: Comma-separated identity ids/public keys without PEM wrapping.
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+          style: form
+          explode: true
+          description: Comma-separated identity ids or repeated identityIds query params. Identity ids are public keys without PEM wrapping.
       responses:
         '200':
           description: Presence states.
