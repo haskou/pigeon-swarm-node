@@ -13,6 +13,8 @@ export class CallStatus extends StringValueObject {
   private static readonly VALID_VALUES: string[] =
     Object.values(CallStatusEnum);
 
+  public static readonly ACTIVE = new CallStatus(CallStatusEnum.ACTIVE);
+
   constructor(value: CallStatusEnum | string) {
     super(value, CallStatus.MAX_LENGTH);
 
@@ -23,6 +25,6 @@ export class CallStatus extends StringValueObject {
   }
 
   public isActive(): boolean {
-    return this.valueOf() === CallStatusEnum.ACTIVE;
+    return this.isEqual(CallStatus.ACTIVE);
   }
 }

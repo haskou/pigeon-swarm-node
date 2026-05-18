@@ -16,8 +16,4 @@ export class ConversationType extends StringValueObject {
       new InvalidConversationTypeError(),
     );
   }
-
-  public isEqual(other: ConversationType): boolean {
-    return this.valueOf() === other.valueOf();
-  }
 }

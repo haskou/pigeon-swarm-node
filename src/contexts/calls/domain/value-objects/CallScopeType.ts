@@ -12,6 +12,14 @@ export class CallScopeType extends StringValueObject {
   private static readonly VALID_VALUES: string[] =
     Object.values(CallScopeTypeEnum);
 
+  public static readonly COMMUNITY_CHANNEL = new CallScopeType(
+    CallScopeTypeEnum.COMMUNITY_CHANNEL,
+  );
+
+  public static readonly CONVERSATION = new CallScopeType(
+    CallScopeTypeEnum.CONVERSATION,
+  );
+
   constructor(value: CallScopeTypeEnum | string) {
     super(value, CallScopeType.MAX_LENGTH);
 
@@ -22,10 +30,10 @@ export class CallScopeType extends StringValueObject {
   }
 
   public isConversation(): boolean {
-    return this.valueOf() === CallScopeTypeEnum.CONVERSATION;
+    return this.isEqual(CallScopeType.CONVERSATION);
   }
 
   public isCommunityChannel(): boolean {
-    return this.valueOf() === CallScopeTypeEnum.COMMUNITY_CHANNEL;
+    return this.isEqual(CallScopeType.COMMUNITY_CHANNEL);
   }
 }

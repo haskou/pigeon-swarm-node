@@ -49,7 +49,7 @@ export default class OneToOneConversationCreator {
     );
 
     if (existing) {
-      return existing as OneToOneConversation;
+      return existing;
     }
 
     const conversation = OneToOneConversation.create(

@@ -72,6 +72,10 @@ export class Node extends AggregateRoot {
     return this.owner?.isEqual(identityId) ?? false;
   }
 
+  public isIdentifiedBy(id: NodeId): boolean {
+    return this.id.isEqual(id);
+  }
+
   public toPrimitives() {
     return {
       id: this.id.valueOf(),

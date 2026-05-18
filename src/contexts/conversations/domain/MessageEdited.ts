@@ -48,8 +48,8 @@ export class MessageEdited extends Message {
         new Timestamp(primitives.createdAt),
         new Signature(primitives.signature),
       ),
-      new MessageId(primitives.targetMessageId as string),
-      new EncryptedMessagePayload(primitives.encryptedPayload as string),
+      new MessageId(primitives.targetMessageId),
+      new EncryptedMessagePayload(primitives.encryptedPayload),
     );
   }
 

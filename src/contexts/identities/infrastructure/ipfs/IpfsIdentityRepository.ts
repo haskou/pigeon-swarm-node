@@ -156,7 +156,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     for (const document of metadata) {
       const candidate = await this.findCandidateFromMetadata(document);
 
-      if (candidate?.toPrimitives().profile.handle === handle.valueOf()) {
+      if (candidate?.hasHandle(handle)) {
         return candidate;
       }
     }

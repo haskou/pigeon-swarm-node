@@ -14,10 +14,10 @@ export class KeychainVersion extends Integer {
   }
 
   public isFirst(): boolean {
-    return this.valueOf() === 1;
+    return this.isEqual(new KeychainVersion(1));
   }
 
   public isNextAfter(previous: KeychainVersion): boolean {
-    return this.valueOf() === previous.valueOf() + 1;
+    return this.isEqual(previous.next());
   }
 }

@@ -159,14 +159,56 @@ export class Identity extends AggregateRoot {
   }
 
   private ensureKeepsCurrentNetworks(networks: NetworkId[]): void {
-    const nextNetworkIds = networks.map((networkId) => networkId.valueOf());
-
     assert(
       this.networks
         .toArray()
-        .every((networkId) => nextNetworkIds.includes(networkId.valueOf())),
+        .every((currentNetworkId) =>
+          networks.some((networkId) => networkId.isEqual(currentNetworkId)),
+        ),
       new IdentityCannotLeaveNetworkError(),
     );
+  }
+
+  public hasHandle(handle: ProfileHandle): boolean {
+    return this.profile.hasHandle(handle);
+  }
+
+  public getId(): IdentityId {
+    return this.id;
+  }
+
+  public hasNoPreviousReference(): boolean {
+    return this.previousIdentityExternalIdentifier === undefined;
+  }
+
+  public getPreviousReference(): IdentityExternalIdentifier | undefined {
+    return this.previousIdentityExternalIdentifier;
+  }
+
+  public isFirstVersion(): boolean {
+    return this.version.isFirst();
+  }
+
+  public isIdentifiedBy(id: IdentityId): boolean {
+    return this.id.isEqual(id);
+  }
+
+  public isNewerThan(other: Identity): boolean {
+    return this.version.isGreaterThan(other.version);
+  }
+
+  public isNextVersionAfter(previous: Identity): boolean {
+    return this.version.isNextAfter(previous.version);
+  }
+
+  public keepsNetworksFrom(previous: Identity): boolean {
+    return previous.networks
+      .toArray()
+      .every((previousNetworkId) =>
+        this.networks
+          .toArray()
+          .some((networkId) => networkId.isEqual(previousNetworkId)),
+      );
   }
 
   public toPrimitives() {

@@ -38,8 +38,7 @@ export default class IdentityFinderService {
     handle: ProfileHandle,
   ): Promise<IdentityCandidate> {
     const identity = await this.findByHandle(handle);
-    const identityId = new IdentityId(identity.toPrimitives().id);
 
-    return this.findCandidateById(identityId);
+    return this.findCandidateById(identity.getId());
   }
 }

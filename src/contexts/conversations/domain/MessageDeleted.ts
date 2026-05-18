@@ -45,7 +45,7 @@ export class MessageDeleted extends Message {
         new Timestamp(primitives.createdAt),
         new Signature(primitives.signature),
       ),
-      new MessageId(primitives.targetMessageId as string),
+      new MessageId(primitives.targetMessageId),
     );
   }
 
