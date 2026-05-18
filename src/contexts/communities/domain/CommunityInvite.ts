@@ -51,11 +51,11 @@ export class CommunityInvite {
   ) {}
 
   private isExpired(now: Timestamp): boolean {
-    return Boolean(this.expiresAt && this.expiresAt.valueOf() <= now.valueOf());
+    return this.expiresAt?.isBeforeOrEqual(now) ?? false;
   }
 
   private hasUsesAvailable(): boolean {
-    return this.uses.valueOf() < this.maxUses.valueOf();
+    return this.uses.isLessThan(this.maxUses);
   }
 
   public accept(now: Timestamp = Timestamp.now()): void {

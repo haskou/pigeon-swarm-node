@@ -15,10 +15,14 @@ export class GroupConversation extends Conversation {
   private static hasAtLeastTwoDifferentParticipants(
     participants: IdentityId[],
   ): boolean {
-    return (
-      new Set(participants.map((participant) => participant.valueOf())).size >=
-      2
+    const uniqueParticipants = participants.filter(
+      (participant, index) =>
+        participants.findIndex((candidate) =>
+          candidate.isEqual(participant),
+        ) === index,
     );
+
+    return uniqueParticipants.length >= 2;
   }
 
   public static create(

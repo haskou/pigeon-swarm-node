@@ -11,9 +11,8 @@ export default class NodePeerRegistrar {
 
   public async register(message: NodePeerRegisterMessage): Promise<void> {
     const localNode = await this.nodeRepository.loadLocalNode();
-    const localNodeId = localNode.toPrimitives().id;
 
-    if (message.nodeId.valueOf() === localNodeId) {
+    if (localNode.isIdentifiedBy(message.nodeId)) {
       return;
     }
 

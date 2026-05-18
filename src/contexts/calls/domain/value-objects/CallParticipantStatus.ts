@@ -46,24 +46,21 @@ export class CallParticipantStatus extends StringValueObject {
   }
 
   public canReceiveSignal(): boolean {
-    return (
-      this.valueOf() === CallParticipantStatusEnum.JOINED ||
-      this.valueOf() === CallParticipantStatusEnum.RINGING
-    );
+    return this.isActiveReceiver();
   }
 
   public isJoined(): boolean {
-    return this.valueOf() === CallParticipantStatusEnum.JOINED;
+    return this.isEqual(CallParticipantStatus.JOINED);
   }
 
   public isActiveReceiver(): boolean {
     return (
-      this.valueOf() === CallParticipantStatusEnum.JOINED ||
-      this.valueOf() === CallParticipantStatusEnum.RINGING
+      this.isEqual(CallParticipantStatus.JOINED) ||
+      this.isEqual(CallParticipantStatus.RINGING)
     );
   }
 
   public isRinging(): boolean {
-    return this.valueOf() === CallParticipantStatusEnum.RINGING;
+    return this.isEqual(CallParticipantStatus.RINGING);
   }
 }

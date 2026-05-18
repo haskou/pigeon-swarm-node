@@ -6,37 +6,49 @@ import { IdentityCandidate } from '../repositories/IdentityRepository';
 
 export class IdentityResolutionDomainService {
   public resolve(identityId: IdentityId, candidates: Identity[]): Identity {
-    const matchingCandidates = candidates.filter(
-      (candidate) => candidate.toPrimitives().id === identityId.valueOf(),
+    const matchingCandidates = candidates.filter((candidate) =>
+      candidate.isIdentifiedBy(identityId),
     );
 
     if (matchingCandidates.length === 0) {
       throw new IdentityNotFoundError(identityId.valueOf());
     }
 
-    return matchingCandidates.sort(
-      (left, right) =>
-        right.toPrimitives().version - left.toPrimitives().version,
-    )[0];
+    return matchingCandidates.sort((left, right) => {
+      if (right.isNewerThan(left)) {
+        return 1;
+      }
+
+      if (left.isNewerThan(right)) {
+        return -1;
+      }
+
+      return 0;
+    })[0];
   }
 
   public resolveCandidate(
     identityId: IdentityId,
     candidates: IdentityCandidate[],
   ): IdentityCandidate {
-    const matchingCandidates = candidates.filter(
-      (candidate) =>
-        candidate.identity.toPrimitives().id === identityId.valueOf(),
+    const matchingCandidates = candidates.filter((candidate) =>
+      candidate.identity.isIdentifiedBy(identityId),
     );
 
     if (matchingCandidates.length === 0) {
       throw new IdentityNotFoundError(identityId.valueOf());
     }
 
-    return matchingCandidates.sort(
-      (left, right) =>
-        right.identity.toPrimitives().version -
-        left.identity.toPrimitives().version,
-    )[0];
+    return matchingCandidates.sort((left, right) => {
+      if (right.identity.isNewerThan(left.identity)) {
+        return 1;
+      }
+
+      if (left.identity.isNewerThan(right.identity)) {
+        return -1;
+      }
+
+      return 0;
+    })[0];
   }
 }

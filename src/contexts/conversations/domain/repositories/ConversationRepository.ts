@@ -3,6 +3,7 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { Conversation } from '../Conversation';
 import { Message } from '../Message';
+import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 
@@ -62,7 +63,7 @@ export interface ConversationRepository {
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
     networkId: NetworkId,
-  ): Promise<Conversation | undefined>;
+  ): Promise<OneToOneConversation | undefined>;
   findConversationSyncScopes(): Promise<ConversationSyncScope[]>;
   markReadUntil(
     conversationId: ConversationId,

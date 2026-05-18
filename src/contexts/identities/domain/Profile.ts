@@ -27,6 +27,10 @@ export class Profile {
     private readonly handle?: ProfileHandle,
   ) {}
 
+  public hasHandle(handle: ProfileHandle): boolean {
+    return this.handle?.isEqual(handle) ?? false;
+  }
+
   public toPrimitives() {
     return {
       banner: this.banner?.valueOf(),

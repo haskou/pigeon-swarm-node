@@ -54,7 +54,7 @@ export class MessageSent extends Message {
           ? new MessageId(primitives.replyToMessageId)
           : undefined,
       ),
-      new EncryptedMessagePayload(primitives.encryptedPayload as string),
+      new EncryptedMessagePayload(primitives.encryptedPayload),
       primitives.attachmentExternalIdentifiers.map(
         (externalIdentifier) =>
           new AttachmentExternalIdentifier(externalIdentifier),

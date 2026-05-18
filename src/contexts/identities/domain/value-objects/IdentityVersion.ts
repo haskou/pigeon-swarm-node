@@ -12,4 +12,12 @@ export class IdentityVersion extends Integer {
   public next(): IdentityVersion {
     return new IdentityVersion(this.valueOf() + 1);
   }
+
+  public isFirst(): boolean {
+    return this.isEqual(new IdentityVersion(1));
+  }
+
+  public isNextAfter(previous: IdentityVersion): boolean {
+    return this.isEqual(previous.next());
+  }
 }

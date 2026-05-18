@@ -1,5 +1,6 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
+import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import {
   ConversationMessageCandidate,
   ConversationMessagesAround,
@@ -503,14 +504,20 @@ export default class MongoConversationRepository implements Repository {
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
     networkId: NetworkId,
-  ): Promise<Conversation | undefined> {
-    return this.findById(
+  ): Promise<OneToOneConversation | undefined> {
+    const conversation = await this.findById(
       ConversationId.deterministic(
         firstIdentityId,
         secondIdentityId,
         networkId,
       ),
     );
+
+    if (conversation instanceof OneToOneConversation) {
+      return conversation;
+    }
+
+    return undefined;
   }
 
   public async markReadUntil(
