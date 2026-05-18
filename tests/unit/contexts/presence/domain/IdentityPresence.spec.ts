@@ -3,7 +3,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { KeyPair, Timestamp } from '@haskou/value-objects';
 
 describe('IdentityPresence', () => {
-  it('keeps presence online at the 10 second heartbeat boundary', async () => {
+  it('keeps presence online when one heartbeat is skipped', async () => {
     const keyPair = await KeyPair.generate();
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const presence = IdentityPresence.fromPrimitives({
@@ -16,13 +16,13 @@ describe('IdentityPresence', () => {
 
     presence.refreshDerivedStatus(
       ['network-id'],
-      new Timestamp(1770000010000),
+      new Timestamp(1770000020000),
     );
 
     expect(presence.toPrimitives().status).toBe('available');
   });
 
-  it('marks presence as disconnected after more than 10 seconds without heartbeat', async () => {
+  it('marks presence as disconnected after more than 20 seconds without heartbeat', async () => {
     const keyPair = await KeyPair.generate();
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const presence = IdentityPresence.fromPrimitives({
@@ -35,7 +35,7 @@ describe('IdentityPresence', () => {
 
     presence.refreshDerivedStatus(
       ['network-id'],
-      new Timestamp(1770000010001),
+      new Timestamp(1770000020001),
     );
 
     expect(presence.toPrimitives().status).toBe('disconnected');
