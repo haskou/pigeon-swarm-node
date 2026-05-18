@@ -42,6 +42,10 @@ Feature: Delete community member API
         "memberIds": []
       }
       """
+    Given I sign the current community request
+    When I GET the current community
+    Then response code is equal to 409
+    And response body should contain "Community not found"
 
   Scenario: Owner cannot leave a private community while other members remain
     Given I am an anonymous user

@@ -4,6 +4,7 @@ import { Community } from '../Community';
 import { CommunityId } from '../value-objects/CommunityId';
 
 export interface CommunityRepository {
+  delete(community: Community): Promise<void>;
   findDiscoverable(options: {
     networkId?: string;
     query?: string;
