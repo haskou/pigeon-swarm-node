@@ -45,10 +45,16 @@ import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/dom
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
+import IPFSReplicationStatusSummaryRefresher from '@app/contexts/ipfs-replication/application/refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/application/register-claim/IPFSContentReplicaClaimRegistrar';
 import IPFSContentReplicationMetadataRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationMetadataRegistrar';
+import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
+import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
+import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
@@ -117,6 +123,20 @@ async function init() {
   );
   const ipfsContentReplicationRepository =
     new MongoIPFSContentReplicationRepository(mongo);
+  const ipfsReplicationSummaryRepository =
+    new MongoIPFSReplicationStatusSummaryRepository(mongo);
+  const ipfsReplicationSummaryRefresher =
+    new IPFSReplicationStatusSummaryRefresher(
+      new IPFSReplicationStatusFinder(
+        ipfsContentReplicationRepository,
+        ipfsReplicaClaimRepository,
+        Kernel.di.getService<MongoNodeMetadataRepository>(
+          MongoNodeMetadataRepository,
+        ),
+        new MongoNodePeerRepository(mongo),
+      ),
+      new IPFSReplicationStatusSummaryUpdater(ipfsReplicationSummaryRepository),
+    );
   const pushNotificationDispatcher = new PushNotificationDispatcher(
     new MongoPushSubscriptionRepository(mongo),
     new MongoIdentityPresenceRepository(mongo),
@@ -165,12 +185,16 @@ async function init() {
     ),
     new RegisterIPFSReplicaClaimWhenClaimed(
       messageBus,
-      new IPFSContentReplicaClaimRegistrar(ipfsReplicaClaimRepository),
+      new IPFSContentReplicaClaimRegistrar(
+        ipfsReplicaClaimRepository,
+        ipfsReplicationSummaryRefresher,
+      ),
     ),
     new RegisterIPFSContentReplicationWhenRegistered(
       messageBus,
       new IPFSContentReplicationMetadataRegistrar(
         ipfsContentReplicationRepository,
+        ipfsReplicationSummaryRefresher,
       ),
     ),
     new RegisterIdentityPresenceWhenUpdated(messageBus),

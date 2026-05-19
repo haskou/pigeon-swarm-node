@@ -8,9 +8,13 @@ import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFS
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationMetadata } from '../../domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '../../domain/value-objects/IPFSContentReplicationPriority';
+import IPFSReplicationStatusSummaryRefresher from '../refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 
 export default class IPFSContentReplicationMetadataRegistrar {
-  constructor(private readonly repository: IPFSContentReplicationRepository) {}
+  constructor(
+    private readonly repository: IPFSContentReplicationRepository,
+    private readonly summaryRefresher?: IPFSReplicationStatusSummaryRefresher,
+  ) {}
 
   public async register(params: {
     cid: string;
@@ -43,6 +47,7 @@ export default class IPFSContentReplicationMetadataRegistrar {
         params.updatedAt ? new Timestamp(params.updatedAt) : Timestamp.now(),
       );
       await this.repository.save(existing);
+      await this.summaryRefresher?.refresh();
 
       return existing;
     }
@@ -68,6 +73,7 @@ export default class IPFSContentReplicationMetadataRegistrar {
     }
 
     await this.repository.save(content);
+    await this.summaryRefresher?.refresh();
 
     return content;
   }

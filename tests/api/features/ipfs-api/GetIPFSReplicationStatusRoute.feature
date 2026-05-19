@@ -17,11 +17,17 @@ Feature: Get IPFS replication status route
     Given I sign the current IPFS replication status request
     When I GET "/ipfs/replication/status"
     Then response code is equal to 200
-    And response body should contain "ipfs_public_upload"
-    And response body should contain "desiredReplicas"
-    And response body should contain "knownReplicas"
-    And response body should contain "releaseLocalReplica"
-    And response body should contain "localResponsible"
+    And response data should match partially
+      """
+      {
+        "summary": {
+          "contentCount": 1,
+          "localResponsibleCount": 1,
+          "releasableCount": 0,
+          "totalSizeBytes": 5
+        }
+      }
+      """
 
   Scenario: Reject replication status from a non-owner
     Given the local node has no owner and no networks

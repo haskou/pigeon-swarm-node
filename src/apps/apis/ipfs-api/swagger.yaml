@@ -128,7 +128,7 @@ paths:
       tags:
         - ipfs
       summary: Get local IPFS replication status
-      description: Returns IPFS content metadata known by the local node and the conservative replica responsibility plan for each network. Known content includes locally uploaded CIDs and CIDs announced by other nodes through network-scoped pubsub, even before the local node claims a replica. A background maintenance job uses the same policy to pin missing responsibilities and release safe extra local replicas.
+      description: Returns the precomputed local IPFS replication summary. The endpoint does not list known CIDs or calculate replica responsibility on demand; uploads, pubsub replication events and the maintenance scheduler refresh the summary document.
       security:
         - signedRequest: []
       responses:
@@ -235,92 +235,35 @@ components:
     IPFSReplicationStatusResource:
       type: object
       required:
-        - contents
         - localNodeId
+        - summary
       properties:
         localNodeId:
           type: string
           example: 550e8400-e29b-41d4-a716-446655440010
-        contents:
-          type: array
-          items:
-            $ref: '#/components/schemas/IPFSReplicationContentResource'
-    IPFSReplicationContentResource:
+        summary:
+          $ref: '#/components/schemas/IPFSReplicationSummaryResource'
+    IPFSReplicationSummaryResource:
       type: object
       required:
-        - cid
-        - context
-        - createdAt
-        - networks
-        - priority
-        - sizeBytes
+        - contentCount
+        - localResponsibleCount
+        - releasableCount
+        - totalSizeBytes
         - updatedAt
       properties:
-        cid:
-          type: string
-          example: bafybeigdyrztomockencryptedcid
-        context:
-          type: string
-          example: ipfs_private_upload
-        createdAt:
+        contentCount:
           type: number
-          example: 1770000000000
-        networks:
-          type: array
-          items:
-            $ref: '#/components/schemas/IPFSReplicationNetworkStatusResource'
-        ownerIdentityId:
-          type: string
-          nullable: true
-          example: MCowBQYDK2VwAyEA...
-        priority:
-          type: string
-          enum:
-            - critical
-            - normal
-            - cold
-          example: normal
-        sizeBytes:
+          example: 42
+        localResponsibleCount:
           type: number
-          example: 215040
+          example: 38
+        releasableCount:
+          type: number
+          example: 3
+        totalSizeBytes:
+          type: number
+          example: 104857600
         updatedAt:
           type: number
           example: 1770000000000
-    IPFSReplicationNetworkStatusResource:
-      type: object
-      required:
-        - activeNodeCount
-        - desiredReplicas
-        - knownReplicaNodeIds
-        - knownReplicas
-        - localResponsible
-        - networkId
-        - releaseLocalReplica
-        - responsibleNodeIds
-      properties:
-        activeNodeCount:
-          type: number
-          example: 2
-        desiredReplicas:
-          type: number
-          example: 2
-        knownReplicaNodeIds:
-          type: array
-          items:
-            type: string
-        knownReplicas:
-          type: number
-          example: 1
-        localResponsible:
-          type: boolean
-          example: true
-        networkId:
-          type: string
-          example: 550e8400-e29b-41d4-a716-446655440001
-        releaseLocalReplica:
-          type: boolean
-          example: false
-        responsibleNodeIds:
-          type: array
-          items:
-            type: string

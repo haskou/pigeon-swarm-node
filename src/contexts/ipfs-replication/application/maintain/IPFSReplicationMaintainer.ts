@@ -12,6 +12,7 @@ import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSCo
 import IPFSReplicationStatusFinder, {
   IPFSContentReplicationStatus,
 } from '../find-status/IPFSReplicationStatusFinder';
+import IPFSReplicationStatusSummaryUpdater from '../update-status-summary/IPFSReplicationStatusSummaryUpdater';
 
 export type IPFSReplicationMaintenanceResult = {
   claimedReplicas: number;
@@ -28,6 +29,7 @@ export default class IPFSReplicationMaintainer {
     private readonly claimRepository: IPFSContentReplicaClaimRepository,
     private readonly ipfs: IPFS,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly summaryUpdater?: IPFSReplicationStatusSummaryUpdater,
   ) {}
 
   private async claimReplica(params: {
@@ -158,6 +160,14 @@ export default class IPFSReplicationMaintainer {
     return result;
   }
 
+  private async updateSummary(): Promise<void> {
+    if (!this.summaryUpdater) {
+      return;
+    }
+
+    await this.summaryUpdater.updateFromStatus(await this.finder.find());
+  }
+
   public async maintain(): Promise<IPFSReplicationMaintenanceResult> {
     const status = await this.finder.find();
     let result = this.emptyResult();
@@ -170,6 +180,8 @@ export default class IPFSReplicationMaintainer {
         );
       }
     }
+
+    await this.updateSummary();
 
     return result;
   }

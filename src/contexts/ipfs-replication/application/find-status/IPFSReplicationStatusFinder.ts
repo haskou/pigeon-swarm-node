@@ -9,6 +9,11 @@ import { IPFSReplicationPolicy } from '../../domain/IPFSReplicationPolicy';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
 
+type NodeRepositoryWithLocalNodeId = NodeRepository & {
+  loadLocalNodeId?(): Promise<{
+    valueOf(): string;
+  }>;
+};
 type NetworkReplicationStatus = {
   activeNodeCount: number;
   desiredReplicas: number;
@@ -46,11 +51,19 @@ export default class IPFSReplicationStatusFinder {
   constructor(
     private readonly contentRepository: IPFSContentReplicationRepository,
     private readonly claimRepository: IPFSContentReplicaClaimRepository,
-    private readonly nodeRepository: NodeRepository,
+    private readonly nodeRepository: NodeRepositoryWithLocalNodeId,
     private readonly nodePeerRepository: NodePeerRepository,
     policy?: IPFSReplicationPolicy,
   ) {
     this.policy = policy ?? new IPFSReplicationPolicy();
+  }
+
+  private async localNodeId(): Promise<string> {
+    if (this.nodeRepository.loadLocalNodeId) {
+      return (await this.nodeRepository.loadLocalNodeId()).valueOf();
+    }
+
+    return (await this.nodeRepository.loadLocalNode()).toPrimitives().id;
   }
 
   private score(cid: string, nodeId: string, networkId: string): string {
@@ -161,18 +174,17 @@ export default class IPFSReplicationStatusFinder {
 
   public async find(): Promise<IPFSReplicationStatus> {
     const contents = await this.contentRepository.findAll();
-    const [claims, localNode, activePeers] = await Promise.all([
+    const [claims, localNodeId, activePeers] = await Promise.all([
       this.claimRepository.findByCids(
         contents.map((content) => content.getCid()),
       ),
-      this.nodeRepository.loadLocalNode(),
+      this.localNodeId(),
       this.nodePeerRepository.findActive(
         new Date(
           Date.now() - IPFSReplicationStatusFinder.ACTIVE_PEER_WINDOW_MS,
         ),
       ),
     ]);
-    const localNodeId = localNode.toPrimitives().id;
     const activeNodeIdsByNetwork = this.activeNodeIdsByNetwork(
       localNodeId,
       activePeers,

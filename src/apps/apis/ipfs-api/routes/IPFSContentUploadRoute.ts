@@ -1,8 +1,13 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
+import IPFSReplicationStatusSummaryRefresher from '@app/contexts/ipfs-replication/application/refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
+import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
+import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -19,11 +24,24 @@ export abstract class IPFSContentUploadRoute extends Route {
 
   private replicationRegistrar(): IPFSContentReplicationRegistrar {
     const mongo = this.get<MongoDB>(MongoDB);
+    const contentRepository = new MongoIPFSContentReplicationRepository(mongo);
+    const claimRepository = new MongoIPFSContentReplicaClaimRepository(mongo);
 
     return new IPFSContentReplicationRegistrar(
-      new MongoIPFSContentReplicationRepository(mongo),
-      new MongoIPFSContentReplicaClaimRepository(mongo),
+      contentRepository,
+      claimRepository,
       this.get<MessageBus>(MessageBus) as DomainEventPublisher,
+      new IPFSReplicationStatusSummaryRefresher(
+        new IPFSReplicationStatusFinder(
+          contentRepository,
+          claimRepository,
+          this.get<MongoNodeMetadataRepository>(MongoNodeMetadataRepository),
+          new MongoNodePeerRepository(mongo),
+        ),
+        new IPFSReplicationStatusSummaryUpdater(
+          new MongoIPFSReplicationStatusSummaryRepository(mongo),
+        ),
+      ),
     );
   }
 
