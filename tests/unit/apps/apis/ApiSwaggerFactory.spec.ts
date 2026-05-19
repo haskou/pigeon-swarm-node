@@ -22,6 +22,7 @@ describe('ApiSwaggerFactory', () => {
         'notifications-api',
         'presence-api',
         'push-api',
+        'stickers-api',
       ]);
       expect(specs['calls-api']).toContain('/calls/:');
       expect(specs['communities-api']).toContain('/communities/:');
@@ -33,6 +34,7 @@ describe('ApiSwaggerFactory', () => {
       expect(specs['notifications-api']).toContain('/notifications/:');
       expect(specs['presence-api']).toContain('/presence/:');
       expect(specs['push-api']).toContain('/push/subscriptions:');
+      expect(specs['stickers-api']).toContain('/stickers/packs:');
     });
   });
 
@@ -68,6 +70,9 @@ describe('ApiSwaggerFactory', () => {
       expect(spec).toContain(
         "$ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'",
       );
+      expect(spec).toContain(
+        "$ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs'",
+      );
     });
   });
 
@@ -86,6 +91,7 @@ describe('ApiSwaggerFactory', () => {
         'notifications-api': '/api/swagger/notifications-api/swagger.yaml',
         'presence-api': '/api/swagger/presence-api/swagger.yaml',
         'push-api': '/api/swagger/push-api/swagger.yaml',
+        'stickers-api': '/api/swagger/stickers-api/swagger.yaml',
       });
     });
   });

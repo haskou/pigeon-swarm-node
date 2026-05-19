@@ -1,0 +1,423 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Stickers API
+  version: 1.0.0
+  description: Endpoints for sticker packs and public IPFS sticker metadata.
+tags:
+  - name: stickers
+paths:
+  /stickers/packs:
+    get:
+      tags:
+        - stickers
+      summary: List sticker packs
+      parameters:
+        - name: ownerIdentityId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sticker packs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPacksResource'
+    post:
+      tags:
+        - stickers
+      summary: Create a sticker pack
+      security:
+        - signedRequest: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StickerPackBody'
+      responses:
+        '200':
+          description: Sticker pack created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPackResource'
+        '401':
+          description: Invalid signed request.
+  /stickers/me:
+    get:
+      tags:
+        - stickers
+      summary: Get authenticated sticker library
+      description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity.
+      security:
+        - signedRequest: []
+      responses:
+        '200':
+          description: Authenticated sticker library.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+        '401':
+          description: Invalid signed request.
+  /stickers/packs/{packId}:
+    get:
+      tags:
+        - stickers
+      summary: Get a sticker pack
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      responses:
+        '200':
+          description: Sticker pack.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPackResource'
+        '409':
+          description: Sticker pack not found.
+    patch:
+      tags:
+        - stickers
+      summary: Update a sticker pack profile
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StickerPackBody'
+      responses:
+        '200':
+          description: Sticker pack updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPackResource'
+        '401':
+          description: Invalid signed request.
+        '409':
+          description: Sticker pack not found or actor is not the owner.
+  /stickers/packs/{packId}/stickers:
+    post:
+      tags:
+        - stickers
+      summary: Add a sticker to a pack
+      description: Sticker assets must already be uploaded as public IPFS bytes with POST /ipfs/public. This endpoint stores metadata and validates size and dimensions.
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StickerBody'
+      responses:
+        '200':
+          description: Sticker added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPackResource'
+        '401':
+          description: Invalid signed request.
+        '409':
+          description: Domain validation failed.
+  /stickers/packs/{packId}/stickers/{stickerId}:
+    patch:
+      tags:
+        - stickers
+      summary: Update a sticker
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StickerBody'
+      responses:
+        '200':
+          description: Sticker updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPackResource'
+        '401':
+          description: Invalid signed request.
+        '409':
+          description: Domain validation failed.
+    delete:
+      tags:
+        - stickers
+      summary: Remove a sticker from a pack
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPackResource'
+        '401':
+          description: Invalid signed request.
+        '409':
+          description: Sticker pack not found, sticker not found or actor is not the owner.
+  /stickers/packs/{packId}/saved:
+    put:
+      tags:
+        - stickers
+      summary: Save a sticker pack for the authenticated identity
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+    delete:
+      tags:
+        - stickers
+      summary: Remove a saved sticker pack from the authenticated identity
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+  /stickers/packs/{packId}/stickers/{stickerId}/favorite:
+    put:
+      tags:
+        - stickers
+      summary: Mark a sticker as favorite
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+    delete:
+      tags:
+        - stickers
+      summary: Remove a sticker from favorites
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+  /stickers/packs/{packId}/stickers/{stickerId}/used:
+    post:
+      tags:
+        - stickers
+      summary: Record a sticker usage in the authenticated recent stickers
+      description: Backend cannot infer this from encrypted messages, so frontend calls this after a sticker message is sent successfully.
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+components:
+  securitySchemes:
+    signedRequest:
+      type: apiKey
+      in: header
+      name: X-Signature
+  parameters:
+    PackId:
+      name: packId
+      in: path
+      required: true
+      schema:
+        type: string
+    StickerId:
+      name: stickerId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    StickerPackBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          example: Blue archive reactions
+    StickerBody:
+      type: object
+      required:
+        - type
+        - assetCid
+        - contentType
+        - sizeBytes
+        - dimensions
+      properties:
+        type:
+          type: string
+          enum:
+            - static
+            - animated
+            - video
+        assetCid:
+          type: string
+          description: CID returned by POST /ipfs/public.
+          example: bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq
+        contentType:
+          type: string
+          example: image/png
+        sizeBytes:
+          type: integer
+          description: Static max 512 KiB, animated max 64 KiB, video max 256 KiB.
+          example: 215040
+        dimensions:
+          type: object
+          required:
+            - width
+            - height
+          properties:
+            width:
+              type: integer
+              maximum: 512
+              example: 512
+            height:
+              type: integer
+              maximum: 512
+              example: 512
+    StickerResource:
+      allOf:
+        - $ref: '#/components/schemas/StickerBody'
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+    StickerPackResource:
+      type: object
+      required:
+        - id
+        - ownerIdentityId
+        - name
+        - stickers
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        ownerIdentityId:
+          type: string
+        name:
+          type: string
+        stickers:
+          type: array
+          items:
+            $ref: '#/components/schemas/StickerResource'
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+    StickerPacksResource:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StickerPackResource'
+    FavoriteStickerResource:
+      type: object
+      required:
+        - packId
+        - stickerId
+        - favoritedAt
+        - sticker
+      properties:
+        packId:
+          type: string
+        stickerId:
+          type: string
+        favoritedAt:
+          type: integer
+        sticker:
+          $ref: '#/components/schemas/StickerResource'
+    RecentStickerResource:
+      type: object
+      required:
+        - packId
+        - stickerId
+        - usedAt
+        - sticker
+      properties:
+        packId:
+          type: string
+        stickerId:
+          type: string
+        usedAt:
+          type: integer
+        sticker:
+          $ref: '#/components/schemas/StickerResource'
+    StickerUserLibraryResource:
+      type: object
+      required:
+        - savedPacks
+        - favoriteStickers
+        - recentStickers
+      properties:
+        savedPacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/StickerPackResource'
+        favoriteStickers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FavoriteStickerResource'
+        recentStickers:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentStickerResource'

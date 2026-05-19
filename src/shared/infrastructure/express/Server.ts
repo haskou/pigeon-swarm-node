@@ -61,6 +61,19 @@ import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresence
 import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/DeletePushSubscriptionRoute';
 import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
 import { PutPushSubscriptionRoute } from '@app/apps/apis/push-api/routes/PutPushSubscriptionRoute';
+import { DeleteFavoriteStickerRoute } from '@app/apps/apis/stickers-api/routes/DeleteFavoriteStickerRoute';
+import { DeleteSavedStickerPackRoute } from '@app/apps/apis/stickers-api/routes/DeleteSavedStickerPackRoute';
+import { DeleteStickerRoute } from '@app/apps/apis/stickers-api/routes/DeleteStickerRoute';
+import { GetStickerPackRoute } from '@app/apps/apis/stickers-api/routes/GetStickerPackRoute';
+import { GetStickerPacksRoute } from '@app/apps/apis/stickers-api/routes/GetStickerPacksRoute';
+import { GetStickerUserLibraryRoute } from '@app/apps/apis/stickers-api/routes/GetStickerUserLibraryRoute';
+import { PatchStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PatchStickerPackRoute';
+import { PatchStickerRoute } from '@app/apps/apis/stickers-api/routes/PatchStickerRoute';
+import { PostStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PostStickerPackRoute';
+import { PostStickerRoute } from '@app/apps/apis/stickers-api/routes/PostStickerRoute';
+import { PostUsedStickerRoute } from '@app/apps/apis/stickers-api/routes/PostUsedStickerRoute';
+import { PutFavoriteStickerRoute } from '@app/apps/apis/stickers-api/routes/PutFavoriteStickerRoute';
+import { PutSavedStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PutSavedStickerPackRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -219,6 +232,19 @@ export default class Server {
           GetPushVapidPublicKeyRoute,
           PutPushSubscriptionRoute,
           DeletePushSubscriptionRoute,
+          GetStickerPacksRoute,
+          GetStickerPackRoute,
+          GetStickerUserLibraryRoute,
+          PostStickerPackRoute,
+          PatchStickerPackRoute,
+          PutSavedStickerPackRoute,
+          DeleteSavedStickerPackRoute,
+          PostStickerRoute,
+          PatchStickerRoute,
+          DeleteStickerRoute,
+          PutFavoriteStickerRoute,
+          DeleteFavoriteStickerRoute,
+          PostUsedStickerRoute,
           GetCommunitiesRoute,
           GetCommunityDiscoveryRoute,
           GetCommunityMembershipRequestsRoute,

@@ -17,6 +17,7 @@ const openAPIFiles = [
   join(apisRoot, 'keychains-api/swagger.yaml'),
   join(apisRoot, 'nodes-api/swagger.yaml'),
   join(apisRoot, 'notifications-api/swagger.yaml'),
+  join(apisRoot, 'stickers-api/swagger.yaml'),
 ];
 
 function escapeRegExp(value: string): string {
