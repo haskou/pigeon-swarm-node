@@ -3,9 +3,11 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { IPFSId } from '../../shared/infrastructure/ipfs/helia/IPFSId';
+import { IPFSContentFilename } from './value-objects/IPFSContentFilename';
 import { IPFSContentReplicationContext } from './value-objects/IPFSContentReplicationContext';
+import { IPFSContentReplicationMetadata } from './value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from './value-objects/IPFSContentReplicationPriority';
-import { IPFSContentSize } from './value-objects/IPFSContentSize';
+import { IPFSContentType } from './value-objects/IPFSContentType';
 
 export class IPFSContentReplication {
   private updatedAt: Timestamp;
@@ -14,7 +16,7 @@ export class IPFSContentReplication {
     cid: IPFSId,
     context: IPFSContentReplicationContext,
     networkIds: NetworkId[],
-    sizeBytes: IPFSContentSize,
+    metadata: IPFSContentReplicationMetadata,
     ownerIdentityId: IdentityId | undefined,
     priority: IPFSContentReplicationPriority,
     createdAt: Timestamp = Timestamp.now(),
@@ -23,7 +25,7 @@ export class IPFSContentReplication {
       cid,
       context,
       networkIds,
-      sizeBytes,
+      metadata,
       ownerIdentityId,
       priority,
       createdAt,
@@ -37,7 +39,11 @@ export class IPFSContentReplication {
       new IPFSId(primitives.cid),
       new IPFSContentReplicationContext(primitives.context),
       primitives.networkIds.map((networkId) => new NetworkId(networkId)),
-      new IPFSContentSize(primitives.sizeBytes),
+      IPFSContentReplicationMetadata.fromPrimitives(
+        primitives.sizeBytes,
+        primitives.contentType,
+        primitives.filename,
+      ),
       primitives.ownerIdentityId
         ? new IdentityId(primitives.ownerIdentityId)
         : undefined,
@@ -50,7 +56,7 @@ export class IPFSContentReplication {
     private readonly cid: IPFSId,
     private readonly context: IPFSContentReplicationContext,
     private readonly networkIds: NetworkId[],
-    private readonly sizeBytes: IPFSContentSize,
+    private metadata: IPFSContentReplicationMetadata,
     private readonly ownerIdentityId: IdentityId | undefined,
     private readonly priority: IPFSContentReplicationPriority,
     private readonly createdAt: Timestamp,
@@ -84,6 +90,18 @@ export class IPFSContentReplication {
     }
   }
 
+  public getContentType(): IPFSContentType {
+    return this.metadata.getContentType();
+  }
+
+  public getFilename(): IPFSContentFilename | undefined {
+    return this.metadata.getFilename();
+  }
+
+  public updateMetadata(metadata: IPFSContentReplicationMetadata): void {
+    this.metadata = metadata;
+  }
+
   public touch(updatedAt: Timestamp = Timestamp.now()): void {
     this.updatedAt = updatedAt;
   }
@@ -91,12 +109,14 @@ export class IPFSContentReplication {
   public toPrimitives() {
     return {
       cid: this.cid.valueOf(),
+      contentType: this.metadata.getContentType().valueOf(),
       context: this.context.valueOf(),
       createdAt: this.createdAt.valueOf(),
+      filename: this.metadata.getFilename()?.valueOf(),
       networkIds: this.networkIds.map((networkId) => networkId.valueOf()),
       ownerIdentityId: this.ownerIdentityId?.valueOf(),
       priority: this.priority.valueOf(),
-      sizeBytes: this.sizeBytes.valueOf(),
+      sizeBytes: this.metadata.getSizeBytes().valueOf(),
       updatedAt: this.updatedAt.valueOf(),
     };
   }

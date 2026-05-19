@@ -22,8 +22,10 @@ export default class MongoIPFSContentReplicationRepository {
 
     return {
       _id: primitives.cid,
+      contentType: primitives.contentType,
       context: primitives.context,
       createdAt: primitives.createdAt,
+      filename: primitives.filename,
       networkIds: primitives.networkIds,
       ownerIdentityId: primitives.ownerIdentityId,
       priority: primitives.priority,
@@ -37,8 +39,10 @@ export default class MongoIPFSContentReplicationRepository {
   ): IPFSContentReplication {
     return IPFSContentReplication.fromPrimitives({
       cid: document._id,
+      contentType: document.contentType,
       context: document.context,
       createdAt: document.createdAt,
+      filename: document.filename,
       networkIds: document.networkIds,
       ownerIdentityId: document.ownerIdentityId,
       priority: document.priority,

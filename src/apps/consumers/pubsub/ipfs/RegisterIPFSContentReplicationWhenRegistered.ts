@@ -34,8 +34,16 @@ export default class RegisterIPFSContentWhenRegistered extends Consumer {
   public async handler(event: DomainEvent): Promise<void> {
     await this.registrar.register({
       cid: String(event.attributes.cid),
+      contentType:
+        typeof event.attributes.contentType === 'string'
+          ? event.attributes.contentType
+          : undefined,
       context: String(event.attributes.context),
       createdAt: Number(event.attributes.createdAt),
+      filename:
+        typeof event.attributes.filename === 'string'
+          ? event.attributes.filename
+          : undefined,
       networkIds: Array.isArray(event.attributes.networkIds)
         ? event.attributes.networkIds.map(String)
         : [],

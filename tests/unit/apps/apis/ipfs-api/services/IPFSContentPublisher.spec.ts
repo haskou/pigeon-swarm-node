@@ -79,7 +79,9 @@ describe('IPFSContentPublisher', () => {
     expect(registeredReplications).toMatchObject([
       {
         cid,
+        contentType: 'text/plain',
         context: 'ipfs_public_upload',
+        filename: 'hello.txt',
         localNodeId: nodeId,
         networkIds: [networkId],
         ownerIdentityId: identityId,
@@ -116,7 +118,9 @@ describe('IPFSContentPublisher', () => {
     expect(registeredReplications).toMatchObject([
       {
         cid,
+        contentType: 'application/octet-stream',
         context: 'ipfs_private_upload',
+        filename: undefined,
         localNodeId: nodeId,
         networkIds: [networkId],
         ownerIdentityId: identityId,

@@ -11,9 +11,12 @@ import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
+import { IPFSContentFilename } from '../../domain/value-objects/IPFSContentFilename';
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
+import { IPFSContentReplicationMetadata } from '../../domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '../../domain/value-objects/IPFSContentReplicationPriority';
 import { IPFSContentSize } from '../../domain/value-objects/IPFSContentSize';
+import { IPFSContentType } from '../../domain/value-objects/IPFSContentType';
 
 export default class IPFSContentReplicationRegistrar {
   constructor(
@@ -65,8 +68,10 @@ export default class IPFSContentReplicationRegistrar {
         (networkId) =>
           new IPFSContentReplicationWasRegisteredEvent(primitives.cid, {
             cid: primitives.cid,
+            contentType: primitives.contentType,
             context: primitives.context,
             createdAt: primitives.createdAt,
+            filename: primitives.filename,
             networkIds: [networkId],
             ownerIdentityId: primitives.ownerIdentityId,
             priority: primitives.priority,
@@ -79,7 +84,9 @@ export default class IPFSContentReplicationRegistrar {
 
   public async register(params: {
     cid: string;
+    contentType?: string;
     context: string;
+    filename?: string;
     localNodeId: string;
     networkIds: string[];
     ownerIdentityId?: string;
@@ -91,9 +98,17 @@ export default class IPFSContentReplicationRegistrar {
     const networkIds = params.networkIds.map(
       (networkId) => new NetworkId(networkId),
     );
+    const metadata = IPFSContentReplicationMetadata.create(
+      new IPFSContentSize(params.sizeBytes),
+      params.contentType
+        ? new IPFSContentType(params.contentType)
+        : IPFSContentType.DEFAULT,
+      params.filename ? new IPFSContentFilename(params.filename) : undefined,
+    );
 
     if (existing) {
       existing.addNetworkIds(networkIds);
+      existing.updateMetadata(metadata);
       existing.touch();
       await this.repository.save(existing);
       await this.publishRegistration(existing);
@@ -106,7 +121,7 @@ export default class IPFSContentReplicationRegistrar {
       cid,
       new IPFSContentReplicationContext(params.context),
       networkIds,
-      new IPFSContentSize(params.sizeBytes),
+      metadata,
       params.ownerIdentityId
         ? new IdentityId(params.ownerIdentityId)
         : undefined,

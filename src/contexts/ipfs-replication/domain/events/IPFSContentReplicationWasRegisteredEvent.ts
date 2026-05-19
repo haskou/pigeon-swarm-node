@@ -2,8 +2,10 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
 type IPFSContentReplicationWasRegisteredAttributes = {
   cid: string;
+  contentType: string;
   context: string;
   createdAt: number;
+  filename?: string;
   networkIds: string[];
   ownerIdentityId?: string;
   priority: string;

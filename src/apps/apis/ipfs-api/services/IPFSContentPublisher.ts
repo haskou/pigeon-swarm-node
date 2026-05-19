@@ -90,7 +90,9 @@ export default class IPFSContentPublisher {
 
   private async registerReplication(params: {
     cid: string;
+    contentType: string;
     context: string;
+    filename?: string;
     networkIds: string[];
     ownerIdentityId: IdentityId;
     sizeBytes: number;
@@ -101,7 +103,9 @@ export default class IPFSContentPublisher {
 
     await this.replicationRegistrar.register({
       cid: params.cid,
+      contentType: params.contentType,
       context: params.context,
+      filename: params.filename,
       localNodeId,
       networkIds: params.networkIds,
       ownerIdentityId: params.ownerIdentityId.valueOf(),
@@ -121,7 +125,9 @@ export default class IPFSContentPublisher {
 
     await this.registerReplication({
       cid: cid.valueOf(),
+      contentType: document.contentType,
       context,
+      filename: params.filename,
       networkIds: await this.networkIds(),
       ownerIdentityId: params.ownerIdentityId,
       sizeBytes: params.body.length,
@@ -146,7 +152,9 @@ export default class IPFSContentPublisher {
 
     await this.registerReplication({
       cid: cid.valueOf(),
+      contentType: params.contentType || defaultContentType,
       context,
+      filename: params.filename,
       networkIds: await this.networkIds(),
       ownerIdentityId: params.ownerIdentityId,
       sizeBytes: params.body.length,

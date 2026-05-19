@@ -665,7 +665,8 @@ Implemented:
 - register the returned CID in local MongoDB replication metadata
 - accept raw request bytes instead of wrapping the content in JSON/base64
 - store the binary bytes directly in IPFS
-- preserve the original filename through `X-Filename`
+- preserve response metadata from `Content-Type` and `X-Filename` in local
+  replication metadata
 - limit content size to 50 MiB
 - return the CID to store in signed identity profiles or posts
 
@@ -682,10 +683,14 @@ Response:
 
 ```http
 HTTP/1.1 200 OK
-Content-Type: application/octet-stream
+Content-Type: image/png
+Content-Disposition: inline; filename="profile-image.png"; filename*=UTF-8''profile-image.png
 ```
 
-The body is the raw byte stream. If the CID points to existing JSON content, the
+The body is the raw byte stream. `Content-Type` and `Content-Disposition` are
+resolved from the replication metadata created during upload or received through
+network sync. If metadata is unknown, the endpoint falls back to
+`application/octet-stream`. If the CID points to existing JSON content, the
 endpoint still returns that JSON document for compatibility with identities,
 keychains and private upload documents.
 

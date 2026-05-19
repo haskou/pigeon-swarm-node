@@ -6,16 +6,18 @@ import { Timestamp } from '@haskou/value-objects';
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
 import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
+import { IPFSContentReplicationMetadata } from '../../domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '../../domain/value-objects/IPFSContentReplicationPriority';
-import { IPFSContentSize } from '../../domain/value-objects/IPFSContentSize';
 
 export default class IPFSContentReplicationMetadataRegistrar {
   constructor(private readonly repository: IPFSContentReplicationRepository) {}
 
   public async register(params: {
     cid: string;
+    contentType?: string;
     context: string;
     createdAt?: number;
+    filename?: string;
     networkIds: string[];
     ownerIdentityId?: string;
     priority: string;
@@ -30,6 +32,13 @@ export default class IPFSContentReplicationMetadataRegistrar {
 
     if (existing) {
       existing.addNetworkIds(networkIds);
+      existing.updateMetadata(
+        IPFSContentReplicationMetadata.fromPrimitives(
+          params.sizeBytes,
+          params.contentType,
+          params.filename,
+        ),
+      );
       existing.touch(
         params.updatedAt ? new Timestamp(params.updatedAt) : Timestamp.now(),
       );
@@ -42,7 +51,11 @@ export default class IPFSContentReplicationMetadataRegistrar {
       cid,
       new IPFSContentReplicationContext(params.context),
       networkIds,
-      new IPFSContentSize(params.sizeBytes),
+      IPFSContentReplicationMetadata.fromPrimitives(
+        params.sizeBytes,
+        params.contentType,
+        params.filename,
+      ),
       params.ownerIdentityId
         ? new IdentityId(params.ownerIdentityId)
         : undefined,

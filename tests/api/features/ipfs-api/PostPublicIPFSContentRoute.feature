@@ -17,5 +17,6 @@ Feature: Post public IPFS content route
       | size        | 5           |
     When I GET the published IPFS content as binary
     Then response code is equal to 200
-    And response header "content-type" should contain "application/octet-stream"
+    And response header "content-type" should contain "image/png"
+    And response header "content-disposition" should contain "avatar.png"
     And binary response body should be "hello"

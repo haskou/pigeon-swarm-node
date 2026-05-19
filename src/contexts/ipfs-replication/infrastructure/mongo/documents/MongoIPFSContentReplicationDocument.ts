@@ -2,8 +2,10 @@ import { IPFSContentReplicationPriorityValue } from '../../../domain/value-objec
 
 export interface MongoIPFSContentReplicationDocument {
   _id: string;
+  contentType?: string;
   context: string;
   createdAt: number;
+  filename?: string;
   networkIds: string[];
   ownerIdentityId?: string;
   priority: IPFSContentReplicationPriorityValue;
