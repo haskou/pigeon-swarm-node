@@ -2508,6 +2508,116 @@ Response:
 Backend also removes stale subscriptions automatically when the push provider
 returns `404` or `410`.
 
+## Stickers API
+
+Sticker files are public IPFS assets. Upload the binary first with
+`POST /ipfs/public`, then store the returned CID in sticker metadata. The
+sticker pack itself lives in MongoDB and is returned through this API.
+
+Current limits:
+
+- static stickers: max 512 KiB
+- animated stickers: max 64 KiB
+- video stickers: max 256 KiB
+- dimensions: max 512x512
+- every sticker must have at least one associated emoji
+
+### Create sticker pack
+
+```http
+POST /stickers/packs
+```
+
+Requires signed HTTP headers. The authenticated identity becomes the pack owner.
+
+Body:
+
+```json
+{
+  "name": "Blue archive reactions",
+  "description": "Public sticker pack for chat reactions."
+}
+```
+
+### List sticker packs
+
+```http
+GET /stickers/packs?ownerIdentityId=<identityId>
+```
+
+`ownerIdentityId` is optional. Without it, the endpoint returns known packs.
+
+### Get sticker pack
+
+```http
+GET /stickers/packs/{packId}
+```
+
+### Update sticker pack
+
+```http
+PATCH /stickers/packs/{packId}
+```
+
+Requires signed HTTP headers from the pack owner.
+
+Body:
+
+```json
+{
+  "name": "Updated pack name",
+  "description": "Updated description."
+}
+```
+
+### Add sticker
+
+```http
+POST /stickers/packs/{packId}/stickers
+```
+
+Requires signed HTTP headers from the pack owner.
+
+Body:
+
+```json
+{
+  "name": "Smile",
+  "type": "static",
+  "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+  "contentType": "image/png",
+  "sizeBytes": 215040,
+  "dimensions": {
+    "width": 512,
+    "height": 512
+  },
+  "emojis": ["😄"]
+}
+```
+
+Supported `type` values:
+
+- `static`
+- `animated`
+- `video`
+
+### Update sticker
+
+```http
+PATCH /stickers/packs/{packId}/stickers/{stickerId}
+```
+
+Requires signed HTTP headers from the pack owner. Body is the same as add
+sticker.
+
+### Remove sticker
+
+```http
+DELETE /stickers/packs/{packId}/stickers/{stickerId}
+```
+
+Requires signed HTTP headers from the pack owner.
+
 ## Planned API
 
 The following API shapes are not implemented yet. They are kept here as design

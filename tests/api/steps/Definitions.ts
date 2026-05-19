@@ -57,6 +57,7 @@ export default class Definitions {
   private response: any = null;
   private restClient: RestClient = new RestClient();
   private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
+  private stickerPackId: string | undefined;
 
   @before()
   public resetScenarioState(): void {
@@ -81,6 +82,7 @@ export default class Definitions {
     this.otherIdentityKeyPair = undefined;
     this.ownerIdentityId = undefined;
     this.response = null;
+    this.stickerPackId = undefined;
     this.ipfsDefinition.resetScenarioState();
   }
 
@@ -1744,6 +1746,83 @@ export default class Definitions {
   @given('I sign the current push subscription removal request')
   public async iSignTheCurrentPushSubscriptionRemovalRequest(): Promise<void> {
     await this.signCurrentRequest('DELETE', '/push/subscriptions');
+  }
+
+  @given('I set a sticker pack body')
+  public iSetAStickerPackBody(): void {
+    this.body = JSON.stringify({
+      description: 'API sticker pack',
+      name: 'API stickers',
+    });
+  }
+
+  @given('I sign the current sticker pack creation request')
+  public async iSignTheCurrentStickerPackCreationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/stickers/packs/');
+  }
+
+  @given('I remember the current sticker pack')
+  public iRememberTheCurrentStickerPack(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Sticker pack response id not found.');
+    }
+
+    this.stickerPackId = this.response.data.id;
+  }
+
+  @given('I set a static sticker body')
+  public iSetAStaticStickerBody(): void {
+    this.body = JSON.stringify({
+      assetCid: 'bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq',
+      contentType: 'image/png',
+      dimensions: {
+        height: 512,
+        width: 512,
+      },
+      emojis: ['😄'],
+      name: 'Smile',
+      sizeBytes: 215040,
+      type: 'static',
+    });
+  }
+
+  @given('I set an oversized animated sticker body')
+  public iSetAnOversizedAnimatedStickerBody(): void {
+    this.body = JSON.stringify({
+      assetCid: 'bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq',
+      contentType: 'image/webp',
+      dimensions: {
+        height: 512,
+        width: 512,
+      },
+      emojis: ['😄'],
+      name: 'Oversized animated',
+      sizeBytes: 70000,
+      type: 'animated',
+    });
+  }
+
+  @given('I sign the current sticker creation request')
+  public async iSignTheCurrentStickerCreationRequest(): Promise<void> {
+    await this.signCurrentRequest(
+      'POST',
+      `/stickers/packs/${this.stickerPackId}/stickers`,
+    );
+  }
+
+  @given('I sign the current sticker packs request')
+  public async iSignTheCurrentStickerPacksRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/stickers/packs');
+  }
+
+  @when('I POST to the current sticker pack stickers')
+  public async iPostToTheCurrentStickerPackStickers(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/stickers/packs/${this.stickerPackId}/stickers`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
   }
 
   @given('the notification recipient signs the current notification patch request')

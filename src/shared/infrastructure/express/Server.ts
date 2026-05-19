@@ -61,6 +61,13 @@ import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresence
 import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/DeletePushSubscriptionRoute';
 import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
 import { PutPushSubscriptionRoute } from '@app/apps/apis/push-api/routes/PutPushSubscriptionRoute';
+import { DeleteStickerRoute } from '@app/apps/apis/stickers-api/routes/DeleteStickerRoute';
+import { GetStickerPackRoute } from '@app/apps/apis/stickers-api/routes/GetStickerPackRoute';
+import { GetStickerPacksRoute } from '@app/apps/apis/stickers-api/routes/GetStickerPacksRoute';
+import { PatchStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PatchStickerPackRoute';
+import { PatchStickerRoute } from '@app/apps/apis/stickers-api/routes/PatchStickerRoute';
+import { PostStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PostStickerPackRoute';
+import { PostStickerRoute } from '@app/apps/apis/stickers-api/routes/PostStickerRoute';
 import * as express from 'express';
 import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
@@ -219,6 +226,13 @@ export default class Server {
           GetPushVapidPublicKeyRoute,
           PutPushSubscriptionRoute,
           DeletePushSubscriptionRoute,
+          GetStickerPacksRoute,
+          GetStickerPackRoute,
+          PostStickerPackRoute,
+          PatchStickerPackRoute,
+          PostStickerRoute,
+          PatchStickerRoute,
+          DeleteStickerRoute,
           GetCommunitiesRoute,
           GetCommunityDiscoveryRoute,
           GetCommunityMembershipRequestsRoute,

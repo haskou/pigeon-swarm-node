@@ -202,3 +202,11 @@ paths:
     $ref: './push-api/swagger.yaml#/paths/~1push~1vapid-public-key'
   /push/subscriptions:
     $ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'
+  /stickers/packs:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs'
+  /stickers/packs/{packId}:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}'
+  /stickers/packs/{packId}/stickers:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers'
+  /stickers/packs/{packId}/stickers/{stickerId}:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}'
