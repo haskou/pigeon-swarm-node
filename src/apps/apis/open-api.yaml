@@ -10,6 +10,7 @@ tags:
   - name: identities
   - name: ipfs
   - name: keychains
+  - name: link-previews
   - name: nodes
   - name: notifications
   - name: presence
@@ -178,6 +179,8 @@ paths:
     $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'
   /keychains/{identityId}:
     $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1{identityId}'
+  /link-previews:
+    $ref: './link-previews-api/swagger.yaml#/paths/~1link-previews'
   /node/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1'
   /node/networks/:

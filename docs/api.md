@@ -807,6 +807,55 @@ Implemented:
   replicas
 - keep per-CID responsibility data internal to the maintenance scheduler
 
+## Link Preview HTTP API
+
+Link previews are fetched by the backend so the frontend can render URL cards
+without exposing user cookies, browser-local networks or private metadata.
+
+### Create link preview
+
+```http
+POST /link-previews
+```
+
+Requires a signed request. Body:
+
+```json
+{
+  "url": "https://example.com/article"
+}
+```
+
+Response:
+
+```json
+{
+  "url": "https://example.com/article",
+  "finalUrl": "https://example.com/article",
+  "title": "Example article",
+  "description": "Short description",
+  "image": "https://example.com/preview.png",
+  "siteName": "Example"
+}
+```
+
+Implemented security rules:
+
+- allow only `http` and `https`
+- block `localhost`
+- block private and local IP ranges, including `127.0.0.0/8`, `10.0.0.0/8`,
+  `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `fc00::/7` and `fe80::/10`
+- resolve DNS before fetching and connect only to the validated address
+- re-resolve and revalidate every redirect target
+- limit redirects to 5
+- limit downloaded HTML to 1 MB
+- use a 5 second timeout
+- send only a backend user-agent and HTML accept header; never forward user
+  cookies or request headers
+- cache successful preview results for 1 hour
+- rate limit by authenticated identity and requester IP
+- discard preview image URLs that do not pass the same URL/IP validation
+
 ## Identity Presence HTTP API
 
 Presence is Mongo-only runtime state. It is not stored in IPFS and it is

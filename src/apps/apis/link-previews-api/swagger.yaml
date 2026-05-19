@@ -1,0 +1,76 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Link Previews API
+  version: 1.0.0
+  description: Authenticated, SSRF-hardened URL preview endpoint.
+tags:
+  - name: link-previews
+paths:
+  /link-previews:
+    post:
+      tags:
+        - link-previews
+      summary: Create or read a cached link preview
+      description: |
+        Fetches bounded HTML from an external `http` or `https` URL and returns
+        preview metadata. The backend blocks localhost/private IPs, resolves DNS
+        before every request, revalidates every redirect target, limits
+        redirects, caps downloaded HTML to 1 MB, uses a short timeout, does not
+        forward user cookies or headers, caches results, and rate-limits by
+        authenticated identity and requester IP.
+      security:
+        - signedRequest: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostLinkPreviewBody'
+      responses:
+        '200':
+          description: Link preview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkPreviewResource'
+        '400':
+          description: Invalid, unsupported, localhost or private-network URL.
+        '401':
+          description: Invalid signed request.
+        '429':
+          description: Rate limit exceeded.
+        '503':
+          description: Preview could not be fetched.
+components:
+  securitySchemes:
+    signedRequest:
+      type: apiKey
+      in: header
+      name: X-Signature
+  schemas:
+    PostLinkPreviewBody:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          example: https://example.com/article
+    LinkPreviewResource:
+      type: object
+      required:
+        - url
+        - finalUrl
+      properties:
+        url:
+          type: string
+        finalUrl:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+        siteName:
+          type: string
