@@ -11,7 +11,7 @@ export class IPFSReplicationStatusSummary {
       new IPFSContentSize(0),
       new Integer(0),
       new Integer(0),
-      Timestamp.now(),
+      new Timestamp(0),
     );
   }
 

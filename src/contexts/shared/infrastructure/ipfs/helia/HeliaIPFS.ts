@@ -112,6 +112,37 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return this.getPeers().length > 0;
   }
 
+  private isAsyncIterableBytes(
+    value: unknown,
+  ): value is AsyncIterable<Uint8Array> {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      Symbol.asyncIterator in value
+    );
+  }
+
+  private async collectRawBlockBytes(
+    parsedCid: ParsedCidLike,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array[]> {
+    const rawBlocks = this.heliaCore.blockstore.get(parsedCid, {
+      signal,
+    }) as unknown;
+
+    if (this.isAsyncIterableBytes(rawBlocks)) {
+      const chunks: Uint8Array[] = [];
+
+      for await (const rawBlock of rawBlocks) {
+        chunks.push(rawBlock);
+      }
+
+      return chunks;
+    }
+
+    return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
+  }
+
   private async publishRoutingRecord(
     key: string,
     value: string,
@@ -165,20 +196,19 @@ export abstract class HeliaIPFS implements IPFSConnection {
     );
     const chunks: Uint8Array[] = [];
 
-    try {
-      for await (const chunk of unixfsClient.cat(parsedCid, { signal })) {
-        chunks.push(chunk);
-      }
-    } catch (error: unknown) {
-      if (parsedCid.code !== HeliaIPFS.RAW_CODEC_CODE) {
-        throw error;
-      }
-
-      for await (const rawBlock of this.heliaCore.blockstore.get(parsedCid, {
+    if (parsedCid.code === HeliaIPFS.RAW_CODEC_CODE) {
+      chunks.push(...(await this.collectRawBlockBytes(parsedCid, signal)));
+      await this.pinningStrategy.ensurePinned(
+        this.heliaCore,
+        parsedCid,
         signal,
-      })) {
-        chunks.push(rawBlock);
-      }
+      );
+
+      return Buffer.concat(chunks);
+    }
+
+    for await (const chunk of unixfsClient.cat(parsedCid, { signal })) {
+      chunks.push(chunk);
     }
 
     await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);

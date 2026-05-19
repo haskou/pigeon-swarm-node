@@ -160,11 +160,17 @@ export default class IPFSReplicationMaintainer {
     return result;
   }
 
+  private async updateSummary(): Promise<void> {
+    if (!this.summaryUpdater) {
+      return;
+    }
+
+    await this.summaryUpdater.updateFromStatus(await this.finder.find());
+  }
+
   public async maintain(): Promise<IPFSReplicationMaintenanceResult> {
     const status = await this.finder.find();
     let result = this.emptyResult();
-
-    await this.summaryUpdater?.updateFromStatus(status);
 
     for (const content of status.contents) {
       for (const network of content.networks) {
@@ -174,6 +180,8 @@ export default class IPFSReplicationMaintainer {
         );
       }
     }
+
+    await this.updateSummary();
 
     return result;
   }
