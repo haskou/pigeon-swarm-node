@@ -2572,7 +2572,6 @@ library:
       "favoritedAt": 1770000000000,
       "sticker": {
         "id": "01J...",
-        "name": "Smile",
         "type": "static",
         "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
         "contentType": "image/png",
@@ -2591,7 +2590,6 @@ library:
       "usedAt": 1770000000000,
       "sticker": {
         "id": "01J...",
-        "name": "Smile",
         "type": "static",
         "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
         "contentType": "image/png",
@@ -2657,7 +2655,6 @@ Body:
 
 ```json
 {
-  "name": "Smile",
   "type": "static",
   "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
   "contentType": "image/png",

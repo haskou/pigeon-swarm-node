@@ -1791,7 +1791,6 @@ export default class Definitions {
         height: 512,
         width: 512,
       },
-      name: 'Smile',
       sizeBytes: 215040,
       type: 'static',
     });
@@ -1806,7 +1805,6 @@ export default class Definitions {
         height: 512,
         width: 512,
       },
-      name: 'Oversized animated',
       sizeBytes: 70000,
       type: 'animated',
     });

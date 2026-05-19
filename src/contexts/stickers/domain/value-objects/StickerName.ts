@@ -1,9 +1,0 @@
-import { StringValueObject } from '@haskou/value-objects';
-
-export class StickerName extends StringValueObject {
-  private static readonly MAX_LENGTH = 80;
-
-  constructor(value: string | StringValueObject) {
-    super(value, StickerName.MAX_LENGTH);
-  }
-}

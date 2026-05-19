@@ -291,17 +291,12 @@ components:
     StickerBody:
       type: object
       required:
-        - name
         - type
         - assetCid
         - contentType
         - sizeBytes
         - dimensions
       properties:
-        name:
-          type: string
-          maxLength: 80
-          example: Smile
         type:
           type: string
           enum:

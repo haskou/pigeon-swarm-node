@@ -2,7 +2,6 @@ import { StickerDetails } from '@app/contexts/stickers/domain/StickerDetails';
 import { StickerAssetCid } from '@app/contexts/stickers/domain/value-objects/StickerAssetCid';
 import { StickerContentType } from '@app/contexts/stickers/domain/value-objects/StickerContentType';
 import { StickerDimensions } from '@app/contexts/stickers/domain/value-objects/StickerDimensions';
-import { StickerName } from '@app/contexts/stickers/domain/value-objects/StickerName';
 import { StickerSize } from '@app/contexts/stickers/domain/value-objects/StickerSize';
 import { StickerType } from '@app/contexts/stickers/domain/value-objects/StickerType';
 import { Integer } from '@haskou/value-objects';
@@ -24,7 +23,6 @@ export class StickerBodyMapper {
     const type = this.type();
 
     return new StickerDetails(
-      this.name(),
       type,
       this.assetCid(),
       this.contentType(),
@@ -38,10 +36,6 @@ export class StickerBodyMapper {
       new Integer(this.body.dimensions.width),
       new Integer(this.body.dimensions.height),
     );
-  }
-
-  public name(): StickerName {
-    return new StickerName(this.body.name);
   }
 
   public size(type: StickerType): StickerSize {

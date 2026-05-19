@@ -27,4 +27,4 @@ Feature: Get sticker user library route
     And response body should contain "savedPacks"
     And response body should contain "favoriteStickers"
     And response body should contain "recentStickers"
-    And response body should contain "Smile"
+    And response body should contain "assetCid"

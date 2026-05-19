@@ -6,7 +6,6 @@ export interface StickerResource {
     width: number;
   };
   id: string;
-  name: string;
   sizeBytes: number;
   type: string;
 }

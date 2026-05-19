@@ -19,4 +19,4 @@ Feature: Post used sticker route
     When I POST the current sticker as used
     Then response code is equal to 200
     And response body should contain "recentStickers"
-    And response body should contain "Smile"
+    And response body should contain "assetCid"

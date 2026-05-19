@@ -14,7 +14,6 @@ Feature: Post sticker route
     And I sign the current sticker creation request
     When I POST to the current sticker pack stickers
     Then response code is equal to 200
-    And response body should contain "Smile"
     And response body should contain "assetCid"
 
   Scenario: Reject an oversized animated sticker

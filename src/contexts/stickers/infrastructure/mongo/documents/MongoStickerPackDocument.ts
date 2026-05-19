@@ -8,7 +8,6 @@ export interface MongoStickerDocument {
     width: number;
   };
   id: string;
-  name: string;
   sizeBytes: number;
   type: StickerTypeValue;
 }

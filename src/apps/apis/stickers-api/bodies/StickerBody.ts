@@ -13,9 +13,6 @@ export class StickerBody {
   @ValidateNested()
   public readonly dimensions: StickerDimensionsBody;
 
-  @IsString()
-  public readonly name: string;
-
   @IsInt()
   public readonly sizeBytes: number;
 

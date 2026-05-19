@@ -19,7 +19,7 @@ Feature: Put favorite sticker route
     When I PUT the current sticker as favorite
     Then response code is equal to 200
     And response body should contain "favoriteStickers"
-    And response body should contain "Smile"
+    And response body should contain "assetCid"
     Given I sign the current favorite sticker removal request
     When I DELETE the current favorite sticker
     Then response code is equal to 200
