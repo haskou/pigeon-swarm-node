@@ -1,10 +1,8 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
-import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
-import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import IPFSReplicationStatusSummaryFinder from '@app/contexts/ipfs-replication/application/find-summary/IPFSReplicationStatusSummaryFinder';
+import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
-import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -21,14 +19,12 @@ export class GetIPFSReplicationStatusRoute extends Route {
 
   private readonly loader: NodeLoader = this.get<NodeLoader>(NodeLoader);
 
-  private finder(): IPFSReplicationStatusFinder {
+  private finder(): IPFSReplicationStatusSummaryFinder {
     const mongo = this.get<MongoDB>(MongoDB);
 
-    return new IPFSReplicationStatusFinder(
-      new MongoIPFSContentReplicationRepository(mongo),
-      new MongoIPFSContentReplicaClaimRepository(mongo),
+    return new IPFSReplicationStatusSummaryFinder(
+      new MongoIPFSReplicationStatusSummaryRepository(mongo),
       this.get<MongoNodeMetadataRepository>(MongoNodeMetadataRepository),
-      new MongoNodePeerRepository(mongo),
     );
   }
 

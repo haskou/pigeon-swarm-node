@@ -1,11 +1,22 @@
-import { IPFSReplicationStatus } from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
+import { IPFSReplicationStatusSummary } from '@app/contexts/ipfs-replication/domain/IPFSReplicationStatusSummary';
 
 import { IPFSReplicationStatusResource } from '../resources/IPFSReplicationStatusResource';
 
 export class IPFSReplicationStatusViewModel {
-  constructor(private readonly status: IPFSReplicationStatus) {}
+  constructor(private readonly summary: IPFSReplicationStatusSummary) {}
 
   public toResource(): IPFSReplicationStatusResource {
-    return this.status;
+    const primitives = this.summary.toPrimitives();
+
+    return {
+      localNodeId: primitives.localNodeId,
+      summary: {
+        contentCount: primitives.contentCount,
+        localResponsibleCount: primitives.localResponsibleCount,
+        releasableCount: primitives.releasableCount,
+        totalSizeBytes: primitives.totalSizeBytes,
+        updatedAt: primitives.updatedAt,
+      },
+    };
   }
 }

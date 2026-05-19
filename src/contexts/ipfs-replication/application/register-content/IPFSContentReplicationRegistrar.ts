@@ -17,12 +17,14 @@ import { IPFSContentReplicationMetadata } from '../../domain/value-objects/IPFSC
 import { IPFSContentReplicationPriority } from '../../domain/value-objects/IPFSContentReplicationPriority';
 import { IPFSContentSize } from '../../domain/value-objects/IPFSContentSize';
 import { IPFSContentType } from '../../domain/value-objects/IPFSContentType';
+import IPFSReplicationStatusSummaryRefresher from '../refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 
 export default class IPFSContentReplicationRegistrar {
   constructor(
     private readonly repository: IPFSContentReplicationRepository,
     private readonly claimRepository: IPFSContentReplicaClaimRepository,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly summaryRefresher?: IPFSReplicationStatusSummaryRefresher,
   ) {}
 
   private async claimLocalReplicas(
@@ -113,6 +115,7 @@ export default class IPFSContentReplicationRegistrar {
       await this.repository.save(existing);
       await this.publishRegistration(existing);
       await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
+      await this.summaryRefresher?.refresh();
 
       return existing;
     }
@@ -131,6 +134,7 @@ export default class IPFSContentReplicationRegistrar {
     await this.repository.save(content);
     await this.publishRegistration(content);
     await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
+    await this.summaryRefresher?.refresh();
 
     return content;
   }

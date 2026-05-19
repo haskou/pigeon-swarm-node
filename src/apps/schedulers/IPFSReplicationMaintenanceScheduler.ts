@@ -1,7 +1,9 @@
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
 import IPFSReplicationMaintainer from '@app/contexts/ipfs-replication/application/maintain/IPFSReplicationMaintainer';
+import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
@@ -26,6 +28,9 @@ export default class IPFSReplicationMaintenanceScheduler extends Scheduler {
       claimRepository,
       this.get<IPFS>(IPFS),
       this.get<MessageBus>(MessageBus),
+      new IPFSReplicationStatusSummaryUpdater(
+        new MongoIPFSReplicationStatusSummaryRepository(mongo),
+      ),
     );
   }
 

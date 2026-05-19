@@ -758,12 +758,13 @@ Implemented:
 GET /ipfs/replication/status
 ```
 
-Requires signed request headers. This endpoint reports local replication
-metadata and the deterministic responsibility plan for known CIDs.
-Known CIDs include content uploaded through the local node and content metadata
-announced by other nodes through network-scoped pubsub events. A node can
-therefore report a CID even when it is not currently responsible for holding a
-local replica.
+Requires signed request headers. This endpoint reports a precomputed local
+replication summary. It does not return known CIDs and does not calculate
+replica responsibility during the request.
+
+The summary is refreshed when local uploads register replication metadata, when
+network-scoped pubsub replication/claim events are consumed, and when the
+background maintenance scheduler runs.
 
 The current policy is intentionally conservative:
 
@@ -782,29 +783,13 @@ Response:
 ```json
 {
   "localNodeId": "<nodeId>",
-  "contents": [
-    {
-      "cid": "<cid>",
-      "context": "ipfs_private_upload",
-      "sizeBytes": 215040,
-      "priority": "normal",
-      "ownerIdentityId": "<identityId>",
-      "createdAt": 1770000000000,
-      "updatedAt": 1770000000000,
-      "networks": [
-        {
-          "networkId": "<networkId>",
-          "activeNodeCount": 2,
-          "desiredReplicas": 2,
-          "knownReplicas": 1,
-          "knownReplicaNodeIds": ["<nodeId>"],
-          "localResponsible": true,
-          "releaseLocalReplica": false,
-          "responsibleNodeIds": ["<nodeId>", "<peerNodeId>"]
-        }
-      ]
-    }
-  ]
+  "summary": {
+    "contentCount": 42,
+    "totalSizeBytes": 104857600,
+    "localResponsibleCount": 38,
+    "releasableCount": 3,
+    "updatedAt": 1770000000000
+  }
 }
 ```
 
@@ -818,10 +803,9 @@ Implemented:
 - derive active node counts from node heartbeat peer metadata
 - keep generous replica margins to avoid losing half the data when there are
   only a few nodes
-- expose the planned responsible nodes per CID/network
 - periodically pin missing local responsibilities and release safe extra local
   replicas
-- avoid automatic unpin/garbage collection until replica claims are modeled
+- keep per-CID responsibility data internal to the maintenance scheduler
 
 ## Identity Presence HTTP API
 

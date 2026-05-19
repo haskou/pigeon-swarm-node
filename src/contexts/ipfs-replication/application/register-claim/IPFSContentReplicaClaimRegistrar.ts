@@ -5,9 +5,13 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSReplicationStatusSummaryRefresher from '../refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 
 export default class IPFSContentReplicaClaimRegistrar {
-  constructor(private readonly repository: IPFSContentReplicaClaimRepository) {}
+  constructor(
+    private readonly repository: IPFSContentReplicaClaimRepository,
+    private readonly summaryRefresher?: IPFSReplicationStatusSummaryRefresher,
+  ) {}
 
   public async register(params: {
     cid: string;
@@ -23,6 +27,7 @@ export default class IPFSContentReplicaClaimRegistrar {
     );
 
     await this.repository.save(claim);
+    await this.summaryRefresher?.refresh();
 
     return claim;
   }
