@@ -45,6 +45,23 @@ paths:
                 $ref: '#/components/schemas/StickerPackResource'
         '401':
           description: Invalid signed request.
+  /stickers/me:
+    get:
+      tags:
+        - stickers
+      summary: Get authenticated sticker library
+      description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity.
+      security:
+        - signedRequest: []
+      responses:
+        '200':
+          description: Authenticated sticker library.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+        '401':
+          description: Invalid signed request.
   /stickers/packs/{packId}:
     get:
       tags:
@@ -160,6 +177,88 @@ paths:
           description: Invalid signed request.
         '409':
           description: Sticker pack not found, sticker not found or actor is not the owner.
+  /stickers/packs/{packId}/saved:
+    put:
+      tags:
+        - stickers
+      summary: Save a sticker pack for the authenticated identity
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+    delete:
+      tags:
+        - stickers
+      summary: Remove a saved sticker pack from the authenticated identity
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+  /stickers/packs/{packId}/stickers/{stickerId}/favorite:
+    put:
+      tags:
+        - stickers
+      summary: Mark a sticker as favorite
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+    delete:
+      tags:
+        - stickers
+      summary: Remove a sticker from favorites
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
+  /stickers/packs/{packId}/stickers/{stickerId}/used:
+    post:
+      tags:
+        - stickers
+      summary: Record a sticker usage in the authenticated recent stickers
+      description: Backend cannot infer this from encrypted messages, so frontend calls this after a sticker message is sent successfully.
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+        - $ref: '#/components/parameters/StickerId'
+      responses:
+        '200':
+          description: Sticker library updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerUserLibraryResource'
 components:
   securitySchemes:
     signedRequest:
@@ -292,3 +391,54 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StickerPackResource'
+    FavoriteStickerResource:
+      type: object
+      required:
+        - packId
+        - stickerId
+        - favoritedAt
+        - sticker
+      properties:
+        packId:
+          type: string
+        stickerId:
+          type: string
+        favoritedAt:
+          type: integer
+        sticker:
+          $ref: '#/components/schemas/StickerResource'
+    RecentStickerResource:
+      type: object
+      required:
+        - packId
+        - stickerId
+        - usedAt
+        - sticker
+      properties:
+        packId:
+          type: string
+        stickerId:
+          type: string
+        usedAt:
+          type: integer
+        sticker:
+          $ref: '#/components/schemas/StickerResource'
+    StickerUserLibraryResource:
+      type: object
+      required:
+        - savedPacks
+        - favoriteStickers
+        - recentStickers
+      properties:
+        savedPacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/StickerPackResource'
+        favoriteStickers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FavoriteStickerResource'
+        recentStickers:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentStickerResource'

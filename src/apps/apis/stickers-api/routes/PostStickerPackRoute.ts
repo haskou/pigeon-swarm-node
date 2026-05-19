@@ -23,8 +23,11 @@ export class PostStickerPackRoute extends StickerRouteSupport {
       new StickerPackName(body.name),
       new StickerPackDescription(body.description),
     );
+    const library = await this.findLibrary(ownerIdentityId);
 
+    library.savePack(pack.getId());
     await this.repository().save(pack);
+    await this.libraryRepository().save(library);
 
     return response
       .status(HttpRouteStatusEnum.OK)

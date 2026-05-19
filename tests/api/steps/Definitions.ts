@@ -58,6 +58,7 @@ export default class Definitions {
   private restClient: RestClient = new RestClient();
   private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
   private stickerPackId: string | undefined;
+  private stickerId: string | undefined;
 
   @before()
   public resetScenarioState(): void {
@@ -83,6 +84,7 @@ export default class Definitions {
     this.ownerIdentityId = undefined;
     this.response = null;
     this.stickerPackId = undefined;
+    this.stickerId = undefined;
     this.ipfsDefinition.resetScenarioState();
   }
 
@@ -1770,6 +1772,17 @@ export default class Definitions {
     this.stickerPackId = this.response.data.id;
   }
 
+  @given('I remember the current sticker')
+  public iRememberTheCurrentSticker(): void {
+    const sticker = this.response?.data?.stickers?.[0];
+
+    if (!sticker?.id) {
+      throw new Error('Sticker response id not found.');
+    }
+
+    this.stickerId = sticker.id;
+  }
+
   @given('I set a static sticker body')
   public iSetAStaticStickerBody(): void {
     this.body = JSON.stringify({
@@ -1816,10 +1829,111 @@ export default class Definitions {
     await this.signCurrentRequest('GET', '/stickers/packs');
   }
 
+  @given('I sign the current sticker library request')
+  public async iSignTheCurrentStickerLibraryRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/stickers/me');
+  }
+
+  @given('I sign the current saved sticker pack request')
+  public async iSignTheCurrentSavedStickerPackRequest(): Promise<void> {
+    this.body = JSON.stringify({});
+    await this.signCurrentRequest(
+      'PUT',
+      `/stickers/packs/${this.stickerPackId}/saved`,
+    );
+  }
+
+  @given('I sign the current saved sticker pack removal request')
+  public async iSignTheCurrentSavedStickerPackRemovalRequest(): Promise<void> {
+    this.body = JSON.stringify({});
+    await this.signCurrentRequest(
+      'DELETE',
+      `/stickers/packs/${this.stickerPackId}/saved`,
+    );
+  }
+
+  @given('I sign the current favorite sticker request')
+  public async iSignTheCurrentFavoriteStickerRequest(): Promise<void> {
+    this.body = JSON.stringify({});
+    await this.signCurrentRequest(
+      'PUT',
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/favorite`,
+    );
+  }
+
+  @given('I sign the current favorite sticker removal request')
+  public async iSignTheCurrentFavoriteStickerRemovalRequest(): Promise<void> {
+    this.body = JSON.stringify({});
+    await this.signCurrentRequest(
+      'DELETE',
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/favorite`,
+    );
+  }
+
+  @given('I sign the current used sticker request')
+  public async iSignTheCurrentUsedStickerRequest(): Promise<void> {
+    this.body = JSON.stringify({});
+    await this.signCurrentRequest(
+      'POST',
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/used`,
+    );
+  }
+
   @when('I POST to the current sticker pack stickers')
   public async iPostToTheCurrentStickerPackStickers(): Promise<void> {
     this.response = await this.restClient.post(
       `/stickers/packs/${this.stickerPackId}/stickers`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET my sticker library')
+  public async iGETMyStickerLibrary(): Promise<void> {
+    this.response = await this.restClient.get('/stickers/me', this.headers);
+  }
+
+  @when('I PUT the current sticker pack as saved')
+  public async iPUTTheCurrentStickerPackAsSaved(): Promise<void> {
+    this.response = await this.restClient.put(
+      `/stickers/packs/${this.stickerPackId}/saved`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current saved sticker pack')
+  public async iDELETETheCurrentSavedStickerPack(): Promise<void> {
+    this.response = await this.restClient.delete(
+      `/stickers/packs/${this.stickerPackId}/saved`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT the current sticker as favorite')
+  public async iPUTTheCurrentStickerAsFavorite(): Promise<void> {
+    this.response = await this.restClient.put(
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/favorite`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current favorite sticker')
+  public async iDELETETheCurrentFavoriteSticker(): Promise<void> {
+    this.response = await this.restClient.delete(
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/favorite`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST the current sticker as used')
+  public async iPOSTTheCurrentStickerAsUsed(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/used`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

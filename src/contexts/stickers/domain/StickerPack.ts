@@ -86,6 +86,10 @@ export class StickerPack extends AggregateRoot {
     return sticker;
   }
 
+  public assertHasSticker(stickerId: StickerId): void {
+    assert(this.findSticker(stickerId), new StickerNotFoundError());
+  }
+
   public removeSticker(actor: IdentityId, stickerId: StickerId): void {
     this.assertOwner(actor);
 

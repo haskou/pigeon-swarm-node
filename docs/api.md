@@ -2529,6 +2529,8 @@ POST /stickers/packs
 ```
 
 Requires signed HTTP headers. The authenticated identity becomes the pack owner.
+The created pack is automatically added to the authenticated identity sticker
+library as a saved pack.
 
 Body:
 
@@ -2552,6 +2554,84 @@ GET /stickers/packs?ownerIdentityId=<identityId>
 ```http
 GET /stickers/packs/{packId}
 ```
+
+### Get my sticker library
+
+```http
+GET /stickers/me
+```
+
+Requires signed HTTP headers. Returns the authenticated identity sticker
+library:
+
+```json
+{
+  "savedPacks": [],
+  "favoriteStickers": [
+    {
+      "packId": "01J...",
+      "stickerId": "01J...",
+      "favoritedAt": 1770000000000,
+      "sticker": {
+        "id": "01J...",
+        "name": "Smile",
+        "type": "static",
+        "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+        "contentType": "image/png",
+        "sizeBytes": 215040,
+        "dimensions": {
+          "width": 512,
+          "height": 512
+        },
+        "emojis": ["😄"]
+      }
+    }
+  ],
+  "recentStickers": [
+    {
+      "packId": "01J...",
+      "stickerId": "01J...",
+      "usedAt": 1770000000000,
+      "sticker": {
+        "id": "01J...",
+        "name": "Smile",
+        "type": "static",
+        "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+        "contentType": "image/png",
+        "sizeBytes": 215040,
+        "dimensions": {
+          "width": 512,
+          "height": 512
+        },
+        "emojis": ["😄"]
+      }
+    }
+  ]
+}
+```
+
+`recentStickers` keeps the last 10 stickers explicitly reported by the client.
+The backend cannot infer recent stickers from encrypted message payloads, so the
+client must call the usage endpoint after a sticker message is sent
+successfully.
+
+### Save sticker pack
+
+```http
+PUT /stickers/packs/{packId}/saved
+```
+
+Requires signed HTTP headers. Adds the pack to the authenticated identity
+library and returns the updated library.
+
+### Remove saved sticker pack
+
+```http
+DELETE /stickers/packs/{packId}/saved
+```
+
+Requires signed HTTP headers. Removes the pack from the authenticated identity
+library and returns the updated library.
 
 ### Update sticker pack
 
@@ -2617,6 +2697,34 @@ DELETE /stickers/packs/{packId}/stickers/{stickerId}
 ```
 
 Requires signed HTTP headers from the pack owner.
+
+### Favorite sticker
+
+```http
+PUT /stickers/packs/{packId}/stickers/{stickerId}/favorite
+```
+
+Requires signed HTTP headers. The sticker must exist. Returns the updated
+authenticated identity sticker library.
+
+### Remove favorite sticker
+
+```http
+DELETE /stickers/packs/{packId}/stickers/{stickerId}/favorite
+```
+
+Requires signed HTTP headers. Returns the updated authenticated identity sticker
+library.
+
+### Record sticker usage
+
+```http
+POST /stickers/packs/{packId}/stickers/{stickerId}/used
+```
+
+Requires signed HTTP headers. The sticker must exist. Returns the updated
+authenticated identity sticker library with the sticker moved to the front of
+`recentStickers`. The list is capped at 10 entries.
 
 ## Planned API
 

@@ -204,9 +204,17 @@ paths:
     $ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'
   /stickers/packs:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs'
+  /stickers/me:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1me'
   /stickers/packs/{packId}:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}'
+  /stickers/packs/{packId}/saved:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1saved'
   /stickers/packs/{packId}/stickers:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers'
   /stickers/packs/{packId}/stickers/{stickerId}:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}'
+  /stickers/packs/{packId}/stickers/{stickerId}/favorite:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1favorite'
+  /stickers/packs/{packId}/stickers/{stickerId}/used:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1used'
