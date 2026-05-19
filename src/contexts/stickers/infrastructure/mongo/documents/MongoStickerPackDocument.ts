@@ -7,7 +7,6 @@ export interface MongoStickerDocument {
     height: number;
     width: number;
   };
-  emojis: string[];
   id: string;
   name: string;
   sizeBytes: number;
@@ -17,7 +16,6 @@ export interface MongoStickerDocument {
 export interface MongoStickerPackDocument {
   _id: string;
   createdAt: number;
-  description: string;
   name: string;
   ownerIdentityId: string;
   stickers: MongoStickerDocument[];

@@ -16,7 +16,6 @@ Feature: Post sticker route
     Then response code is equal to 200
     And response body should contain "Smile"
     And response body should contain "assetCid"
-    And response body should contain "😄"
 
   Scenario: Reject an oversized animated sticker
     Given I am an anonymous user

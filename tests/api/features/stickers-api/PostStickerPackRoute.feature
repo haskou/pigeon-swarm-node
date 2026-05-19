@@ -10,6 +10,5 @@ Feature: Post sticker pack route
     When I POST to "/stickers/packs/"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
-      | name        | API stickers     |
-      | description | API sticker pack |
+      | name | API stickers |
     And response body should contain "ownerIdentityId"

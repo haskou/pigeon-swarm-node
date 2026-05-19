@@ -2,7 +2,6 @@ import { StickerDetails } from '@app/contexts/stickers/domain/StickerDetails';
 import { StickerAssetCid } from '@app/contexts/stickers/domain/value-objects/StickerAssetCid';
 import { StickerContentType } from '@app/contexts/stickers/domain/value-objects/StickerContentType';
 import { StickerDimensions } from '@app/contexts/stickers/domain/value-objects/StickerDimensions';
-import { StickerEmoji } from '@app/contexts/stickers/domain/value-objects/StickerEmoji';
 import { StickerName } from '@app/contexts/stickers/domain/value-objects/StickerName';
 import { StickerSize } from '@app/contexts/stickers/domain/value-objects/StickerSize';
 import { StickerType } from '@app/contexts/stickers/domain/value-objects/StickerType';
@@ -31,7 +30,6 @@ export class StickerBodyMapper {
       this.contentType(),
       this.size(type),
       this.dimensions(),
-      this.emojis(),
     );
   }
 
@@ -40,10 +38,6 @@ export class StickerBodyMapper {
       new Integer(this.body.dimensions.width),
       new Integer(this.body.dimensions.height),
     );
-  }
-
-  public emojis(): StickerEmoji[] {
-    return this.body.emojis.map((emoji) => new StickerEmoji(emoji));
   }
 
   public name(): StickerName {

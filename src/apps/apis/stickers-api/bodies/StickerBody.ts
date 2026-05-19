@@ -1,11 +1,4 @@
-import {
-  ArrayMinSize,
-  IsArray,
-  IsInt,
-  IsObject,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
+import { IsInt, IsObject, IsString, ValidateNested } from 'class-validator';
 
 import { StickerDimensionsBody } from './StickerDimensionsBody';
 
@@ -19,11 +12,6 @@ export class StickerBody {
   @IsObject()
   @ValidateNested()
   public readonly dimensions: StickerDimensionsBody;
-
-  @ArrayMinSize(1)
-  @IsArray()
-  @IsString({ each: true })
-  public readonly emojis: string[];
 
   @IsString()
   public readonly name: string;

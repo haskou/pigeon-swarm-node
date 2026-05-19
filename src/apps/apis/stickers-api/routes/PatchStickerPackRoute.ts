@@ -1,4 +1,3 @@
-import { StickerPackDescription } from '@app/contexts/stickers/domain/value-objects/StickerPackDescription';
 import { StickerPackName } from '@app/contexts/stickers/domain/value-objects/StickerPackName';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -27,11 +26,7 @@ export class PatchStickerPackRoute extends StickerRouteSupport {
     const actor = await this.authenticate(request);
     const pack = await this.findPack(packId);
 
-    pack.updateProfile(
-      actor,
-      new StickerPackName(body.name),
-      new StickerPackDescription(body.description),
-    );
+    pack.updateProfile(actor, new StickerPackName(body.name));
     await this.repository().save(pack);
 
     return response

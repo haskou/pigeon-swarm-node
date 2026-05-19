@@ -2,13 +2,11 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
-import { InvalidStickerEmojiError } from './errors/InvalidStickerEmojiError';
 import { StickerNotFoundError } from './errors/StickerNotFoundError';
 import { StickerPackOwnerMismatchError } from './errors/StickerPackOwnerMismatchError';
 import { Sticker } from './Sticker';
 import { StickerDetails } from './StickerDetails';
 import { StickerId } from './value-objects/StickerId';
-import { StickerPackDescription } from './value-objects/StickerPackDescription';
 import { StickerPackId } from './value-objects/StickerPackId';
 import { StickerPackName } from './value-objects/StickerPackName';
 
@@ -16,13 +14,11 @@ export class StickerPack extends AggregateRoot {
   public static create(
     ownerIdentityId: IdentityId,
     name: StickerPackName,
-    description: StickerPackDescription,
   ): StickerPack {
     return new StickerPack(
       StickerPackId.generate(),
       ownerIdentityId,
       name,
-      description,
       [],
       Timestamp.now(),
       Timestamp.now(),
@@ -36,7 +32,6 @@ export class StickerPack extends AggregateRoot {
       new StickerPackId(primitives.id),
       new IdentityId(primitives.ownerIdentityId),
       new StickerPackName(primitives.name),
-      new StickerPackDescription(primitives.description),
       primitives.stickers.map((sticker) => Sticker.fromPrimitives(sticker)),
       new Timestamp(primitives.createdAt),
       new Timestamp(primitives.updatedAt),
@@ -47,7 +42,6 @@ export class StickerPack extends AggregateRoot {
     private readonly id: StickerPackId,
     private readonly ownerIdentityId: IdentityId,
     private name: StickerPackName,
-    private description: StickerPackDescription,
     private readonly stickers: Sticker[],
     private readonly createdAt: Timestamp,
     private updatedAt: Timestamp,
@@ -62,10 +56,6 @@ export class StickerPack extends AggregateRoot {
     );
   }
 
-  private assertHasEmoji(details: StickerDetails): void {
-    assert(details.getEmojis().length > 0, new InvalidStickerEmojiError());
-  }
-
   private findSticker(stickerId: StickerId): Sticker | undefined {
     return this.stickers.find((sticker) => sticker.getId().isEqual(stickerId));
   }
@@ -76,7 +66,6 @@ export class StickerPack extends AggregateRoot {
 
   public addSticker(actor: IdentityId, details: StickerDetails): Sticker {
     this.assertOwner(actor);
-    this.assertHasEmoji(details);
 
     const sticker = Sticker.create(details);
 
@@ -102,14 +91,9 @@ export class StickerPack extends AggregateRoot {
     this.touch();
   }
 
-  public updateProfile(
-    actor: IdentityId,
-    name: StickerPackName,
-    description: StickerPackDescription,
-  ): void {
+  public updateProfile(actor: IdentityId, name: StickerPackName): void {
     this.assertOwner(actor);
     this.name = name;
-    this.description = description;
     this.touch();
   }
 
@@ -119,7 +103,6 @@ export class StickerPack extends AggregateRoot {
     details: StickerDetails,
   ): Sticker {
     this.assertOwner(actor);
-    this.assertHasEmoji(details);
 
     const sticker = this.findSticker(stickerId);
 
@@ -137,7 +120,6 @@ export class StickerPack extends AggregateRoot {
   public toPrimitives() {
     return {
       createdAt: this.createdAt.valueOf(),
-      description: this.description.valueOf(),
       id: this.id.valueOf(),
       name: this.name.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),

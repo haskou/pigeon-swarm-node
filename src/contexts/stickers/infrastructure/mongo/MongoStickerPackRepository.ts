@@ -23,7 +23,6 @@ export class MongoStickerPackRepository implements StickerPackRepository {
     return {
       _id: primitives.id,
       createdAt: primitives.createdAt,
-      description: primitives.description,
       name: primitives.name,
       ownerIdentityId: primitives.ownerIdentityId,
       stickers: primitives.stickers,
@@ -34,7 +33,6 @@ export class MongoStickerPackRepository implements StickerPackRepository {
   private toDomain(document: MongoStickerPackDocument): StickerPack {
     return StickerPack.fromPrimitives({
       createdAt: document.createdAt,
-      description: document.description,
       id: document._id,
       name: document.name,
       ownerIdentityId: document.ownerIdentityId,

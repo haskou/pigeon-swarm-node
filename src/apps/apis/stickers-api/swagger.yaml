@@ -108,7 +108,7 @@ paths:
       tags:
         - stickers
       summary: Add a sticker to a pack
-      description: Sticker assets must already be uploaded as public IPFS bytes with POST /ipfs/public. This endpoint stores metadata and validates size, dimensions and emoji rules.
+      description: Sticker assets must already be uploaded as public IPFS bytes with POST /ipfs/public. This endpoint stores metadata and validates size and dimensions.
       security:
         - signedRequest: []
       parameters:
@@ -283,16 +283,11 @@ components:
       type: object
       required:
         - name
-        - description
       properties:
         name:
           type: string
           maxLength: 80
           example: Blue archive reactions
-        description:
-          type: string
-          maxLength: 500
-          example: Public sticker pack for chat reactions.
     StickerBody:
       type: object
       required:
@@ -302,7 +297,6 @@ components:
         - contentType
         - sizeBytes
         - dimensions
-        - emojis
       properties:
         name:
           type: string
@@ -339,13 +333,6 @@ components:
               type: integer
               maximum: 512
               example: 512
-        emojis:
-          type: array
-          minItems: 1
-          items:
-            type: string
-          example:
-            - 😄
     StickerResource:
       allOf:
         - $ref: '#/components/schemas/StickerBody'
@@ -361,7 +348,6 @@ components:
         - id
         - ownerIdentityId
         - name
-        - description
         - stickers
         - createdAt
         - updatedAt
@@ -371,8 +357,6 @@ components:
         ownerIdentityId:
           type: string
         name:
-          type: string
-        description:
           type: string
         stickers:
           type: array

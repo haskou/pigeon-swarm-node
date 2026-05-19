@@ -1753,7 +1753,6 @@ export default class Definitions {
   @given('I set a sticker pack body')
   public iSetAStickerPackBody(): void {
     this.body = JSON.stringify({
-      description: 'API sticker pack',
       name: 'API stickers',
     });
   }
@@ -1792,7 +1791,6 @@ export default class Definitions {
         height: 512,
         width: 512,
       },
-      emojis: ['😄'],
       name: 'Smile',
       sizeBytes: 215040,
       type: 'static',
@@ -1808,7 +1806,6 @@ export default class Definitions {
         height: 512,
         width: 512,
       },
-      emojis: ['😄'],
       name: 'Oversized animated',
       sizeBytes: 70000,
       type: 'animated',

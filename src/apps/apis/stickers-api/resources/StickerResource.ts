@@ -5,7 +5,6 @@ export interface StickerResource {
     height: number;
     width: number;
   };
-  emojis: string[];
   id: string;
   name: string;
   sizeBytes: number;

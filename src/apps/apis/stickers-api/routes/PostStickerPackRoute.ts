@@ -1,5 +1,4 @@
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
-import { StickerPackDescription } from '@app/contexts/stickers/domain/value-objects/StickerPackDescription';
 import { StickerPackName } from '@app/contexts/stickers/domain/value-objects/StickerPackName';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -21,7 +20,6 @@ export class PostStickerPackRoute extends StickerRouteSupport {
     const pack = StickerPack.create(
       ownerIdentityId,
       new StickerPackName(body.name),
-      new StickerPackDescription(body.description),
     );
     const library = await this.findLibrary(ownerIdentityId);
 

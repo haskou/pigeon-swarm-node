@@ -2520,7 +2520,6 @@ Current limits:
 - animated stickers: max 64 KiB
 - video stickers: max 256 KiB
 - dimensions: max 512x512
-- every sticker must have at least one associated emoji
 
 ### Create sticker pack
 
@@ -2536,8 +2535,7 @@ Body:
 
 ```json
 {
-  "name": "Blue archive reactions",
-  "description": "Public sticker pack for chat reactions."
+  "name": "Blue archive reactions"
 }
 ```
 
@@ -2582,8 +2580,7 @@ library:
         "dimensions": {
           "width": 512,
           "height": 512
-        },
-        "emojis": ["😄"]
+        }
       }
     }
   ],
@@ -2602,8 +2599,7 @@ library:
         "dimensions": {
           "width": 512,
           "height": 512
-        },
-        "emojis": ["😄"]
+        }
       }
     }
   ]
@@ -2645,8 +2641,7 @@ Body:
 
 ```json
 {
-  "name": "Updated pack name",
-  "description": "Updated description."
+  "name": "Updated pack name"
 }
 ```
 
@@ -2670,8 +2665,7 @@ Body:
   "dimensions": {
     "width": 512,
     "height": 512
-  },
-  "emojis": ["😄"]
+  }
 }
 ```
 
