@@ -1,4 +1,5 @@
 import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
+import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -7,7 +8,7 @@ import { maxIPFSContentSizeBytes } from '../IPFSContentLimits';
 
 const defaultContentType = 'application/octet-stream';
 const privateUploadContext = 'ipfs_private_upload';
-const publicUploadContext = 'ipfs_public_upload';
+const publicUploadContext = IPFSContentReplicationContext.PUBLIC_UPLOAD;
 
 type NodeRepository = {
   loadLocalNodeId?(): Promise<{

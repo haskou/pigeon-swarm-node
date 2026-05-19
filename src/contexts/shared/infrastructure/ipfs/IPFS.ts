@@ -122,6 +122,17 @@ export default class IPFS {
     return network.getJSON<T>(cid);
   }
 
+  public async getBytesFromNetwork(
+    cid: IPFSId,
+    networkId: string,
+  ): Promise<Buffer> {
+    await this.initialize();
+
+    const network = this.registry.find(networkId);
+
+    return network.getBytes(cid);
+  }
+
   // TODO: Fix security issue of this method
   public async getRecord(key: string): Promise<string | undefined> {
     await this.initialize();

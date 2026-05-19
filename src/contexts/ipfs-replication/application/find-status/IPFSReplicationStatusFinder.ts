@@ -22,8 +22,10 @@ type NetworkReplicationStatus = {
 
 export type IPFSContentReplicationStatus = {
   cid: string;
+  contentType: string;
   context: string;
   createdAt: number;
+  filename?: string;
   networks: NetworkReplicationStatus[];
   ownerIdentityId?: string;
   priority: string;
@@ -145,8 +147,10 @@ export default class IPFSReplicationStatusFinder {
 
     return {
       cid: primitives.cid,
+      contentType: primitives.contentType,
       context: primitives.context,
       createdAt: primitives.createdAt,
+      filename: primitives.filename,
       networks,
       ownerIdentityId: primitives.ownerIdentityId,
       priority: primitives.priority,
