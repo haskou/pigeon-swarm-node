@@ -4,8 +4,8 @@ import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IP
 import { IPFSContentReplicaClaimRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
+import { IPFSContentReplicationMetadata } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
-import { IPFSContentSize } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentSize';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
@@ -26,7 +26,7 @@ describe('IPFSContentReplicationRegistrar', () => {
       new IPFSId(cid),
       new IPFSContentReplicationContext('ipfs_private_upload'),
       [new NetworkId(firstNetworkId)],
-      new IPFSContentSize(128),
+      IPFSContentReplicationMetadata.fromPrimitives(128),
       undefined,
       IPFSContentReplicationPriority.NORMAL,
       new Timestamp(1770000000000),

@@ -1,4 +1,5 @@
 import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
+import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -7,9 +8,12 @@ import { maxIPFSContentSizeBytes } from '../IPFSContentLimits';
 
 const defaultContentType = 'application/octet-stream';
 const privateUploadContext = 'ipfs_private_upload';
-const publicUploadContext = 'ipfs_public_upload';
+const publicUploadContext = IPFSContentReplicationContext.PUBLIC_UPLOAD;
 
 type NodeRepository = {
+  loadLocalNodeId?(): Promise<{
+    valueOf(): string;
+  }>;
   loadLocalNode(): Promise<{
     toPrimitives(): {
       id: string;
@@ -17,6 +21,9 @@ type NodeRepository = {
   }>;
 };
 type IPFSClient = {
+  addBytesToAll(data: Uint8Array): Promise<{
+    valueOf(): string;
+  }>;
   addJSONToAll(data: unknown): Promise<{
     valueOf(): string;
   }>;
@@ -84,17 +91,23 @@ export default class IPFSContentPublisher {
 
   private async registerReplication(params: {
     cid: string;
+    contentType: string;
     context: string;
+    filename?: string;
     networkIds: string[];
     ownerIdentityId: IdentityId;
     sizeBytes: number;
   }): Promise<void> {
-    const localNode = await this.nodeRepository.loadLocalNode();
+    const localNodeId = this.nodeRepository.loadLocalNodeId
+      ? (await this.nodeRepository.loadLocalNodeId()).valueOf()
+      : (await this.nodeRepository.loadLocalNode()).toPrimitives().id;
 
     await this.replicationRegistrar.register({
       cid: params.cid,
+      contentType: params.contentType,
       context: params.context,
-      localNodeId: localNode.toPrimitives().id,
+      filename: params.filename,
+      localNodeId,
       networkIds: params.networkIds,
       ownerIdentityId: params.ownerIdentityId.valueOf(),
       priority: IPFSContentReplicationPriority.NORMAL,
@@ -113,7 +126,9 @@ export default class IPFSContentPublisher {
 
     await this.registerReplication({
       cid: cid.valueOf(),
+      contentType: document.contentType,
       context,
+      filename: params.filename,
       networkIds: await this.networkIds(),
       ownerIdentityId: params.ownerIdentityId,
       sizeBytes: params.body.length,
@@ -123,6 +138,32 @@ export default class IPFSContentPublisher {
       cid: cid.valueOf(),
       contentType: document.contentType,
       encrypted: document.encrypted,
+      filename: params.filename,
+      size: params.body.length,
+    };
+  }
+
+  private async publishBytes(
+    params: PublishContentParams,
+    context: string,
+  ): Promise<PublishedIPFSContent> {
+    this.assertContentSize(params.body);
+
+    const cid = await this.ipfs.addBytesToAll(params.body);
+
+    await this.registerReplication({
+      cid: cid.valueOf(),
+      contentType: params.contentType || defaultContentType,
+      context,
+      filename: params.filename,
+      networkIds: await this.networkIds(),
+      ownerIdentityId: params.ownerIdentityId,
+      sizeBytes: params.body.length,
+    });
+
+    return {
+      cid: cid.valueOf(),
+      contentType: params.contentType || defaultContentType,
       filename: params.filename,
       size: params.body.length,
     };
@@ -143,11 +184,6 @@ export default class IPFSContentPublisher {
   public async publishPublic(
     params: PublishContentParams,
   ): Promise<PublishedIPFSContent> {
-    const document: IPFSContentDocument = {
-      ...this.commonDocument(params),
-      data: params.body.toString('base64'),
-    };
-
-    return this.publish(params, document, publicUploadContext);
+    return this.publishBytes(params, publicUploadContext);
   }
 }

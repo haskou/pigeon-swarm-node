@@ -73,6 +73,12 @@ export default class IPFS {
     return this.racer.raceGetJSON<T>(this.registry.getAll(), cid);
   }
 
+  public async getBytes(cid: IPFSId): Promise<Buffer> {
+    await this.initialize();
+
+    return this.racer.raceGetBytes(this.registry.getAll(), cid);
+  }
+
   public async stat(
     cid: IPFSId,
     offlineOnly: boolean = false,
@@ -114,6 +120,17 @@ export default class IPFS {
     const network = this.registry.find(networkId);
 
     return network.getJSON<T>(cid);
+  }
+
+  public async getBytesFromNetwork(
+    cid: IPFSId,
+    networkId: string,
+  ): Promise<Buffer> {
+    await this.initialize();
+
+    const network = this.registry.find(networkId);
+
+    return network.getBytes(cid);
   }
 
   // TODO: Fix security issue of this method
@@ -163,6 +180,16 @@ export default class IPFS {
 
     const results = await Promise.all(
       this.registry.getAll().map((network) => network.addJSON(data)),
+    );
+
+    return results[0];
+  }
+
+  public async addBytesToAll(bytes: Uint8Array): Promise<IPFSId> {
+    await this.initialize();
+
+    const results = await Promise.all(
+      this.registry.getAll().map((network) => network.addBytes(bytes)),
     );
 
     return results[0];

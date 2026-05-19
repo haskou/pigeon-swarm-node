@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm IPFS API
   version: 1.0.0
-  description: Endpoints for publishing and reading JSON content from IPFS.
+  description: Endpoints for publishing and reading IPFS content.
 tags:
   - name: ipfs
 paths:
@@ -89,7 +89,7 @@ paths:
       tags:
         - ipfs
       summary: Publish public content to IPFS
-      description: Accepts raw request bytes, stores them as a public JSON IPFS document, and returns the CID to reference from identities, messages, or posts.
+      description: Accepts raw request bytes, stores them directly as public IPFS bytes without JSON/base64 wrapping, preserves Content-Type and X-Filename in replication metadata, and returns the CID to reference from identities, messages, or posts.
       security:
         - signedRequest: []
       parameters:
@@ -153,8 +153,16 @@ paths:
             type: string
       responses:
         '200':
-          description: JSON content found.
+          description: Public binary content or JSON content found. Public binary responses use the uploaded Content-Type when replication metadata is known and include inline Content-Disposition when X-Filename was provided.
           content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
             application/json:
               schema:
                 type: object

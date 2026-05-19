@@ -8,6 +8,7 @@ import { Timestamp } from '@haskou/value-objects';
 import { IPFSContentReplicationWasClaimedEvent } from '../../domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
+import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
 import IPFSReplicationStatusFinder, {
   IPFSContentReplicationStatus,
 } from '../find-status/IPFSReplicationStatusFinder';
@@ -87,8 +88,13 @@ export default class IPFSReplicationMaintainer {
     localNodeId: string,
   ): Promise<number> {
     const cid = new IPFSId(content.cid);
+    const context = new IPFSContentReplicationContext(content.context);
 
-    await this.ipfs.getJSONFromNetwork<unknown>(cid, network.networkId);
+    if (context.isPublicUpload()) {
+      await this.ipfs.getBytesFromNetwork(cid, network.networkId);
+    } else {
+      await this.ipfs.getJSONFromNetwork<unknown>(cid, network.networkId);
+    }
 
     if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
       return 0;

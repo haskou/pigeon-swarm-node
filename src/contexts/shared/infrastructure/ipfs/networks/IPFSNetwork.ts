@@ -58,6 +58,17 @@ export class IPFSNetwork {
     return this.connection.getJSON<T>(cid, signal);
   }
 
+  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
+    return this.connection.getBytes(cid, signal);
+  }
+
+  public async addBytes(
+    bytes: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<IPFSId> {
+    return this.connection.addBytes(bytes, signal);
+  }
+
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
     return this.connection.addJSON(data, signal);
   }
