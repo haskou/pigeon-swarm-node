@@ -4,7 +4,6 @@ import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRo
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
 
-import { StickerUserLibraryViewModel } from '../view-model/StickerUserLibraryViewModel';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
@@ -28,6 +27,6 @@ export class PutFavoriteStickerRoute extends StickerRouteSupport {
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new StickerUserLibraryViewModel(library, [pack]).toResource());
+      .send(await this.libraryResource(library));
   }
 }

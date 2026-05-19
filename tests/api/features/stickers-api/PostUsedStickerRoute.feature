@@ -18,5 +18,13 @@ Feature: Post used sticker route
     And I sign the current used sticker request
     When I POST the current sticker as used
     Then response code is equal to 200
+    Given I set a sticker pack body
+    And I sign the current sticker pack creation request
+    When I POST to "/stickers/packs/"
+    Then response code is equal to 200
+    Given I sign the current used sticker request
+    When I POST the current sticker as used
+    Then response code is equal to 200
     And response body should contain "recentStickers"
+    And response body should contain "API stickers secondary"
     And response body should contain "assetCid"

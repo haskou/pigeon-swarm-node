@@ -10,6 +10,9 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request } from 'express';
 
+import { StickerUserLibraryResource } from '../resources/StickerUserLibraryResource';
+import { StickerUserLibraryViewModel } from '../view-model/StickerUserLibraryViewModel';
+
 export abstract class StickerRouteSupport extends Route {
   protected readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
@@ -32,6 +35,15 @@ export abstract class StickerRouteSupport extends Route {
     const library = await this.libraryRepository().findByIdentityId(identityId);
 
     return library ?? StickerUserLibrary.create(identityId);
+  }
+
+  protected async libraryResource(
+    library: StickerUserLibrary,
+  ): Promise<StickerUserLibraryResource> {
+    return new StickerUserLibraryViewModel(
+      library,
+      await this.repository().findAll(),
+    ).toResource();
   }
 
   protected async findPack(id: string): Promise<StickerPack> {
