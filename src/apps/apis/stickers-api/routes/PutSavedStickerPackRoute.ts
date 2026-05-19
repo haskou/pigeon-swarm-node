@@ -3,7 +3,6 @@ import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRo
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
 
-import { StickerUserLibraryViewModel } from '../view-model/StickerUserLibraryViewModel';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
@@ -15,7 +14,7 @@ export class PutSavedStickerPackRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const pack = await this.findPack(packId);
+    await this.findPack(packId);
     const library = await this.findLibrary(identityId);
 
     library.savePack(new StickerPackId(packId));
@@ -23,6 +22,6 @@ export class PutSavedStickerPackRoute extends StickerRouteSupport {
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new StickerUserLibraryViewModel(library, [pack]).toResource());
+      .send(await this.libraryResource(library));
   }
 }

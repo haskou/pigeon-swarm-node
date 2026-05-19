@@ -1752,8 +1752,10 @@ export default class Definitions {
 
   @given('I set a sticker pack body')
   public iSetAStickerPackBody(): void {
+    const suffix = this.stickerPackId ? 'secondary' : 'primary';
+
     this.body = JSON.stringify({
-      name: 'API stickers',
+      name: `API stickers ${suffix}`,
     });
   }
 
