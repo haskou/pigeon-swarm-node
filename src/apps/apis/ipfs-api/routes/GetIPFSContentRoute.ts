@@ -8,7 +8,21 @@ import { Get, JsonController, Param, Res } from 'routing-controllers';
 
 @JsonController('/ipfs')
 export class GetIPFSContentRoute extends Route {
-  private readonly ipfs: IPFS = this.get<IPFS>(IPFS);
+  private async getPublicBytes(cid: IPFSId): Promise<Buffer | undefined> {
+    try {
+      return await this.ipfs().getBytes(cid);
+    } catch (error: unknown) {
+      if (error instanceof IPFSContentNotFoundError) {
+        return undefined;
+      }
+
+      throw error;
+    }
+  }
+
+  private ipfs(): IPFS {
+    return this.get<IPFS>(IPFS);
+  }
 
   @Get('/:cid')
   public async request(
@@ -16,7 +30,17 @@ export class GetIPFSContentRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     try {
-      const content = await this.ipfs.getJSON(new IPFSId(cid));
+      const ipfsId = new IPFSId(cid);
+      const publicBytes = await this.getPublicBytes(ipfsId);
+
+      if (publicBytes !== undefined) {
+        return response
+          .status(HttpRouteStatusEnum.OK)
+          .type('application/octet-stream')
+          .send(publicBytes);
+      }
+
+      const content = await this.ipfs().getJSON(ipfsId);
 
       return response.status(HttpRouteStatusEnum.OK).json(content);
     } catch (error: unknown) {

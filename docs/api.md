@@ -664,11 +664,30 @@ Implemented:
 - publish public content to every configured IPFS network
 - register the returned CID in local MongoDB replication metadata
 - accept raw request bytes instead of wrapping the content in JSON/base64
-- store content as a JSON IPFS document with `contentType`, base64 `data`,
-  optional `filename`, `size`, `uploadedAt` and `uploadedByIdentityId`
+- store the binary bytes directly in IPFS
 - preserve the original filename through `X-Filename`
 - limit content size to 50 MiB
 - return the CID to store in signed identity profiles or posts
+
+### Get public IPFS content
+
+```http
+GET /ipfs/{cid}
+```
+
+For CIDs uploaded with `POST /ipfs/public`, the response body is the original
+binary content. It is not wrapped in JSON and it is not base64 encoded.
+
+Response:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/octet-stream
+```
+
+The body is the raw byte stream. If the CID points to existing JSON content, the
+endpoint still returns that JSON document for compatibility with identities,
+keychains and private upload documents.
 
 ### Publish private content
 

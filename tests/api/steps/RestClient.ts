@@ -31,6 +31,23 @@ export default class RestClient {
     }
   }
 
+  public async getBinary(path: string, headers = {}): Promise<any> {
+    try {
+      return await this.client.get(path, {
+        headers,
+        responseType: 'arraybuffer',
+      });
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+
+        return axiosError.response;
+      }
+
+      return (error as Error).message;
+    }
+  }
+
   public async post(path: string, data: any, headers = {}): Promise<any> {
     try {
       return await this.client.post(path, data, headers);

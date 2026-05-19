@@ -121,6 +121,12 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
     return node;
   }
 
+  public async loadLocalNodeId(): Promise<NodeId> {
+    const metadata = await this.loadOrCreateMetadata();
+
+    return new NodeId(metadata.nodeId);
+  }
+
   public async saveLocalNode(node: Node): Promise<void> {
     await this.persistMetadata(this.metadataMapper.toDocument(node));
     await this.syncRuntimeNetworks(node);

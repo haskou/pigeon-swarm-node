@@ -2430,6 +2430,14 @@ export default class Definitions {
     this.response = await this.restClient.get(path, this.headers);
   }
 
+  @when('I GET the published IPFS content as binary')
+  public async iGETThePublishedIPFSContentAsBinary(): Promise<void> {
+    this.response = await this.restClient.getBinary(
+      `/ipfs/${this.response.data.cid}`,
+      this.headers,
+    );
+  }
+
   @when('I GET the current identity presence')
   public async iGETTheCurrentIdentityPresence(): Promise<void> {
     await this.ensureIdentityKeyPair();
@@ -2581,6 +2589,11 @@ export default class Definitions {
       textToContain,
       JSON.stringify(this.response.data),
     );
+  }
+
+  @then('binary response body should be {string}')
+  public binaryResponseBodyShouldBe(expectedBody: string): void {
+    expect(Buffer.from(this.response.data).toString()).to.equal(expectedBody);
   }
 
   @then('response body should contain the current call')

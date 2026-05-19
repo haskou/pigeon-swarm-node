@@ -1,4 +1,5 @@
 import type { json as createHeliaJsonClient } from '@helia/json';
+import type { unixfs as createHeliaUnixfsClient } from '@helia/unixfs';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
 import type { MemoryBlockstore } from 'blockstore-core';
@@ -11,6 +12,7 @@ import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
 
 export type HeliaJSONClient = ReturnType<typeof createHeliaJsonClient>;
+export type HeliaUnixfsClient = ReturnType<typeof createHeliaUnixfsClient>;
 export type HeliaLibp2pConfig = Parameters<typeof createLibp2p>[0];
 export type HeliaInstance = HeliaCore.Helia;
 export type Libp2pDefaults = ReturnType<typeof HeliaCore.libp2pDefaults>;
@@ -22,6 +24,7 @@ export type ParsedCidLike = MultiformatsCid;
 export class HeliaRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
+  private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private pnetModulePromise?: Promise<typeof import('@libp2p/pnet')>;
   private multiaddrModulePromise?: Promise<
@@ -69,6 +72,13 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof import('@helia/json')>('@helia/json');
 
     return this.heliaJsonModulePromise;
+  }
+
+  private loadHeliaUnixfsModule(): Promise<typeof import('@helia/unixfs')> {
+    this.heliaUnixfsModulePromise ??=
+      this.nativeImport<typeof import('@helia/unixfs')>('@helia/unixfs');
+
+    return this.heliaUnixfsModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
@@ -190,6 +200,14 @@ export class HeliaRuntimeAdapter {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
     return heliaJsonModule.json(core);
+  }
+
+  public async createUnixfsClient(
+    core: HeliaInstance,
+  ): Promise<HeliaUnixfsClient> {
+    const heliaUnixfsModule = await this.loadHeliaUnixfsModule();
+
+    return heliaUnixfsModule.unixfs(core);
   }
 
   public async createHelia(

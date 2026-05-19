@@ -42,6 +42,28 @@ export default class IPFSContentRacer {
     }
   }
 
+  public async raceGetBytes(
+    networks: IPFSNetwork[],
+    cid: IPFSId,
+  ): Promise<Buffer> {
+    const controller = new AbortController();
+    const timeout = this.startTimeout(controller);
+
+    try {
+      const result = await Promise.any(
+        networks.map((network) => network.getBytes(cid, controller.signal)),
+      );
+
+      controller.abort();
+
+      return result;
+    } catch {
+      throw new IPFSContentNotFoundError(cid.valueOf());
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   public async raceStat(networks: IPFSNetwork[], cid: IPFSId): Promise<void> {
     const controller = new AbortController();
     const timeout = this.startTimeout(controller);

@@ -10,6 +10,9 @@ const privateUploadContext = 'ipfs_private_upload';
 const publicUploadContext = 'ipfs_public_upload';
 
 type NodeRepository = {
+  loadLocalNodeId?(): Promise<{
+    valueOf(): string;
+  }>;
   loadLocalNode(): Promise<{
     toPrimitives(): {
       id: string;
@@ -17,6 +20,9 @@ type NodeRepository = {
   }>;
 };
 type IPFSClient = {
+  addBytesToAll(data: Uint8Array): Promise<{
+    valueOf(): string;
+  }>;
   addJSONToAll(data: unknown): Promise<{
     valueOf(): string;
   }>;
@@ -89,12 +95,14 @@ export default class IPFSContentPublisher {
     ownerIdentityId: IdentityId;
     sizeBytes: number;
   }): Promise<void> {
-    const localNode = await this.nodeRepository.loadLocalNode();
+    const localNodeId = this.nodeRepository.loadLocalNodeId
+      ? (await this.nodeRepository.loadLocalNodeId()).valueOf()
+      : (await this.nodeRepository.loadLocalNode()).toPrimitives().id;
 
     await this.replicationRegistrar.register({
       cid: params.cid,
       context: params.context,
-      localNodeId: localNode.toPrimitives().id,
+      localNodeId,
       networkIds: params.networkIds,
       ownerIdentityId: params.ownerIdentityId.valueOf(),
       priority: IPFSContentReplicationPriority.NORMAL,
@@ -128,6 +136,30 @@ export default class IPFSContentPublisher {
     };
   }
 
+  private async publishBytes(
+    params: PublishContentParams,
+    context: string,
+  ): Promise<PublishedIPFSContent> {
+    this.assertContentSize(params.body);
+
+    const cid = await this.ipfs.addBytesToAll(params.body);
+
+    await this.registerReplication({
+      cid: cid.valueOf(),
+      context,
+      networkIds: await this.networkIds(),
+      ownerIdentityId: params.ownerIdentityId,
+      sizeBytes: params.body.length,
+    });
+
+    return {
+      cid: cid.valueOf(),
+      contentType: params.contentType || defaultContentType,
+      filename: params.filename,
+      size: params.body.length,
+    };
+  }
+
   public async publishPrivate(
     params: PublishContentParams,
   ): Promise<PublishedIPFSContent> {
@@ -143,11 +175,6 @@ export default class IPFSContentPublisher {
   public async publishPublic(
     params: PublishContentParams,
   ): Promise<PublishedIPFSContent> {
-    const document: IPFSContentDocument = {
-      ...this.commonDocument(params),
-      data: params.body.toString('base64'),
-    };
-
-    return this.publish(params, document, publicUploadContext);
+    return this.publishBytes(params, publicUploadContext);
   }
 }

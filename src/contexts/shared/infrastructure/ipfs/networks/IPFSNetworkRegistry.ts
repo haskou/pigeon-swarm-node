@@ -10,15 +10,41 @@ import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { PrivateIPFS } from './PrivateIPFS';
 import { PublicIPFS } from './PublicIPFS';
 
+type IPFSNetworkRegistryState = {
+  initialized: boolean;
+  listeners: Array<(network: IPFSNetwork) => void>;
+  networks: IPFSNetwork[];
+  sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
+  sharedPeerPrivateKeyPem?: string;
+};
+
+const globalRegistryStateKey = '__pigeonSwarmIPFSNetworkRegistryState';
+
 export default class IPFSNetworkRegistry {
-  private readonly networks: IPFSNetwork[] = [];
-  private readonly listeners: Array<(network: IPFSNetwork) => void> = [];
-  private initialized: boolean = false;
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
-  private sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
-  private sharedPeerPrivateKeyPem?: string;
+  private get state(): IPFSNetworkRegistryState {
+    const globalState = globalThis as typeof globalThis & {
+      [globalRegistryStateKey]?: IPFSNetworkRegistryState;
+    };
+
+    globalState[globalRegistryStateKey] ??= {
+      initialized: false,
+      listeners: [],
+      networks: [],
+    };
+
+    return globalState[globalRegistryStateKey];
+  }
+
+  private get networks(): IPFSNetwork[] {
+    return this.state.networks;
+  }
+
+  private set networks(networks: IPFSNetwork[]) {
+    this.state.networks = networks;
+  }
 
   private get sharedPeerKeyFilePath(): string {
     return `${this.storagePath}/shared-peer-private-key.pb`;
@@ -26,16 +52,16 @@ export default class IPFSNetworkRegistry {
 
   // eslint-disable-next-line max-len
   private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
-    if (this.sharedPeerPrivateKey) {
-      return this.sharedPeerPrivateKey;
+    if (this.state.sharedPeerPrivateKey) {
+      return this.state.sharedPeerPrivateKey;
     }
 
     try {
       const persistedPrivateKey = await fs.readFile(this.sharedPeerKeyFilePath);
-      this.sharedPeerPrivateKey =
+      this.state.sharedPeerPrivateKey =
         await libp2pKeyAdapter.privateKeyFromProtobuf(persistedPrivateKey);
 
-      return this.sharedPeerPrivateKey;
+      return this.state.sharedPeerPrivateKey;
     } catch {
       const generatedPrivateKey =
         await libp2pKeyAdapter.generateEd25519KeyPair();
@@ -46,7 +72,7 @@ export default class IPFSNetworkRegistry {
         await libp2pKeyAdapter.privateKeyToProtobuf(generatedPrivateKey),
       );
 
-      this.sharedPeerPrivateKey = generatedPrivateKey;
+      this.state.sharedPeerPrivateKey = generatedPrivateKey;
 
       return generatedPrivateKey;
     }
@@ -55,8 +81,8 @@ export default class IPFSNetworkRegistry {
   private exportSharedPeerPrivateKeyPem(
     privateKey: Libp2pPrivateKeyLike,
   ): string {
-    if (this.sharedPeerPrivateKeyPem) {
-      return this.sharedPeerPrivateKeyPem;
+    if (this.state.sharedPeerPrivateKeyPem) {
+      return this.state.sharedPeerPrivateKeyPem;
     }
 
     if (privateKey.type !== 'Ed25519') {
@@ -79,12 +105,12 @@ export default class IPFSNetworkRegistry {
       },
     });
 
-    this.sharedPeerPrivateKeyPem = keyObject.export({
+    this.state.sharedPeerPrivateKeyPem = keyObject.export({
       format: 'pem',
       type: 'pkcs8',
     }) as string;
 
-    return this.sharedPeerPrivateKeyPem;
+    return this.state.sharedPeerPrivateKeyPem;
   }
 
   private async createNetworkFromConfig(
@@ -120,12 +146,12 @@ export default class IPFSNetworkRegistry {
   }
 
   public async initialize(): Promise<void> {
-    if (this.initialized) {
+    if (this.state.initialized) {
       return;
     }
 
     await this.loadOrCreateSharedPeerPrivateKey();
-    this.initialized = true;
+    this.state.initialized = true;
   }
 
   public async register(config: IPFSNetworkConfig): Promise<IPFSNetwork> {
@@ -143,13 +169,13 @@ export default class IPFSNetworkRegistry {
       sharedPrivateKey,
     );
     this.networks.push(network);
-    this.listeners.forEach((listener) => listener(network));
+    this.state.listeners.forEach((listener) => listener(network));
 
     return network;
   }
 
   public onNetworkRegistered(listener: (network: IPFSNetwork) => void): void {
-    this.listeners.push(listener);
+    this.state.listeners.push(listener);
   }
 
   public async removeNetwork(id: string): Promise<void> {

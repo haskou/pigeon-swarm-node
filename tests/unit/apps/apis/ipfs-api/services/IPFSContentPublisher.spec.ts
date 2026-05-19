@@ -15,10 +15,16 @@ describe('IPFSContentPublisher', () => {
   }
 
   function createPublisher() {
+    const addedBytes: Uint8Array[] = [];
     const addedDocuments: unknown[] = [];
     const registeredReplications: unknown[] = [];
     const publisher = new IPFSContentPublisher(
       {
+        addBytesToAll: async (bytes) => {
+          addedBytes.push(bytes);
+
+          return new FakeIPFSId();
+        },
         addJSONToAll: async (document) => {
           addedDocuments.push(document);
 
@@ -46,15 +52,16 @@ describe('IPFSContentPublisher', () => {
       },
     );
 
-    return { addedDocuments, publisher, registeredReplications };
+    return { addedBytes, addedDocuments, publisher, registeredReplications };
   }
 
-  it('publishes public content and registers replication', async () => {
-    const { addedDocuments, publisher, registeredReplications } =
+  it('publishes public bytes directly and registers replication', async () => {
+    const { addedBytes, addedDocuments, publisher, registeredReplications } =
       createPublisher();
+    const body = Buffer.from('hello');
 
     const result = await publisher.publishPublic({
-      body: Buffer.from('hello'),
+      body,
       contentType: 'text/plain',
       filename: 'hello.txt',
       ownerIdentityId: new IdentityId(identityId),
@@ -67,15 +74,8 @@ describe('IPFSContentPublisher', () => {
       filename: 'hello.txt',
       size: 5,
     });
-    expect(addedDocuments).toMatchObject([
-      {
-        contentType: 'text/plain',
-        data: Buffer.from('hello').toString('base64'),
-        filename: 'hello.txt',
-        size: 5,
-        uploadedByIdentityId: identityId,
-      },
-    ]);
+    expect(addedBytes).toEqual([body]);
+    expect(addedDocuments).toEqual([]);
     expect(registeredReplications).toMatchObject([
       {
         cid,

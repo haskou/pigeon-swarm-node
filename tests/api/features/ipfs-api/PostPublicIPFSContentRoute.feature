@@ -15,3 +15,7 @@ Feature: Post public IPFS content route
       | contentType | image/png   |
       | filename    | avatar.png  |
       | size        | 5           |
+    When I GET the published IPFS content as binary
+    Then response code is equal to 200
+    And response header "content-type" should contain "application/octet-stream"
+    And binary response body should be "hello"

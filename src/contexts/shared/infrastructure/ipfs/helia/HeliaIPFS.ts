@@ -16,6 +16,7 @@ import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 
 export abstract class HeliaIPFS implements IPFSConnection {
+  private static readonly RAW_CODEC_CODE = 0x55;
   private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
   private readonly pinningStrategy: HeliaPinningStrategy;
 
@@ -141,6 +142,48 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const cid = await heliaJSONClient.add(data, { signal });
 
     return new IPFSId(cid.toString());
+  }
+
+  public async addBytes(
+    bytes: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<IPFSId> {
+    const unixfsClient = await heliaRuntimeAdapter.createUnixfsClient(
+      this.heliaCore,
+    );
+    const cid = await unixfsClient.addBytes(bytes, { signal });
+
+    return new IPFSId(cid.toString());
+  }
+
+  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
+    const unixfsClient = await heliaRuntimeAdapter.createUnixfsClient(
+      this.heliaCore,
+    );
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+    const chunks: Uint8Array[] = [];
+
+    try {
+      for await (const chunk of unixfsClient.cat(parsedCid, { signal })) {
+        chunks.push(chunk);
+      }
+    } catch (error: unknown) {
+      if (parsedCid.code !== HeliaIPFS.RAW_CODEC_CODE) {
+        throw error;
+      }
+
+      for await (const rawBlock of this.heliaCore.blockstore.get(parsedCid, {
+        signal,
+      })) {
+        chunks.push(rawBlock);
+      }
+    }
+
+    await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
+
+    return Buffer.concat(chunks);
   }
 
   public async removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void> {
