@@ -40,6 +40,10 @@ export class CommunityMembership {
     return this.roles;
   }
 
+  public getMemberIds(): IdentityId[] {
+    return [...this.members];
+  }
+
   public hasMembers(): boolean {
     return this.members.length > 0;
   }

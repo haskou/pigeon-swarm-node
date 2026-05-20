@@ -1,9 +1,10 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { StickerPackNotFoundError } from '@app/contexts/stickers/domain/errors/StickerPackNotFoundError';
-import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
+import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
+import { StickerPacksFinder } from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
+import { StickerPackRepository } from '@app/contexts/stickers/domain/repositories/StickerPackRepository';
+import { StickerUserLibraryRepository } from '@app/contexts/stickers/domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
 import { MongoStickerPackRepository } from '@app/contexts/stickers/infrastructure/mongo/MongoStickerPackRepository';
 import { MongoStickerUserLibraryRepository } from '@app/contexts/stickers/infrastructure/mongo/MongoStickerUserLibraryRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -21,38 +22,21 @@ export abstract class StickerRouteSupport extends Route {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 
-  protected repository(): MongoStickerPackRepository {
+  protected packRepository(): StickerPackRepository {
     return new MongoStickerPackRepository(this.get<MongoDB>(MongoDB));
   }
 
-  protected libraryRepository(): MongoStickerUserLibraryRepository {
+  protected libraryRepository(): StickerUserLibraryRepository {
     return new MongoStickerUserLibraryRepository(this.get<MongoDB>(MongoDB));
-  }
-
-  protected async findLibrary(
-    identityId: IdentityId,
-  ): Promise<StickerUserLibrary> {
-    const library = await this.libraryRepository().findByIdentityId(identityId);
-
-    return library ?? StickerUserLibrary.create(identityId);
   }
 
   protected async libraryResource(
     library: StickerUserLibrary,
   ): Promise<StickerUserLibraryResource> {
-    return new StickerUserLibraryViewModel(
-      library,
-      await this.repository().findAll(),
-    ).toResource();
-  }
+    const packs = await new StickerPacksFinder(this.packRepository()).find(
+      new StickerPacksFindMessage(),
+    );
 
-  protected async findPack(id: string): Promise<StickerPack> {
-    const pack = await this.repository().findById(new StickerPackId(id));
-
-    if (!pack) {
-      throw new StickerPackNotFoundError();
-    }
-
-    return pack;
+    return new StickerUserLibraryViewModel(library, packs).toResource();
   }
 }

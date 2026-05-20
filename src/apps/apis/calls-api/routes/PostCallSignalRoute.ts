@@ -1,6 +1,6 @@
+import { CallSignalSender } from '@app/contexts/calls/application/send-signal/CallSignalSender';
+import { CallSignalSendMessage } from '@app/contexts/calls/application/send-signal/messages/CallSignalSendMessage';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
-import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -28,19 +28,23 @@ export class PostCallSignalRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const senderIdentityId = await this.authenticate(request);
-    const call = await this.findCall(callId);
 
     await new CallSignalRateLimiter(this.get<MongoDB>(MongoDB)).consume(
       new CallId(callId),
       senderIdentityId,
     );
-    call.sendSignal(
-      senderIdentityId,
-      new IdentityId(body.recipientIdentityId),
-      new CallSignalType(body.signalType),
-      body.payload,
+    const call = await new CallSignalSender(
+      this.callRepository(),
+      this.eventPublisher,
+    ).send(
+      new CallSignalSendMessage(
+        callId,
+        senderIdentityId.valueOf(),
+        body.recipientIdentityId,
+        body.signalType,
+        body.payload,
+      ),
     );
-    await this.eventPublisher.publish(call.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

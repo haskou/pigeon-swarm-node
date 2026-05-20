@@ -1,0 +1,150 @@
+@startuml StickersClasses
+
+skinparam classAttributeIconSize 0
+
+package "stickers/application" {
+  class StickerPackCreator {
+    + create(message): StickerPack
+  }
+  class StickerPackUpdater {
+    + update(message): StickerPack
+  }
+  class StickerPackFinder {
+    + find(message): StickerPack
+  }
+  class StickerPacksFinder {
+    + find(message): StickerPack[]
+  }
+  class StickerAdder {
+    + add(message): StickerPack
+  }
+  class StickerUpdater {
+    + update(message): StickerPack
+  }
+  class StickerDeleter {
+    + delete(message): StickerPack
+  }
+  class StickerUserLibraryFinder {
+    + find(message): StickerUserLibrary
+  }
+  class StickerPackSaver {
+    + save(message): StickerUserLibrary
+  }
+  class StickerPackForgetter {
+    + forget(message): StickerUserLibrary
+  }
+  class StickerFavoriter {
+    + favorite(message): StickerUserLibrary
+  }
+  class StickerUnfavoriter {
+    + unfavorite(message): StickerUserLibrary
+  }
+  class StickerUseRecorder {
+    + record(message): StickerUserLibrary
+  }
+}
+
+package "stickers/domain" {
+  class StickerPack {
+    - id: StickerPackId
+    - ownerIdentityId: IdentityId
+    - name: StickerPackName
+    - stickers: Sticker[]
+    - createdAt: Timestamp
+    - updatedAt: Timestamp
+    + create(ownerIdentityId, name): StickerPack
+    + addSticker(actor, details): Sticker
+    + updateSticker(actor, stickerId, details): Sticker
+    + removeSticker(actor, stickerId): void
+    + updateProfile(actor, name): void
+    + assertHasSticker(stickerId): void
+  }
+
+  class Sticker {
+    - id: StickerId
+    - details: StickerDetails
+    + create(details): Sticker
+    + update(details): void
+  }
+
+  class StickerDetails {
+    - type: StickerType
+    - assetCid: StickerAssetCid
+    - contentType: StickerContentType
+    - size: StickerSize
+    - dimensions: StickerDimensions
+  }
+
+  class StickerUserLibrary {
+    - identityId: IdentityId
+    - savedPackIds: StickerPackId[]
+    - favoriteStickers: StickerReference[]
+    - recentStickers: StickerReference[]
+    + savePack(packId): void
+    + forgetPack(packId): void
+    + favoriteSticker(packId, stickerId): void
+    + unfavoriteSticker(packId, stickerId): void
+    + recordStickerUse(packId, stickerId): void
+  }
+
+  class StickerReference {
+    - packId: StickerPackId
+    - stickerId: StickerId
+    - timestamp: Timestamp
+    + isSameSticker(packId, stickerId): boolean
+    + touch(timestamp?): void
+  }
+
+  interface StickerPackRepository {
+    + findAll(): StickerPack[]
+    + findById(id): StickerPack?
+    + findByOwner(ownerIdentityId): StickerPack[]
+    + save(pack): void
+  }
+
+  interface StickerUserLibraryRepository {
+    + findByIdentityId(identityId): StickerUserLibrary?
+    + save(library): void
+  }
+
+  StickerPack *-- Sticker
+  Sticker *-- StickerDetails
+  StickerUserLibrary *-- StickerReference
+  StickerPackRepository ..> StickerPack
+  StickerUserLibraryRepository ..> StickerUserLibrary
+}
+
+package "stickers/infrastructure" {
+  class MongoStickerPackRepository
+  class MongoStickerUserLibraryRepository
+
+  MongoStickerPackRepository ..|> StickerPackRepository
+  MongoStickerUserLibraryRepository ..|> StickerUserLibraryRepository
+}
+
+StickerPackCreator ..> StickerPackRepository
+StickerPackCreator ..> StickerUserLibraryRepository
+StickerPackUpdater ..> StickerPackRepository
+StickerPackFinder ..> StickerPackRepository
+StickerPacksFinder ..> StickerPackRepository
+StickerAdder ..> StickerPackRepository
+StickerUpdater ..> StickerPackRepository
+StickerDeleter ..> StickerPackRepository
+StickerUserLibraryFinder ..> StickerUserLibraryRepository
+StickerPackSaver ..> StickerPackRepository
+StickerPackSaver ..> StickerUserLibraryRepository
+StickerPackForgetter ..> StickerUserLibraryRepository
+StickerFavoriter ..> StickerPackRepository
+StickerFavoriter ..> StickerUserLibraryRepository
+StickerUnfavoriter ..> StickerUserLibraryRepository
+StickerUseRecorder ..> StickerPackRepository
+StickerUseRecorder ..> StickerUserLibraryRepository
+
+note right of StickerPack
+  Sticker assets are public IPFS CIDs.
+  Deleting a sticker removes it from the pack
+  metadata only; the IPFS asset is not unpinned
+  because old messages may still reference it.
+end note
+
+@enduml

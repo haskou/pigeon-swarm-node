@@ -1,10 +1,10 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import { CommunityFinder } from '@app/contexts/communities/application/find-community/CommunityFinder';
+import { CommunityFindMessage } from '@app/contexts/communities/application/find-community/messages/CommunityFindMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/CommunityModerationLogDetails';
 import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/CommunityModerationLogEntry';
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/CommunityModerationTarget';
-import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
@@ -95,12 +95,8 @@ export abstract class CommunityRouteSupport extends Route {
   }
 
   protected async findCommunity(id: string): Promise<Community> {
-    const community = await this.repository().findById(new CommunityId(id));
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
-
-    return community;
+    return new CommunityFinder(this.repository()).find(
+      new CommunityFindMessage(id),
+    );
   }
 }

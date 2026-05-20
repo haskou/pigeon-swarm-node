@@ -1,4 +1,5 @@
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
+import { StickerDeleteMessage } from '@app/contexts/stickers/application/delete-sticker/messages/StickerDeleteMessage';
+import { StickerDeleter } from '@app/contexts/stickers/application/delete-sticker/StickerDeleter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -16,10 +17,9 @@ export class DeleteStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const pack = await this.findPack(packId);
-
-    pack.removeSticker(actor, new StickerId(stickerId));
-    await this.repository().save(pack);
+    const pack = await new StickerDeleter(this.packRepository()).delete(
+      new StickerDeleteMessage(packId, stickerId, actor.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

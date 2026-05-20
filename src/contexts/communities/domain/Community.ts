@@ -552,6 +552,10 @@ export class Community extends AggregateRoot {
     return this.networkId;
   }
 
+  public getMemberIds(): IdentityId[] {
+    return this.membership.getMemberIds();
+  }
+
   public isMember(identityId: IdentityId): boolean {
     return this.membership.isMember(identityId);
   }

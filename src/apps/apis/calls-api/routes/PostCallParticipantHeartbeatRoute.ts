@@ -1,3 +1,5 @@
+import { CallParticipantHeartbeatRecorder } from '@app/contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder';
+import { CallParticipantHeartbeatRecordMessage } from '@app/contexts/calls/application/record-participant-heartbeat/messages/CallParticipantHeartbeatRecordMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
@@ -14,10 +16,14 @@ export class PostCallParticipantHeartbeatRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await this.findCall(callId);
-
-    call.recordParticipantHeartbeat(participantIdentityId);
-    await this.callRepository().save(call);
+    const call = await new CallParticipantHeartbeatRecorder(
+      this.callRepository(),
+    ).record(
+      new CallParticipantHeartbeatRecordMessage(
+        callId,
+        participantIdentityId.valueOf(),
+      ),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

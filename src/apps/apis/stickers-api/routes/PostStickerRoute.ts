@@ -1,3 +1,5 @@
+import { StickerAddMessage } from '@app/contexts/stickers/application/add-sticker/messages/StickerAddMessage';
+import { StickerAdder } from '@app/contexts/stickers/application/add-sticker/StickerAdder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -11,7 +13,6 @@ import {
 
 import { StickerBody } from '../bodies/StickerBody';
 import { StickerPackViewModel } from '../view-model/StickerPackViewModel';
-import { StickerBodyMapper } from './StickerBodyMapper';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
@@ -24,11 +25,9 @@ export class PostStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const pack = await this.findPack(packId);
-    const sticker = new StickerBodyMapper(body);
-
-    pack.addSticker(actor, sticker.details());
-    await this.repository().save(pack);
+    const pack = await new StickerAdder(this.packRepository()).add(
+      new StickerAddMessage(packId, actor.valueOf(), body),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

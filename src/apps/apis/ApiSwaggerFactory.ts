@@ -13,8 +13,8 @@ const swaggerFileByApi: Record<string, string> = {
   'link-previews-api': 'link-previews-api/swagger.yaml',
   'nodes-api': 'nodes-api/swagger.yaml',
   'notifications-api': 'notifications-api/swagger.yaml',
-  'presence-api': 'presence-api/swagger.yaml',
   'polls-api': 'polls-api/swagger.yaml',
+  'presence-api': 'presence-api/swagger.yaml',
   'push-api': 'push-api/swagger.yaml',
   'stickers-api': 'stickers-api/swagger.yaml',
 };

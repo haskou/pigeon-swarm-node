@@ -1,3 +1,5 @@
+import { ActiveCallsFinder } from '@app/contexts/calls/application/find-active-calls/ActiveCallsFinder';
+import { ActiveCallsFindMessage } from '@app/contexts/calls/application/find-active-calls/messages/ActiveCallsFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';
@@ -13,8 +15,9 @@ export class GetCallsRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const requesterIdentityId = await this.authenticate(request);
-    const calls =
-      await this.callRepository().findActiveByParticipant(requesterIdentityId);
+    const calls = await new ActiveCallsFinder(this.callRepository()).find(
+      new ActiveCallsFindMessage(requesterIdentityId.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
