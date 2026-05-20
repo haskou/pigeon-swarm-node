@@ -2,6 +2,19 @@
 
 skinparam classAttributeIconSize 0
 
+package "communities/application" {
+  class CommunityCreator {
+    + create(message): Community
+  }
+
+  class CommunityFinder {
+    + find(message): Community
+  }
+
+  CommunityCreator ..> CommunityRepository
+  CommunityFinder ..> CommunityRepository
+}
+
 package "communities/domain" {
   class Community {
     - id: CommunityId
@@ -362,11 +375,11 @@ package "communities-api" {
   class GetCommunityChannelMessagesRoute
   class CommunityChannelMessageReactionRoute
 
-  PostCommunityRoute ..> Community
+  PostCommunityRoute ..> CommunityCreator
   GetCommunitiesRoute ..> CommunityRepository
   GetCommunityDiscoveryRoute ..> CommunityRepository
   GetCommunityDiscoveryRoute ..> CommunityRequestStore
-  GetCommunityRoute ..> CommunityRepository
+  GetCommunityRoute ..> CommunityFinder
   PatchCommunityRoute ..> Community
   GetCommunityMembersRoute ..> Community
   GetCommunityMembershipRequestsRoute ..> CommunityRequestStore

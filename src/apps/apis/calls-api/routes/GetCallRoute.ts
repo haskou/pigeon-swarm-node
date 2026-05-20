@@ -1,3 +1,5 @@
+import { CallFinder } from '@app/contexts/calls/application/find-call/CallFinder';
+import { CallFindMessage } from '@app/contexts/calls/application/find-call/messages/CallFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -14,7 +16,9 @@ export class GetCallRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const requesterIdentityId = await this.authenticate(request);
-    const call = await this.findAccessibleCall(callId, requesterIdentityId);
+    const call = await new CallFinder(this.callRepository()).find(
+      new CallFindMessage(callId, requesterIdentityId.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

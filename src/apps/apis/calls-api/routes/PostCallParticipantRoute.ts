@@ -1,3 +1,5 @@
+import { CallJoiner } from '@app/contexts/calls/application/join-call/CallJoiner';
+import { CallJoinMessage } from '@app/contexts/calls/application/join-call/messages/CallJoinMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
@@ -14,11 +16,10 @@ export class PostCallParticipantRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await this.findCall(callId);
-
-    call.join(participantIdentityId);
-    await this.callRepository().save(call);
-    await this.eventPublisher.publish(call.pullDomainEvents());
+    const call = await new CallJoiner(
+      this.callRepository(),
+      this.eventPublisher,
+    ).join(new CallJoinMessage(callId, participantIdentityId.valueOf()));
 
     return response
       .status(HttpRouteStatusEnum.OK)

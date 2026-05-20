@@ -1,5 +1,5 @@
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import { StickerUseRecordMessage } from '@app/contexts/stickers/application/record-sticker-use/messages/StickerUseRecordMessage';
+import { StickerUseRecorder } from '@app/contexts/stickers/application/record-sticker-use/StickerUseRecorder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
@@ -16,14 +16,12 @@ export class PostUsedStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const pack = await this.findPack(packId);
-    const packIdValueObject = new StickerPackId(packId);
-    const stickerIdValueObject = new StickerId(stickerId);
-    const library = await this.findLibrary(identityId);
-
-    pack.assertHasSticker(stickerIdValueObject);
-    library.recordStickerUse(packIdValueObject, stickerIdValueObject);
-    await this.libraryRepository().save(library);
+    const library = await new StickerUseRecorder(
+      this.packRepository(),
+      this.libraryRepository(),
+    ).record(
+      new StickerUseRecordMessage(identityId.valueOf(), packId, stickerId),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

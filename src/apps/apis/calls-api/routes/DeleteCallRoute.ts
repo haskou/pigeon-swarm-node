@@ -1,3 +1,5 @@
+import { CallEnder } from '@app/contexts/calls/application/end-call/CallEnder';
+import { CallEndMessage } from '@app/contexts/calls/application/end-call/messages/CallEndMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -14,11 +16,10 @@ export class DeleteCallRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await this.findCall(callId);
-
-    call.end(participantIdentityId);
-    await this.callRepository().save(call);
-    await this.eventPublisher.publish(call.pullDomainEvents());
+    const call = await new CallEnder(
+      this.callRepository(),
+      this.eventPublisher,
+    ).end(new CallEndMessage(callId, participantIdentityId.valueOf()));
 
     return response
       .status(HttpRouteStatusEnum.OK)

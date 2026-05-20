@@ -1,5 +1,5 @@
-import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
-import { StickerPackName } from '@app/contexts/stickers/domain/value-objects/StickerPackName';
+import { StickerPackCreateMessage } from '@app/contexts/stickers/application/create-pack/messages/StickerPackCreateMessage';
+import { StickerPackCreator } from '@app/contexts/stickers/application/create-pack/StickerPackCreator';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
@@ -17,15 +17,12 @@ export class PostStickerPackRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const ownerIdentityId = await this.authenticate(request);
-    const pack = StickerPack.create(
-      ownerIdentityId,
-      new StickerPackName(body.name),
+    const pack = await new StickerPackCreator(
+      this.packRepository(),
+      this.libraryRepository(),
+    ).create(
+      new StickerPackCreateMessage(ownerIdentityId.valueOf(), body.name),
     );
-    const library = await this.findLibrary(ownerIdentityId);
-
-    library.savePack(pack.getId());
-    await this.repository().save(pack);
-    await this.libraryRepository().save(library);
 
     return response
       .status(HttpRouteStatusEnum.OK)
