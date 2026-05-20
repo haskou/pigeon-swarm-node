@@ -1,4 +1,6 @@
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -32,6 +34,16 @@ export class PostCommunityTextChannelRoute extends CommunityRouteSupport {
 
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.CHANNEL_CREATED,
+      this.moderationTarget(
+        CommunityModerationTargetType.CHANNEL,
+        channel.getId(),
+      ),
+      { name: body.name, type: 'text' },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

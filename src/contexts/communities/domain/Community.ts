@@ -207,6 +207,10 @@ export class Community extends AggregateRoot {
     this.assertPermission(identityId, CommunityPermission.MANAGE_MEMBERS);
   }
 
+  public assertCanViewModerationLog(identityId: IdentityId): void {
+    this.assertCanManageMembers(identityId);
+  }
+
   public assertCanManageChannels(identityId: IdentityId): void {
     this.assertPermission(identityId, CommunityPermission.MANAGE_CHANNELS);
   }

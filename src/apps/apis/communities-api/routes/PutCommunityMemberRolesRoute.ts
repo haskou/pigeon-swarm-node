@@ -1,3 +1,5 @@
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -35,6 +37,16 @@ export class PutCommunityMemberRolesRoute extends CommunityRouteSupport {
     );
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.MEMBER_ROLES_UPDATED,
+      this.moderationTarget(
+        CommunityModerationTargetType.MEMBER,
+        new IdentityId(identityId),
+      ),
+      { roleIds: body.roleIds },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

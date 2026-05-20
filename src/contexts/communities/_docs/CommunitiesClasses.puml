@@ -118,6 +118,24 @@ package "communities/domain" {
     - createdAt: Timestamp
   }
 
+  class CommunityModerationLogEntry {
+    - id: CommunityModerationLogId
+    - communityId: CommunityId
+    - actorIdentityId: IdentityId
+    - action: CommunityModerationAction
+    - target: CommunityModerationTarget
+    - details: CommunityModerationLogDetails
+    - createdAt: Timestamp
+    + record(communityId, actorIdentityId, action, target, details?): CommunityModerationLogEntry
+  }
+
+  class CommunityModerationTarget {
+    - type: CommunityModerationTargetType
+    - id: StringValueObject
+  }
+
+  class CommunityModerationLogDetails
+
   class CommunityProfile {
     - name: CommunityName
     - description: CommunityDescription
@@ -172,6 +190,9 @@ package "communities/domain" {
   class CommunityRequestStatus
   class CommunityRequestType
   class CommunityMembershipRequestTimestamps
+  class CommunityModerationLogId
+  class CommunityModerationAction
+  class CommunityModerationTargetType
 
   interface CommunityRepository {
     + findDiscoverable(options): Community[]
@@ -202,6 +223,12 @@ package "communities/domain" {
     + findByIdentity(identityId): CommunityMembershipRequest[]
     + findByOwnedCommunities(ownerIdentityId): CommunityMembershipRequest[]
     + save(request): void
+  }
+
+  interface CommunityModerationLogRepository {
+    + findByCommunity(communityId, limit, beforeLogId?): CommunityModerationLogEntry[]
+    + save(entry): void
+    + deleteByCommunity(communityId): void
   }
 
   Community *-- CommunityMembership
@@ -239,6 +266,13 @@ package "communities/domain" {
   CommunityChannelMessageReaction --> CommunityChannelMessageId
   CommunityChannelMessageReaction --> IdentityId
   CommunityChannelMessageReaction --> CommunityChannelMessageReactionEmoji
+  CommunityModerationLogEntry --> CommunityModerationLogId
+  CommunityModerationLogEntry --> CommunityId
+  CommunityModerationLogEntry --> IdentityId
+  CommunityModerationLogEntry --> CommunityModerationAction
+  CommunityModerationLogEntry --> CommunityModerationTarget
+  CommunityModerationLogEntry --> CommunityModerationLogDetails
+  CommunityModerationTarget --> CommunityModerationTargetType
   CommunityInvite --> CommunityId
   CommunityInvite --> IdentityId
   CommunityInvite --> CommunityInviteToken
@@ -255,6 +289,7 @@ package "communities/domain" {
   CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
   CommunityInviteRepository ..> CommunityInvite
   CommunityRequestStore ..> CommunityMembershipRequest
+  CommunityModerationLogRepository ..> CommunityModerationLogEntry
 }
 
 package "shared value objects" {
@@ -280,6 +315,8 @@ package "communities/infrastructure" {
   class MongoCommunityInviteDocument
   class MongoCommunityRequestStore
   class MongoCommunityRequestDocument
+  class MongoCommunityModerationLogRepository
+  class MongoCommunityModerationLogDocument
 
   MongoCommunityRepository ..|> CommunityRepository
   MongoCommunityRepository --> MongoCommunityDocument
@@ -291,6 +328,8 @@ package "communities/infrastructure" {
   MongoCommunityInviteRepository --> MongoCommunityInviteDocument
   MongoCommunityRequestStore ..|> CommunityRequestStore
   MongoCommunityRequestStore --> MongoCommunityRequestDocument
+  MongoCommunityModerationLogRepository ..|> CommunityModerationLogRepository
+  MongoCommunityModerationLogRepository --> MongoCommunityModerationLogDocument
 }
 
 package "communities-api" {
@@ -314,6 +353,7 @@ package "communities-api" {
   class CommunityChannelPermissionsRoute
   class DeleteCommunityChannelRoute
   class GetCommunityRolesRoute
+  class GetCommunityModerationLogsRoute
   class PostCommunityRoleRoute
   class PatchCommunityRoleRoute
   class DeleteCommunityRoleRoute
@@ -345,6 +385,7 @@ package "communities-api" {
   CommunityChannelPermissionsRoute ..> Community
   DeleteCommunityChannelRoute ..> Community
   GetCommunityRolesRoute ..> Community
+  GetCommunityModerationLogsRoute ..> CommunityModerationLogRepository
   PostCommunityRoleRoute ..> Community
   PatchCommunityRoleRoute ..> Community
   DeleteCommunityRoleRoute ..> Community
@@ -382,6 +423,8 @@ note right of Community
     text channel messages
   - channel message reactions are
     Mongo-only synchronized metadata
+  - moderation log entries are
+    Mongo-only administrative audit
 end note
 
 @enduml
