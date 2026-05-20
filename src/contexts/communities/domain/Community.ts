@@ -3,6 +3,7 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
 import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 import { CommunityChannels } from './CommunityChannels';
 import { CommunityMembership } from './CommunityMembership';
@@ -233,6 +234,25 @@ export class Community extends AggregateRoot {
   ): void {
     this.assertCanSendMessage(identityId, channelId);
     this.assertPermission(identityId, CommunityPermission.SEND_STICKERS);
+  }
+
+  public assertCanMention(
+    identityId: IdentityId,
+    mentions: CommunityChannelMessageMention[],
+  ): void {
+    for (const mention of mentions) {
+      if (mention.isEveryone()) {
+        this.assertPermission(identityId, CommunityPermission.MENTION_EVERYONE);
+      }
+
+      if (mention.isHere()) {
+        this.assertPermission(identityId, CommunityPermission.MENTION_HERE);
+      }
+
+      if (mention.isRole()) {
+        this.assertPermission(identityId, CommunityPermission.MENTION_ROLES);
+      }
+    }
   }
 
   public assertCanConnectVoice(

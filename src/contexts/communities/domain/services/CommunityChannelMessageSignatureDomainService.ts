@@ -4,8 +4,10 @@ import { CommunityChannelMessage } from '../CommunityChannelMessage';
 
 type CommunityChannelMessageSignaturePayload = Omit<
   ReturnType<CommunityChannelMessage['toPrimitives']>,
-  'signature'
->;
+  'mentions' | 'signature'
+> & {
+  mentions?: ReturnType<CommunityChannelMessage['toPrimitives']>['mentions'];
+};
 type CommunityChannelMessageDeletionSignaturePayload = {
   actorIdentityId: string;
   channelId: string;
@@ -43,6 +45,7 @@ export class CommunityChannelMessageSignatureDomainService {
       createdAt: payload.createdAt,
       encryptedPayload: payload.encryptedPayload,
       id: payload.id,
+      mentions: payload.mentions,
       type: payload.type,
     };
   }

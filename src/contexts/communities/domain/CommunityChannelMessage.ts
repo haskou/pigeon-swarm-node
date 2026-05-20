@@ -1,6 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from './CommunityChannelMessageMetadata';
 import { CommunityChannelAttachmentId } from './value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
@@ -9,6 +10,7 @@ import { CommunityChannelMessageId } from './value-objects/CommunityChannelMessa
 import { CommunityId } from './value-objects/CommunityId';
 
 type Attachments = CommunityChannelAttachmentId[];
+type Mentions = CommunityChannelMessageMention[];
 export type CommunityChannelMessagePrimitives = ReturnType<
   CommunityChannelMessage['toPrimitives']
 >;
@@ -19,12 +21,14 @@ export class CommunityChannelMessage {
     encryptedPayload: CommunityChannelMessageEncryptedPayload,
     signature: Signature,
     attachmentExternalIdentifiers: Attachments = [],
+    mentions: Mentions = [],
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       metadata,
       encryptedPayload,
       signature,
       attachmentExternalIdentifiers,
+      mentions,
     );
   }
 
@@ -45,6 +49,9 @@ export class CommunityChannelMessage {
         (externalIdentifier) =>
           new CommunityChannelAttachmentId(externalIdentifier),
       ),
+      (primitives.mentions || []).map((mention) =>
+        CommunityChannelMessageMention.fromPrimitives(mention),
+      ),
     );
   }
 
@@ -53,6 +60,7 @@ export class CommunityChannelMessage {
     private readonly encryptedPayload: CommunityChannelMessageEncryptedPayload,
     private readonly signature: Signature,
     private readonly attachmentExternalIdentifiers: Attachments,
+    private readonly mentions: Mentions,
   ) {}
 
   private type(): 'sent' {
@@ -61,6 +69,10 @@ export class CommunityChannelMessage {
 
   public getAuthorIdentityId(): IdentityId {
     return this.metadata.getAuthorIdentityId();
+  }
+
+  public getMentions(): CommunityChannelMessageMention[] {
+    return this.mentions;
   }
 
   public toPrimitives() {
@@ -74,6 +86,7 @@ export class CommunityChannelMessage {
       createdAt: this.metadata.getCreatedAt().valueOf(),
       encryptedPayload: this.encryptedPayload.valueOf(),
       id: this.metadata.getId().valueOf(),
+      mentions: this.mentions.map((mention) => mention.toPrimitives()),
       signature: this.signature.valueOf(),
       type: this.type(),
     };

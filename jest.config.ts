@@ -20,6 +20,7 @@ const config: Config.InitialOptions = {
   verbose: true,
   roots: ['<rootDir>/src/', '<rootDir>/tests/'],
   moduleDirectories: ['node_modules', '<rootDir>/src'],
+  setupFiles: ['reflect-metadata'],
   globals: {
     'ts-jest': {
       tsconfig: 'tsconfig.jest.json',

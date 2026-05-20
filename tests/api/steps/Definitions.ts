@@ -1021,6 +1021,10 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-community-channel-message-payload',
       id,
+      mentions: [] as {
+        targetId?: string;
+        type: string;
+      }[],
       type: 'sent',
     };
 
@@ -1029,6 +1033,46 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-community-channel-message-payload',
       id,
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
+  @given('I set an encrypted community channel message body mentioning everyone')
+  public async iSetAnEncryptedCommunityChannelMessageBodyMentioningEveryone(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const id = `community-message:${Date.now()}:${randomUUID()}`;
+    const createdAt = Date.now();
+    const mentions: {
+      targetId: string | undefined;
+      type: string;
+    }[] = [
+      {
+        targetId: undefined,
+        type: 'everyone',
+      },
+    ];
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      createdAt,
+      encryptedPayload: 'encrypted-community-channel-message-payload',
+      id,
+      mentions,
+      type: 'sent',
+    };
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      createdAt,
+      encryptedPayload: 'encrypted-community-channel-message-payload',
+      id,
+      mentions,
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });
   }
