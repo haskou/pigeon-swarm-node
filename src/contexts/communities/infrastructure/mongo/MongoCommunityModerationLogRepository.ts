@@ -52,17 +52,33 @@ export class MongoCommunityModerationLogRepository implements LogRepository {
     limit: number,
     beforeLogId?: CommunityModerationLogId,
   ): Promise<CommunityModerationLogEntry[]> {
+    const communityIdValue = communityId.valueOf();
     const beforeLog = beforeLogId
-      ? await (await this.collection()).findOne({ _id: beforeLogId.valueOf() })
+      ? await (
+          await this.collection()
+        ).findOne({
+          _id: beforeLogId.valueOf(),
+          communityId: communityIdValue,
+        })
       : undefined;
     const documents = await (
       await this.collection()
     )
       .find({
-        communityId: communityId.valueOf(),
-        ...(beforeLog ? { createdAt: { $lt: beforeLog.createdAt } } : {}),
+        communityId: communityIdValue,
+        ...(beforeLog
+          ? {
+              $or: [
+                { createdAt: { $lt: beforeLog.createdAt } },
+                {
+                  _id: { $lt: beforeLog._id },
+                  createdAt: beforeLog.createdAt,
+                },
+              ],
+            }
+          : {}),
       })
-      .sort({ createdAt: -1 })
+      .sort({ _id: -1, createdAt: -1 })
       .limit(limit)
       .toArray();
 
