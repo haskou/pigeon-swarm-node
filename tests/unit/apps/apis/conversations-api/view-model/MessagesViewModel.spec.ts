@@ -48,6 +48,23 @@ describe('MessagesViewModel', () => {
     expect(resource.messages[1].type).toEqual('poll');
   });
 
+  it('uses the oldest returned message as pagination cursor when polls are first', () => {
+    const resource = new MessagesViewModel(
+      'conversation-id',
+      [message('message-1', 2000), message('message-2', 3000)],
+      [],
+      [poll('poll-1', 1000)],
+      3,
+    ).toResource();
+
+    expect(resource.messages.map((item) => item.id)).toEqual([
+      'poll-1',
+      'message-1',
+      'message-2',
+    ]);
+    expect(resource.nextBeforeMessageId).toEqual('message-1');
+  });
+
   function callEvent(id: string, createdAt: number) {
     return {
       actorIdentityId: 'actor-id',

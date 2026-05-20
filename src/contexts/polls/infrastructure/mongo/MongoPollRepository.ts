@@ -76,7 +76,10 @@ export class MongoPollRepository implements PollRepository {
         'scope.type': 'community_channel',
         ...(beforeCreatedAt ? { createdAt: { $lte: beforeCreatedAt } } : {}),
       })
-      .sort({ _id: -1, createdAt: -1 })
+      .sort([
+        ['createdAt', -1],
+        ['_id', -1],
+      ])
       .limit(limit)
       .toArray();
 
@@ -96,7 +99,10 @@ export class MongoPollRepository implements PollRepository {
         'scope.type': 'group_conversation',
         ...(beforeCreatedAt ? { createdAt: { $lte: beforeCreatedAt } } : {}),
       })
-      .sort({ _id: -1, createdAt: -1 })
+      .sort([
+        ['createdAt', -1],
+        ['_id', -1],
+      ])
       .limit(limit)
       .toArray();
 

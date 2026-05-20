@@ -50,7 +50,7 @@ export class MessagesViewModel {
       .sort((first, second) => first.createdAt - second.createdAt)
       .slice(-this.limit);
     const firstReturnedMessage = timeline.find(
-      (item) => item.type !== 'call_event',
+      (item) => item.type !== 'call_event' && item.type !== 'poll',
     );
 
     return {
