@@ -10,6 +10,7 @@ const swaggerFileByApi: Record<string, string> = {
   'identities-api': 'identities-api/swagger.yaml',
   'ipfs-api': 'ipfs-api/swagger.yaml',
   'keychains-api': 'keychains-api/swagger.yaml',
+  'link-previews-api': 'link-previews-api/swagger.yaml',
   'nodes-api': 'nodes-api/swagger.yaml',
   'notifications-api': 'notifications-api/swagger.yaml',
   'presence-api': 'presence-api/swagger.yaml',

@@ -392,6 +392,11 @@ export default class Definitions {
     await this.signCurrentRequest('PUT', '/presence/me');
   }
 
+  @given('I sign the current link preview request')
+  public async iSignTheCurrentLinkPreviewRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/link-previews');
+  }
+
   @given('I sign the current presence custom message deletion request')
   public async iSignTheCurrentPresenceCustomMessageDeletionRequest(): Promise<void> {
     this.body = undefined;

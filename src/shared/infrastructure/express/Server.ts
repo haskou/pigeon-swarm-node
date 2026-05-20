@@ -47,6 +47,7 @@ import { PostPrivateIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/Post
 import { PostPublicIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostPublicIPFSContentRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
+import { PostLinkPreviewRoute } from '@app/apps/apis/link-previews-api/routes/PostLinkPreviewRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
@@ -207,6 +208,7 @@ export default class Server {
           PutIdentityRoute,
           GetKeychainRoute,
           PostKeychainRoute,
+          PostLinkPreviewRoute,
           PostConversationRoute,
           GetConversationsRoute,
           PostConversationMessageRoute,
