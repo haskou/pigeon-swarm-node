@@ -33,11 +33,25 @@ export class PollLifecycle {
     return this.status.isClosed();
   }
 
+  public isOpenAt(timestamp: Timestamp): boolean {
+    if (this.isClosed()) {
+      return false;
+    }
+
+    if (!this.expiresAt) {
+      return true;
+    }
+
+    return timestamp.isBefore(this.expiresAt);
+  }
+
   public toPrimitives() {
     return {
       createdAt: this.createdAt.valueOf(),
       expiresAt: this.expiresAt?.valueOf(),
-      status: this.status.valueOf(),
+      status: this.isOpenAt(Timestamp.now())
+        ? PollStatus.OPEN.valueOf()
+        : PollStatus.CLOSED.valueOf(),
     };
   }
 }

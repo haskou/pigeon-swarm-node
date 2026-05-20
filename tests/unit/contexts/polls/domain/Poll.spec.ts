@@ -1,6 +1,7 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { PollDuplicateOptionVoteError } from '@app/contexts/polls/domain/errors/PollDuplicateOptionVoteError';
+import { PollAlreadyClosedError } from '@app/contexts/polls/domain/errors/PollAlreadyClosedError';
 import { PollMultipleVotesNotAllowedError } from '@app/contexts/polls/domain/errors/PollMultipleVotesNotAllowedError';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
@@ -10,6 +11,7 @@ import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOpt
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { Timestamp } from '@haskou/value-objects';
 
 describe('Poll', () => {
   const creator = new IdentityId(
@@ -86,5 +88,21 @@ describe('Poll', () => {
     expect(() =>
       poll.castVote(voter, [new PollOptionId('a'), new PollOptionId('a')]),
     ).toThrow(PollDuplicateOptionVoteError);
+  });
+
+  it('rejects votes after the expiration time', () => {
+    const poll = Poll.create(
+      creator,
+      scope,
+      new PollQuestion('Choose one'),
+      options,
+      false,
+      new Timestamp(Date.now() - 1),
+    );
+
+    expect(() => poll.castVote(voter, [new PollOptionId('a')])).toThrow(
+      PollAlreadyClosedError,
+    );
+    expect(poll.toPrimitives().status).toBe('closed');
   });
 });
