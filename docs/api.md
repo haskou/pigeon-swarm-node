@@ -1633,6 +1633,7 @@ Response:
       "avatar": "<publicAvatarCid>",
       "banner": "<publicBannerCid>",
       "memberIds": ["<identityId>"],
+      "bannedMemberIds": [],
       "memberRoles": [],
       "roles": [
         {
@@ -1838,6 +1839,7 @@ POST /communities/{communityId}/join-requests
 Implemented:
 
 - require signed request auth from the requester
+- reject banned identities
 - create a pending `request`
 - do not add the requester to `memberIds` until the owner accepts
 - return an existing pending request for the same requester idempotently
@@ -1940,8 +1942,33 @@ Implemented:
 - reject missing, expired or exhausted invite tokens
 - consume one invite use
 - add the authenticated identity as a community member
+- reject banned identities
 - publish `communities.v1.member.was_added` with the updated community
 - never receive or decrypt the community key
+
+### Ban community member
+
+```http
+POST /communities/{communityId}/bans
+DELETE /communities/{communityId}/bans/{urlEncodedIdentityId}
+```
+
+Ban request:
+
+```json
+{
+  "identityId": "<identityId>",
+  "reason": "optional moderation note"
+}
+```
+
+Implemented:
+
+- require signed request auth from the owner or a member with `ban_members`
+- remove the banned identity from `memberIds` if they were a member
+- store banned identities in `bannedMemberIds`
+- prevent banned identities from requesting to join or accepting invite links
+- publish `communities.v1.community.was_updated`
 
 ### List community channels
 

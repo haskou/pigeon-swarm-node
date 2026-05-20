@@ -27,6 +27,7 @@ export class PostCommunityInviteAcceptRoute extends CommunityRouteSupport {
     const communityId = invite.getCommunityId().valueOf();
     const community = await this.findCommunity(communityId);
 
+    community.assertIsNotBanned(actorIdentityId);
     await this.inviteRepository().consume(invite);
     community.joinWithInvite(actorIdentityId);
     await this.repository().save(community);

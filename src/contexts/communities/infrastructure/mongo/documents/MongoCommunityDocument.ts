@@ -34,6 +34,7 @@ export interface MongoCommunityDocument {
   _id: string;
   avatar?: string;
   banner?: string;
+  bannedMemberIds?: string[];
   createdAt: number;
   description: string;
   memberRoles?: MongoCommunityMemberRoleDocument[];

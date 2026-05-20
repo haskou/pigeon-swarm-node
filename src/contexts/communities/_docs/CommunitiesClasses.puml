@@ -14,11 +14,14 @@ package "communities/domain" {
     + create(ownerIdentityId, networkId, name, description, banner?): Community
     + joinWithInvite(member): void
     + leave(member): void
+    + banMember(actor, member): void
+    + unbanMember(actor, member): void
     + assertCanCreateInvite(identityId): void
     + assertCanManageChannels(identityId): void
     + assertCanManageRoles(identityId): void
     + assertCanSendMessage(identityId, channelId): void
     + assertCanDeleteMessage(actor, targetAuthor, channelId): void
+    + assertIsNotBanned(identityId): void
     + addTextChannel(actor, name): CommunityTextChannel
     + addRole(actor, name, permissions): CommunityRole
     + assignRoles(actor, member, roleIds): void
@@ -30,10 +33,14 @@ package "communities/domain" {
 
   class CommunityMembership {
     - members: IdentityId[]
+    - bannedMembers: IdentityId[]
     - roles: CommunityRoles
     + add(member): void
+    + ban(member): void
+    + unban(member): void
     + remove(member): void
     + assignRoles(member, roleIds): void
+    + isBanned(identityId): boolean
     + isMember(identityId): boolean
   }
 

@@ -12,6 +12,7 @@ import { CommunityRole } from './CommunityRole';
 import { CommunityRoles } from './CommunityRoles';
 import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
+import { CommunityMemberBannedError } from './errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
@@ -67,6 +68,9 @@ export class Community extends AggregateRoot {
       CommunityMembership.create(
         primitives.memberIds.map((memberId) => new IdentityId(memberId)),
         CommunityRoles.fromPrimitives(primitives.roles, primitives.memberRoles),
+        (primitives.bannedMemberIds || []).map(
+          (memberId) => new IdentityId(memberId),
+        ),
       ),
       new CommunityChannels(
         primitives.textChannels.map((channel) =>
@@ -161,6 +165,8 @@ export class Community extends AggregateRoot {
   }
 
   private join(member: IdentityId): void {
+    assert(!this.membership.isBanned(member), new CommunityMemberBannedError());
+
     if (this.isMember(member)) {
       return;
     }
@@ -206,6 +212,10 @@ export class Community extends AggregateRoot {
 
   public assertCanManageRoles(identityId: IdentityId): void {
     this.assertPermission(identityId, CommunityPermission.MANAGE_ROLES);
+  }
+
+  public assertCanBanMembers(identityId: IdentityId): void {
+    this.assertPermission(identityId, CommunityPermission.BAN_MEMBERS);
   }
 
   public assertCanSendMessage(
@@ -455,6 +465,32 @@ export class Community extends AggregateRoot {
     );
   }
 
+  public banMember(actor: IdentityId, member: IdentityId): void {
+    this.assertCanBanMembers(actor);
+    assert(
+      !this.ownerIdentityId.isEqual(member),
+      new CommunityOwnerMismatchError(),
+    );
+    this.membership.ban(member);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
+  }
+
+  public unbanMember(actor: IdentityId, member: IdentityId): void {
+    this.assertCanBanMembers(actor);
+    this.membership.unban(member);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
+  }
+
   public updateProfile(
     actor: IdentityId,
     name: CommunityName,
@@ -500,6 +536,13 @@ export class Community extends AggregateRoot {
     assert(this.isMember(identityId), new CommunityMemberNotFoundError());
   }
 
+  public assertIsNotBanned(identityId: IdentityId): void {
+    assert(
+      !this.membership.isBanned(identityId),
+      new CommunityMemberBannedError(),
+    );
+  }
+
   public visibleChannelsFor(
     identityId: IdentityId,
   ): ReturnType<CommunityChannels['toPrimitives']> {
@@ -519,6 +562,7 @@ export class Community extends AggregateRoot {
 
     return {
       avatar: this.profile.getAvatar()?.valueOf(),
+      bannedMemberIds: this.membership.toPrimitives().bannedMemberIds,
       banner: this.profile.getBanner()?.valueOf(),
       createdAt: this.createdAt.valueOf(),
       description: this.profile.getDescription().valueOf(),

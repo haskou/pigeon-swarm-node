@@ -633,6 +633,15 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community ban body for another identity')
+  public async iSetACommunityBanBodyForAnotherIdentity(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      identityId: this.otherIdentityId?.valueOf(),
+    });
+  }
+
   @given('I set current community channel visible for the current role')
   public iSetCurrentCommunityChannelVisibleForTheCurrentRole(): void {
     if (!this.communityRoleId) {
@@ -667,6 +676,18 @@ export default class Definitions {
       `/communities/${this.communityId}/members/${encodeURIComponent(
         this.otherIdentityId.valueOf(),
       )}/roles`,
+    );
+  }
+
+  @given('I sign the current community ban request')
+  public async iSignTheCurrentCommunityBanRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/bans`,
     );
   }
 
@@ -2448,6 +2469,19 @@ export default class Definitions {
       `/communities/${this.communityId}/members/${encodeURIComponent(
         this.otherIdentityId.valueOf(),
       )}/roles`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST a ban to the current community')
+  public async iPOSTABanToTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/bans`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
