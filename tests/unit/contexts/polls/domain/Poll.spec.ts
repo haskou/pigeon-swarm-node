@@ -31,6 +31,10 @@ describe('Poll', () => {
     PollOption.create(new PollOptionId('b'), new PollOptionText('Option B')),
   ];
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('creates and records a single-choice vote', () => {
     const poll = Poll.create(
       creator,
@@ -104,5 +108,25 @@ describe('Poll', () => {
       PollAlreadyClosedError,
     );
     expect(poll.toPrimitives().status).toBe('closed');
+  });
+
+  it('accepts votes at the exact expiration time', () => {
+    const now = Date.now();
+
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+
+    const poll = Poll.create(
+      creator,
+      scope,
+      new PollQuestion('Choose one'),
+      options,
+      false,
+      new Timestamp(now),
+    );
+
+    poll.castVote(voter, [new PollOptionId('a')]);
+
+    expect(poll.toPrimitives().status).toBe('open');
+    expect(poll.toPrimitives().votes).toHaveLength(1);
   });
 });
