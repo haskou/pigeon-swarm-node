@@ -415,6 +415,33 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not a community member or is the community owner.
+  /communities/{communityId}/members/{identityId}/kick:
+    delete:
+      tags:
+        - communities
+      summary: Kick a member from a private community
+      description: Requires the community owner or a member with manage_members. This removes the target from memberIds but does not ban them.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: URL-encoded identity id to remove.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Member removed from the community.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity cannot manage members, target is not a member, or target is the owner.
   /communities/{communityId}/invites:
     post:
       tags:
