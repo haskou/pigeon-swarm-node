@@ -52,6 +52,17 @@ export class CommunityMembership {
     return this.members.some((member) => member.isEqual(identityId));
   }
 
+  public membersWithAnyRole(
+    roleIds: CommunityRoleId[],
+    ownerIdentityId: IdentityId,
+  ): IdentityId[] {
+    return this.members.filter(
+      (member) =>
+        member.isEqual(ownerIdentityId) ||
+        this.roles.memberHasAnyRole(member, roleIds),
+    );
+  }
+
   public remove(member: IdentityId): void {
     const memberIndex = this.members.findIndex((currentMember) =>
       currentMember.isEqual(member),

@@ -3,6 +3,7 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { PollAlreadyClosedError } from './errors/PollAlreadyClosedError';
+import { PollDuplicateOptionVoteError } from './errors/PollDuplicateOptionVoteError';
 import { PollMultipleVotesNotAllowedError } from './errors/PollMultipleVotesNotAllowedError';
 import { PollOptionNotFoundError } from './errors/PollOptionNotFoundError';
 import { PollContent } from './PollContent';
@@ -68,6 +69,16 @@ export class Poll extends AggregateRoot {
     }
   }
 
+  private assertUniqueOptions(optionIds: PollOptionId[]): void {
+    optionIds.forEach((optionId, index) => {
+      const firstIndex = optionIds.findIndex((candidate) =>
+        candidate.isEqual(optionId),
+      );
+
+      assert(firstIndex === index, new PollDuplicateOptionVoteError());
+    });
+  }
+
   private removeVoteBy(voterIdentityId: IdentityId): void {
     const index = this.votes.findIndex((vote) =>
       vote.belongsTo(voterIdentityId),
@@ -88,6 +99,7 @@ export class Poll extends AggregateRoot {
       this.allowsMultipleVotes || optionIds.length === 1,
       new PollMultipleVotesNotAllowedError(),
     );
+    this.assertUniqueOptions(optionIds);
     this.assertOptionsExist(optionIds);
     this.removeVoteBy(voterIdentityId);
     this.votes.push(PollVote.create(voterIdentityId, optionIds));

@@ -79,7 +79,9 @@ export abstract class PollRouteSupport extends Route {
 
     return {
       recipients: {
-        memberIds: community.toPrimitives().memberIds,
+        memberIds: community
+          .visibleMembersForTextChannel(channel)
+          .map((member) => member.valueOf()),
       },
       scope: PollScope.communityChannel(
         community.getId(),

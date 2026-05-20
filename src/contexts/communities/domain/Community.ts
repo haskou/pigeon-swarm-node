@@ -569,6 +569,17 @@ export class Community extends AggregateRoot {
     });
   }
 
+  public visibleMembersForTextChannel(
+    channelId: CommunityChannelId,
+  ): IdentityId[] {
+    this.assertHasTextChannel(channelId);
+
+    return this.membership.membersWithAnyRole(
+      this.channels.textChannelPermissions(channelId).getVisibleRoleIds(),
+      this.ownerIdentityId,
+    );
+  }
+
   public toPrimitives() {
     const channels = this.channels.toPrimitives();
 

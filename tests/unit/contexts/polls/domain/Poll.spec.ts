@@ -1,3 +1,6 @@
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { PollDuplicateOptionVoteError } from '@app/contexts/polls/domain/errors/PollDuplicateOptionVoteError';
 import { PollMultipleVotesNotAllowedError } from '@app/contexts/polls/domain/errors/PollMultipleVotesNotAllowedError';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
@@ -5,8 +8,6 @@ import { PollScope } from '@app/contexts/polls/domain/PollScope';
 import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptionId';
 import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
@@ -69,10 +70,21 @@ describe('Poll', () => {
     );
 
     expect(() =>
-      poll.castVote(voter, [
-        new PollOptionId('a'),
-        new PollOptionId('b'),
-      ]),
+      poll.castVote(voter, [new PollOptionId('a'), new PollOptionId('b')]),
     ).toThrow(PollMultipleVotesNotAllowedError);
+  });
+
+  it('rejects duplicate option ids in the same vote', () => {
+    const poll = Poll.create(
+      creator,
+      scope,
+      new PollQuestion('Choose any'),
+      options,
+      true,
+    );
+
+    expect(() =>
+      poll.castVote(voter, [new PollOptionId('a'), new PollOptionId('a')]),
+    ).toThrow(PollDuplicateOptionVoteError);
   });
 });
