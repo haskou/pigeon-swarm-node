@@ -1124,6 +1124,7 @@ components:
         - encryptedPayload
         - signature
         - attachmentExternalIdentifiers
+        - mentions
         - reactions
         - type
         - createdAt
@@ -1144,6 +1145,11 @@ components:
           type: array
           items:
             type: string
+        mentions:
+          type: array
+          description: Visible mention metadata used for permission checks and notifications. Content remains encrypted.
+          items:
+            $ref: '#/components/schemas/CommunityMessageMentionResource'
         type:
           type: string
           enum:
@@ -1364,6 +1370,25 @@ components:
           type: array
           items:
             type: string
+        mentions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityMessageMentionResource'
+    CommunityMessageMentionResource:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - everyone
+            - here
+            - identity
+            - role
+        targetId:
+          type: string
+          description: Identity id or role id for identity/role mentions.
     DeleteCommunityChannelMessageBody:
       type: object
       required:

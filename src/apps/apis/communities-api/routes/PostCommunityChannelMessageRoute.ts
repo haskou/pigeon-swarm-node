@@ -1,5 +1,6 @@
 import { PostCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/PostCommunityChannelMessageBody';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
+import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
@@ -9,6 +10,8 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageEncryptedPayload } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
+import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { PublicKey, Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -57,7 +60,17 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
         (externalIdentifier) =>
           new CommunityChannelAttachmentId(externalIdentifier),
       ),
+      (body.mentions ?? []).map(
+        (mention) =>
+          new CommunityChannelMessageMention(
+            new CommunityMentionType(mention.type),
+            mention.targetId
+              ? new CommunityMentionTargetId(mention.targetId)
+              : undefined,
+          ),
+      ),
     );
+    community.assertCanMention(authorIdentityId, message.getMentions());
     const primitives = message.toPrimitives();
     const isValidSignature = this.signatureService.isValidSignature(
       PublicKey.fromPEM(authorIdentityId.toString()),

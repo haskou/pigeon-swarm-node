@@ -2247,6 +2247,12 @@ Request:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
   "signature": "<messageSignature>",
+  "mentions": [
+    {
+      "type": "role",
+      "targetId": "<roleId>"
+    }
+  ],
   "attachmentExternalIdentifiers": ["<privateContentCid>"]
 }
 ```
@@ -2262,6 +2268,7 @@ Response:
   "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
   "signature": "<messageSignature>",
   "attachmentExternalIdentifiers": [],
+  "mentions": [],
   "reactions": [],
   "type": "sent",
   "createdAt": 1773848829055
@@ -2274,6 +2281,11 @@ Implemented:
 - require the channel to exist in the community
 - require the authenticated member to have channel visibility through their
   roles and `send_messages`
+- validate visible mention metadata:
+  - `everyone` requires `mention_everyone`
+  - `here` requires `mention_here`
+  - `role` requires `mention_roles`
+  - `identity` mentions do not require a special permission
 - store `encryptedPayload` as opaque client-encrypted text
 - store attachment CIDs only; private attachment bytes must be encrypted by the
   client and published first with `POST /ipfs/private`
@@ -2288,6 +2300,12 @@ Implemented:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
   "id": "<messageId>",
+  "mentions": [
+    {
+      "type": "role",
+      "targetId": "<roleId>"
+    }
+  ],
   "type": "sent"
 }
 ```
