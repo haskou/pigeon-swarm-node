@@ -16,4 +16,8 @@ export class ConversationType extends StringValueObject {
       new InvalidConversationTypeError(),
     );
   }
+
+  public isGroup(): boolean {
+    return this.isEqual(ConversationType.GROUP);
+  }
 }

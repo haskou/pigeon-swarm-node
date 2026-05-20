@@ -14,6 +14,7 @@ tags:
   - name: nodes
   - name: notifications
   - name: presence
+  - name: polls
   - name: push
   - name: realtime
 paths:
@@ -201,6 +202,16 @@ paths:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1me'
   /presence/me/custom-message:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1me~1custom-message'
+  /polls/:
+    $ref: './polls-api/swagger.yaml#/paths/~1polls~1'
+  /polls/{pollId}:
+    $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}'
+  /polls/{pollId}/votes:
+    $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}~1votes'
+  /polls/{pollId}/votes/me:
+    $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}~1votes~1me'
+  /polls/{pollId}/close:
+    $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}~1close'
   /push/vapid-public-key:
     $ref: './push-api/swagger.yaml#/paths/~1push~1vapid-public-key'
   /push/subscriptions:

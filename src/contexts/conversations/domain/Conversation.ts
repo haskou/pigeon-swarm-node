@@ -261,6 +261,10 @@ export class Conversation extends AggregateRoot {
     return this.networkId;
   }
 
+  public isGroup(): boolean {
+    return this.type.isGroup();
+  }
+
   public hasParticipant(identityId: IdentityId): boolean {
     return this.participants.some((participant) =>
       participant.isEqual(identityId),

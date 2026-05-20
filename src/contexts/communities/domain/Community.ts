@@ -214,6 +214,14 @@ export class Community extends AggregateRoot {
     this.assertPermission(identityId, CommunityPermission.MANAGE_ROLES);
   }
 
+  public assertCanCreatePoll(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+    this.assertPermission(identityId, CommunityPermission.CREATE_POLLS);
+  }
+
   public assertCanBanMembers(identityId: IdentityId): void {
     this.assertPermission(identityId, CommunityPermission.BAN_MEMBERS);
   }
@@ -514,6 +522,10 @@ export class Community extends AggregateRoot {
 
   public getOwnerIdentityId(): IdentityId {
     return this.ownerIdentityId;
+  }
+
+  public getNetworkId(): NetworkId {
+    return this.networkId;
   }
 
   public isMember(identityId: IdentityId): boolean {
