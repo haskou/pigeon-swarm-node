@@ -34,6 +34,7 @@ export interface CommunityMemberRolesResource {
 export interface CommunityResource {
   avatar?: string;
   banner?: string;
+  bannedMemberIds: string[];
   createdAt: number;
   description: string;
   id: string;

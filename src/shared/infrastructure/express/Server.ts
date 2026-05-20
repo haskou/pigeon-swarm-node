@@ -10,6 +10,7 @@ import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCa
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
 import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
 import { CommunityMessageReactionRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelMessageReactionRoute';
+import { DeleteCommunityBanRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityBanRoute';
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
 import { DeleteCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelRoute';
 import { DeleteCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberRoute';
@@ -27,6 +28,7 @@ import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/route
 import { PatchCommunityRequestRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRequestRoute';
 import { PatchCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoleRoute';
 import { PatchCommunityRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoute';
+import { PostCommunityBanRoute } from '@app/apps/apis/communities-api/routes/PostCommunityBanRoute';
 import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
 import { PostCommunityInviteAcceptRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteAcceptRoute';
 import { PostCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteRoute';
@@ -264,6 +266,8 @@ export default class Server {
           PostCommunityMemberRoute,
           PostCommunityJoinRequestRoute,
           DeleteCommunityMemberRoute,
+          PostCommunityBanRoute,
+          DeleteCommunityBanRoute,
           GetCommunityRolesRoute,
           PostCommunityRoleRoute,
           PatchCommunityRoleRoute,

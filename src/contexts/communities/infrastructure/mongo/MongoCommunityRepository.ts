@@ -31,6 +31,7 @@ export class MongoCommunityRepository implements CommunityRepository {
     return {
       _id: primitives.id,
       avatar: primitives.avatar,
+      bannedMemberIds: primitives.bannedMemberIds,
       banner: primitives.banner,
       createdAt: primitives.createdAt,
       description: primitives.description,
@@ -49,6 +50,7 @@ export class MongoCommunityRepository implements CommunityRepository {
   private toDomain(document: MongoCommunityDocument): Community {
     return Community.fromPrimitives({
       avatar: document.avatar,
+      bannedMemberIds: document.bannedMemberIds || [],
       banner: document.banner,
       createdAt: document.createdAt,
       description: document.description,

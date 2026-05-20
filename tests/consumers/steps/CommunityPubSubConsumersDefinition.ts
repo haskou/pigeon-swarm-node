@@ -195,6 +195,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
         findById: async (): Promise<Community> =>
           Community.fromPrimitives({
             avatar: undefined,
+            bannedMemberIds: [],
             banner: undefined,
             createdAt: 1778513696020,
             description: 'Community description',

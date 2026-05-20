@@ -246,6 +246,56 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity does not have manage_roles.
+  /communities/{communityId}/bans:
+    post:
+      tags:
+        - communities
+      summary: Ban an identity from a community
+      description: Requires ban_members. Banned identities cannot request to join or accept invite links.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityBanBody'
+      responses:
+        '200':
+          description: Identity banned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+  /communities/{communityId}/bans/{identityId}:
+    delete:
+      tags:
+        - communities
+      summary: Remove a community ban
+      description: Requires ban_members.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: URL-encoded identity id.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Ban removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
   /communities/{communityId}/roles:
     get:
       tags:
@@ -863,6 +913,7 @@ components:
         - name
         - description
         - memberIds
+        - bannedMemberIds
         - memberRoles
         - roles
         - textChannels
@@ -887,6 +938,10 @@ components:
           type: string
           description: Public IPFS CID for the community banner.
         memberIds:
+          type: array
+          items:
+            type: string
+        bannedMemberIds:
           type: array
           items:
             type: string
@@ -1271,6 +1326,15 @@ components:
           type: integer
           minimum: 1
           default: 1
+    PostCommunityBanBody:
+      type: object
+      required:
+        - identityId
+      properties:
+        identityId:
+          type: string
+        reason:
+          type: string
     PostCommunityTextChannelBody:
       type: object
       required:

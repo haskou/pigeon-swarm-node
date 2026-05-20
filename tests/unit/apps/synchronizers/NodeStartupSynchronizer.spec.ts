@@ -155,6 +155,7 @@ describe('NodeStartupSynchronizer', () => {
   it('should publish community startup sync requests', async () => {
     const communityPrimitives: PrimitiveOf<Community> = {
       avatar: undefined,
+      bannedMemberIds: [],
       banner: undefined,
       createdAt: 1,
       description: 'Community description',
