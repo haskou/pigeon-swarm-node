@@ -1,5 +1,5 @@
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import { StickerUnfavoriteMessage } from '@app/contexts/stickers/application/unfavorite-sticker/messages/StickerUnfavoriteMessage';
+import { StickerUnfavoriter } from '@app/contexts/stickers/application/unfavorite-sticker/StickerUnfavoriter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -16,13 +16,11 @@ export class DeleteFavoriteStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const library = await this.findLibrary(identityId);
-
-    library.unfavoriteSticker(
-      new StickerPackId(packId),
-      new StickerId(stickerId),
+    const library = await new StickerUnfavoriter(
+      this.libraryRepository(),
+    ).unfavorite(
+      new StickerUnfavoriteMessage(identityId.valueOf(), packId, stickerId),
     );
-    await this.libraryRepository().save(library);
 
     return response
       .status(HttpRouteStatusEnum.OK)

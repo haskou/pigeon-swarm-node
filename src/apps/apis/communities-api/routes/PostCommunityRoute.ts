@@ -1,9 +1,5 @@
-import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
-import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
-import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
-import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { CommunityCreator } from '@app/contexts/communities/application/create-community/CommunityCreator';
+import { CommunityCreateMessage } from '@app/contexts/communities/application/create-community/messages/CommunityCreateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
@@ -21,16 +17,16 @@ export class PostCommunityRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const ownerIdentityId = await this.authenticate(request);
-    const community = Community.create(
-      ownerIdentityId,
-      new NetworkId(body.networkId),
-      new CommunityName(body.name),
-      new CommunityDescription(body.description),
-      body.avatar ? new CommunityAvatar(body.avatar) : undefined,
-      body.banner ? new CommunityBanner(body.banner) : undefined,
+    const community = await new CommunityCreator(this.repository()).create(
+      new CommunityCreateMessage(
+        ownerIdentityId.valueOf(),
+        body.networkId,
+        body.name,
+        body.description,
+        body.avatar,
+        body.banner,
+      ),
     );
-
-    await this.repository().save(community);
 
     return response
       .status(HttpRouteStatusEnum.OK)

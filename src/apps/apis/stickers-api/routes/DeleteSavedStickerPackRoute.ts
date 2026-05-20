@@ -1,4 +1,5 @@
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import { StickerPackForgetMessage } from '@app/contexts/stickers/application/forget-pack/messages/StickerPackForgetMessage';
+import { StickerPackForgetter } from '@app/contexts/stickers/application/forget-pack/StickerPackForgetter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -14,10 +15,9 @@ export class DeleteSavedStickerPackRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const library = await this.findLibrary(identityId);
-
-    library.forgetPack(new StickerPackId(packId));
-    await this.libraryRepository().save(library);
+    const library = await new StickerPackForgetter(
+      this.libraryRepository(),
+    ).forget(new StickerPackForgetMessage(identityId.valueOf(), packId));
 
     return response
       .status(HttpRouteStatusEnum.OK)

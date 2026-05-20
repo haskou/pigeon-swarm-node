@@ -59,8 +59,8 @@ export class Poll extends AggregateRoot {
     super();
   }
 
-  private assertOpen(): void {
-    assert(!this.lifecycle.isClosed(), new PollAlreadyClosedError());
+  private assertOpen(timestamp: Timestamp = Timestamp.now()): void {
+    assert(this.lifecycle.isOpenAt(timestamp), new PollAlreadyClosedError());
   }
 
   private assertOptionsExist(optionIds: PollOptionId[]): void {

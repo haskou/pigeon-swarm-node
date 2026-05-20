@@ -1,5 +1,5 @@
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import { StickerFavoriteMessage } from '@app/contexts/stickers/application/favorite-sticker/messages/StickerFavoriteMessage';
+import { StickerFavoriter } from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
@@ -16,14 +16,12 @@ export class PutFavoriteStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const pack = await this.findPack(packId);
-    const packIdValueObject = new StickerPackId(packId);
-    const stickerIdValueObject = new StickerId(stickerId);
-    const library = await this.findLibrary(identityId);
-
-    pack.assertHasSticker(stickerIdValueObject);
-    library.favoriteSticker(packIdValueObject, stickerIdValueObject);
-    await this.libraryRepository().save(library);
+    const library = await new StickerFavoriter(
+      this.packRepository(),
+      this.libraryRepository(),
+    ).favorite(
+      new StickerFavoriteMessage(identityId.valueOf(), packId, stickerId),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

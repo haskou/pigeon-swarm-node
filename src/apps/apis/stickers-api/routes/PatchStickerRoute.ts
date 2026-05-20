@@ -1,4 +1,5 @@
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
+import { StickerUpdateMessage } from '@app/contexts/stickers/application/update-sticker/messages/StickerUpdateMessage';
+import { StickerUpdater } from '@app/contexts/stickers/application/update-sticker/StickerUpdater';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -12,7 +13,6 @@ import {
 
 import { StickerBody } from '../bodies/StickerBody';
 import { StickerPackViewModel } from '../view-model/StickerPackViewModel';
-import { StickerBodyMapper } from './StickerBodyMapper';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
@@ -26,11 +26,9 @@ export class PatchStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const pack = await this.findPack(packId);
-    const sticker = new StickerBodyMapper(body);
-
-    pack.updateSticker(actor, new StickerId(stickerId), sticker.details());
-    await this.repository().save(pack);
+    const pack = await new StickerUpdater(this.packRepository()).update(
+      new StickerUpdateMessage(packId, stickerId, actor.valueOf(), body),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

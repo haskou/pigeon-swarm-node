@@ -1,4 +1,5 @@
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import { StickerPackSaveMessage } from '@app/contexts/stickers/application/save-pack/messages/StickerPackSaveMessage';
+import { StickerPackSaver } from '@app/contexts/stickers/application/save-pack/StickerPackSaver';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
@@ -14,11 +15,10 @@ export class PutSavedStickerPackRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    await this.findPack(packId);
-    const library = await this.findLibrary(identityId);
-
-    library.savePack(new StickerPackId(packId));
-    await this.libraryRepository().save(library);
+    const library = await new StickerPackSaver(
+      this.packRepository(),
+      this.libraryRepository(),
+    ).save(new StickerPackSaveMessage(identityId.valueOf(), packId));
 
     return response
       .status(HttpRouteStatusEnum.OK)

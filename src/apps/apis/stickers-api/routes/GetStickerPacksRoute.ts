@@ -1,4 +1,5 @@
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
+import { StickerPacksFinder } from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Response } from 'express';
 import { Get, JsonController, QueryParam, Res } from 'routing-controllers';
@@ -14,9 +15,9 @@ export class GetStickerPacksRoute extends StickerRouteSupport {
     @QueryParam('ownerIdentityId') ownerIdentityId: string | undefined,
     @Res() response: Response,
   ): Promise<Response> {
-    const packs = ownerIdentityId
-      ? await this.repository().findByOwner(new IdentityId(ownerIdentityId))
-      : await this.repository().findAll();
+    const packs = await new StickerPacksFinder(this.packRepository()).find(
+      new StickerPacksFindMessage(ownerIdentityId),
+    );
     const resource: StickerPacksResource = {
       results: packs.map((pack) => new StickerPackViewModel(pack).toResource()),
     };

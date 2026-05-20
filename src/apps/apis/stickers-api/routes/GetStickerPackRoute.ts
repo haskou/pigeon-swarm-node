@@ -1,3 +1,5 @@
+import { StickerPackFindMessage } from '@app/contexts/stickers/application/find-pack/messages/StickerPackFindMessage';
+import { StickerPackFinder } from '@app/contexts/stickers/application/find-pack/StickerPackFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Response } from 'express';
 import { Get, JsonController, Param, Res } from 'routing-controllers';
@@ -12,7 +14,9 @@ export class GetStickerPackRoute extends StickerRouteSupport {
     @Param('packId') packId: string,
     @Res() response: Response,
   ): Promise<Response> {
-    const pack = await this.findPack(packId);
+    const pack = await new StickerPackFinder(this.packRepository()).find(
+      new StickerPackFindMessage(packId),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

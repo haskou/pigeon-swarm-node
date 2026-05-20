@@ -3117,6 +3117,8 @@ Rules:
 - option ids are client-provided stable strings unique inside the poll
 - question max length is 200 characters
 - option text max length is 120 characters
+- `expiresAt`, when provided, is an epoch millisecond deadline; after that
+  instant the poll is treated as closed and rejects new votes
 
 ### Get poll
 
@@ -3142,6 +3144,7 @@ Requires signed HTTP headers and access to the poll scope.
 
 Sending a new vote replaces the authenticated identity's previous vote. Polls
 with `allowsMultipleVotes: false` accept exactly one option id.
+Expired or manually closed polls reject new votes.
 
 ### Remove own vote
 
@@ -3157,8 +3160,8 @@ Requires signed HTTP headers and access to the poll scope.
 POST /polls/{pollId}/close
 ```
 
-Requires signed HTTP headers and access to the poll scope. Closed polls reject
-new votes.
+Requires signed HTTP headers and access to the poll scope. Closed or expired
+polls reject new votes.
 
 ## Planned API
 
