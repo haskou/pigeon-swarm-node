@@ -42,7 +42,7 @@ export class PollLifecycle {
       return true;
     }
 
-    return timestamp.isBefore(this.expiresAt);
+    return timestamp.isBeforeOrEqual(this.expiresAt);
   }
 
   public toPrimitives() {

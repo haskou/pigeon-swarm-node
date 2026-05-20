@@ -11,12 +11,17 @@ export class CallSignalSender {
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
-  public async send(message: CallSignalSendMessage): Promise<Call> {
+  public async send(
+    message: CallSignalSendMessage,
+    onCallFound?: () => Promise<void>,
+  ): Promise<Call> {
     const call = await this.repository.findById(message.callId);
 
     if (!call) {
       throw new CallNotFoundError();
     }
+
+    await onCallFound?.();
 
     call.sendSignal(
       message.senderIdentityId,

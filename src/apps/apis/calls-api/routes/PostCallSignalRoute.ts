@@ -28,11 +28,7 @@ export class PostCallSignalRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const senderIdentityId = await this.authenticate(request);
-
-    await new CallSignalRateLimiter(this.get<MongoDB>(MongoDB)).consume(
-      new CallId(callId),
-      senderIdentityId,
-    );
+    const rateLimiter = new CallSignalRateLimiter(this.get<MongoDB>(MongoDB));
     const call = await new CallSignalSender(
       this.callRepository(),
       this.eventPublisher,
@@ -44,6 +40,9 @@ export class PostCallSignalRoute extends CallRouteSupport {
         body.signalType,
         body.payload,
       ),
+      async () => {
+        await rateLimiter.consume(new CallId(callId), senderIdentityId);
+      },
     );
 
     return response
