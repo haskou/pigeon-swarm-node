@@ -1,6 +1,7 @@
 import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -38,6 +39,18 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
     );
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.COMMUNITY_UPDATED,
+      this.communityTarget(community),
+      {
+        avatar: body.avatar,
+        banner: body.banner,
+        description: body.description,
+        name: body.name,
+      },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

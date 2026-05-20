@@ -889,6 +889,19 @@ export default class Definitions {
     await this.signCurrentRequest('GET', `/communities/${this.communityId}`);
   }
 
+  @given('I sign the current community moderation logs request')
+  public async iSignTheCurrentCommunityModerationLogsRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/moderation-logs`,
+    );
+  }
+
   @given('I set a community text channel body')
   public iSetACommunityTextChannelBody(): void {
     this.body = JSON.stringify({
@@ -2679,6 +2692,18 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/communities/${this.communityId}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET moderation logs from the current community')
+  public async iGETModerationLogsFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/moderation-logs?limit=50`,
       this.headers,
     );
   }

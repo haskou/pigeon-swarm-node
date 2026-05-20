@@ -1,3 +1,5 @@
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityPermission } from '@app/contexts/communities/domain/value-objects/CommunityPermission';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { CommunityRoleName } from '@app/contexts/communities/domain/value-objects/CommunityRoleName';
@@ -37,6 +39,16 @@ export class PatchCommunityRoleRoute extends CommunityRouteSupport {
     );
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.ROLE_UPDATED,
+      this.moderationTarget(
+        CommunityModerationTargetType.ROLE,
+        new CommunityRoleId(roleId),
+      ),
+      { name: body.name, permissions: body.permissions },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

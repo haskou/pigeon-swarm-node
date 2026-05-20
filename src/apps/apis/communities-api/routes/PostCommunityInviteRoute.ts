@@ -1,5 +1,7 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/CommunityInvite';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -38,6 +40,19 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
     );
 
     await this.inviteRepository().save(invite);
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.INVITE_LINK_CREATED,
+      this.moderationTarget(
+        CommunityModerationTargetType.INVITE,
+        invite.getToken(),
+      ),
+      {
+        expiresAt: body?.expiresAt,
+        maxUses: body?.maxUses,
+      },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

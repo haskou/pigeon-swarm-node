@@ -168,6 +168,39 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not the community owner.
+  /communities/{communityId}/moderation-logs:
+    get:
+      tags:
+        - communities
+      summary: List community moderation log entries
+      description: Requires manage_members. Returns MongoDB-only audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: beforeLogId
+          schema:
+            type: string
+          description: Cursor returned as nextBeforeLogId.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Moderation log entries ordered from newest to oldest.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityModerationLogsResource'
+        '409':
+          description: Authenticated identity does not have manage_members.
   /communities/{communityId}/members:
     get:
       tags:
@@ -976,6 +1009,80 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityResource'
+    CommunityModerationLogsResource:
+      type: object
+      required:
+        - logs
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityModerationLogResource'
+        nextBeforeLogId:
+          type: string
+    CommunityModerationLogResource:
+      type: object
+      required:
+        - id
+        - communityId
+        - actorIdentityId
+        - action
+        - target
+        - details
+        - createdAt
+      properties:
+        id:
+          type: string
+        communityId:
+          type: string
+        actorIdentityId:
+          type: string
+        action:
+          $ref: '#/components/schemas/CommunityModerationAction'
+        target:
+          $ref: '#/components/schemas/CommunityModerationTargetResource'
+        details:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: integer
+    CommunityModerationTargetResource:
+      type: object
+      required:
+        - type
+        - id
+      properties:
+        type:
+          type: string
+          enum:
+            - channel
+            - community
+            - invite
+            - member
+            - membership_request
+            - message
+            - role
+        id:
+          type: string
+    CommunityModerationAction:
+      type: string
+      enum:
+        - channel_created
+        - channel_deleted
+        - channel_permissions_updated
+        - channel_renamed
+        - community_updated
+        - invitation_created
+        - invite_link_created
+        - member_banned
+        - member_roles_updated
+        - member_unbanned
+        - membership_request_accepted
+        - membership_request_declined
+        - message_deleted
+        - role_created
+        - role_deleted
+        - role_updated
     CommunityDiscoveryResource:
       type: object
       required:

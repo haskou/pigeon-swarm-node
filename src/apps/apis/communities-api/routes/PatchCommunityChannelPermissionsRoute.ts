@@ -1,5 +1,7 @@
 import { CommunityChannelPermissions } from '@app/contexts/communities/domain/CommunityChannelPermissions';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -38,6 +40,16 @@ export class CommunityChannelPermissionsRoute extends CommunityRouteSupport {
     );
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.CHANNEL_PERMISSIONS_UPDATED,
+      this.moderationTarget(
+        CommunityModerationTargetType.CHANNEL,
+        new CommunityChannelId(channelId),
+      ),
+      { visibleRoleIds: body.visibleRoleIds },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

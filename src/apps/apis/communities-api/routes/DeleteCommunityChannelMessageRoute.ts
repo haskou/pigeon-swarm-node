@@ -6,6 +6,8 @@ import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/com
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { assert, PublicKey, Signature } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -90,6 +92,19 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
         targetMessageId: messageId,
       }),
     ]);
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.MESSAGE_DELETED,
+      this.moderationTarget(
+        CommunityModerationTargetType.MESSAGE,
+        targetMessageId,
+      ),
+      {
+        channelId,
+        targetMessageAuthorId: targetMessage.toPrimitives().authorIdentityId,
+      },
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send(
       new DeletedCommunityChannelMessageViewModel({

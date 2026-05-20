@@ -25,6 +25,7 @@ export class DeleteCommunityMemberRoute extends CommunityRouteSupport {
       await this.messageRepository().deleteByCommunity(community.getId());
       await this.inviteRepository().deleteByCommunity(community.getId());
       await this.membershipRequests().deleteByCommunity(community.getId());
+      await this.moderationLogs().deleteByCommunity(community.getId());
       await this.repository().delete(community);
     }
 

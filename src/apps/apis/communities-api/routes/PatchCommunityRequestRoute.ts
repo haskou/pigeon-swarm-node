@@ -1,6 +1,8 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
 import { CommunityRequestNotFoundError } from '@app/contexts/communities/domain/errors/CommunityRequestNotFoundError';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -85,6 +87,21 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
 
     await this.membershipRequests().save(membershipRequest);
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      body.status === 'accepted'
+        ? CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED
+        : CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED,
+      this.moderationTarget(
+        CommunityModerationTargetType.MEMBERSHIP_REQUEST,
+        membershipRequest.getId(),
+      ),
+      {
+        identityId: membershipRequest.getIdentityId().valueOf(),
+        type: membershipRequest.toPrimitives().type,
+      },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

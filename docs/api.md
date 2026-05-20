@@ -1769,8 +1769,7 @@ Request:
 
 Implemented:
 
-- require signed request auth from the community owner or a member with
-  `create_invites`
+- require signed request auth from the community owner
 - update name, description and optional avatar/banner CIDs
 - omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
@@ -1969,6 +1968,50 @@ Implemented:
 - store banned identities in `bannedMemberIds`
 - prevent banned identities from requesting to join or accepting invite links
 - publish `communities.v1.community.was_updated`
+
+### List community moderation log
+
+```http
+GET /communities/{communityId}/moderation-logs?limit=50&beforeLogId=<logId>
+```
+
+Response:
+
+```json
+{
+  "logs": [
+    {
+      "id": "<logId>",
+      "communityId": "<communityId>",
+      "actorIdentityId": "<identityId>",
+      "action": "channel_created",
+      "target": {
+        "type": "channel",
+        "id": "<channelId>"
+      },
+      "details": {
+        "name": "general",
+        "type": "text"
+      },
+      "createdAt": 1773848829055
+    }
+  ],
+  "nextBeforeLogId": "<logId>"
+}
+```
+
+Implemented:
+
+- require signed request auth from the owner or a member with `manage_members`
+- store log entries in MongoDB only; they are not written to IPFS
+- return newest entries first, with `beforeLogId` pagination
+- currently recorded actions:
+  `community_updated`, `channel_created`, `channel_renamed`,
+  `channel_deleted`, `channel_permissions_updated`, `role_created`,
+  `role_updated`, `role_deleted`, `member_roles_updated`,
+  `invitation_created`, `invite_link_created`,
+  `membership_request_accepted`, `membership_request_declined`,
+  `member_banned`, `member_unbanned` and `message_deleted`
 
 ### List community channels
 

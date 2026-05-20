@@ -21,6 +21,7 @@ import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
 import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembershipRequestsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
+import { GetCommunityModerationLogsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityModerationLogsRoute';
 import { GetCommunityRolesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRolesRoute';
 import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
 import { CommunityChannelPermissionsRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelPermissionsRoute';
@@ -263,6 +264,7 @@ export default class Server {
           GetCommunityRoute,
           PatchCommunityRoute,
           GetCommunityMembersRoute,
+          GetCommunityModerationLogsRoute,
           PostCommunityMemberRoute,
           PostCommunityJoinRequestRoute,
           DeleteCommunityMemberRoute,

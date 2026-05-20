@@ -1,3 +1,5 @@
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -21,6 +23,15 @@ export class DeleteCommunityRoleRoute extends CommunityRouteSupport {
     community.deleteRole(actorIdentityId, new CommunityRoleId(roleId));
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.ROLE_DELETED,
+      this.moderationTarget(
+        CommunityModerationTargetType.ROLE,
+        new CommunityRoleId(roleId),
+      ),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

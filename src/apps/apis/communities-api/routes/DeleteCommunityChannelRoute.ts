@@ -1,5 +1,7 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -25,6 +27,16 @@ export class DeleteCommunityChannelRoute extends CommunityRouteSupport {
 
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.CHANNEL_DELETED,
+      this.moderationTarget(
+        CommunityModerationTargetType.CHANNEL,
+        new CommunityChannelId(channelId),
+      ),
+      { type: channelType },
+    );
 
     if (channelType === 'text') {
       await this.messageRepository().deleteByChannel(

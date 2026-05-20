@@ -1,3 +1,5 @@
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -29,6 +31,16 @@ export class PostCommunityBanRoute extends CommunityRouteSupport {
     community.banMember(actorIdentityId, new IdentityId(body.identityId));
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.MEMBER_BANNED,
+      this.moderationTarget(
+        CommunityModerationTargetType.MEMBER,
+        new IdentityId(body.identityId),
+      ),
+      { reason: body.reason },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

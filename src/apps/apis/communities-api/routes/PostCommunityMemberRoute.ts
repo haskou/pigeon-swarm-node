@@ -1,4 +1,6 @@
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -56,6 +58,16 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
 
     await requests.save(membershipRequest);
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
+    await this.recordModerationLog(
+      community,
+      actorIdentityId,
+      CommunityModerationAction.INVITATION_CREATED,
+      this.moderationTarget(
+        CommunityModerationTargetType.MEMBERSHIP_REQUEST,
+        membershipRequest.getId(),
+      ),
+      { identityId: invitedIdentityId.valueOf() },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
