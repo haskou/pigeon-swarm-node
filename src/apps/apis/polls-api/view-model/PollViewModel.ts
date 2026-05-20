@@ -6,6 +6,9 @@ export class PollViewModel {
   constructor(private readonly poll: Poll) {}
 
   public toResource(): PollResource {
-    return this.poll.toPrimitives();
+    return {
+      ...this.poll.toPrimitives(),
+      type: 'poll',
+    };
   }
 }

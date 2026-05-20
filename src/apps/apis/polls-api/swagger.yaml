@@ -162,6 +162,7 @@ components:
         - question
         - scope
         - status
+        - type
         - votes
       properties:
         allowsMultipleVotes:
@@ -207,6 +208,9 @@ components:
         status:
           type: string
           enum: [open, closed]
+        type:
+          type: string
+          enum: [poll]
         votes:
           type: array
           items:

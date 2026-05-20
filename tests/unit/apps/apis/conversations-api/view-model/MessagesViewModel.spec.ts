@@ -1,6 +1,7 @@
 import { MessagesViewModel } from '@app/apps/apis/conversations-api/view-model/MessagesViewModel';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { Poll } from '@app/contexts/polls/domain/Poll';
 
 describe('MessagesViewModel', () => {
   it('keeps call events inside the message page window and limit', () => {
@@ -16,6 +17,7 @@ describe('MessagesViewModel', () => {
         callEvent('inside-call', 2500),
         callEvent('new-call', 3500),
       ],
+      [],
       3,
     ).toResource();
 
@@ -27,6 +29,23 @@ describe('MessagesViewModel', () => {
     expect(resource.nextBeforeMessageId).toEqual('message-2');
     expect(JSON.stringify(resource.messages)).not.toContain('old-call');
     expect(JSON.stringify(resource.messages)).not.toContain('new-call');
+  });
+
+  it('returns polls inside the message list ordered by creation date', () => {
+    const resource = new MessagesViewModel(
+      'conversation-id',
+      [message('message-1', 1000), message('message-2', 3000)],
+      [],
+      [poll('poll-1', 2000)],
+      3,
+    ).toResource();
+
+    expect(resource.messages.map((item) => item.id)).toEqual([
+      'message-1',
+      'poll-1',
+      'message-2',
+    ]);
+    expect(resource.messages[1].type).toEqual('poll');
   });
 
   function callEvent(id: string, createdAt: number) {
@@ -56,5 +75,32 @@ describe('MessagesViewModel', () => {
         type: 'sent',
       }),
     } as unknown as Message;
+  }
+
+  function poll(id: string, createdAt: number): Poll {
+    return {
+      toPrimitives: () => ({
+        allowsMultipleVotes: false,
+        createdAt,
+        creatorIdentityId: 'creator-id',
+        id,
+        options: [
+          { id: 'a', text: 'Option A' },
+          { id: 'b', text: 'Option B' },
+        ],
+        question: 'Question?',
+        scope: {
+          conversationId: 'conversation-id',
+          networkId: 'network-id',
+          type: 'group_conversation',
+        },
+        status: 'open',
+        votes: [] as Array<{
+          createdAt: number;
+          optionIds: string[];
+          voterIdentityId: string;
+        }>,
+      }),
+    } as unknown as Poll;
   }
 });

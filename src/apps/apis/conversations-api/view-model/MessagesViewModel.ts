@@ -1,6 +1,8 @@
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
+import { Poll } from '@app/contexts/polls/domain/Poll';
 
+import { PollViewModel } from '../../polls-api/view-model/PollViewModel';
 import { ConversationCallEventResource } from '../resources/ConversationCallEventResource';
 import {
   ConversationTimelineItemResource,
@@ -13,6 +15,7 @@ export class MessagesViewModel {
     private readonly conversationId: string,
     private readonly messages: Message[],
     private readonly callEvents: ConversationCallEventResource[] = [],
+    private readonly polls: Poll[] = [],
     private readonly limit: number = 50,
     private readonly reactions: MessageReaction[] = [],
   ) {}
@@ -27,6 +30,9 @@ export class MessagesViewModel {
     const messages = this.messages.map((message) =>
       new MessageViewModel(message, this.reactionsFor(message)).toResource(),
     );
+    const polls = this.polls.map((poll) =>
+      new PollViewModel(poll).toResource(),
+    );
     const lowerBound = messages.at(0)?.createdAt;
     const upperBound = messages.at(-1)?.createdAt;
     const callEvents = this.callEvents.filter((event) => {
@@ -39,6 +45,7 @@ export class MessagesViewModel {
     const timeline: ConversationTimelineItemResource[] = [
       ...messages,
       ...callEvents,
+      ...polls,
     ]
       .sort((first, second) => first.createdAt - second.createdAt)
       .slice(-this.limit);

@@ -17,6 +17,7 @@ export interface PollResource {
     type: string;
   };
   status: string;
+  type: 'poll';
   votes: {
     createdAt: number;
     optionIds: string[];
