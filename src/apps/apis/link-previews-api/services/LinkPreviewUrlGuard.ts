@@ -53,8 +53,54 @@ export class LinkPreviewUrlGuard {
     return targetAddress >= baseAddress && targetAddress < baseAddress + size;
   }
 
-  private normalizedIpv6(address: string): string {
-    return address.toLowerCase();
+  private normalizedAddress(address: string): string {
+    const normalized = address.toLowerCase();
+
+    if (normalized.startsWith('[') && normalized.endsWith(']')) {
+      return normalized.slice(1, -1);
+    }
+
+    return normalized;
+  }
+
+  private mappedIpv4Address(address: string): string | undefined {
+    if (!address.startsWith('::ffff:')) {
+      return undefined;
+    }
+
+    const suffix = address.replace('::ffff:', '');
+
+    if (net.isIP(suffix) === 4) {
+      return suffix;
+    }
+
+    return this.mappedIpv4AddressFromHextets(suffix.split(':'));
+  }
+
+  private mappedIpv4AddressFromHextets(hextets: string[]): string | undefined {
+    if (hextets.length !== 2) {
+      return undefined;
+    }
+
+    const [high, low] = hextets.map((hextet) => parseInt(hextet, 16));
+
+    if (
+      !this.isValidMappedIpv4Hextet(high) ||
+      !this.isValidMappedIpv4Hextet(low)
+    ) {
+      return undefined;
+    }
+
+    return [
+      Math.floor(high / 256),
+      high % 256,
+      Math.floor(low / 256),
+      low % 256,
+    ].join('.');
+  }
+
+  private isValidMappedIpv4Hextet(hextet: number): boolean {
+    return !Number.isNaN(hextet) && hextet >= 0 && hextet <= 0xffff;
   }
 
   private isBlockedIpv4(address: string): boolean {
@@ -79,14 +125,13 @@ export class LinkPreviewUrlGuard {
   }
 
   private isBlockedMappedIpv4(address: string): boolean {
-    return (
-      address.startsWith('::ffff:') &&
-      this.isBlockedIpv4(address.replace('::ffff:', ''))
-    );
+    const mappedAddress = this.mappedIpv4Address(address);
+
+    return mappedAddress !== undefined && this.isBlockedIpv4(mappedAddress);
   }
 
   private isBlockedIpv6(address: string): boolean {
-    const normalized = this.normalizedIpv6(address);
+    const normalized = this.normalizedAddress(address);
 
     return (
       normalized === '::1' ||
@@ -97,15 +142,16 @@ export class LinkPreviewUrlGuard {
   }
 
   private assertAllowedAddress(address: string): void {
-    const family = net.isIP(address);
+    const normalized = this.normalizedAddress(address);
+    const family = net.isIP(normalized);
 
-    if (family === 4 && this.isBlockedIpv4(address)) {
+    if (family === 4 && this.isBlockedIpv4(normalized)) {
       throw new InvalidLinkPreviewUrlError(
         'Private IP addresses cannot be previewed.',
       );
     }
 
-    if (family === 6 && this.isBlockedIpv6(address)) {
+    if (family === 6 && this.isBlockedIpv6(normalized)) {
       throw new InvalidLinkPreviewUrlError(
         'Private IP addresses cannot be previewed.',
       );
@@ -124,7 +170,7 @@ export class LinkPreviewUrlGuard {
     this.assertAllowedProtocol(url);
     this.assertAllowedHostname(url);
 
-    if (net.isIP(url.hostname)) {
+    if (net.isIP(this.normalizedAddress(url.hostname))) {
       this.assertAllowedAddress(url.hostname);
     }
 

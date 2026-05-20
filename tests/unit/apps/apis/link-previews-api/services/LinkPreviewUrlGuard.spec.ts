@@ -28,6 +28,22 @@ describe('LinkPreviewUrlGuard', () => {
     );
   });
 
+  it('rejects bracketed private IPv6 literals', () => {
+    const guard = new LinkPreviewUrlGuard();
+
+    expect(() => guard.parse('http://[::1]/page')).toThrow(
+      'Private IP addresses cannot be previewed.',
+    );
+  });
+
+  it('rejects IPv4-mapped IPv6 literals', () => {
+    const guard = new LinkPreviewUrlGuard();
+
+    expect(() => guard.parse('http://[::ffff:192.168.1.20]/page')).toThrow(
+      'Private IP addresses cannot be previewed.',
+    );
+  });
+
   it('rejects hostnames that resolve to private addresses', async () => {
     mockedLookup.mockResolvedValue([
       {

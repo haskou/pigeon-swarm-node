@@ -70,8 +70,16 @@ export class LinkPreviewHttpFetcher {
         chunks.push(chunk);
       });
       response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      response.on('error', reject);
+      response.on('error', (error) => reject(this.fetchErrorFrom(error)));
     });
+  }
+
+  private fetchErrorFrom(error: unknown): LinkPreviewFetchError {
+    if (error instanceof LinkPreviewFetchError) {
+      return error;
+    }
+
+    return new LinkPreviewFetchError('Could not fetch link preview URL.');
   }
 
   private request(
@@ -107,7 +115,7 @@ export class LinkPreviewHttpFetcher {
       request.on('timeout', () => {
         request.destroy(new LinkPreviewFetchError('Link preview timed out.'));
       });
-      request.on('error', reject);
+      request.on('error', (error) => reject(this.fetchErrorFrom(error)));
       request.end();
     });
   }
