@@ -1895,6 +1895,23 @@ Implemented:
 - allow the owner to leave only when they are the last community member
 - reject the owner while other members remain
 
+### Kick community member
+
+```http
+DELETE /communities/{communityId}/members/{identityId}/kick
+```
+
+Implemented:
+
+- require signed request auth from the community owner or a member with
+  `manage_members`
+- `identityId` must be URL-encoded
+- remove the target identity from `memberIds`
+- publish `communities.v1.member.was_left` with the updated community and
+  `actorIdentityId`
+- reject attempts to kick the community owner
+- does not add the target to `bannedMemberIds`
+
 ### Create community invite link token
 
 ```http

@@ -14,6 +14,7 @@ import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberBannedError } from './errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
+import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
 import { CommunityPermissionDeniedError } from './errors/CommunityPermissionDeniedError';
@@ -304,6 +305,25 @@ export class Community extends AggregateRoot {
     this.record(
       new CommunityMemberWasLeftEvent(this.id.valueOf(), {
         ...this.eventAttributes(),
+        community: this.toPrimitives(),
+        identityId: member.valueOf(),
+      }),
+    );
+  }
+
+  public kickMember(actor: IdentityId, member: IdentityId): void {
+    this.assertCanManageMembers(actor);
+    this.assertIsMember(member);
+    assert(
+      !this.ownerIdentityId.isEqual(member),
+      new CommunityOwnerCannotBeKickedError(),
+    );
+
+    this.membership.remove(member);
+    this.record(
+      new CommunityMemberWasLeftEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        actorIdentityId: actor.valueOf(),
         community: this.toPrimitives(),
         identityId: member.valueOf(),
       }),

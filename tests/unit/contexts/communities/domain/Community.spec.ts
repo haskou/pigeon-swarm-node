@@ -145,6 +145,26 @@ describe('Community', () => {
     expect(community.toPrimitives().memberIds).toEqual([]);
   });
 
+  it('allows the owner to kick a member without banning them', () => {
+    const community = createCommunity();
+
+    community.addMember(owner, member);
+    community.pullDomainEvents();
+    community.kickMember(owner, member);
+
+    const events = community.pullDomainEvents();
+
+    expect(community.toPrimitives()).toMatchObject({
+      bannedMemberIds: [],
+      memberIds: [owner.valueOf()],
+    });
+    expect(events[0]).toBeInstanceOf(CommunityMemberWasLeftEvent);
+    expect(events[0].attributes).toMatchObject({
+      actorIdentityId: owner.valueOf(),
+      identityId: member.valueOf(),
+    });
+  });
+
   it('does not allow the owner to leave while other members remain', () => {
     const community = createCommunity();
 
