@@ -1,5 +1,8 @@
+import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
 import { CommunityRequestNotFoundError } from '@app/contexts/communities/domain/errors/CommunityRequestNotFoundError';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -17,6 +20,43 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PatchCommunityRequestRoute extends CommunityRouteSupport {
+  private async acceptRequest(
+    membershipRequest: CommunityMembershipRequest,
+    community: Community,
+    actorIdentityId: IdentityId,
+  ): Promise<void> {
+    if (membershipRequest.isRequest()) {
+      community.assertCanApproveMembers(actorIdentityId);
+    }
+
+    membershipRequest.accept(
+      actorIdentityId,
+      membershipRequest.isRequest()
+        ? actorIdentityId
+        : community.getOwnerIdentityId(),
+    );
+    community.joinWithInvite(membershipRequest.getIdentityId());
+    await this.repository().save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
+  }
+
+  private declineRequest(
+    membershipRequest: CommunityMembershipRequest,
+    community: Community,
+    actorIdentityId: IdentityId,
+  ): void {
+    if (membershipRequest.isRequest()) {
+      community.assertCanRejectMembers(actorIdentityId);
+    }
+
+    membershipRequest.decline(
+      actorIdentityId,
+      membershipRequest.isRequest()
+        ? actorIdentityId
+        : community.getOwnerIdentityId(),
+    );
+  }
+
   @Patch('/membership-requests/:requestId')
   public async updateMembershipRequest(
     @Param('requestId') requestId: string,
@@ -38,15 +78,9 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
     );
 
     if (body.status === 'accepted') {
-      membershipRequest.accept(actorIdentityId, community.getOwnerIdentityId());
-      community.joinWithInvite(membershipRequest.getIdentityId());
-      await this.repository().save(community);
-      await this.eventPublisher.publish(community.pullDomainEvents());
+      await this.acceptRequest(membershipRequest, community, actorIdentityId);
     } else {
-      membershipRequest.decline(
-        actorIdentityId,
-        community.getOwnerIdentityId(),
-      );
+      this.declineRequest(membershipRequest, community, actorIdentityId);
     }
 
     await this.membershipRequests().save(membershipRequest);

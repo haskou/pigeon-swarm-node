@@ -41,8 +41,7 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
     const communityChannelId = new CommunityChannelId(channelId);
 
-    community.assertIsMember(authorIdentityId);
-    community.assertHasTextChannel(communityChannelId);
+    community.assertCanSendMessage(authorIdentityId, communityChannelId);
 
     const message = CommunityChannelMessage.create(
       new CommunityChannelMessageMetadata(

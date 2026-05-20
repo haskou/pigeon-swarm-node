@@ -3,13 +3,18 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 import { CommunityChannels } from './CommunityChannels';
+import { CommunityMembership } from './CommunityMembership';
 import { CommunityProfile } from './CommunityProfile';
+import { CommunityRole } from './CommunityRole';
+import { CommunityRoles } from './CommunityRoles';
 import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityPermissionDeniedError } from './errors/CommunityPermissionDeniedError';
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
@@ -23,6 +28,9 @@ import { CommunityChannelName } from './value-objects/CommunityChannelName';
 import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
 import { CommunityName } from './value-objects/CommunityName';
+import { CommunityPermission } from './value-objects/CommunityPermission';
+import { CommunityRoleId } from './value-objects/CommunityRoleId';
+import { CommunityRoleName } from './value-objects/CommunityRoleName';
 
 export class Community extends AggregateRoot {
   public static create(
@@ -38,7 +46,7 @@ export class Community extends AggregateRoot {
       networkId,
       ownerIdentityId,
       new CommunityProfile(name, description, avatar, banner),
-      [ownerIdentityId],
+      CommunityMembership.create([ownerIdentityId], CommunityRoles.default()),
       new CommunityChannels([], []),
       Timestamp.now(),
     );
@@ -55,7 +63,10 @@ export class Community extends AggregateRoot {
         primitives.avatar ? new CommunityAvatar(primitives.avatar) : undefined,
         primitives.banner ? new CommunityBanner(primitives.banner) : undefined,
       ),
-      primitives.memberIds.map((memberId) => new IdentityId(memberId)),
+      CommunityMembership.create(
+        primitives.memberIds.map((memberId) => new IdentityId(memberId)),
+        CommunityRoles.fromPrimitives(primitives.roles, primitives.memberRoles),
+      ),
       new CommunityChannels(
         primitives.textChannels.map((channel) =>
           CommunityTextChannel.fromPrimitives(channel),
@@ -73,7 +84,7 @@ export class Community extends AggregateRoot {
     private readonly networkId: NetworkId,
     private readonly ownerIdentityId: IdentityId,
     private profile: CommunityProfile,
-    private readonly members: IdentityId[],
+    private readonly membership: CommunityMembership,
     private readonly channels: CommunityChannels,
     private readonly createdAt: Timestamp,
   ) {
@@ -89,6 +100,42 @@ export class Community extends AggregateRoot {
 
   private visibility(): 'private' {
     return 'private';
+  }
+
+  private hasPermission(
+    identityId: IdentityId,
+    permission: CommunityPermission,
+  ): boolean {
+    return (
+      this.isOwner(identityId) ||
+      (this.isMember(identityId) &&
+        this.membership.getRoles().memberHasPermission(identityId, permission))
+    );
+  }
+
+  private assertPermission(
+    identityId: IdentityId,
+    permission: CommunityPermission,
+  ): void {
+    assert(
+      this.hasPermission(identityId, permission),
+      new CommunityPermissionDeniedError(permission.valueOf()),
+    );
+  }
+
+  private assertCanAccessChannel(
+    identityId: IdentityId,
+    permissions: CommunityChannelPermissions,
+  ): void {
+    assert(
+      this.isOwner(identityId) ||
+        this.membership
+          .getRoles()
+          .memberHasAnyRole(identityId, permissions.getVisibleRoleIds()),
+      new CommunityPermissionDeniedError(
+        CommunityPermission.VIEW_CHANNELS.valueOf(),
+      ),
+    );
   }
 
   private eventAttributes() {
@@ -117,7 +164,7 @@ export class Community extends AggregateRoot {
       return;
     }
 
-    this.members.push(member);
+    this.membership.add(member);
     this.record(
       new CommunityMemberWasAddedEvent(this.id.valueOf(), {
         ...this.eventAttributes(),
@@ -128,7 +175,7 @@ export class Community extends AggregateRoot {
   }
 
   public addMember(actor: IdentityId, member: IdentityId): void {
-    this.assertOwner(actor);
+    this.assertCanManageMembers(actor);
     this.join(member);
   }
 
@@ -137,21 +184,93 @@ export class Community extends AggregateRoot {
   }
 
   public assertCanCreateInvite(identityId: IdentityId): void {
-    this.assertOwner(identityId);
+    this.assertPermission(identityId, CommunityPermission.CREATE_INVITES);
+  }
+
+  public assertCanApproveMembers(identityId: IdentityId): void {
+    this.assertPermission(identityId, CommunityPermission.APPROVE_MEMBERS);
+  }
+
+  public assertCanRejectMembers(identityId: IdentityId): void {
+    this.assertPermission(identityId, CommunityPermission.REJECT_MEMBERS);
+  }
+
+  public assertCanManageMembers(identityId: IdentityId): void {
+    this.assertPermission(identityId, CommunityPermission.MANAGE_MEMBERS);
+  }
+
+  public assertCanManageChannels(identityId: IdentityId): void {
+    this.assertPermission(identityId, CommunityPermission.MANAGE_CHANNELS);
+  }
+
+  public assertCanManageRoles(identityId: IdentityId): void {
+    this.assertPermission(identityId, CommunityPermission.MANAGE_ROLES);
+  }
+
+  public assertCanSendMessage(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+    this.assertPermission(identityId, CommunityPermission.SEND_MESSAGES);
+  }
+
+  public assertCanViewTextChannel(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertIsMember(identityId);
+    this.assertHasTextChannel(channelId);
+    this.assertCanAccessChannel(
+      identityId,
+      this.channels.textChannelPermissions(channelId),
+    );
+  }
+
+  public assertCanReactWithSticker(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanSendMessage(identityId, channelId);
+    this.assertPermission(identityId, CommunityPermission.SEND_STICKERS);
+  }
+
+  public assertCanConnectVoice(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertIsMember(identityId);
+    this.assertHasVoiceChannel(channelId);
+    this.assertCanAccessChannel(
+      identityId,
+      this.channels.voiceChannelPermissions(channelId),
+    );
+    this.assertPermission(identityId, CommunityPermission.CONNECT_VOICE);
+  }
+
+  public assertCanDeleteMessage(
+    actor: IdentityId,
+    targetAuthor: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertIsMember(actor);
+    this.assertHasTextChannel(channelId);
+
+    if (actor.isEqual(targetAuthor)) {
+      return;
+    }
+
+    this.assertPermission(actor, CommunityPermission.MANAGE_MESSAGES);
   }
 
   public leave(member: IdentityId): void {
     this.assertIsMember(member);
     assert(
-      !this.ownerIdentityId.isEqual(member) || this.members.length === 1,
+      !this.ownerIdentityId.isEqual(member) || this.membership.size() === 1,
       new CommunityOwnerCannotLeaveError(),
     );
 
-    const memberIndex = this.members.findIndex((currentMember) =>
-      currentMember.isEqual(member),
-    );
-
-    this.members.splice(memberIndex, 1);
+    this.membership.remove(member);
     this.record(
       new CommunityMemberWasLeftEvent(this.id.valueOf(), {
         ...this.eventAttributes(),
@@ -165,7 +284,7 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityChannelName,
   ): CommunityTextChannel {
-    this.assertOwner(actor);
+    this.assertCanManageChannels(actor);
 
     const channel = this.channels.addText(name);
 
@@ -183,7 +302,7 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityChannelName,
   ): CommunityVoiceChannel {
-    this.assertOwner(actor);
+    this.assertCanManageChannels(actor);
 
     const channel = this.channels.addVoice(name);
 
@@ -202,7 +321,7 @@ export class Community extends AggregateRoot {
     channelId: CommunityChannelId,
     name: CommunityChannelName,
   ): void {
-    this.assertOwner(actor);
+    this.assertCanManageChannels(actor);
     this.channels.rename(channelId, name);
     this.record(
       new CommunityChannelWasRenamedEvent(this.id.valueOf(), {
@@ -217,7 +336,7 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     channelId: CommunityChannelId,
   ): 'text' | 'voice' {
-    this.assertOwner(actor);
+    this.assertCanManageChannels(actor);
 
     const channelType = this.channels.remove(channelId);
 
@@ -237,6 +356,83 @@ export class Community extends AggregateRoot {
 
   public assertHasVoiceChannel(channelId: CommunityChannelId): void {
     this.channels.assertHasVoice(channelId);
+  }
+
+  public updateChannelPermissions(
+    actor: IdentityId,
+    channelId: CommunityChannelId,
+    permissions: CommunityChannelPermissions,
+  ): void {
+    this.assertCanManageChannels(actor);
+    this.channels.updatePermissions(channelId, permissions);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
+  }
+
+  public addRole(
+    actor: IdentityId,
+    name: CommunityRoleName,
+    permissions: CommunityPermission[],
+  ): CommunityRole {
+    this.assertCanManageRoles(actor);
+
+    const role = this.membership.getRoles().add(name, permissions);
+
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
+
+    return role;
+  }
+
+  public updateRole(
+    actor: IdentityId,
+    roleId: CommunityRoleId,
+    name: CommunityRoleName,
+    permissions: CommunityPermission[],
+  ): void {
+    this.assertCanManageRoles(actor);
+    this.membership.getRoles().update(roleId, name, permissions);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
+  }
+
+  public deleteRole(actor: IdentityId, roleId: CommunityRoleId): void {
+    this.assertCanManageRoles(actor);
+    this.membership.getRoles().remove(roleId);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
+  }
+
+  public assignRoles(
+    actor: IdentityId,
+    member: IdentityId,
+    roleIds: CommunityRoleId[],
+  ): void {
+    this.assertCanManageRoles(actor);
+    this.assertIsMember(member);
+    this.membership.assignRoles(member, roleIds);
+    this.record(
+      new CommunityWasUpdatedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        community: this.toPrimitives(),
+      }),
+    );
   }
 
   public updateProfile(
@@ -265,7 +461,7 @@ export class Community extends AggregateRoot {
   }
 
   public isMember(identityId: IdentityId): boolean {
-    return this.members.some((member) => member.isEqual(identityId));
+    return this.membership.isMember(identityId);
   }
 
   public belongsToNetwork(networkId: NetworkId): boolean {
@@ -277,11 +473,25 @@ export class Community extends AggregateRoot {
   }
 
   public hasMembers(): boolean {
-    return this.members.length > 0;
+    return this.membership.hasMembers();
   }
 
   public assertIsMember(identityId: IdentityId): void {
     assert(this.isMember(identityId), new CommunityMemberNotFoundError());
+  }
+
+  public visibleChannelsFor(
+    identityId: IdentityId,
+  ): ReturnType<CommunityChannels['toPrimitives']> {
+    return this.channels.visiblePrimitivesFor((permissions) => {
+      if (this.isOwner(identityId)) {
+        return true;
+      }
+
+      return this.membership
+        .getRoles()
+        .memberHasAnyRole(identityId, permissions.getVisibleRoleIds());
+    });
   }
 
   public toPrimitives() {
@@ -293,10 +503,12 @@ export class Community extends AggregateRoot {
       createdAt: this.createdAt.valueOf(),
       description: this.profile.getDescription().valueOf(),
       id: this.id.valueOf(),
-      memberIds: this.members.map((member) => member.valueOf()),
+      memberIds: this.membership.toPrimitives().memberIds,
+      memberRoles: this.membership.toPrimitives().memberRoles,
       name: this.profile.getName().valueOf(),
       networkId: this.networkId.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),
+      roles: this.membership.toPrimitives().roles,
       textChannels: channels.textChannels,
       visibility: this.visibility(),
       voiceChannels: channels.voiceChannels,

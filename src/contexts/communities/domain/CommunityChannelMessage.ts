@@ -59,6 +59,10 @@ export class CommunityChannelMessage {
     return 'sent';
   }
 
+  public getAuthorIdentityId(): IdentityId {
+    return this.metadata.getAuthorIdentityId();
+  }
+
   public toPrimitives() {
     return {
       attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(

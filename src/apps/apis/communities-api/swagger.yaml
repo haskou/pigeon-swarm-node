@@ -97,7 +97,7 @@ paths:
       tags:
         - communities
       summary: Accept or decline a community invitation or join request
-      description: Invited identities can accept or decline invitations. Community owners can accept or decline join requests. Accepted requests add the target identity to memberIds.
+      description: Invited identities can accept or decline invitations. Community owners or members with approve/reject member permissions can accept or decline join requests. Accepted requests add the target identity to memberIds.
       parameters:
         - in: path
           name: requestId
@@ -191,7 +191,7 @@ paths:
       tags:
         - communities
       summary: Invite an identity to a private community
-      description: Only the community owner can create direct membership invitations. The invited identity is not added to memberIds until they accept the invitation.
+      description: Only the community owner or members with create_invites can create direct membership invitations. The invited identity is not added to memberIds until they accept the invitation.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -212,7 +212,138 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityMembershipRequestResource'
         '409':
-          description: Authenticated identity is not the community owner.
+          description: Authenticated identity does not have create_invites.
+  /communities/{communityId}/members/{identityId}/roles:
+    put:
+      tags:
+        - communities
+      summary: Replace roles assigned to a community member
+      description: Only the owner or members with manage_roles can assign roles. The built-in everyone role is implicit and does not need to be assigned.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: URL-encoded identity id.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutCommunityMemberRolesBody'
+      responses:
+        '200':
+          description: Member roles replaced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: Authenticated identity does not have manage_roles.
+  /communities/{communityId}/roles:
+    get:
+      tags:
+        - communities
+      summary: List community roles and member assignments
+      description: Only community members can list roles.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community roles and member role assignments.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityRolesResource'
+    post:
+      tags:
+        - communities
+      summary: Create a community role
+      description: Only the owner or members with manage_roles can create roles.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityRoleBody'
+      responses:
+        '200':
+          description: Role created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityRoleResource'
+        '409':
+          description: Authenticated identity does not have manage_roles.
+  /communities/{communityId}/roles/{roleId}:
+    patch:
+      tags:
+        - communities
+      summary: Update a community role
+      description: Only the owner or members with manage_roles can update roles.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityRoleBody'
+      responses:
+        '200':
+          description: Role updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+    delete:
+      tags:
+        - communities
+      summary: Delete a community role
+      description: Only the owner or members with manage_roles can delete custom roles. Built-in roles cannot be deleted.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Role deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
   /communities/{communityId}/members/me:
     delete:
       tags:
@@ -310,7 +441,7 @@ paths:
       tags:
         - communities
       summary: List private community channels
-      description: Only community members can list text and voice channel metadata.
+      description: Only community members can list text and voice channel metadata. Channels hidden from the authenticated member by role visibility are omitted.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -329,7 +460,7 @@ paths:
       tags:
         - communities
       summary: Create a private community text channel
-      description: Only the community owner can create text channels.
+      description: Requires manage_channels.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -350,13 +481,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityTextChannelResource'
         '409':
-          description: Authenticated identity is not the community owner.
+          description: Authenticated identity does not have manage_channels.
   /communities/{communityId}/channels/voice:
     post:
       tags:
         - communities
       summary: Create a private community voice channel
-      description: Only the community owner can create voice channels. Voice channel presence is derived from active calls scoped to that channel.
+      description: Requires manage_channels. Voice channel presence is derived from active calls scoped to that channel.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -377,13 +508,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityVoiceChannelResource'
         '409':
-          description: Authenticated identity is not the community owner.
+          description: Authenticated identity does not have manage_channels.
   /communities/{communityId}/channels/{channelId}:
     patch:
       tags:
         - communities
       summary: Rename a private community text channel
-      description: Only the community owner can rename text channels.
+      description: Requires manage_channels.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -409,12 +540,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
-          description: Authenticated identity is not the community owner or the channel does not exist.
+          description: Authenticated identity does not have manage_channels or the channel does not exist.
     delete:
       tags:
         - communities
       summary: Delete a private community channel
-      description: Only the community owner can delete text or voice channels. Deleting a text channel also deletes its stored channel messages.
+      description: Requires manage_channels. Deleting a text channel also deletes its stored channel messages.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -434,7 +565,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
-          description: Authenticated identity is not the community owner or the channel does not exist.
+          description: Authenticated identity does not have manage_channels or the channel does not exist.
+  /communities/{communityId}/channels/{channelId}/permissions:
+    patch:
+      tags:
+        - communities
+      summary: Update channel role visibility
+      description: Requires manage_channels. A channel is visible to members that have at least one role listed in visibleRoleIds. Use everyone for all members.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchCommunityChannelPermissionsBody'
+      responses:
+        '200':
+          description: Channel visibility updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
   /communities/{communityId}/channels/{channelId}/messages:
     get:
       tags:
@@ -652,6 +813,7 @@ components:
         - name
         - type
         - createdAt
+        - permissions
       properties:
         id:
           type: string
@@ -663,6 +825,8 @@ components:
             - text
         createdAt:
           type: integer
+        permissions:
+          $ref: '#/components/schemas/CommunityChannelPermissionsResource'
     CommunityVoiceChannelResource:
       type: object
       required:
@@ -671,6 +835,7 @@ components:
         - type
         - createdAt
         - connectedIdentityIds
+        - permissions
       properties:
         id:
           type: string
@@ -682,6 +847,8 @@ components:
             - voice
         createdAt:
           type: integer
+        permissions:
+          $ref: '#/components/schemas/CommunityChannelPermissionsResource'
         connectedIdentityIds:
           type: array
           description: Identities currently joined to the active call for this voice channel.
@@ -696,6 +863,8 @@ components:
         - name
         - description
         - memberIds
+        - memberRoles
+        - roles
         - textChannels
         - voiceChannels
         - visibility
@@ -721,6 +890,14 @@ components:
           type: array
           items:
             type: string
+        memberRoles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityMemberRolesResource'
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityRoleResource'
         textChannels:
           type: array
           items:
@@ -855,6 +1032,60 @@ components:
       properties:
         memberIds:
           type: array
+          items:
+            type: string
+    CommunityRolesResource:
+      type: object
+      required:
+        - roles
+        - memberRoles
+      properties:
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityRoleResource'
+        memberRoles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityMemberRolesResource'
+    CommunityRoleResource:
+      type: object
+      required:
+        - id
+        - name
+        - permissions
+        - builtIn
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityPermission'
+        builtIn:
+          type: boolean
+    CommunityMemberRolesResource:
+      type: object
+      required:
+        - identityId
+        - roleIds
+      properties:
+        identityId:
+          type: string
+        roleIds:
+          type: array
+          items:
+            type: string
+    CommunityChannelPermissionsResource:
+      type: object
+      required:
+        - visibleRoleIds
+      properties:
+        visibleRoleIds:
+          type: array
+          description: Role ids that can see and access the channel. Use everyone for all members.
           items:
             type: string
     CommunityInviteResource:
@@ -1058,6 +1289,60 @@ components:
         name:
           type: string
           maxLength: 80
+    CommunityRoleBody:
+      type: object
+      required:
+        - name
+        - permissions
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityPermission'
+    PutCommunityMemberRolesBody:
+      type: object
+      required:
+        - roleIds
+      properties:
+        roleIds:
+          type: array
+          description: Custom role ids to assign. The everyone role is implicit.
+          items:
+            type: string
+    PatchCommunityChannelPermissionsBody:
+      type: object
+      required:
+        - visibleRoleIds
+      properties:
+        visibleRoleIds:
+          type: array
+          description: Role ids that can see and access this channel. Use everyone for all members.
+          items:
+            type: string
+    CommunityPermission:
+      type: string
+      enum:
+        - approve_members
+        - attach_files
+        - ban_members
+        - connect_voice
+        - create_invites
+        - create_polls
+        - embed_links
+        - manage_channels
+        - manage_members
+        - manage_messages
+        - manage_roles
+        - mention_everyone
+        - mention_here
+        - mention_roles
+        - reject_members
+        - send_messages
+        - send_stickers
+        - view_channels
     PostCommunityChannelMessageBody:
       type: object
       required:

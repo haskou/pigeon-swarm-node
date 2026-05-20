@@ -1,5 +1,6 @@
 import { assert } from '@haskou/value-objects';
 
+import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityChannelNotFoundError } from './errors/CommunityChannelNotFoundError';
@@ -16,6 +17,26 @@ export class CommunityChannels {
     return [...this.textChannels, ...this.voiceChannels].find((candidate) =>
       candidate.getId().isEqual(channelId),
     );
+  }
+
+  private findText(channelId: CommunityChannelId): CommunityTextChannel {
+    const channel = this.textChannels.find((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
+
+    assert(channel, new CommunityChannelNotFoundError());
+
+    return channel;
+  }
+
+  private findVoice(channelId: CommunityChannelId): CommunityVoiceChannel {
+    const channel = this.voiceChannels.find((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
+
+    assert(channel, new CommunityChannelNotFoundError());
+
+    return channel;
   }
 
   public addText(name: CommunityChannelName): CommunityTextChannel {
@@ -35,19 +56,23 @@ export class CommunityChannels {
   }
 
   public assertHasText(channelId: CommunityChannelId): void {
-    const channel = this.textChannels.find((candidate) =>
-      candidate.getId().isEqual(channelId),
-    );
-
-    assert(channel, new CommunityChannelNotFoundError());
+    this.findText(channelId);
   }
 
   public assertHasVoice(channelId: CommunityChannelId): void {
-    const channel = this.voiceChannels.find((candidate) =>
-      candidate.getId().isEqual(channelId),
-    );
+    this.findVoice(channelId);
+  }
 
-    assert(channel, new CommunityChannelNotFoundError());
+  public textChannelPermissions(
+    channelId: CommunityChannelId,
+  ): CommunityChannelPermissions {
+    return this.findText(channelId).getPermissions();
+  }
+
+  public voiceChannelPermissions(
+    channelId: CommunityChannelId,
+  ): CommunityChannelPermissions {
+    return this.findVoice(channelId).getPermissions();
   }
 
   public rename(
@@ -84,12 +109,35 @@ export class CommunityChannels {
     throw new CommunityChannelNotFoundError();
   }
 
+  public updatePermissions(
+    channelId: CommunityChannelId,
+    permissions: CommunityChannelPermissions,
+  ): void {
+    const channel = this.find(channelId);
+
+    assert(channel, new CommunityChannelNotFoundError());
+    channel?.updatePermissions(permissions);
+  }
+
   public toPrimitives() {
     return {
       textChannels: this.textChannels.map((channel) => channel.toPrimitives()),
       voiceChannels: this.voiceChannels.map((channel) =>
         channel.toPrimitives(),
       ),
+    };
+  }
+
+  public visiblePrimitivesFor(
+    canView: (permissions: CommunityChannelPermissions) => boolean,
+  ): ReturnType<CommunityChannels['toPrimitives']> {
+    return {
+      textChannels: this.textChannels
+        .filter((channel) => canView(channel.getPermissions()))
+        .map((channel) => channel.toPrimitives()),
+      voiceChannels: this.voiceChannels
+        .filter((channel) => canView(channel.getPermissions()))
+        .map((channel) => channel.toPrimitives()),
     };
   }
 }

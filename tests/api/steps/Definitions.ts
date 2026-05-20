@@ -39,6 +39,7 @@ export default class Definitions {
   private communityId: string | undefined;
   private communityInviteToken: string | undefined;
   private communityMembershipRequestId: string | undefined;
+  private communityRoleId: string | undefined;
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -70,6 +71,7 @@ export default class Definitions {
     this.communityId = undefined;
     this.communityInviteToken = undefined;
     this.communityMembershipRequestId = undefined;
+    this.communityRoleId = undefined;
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -594,6 +596,90 @@ export default class Definitions {
     }
 
     this.communityMembershipRequestId = this.response.data.id;
+  }
+
+  @given('I remember the current community role')
+  public iRememberTheCurrentCommunityRole(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community role response id not found.');
+    }
+
+    this.communityRoleId = this.response.data.id;
+  }
+
+  @given('I set a community administrator role body')
+  public iSetACommunityAdministratorRoleBody(): void {
+    this.body = JSON.stringify({
+      name: 'admin',
+      permissions: [
+        'approve_members',
+        'create_invites',
+        'manage_channels',
+        'manage_messages',
+        'manage_roles',
+        'reject_members',
+      ],
+    });
+  }
+
+  @given('I set community member roles body with the current role')
+  public iSetCommunityMemberRolesBodyWithTheCurrentRole(): void {
+    if (!this.communityRoleId) {
+      throw new Error('Community role must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      roleIds: [this.communityRoleId],
+    });
+  }
+
+  @given('I set current community channel visible for the current role')
+  public iSetCurrentCommunityChannelVisibleForTheCurrentRole(): void {
+    if (!this.communityRoleId) {
+      throw new Error('Community role must be created first.');
+    }
+
+    this.body = JSON.stringify({
+      visibleRoleIds: [this.communityRoleId],
+    });
+  }
+
+  @given('I sign the current community role request')
+  public async iSignTheCurrentCommunityRoleRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/roles`,
+    );
+  }
+
+  @given('I sign the current community member roles request')
+  public async iSignTheCurrentCommunityMemberRolesRequest(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and member must be available first.');
+    }
+
+    await this.signCurrentRequest(
+      'PUT',
+      `/communities/${this.communityId}/members/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}/roles`,
+    );
+  }
+
+  @given('I sign the current community channel permissions request')
+  public async iSignTheCurrentCommunityChannelPermissionsRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/permissions`,
+    );
   }
 
   @given('I set an accepted community membership request body')
@@ -2290,6 +2376,47 @@ export default class Definitions {
 
     this.response = await this.restClient.post(
       `/communities/${this.communityId}/invites`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST a role to the current community')
+  public async iPOSTARoleToTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/roles`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT roles for the current community member')
+  public async iPUTRolesForTheCurrentCommunityMember(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and member must be available first.');
+    }
+
+    this.response = await this.restClient.put(
+      `/communities/${this.communityId}/members/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}/roles`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PATCH permissions for the current community channel')
+  public async iPATCHPermissionsForTheCurrentCommunityChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/permissions`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

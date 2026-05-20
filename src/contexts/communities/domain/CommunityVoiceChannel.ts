@@ -1,5 +1,6 @@
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
 import { CommunityChannelName } from './value-objects/CommunityChannelName';
 
@@ -8,6 +9,7 @@ export class CommunityVoiceChannel {
     return new CommunityVoiceChannel(
       CommunityChannelId.generate(),
       name,
+      CommunityChannelPermissions.visibleForEveryone(),
       Timestamp.now(),
     );
   }
@@ -18,6 +20,7 @@ export class CommunityVoiceChannel {
     return new CommunityVoiceChannel(
       new CommunityChannelId(primitives.id),
       new CommunityChannelName(primitives.name),
+      CommunityChannelPermissions.fromPrimitives(primitives.permissions),
       new Timestamp(primitives.createdAt),
     );
   }
@@ -25,6 +28,7 @@ export class CommunityVoiceChannel {
   constructor(
     private readonly id: CommunityChannelId,
     private name: CommunityChannelName,
+    private readonly permissions: CommunityChannelPermissions,
     private readonly createdAt: Timestamp,
   ) {}
 
@@ -40,11 +44,20 @@ export class CommunityVoiceChannel {
     this.name = name;
   }
 
+  public getPermissions(): CommunityChannelPermissions {
+    return this.permissions;
+  }
+
+  public updatePermissions(permissions: CommunityChannelPermissions): void {
+    this.permissions.updateVisibleRoleIds(permissions.getVisibleRoleIds());
+  }
+
   public toPrimitives() {
     return {
       createdAt: this.createdAt.valueOf(),
       id: this.id.valueOf(),
       name: this.name.valueOf(),
+      permissions: this.permissions.toPrimitives(),
       type: this.type(),
     };
   }
