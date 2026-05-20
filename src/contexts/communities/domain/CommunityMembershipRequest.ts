@@ -192,6 +192,14 @@ export class CommunityMembershipRequest extends AggregateRoot {
     return this.status.isPending();
   }
 
+  public isInvitation(): boolean {
+    return this.type.isInvitation();
+  }
+
+  public isRequest(): boolean {
+    return this.type.isRequest();
+  }
+
   public toPrimitives() {
     const timestamps = this.timestamps.toPrimitives();
 

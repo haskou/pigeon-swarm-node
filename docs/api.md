@@ -1633,6 +1633,22 @@ Response:
       "avatar": "<publicAvatarCid>",
       "banner": "<publicBannerCid>",
       "memberIds": ["<identityId>"],
+      "memberRoles": [],
+      "roles": [
+        {
+          "id": "everyone",
+          "name": "everyone",
+          "permissions": [
+            "view_channels",
+            "send_messages",
+            "attach_files",
+            "embed_links",
+            "send_stickers",
+            "connect_voice"
+          ],
+          "builtIn": true
+        }
+      ],
       "textChannels": [],
       "visibility": "private",
       "createdAt": 1773848829055
@@ -1752,7 +1768,8 @@ Request:
 
 Implemented:
 
-- require signed request auth from the community owner
+- require signed request auth from the community owner or a member with
+  `create_invites`
 - update name, description and optional avatar/banner CIDs
 - omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
@@ -1857,7 +1874,8 @@ Implemented:
 
 - accepted statuses add the request `identityId` to `memberIds`
 - invited identities can accept or decline `invitation` requests
-- community owners can accept or decline `request` join requests
+- community owners or members with `approve_members`/`reject_members` can
+  accept or decline `request` join requests
 - requesters can decline their own pending join request
 - owners can decline invitations they created
 
@@ -1903,7 +1921,8 @@ Response:
 
 Implemented:
 
-- require signed request auth from the community owner
+- require signed request auth from the community owner or a member with
+  `create_invites`
 - create a bearer invite token for the community
 - default `maxUses` to `1`
 - keep community keys out of the backend; frontend should carry key material in
@@ -1939,12 +1958,18 @@ Response:
       "id": "<channelId>",
       "name": "general",
       "type": "text",
+      "permissions": {
+        "visibleRoleIds": ["everyone"]
+      },
       "createdAt": 1773848829055
     },
     {
       "id": "<channelId>",
       "name": "Voice",
       "type": "voice",
+      "permissions": {
+        "visibleRoleIds": ["everyone"]
+      },
       "createdAt": 1773848829055,
       "connectedIdentityIds": ["<identityId>"]
     }
@@ -1956,9 +1981,95 @@ Implemented:
 
 - require signed request auth
 - only allow community members to list channel metadata
+- omit channels that are not visible to the authenticated member roles
 - return both text and voice channels
 - include `connectedIdentityIds` for voice channels, derived from identities
   currently `joined` to the active call scoped to that voice channel
+
+### Community roles
+
+Roles let a community owner delegate administration. The owner always has every
+permission. The built-in `everyone` role applies to every member and cannot be
+deleted. New custom roles can be assigned to members.
+
+Supported permission values:
+
+- `view_channels`
+- `manage_channels`
+- `manage_roles`
+- `manage_members`
+- `create_invites`
+- `approve_members`
+- `reject_members`
+- `ban_members`
+- `send_messages`
+- `embed_links`
+- `attach_files`
+- `send_stickers`
+- `mention_everyone`
+- `mention_here`
+- `mention_roles`
+- `manage_messages`
+- `create_polls`
+- `connect_voice`
+
+```http
+GET /communities/{communityId}/roles
+```
+
+Returns:
+
+```json
+{
+  "roles": [
+    {
+      "id": "everyone",
+      "name": "everyone",
+      "permissions": ["view_channels", "send_messages"],
+      "builtIn": true
+    }
+  ],
+  "memberRoles": [
+    {
+      "identityId": "<identityId>",
+      "roleIds": ["<roleId>"]
+    }
+  ]
+}
+```
+
+```http
+POST /communities/{communityId}/roles
+PATCH /communities/{communityId}/roles/{roleId}
+DELETE /communities/{communityId}/roles/{roleId}
+PUT /communities/{communityId}/members/{urlEncodedIdentityId}/roles
+```
+
+Role body:
+
+```json
+{
+  "name": "Admin",
+  "permissions": ["manage_channels", "create_invites"]
+}
+```
+
+Member role replacement body:
+
+```json
+{
+  "roleIds": ["<roleId>"]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require owner or `manage_roles` for role creation/update/deletion and member
+  role assignment
+- keep `everyone` implicit for every member; clients should not assign it
+  manually
+- persist roles and assignments in the community document
 
 ### Create text channel
 
@@ -1976,7 +2087,8 @@ Request:
 
 Implemented:
 
-- require signed request auth from the community owner
+- require signed request auth from the community owner or a member with
+  `manage_channels`
 - create text channel metadata in the community
 
 ### Create voice channel
@@ -1995,7 +2107,8 @@ Request:
 
 Implemented:
 
-- require signed request auth from the community owner
+- require signed request auth from the community owner or a member with
+  `manage_channels`
 - create voice channel metadata in the community
 - voice channels do not accept text messages
 - calls scoped to community channels must target a voice channel
@@ -2016,8 +2129,32 @@ Request:
 
 Implemented:
 
-- require signed request auth from the community owner
+- require signed request auth from the community owner or a member with
+  `manage_channels`
 - rename an existing text or voice channel
+
+### Update channel visibility
+
+```http
+PATCH /communities/{communityId}/channels/{channelId}/permissions
+```
+
+Request:
+
+```json
+{
+  "visibleRoleIds": ["everyone", "<roleId>"]
+}
+```
+
+Implemented:
+
+- require signed request auth from the community owner or a member with
+  `manage_channels`
+- require at least one visible role; an empty list falls back to `everyone`
+- use `visibleRoleIds` to decide whether the authenticated member can list,
+  read, write or join a channel
+- use `everyone` to make a channel visible to all community members
 
 ### Delete channel
 
@@ -2044,7 +2181,8 @@ Response:
 
 Implemented:
 
-- require signed request auth from the community owner
+- require signed request auth from the community owner or a member with
+  `manage_channels`
 - delete an existing text or voice channel from the community metadata
 - when deleting a text channel, delete all stored messages for that channel
 - return the updated community resource
@@ -2134,6 +2272,8 @@ Implemented:
 
 - require signed request auth from a community member
 - require the channel to exist in the community
+- require the authenticated member to have channel visibility through their
+  roles and `send_messages`
 - store `encryptedPayload` as opaque client-encrypted text
 - store attachment CIDs only; private attachment bytes must be encrypted by the
   client and published first with `POST /ipfs/private`
@@ -2195,6 +2335,8 @@ Implemented:
 
 - require signed request auth from a community member
 - require the channel to exist in the community
+- require the authenticated member to have channel visibility through their
+  roles
 - return messages ordered from oldest to newest in the page
 - include MongoDB-only reactions for each message
 - do not include call lifecycle system items; community voice channels expose
@@ -2230,6 +2372,8 @@ Implemented:
 
 - require signed request auth from a community member
 - require the channel and target message to exist
+- require the authenticated member to have channel visibility through their
+  roles and `send_stickers`
 - store reactions in MongoDB only; encrypted message documents are not rewritten
 - keep reactions unique by community id, channel id, message id, author id and
   emoji
@@ -2316,6 +2460,9 @@ Implemented:
 
 - require signed request auth from a community member
 - require the channel to exist in the community
+- allow the message author to delete their own message
+- allow the community owner or members with `manage_messages` to delete any
+  message in the channel
 - validate the deletion signature
 - remove the target message from local storage
 - publish `communities.v1.channel.message.was_deleted` to community members

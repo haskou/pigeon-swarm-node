@@ -111,13 +111,13 @@ export abstract class CallRouteSupport extends Route {
       new CommunityId(body.communityId),
     );
 
-    if (!community || !community.isMember(requesterIdentityId)) {
+    if (!community) {
       throw new InvalidCallScopeError();
     }
 
     const channelId = new CommunityChannelId(body.channelId);
 
-    community.assertHasVoiceChannel(channelId);
+    community.assertCanConnectVoice(requesterIdentityId, channelId);
     const primitives = community.toPrimitives();
 
     return {

@@ -8,24 +8,85 @@ package "communities/domain" {
     - networkId: NetworkId
     - ownerIdentityId: IdentityId
     - profile: CommunityProfile
-    - members: IdentityId[]
-    - textChannels: CommunityTextChannel[]
+    - membership: CommunityMembership
+    - channels: CommunityChannels
     - createdAt: Timestamp
     + create(ownerIdentityId, networkId, name, description, banner?): Community
     + joinWithInvite(member): void
     + leave(member): void
     + assertCanCreateInvite(identityId): void
+    + assertCanManageChannels(identityId): void
+    + assertCanManageRoles(identityId): void
+    + assertCanSendMessage(identityId, channelId): void
+    + assertCanDeleteMessage(actor, targetAuthor, channelId): void
     + addTextChannel(actor, name): CommunityTextChannel
-    + renameTextChannel(actor, channelId, name): void
+    + addRole(actor, name, permissions): CommunityRole
+    + assignRoles(actor, member, roleIds): void
+    + updateChannelPermissions(actor, channelId, permissions): void
+    + renameChannel(actor, channelId, name): void
     + updateProfile(actor, name, description, banner?): void
     + assertIsMember(identityId): void
+  }
+
+  class CommunityMembership {
+    - members: IdentityId[]
+    - roles: CommunityRoles
+    + add(member): void
+    + remove(member): void
+    + assignRoles(member, roleIds): void
+    + isMember(identityId): boolean
+  }
+
+  class CommunityRoles {
+    - roles: CommunityRole[]
+    - memberRoles: CommunityMemberRoleAssignment[]
+    + add(name, permissions): CommunityRole
+    + update(roleId, name, permissions): void
+    + remove(roleId): void
+    + assign(identityId, roleIds): void
+    + memberHasPermission(identityId, permission): boolean
+  }
+
+  class CommunityRole {
+    - id: CommunityRoleId
+    - name: CommunityRoleName
+    - permissions: CommunityPermission[]
+    - builtIn: boolean
+    + everyone(): CommunityRole
+    + create(name, permissions): CommunityRole
+    + allows(permission): boolean
+  }
+
+  class CommunityChannels {
+    - textChannels: CommunityTextChannel[]
+    - voiceChannels: CommunityVoiceChannel[]
+    + addText(name): CommunityTextChannel
+    + addVoice(name): CommunityVoiceChannel
+    + updatePermissions(channelId, permissions): void
+    + visiblePrimitivesFor(canView): object
+  }
+
+  class CommunityChannelPermissions {
+    - visibleRoleIds: CommunityRoleId[]
+    + visibleForEveryone(): CommunityChannelPermissions
+    + updateVisibleRoleIds(roleIds): void
   }
 
   class CommunityTextChannel {
     - id: CommunityChannelId
     - name: CommunityChannelName
+    - permissions: CommunityChannelPermissions
     - createdAt: Timestamp
     + create(name): CommunityTextChannel
+    + rename(name): void
+  }
+
+  class CommunityVoiceChannel {
+    - id: CommunityChannelId
+    - name: CommunityChannelName
+    - permissions: CommunityChannelPermissions
+    - createdAt: Timestamp
+    + create(name): CommunityVoiceChannel
     + rename(name): void
   }
 
@@ -90,6 +151,9 @@ package "communities/domain" {
   class CommunityBanner
   class CommunityChannelId
   class CommunityChannelName
+  class CommunityPermission
+  class CommunityRoleId
+  class CommunityRoleName
   class CommunityChannelMessageId
   class CommunityChannelMessageEncryptedPayload
   class CommunityChannelAttachmentId
@@ -133,15 +197,30 @@ package "communities/domain" {
     + save(request): void
   }
 
-  Community *-- CommunityTextChannel
+  Community *-- CommunityMembership
+  Community *-- CommunityChannels
   Community *-- CommunityProfile
   Community --> CommunityId
   CommunityProfile --> CommunityName
   CommunityProfile --> CommunityDescription
   CommunityProfile --> CommunityAvatar
   CommunityProfile --> CommunityBanner
+  CommunityMembership *-- CommunityRoles
+  CommunityMembership --> IdentityId
+  CommunityRoles *-- CommunityRole
+  CommunityRoles --> CommunityRoleId
+  CommunityRole --> CommunityRoleId
+  CommunityRole --> CommunityRoleName
+  CommunityRole --> CommunityPermission
+  CommunityChannels *-- CommunityTextChannel
+  CommunityChannels *-- CommunityVoiceChannel
   CommunityTextChannel --> CommunityChannelId
   CommunityTextChannel --> CommunityChannelName
+  CommunityTextChannel --> CommunityChannelPermissions
+  CommunityVoiceChannel --> CommunityChannelId
+  CommunityVoiceChannel --> CommunityChannelName
+  CommunityVoiceChannel --> CommunityChannelPermissions
+  CommunityChannelPermissions --> CommunityRoleId
   CommunityChannelMessage --> CommunityChannelMessageId
   CommunityChannelMessage --> CommunityId
   CommunityChannelMessage --> CommunityChannelId
@@ -223,8 +302,15 @@ package "communities-api" {
   class PostCommunityInviteAcceptRoute
   class GetCommunityChannelsRoute
   class PostCommunityTextChannelRoute
+  class PostCommunityVoiceChannelRoute
   class PatchCommunityChannelRoute
+  class CommunityChannelPermissionsRoute
   class DeleteCommunityChannelRoute
+  class GetCommunityRolesRoute
+  class PostCommunityRoleRoute
+  class PatchCommunityRoleRoute
+  class DeleteCommunityRoleRoute
+  class PutCommunityMemberRolesRoute
   class PostCommunityChannelMessageRoute
   class GetCommunityChannelMessagesRoute
   class CommunityChannelMessageReactionRoute
@@ -247,8 +333,15 @@ package "communities-api" {
   PostCommunityInviteAcceptRoute ..> Community
   GetCommunityChannelsRoute ..> Community
   PostCommunityTextChannelRoute ..> Community
+  PostCommunityVoiceChannelRoute ..> Community
   PatchCommunityChannelRoute ..> Community
+  CommunityChannelPermissionsRoute ..> Community
   DeleteCommunityChannelRoute ..> Community
+  GetCommunityRolesRoute ..> Community
+  PostCommunityRoleRoute ..> Community
+  PatchCommunityRoleRoute ..> Community
+  DeleteCommunityRoleRoute ..> Community
+  PutCommunityMemberRolesRoute ..> Community
   DeleteCommunityChannelRoute ..> CommunityChannelMessageRepository
   PostCommunityChannelMessageRoute ..> Community
   PostCommunityChannelMessageRoute ..> CommunityChannelMessage
@@ -262,9 +355,15 @@ package "communities-api" {
 note right of Community
   MVP scope:
   - private communities only
-  - one owner
-  - owner administers profile,
-    members and text channel metadata
+  - one owner with all permissions
+  - built-in everyone role
+  - custom roles assign permissions
+    to community members
+  - roles can manage channels,
+    invites, member approvals,
+    messages and role assignment
+  - channels can be visible to
+    everyone or selected roles
   - non-owner members can leave
   - owner can create bearer invite links
   - owner can invite identities as

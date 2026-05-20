@@ -57,8 +57,7 @@ export class CommunityMessageReactionRoute extends CommunityRouteSupport {
     const communityChannelId = new CommunityChannelId(channelId);
     const communityMessageId = new CommunityChannelMessageId(messageId);
 
-    community.assertIsMember(authorIdentityId);
-    community.assertHasTextChannel(communityChannelId);
+    community.assertCanReactWithSticker(authorIdentityId, communityChannelId);
     assert(
       await this.messageRepository().findById(
         new CommunityId(communityId),

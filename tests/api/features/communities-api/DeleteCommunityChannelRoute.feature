@@ -44,4 +44,4 @@ Feature: Delete community channel API
     And another identity signs the current community channel deletion request
     When I DELETE the current community channel
     Then response code is equal to 409
-    And response body should contain "Only the community owner"
+    And response body should contain "Community permission denied"

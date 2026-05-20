@@ -2,6 +2,7 @@ export interface CommunityTextChannelResource {
   createdAt: number;
   id: string;
   name: string;
+  permissions: CommunityChannelPermissionsResource;
   type: 'text';
 }
 
@@ -10,7 +11,24 @@ export interface CommunityVoiceChannelResource {
   createdAt: number;
   id: string;
   name: string;
+  permissions: CommunityChannelPermissionsResource;
   type: 'voice';
+}
+
+export interface CommunityChannelPermissionsResource {
+  visibleRoleIds: string[];
+}
+
+export interface CommunityRoleResource {
+  builtIn: boolean;
+  id: string;
+  name: string;
+  permissions: string[];
+}
+
+export interface CommunityMemberRolesResource {
+  identityId: string;
+  roleIds: string[];
 }
 
 export interface CommunityResource {
@@ -19,10 +37,12 @@ export interface CommunityResource {
   createdAt: number;
   description: string;
   id: string;
+  memberRoles: CommunityMemberRolesResource[];
   memberIds: string[];
   name: string;
   networkId: string;
   ownerIdentityId: string;
+  roles: CommunityRoleResource[];
   textChannels: CommunityTextChannelResource[];
   visibility: 'private';
   voiceChannels: CommunityVoiceChannelResource[];

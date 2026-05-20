@@ -13,24 +13,30 @@ import { CommunityMessageReactionRoute } from '@app/apps/apis/communities-api/ro
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
 import { DeleteCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelRoute';
 import { DeleteCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberRoute';
+import { DeleteCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityRoleRoute';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
 import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembershipRequestsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
+import { GetCommunityRolesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRolesRoute';
 import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
+import { CommunityChannelPermissionsRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelPermissionsRoute';
 import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelRoute';
 import { PatchCommunityRequestRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRequestRoute';
+import { PatchCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoleRoute';
 import { PatchCommunityRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoute';
 import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
 import { PostCommunityInviteAcceptRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteAcceptRoute';
 import { PostCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteRoute';
 import { PostCommunityJoinRequestRoute } from '@app/apps/apis/communities-api/routes/PostCommunityJoinRequestRoute';
 import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
+import { PostCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoleRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
 import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
+import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
 import { ConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessageReactionRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
@@ -258,12 +264,18 @@ export default class Server {
           PostCommunityMemberRoute,
           PostCommunityJoinRequestRoute,
           DeleteCommunityMemberRoute,
+          GetCommunityRolesRoute,
+          PostCommunityRoleRoute,
+          PatchCommunityRoleRoute,
+          DeleteCommunityRoleRoute,
+          PutCommunityMemberRolesRoute,
           PostCommunityInviteRoute,
           PostCommunityInviteAcceptRoute,
           GetCommunityChannelsRoute,
           PostCommunityTextChannelRoute,
           PostCommunityVoiceChannelRoute,
           PatchCommunityChannelRoute,
+          CommunityChannelPermissionsRoute,
           DeleteCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
           PostCommunityChannelMessageRoute,

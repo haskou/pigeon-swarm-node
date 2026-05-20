@@ -2,9 +2,16 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Community } from '../../domain/Community';
+import { CommunityRole } from '../../domain/CommunityRole';
 import { CommunityRepository } from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
-import { MongoCommunityDocument } from './documents/MongoCommunityDocument';
+import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
+import {
+  MongoCommunityDocument,
+  MongoCommunityRoleDocument,
+  MongoCommunityTextChannelDocument,
+  MongoCommunityVoiceChannelDocument,
+} from './documents/MongoCommunityDocument';
 
 export class MongoCommunityRepository implements CommunityRepository {
   private static readonly COLLECTION = 'communities';
@@ -28,9 +35,11 @@ export class MongoCommunityRepository implements CommunityRepository {
       createdAt: primitives.createdAt,
       description: primitives.description,
       memberIds: primitives.memberIds,
+      memberRoles: primitives.memberRoles,
       name: primitives.name,
       networkId: primitives.networkId,
       ownerIdentityId: primitives.ownerIdentityId,
+      roles: primitives.roles,
       textChannels: primitives.textChannels,
       visibility: primitives.visibility,
       voiceChannels: primitives.voiceChannels,
@@ -45,13 +54,45 @@ export class MongoCommunityRepository implements CommunityRepository {
       description: document.description,
       id: document._id,
       memberIds: document.memberIds,
+      memberRoles: document.memberRoles || [],
       name: document.name,
       networkId: document.networkId,
       ownerIdentityId: document.ownerIdentityId,
-      textChannels: document.textChannels,
+      roles: this.rolesFromDocument(document.roles),
+      textChannels: document.textChannels.map((channel) =>
+        this.textChannelFromDocument(channel),
+      ),
       visibility: document.visibility,
-      voiceChannels: document.voiceChannels || [],
+      voiceChannels: (document.voiceChannels || []).map((channel) =>
+        this.voiceChannelFromDocument(channel),
+      ),
     });
+  }
+
+  private rolesFromDocument(
+    roles: MongoCommunityRoleDocument[] | undefined,
+  ): ReturnType<CommunityRole['toPrimitives']>[] {
+    return roles?.length ? roles : [CommunityRole.everyone().toPrimitives()];
+  }
+
+  private textChannelFromDocument(channel: MongoCommunityTextChannelDocument) {
+    return {
+      ...channel,
+      permissions: channel.permissions || {
+        visibleRoleIds: [CommunityRoleId.EVERYONE_VALUE],
+      },
+    };
+  }
+
+  private voiceChannelFromDocument(
+    channel: MongoCommunityVoiceChannelDocument,
+  ) {
+    return {
+      ...channel,
+      permissions: channel.permissions || {
+        visibleRoleIds: [CommunityRoleId.EVERYONE_VALUE],
+      },
+    };
   }
 
   private escapeRegex(value: string): string {

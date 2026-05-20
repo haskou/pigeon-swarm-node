@@ -59,6 +59,7 @@ export class GetCommunityChannelsRoute extends CommunityRouteSupport {
       .send(
         new CommunityChannelsViewModel(
           community,
+          actorIdentityId,
           connectedIdentityIdsByChannelId,
         ).toResource(),
       );

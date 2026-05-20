@@ -31,8 +31,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
     const communityChannelId = new CommunityChannelId(channelId);
     const safeLimit = Math.min(Math.max(limit ?? 50, 1), 100);
 
-    community.assertIsMember(actorIdentityId);
-    community.assertHasTextChannel(communityChannelId);
+    community.assertCanViewTextChannel(actorIdentityId, communityChannelId);
 
     const messages = await this.messageRepository().findByChannel(
       new CommunityId(communityId),

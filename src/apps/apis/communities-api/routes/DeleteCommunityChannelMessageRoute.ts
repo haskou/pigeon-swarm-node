@@ -1,4 +1,5 @@
 import { DeleteCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityChannelMessageBody';
+import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
@@ -6,7 +7,7 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { PublicKey, Signature } from '@haskou/value-objects';
+import { assert, PublicKey, Signature } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -44,8 +45,12 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
       targetMessageId,
     );
 
-    community.assertIsMember(actorIdentityId);
-    community.assertHasTextChannel(communityChannelId);
+    assert(targetMessage, new CommunityChannelMessageNotFoundError());
+    community.assertCanDeleteMessage(
+      actorIdentityId,
+      targetMessage.getAuthorIdentityId(),
+      communityChannelId,
+    );
 
     const isValidSignature = this.signatureService.isValidSignature(
       PublicKey.fromPEM(actorIdentityId.toString()),
@@ -81,7 +86,7 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
         memberIds: communityPrimitives.memberIds,
         messageId: body.id,
         networkId: communityPrimitives.networkId,
-        targetMessageAuthorId: targetMessage?.toPrimitives().authorIdentityId,
+        targetMessageAuthorId: targetMessage.toPrimitives().authorIdentityId,
         targetMessageId: messageId,
       }),
     ]);
