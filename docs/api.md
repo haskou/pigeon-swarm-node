@@ -2942,6 +2942,115 @@ Requires signed HTTP headers. The sticker must exist. Returns the updated
 authenticated identity sticker library with the sticker moved to the front of
 `recentStickers`. The list is capped at 10 entries.
 
+## Polls API
+
+Polls are Mongo-only interactive timeline items. They are not encrypted message
+documents and they are not stored in IPFS. They can live in a community text
+channel or in a group conversation.
+
+Poll events are emitted through websocket as domain events:
+
+- `polls.v1.poll.was_created`
+- `polls.v1.vote.was_cast`
+- `polls.v1.vote.was_removed`
+- `polls.v1.poll.was_closed`
+
+Community poll events include `memberIds` for realtime routing. Group
+conversation poll events include `participantIds`.
+
+### Create poll
+
+```http
+POST /polls/
+```
+
+Requires signed HTTP headers.
+
+Community channel poll:
+
+```json
+{
+  "scopeType": "community_channel",
+  "communityId": "<communityId>",
+  "channelId": "<textChannelId>",
+  "question": "What should we play tonight?",
+  "options": [
+    { "id": "minecraft", "text": "Minecraft" },
+    { "id": "factorio", "text": "Factorio" }
+  ],
+  "allowsMultipleVotes": false,
+  "expiresAt": null
+}
+```
+
+Group conversation poll:
+
+```json
+{
+  "scopeType": "group_conversation",
+  "conversationId": "<groupConversationId>",
+  "question": "Pizza or sushi?",
+  "options": [
+    { "id": "pizza", "text": "Pizza" },
+    { "id": "sushi", "text": "Sushi" }
+  ],
+  "allowsMultipleVotes": true
+}
+```
+
+Rules:
+
+- community channel polls require membership, channel visibility and
+  `create_polls`
+- group conversation polls require the authenticated identity to be a
+  participant of a `group` conversation
+- a poll must have 2-10 options
+- option ids are client-provided stable strings unique inside the poll
+- question max length is 200 characters
+- option text max length is 120 characters
+
+### Get poll
+
+```http
+GET /polls/{pollId}
+```
+
+Requires signed HTTP headers and access to the poll scope.
+
+### Cast vote
+
+```http
+POST /polls/{pollId}/votes
+```
+
+Requires signed HTTP headers and access to the poll scope.
+
+```json
+{
+  "optionIds": ["pizza"]
+}
+```
+
+Sending a new vote replaces the authenticated identity's previous vote. Polls
+with `allowsMultipleVotes: false` accept exactly one option id.
+
+### Remove own vote
+
+```http
+DELETE /polls/{pollId}/votes/me
+```
+
+Requires signed HTTP headers and access to the poll scope.
+
+### Close poll
+
+```http
+POST /polls/{pollId}/close
+```
+
+Requires signed HTTP headers and access to the poll scope. Closed polls reject
+new votes.
+
 ## Planned API
 
 The following API shapes are not implemented yet. They are kept here as design

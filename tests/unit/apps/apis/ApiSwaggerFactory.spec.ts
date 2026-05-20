@@ -22,6 +22,7 @@ describe('ApiSwaggerFactory', () => {
         'nodes-api',
         'notifications-api',
         'presence-api',
+        'polls-api',
         'push-api',
         'stickers-api',
       ]);
@@ -96,6 +97,7 @@ describe('ApiSwaggerFactory', () => {
         'nodes-api': '/api/swagger/nodes-api/swagger.yaml',
         'notifications-api': '/api/swagger/notifications-api/swagger.yaml',
         'presence-api': '/api/swagger/presence-api/swagger.yaml',
+        'polls-api': '/api/swagger/polls-api/swagger.yaml',
         'push-api': '/api/swagger/push-api/swagger.yaml',
         'stickers-api': '/api/swagger/stickers-api/swagger.yaml',
       });

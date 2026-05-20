@@ -64,6 +64,11 @@ import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerR
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
 import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/PatchNotificationRoute';
 import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/PostNotificationRoute';
+import { DeletePollVoteRoute } from '@app/apps/apis/polls-api/routes/DeletePollVoteRoute';
+import { GetPollRoute } from '@app/apps/apis/polls-api/routes/GetPollRoute';
+import { PostPollCloseRoute } from '@app/apps/apis/polls-api/routes/PostPollCloseRoute';
+import { PostPollRoute } from '@app/apps/apis/polls-api/routes/PostPollRoute';
+import { PostPollVoteRoute } from '@app/apps/apis/polls-api/routes/PostPollVoteRoute';
 import { DeletePresenceCustomMessageRoute } from '@app/apps/apis/presence-api/routes/DeletePresenceCustomMessageRoute';
 import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresenceRoute';
 import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresenceRoute';
@@ -239,6 +244,11 @@ export default class Server {
           GetPresenceRoute,
           PutPresenceRoute,
           DeletePresenceCustomMessageRoute,
+          PostPollRoute,
+          GetPollRoute,
+          PostPollVoteRoute,
+          DeletePollVoteRoute,
+          PostPollCloseRoute,
           GetPushVapidPublicKeyRoute,
           PutPushSubscriptionRoute,
           DeletePushSubscriptionRoute,

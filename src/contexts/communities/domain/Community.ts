@@ -214,6 +214,14 @@ export class Community extends AggregateRoot {
     this.assertPermission(identityId, CommunityPermission.MANAGE_ROLES);
   }
 
+  public assertCanCreatePoll(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+    this.assertPermission(identityId, CommunityPermission.CREATE_POLLS);
+  }
+
   public assertCanBanMembers(identityId: IdentityId): void {
     this.assertPermission(identityId, CommunityPermission.BAN_MEMBERS);
   }
@@ -516,6 +524,10 @@ export class Community extends AggregateRoot {
     return this.ownerIdentityId;
   }
 
+  public getNetworkId(): NetworkId {
+    return this.networkId;
+  }
+
   public isMember(identityId: IdentityId): boolean {
     return this.membership.isMember(identityId);
   }
@@ -555,6 +567,17 @@ export class Community extends AggregateRoot {
         .getRoles()
         .memberHasAnyRole(identityId, permissions.getVisibleRoleIds());
     });
+  }
+
+  public visibleMembersForTextChannel(
+    channelId: CommunityChannelId,
+  ): IdentityId[] {
+    this.assertHasTextChannel(channelId);
+
+    return this.membership.membersWithAnyRole(
+      this.channels.textChannelPermissions(channelId).getVisibleRoleIds(),
+      this.ownerIdentityId,
+    );
   }
 
   public toPrimitives() {
