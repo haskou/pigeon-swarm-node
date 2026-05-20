@@ -3,6 +3,7 @@ import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/Mo
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { MongoPollRepository } from '@app/contexts/polls/infrastructure/mongo/MongoPollRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -39,6 +40,10 @@ export class GetConversationMessagesRoute extends Route {
     return new MongoCallRepository(this.get<MongoDB>(MongoDB));
   }
 
+  private pollRepository(): MongoPollRepository {
+    return new MongoPollRepository(this.get<MongoDB>(MongoDB));
+  }
+
   @Get('/:conversationId/messages')
   public async getMessages(
     @Param('conversationId') conversationId: string,
@@ -70,6 +75,15 @@ export class GetConversationMessagesRoute extends Route {
         : calls.flatMap((call) =>
             ConversationCallEventViewModel.fromCall(call),
           );
+    const upperBound = messages.at(-1)?.toPrimitives().createdAt;
+    const polls =
+      beforeMessageId && messages.length === 0
+        ? []
+        : await this.pollRepository().findByGroupConversation(
+            new ConversationId(conversationId),
+            safeLimit,
+            beforeMessageId ? upperBound : undefined,
+          );
     const reactions = await this.finder.findReactionsFor(
       new GetConversationMessagesRequest(
         conversationId,
@@ -87,6 +101,7 @@ export class GetConversationMessagesRoute extends Route {
           conversationId,
           messages,
           callEvents,
+          polls,
           safeLimit,
           reactions,
         ).toResource(),

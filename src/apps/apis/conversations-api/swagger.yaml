@@ -497,6 +497,7 @@ components:
             oneOf:
               - $ref: '#/components/schemas/MessageResource'
               - $ref: '#/components/schemas/ConversationCallEventResource'
+              - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
         nextBeforeMessageId:
           type: string
     ConversationCallEventResource:

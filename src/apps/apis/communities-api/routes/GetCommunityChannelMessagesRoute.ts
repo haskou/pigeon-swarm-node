@@ -1,6 +1,8 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { MongoPollRepository } from '@app/contexts/polls/infrastructure/mongo/MongoPollRepository';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -17,6 +19,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
+  private pollRepository(): MongoPollRepository {
+    return new MongoPollRepository(this.get<MongoDB>(MongoDB));
+  }
+
   @Get('/:communityId/channels/:channelId/messages')
   public async getMessages(
     @Param('communityId') communityId: string,
@@ -48,6 +54,16 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
         (message) => new CommunityChannelMessageId(message.toPrimitives().id),
       ),
     );
+    const upperBound = messages.at(-1)?.toPrimitives().createdAt;
+    const polls =
+      beforeMessageId && messages.length === 0
+        ? []
+        : await this.pollRepository().findByCommunityChannel(
+            new CommunityId(communityId),
+            communityChannelId,
+            safeLimit,
+            beforeMessageId ? upperBound : undefined,
+          );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -57,6 +73,8 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
           channelId,
           messages,
           reactions,
+          polls,
+          safeLimit,
         ).toResource(),
       );
   }

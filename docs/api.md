@@ -1322,6 +1322,25 @@ Response:
       "actorIdentityId": "<identityId>",
       "createdAt": 1773848869055,
       "durationMs": 40000
+    },
+    {
+      "id": "<pollId>",
+      "type": "poll",
+      "creatorIdentityId": "<identityId>",
+      "createdAt": 1773848879055,
+      "question": "Pizza or sushi?",
+      "options": [
+        { "id": "pizza", "text": "Pizza" },
+        { "id": "sushi", "text": "Sushi" }
+      ],
+      "allowsMultipleVotes": true,
+      "scope": {
+        "type": "group_conversation",
+        "conversationId": "group:<id>",
+        "networkId": "<networkId>"
+      },
+      "status": "open",
+      "votes": []
     }
   ],
   "nextBeforeMessageId": "<messageId>"
@@ -1334,6 +1353,7 @@ Implemented:
 - return the latest messages ordered from oldest to newest in the page
 - include non-encrypted `call_event` system items for calls scoped to the
   conversation, with `callEventType` equal to `ended`, `declined` or `missed`
+- include Mongo-only `poll` timeline items scoped to the group conversation
 - when `beforeMessageId` is provided, return messages older than that message
 
 ### Get one message
@@ -2430,6 +2450,26 @@ Response:
         }
       ],
       "type": "sent"
+    },
+    {
+      "id": "<pollId>",
+      "type": "poll",
+      "creatorIdentityId": "<identityId>",
+      "createdAt": 1773848879055,
+      "question": "What should we play tonight?",
+      "options": [
+        { "id": "minecraft", "text": "Minecraft" },
+        { "id": "factorio", "text": "Factorio" }
+      ],
+      "allowsMultipleVotes": false,
+      "scope": {
+        "type": "community_channel",
+        "communityId": "<communityId>",
+        "channelId": "<channelId>",
+        "networkId": "<networkId>"
+      },
+      "status": "open",
+      "votes": []
     }
   ],
   "nextBeforeMessageId": "<messageId>"
@@ -2444,6 +2484,8 @@ Implemented:
   roles
 - return messages ordered from oldest to newest in the page
 - include MongoDB-only reactions for each message
+- include MongoDB-only `poll` timeline items scoped to the same community text
+  channel
 - do not include call lifecycle system items; community voice channels expose
   active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
@@ -3007,6 +3049,13 @@ authenticated identity sticker library with the sticker moved to the front of
 Polls are Mongo-only interactive timeline items. They are not encrypted message
 documents and they are not stored in IPFS. They can live in a community text
 channel or in a group conversation.
+
+Poll resources include `"type": "poll"` and are also returned inside the
+existing `messages` arrays for their scope:
+
+- `GET /conversations/{conversationId}/messages` for group conversation polls
+- `GET /communities/{communityId}/channels/{channelId}/messages` for community
+  text channel polls
 
 Poll events are emitted through websocket as domain events:
 

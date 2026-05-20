@@ -1,3 +1,6 @@
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Poll } from '../../domain/Poll';
@@ -56,6 +59,54 @@ export class MongoPollRepository implements PollRepository {
     });
 
     return document ? this.toDomain(document) : undefined;
+  }
+
+  public async findByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    limit: number,
+    beforeCreatedAt?: number,
+  ): Promise<Poll[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        'scope.channelId': channelId.valueOf(),
+        'scope.communityId': communityId.valueOf(),
+        'scope.type': 'community_channel',
+        ...(beforeCreatedAt ? { createdAt: { $lte: beforeCreatedAt } } : {}),
+      })
+      .sort([
+        ['createdAt', -1],
+        ['_id', -1],
+      ])
+      .limit(limit)
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findByGroupConversation(
+    conversationId: ConversationId,
+    limit: number,
+    beforeCreatedAt?: number,
+  ): Promise<Poll[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        'scope.conversationId': conversationId.valueOf(),
+        'scope.type': 'group_conversation',
+        ...(beforeCreatedAt ? { createdAt: { $lte: beforeCreatedAt } } : {}),
+      })
+      .sort([
+        ['createdAt', -1],
+        ['_id', -1],
+      ])
+      .limit(limit)
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
   }
 
   public async save(poll: Poll): Promise<void> {

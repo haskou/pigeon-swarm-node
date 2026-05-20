@@ -1377,7 +1377,9 @@ components:
         messages:
           type: array
           items:
-            $ref: '#/components/schemas/CommunityChannelMessageResource'
+            oneOf:
+              - $ref: '#/components/schemas/CommunityChannelMessageResource'
+              - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
         nextBeforeMessageId:
           type: string
     DeletedCommunityChannelMessageResource:
