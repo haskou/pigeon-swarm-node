@@ -17,7 +17,7 @@ export class PostPollCloseRoute extends PollRouteSupport {
   ): Promise<Response> {
     const actor = await this.authenticate(request);
     const poll = await this.findPoll(pollId);
-    const scopeAccess = await this.accessPollScope(actor, poll);
+    const scopeAccess = await this.managePollScope(actor, poll);
     const updatedPoll = await new PollCloser(
       this.repository(),
       this.eventPublisher,
