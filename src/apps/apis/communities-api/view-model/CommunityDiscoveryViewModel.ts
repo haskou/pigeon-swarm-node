@@ -55,6 +55,7 @@ export class CommunityDiscoveryViewModel {
       avatar: primitives.avatar,
       banner: primitives.banner,
       description: primitives.description,
+      discoverable: true,
       id: primitives.id,
       memberCount: primitives.memberIds.length,
       membershipRequest: request

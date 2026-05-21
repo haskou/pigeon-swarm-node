@@ -513,6 +513,19 @@ export default class Definitions {
       avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Private API community',
+      discoverable: true,
+      name: 'API community',
+      networkId: this.currentNetworkId,
+    });
+  }
+
+  @given('I set a hidden private community body')
+  public iSetAHiddenPrivateCommunityBody(): void {
+    this.body = JSON.stringify({
+      avatar: 'bafybeigcommunityavatar',
+      banner: 'bafybeigcommunitybanner',
+      description: 'Private API community',
+      discoverable: false,
       name: 'API community',
       networkId: this.currentNetworkId,
     });
@@ -2650,7 +2663,7 @@ export default class Definitions {
   @when('I GET discoverable communities')
   public async iGETDiscoverableCommunities(): Promise<void> {
     this.response = await this.restClient.get(
-      '/communities/discover?query=API',
+      `/communities/discover?query=API&networkId=${this.currentNetworkId}`,
       this.headers,
     );
   }

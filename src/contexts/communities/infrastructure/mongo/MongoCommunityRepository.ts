@@ -35,6 +35,7 @@ export class MongoCommunityRepository implements CommunityRepository {
       banner: primitives.banner,
       createdAt: primitives.createdAt,
       description: primitives.description,
+      discoverable: primitives.discoverable,
       memberIds: primitives.memberIds,
       memberRoles: primitives.memberRoles,
       name: primitives.name,
@@ -54,6 +55,7 @@ export class MongoCommunityRepository implements CommunityRepository {
       banner: document.banner,
       createdAt: document.createdAt,
       description: document.description,
+      discoverable: document.discoverable ?? true,
       id: document._id,
       memberIds: document.memberIds,
       memberRoles: document.memberRoles || [],
@@ -124,7 +126,9 @@ export class MongoCommunityRepository implements CommunityRepository {
     networkId?: string;
     query?: string;
   }): Promise<Community[]> {
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = {
+      $or: [{ discoverable: true }, { discoverable: { $exists: false } }],
+    };
     const query = options.query?.trim();
 
     if (options.networkId) {
@@ -134,10 +138,16 @@ export class MongoCommunityRepository implements CommunityRepository {
     if (query) {
       const escapedQuery = this.escapeRegex(query);
 
-      filter.$or = [
-        { name: { $options: 'i', $regex: escapedQuery } },
-        { description: { $options: 'i', $regex: escapedQuery } },
+      filter.$and = [
+        { $or: filter.$or },
+        {
+          $or: [
+            { name: { $options: 'i', $regex: escapedQuery } },
+            { description: { $options: 'i', $regex: escapedQuery } },
+          ],
+        },
       ];
+      delete filter.$or;
     }
 
     const documents = await (await this.collection())
