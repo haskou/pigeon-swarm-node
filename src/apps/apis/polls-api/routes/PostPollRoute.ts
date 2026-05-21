@@ -1,6 +1,7 @@
 import { PollCreateMessage } from '@app/contexts/polls/application/create/messages/PollCreateMessage';
 import { PollCreator } from '@app/contexts/polls/application/create/PollCreator';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
@@ -39,6 +40,24 @@ export class PostPollRoute extends PollRouteSupport {
         body.expiresAt,
       ),
     );
+    const conversationId = scopeAccess.scope.getConversationId();
+
+    if (conversationId) {
+      const conversation =
+        await this.conversationRepository().findById(conversationId);
+
+      if (conversation) {
+        conversation.addPollMessage(
+          actor,
+          poll.getId(),
+          new Signature(request.header('X-Signature') || ''),
+          {
+            createdAt: new Timestamp(poll.toPrimitives().createdAt),
+          },
+        );
+        await this.conversationRepository().save(conversation);
+      }
+    }
 
     return response
       .status(HttpRouteStatusEnum.OK)

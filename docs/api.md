@@ -1353,7 +1353,9 @@ Implemented:
 - return the latest messages ordered from oldest to newest in the page
 - include non-encrypted `call_event` system items for calls scoped to the
   conversation, with `callEventType` equal to `ended`, `declined` or `missed`
-- include Mongo-only `poll` timeline items scoped to the group conversation
+- include `poll` timeline items scoped to the group conversation. For group
+  conversations, the poll `id` is also registered as a conversation message id,
+  so it is valid in later `previousMessageIds`.
 - when `beforeMessageId` is provided, return messages older than that message
 
 ### Get one message
@@ -3096,9 +3098,14 @@ authenticated identity sticker library with the sticker moved to the front of
 
 ## Polls API
 
-Polls are Mongo-only interactive timeline items. They are not encrypted message
-documents and they are not stored in IPFS. They can live in a community text
-channel or in a group conversation.
+Polls are interactive timeline items. They can live in a community text channel
+or in a group conversation.
+
+Group conversation polls are also registered as conversation message ids. The
+poll `id` returned in the conversation messages timeline can be used by the
+next message as `previousMessageIds: ["<pollId>"]`.
+
+Community text channel polls remain Mongo-only channel timeline items.
 
 Poll resources include `"type": "poll"` and are also returned inside the
 existing `messages` arrays for their scope:

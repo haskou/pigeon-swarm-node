@@ -48,7 +48,24 @@ describe('MessagesViewModel', () => {
     expect(resource.messages[1].type).toEqual('poll');
   });
 
-  it('uses the oldest returned message as pagination cursor when polls are first', () => {
+  it('uses poll messages as poll timeline items without duplicating them', () => {
+    const resource = new MessagesViewModel(
+      'conversation-id',
+      [message('message-1', 1000), pollMessage('poll-1', 2000)],
+      [],
+      [poll('poll-1', 2000)],
+      3,
+    ).toResource();
+
+    expect(resource.messages.map((item) => item.id)).toEqual([
+      'message-1',
+      'poll-1',
+    ]);
+    expect(resource.messages[1].type).toEqual('poll');
+    expect(resource.nextBeforeMessageId).toEqual('message-1');
+  });
+
+  it('uses the oldest returned timeline message as pagination cursor when polls are first', () => {
     const resource = new MessagesViewModel(
       'conversation-id',
       [message('message-1', 2000), message('message-2', 3000)],
@@ -62,7 +79,7 @@ describe('MessagesViewModel', () => {
       'message-1',
       'message-2',
     ]);
-    expect(resource.nextBeforeMessageId).toEqual('message-1');
+    expect(resource.nextBeforeMessageId).toEqual('poll-1');
   });
 
   function callEvent(id: string, createdAt: number) {
@@ -94,8 +111,26 @@ describe('MessagesViewModel', () => {
     } as unknown as Message;
   }
 
+  function pollMessage(id: string, createdAt: number): Message {
+    return {
+      getId: () => new MessageId(id),
+      toPrimitives: () => ({
+        attachmentExternalIdentifiers: [] as string[],
+        authorId: 'author-id',
+        conversationId: 'conversation-id',
+        createdAt,
+        id,
+        pollId: id,
+        previousMessageIds: [] as string[],
+        signature: 'signature',
+        type: 'poll',
+      }),
+    } as unknown as Message;
+  }
+
   function poll(id: string, createdAt: number): Poll {
     return {
+      getId: () => new MessageId(id),
       toPrimitives: () => ({
         allowsMultipleVotes: false,
         createdAt,

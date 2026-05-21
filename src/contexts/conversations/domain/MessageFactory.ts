@@ -3,6 +3,7 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { Message } from './Message';
 import { MessageDeleted } from './MessageDeleted';
 import { MessageEdited } from './MessageEdited';
+import { MessagePoll } from './MessagePoll';
 import { MessageSent } from './MessageSent';
 import { MessageType } from './value-objects/MessageType';
 
@@ -26,6 +27,15 @@ export class MessageFactory {
     );
   }
 
+  private static isPoll(
+    primitives: PrimitiveOf<Message>,
+  ): primitives is PrimitiveOf<MessagePoll> {
+    return (
+      new MessageType(primitives.type).isEqual(MessageType.POLL) &&
+      'pollId' in primitives
+    );
+  }
+
   public static fromPrimitives(primitives: PrimitiveOf<Message>): Message {
     if (MessageFactory.isSent(primitives)) {
       return MessageSent.fromPrimitives(primitives);
@@ -33,6 +43,10 @@ export class MessageFactory {
 
     if (MessageFactory.isEdited(primitives)) {
       return MessageEdited.fromPrimitives(primitives);
+    }
+
+    if (MessageFactory.isPoll(primitives)) {
+      return MessagePoll.fromPrimitives(primitives);
     }
 
     return MessageDeleted.fromPrimitives(primitives);

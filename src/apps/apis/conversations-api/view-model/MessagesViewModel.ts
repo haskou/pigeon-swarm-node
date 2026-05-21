@@ -26,13 +26,32 @@ export class MessagesViewModel {
     );
   }
 
+  private messageResource(
+    message: Message,
+  ): ConversationTimelineItemResource[] {
+    const primitives = message.toPrimitives();
+
+    if (primitives.type !== 'poll' || !('pollId' in primitives)) {
+      return [
+        new MessageViewModel(message, this.reactionsFor(message)).toResource(),
+      ];
+    }
+
+    const poll = this.polls.find(
+      (candidate) => candidate.getId().valueOf() === primitives.pollId,
+    );
+
+    return poll ? [new PollViewModel(poll).toResource()] : [];
+  }
+
   public toResource(): MessagesResource {
-    const messages = this.messages.map((message) =>
-      new MessageViewModel(message, this.reactionsFor(message)).toResource(),
+    const messages = this.messages.flatMap((message) =>
+      this.messageResource(message),
     );
-    const polls = this.polls.map((poll) =>
-      new PollViewModel(poll).toResource(),
-    );
+    const messageIds = new Set(messages.map((message) => message.id));
+    const polls = this.polls
+      .filter((poll) => !messageIds.has(poll.getId().valueOf()))
+      .map((poll) => new PollViewModel(poll).toResource());
     const lowerBound = messages.at(0)?.createdAt;
     const upperBound = messages.at(-1)?.createdAt;
     const callEvents = this.callEvents.filter((event) => {
@@ -50,7 +69,7 @@ export class MessagesViewModel {
       .sort((first, second) => first.createdAt - second.createdAt)
       .slice(-this.limit);
     const firstReturnedMessage = timeline.find(
-      (item) => item.type !== 'call_event' && item.type !== 'poll',
+      (item) => item.type !== 'call_event',
     );
 
     return {
