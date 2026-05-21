@@ -47,6 +47,7 @@ import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/r
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
 import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageRoute';
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
+import { PutConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessageRoute';
 import { PutConversationMessagesReadUntilRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessagesReadUntilRoute';
 import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdentityRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
@@ -230,6 +231,7 @@ export default class Server {
           ConversationMessageReactionRoute,
           DeleteConversationMessageRoute,
           PutConversationMessagesReadUntilRoute,
+          PutConversationMessageRoute,
           GetConversationMessagesRoute,
           GetIPFSReplicationStatusRoute,
           GetIPFSContentRoute,
