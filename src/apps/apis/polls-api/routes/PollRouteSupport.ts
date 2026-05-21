@@ -65,6 +65,33 @@ export abstract class PollRouteSupport extends Route {
     communityId: string,
     channelId: string,
   ): Promise<ScopeAccess> {
+    return this.communityChannelScopeAccess(
+      actor,
+      communityId,
+      channelId,
+      'create',
+    );
+  }
+
+  protected async communityChannelVoteScope(
+    actor: IdentityId,
+    communityId: string,
+    channelId: string,
+  ): Promise<ScopeAccess> {
+    return this.communityChannelScopeAccess(
+      actor,
+      communityId,
+      channelId,
+      'vote',
+    );
+  }
+
+  private async communityChannelScopeAccess(
+    actor: IdentityId,
+    communityId: string,
+    channelId: string,
+    action: 'create' | 'vote',
+  ): Promise<ScopeAccess> {
     const community = await this.communityRepository().findById(
       new CommunityId(communityId),
     );
@@ -75,7 +102,11 @@ export abstract class PollRouteSupport extends Route {
 
     const channel = new CommunityChannelId(channelId);
 
-    community.assertCanCreatePoll(actor, channel);
+    if (action === 'create') {
+      community.assertCanCreatePoll(actor, channel);
+    } else {
+      community.assertCanVotePoll(actor, channel);
+    }
 
     return {
       recipients: {
@@ -119,6 +150,30 @@ export abstract class PollRouteSupport extends Route {
   }
 
   protected async accessPollScope(
+    actor: IdentityId,
+    poll: Poll,
+  ): Promise<ScopeAccess> {
+    const scope = poll.getScope();
+    const communityId = scope.getCommunityId();
+    const channelId = scope.getChannelId();
+    const conversationId = scope.getConversationId();
+
+    if (scope.isCommunityChannel() && communityId && channelId) {
+      return this.communityChannelVoteScope(
+        actor,
+        communityId.valueOf(),
+        channelId.valueOf(),
+      );
+    }
+
+    if (conversationId) {
+      return this.groupConversationScope(actor, conversationId.valueOf());
+    }
+
+    throw new InvalidPollScopeError();
+  }
+
+  protected async managePollScope(
     actor: IdentityId,
     poll: Poll,
   ): Promise<ScopeAccess> {

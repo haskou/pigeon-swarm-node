@@ -175,6 +175,21 @@ describe('Community', () => {
     );
   });
 
+  it('allows channel members to vote in polls without create poll permission', () => {
+    const community = createCommunity();
+    const channel = community.addTextChannel(
+      owner,
+      new CommunityChannelName('polls'),
+    );
+
+    community.addMember(owner, member);
+
+    expect(() => community.assertCanVotePoll(member, channel.getId())).not.toThrow();
+    expect(() => community.assertCanCreatePoll(member, channel.getId())).toThrow(
+      'Community permission denied: create_polls',
+    );
+  });
+
   function createCommunity(): Community {
     return Community.create(
       owner,

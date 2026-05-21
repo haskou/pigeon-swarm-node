@@ -227,6 +227,13 @@ export class Community extends AggregateRoot {
     this.assertPermission(identityId, CommunityPermission.CREATE_POLLS);
   }
 
+  public assertCanVotePoll(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+  }
+
   public assertCanBanMembers(identityId: IdentityId): void {
     this.assertPermission(identityId, CommunityPermission.BAN_MEMBERS);
   }
