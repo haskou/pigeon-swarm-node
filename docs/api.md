@@ -1724,6 +1724,7 @@ Response:
       ],
       "textChannels": [],
       "visibility": "private",
+      "discoverable": true,
       "createdAt": 1773848829055
     }
   ]
@@ -1770,7 +1771,8 @@ Response:
         "createdAt": 1773848829055,
         "updatedAt": 1773848829055
       },
-      "visibility": "private"
+      "visibility": "private",
+      "discoverable": true
     }
   ]
 }
@@ -1781,6 +1783,7 @@ Implemented:
 - require signed request auth
 - search private community metadata by `name` or `description`
 - optionally scope results with `networkId`
+- only return communities configured with `discoverable: true`
 - do not return channel metadata or encrypted content
 - include the authenticated identity membership state:
   `none`, `member`, `requested` or `invited`
@@ -1799,7 +1802,8 @@ Request:
   "name": "Pigeon Lab",
   "description": "Private workspace",
   "avatar": "<publicAvatarCid>",
-  "banner": "<publicBannerCid>"
+  "banner": "<publicBannerCid>",
+  "discoverable": true
 }
 ```
 
@@ -1810,6 +1814,8 @@ Implemented:
 - add the owner as the first member
 - store `avatar` as an optional public IPFS CID, not as base64
 - store `banner` as an optional public IPFS CID, not as base64
+- default `discoverable` to `true`; set it to `false` to hide the community
+  from `GET /communities/discover`
 
 ### Get community
 
@@ -1835,7 +1841,8 @@ Request:
   "name": "Pigeon Lab",
   "description": "Updated private workspace",
   "avatar": "<publicAvatarCid>",
-  "banner": "<publicBannerCid>"
+  "banner": "<publicBannerCid>",
+  "discoverable": false
 }
 ```
 
@@ -1845,6 +1852,7 @@ Implemented:
 - update name, description and optional avatar/banner CIDs
 - omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
+- update `discoverable` without changing membership or invitation behavior
 
 ### List community members
 

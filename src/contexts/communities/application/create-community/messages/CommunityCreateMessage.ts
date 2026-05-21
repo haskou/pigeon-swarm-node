@@ -9,6 +9,7 @@ import { CommunityName } from '../../../domain/value-objects/CommunityName';
 export class CommunityCreateMessage {
   public readonly avatar?: CommunityAvatar;
   public readonly banner?: CommunityBanner;
+  public readonly discoverable: boolean;
   public readonly description: CommunityDescription;
   public readonly name: CommunityName;
   public readonly networkId: NetworkId;
@@ -21,6 +22,7 @@ export class CommunityCreateMessage {
     description: string,
     avatar?: string,
     banner?: string,
+    discoverable = true,
   ) {
     this.ownerIdentityId = new IdentityId(ownerIdentityId);
     this.networkId = new NetworkId(networkId);
@@ -28,5 +30,6 @@ export class CommunityCreateMessage {
     this.description = new CommunityDescription(description);
     this.avatar = avatar ? new CommunityAvatar(avatar) : undefined;
     this.banner = banner ? new CommunityBanner(banner) : undefined;
+    this.discoverable = discoverable;
   }
 }

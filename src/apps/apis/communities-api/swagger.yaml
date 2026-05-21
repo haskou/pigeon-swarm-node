@@ -51,7 +51,7 @@ paths:
       tags:
         - communities
       summary: Discover private communities by public metadata
-      description: Returns searchable community metadata without exposing channels or encrypted content. The authenticated identity receives its current membership state for each result.
+      description: Returns searchable community metadata without exposing channels or encrypted content. Hidden communities with discoverable=false are excluded. The authenticated identity receives its current membership state for each result.
       parameters:
         - in: query
           name: query
@@ -1015,6 +1015,7 @@ components:
         - textChannels
         - voiceChannels
         - visibility
+        - discoverable
         - createdAt
       properties:
         id:
@@ -1027,6 +1028,9 @@ components:
           type: string
         description:
           type: string
+        discoverable:
+          type: boolean
+          description: Whether this private community appears in discovery search results.
         avatar:
           type: string
           description: Public IPFS CID for the community avatar/icon.
@@ -1166,6 +1170,7 @@ components:
         - memberCount
         - membershipStatus
         - visibility
+        - discoverable
       properties:
         id:
           type: string
@@ -1177,6 +1182,11 @@ components:
           type: string
         description:
           type: string
+        discoverable:
+          type: boolean
+          enum:
+            - true
+          description: Discovery only returns communities where this flag is true.
         avatar:
           type: string
         banner:
@@ -1469,6 +1479,10 @@ components:
         banner:
           type: string
           description: Optional public IPFS CID for the community banner.
+        discoverable:
+          type: boolean
+          default: true
+          description: Set false to keep this community out of discovery search results.
     PatchCommunityBody:
       type: object
       required:
@@ -1487,6 +1501,9 @@ components:
         banner:
           type: string
           description: Optional public IPFS CID. Omit it to remove the banner.
+        discoverable:
+          type: boolean
+          description: Set false to keep this community out of discovery search results.
     PostCommunityMemberBody:
       type: object
       required:

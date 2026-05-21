@@ -4,6 +4,7 @@ export interface CommunityDiscoveryItemResource {
   avatar?: string;
   banner?: string;
   description: string;
+  discoverable: true;
   id: string;
   memberCount: number;
   membershipRequest?: CommunityMembershipRequestResource;

@@ -199,6 +199,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
             banner: undefined,
             createdAt: 1778513696020,
             description: 'Community description',
+            discoverable: true,
             id: this.communityId,
             memberIds: [this.ownerIdentityId()],
             memberRoles: [],

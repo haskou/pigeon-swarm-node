@@ -36,6 +36,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
       new CommunityDescription(body.description),
       body.avatar ? new CommunityAvatar(body.avatar) : undefined,
       body.banner ? new CommunityBanner(body.banner) : undefined,
+      body.discoverable,
     );
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
@@ -48,6 +49,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
         avatar: body.avatar,
         banner: body.banner,
         description: body.description,
+        discoverable: body.discoverable,
         name: body.name,
       },
     );

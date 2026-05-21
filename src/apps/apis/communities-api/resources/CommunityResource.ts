@@ -37,6 +37,7 @@ export interface CommunityResource {
   bannedMemberIds: string[];
   createdAt: number;
   description: string;
+  discoverable: boolean;
   id: string;
   memberRoles: CommunityMemberRolesResource[];
   memberIds: string[];

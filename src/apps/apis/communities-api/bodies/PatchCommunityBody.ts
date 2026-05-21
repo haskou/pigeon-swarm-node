@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class PatchCommunityBody {
   @IsOptional()
@@ -8,6 +8,10 @@ export class PatchCommunityBody {
   @IsOptional()
   @IsString()
   public readonly banner?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  public readonly discoverable?: boolean;
 
   @IsString()
   public readonly description: string;

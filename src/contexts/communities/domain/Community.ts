@@ -10,6 +10,7 @@ import { CommunityMembership } from './CommunityMembership';
 import { CommunityProfile } from './CommunityProfile';
 import { CommunityRole } from './CommunityRole';
 import { CommunityRoles } from './CommunityRoles';
+import { CommunitySettings } from './CommunitySettings';
 import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberBannedError } from './errors/CommunityMemberBannedError';
@@ -43,6 +44,7 @@ export class Community extends AggregateRoot {
     description: CommunityDescription,
     avatar?: CommunityAvatar,
     banner?: CommunityBanner,
+    discoverable = true,
   ): Community {
     return new Community(
       CommunityId.generate(),
@@ -51,7 +53,7 @@ export class Community extends AggregateRoot {
       new CommunityProfile(name, description, avatar, banner),
       CommunityMembership.create([ownerIdentityId], CommunityRoles.default()),
       new CommunityChannels([], []),
-      Timestamp.now(),
+      CommunitySettings.create(Timestamp.now(), discoverable),
     );
   }
 
@@ -81,7 +83,10 @@ export class Community extends AggregateRoot {
           CommunityVoiceChannel.fromPrimitives(channel),
         ),
       ),
-      new Timestamp(primitives.createdAt),
+      CommunitySettings.fromPrimitives({
+        createdAt: primitives.createdAt,
+        discoverable: primitives.discoverable,
+      }),
     );
   }
 
@@ -92,7 +97,7 @@ export class Community extends AggregateRoot {
     private profile: CommunityProfile,
     private readonly membership: CommunityMembership,
     private readonly channels: CommunityChannels,
-    private readonly createdAt: Timestamp,
+    private readonly settings: CommunitySettings,
   ) {
     super();
   }
@@ -536,9 +541,15 @@ export class Community extends AggregateRoot {
     description: CommunityDescription,
     avatar?: CommunityAvatar,
     banner?: CommunityBanner,
+    discoverable?: boolean,
   ): void {
     this.assertOwner(actor);
     this.profile = new CommunityProfile(name, description, avatar, banner);
+
+    if (discoverable !== undefined) {
+      this.settings.updateDiscoverable(discoverable);
+    }
+
     this.record(
       new CommunityWasUpdatedEvent(this.id.valueOf(), {
         ...this.eventAttributes(),
@@ -617,13 +628,15 @@ export class Community extends AggregateRoot {
 
   public toPrimitives() {
     const channels = this.channels.toPrimitives();
+    const settings = this.settings.toPrimitives();
 
     return {
       avatar: this.profile.getAvatar()?.valueOf(),
       bannedMemberIds: this.membership.toPrimitives().bannedMemberIds,
       banner: this.profile.getBanner()?.valueOf(),
-      createdAt: this.createdAt.valueOf(),
+      createdAt: settings.createdAt,
       description: this.profile.getDescription().valueOf(),
+      discoverable: settings.discoverable,
       id: this.id.valueOf(),
       memberIds: this.membership.toPrimitives().memberIds,
       memberRoles: this.membership.toPrimitives().memberRoles,

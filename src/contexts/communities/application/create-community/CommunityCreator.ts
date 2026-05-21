@@ -13,6 +13,7 @@ export class CommunityCreator {
       message.description,
       message.avatar,
       message.banner,
+      message.discoverable,
     );
 
     await this.repository.save(community);
