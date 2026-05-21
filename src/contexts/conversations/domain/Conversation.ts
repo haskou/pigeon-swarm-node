@@ -36,6 +36,12 @@ type MessageSendOptions = {
   replyToMessageId?: MessageId;
 };
 
+type MessageEditOptions = {
+  createdAt?: Timestamp;
+  id?: MessageId;
+  previousMessageIds?: MessageId[];
+};
+
 export class Conversation extends AggregateRoot {
   public static fromPrimitives(
     primitives: PrimitiveOf<Conversation>,
@@ -192,14 +198,20 @@ export class Conversation extends AggregateRoot {
     targetMessageId: MessageId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
+    options: MessageEditOptions = {},
   ): MessageEdited {
     this.assertCanChangeMessage(authorId, targetMessageId);
+    const previousMessageIds = options.previousMessageIds ?? [targetMessageId];
+
+    this.assertPreviousMessagesExist(previousMessageIds);
 
     const message = MessageEdited.create({
       authorId,
       conversationId: this.id,
+      createdAt: options.createdAt,
       encryptedPayload,
-      previousMessageIds: this.getLastMessageIds(),
+      id: options.id,
+      previousMessageIds,
       signature,
       targetMessageId,
     });

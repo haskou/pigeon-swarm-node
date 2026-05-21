@@ -229,6 +229,26 @@ describe('Conversation', () => {
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
+
+    it('should reject edits with unknown previous ids', () => {
+      const sent = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('original-payload'),
+        signature(),
+      );
+
+      expect(() =>
+        conversation.editMessage(
+          author,
+          sent.getId(),
+          new EncryptedMessagePayload('edited-payload'),
+          signature(),
+          {
+            previousMessageIds: [MessageId.generate()],
+          },
+        ),
+      ).toThrow(MessageTargetNotFoundError);
+    });
   });
 
   describe('deleteMessage', () => {

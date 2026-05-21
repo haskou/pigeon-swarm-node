@@ -815,6 +815,17 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19zZXJ2aWNlc19fTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2VfX01lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNl
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fYXBwbGljYXRpb25fX2VkaXQtbWVzc2FnZV9fTWVzc2FnZUVkaXRvcl9fTWVzc2FnZUVkaXRvcg==:
+    class: /contexts/conversations/application/edit-message/MessageEditor
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2RvbWFpbl9fZXZlbnRzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19zZXJ2aWNlc19fTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2VfX01lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNl
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19zZXJ2aWNlc19fTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2VfX01lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNl:
     class: /contexts/conversations/domain/services/MessageSignatureDomainService
     arguments: []

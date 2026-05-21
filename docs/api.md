@@ -1466,6 +1466,56 @@ Implemented:
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
 
+### Edit message
+
+```http
+PUT /conversations/{conversationId}/messages/{messageId}
+```
+
+Request:
+
+```json
+{
+  "id": "<clientGeneratedEditionMessageId>",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "<updatedEncryptedMessagePayload>",
+  "previousMessageIds": ["<editedMessageId>"],
+  "signature": "<editedMessageSignature>"
+}
+```
+
+Response:
+
+```json
+{
+  "id": "<editionMessageId>",
+  "conversationId": "one-to-one:<deterministic-id>",
+  "authorIdentityId": "<identityId>",
+  "type": "edited",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "<updatedEncryptedMessagePayload>",
+  "previousMessageIds": ["<editedMessageId>"],
+  "attachmentExternalIdentifiers": [],
+  "reactions": [],
+  "targetMessageId": "<editedMessageId>"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- only allow the original message author to edit the message
+- reject edits for deleted messages
+- validate the edit tombstone signature against the canonical edited message
+  payload
+- use `targetMessageId` from the path and default `previousMessageIds` to
+  `[messageId]` when the body omits it
+- persist the immutable `edited` tombstone in IPFS
+- publish `ConversationMessageWasEditedEvent` with `messageId`,
+  `targetMessageId`, `networkId` and `participantIds`
+- consuming nodes register the edit through the existing conversation message
+  registrar
+
 ### Mark messages as read
 
 ```http

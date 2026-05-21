@@ -649,7 +649,10 @@ export default class MongoConversationRepository implements Repository {
         cid.valueOf(),
         [networkId.valueOf()],
       );
-      await this.deleteTargetMessageContent(domainMessage);
+
+      if (domainMessage.getType().isEqual(MessageType.DELETED)) {
+        await this.deleteTargetMessageContent(domainMessage);
+      }
     }
   }
 }

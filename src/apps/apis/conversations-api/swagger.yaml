@@ -177,6 +177,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+    put:
+      tags:
+        - conversations
+      summary: Edit conversation message
+      description: Creates a signed edited-message tombstone with a new encrypted payload. The target message remains immutable; clients should apply the newest valid edit event for the target message.
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutConversationMessageBody'
+      responses:
+        '200':
+          description: Message edition accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResource'
   /conversations/{conversationId}/messages/{messageId}/reactions:
     post:
       tags:
@@ -413,6 +442,30 @@ components:
         signature:
           type: string
           description: Signature of the deleted-message canonical payload, using previousMessageIds equal to the path messageId.
+    PutConversationMessageBody:
+      type: object
+      required:
+        - id
+        - createdAt
+        - encryptedPayload
+        - signature
+      properties:
+        id:
+          type: string
+          description: Client-generated id for the edited-message tombstone.
+        createdAt:
+          type: integer
+        encryptedPayload:
+          type: string
+          description: Updated encrypted payload for the target message.
+        previousMessageIds:
+          type: array
+          description: Optional previous message ids used by the client to sign the edited payload. When omitted, the node uses an array containing the path messageId.
+          items:
+            type: string
+        signature:
+          type: string
+          description: Signature of the edited-message canonical payload, using targetMessageId equal to the path messageId.
     PutConversationMessagesReadUntilBody:
       type: object
       required:
