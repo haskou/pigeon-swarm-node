@@ -1,5 +1,11 @@
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
+import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
+import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { PollCreateMessage } from '@app/contexts/polls/application/create/messages/PollCreateMessage';
 import { PollCreator } from '@app/contexts/polls/application/create/PollCreator';
+import { Poll } from '@app/contexts/polls/domain/Poll';
+import { PollScope } from '@app/contexts/polls/domain/PollScope';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -11,6 +17,59 @@ import { PollRouteSupport } from './PollRouteSupport';
 
 @JsonController('/polls')
 export class PostPollRoute extends PollRouteSupport {
+  private async registerConversationTimelineMessage(
+    actor: IdentityId,
+    poll: Poll,
+    scope: PollScope,
+    request: Request,
+  ): Promise<void> {
+    const conversationId = scope.getConversationId();
+
+    if (!conversationId) {
+      return;
+    }
+    const conversation =
+      await this.conversationRepository().findById(conversationId);
+
+    if (!conversation) {
+      return;
+    }
+    conversation.addPollMessage(
+      actor,
+      poll.getId(),
+      new Signature(request.header('X-Signature') || ''),
+      {
+        createdAt: new Timestamp(poll.toPrimitives().createdAt),
+      },
+    );
+    await this.conversationRepository().save(conversation);
+  }
+
+  private async registerCommunityChannelTimelineMessage(
+    actor: IdentityId,
+    poll: Poll,
+    scope: PollScope,
+  ): Promise<void> {
+    const communityId = scope.getCommunityId();
+    const channelId = scope.getChannelId();
+
+    if (!communityId || !channelId) {
+      return;
+    }
+    await this.communityMessageRepository().save(
+      CommunityChannelMessage.poll(
+        new CommunityChannelMessageMetadata(
+          new CommunityChannelMessageId(poll.getId().valueOf()),
+          communityId,
+          channelId,
+          actor,
+          new Timestamp(poll.toPrimitives().createdAt),
+        ),
+        poll.getId(),
+      ),
+    );
+  }
+
   @Post('/')
   public async createPoll(
     @Body() body: PostPollBody,
@@ -40,24 +99,17 @@ export class PostPollRoute extends PollRouteSupport {
         body.expiresAt,
       ),
     );
-    const conversationId = scopeAccess.scope.getConversationId();
-
-    if (conversationId) {
-      const conversation =
-        await this.conversationRepository().findById(conversationId);
-
-      if (conversation) {
-        conversation.addPollMessage(
-          actor,
-          poll.getId(),
-          new Signature(request.header('X-Signature') || ''),
-          {
-            createdAt: new Timestamp(poll.toPrimitives().createdAt),
-          },
-        );
-        await this.conversationRepository().save(conversation);
-      }
-    }
+    await this.registerConversationTimelineMessage(
+      actor,
+      poll,
+      scopeAccess.scope,
+      request,
+    );
+    await this.registerCommunityChannelTimelineMessage(
+      actor,
+      poll,
+      scopeAccess.scope,
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

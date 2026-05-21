@@ -2474,6 +2474,49 @@ The accepted message is published to WebSocket clients as
 `event.aggregate_id` as `communityId`, `event.attributes.channelId` as
 `channelId` and `event.attributes.messageId` as the id to fetch or reconcile.
 
+### Edit channel message
+
+```http
+PUT /communities/{communityId}/channels/{channelId}/messages/{messageId}
+```
+
+Only the original author can edit a community text channel message. The
+message keeps the same `id` and `createdAt`; the backend replaces the opaque
+encrypted payload and stores the edit timestamp as `editedAt`.
+
+Request:
+
+```json
+{
+  "createdAt": 1773848929055,
+  "encryptedPayload": "<editedEncryptedCommunityChannelMessagePayload>",
+  "signature": "<messageEditionSignature>",
+  "mentions": [],
+  "attachmentExternalIdentifiers": []
+}
+```
+
+The edition signature must be generated from this canonical payload:
+
+```json
+{
+  "attachmentExternalIdentifiers": [],
+  "authorIdentityId": "<identityId>",
+  "channelId": "<channelId>",
+  "communityId": "<communityId>",
+  "createdAt": 1773848929055,
+  "encryptedPayload": "<editedEncryptedCommunityChannelMessagePayload>",
+  "id": "<messageId>",
+  "mentions": [],
+  "type": "edited"
+}
+```
+
+The edited message is published to WebSocket clients as
+`communities.v1.channel.message.was_edited`. The event attributes include
+`communityId`, `channelId`, `messageId`, `memberIds`, `networkId` and the full
+updated `message` resource.
+
 ### List channel messages
 
 ```http
@@ -2493,6 +2536,7 @@ Response:
       "channelId": "<channelId>",
       "authorIdentityId": "<identityId>",
       "createdAt": 1773848869055,
+      "editedAt": 1773848929055,
       "encryptedPayload": "<encryptedMessagePayload>",
       "reactions": [
         {
@@ -2536,8 +2580,9 @@ Implemented:
   roles
 - return messages ordered from oldest to newest in the page
 - include MongoDB-only reactions for each message
-- include MongoDB-only `poll` timeline items scoped to the same community text
-  channel
+- include `poll` timeline items scoped to the same community text channel. The
+  poll `id` is also registered as a channel message id, so it is valid as
+  `beforeMessageId` for pagination.
 - do not include call lifecycle system items; community voice channels expose
   active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
@@ -3105,7 +3150,9 @@ Group conversation polls are also registered as conversation message ids. The
 poll `id` returned in the conversation messages timeline can be used by the
 next message as `previousMessageIds: ["<pollId>"]`.
 
-Community text channel polls remain Mongo-only channel timeline items.
+Community text channel polls are also registered as channel message ids. The
+poll `id` returned in the community channel messages timeline can be used as
+`beforeMessageId` in pagination.
 
 Poll resources include `"type": "poll"` and are also returned inside the
 existing `messages` arrays for their scope:

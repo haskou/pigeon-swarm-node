@@ -4,7 +4,7 @@ import { CommunityChannelMessage } from '../CommunityChannelMessage';
 
 type CommunityChannelMessageSignaturePayload = Omit<
   ReturnType<CommunityChannelMessage['toPrimitives']>,
-  'mentions' | 'signature'
+  'editedAt' | 'mentions' | 'pollId' | 'signature'
 > & {
   mentions?: ReturnType<CommunityChannelMessage['toPrimitives']>['mentions'];
 };
@@ -17,9 +17,21 @@ type CommunityChannelMessageDeletionSignaturePayload = {
   targetMessageId: string;
   type: 'deleted';
 };
+type CommunityChannelMessageEditionSignaturePayload = {
+  attachmentExternalIdentifiers: string[];
+  authorIdentityId: string;
+  channelId: string;
+  communityId: string;
+  createdAt: number;
+  encryptedPayload: string;
+  id: string;
+  mentions?: ReturnType<CommunityChannelMessage['toPrimitives']>['mentions'];
+  type: 'edited';
+};
 type CommunityChannelSignaturePayload =
   | CommunityChannelMessageSignaturePayload
-  | CommunityChannelMessageDeletionSignaturePayload;
+  | CommunityChannelMessageDeletionSignaturePayload
+  | CommunityChannelMessageEditionSignaturePayload;
 
 export class CommunityChannelMessageSignatureDomainService {
   private getCanonicalPayload(
@@ -33,6 +45,20 @@ export class CommunityChannelMessageSignatureDomainService {
         createdAt: payload.createdAt,
         id: payload.id,
         targetMessageId: payload.targetMessageId,
+        type: payload.type,
+      };
+    }
+
+    if (payload.type === 'edited') {
+      return {
+        attachmentExternalIdentifiers: payload.attachmentExternalIdentifiers,
+        authorIdentityId: payload.authorIdentityId,
+        channelId: payload.channelId,
+        communityId: payload.communityId,
+        createdAt: payload.createdAt,
+        encryptedPayload: payload.encryptedPayload,
+        id: payload.id,
+        mentions: payload.mentions,
         type: payload.type,
       };
     }
