@@ -1055,10 +1055,6 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-community-channel-message-payload',
       id,
-      mentions: [] as {
-        targetId?: string;
-        type: string;
-      }[],
       type: 'sent',
     };
 
@@ -1141,6 +1137,37 @@ export default class Definitions {
     });
   }
 
+  @given('I set an edit community channel message body')
+  public async iSetAnEditCommunityChannelMessageBody(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      createdAt,
+      encryptedPayload: 'edited-community-channel-message-payload',
+      id: this.communityChannelMessageId,
+      type: 'edited',
+    };
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      createdAt,
+      encryptedPayload: 'edited-community-channel-message-payload',
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
   @given('I sign the current community channel message request')
   public async iSignTheCurrentCommunityChannelMessageRequest(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -1178,6 +1205,22 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'DELETE',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}`,
+    );
+  }
+
+  @given('I sign the current community channel message edition request')
+  public async iSignTheCurrentCommunityChannelMessageEditionRequest(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PUT',
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}`,
     );
   }
@@ -2854,6 +2897,23 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT the current community channel message')
+  public async iPUTTheCurrentCommunityChannelMessage(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    this.response = await this.restClient.put(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },

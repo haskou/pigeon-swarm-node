@@ -546,6 +546,10 @@ components:
           type: string
         messages:
           type: array
+          description: >
+            Conversation timeline items. Group conversation poll ids are also
+            valid conversation message ids and can be used in later
+            previousMessageIds.
           items:
             oneOf:
               - $ref: '#/components/schemas/MessageResource'

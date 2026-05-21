@@ -12,6 +12,7 @@ import { AttachmentExternalIdentifier } from '@app/contexts/conversations/domain
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature } from '@haskou/value-objects';
 
@@ -248,6 +249,36 @@ describe('Conversation', () => {
           },
         ),
       ).toThrow(MessageTargetNotFoundError);
+    });
+  });
+
+  describe('addPollMessage', () => {
+    it('should add a poll message that can be used as a previous message', () => {
+      const poll = conversation.addPollMessage(
+        author,
+        PollId.generate(),
+        signature(),
+      );
+
+      const message = conversation.sendMessage(
+        author,
+        new EncryptedMessagePayload('message-after-poll'),
+        signature(),
+        {
+          previousMessageIds: [poll.getId()],
+        },
+      );
+
+      expect(conversation.toPrimitives().messages[0]).toEqual(
+        expect.objectContaining({
+          id: poll.getId().valueOf(),
+          pollId: poll.getId().valueOf(),
+          type: MessageType.POLL.valueOf(),
+        }),
+      );
+      expect(message.getPreviousMessageIds()[0].isEqual(poll.getId())).toBe(
+        true,
+      );
     });
   });
 

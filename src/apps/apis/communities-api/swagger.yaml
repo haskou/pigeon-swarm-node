@@ -735,7 +735,7 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
-          description: Channel messages ordered from oldest to newest in the page.
+          description: Channel timeline items ordered from oldest to newest in the page. Community channel poll ids are valid channel message ids and can be used as beforeMessageId.
           content:
             application/json:
               schema:
@@ -774,6 +774,42 @@ paths:
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the message signature is invalid.
   /communities/{communityId}/channels/{channelId}/messages/{messageId}:
+    put:
+      tags:
+        - communities
+      summary: Edit an encrypted private community text channel message
+      description: Only the original author can edit a channel message. The backend validates the edition signature, stores the new opaque encrypted payload, and announces the change through realtime and pubsub events.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutCommunityChannelMessageBody'
+      responses:
+        '200':
+          description: Message edited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessageResource'
+        '409':
+          description: Authenticated identity is not the author, the channel does not exist, or the edition signature is invalid.
     delete:
       tags:
         - communities
@@ -1310,8 +1346,6 @@ components:
         - communityId
         - channelId
         - authorIdentityId
-        - encryptedPayload
-        - signature
         - attachmentExternalIdentifiers
         - mentions
         - reactions
@@ -1328,8 +1362,10 @@ components:
           type: string
         encryptedPayload:
           type: string
+          description: Present for sent messages. Omitted for poll timeline items.
         signature:
           type: string
+          description: Present for sent messages. Omitted for poll timeline items.
         attachmentExternalIdentifiers:
           type: array
           items:
@@ -1342,8 +1378,14 @@ components:
         type:
           type: string
           enum:
+            - poll
             - sent
+        pollId:
+          type: string
+          description: Present for poll timeline items. The value matches id.
         createdAt:
+          type: integer
+        editedAt:
           type: integer
         reactions:
           type: array
@@ -1602,6 +1644,29 @@ components:
           type: integer
         signature:
           type: string
+    PutCommunityChannelMessageBody:
+      type: object
+      required:
+        - createdAt
+        - encryptedPayload
+        - signature
+      properties:
+        createdAt:
+          type: integer
+          description: Edition timestamp used in the domain signature and returned as editedAt.
+        encryptedPayload:
+          type: string
+          description: Updated client-encrypted payload. The backend stores it as opaque text.
+        signature:
+          type: string
+        attachmentExternalIdentifiers:
+          type: array
+          items:
+            type: string
+        mentions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityMessageMentionResource'
     CommunityChannelMessageReactionBody:
       type: object
       required:

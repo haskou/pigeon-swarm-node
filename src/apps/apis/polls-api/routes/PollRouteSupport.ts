@@ -2,6 +2,7 @@ import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttp
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -26,6 +27,7 @@ type ScopeAccess = {
   };
   scope: PollScope;
 };
+type CommunityMessageRepository = MongoCommunityChannelMessageRepository;
 
 export abstract class PollRouteSupport extends Route {
   protected readonly eventPublisher: DomainEventPublisher =
@@ -44,6 +46,12 @@ export abstract class PollRouteSupport extends Route {
 
   protected communityRepository(): MongoCommunityRepository {
     return new MongoCommunityRepository(this.get<MongoDB>(MongoDB));
+  }
+
+  protected communityMessageRepository(): CommunityMessageRepository {
+    return new MongoCommunityChannelMessageRepository(
+      this.get<MongoDB>(MongoDB),
+    );
   }
 
   protected conversationRepository(): MongoConversationRepository {

@@ -1,3 +1,4 @@
+import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
@@ -19,6 +20,7 @@ import { Message } from './Message';
 import { MessageDeleted } from './MessageDeleted';
 import { MessageEdited } from './MessageEdited';
 import { MessageFactory } from './MessageFactory';
+import { MessagePoll } from './MessagePoll';
 import { MessageSent } from './MessageSent';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
@@ -37,6 +39,12 @@ type MessageSendOptions = {
 };
 
 type MessageEditOptions = {
+  createdAt?: Timestamp;
+  id?: MessageId;
+  previousMessageIds?: MessageId[];
+};
+
+type MessagePollOptions = {
   createdAt?: Timestamp;
   id?: MessageId;
   previousMessageIds?: MessageId[];
@@ -180,9 +188,13 @@ export class Conversation extends AggregateRoot {
       return;
     }
 
-    if (message.getType().isEqual(MessageType.SENT)) {
+    if (
+      message.getType().isEqual(MessageType.SENT) ||
+      message.getType().isEqual(MessageType.POLL)
+    ) {
       this.assertIsParticipant(message.getAuthorId());
       this.assertCanReplyToMessage(message.getReplyToMessageId());
+      this.assertPreviousMessagesExist(message.getPreviousMessageIds());
     } else {
       const targetMessageId = message.getTargetMessageId();
 
@@ -191,6 +203,33 @@ export class Conversation extends AggregateRoot {
     }
 
     this.messages.push(message);
+  }
+
+  public addPollMessage(
+    authorId: IdentityId,
+    pollId: PollId,
+    signature: Signature,
+    options: MessagePollOptions = {},
+  ): MessagePoll {
+    this.assertIsParticipant(authorId);
+    const previousMessageIds =
+      options.previousMessageIds ?? this.getLastMessageIds();
+
+    this.assertPreviousMessagesExist(previousMessageIds);
+
+    const message = MessagePoll.create({
+      authorId,
+      conversationId: this.id,
+      createdAt: options.createdAt,
+      id: options.id,
+      pollId,
+      previousMessageIds,
+      signature,
+    });
+
+    this.messages.push(message);
+
+    return message;
   }
 
   public editMessage(

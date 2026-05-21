@@ -45,6 +45,10 @@ export class PollLifecycle {
     return timestamp.isBeforeOrEqual(this.expiresAt);
   }
 
+  public getCreatedAt(): Timestamp {
+    return this.createdAt;
+  }
+
   public toPrimitives() {
     return {
       createdAt: this.createdAt.valueOf(),

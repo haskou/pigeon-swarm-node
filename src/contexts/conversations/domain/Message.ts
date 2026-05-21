@@ -67,6 +67,10 @@ export abstract class Message {
     return this.metadata.getReplyToMessageId();
   }
 
+  public getPreviousMessageIds(): MessageId[] {
+    return this.metadata.getPreviousMessageIds();
+  }
+
   public toPrimitives() {
     return {
       ...this.basePrimitives(),

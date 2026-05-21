@@ -40,6 +40,7 @@ import { PostCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/Po
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
 import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
+import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
 import { ConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessageReactionRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
@@ -299,6 +300,7 @@ export default class Server {
           DeleteCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
           PostCommunityChannelMessageRoute,
+          PutCommunityChannelMessageRoute,
           CommunityMessageReactionRoute,
           DeleteCommunityChannelMessageRoute,
         ],

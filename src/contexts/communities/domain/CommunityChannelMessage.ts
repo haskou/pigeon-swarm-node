@@ -1,3 +1,4 @@
+import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
@@ -32,6 +33,21 @@ export class CommunityChannelMessage {
     );
   }
 
+  public static poll(
+    metadata: CommunityChannelMessageMetadata,
+    pollId: PollId,
+  ): CommunityChannelMessage {
+    return new CommunityChannelMessage(
+      metadata,
+      undefined,
+      undefined,
+      [],
+      [],
+      undefined,
+      pollId,
+    );
+  }
+
   public static fromPrimitives(
     primitives: PrimitiveOf<CommunityChannelMessage>,
   ): CommunityChannelMessage {
@@ -43,8 +59,12 @@ export class CommunityChannelMessage {
         new IdentityId(primitives.authorIdentityId),
         new Timestamp(primitives.createdAt),
       ),
-      new CommunityChannelMessageEncryptedPayload(primitives.encryptedPayload),
-      new Signature(primitives.signature),
+      primitives.encryptedPayload
+        ? new CommunityChannelMessageEncryptedPayload(
+            primitives.encryptedPayload,
+          )
+        : undefined,
+      primitives.signature ? new Signature(primitives.signature) : undefined,
       primitives.attachmentExternalIdentifiers.map(
         (externalIdentifier) =>
           new CommunityChannelAttachmentId(externalIdentifier),
@@ -52,19 +72,25 @@ export class CommunityChannelMessage {
       (primitives.mentions || []).map((mention) =>
         CommunityChannelMessageMention.fromPrimitives(mention),
       ),
+      primitives.editedAt ? new Timestamp(primitives.editedAt) : undefined,
+      primitives.pollId ? new PollId(primitives.pollId) : undefined,
     );
   }
 
   constructor(
     private readonly metadata: CommunityChannelMessageMetadata,
-    private readonly encryptedPayload: CommunityChannelMessageEncryptedPayload,
-    private readonly signature: Signature,
+    private readonly encryptedPayload:
+      | CommunityChannelMessageEncryptedPayload
+      | undefined,
+    private readonly signature: Signature | undefined,
     private readonly attachmentExternalIdentifiers: Attachments,
     private readonly mentions: Mentions,
+    private readonly editedAt?: Timestamp,
+    private readonly pollId?: PollId,
   ) {}
 
-  private type(): 'sent' {
-    return 'sent';
+  private type(): 'poll' | 'sent' {
+    return this.pollId ? 'poll' : 'sent';
   }
 
   public getAuthorIdentityId(): IdentityId {
@@ -73,6 +99,23 @@ export class CommunityChannelMessage {
 
   public getMentions(): CommunityChannelMessageMention[] {
     return this.mentions;
+  }
+
+  public edit(
+    encryptedPayload: CommunityChannelMessageEncryptedPayload,
+    signature: Signature,
+    editedAt: Timestamp,
+    attachmentExternalIdentifiers: Attachments,
+    mentions: Mentions,
+  ): CommunityChannelMessage {
+    return new CommunityChannelMessage(
+      this.metadata,
+      encryptedPayload,
+      signature,
+      attachmentExternalIdentifiers,
+      mentions,
+      editedAt,
+    );
   }
 
   public toPrimitives() {
@@ -84,10 +127,12 @@ export class CommunityChannelMessage {
       channelId: this.metadata.getChannelId().valueOf(),
       communityId: this.metadata.getCommunityId().valueOf(),
       createdAt: this.metadata.getCreatedAt().valueOf(),
-      encryptedPayload: this.encryptedPayload.valueOf(),
+      editedAt: this.editedAt?.valueOf(),
+      encryptedPayload: this.encryptedPayload?.valueOf(),
       id: this.metadata.getId().valueOf(),
       mentions: this.mentions.map((mention) => mention.toPrimitives()),
-      signature: this.signature.valueOf(),
+      pollId: this.pollId?.valueOf(),
+      signature: this.signature?.valueOf(),
       type: this.type(),
     };
   }

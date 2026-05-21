@@ -3,7 +3,10 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/Commun
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 
-import { CommunityChannelMessagesResource } from '../resources/CommunityChannelMessagesResource';
+import {
+  CommunityChannelMessagesResource,
+  CommunityChannelTimelineItemResource,
+} from '../resources/CommunityChannelMessagesResource';
 import { CommunityChannelMessageViewModel } from './CommunityChannelMessageViewModel';
 
 export class CommunityChannelMessagesViewModel {
@@ -26,26 +29,44 @@ export class CommunityChannelMessagesViewModel {
     );
   }
 
+  private messageResource(
+    message: CommunityChannelMessage,
+  ): CommunityChannelTimelineItemResource[] {
+    const primitives = message.toPrimitives();
+
+    if (primitives.type !== 'poll' || !primitives.pollId) {
+      return [
+        new CommunityChannelMessageViewModel(
+          message,
+          this.reactionsFor(message),
+        ).toResource(),
+      ];
+    }
+
+    const poll = this.polls.find(
+      (candidate) => candidate.getId().valueOf() === primitives.pollId,
+    );
+
+    return poll ? [new PollViewModel(poll).toResource()] : [];
+  }
+
   public toResource(): CommunityChannelMessagesResource {
-    const messageResources = this.messages.map((message) =>
-      new CommunityChannelMessageViewModel(
-        message,
-        this.reactionsFor(message),
-      ).toResource(),
+    const messageResources = this.messages.flatMap((message) =>
+      this.messageResource(message),
     );
-    const pollResources = this.polls.map((poll) =>
-      new PollViewModel(poll).toResource(),
-    );
+    const messageIds = new Set(messageResources.map((message) => message.id));
+    const pollResources = this.polls
+      .filter((poll) => !messageIds.has(poll.getId().valueOf()))
+      .map((poll) => new PollViewModel(poll).toResource());
     const timeline = [...messageResources, ...pollResources]
       .sort((first, second) => first.createdAt - second.createdAt)
       .slice(-this.limit);
-    const firstMessage = timeline.find((item) => item.type !== 'poll');
 
     return {
       channelId: this.channelId,
       communityId: this.communityId,
       messages: timeline,
-      nextBeforeMessageId: firstMessage?.id,
+      nextBeforeMessageId: timeline[0]?.id,
     };
   }
 }

@@ -7,11 +7,13 @@ export interface MongoCommunityChannelMessageDocument {
   channelId: string;
   communityId: string;
   createdAt: number;
-  encryptedPayload: string;
+  editedAt?: number;
+  encryptedPayload?: string;
   mentions?: {
     targetId: string | undefined;
     type: CommunityMentionTypeValue;
   }[];
-  signature: string;
-  type: 'sent';
+  pollId?: string;
+  signature?: string;
+  type: 'poll' | 'sent';
 }

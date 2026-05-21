@@ -2,6 +2,7 @@
 import 'module-alias/register';
 import 'reflect-metadata';
 import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced';
+import RegisterCommunityChannelMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced';
 import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
@@ -158,6 +159,11 @@ async function init() {
       communityMessageRepository,
     ),
     new DeleteCommunityChannelMessageWhenAnnounced(
+      messageBus,
+      communityRepository,
+      communityMessageRepository,
+    ),
+    new RegisterCommunityChannelMessageEditionWhenAnnounced(
       messageBus,
       communityRepository,
       communityMessageRepository,

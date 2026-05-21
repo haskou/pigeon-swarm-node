@@ -563,7 +563,10 @@ export default class MongoConversationRepository implements Repository {
       return;
     }
 
-    if (!message.getType().isEqual(MessageType.SENT)) {
+    if (
+      !message.getType().isEqual(MessageType.SENT) &&
+      !message.getType().isEqual(MessageType.POLL)
+    ) {
       return;
     }
 

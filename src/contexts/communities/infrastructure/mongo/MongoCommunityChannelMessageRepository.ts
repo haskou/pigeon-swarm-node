@@ -29,8 +29,10 @@ export class MongoCommunityChannelMessageRepository {
       channelId: primitives.channelId,
       communityId: primitives.communityId,
       createdAt: primitives.createdAt,
+      editedAt: primitives.editedAt,
       encryptedPayload: primitives.encryptedPayload,
       mentions: primitives.mentions,
+      pollId: primitives.pollId,
       signature: primitives.signature,
       type: primitives.type,
     };
@@ -45,9 +47,11 @@ export class MongoCommunityChannelMessageRepository {
       channelId: document.channelId,
       communityId: document.communityId,
       createdAt: document.createdAt,
+      editedAt: document.editedAt,
       encryptedPayload: document.encryptedPayload,
       id: document._id,
       mentions: document.mentions || [],
+      pollId: document.pollId,
       signature: document.signature,
       type: document.type,
     });

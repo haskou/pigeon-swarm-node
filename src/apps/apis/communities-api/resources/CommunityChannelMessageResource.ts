@@ -6,7 +6,8 @@ export interface CommunityChannelMessageResource {
   channelId: string;
   communityId: string;
   createdAt: number;
-  encryptedPayload: string;
+  editedAt?: number;
+  encryptedPayload?: string;
   id: string;
   mentions: {
     targetId: string | undefined;
@@ -17,6 +18,7 @@ export interface CommunityChannelMessageResource {
     createdAt: number;
     emoji: string;
   }[];
-  signature: string;
-  type: 'sent';
+  pollId?: string;
+  signature?: string;
+  type: 'poll' | 'sent';
 }
