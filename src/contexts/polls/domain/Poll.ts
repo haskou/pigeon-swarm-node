@@ -122,6 +122,14 @@ export class Poll extends AggregateRoot {
     return this.scope;
   }
 
+  public getCreatorIdentityId(): IdentityId {
+    return this.creatorIdentityId;
+  }
+
+  public getCreatedAt(): Timestamp {
+    return this.lifecycle.getCreatedAt();
+  }
+
   public toPrimitives() {
     const scope = this.scope.toPrimitives();
     const lifecycle = this.lifecycle.toPrimitives();

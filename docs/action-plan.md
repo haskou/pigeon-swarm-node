@@ -1,49 +1,32 @@
 # Pigeon Swarm Action Plan
 
-Last updated: 2026-05-17.
+Last updated: 2026-05-20.
 
 Keep this file short. Completed slices should live in Git history, API docs,
 OpenAPI, context docs and tests instead of remaining here as stale backlog.
 
-## Current Slice: Sticker Packs
+## Current Slice: Community Channel Message Contract
 
-Goal: support Telegram-like sticker packs created inside Pigeon Swarm, synced
-between nodes and usable in chats without depending on external sticker
-providers.
+Goal: make community channel messages belong to the channel scope instead of
+looking like direct messages with explicit recipients.
 
 Scope:
 
-1. Add a `stickers` context with `StickerPack`, `Sticker` and authenticated
-   identity sticker libraries.
-2. Store sticker media in IPFS through the existing public upload flow and keep
-   messages referencing CIDs, not embedded binaries.
-3. Add HTTP API:
-   - `POST /sticker-packs`
-   - `GET /sticker-packs/{packId}`
-   - `PATCH /sticker-packs/{packId}`
-   - `DELETE /sticker-packs/{packId}`
-   - `POST /sticker-packs/{packId}/stickers`
-   - `DELETE /sticker-packs/{packId}/stickers/{stickerId}`
-   - `GET /stickers/library`
-   - `POST /stickers/library/{packId}`
-   - `DELETE /stickers/library/{packId}`
-4. Add optional discovery for public packs by network only if the first product
-   flow needs it.
-5. Emit websocket and PubSub events for pack changes and library changes.
-6. Document how frontend sends a sticker as encrypted message content using
-   `packId`, `stickerId` and `mediaExternalIdentifier`.
-7. Enforce sticker media constraints:
-   - static stickers: max 512 KB and max 512x512 pixels
-   - animated stickers: max 64 KB and max 512x512 pixels
-   - video stickers: max 256 KB and max 512x512 pixels
-   - every sticker must have at least one associated emoji
-8. Add API, unit and consumer coverage with acceptance tests split by route.
+1. Remove explicit recipient fields from community channel message resources and
+   request contracts unless a concrete product flow still needs them.
+2. Route websocket events from `communityId` + `channelId`, using community
+   membership and future channel permissions as the recipient source.
+3. Keep authorization tied to community membership and channel access, not to a
+   per-message identity list.
+4. Keep encryption ownership scoped to the community/channel key model.
+5. Update OpenAPI, `docs/api.md`, frontend handoff docs and context diagrams.
+6. Add or adjust API and websocket coverage so community channel messages are
+   validated as channel-scoped messages.
 
-Out of scope for the first sticker PR:
+Out of scope for this cleanup:
 
-- Telegram pack compatibility.
-- Marketplace/ranking.
-- Private sticker packs with per-recipient encrypted media.
+- roles and per-channel permissions beyond preserving the future seam
+- changing 1to1 or group conversation message contracts
 
 ## Next Slice: Node Network Management
 

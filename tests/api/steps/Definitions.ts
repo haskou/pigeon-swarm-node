@@ -1055,10 +1055,6 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'encrypted-community-channel-message-payload',
       id,
-      mentions: [] as {
-        targetId?: string;
-        type: string;
-      }[],
       type: 'sent',
     };
 
@@ -1161,10 +1157,6 @@ export default class Definitions {
       createdAt,
       encryptedPayload: 'edited-community-channel-message-payload',
       id: this.communityChannelMessageId,
-      mentions: [] as {
-        targetId?: string;
-        type: string;
-      }[],
       type: 'edited',
     };
 
