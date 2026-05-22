@@ -64,6 +64,7 @@ import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/in
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import { MongoIndexInitializer } from '@app/shared/infrastructure/mongodb/MongoIndexInitializer';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
 
@@ -109,6 +110,7 @@ async function init() {
       MongoConversationRepository,
     );
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
+  await new MongoIndexInitializer(mongo).ensure();
   const identityMetadataRepository =
     Kernel.di.getService<MongoIdentityMetadataRepository>(
       MongoIdentityMetadataRepository,
