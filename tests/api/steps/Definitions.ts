@@ -531,6 +531,19 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community profile body with empty channel lists')
+  public iSetACommunityProfileBodyWithEmptyChannelLists(): void {
+    this.body = JSON.stringify({
+      avatar: 'bafybeigcommunityavatarupdated',
+      banner: 'bafybeigcommunitybannerupdated',
+      description: 'Updated private API community',
+      discoverable: true,
+      name: 'Updated API community',
+      textChannels: [],
+      voiceChannels: [],
+    });
+  }
+
   @given('I sign the current community creation request')
   public async iSignTheCurrentCommunityCreationRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/communities/');
@@ -900,6 +913,15 @@ export default class Definitions {
 
     this.body = undefined;
     await this.signCurrentRequest('GET', `/communities/${this.communityId}`);
+  }
+
+  @given('I sign the current community profile update request')
+  public async iSignTheCurrentCommunityProfileUpdateRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest('PATCH', `/communities/${this.communityId}`);
   }
 
   @given('I sign the current community moderation logs request')
@@ -2657,6 +2679,19 @@ export default class Definitions {
     this.response = await this.restClient.get(
       '/communities/',
       this.headers,
+    );
+  }
+
+  @when('I PATCH the current community')
+  public async iPATCHTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/communities/${this.communityId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
     );
   }
 
