@@ -52,11 +52,45 @@ export class MongoIndexInitializer {
 
   constructor(private readonly mongo: MongoDB) {}
 
+  private hasSameKeys(
+    existingKeys: Record<string, unknown>,
+    requestedKeys: Record<string, 1 | -1>,
+  ): boolean {
+    const existingEntries = Object.entries(existingKeys);
+    const requestedEntries = Object.entries(requestedKeys);
+
+    return (
+      existingEntries.length === requestedEntries.length &&
+      requestedEntries.every(([field, direction], index) => {
+        const existingEntry = existingEntries[index];
+
+        return (
+          existingEntry !== undefined &&
+          existingEntry[0] === field &&
+          existingEntry[1] === direction
+        );
+      })
+    );
+  }
+
   public async ensure(): Promise<void> {
     for (const index of this.indexes) {
-      await (
-        await this.mongo.getCollection(index.collection)
-      ).createIndex(index.keys, { background: true, name: index.name });
+      const collection = await this.mongo.getCollection(index.collection);
+      const existingIndex = (await collection.indexes()).find(
+        (candidate) => candidate.name === index.name,
+      );
+
+      if (
+        existingIndex?.key &&
+        !this.hasSameKeys(existingIndex.key, index.keys)
+      ) {
+        await collection.dropIndex(index.name);
+      }
+
+      await collection.createIndex(index.keys, {
+        background: true,
+        name: index.name,
+      });
     }
   }
 }
