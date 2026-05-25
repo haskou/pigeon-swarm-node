@@ -22,6 +22,8 @@ export class GetCommunityInviteRoute extends CommunityRouteSupport {
       throw new CommunityInviteNotFoundError();
     }
 
+    invite.assertCanBeAccepted();
+
     const community = await this.findCommunity(
       invite.getCommunityId().valueOf(),
     );
