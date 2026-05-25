@@ -2001,6 +2001,12 @@ Request:
 
 ```json
 {
+  "encryptedCommunityKey": {
+    "version": 1,
+    "algorithm": "AES-GCM",
+    "nonce": "base64url",
+    "ciphertext": "base64url"
+  },
   "expiresAt": 1770000000000,
   "maxUses": 1
 }
@@ -2012,8 +2018,15 @@ Response:
 {
   "inviteToken": "<inviteToken>",
   "communityId": "<communityId>",
+  "encryptedCommunityKey": {
+    "version": 1,
+    "algorithm": "AES-GCM",
+    "nonce": "base64url",
+    "ciphertext": "base64url"
+  },
   "expiresAt": 1770000000000,
-  "maxUses": 1
+  "maxUses": 1,
+  "uses": 0
 }
 ```
 
@@ -2023,8 +2036,55 @@ Implemented:
   `create_invites`
 - create a bearer invite token for the community
 - default `maxUses` to `1`
-- keep community keys out of the backend; frontend should carry key material in
-  the URL fragment, which is not sent to the server
+- optionally store an opaque `encryptedCommunityKey` blob produced by frontend
+- never receive the invite fragment secret or the community key in clear text
+
+Recommended frontend invite link shape:
+
+```text
+https://pigeon.futoineko.com/invite/community/<inviteToken>#k=<inviteSecret>
+```
+
+The `inviteSecret` after `#` must not be sent to the backend. Frontend encrypts
+the current community key entry with that secret and sends only
+`encryptedCommunityKey` in the invite creation body.
+
+### Read community invite link token
+
+```http
+GET /communities/invites/{inviteToken}
+```
+
+This endpoint is unsigned so a user opening an invite link can preview the
+community and create an identity before accepting.
+
+Response:
+
+```json
+{
+  "inviteToken": "<inviteToken>",
+  "communityId": "<communityId>",
+  "communityName": "Pigeon Swarm",
+  "communityAvatar": "bagaa...",
+  "communityBanner": "bagaa...",
+  "encryptedCommunityKey": {
+    "version": 1,
+    "algorithm": "AES-GCM",
+    "nonce": "base64url",
+    "ciphertext": "base64url"
+  },
+  "expiresAt": 1770000000000,
+  "maxUses": 1,
+  "uses": 0
+}
+```
+
+Implemented:
+
+- resolve invite metadata by bearer token
+- return minimal community metadata for invite preview
+- return `encryptedCommunityKey` exactly as stored
+- never receive the `#k` fragment secret
 
 ### Accept community invite link token
 

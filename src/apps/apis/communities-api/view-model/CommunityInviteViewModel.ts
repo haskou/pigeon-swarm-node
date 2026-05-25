@@ -10,9 +10,11 @@ export class CommunityInviteViewModel {
 
     return {
       communityId: primitives.communityId,
+      encryptedCommunityKey: primitives.encryptedCommunityKey,
       expiresAt: primitives.expiresAt,
       inviteToken: primitives.token,
       maxUses: primitives.maxUses,
+      uses: primitives.uses,
     };
   }
 }
