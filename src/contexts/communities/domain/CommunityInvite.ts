@@ -7,15 +7,19 @@ import { CommunityId } from './value-objects/CommunityId';
 import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
 import { CommunityInviteToken } from './value-objects/CommunityInviteToken';
 import { CommunityInviteUses } from './value-objects/CommunityInviteUses';
+import { EncryptedCommunityInviteKey } from './value-objects/EncryptedCommunityInviteKey';
 
 export class CommunityInvite {
+  private encryptedCommunityKey?: EncryptedCommunityInviteKey;
+
   public static create(
     communityId: CommunityId,
     creatorIdentityId: IdentityId,
     expiresAt?: Timestamp,
     maxUses: CommunityInviteMaxUses = new CommunityInviteMaxUses(1),
+    encryptedCommunityKey?: EncryptedCommunityInviteKey,
   ): CommunityInvite {
-    return new CommunityInvite(
+    const invite = new CommunityInvite(
       CommunityInviteToken.generate(),
       communityId,
       creatorIdentityId,
@@ -24,12 +28,16 @@ export class CommunityInvite {
       maxUses,
       CommunityInviteUses.zero(),
     );
+
+    invite.setEncryptedCommunityKey(encryptedCommunityKey);
+
+    return invite;
   }
 
   public static fromPrimitives(
     primitives: PrimitiveOf<CommunityInvite>,
   ): CommunityInvite {
-    return new CommunityInvite(
+    const invite = new CommunityInvite(
       new CommunityInviteToken(primitives.token),
       new CommunityId(primitives.communityId),
       new IdentityId(primitives.creatorIdentityId),
@@ -38,6 +46,16 @@ export class CommunityInvite {
       new CommunityInviteMaxUses(primitives.maxUses),
       new CommunityInviteUses(primitives.uses),
     );
+
+    invite.setEncryptedCommunityKey(
+      primitives.encryptedCommunityKey
+        ? EncryptedCommunityInviteKey.fromPrimitives(
+            primitives.encryptedCommunityKey,
+          )
+        : undefined,
+    );
+
+    return invite;
   }
 
   constructor(
@@ -58,6 +76,12 @@ export class CommunityInvite {
     return this.uses.isLessThan(this.maxUses);
   }
 
+  private setEncryptedCommunityKey(
+    encryptedCommunityKey?: EncryptedCommunityInviteKey,
+  ): void {
+    this.encryptedCommunityKey = encryptedCommunityKey;
+  }
+
   public accept(now: Timestamp = Timestamp.now()): void {
     assert(!this.isExpired(now), new CommunityInviteExpiredError());
     assert(this.hasUsesAvailable(), new CommunityInviteUsesExceededError());
@@ -73,11 +97,16 @@ export class CommunityInvite {
     return this.token;
   }
 
+  public hasEncryptedCommunityKey(): boolean {
+    return this.encryptedCommunityKey !== undefined;
+  }
+
   public toPrimitives() {
     return {
       communityId: this.communityId.valueOf(),
       createdAt: this.createdAt.valueOf(),
       creatorIdentityId: this.creatorIdentityId.valueOf(),
+      encryptedCommunityKey: this.encryptedCommunityKey?.toPrimitives(),
       expiresAt: this.expiresAt?.valueOf(),
       maxUses: this.maxUses.valueOf(),
       token: this.token.valueOf(),

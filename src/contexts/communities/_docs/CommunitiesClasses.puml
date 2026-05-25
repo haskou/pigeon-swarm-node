@@ -164,7 +164,8 @@ package "communities/domain" {
     - expiresAt: Timestamp?
     - maxUses: CommunityInviteMaxUses
     - uses: CommunityInviteUses
-    + create(communityId, creatorIdentityId, expiresAt?, maxUses?): CommunityInvite
+    - encryptedCommunityKey: EncryptedCommunityInviteKey?
+    + create(communityId, creatorIdentityId, expiresAt?, maxUses?, encryptedCommunityKey?): CommunityInvite
     + accept(now?): void
   }
 
@@ -199,6 +200,7 @@ package "communities/domain" {
   class CommunityInviteToken
   class CommunityInviteMaxUses
   class CommunityInviteUses
+  class EncryptedCommunityInviteKey
   class CommunityRequestId
   class CommunityRequestStatus
   class CommunityRequestType
@@ -291,6 +293,7 @@ package "communities/domain" {
   CommunityInvite --> CommunityInviteToken
   CommunityInvite --> CommunityInviteMaxUses
   CommunityInvite --> CommunityInviteUses
+  CommunityInvite --> EncryptedCommunityInviteKey
   CommunityMembershipRequest --> CommunityId
   CommunityMembershipRequest --> IdentityId
   CommunityMembershipRequest --> CommunityRequestId
@@ -357,6 +360,7 @@ package "communities-api" {
   class PostCommunityMemberRoute
   class PostCommunityJoinRequestRoute
   class DeleteCommunityMemberRoute
+  class GetCommunityInviteRoute
   class PostCommunityInviteRoute
   class PostCommunityInviteAcceptRoute
   class GetCommunityChannelsRoute
@@ -389,6 +393,8 @@ package "communities-api" {
   PatchCommunityRequestRoute ..> Community
   DeleteCommunityMemberRoute ..> Community
   PostCommunityInviteRoute ..> CommunityInvite
+  GetCommunityInviteRoute ..> CommunityInviteRepository
+  GetCommunityInviteRoute ..> Community
   PostCommunityInviteAcceptRoute ..> CommunityInviteRepository
   PostCommunityInviteAcceptRoute ..> Community
   GetCommunityChannelsRoute ..> Community

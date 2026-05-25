@@ -574,6 +574,19 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community invite body with an encrypted community key')
+  public iSetACommunityInviteBodyWithAnEncryptedCommunityKey(): void {
+    this.body = JSON.stringify({
+      encryptedCommunityKey: {
+        algorithm: 'AES-GCM',
+        ciphertext: 'encryptedcommunitykeyciphertext',
+        nonce: 'encryptedcommunitykeynonce',
+        version: 1,
+      },
+      maxUses: 1,
+    });
+  }
+
   @given('I set an expired community invite body')
   public iSetAnExpiredCommunityInviteBody(): void {
     this.body = JSON.stringify({
@@ -2645,6 +2658,17 @@ export default class Definitions {
       `/communities/${this.communityId}/join-requests`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
+    );
+  }
+
+  @when('I GET the current community invite')
+  public async iGETTheCurrentCommunityInvite(): Promise<void> {
+    if (!this.communityInviteToken) {
+      throw new Error('Community invite must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/invites/${this.communityInviteToken}`,
     );
   }
 

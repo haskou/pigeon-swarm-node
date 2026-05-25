@@ -2,6 +2,7 @@ import { CommunityInvite } from '@app/contexts/communities/domain/CommunityInvit
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
+import { EncryptedCommunityInviteKey } from '@app/contexts/communities/domain/value-objects/EncryptedCommunityInviteKey';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -37,6 +38,9 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
       actorIdentityId,
       body?.expiresAt ? new Timestamp(body.expiresAt) : undefined,
       body?.maxUses ? new CommunityInviteMaxUses(body.maxUses) : undefined,
+      body?.encryptedCommunityKey
+        ? EncryptedCommunityInviteKey.fromPrimitives(body.encryptedCommunityKey)
+        : undefined,
     );
 
     await this.inviteRepository().save(invite);
@@ -49,6 +53,7 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
         invite.getToken(),
       ),
       {
+        encryptedCommunityKeyStored: invite.hasEncryptedCommunityKey(),
         expiresAt: body?.expiresAt,
         maxUses: body?.maxUses,
       },
