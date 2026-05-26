@@ -317,6 +317,40 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
 
+    it('should not resolve previous identity versions for trusted mongo metadata', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafypreviousidentity';
+      const currentCidString = 'bafycurrentidentity';
+      const candidate = await previousIdentity.updateProfile(
+        new Profile(new ProfileName('Jane')),
+        mother.password,
+        new IdentityExternalIdentifier(previousCidString),
+      );
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          _id: previousPrimitives.id + ':' + currentCidString,
+          cid: currentCidString,
+          identityId: previousPrimitives.id,
+          previousCid: previousCidString,
+          receivedAt: Date.now(),
+          version: candidate.toPrimitives().version,
+        },
+      ]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(candidate));
+
+      const result = await repository.findById(
+        new IdentityId(previousPrimitives.id),
+      );
+
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(currentCidString),
+      );
+      expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
+    });
+
     it('should reject a DHT candidate with a missing previous identity', async () => {
       const previousIdentity = await mother.build();
       const previousPrimitives = previousIdentity.toPrimitives();
