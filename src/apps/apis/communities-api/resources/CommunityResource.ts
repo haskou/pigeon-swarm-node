@@ -32,6 +32,7 @@ export interface CommunityMemberRolesResource {
 }
 
 export interface CommunityResource {
+  autoJoinEnabled: boolean;
   avatar?: string;
   banner?: string;
   bannedMemberIds: string[];
@@ -46,6 +47,6 @@ export interface CommunityResource {
   ownerIdentityId: string;
   roles: CommunityRoleResource[];
   textChannels: CommunityTextChannelResource[];
-  visibility: 'private';
+  visibility: 'private' | 'public';
   voiceChannels: CommunityVoiceChannelResource[];
 }

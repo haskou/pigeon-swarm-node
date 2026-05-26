@@ -4,9 +4,9 @@ import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from './CommunityChannelMessageMetadata';
+import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
 import { CommunityChannelAttachmentId } from './value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
-import { CommunityChannelMessageEncryptedPayload } from './value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityChannelMessageId } from './value-objects/CommunityChannelMessageId';
 import { CommunityId } from './value-objects/CommunityId';
 
@@ -19,14 +19,14 @@ export type CommunityChannelMessagePrimitives = ReturnType<
 export class CommunityChannelMessage {
   public static create(
     metadata: CommunityChannelMessageMetadata,
-    encryptedPayload: CommunityChannelMessageEncryptedPayload,
+    payload: CommunityChannelMessagePayload,
     signature: Signature,
     attachmentExternalIdentifiers: Attachments = [],
     mentions: Mentions = [],
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       metadata,
-      encryptedPayload,
+      payload,
       signature,
       attachmentExternalIdentifiers,
       mentions,
@@ -59,10 +59,11 @@ export class CommunityChannelMessage {
         new IdentityId(primitives.authorIdentityId),
         new Timestamp(primitives.createdAt),
       ),
-      primitives.encryptedPayload
-        ? new CommunityChannelMessageEncryptedPayload(
-            primitives.encryptedPayload,
-          )
+      primitives.encryptedPayload || primitives.plaintextPayload
+        ? CommunityChannelMessagePayload.fromPrimitives({
+            encryptedPayload: primitives.encryptedPayload,
+            plaintextPayload: primitives.plaintextPayload,
+          })
         : undefined,
       primitives.signature ? new Signature(primitives.signature) : undefined,
       primitives.attachmentExternalIdentifiers.map(
@@ -79,9 +80,7 @@ export class CommunityChannelMessage {
 
   constructor(
     private readonly metadata: CommunityChannelMessageMetadata,
-    private readonly encryptedPayload:
-      | CommunityChannelMessageEncryptedPayload
-      | undefined,
+    private readonly payload: CommunityChannelMessagePayload | undefined,
     private readonly signature: Signature | undefined,
     private readonly attachmentExternalIdentifiers: Attachments,
     private readonly mentions: Mentions,
@@ -102,7 +101,7 @@ export class CommunityChannelMessage {
   }
 
   public edit(
-    encryptedPayload: CommunityChannelMessageEncryptedPayload,
+    payload: CommunityChannelMessagePayload,
     signature: Signature,
     editedAt: Timestamp,
     attachmentExternalIdentifiers: Attachments,
@@ -110,7 +109,7 @@ export class CommunityChannelMessage {
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       this.metadata,
-      encryptedPayload,
+      payload,
       signature,
       attachmentExternalIdentifiers,
       mentions,
@@ -119,6 +118,8 @@ export class CommunityChannelMessage {
   }
 
   public toPrimitives() {
+    const payload = this.payload?.toPrimitives();
+
     return {
       attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
         (externalIdentifier) => externalIdentifier.valueOf(),
@@ -128,9 +129,10 @@ export class CommunityChannelMessage {
       communityId: this.metadata.getCommunityId().valueOf(),
       createdAt: this.metadata.getCreatedAt().valueOf(),
       editedAt: this.editedAt?.valueOf(),
-      encryptedPayload: this.encryptedPayload?.valueOf(),
+      encryptedPayload: payload?.encryptedPayload,
       id: this.metadata.getId().valueOf(),
       mentions: this.mentions.map((mention) => mention.toPrimitives()),
+      plaintextPayload: payload?.plaintextPayload,
       pollId: this.pollId?.valueOf(),
       signature: this.signature?.valueOf(),
       type: this.type(),

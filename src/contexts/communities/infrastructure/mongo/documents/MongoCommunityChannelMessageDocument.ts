@@ -13,6 +13,7 @@ export interface MongoCommunityChannelMessageDocument {
     targetId: string | undefined;
     type: CommunityMentionTypeValue;
   }[];
+  plaintextPayload?: string;
   pollId?: string;
   signature?: string;
   type: 'poll' | 'sent';

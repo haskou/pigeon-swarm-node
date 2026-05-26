@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Communities API
   version: 1.0.0
-  description: Endpoints for private communities, members, text channels, and encrypted channel messages.
+  description: Endpoints for private/public communities, members, text channels, and channel messages.
 tags:
   - name: communities
 paths:
@@ -10,7 +10,7 @@ paths:
     get:
       tags:
         - communities
-      summary: List private communities for the authenticated member
+      summary: List communities for the authenticated member
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -26,8 +26,8 @@ paths:
     post:
       tags:
         - communities
-      summary: Create a private community
-      description: The authenticated identity becomes the owner and first member.
+      summary: Create a community
+      description: The authenticated identity becomes the owner and first member. visibility defaults to private and cannot be changed later. Private communities require encrypted channel message payloads. Public communities require plaintext channel message payloads so messages can be indexed and searched.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -50,8 +50,8 @@ paths:
     get:
       tags:
         - communities
-      summary: Discover private communities by public metadata
-      description: Returns searchable community metadata without exposing channels or encrypted content. Hidden communities with discoverable=false are excluded. The authenticated identity receives its current membership state for each result.
+      summary: Discover communities by public metadata
+      description: Returns searchable community metadata without exposing channels or private message content. Hidden communities with discoverable=false are excluded. The authenticated identity receives its current membership state for each result.
       parameters:
         - in: query
           name: query
@@ -528,7 +528,7 @@ paths:
       tags:
         - communities
       summary: Request to join a private community
-      description: Creates a pending join request. The requester is not added to memberIds until the community owner accepts the request.
+      description: Creates a pending join request when autoJoinEnabled is false. If autoJoinEnabled is true, the request is immediately accepted and the requester is added to memberIds.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -537,7 +537,7 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
-          description: Pending join request created.
+          description: Pending or auto-accepted join request.
           content:
             application/json:
               schema:
@@ -731,8 +731,8 @@ paths:
     get:
       tags:
         - communities
-      summary: List encrypted private community text channel messages
-      description: Only community members can read text channel messages. Payloads are client-encrypted and opaque to the backend. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline.
+      summary: List community text channel messages
+      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -766,8 +766,8 @@ paths:
     post:
       tags:
         - communities
-      summary: Send an encrypted private community text channel message
-      description: Only community members can send channel messages. The backend validates the message signature but never decrypts the payload.
+      summary: Send a community text channel message
+      description: Only community members can send channel messages. Private communities require encryptedPayload and public communities require plaintextPayload. The backend validates the message signature.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -794,12 +794,79 @@ paths:
                 $ref: '#/components/schemas/CommunityChannelMessageResource'
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the message signature is invalid.
+  /communities/{communityId}/messages/search:
+    get:
+      tags:
+        - communities
+      summary: Search public community messages across visible text channels
+      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. The request is signed as GET /communities/{communityId}/messages/search; query string values are not part of the signed path.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: query
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Matching public messages from visible text channels.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMessageSearchResource'
+        '409':
+          description: The community is private or the authenticated identity is not a member.
+  /communities/{communityId}/channels/{channelId}/messages/search:
+    get:
+      tags:
+        - communities
+      summary: Search public community text channel messages
+      description: Only public community plaintext messages are searchable. The request is signed as GET /communities/{communityId}/channels/{channelId}/messages/search; query string values are not part of the signed path.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: query
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Matching public channel messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessagesResource'
+        '409':
+          description: The community is private, the authenticated identity is not a member, or the channel does not exist.
   /communities/{communityId}/channels/{channelId}/messages/{messageId}:
     put:
       tags:
         - communities
-      summary: Edit an encrypted private community text channel message
-      description: Only the original author can edit a channel message. The backend validates the edition signature, stores the new opaque encrypted payload, and announces the change through realtime and pubsub events.
+      summary: Edit a community text channel message
+      description: Only the original author can edit a channel message. Private communities require encryptedPayload and public communities require plaintextPayload. The backend validates the edition signature and announces the change through realtime and pubsub events.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -1037,6 +1104,7 @@ components:
         - voiceChannels
         - visibility
         - discoverable
+        - autoJoinEnabled
         - createdAt
       properties:
         id:
@@ -1052,6 +1120,9 @@ components:
         discoverable:
           type: boolean
           description: Whether this private community appears in discovery search results.
+        autoJoinEnabled:
+          type: boolean
+          description: Whether non-banned identities can join without owner approval.
         avatar:
           type: string
           description: Public IPFS CID for the community avatar/icon.
@@ -1086,6 +1157,7 @@ components:
           type: string
           enum:
             - private
+            - public
         createdAt:
           type: integer
     CommunitiesResource:
@@ -1192,6 +1264,7 @@ components:
         - membershipStatus
         - visibility
         - discoverable
+        - autoJoinEnabled
       properties:
         id:
           type: string
@@ -1208,6 +1281,9 @@ components:
           enum:
             - true
           description: Discovery only returns communities where this flag is true.
+        autoJoinEnabled:
+          type: boolean
+          description: Whether the community accepts join requests immediately.
         avatar:
           type: string
         banner:
@@ -1227,6 +1303,7 @@ components:
           type: string
           enum:
             - private
+            - public
     PatchCommunityMembershipRequestBody:
       type: object
       required:
@@ -1411,7 +1488,10 @@ components:
           type: string
         encryptedPayload:
           type: string
-          description: Present for sent messages. Omitted for poll timeline items.
+          description: Present for sent private community messages. Omitted for public messages and poll timeline items.
+        plaintextPayload:
+          type: string
+          description: Present for sent public community messages. Omitted for private messages and poll timeline items.
         signature:
           type: string
           description: Present for sent messages. Omitted for poll timeline items.
@@ -1473,6 +1553,18 @@ components:
               - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
         nextBeforeMessageId:
           type: string
+    CommunityMessageSearchResource:
+      type: object
+      required:
+        - communityId
+        - messages
+      properties:
+        communityId:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityChannelMessageResource'
     DeletedCommunityChannelMessageResource:
       type: object
       required:
@@ -1522,6 +1614,17 @@ components:
           type: boolean
           default: true
           description: Set false to keep this community out of discovery search results.
+        autoJoinEnabled:
+          type: boolean
+          default: false
+          description: Set true to let any non-banned identity join without owner approval.
+        visibility:
+          type: string
+          default: private
+          description: Select private for encrypted channel messages or public for plaintext searchable channel messages. This value is immutable after creation.
+          enum:
+            - private
+            - public
     PatchCommunityBody:
       type: object
       required:
@@ -1543,6 +1646,9 @@ components:
         discoverable:
           type: boolean
           description: Set false to keep this community out of discovery search results.
+        autoJoinEnabled:
+          type: boolean
+          description: Set true to let any non-banned identity join without owner approval.
     PostCommunityMemberBody:
       type: object
       required:
@@ -1676,7 +1782,6 @@ components:
       required:
         - id
         - createdAt
-        - encryptedPayload
         - signature
       properties:
         id:
@@ -1685,7 +1790,10 @@ components:
           type: integer
         encryptedPayload:
           type: string
-          description: Client-encrypted payload. The backend stores it as opaque text.
+          description: Required for private communities. Client-encrypted payload stored as opaque text.
+        plaintextPayload:
+          type: string
+          description: Required for public communities. Plain text payload stored for indexing/search.
         signature:
           type: string
         attachmentExternalIdentifiers:
@@ -1728,7 +1836,6 @@ components:
       type: object
       required:
         - createdAt
-        - encryptedPayload
         - signature
       properties:
         createdAt:
@@ -1736,7 +1843,10 @@ components:
           description: Edition timestamp used in the domain signature and returned as editedAt.
         encryptedPayload:
           type: string
-          description: Updated client-encrypted payload. The backend stores it as opaque text.
+          description: Required when editing private community messages. Updated client-encrypted payload stored as opaque text.
+        plaintextPayload:
+          type: string
+          description: Required when editing public community messages. Updated plain text payload stored for indexing/search.
         signature:
           type: string
         attachmentExternalIdentifiers:

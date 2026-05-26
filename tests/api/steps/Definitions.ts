@@ -510,6 +510,34 @@ export default class Definitions {
   @given('I set a private community body')
   public iSetAPrivateCommunityBody(): void {
     this.body = JSON.stringify({
+      autoJoinEnabled: false,
+      avatar: 'bafybeigcommunityavatar',
+      banner: 'bafybeigcommunitybanner',
+      description: 'Private API community',
+      discoverable: true,
+      name: 'API community',
+      networkId: this.currentNetworkId,
+    });
+  }
+
+  @given('I set a public community body')
+  public iSetAPublicCommunityBody(): void {
+    this.body = JSON.stringify({
+      autoJoinEnabled: false,
+      avatar: 'bafybeigcommunityavatar',
+      banner: 'bafybeigcommunitybanner',
+      description: 'Public API community',
+      discoverable: true,
+      name: 'Public API community',
+      networkId: this.currentNetworkId,
+      visibility: 'public',
+    });
+  }
+
+  @given('I set an auto-join private community body')
+  public iSetAnAutoJoinPrivateCommunityBody(): void {
+    this.body = JSON.stringify({
+      autoJoinEnabled: true,
       avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Private API community',
@@ -522,6 +550,7 @@ export default class Definitions {
   @given('I set a hidden private community body')
   public iSetAHiddenPrivateCommunityBody(): void {
     this.body = JSON.stringify({
+      autoJoinEnabled: false,
       avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Private API community',
@@ -535,12 +564,25 @@ export default class Definitions {
   public iSetACommunityProfileBodyWithEmptyChannelLists(): void {
     this.body = JSON.stringify({
       avatar: 'bafybeigcommunityavatarupdated',
+      autoJoinEnabled: false,
       banner: 'bafybeigcommunitybannerupdated',
       description: 'Updated private API community',
       discoverable: true,
       name: 'Updated API community',
       textChannels: [],
       voiceChannels: [],
+    });
+  }
+
+  @given('I set a community profile body enabling auto join')
+  public iSetACommunityProfileBodyEnablingAutoJoin(): void {
+    this.body = JSON.stringify({
+      avatar: 'bafybeigcommunityavatarupdated',
+      autoJoinEnabled: true,
+      banner: 'bafybeigcommunitybannerupdated',
+      description: 'Updated private API community',
+      discoverable: true,
+      name: 'Updated API community',
     });
   }
 
@@ -1115,6 +1157,35 @@ export default class Definitions {
     });
   }
 
+  @given('I set a plaintext community channel message body')
+  public async iSetAPlaintextCommunityChannelMessageBody(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const id = `community-message:${Date.now()}:${randomUUID()}`;
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      createdAt,
+      id,
+      plaintextPayload: 'plain public searchable community message',
+      type: 'sent',
+    };
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      createdAt,
+      id,
+      plaintextPayload: 'plain public searchable community message',
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
   @given('I set an encrypted community channel message body mentioning everyone')
   public async iSetAnEncryptedCommunityChannelMessageBodyMentioningEveryone(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -1238,6 +1309,32 @@ export default class Definitions {
     await this.signCurrentRequest(
       'GET',
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
+    );
+  }
+
+  @given('I sign the current community channel message search request')
+  public async iSignTheCurrentCommunityChannelMessageSearchRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/search`,
+    );
+  }
+
+  @given('I sign the current community message search request')
+  public async iSignTheCurrentCommunityMessageSearchRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/messages/search`,
     );
   }
 
@@ -1957,6 +2054,12 @@ export default class Definitions {
   @given('I sign the current node network request')
   public async iSignTheCurrentNodeNetworkRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/node/networks/');
+  }
+
+  @given('I sign the current node public network request')
+  public async iSignTheCurrentNodePublicNetworkRequest(): Promise<void> {
+    this.body = this.body ?? '{}';
+    await this.signCurrentRequest('POST', '/node/networks/public/');
   }
 
   @given('I set a conversation invitation notification body')
@@ -2954,6 +3057,30 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?limit=50`,
+      this.headers,
+    );
+  }
+
+  @when('I search messages from the current community text channel')
+  public async iSearchMessagesFromTheCurrentCommunityTextChannel(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/search?query=searchable&limit=20`,
+      this.headers,
+    );
+  }
+
+  @when('I search messages from the current community')
+  public async iSearchMessagesFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/messages/search?query=searchable&limit=20`,
       this.headers,
     );
   }

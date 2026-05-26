@@ -194,6 +194,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
       {
         findById: async (): Promise<Community> =>
           Community.fromPrimitives({
+            autoJoinEnabled: false,
             avatar: undefined,
             bannedMemberIds: [],
             banner: undefined,

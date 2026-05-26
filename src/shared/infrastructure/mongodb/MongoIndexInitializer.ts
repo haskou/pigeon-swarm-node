@@ -29,6 +29,11 @@ export class MongoIndexInitializer {
       name: 'community_channel_messages_community_createdAt_idx',
     },
     {
+      collection: 'community_channel_messages',
+      keys: { communityId: 1, channelId: 1, plaintextPayload: 1 },
+      name: 'community_channel_messages_public_text_idx',
+    },
+    {
       collection: 'community_channel_message_reactions',
       keys: { channelId: 1, communityId: 1, messageId: 1 },
       name: 'community_channel_message_reactions_message_idx',

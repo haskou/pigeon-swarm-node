@@ -44,11 +44,13 @@ describe('CommunityCreator', () => {
         'Architecture refactor test community',
         'bagaaieraavatar',
         'bagaaierabanner',
+        { autoJoinEnabled: true },
       ),
     );
 
     expect(repository.savedCommunities).toEqual([community]);
     expect(community.isOwner(new IdentityId(ownerIdentityId))).toBe(true);
     expect(community.isMember(new IdentityId(ownerIdentityId))).toBe(true);
+    expect(community.isAutoJoinEnabled()).toBe(true);
   });
 });

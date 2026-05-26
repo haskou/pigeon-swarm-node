@@ -9,11 +9,8 @@ export class CommunityCreator {
     const community = Community.create(
       message.ownerIdentityId,
       message.networkId,
-      message.name,
-      message.description,
-      message.avatar,
-      message.banner,
-      message.discoverable,
+      message.profile,
+      message.settings,
     );
 
     await this.repository.save(community);

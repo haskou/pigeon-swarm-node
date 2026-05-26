@@ -1,6 +1,7 @@
 import { CommunityMembershipRequestResource } from './CommunityMembershipRequestResource';
 
 export interface CommunityDiscoveryItemResource {
+  autoJoinEnabled: boolean;
   avatar?: string;
   banner?: string;
   description: string;
@@ -12,7 +13,7 @@ export interface CommunityDiscoveryItemResource {
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  visibility: 'private';
+  visibility: 'private' | 'public';
 }
 
 export interface CommunityDiscoveryResource {

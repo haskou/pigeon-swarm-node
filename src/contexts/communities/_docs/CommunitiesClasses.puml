@@ -23,9 +23,10 @@ package "communities/domain" {
     - profile: CommunityProfile
     - membership: CommunityMembership
     - channels: CommunityChannels
-    - createdAt: Timestamp
-    + create(ownerIdentityId, networkId, name, description, banner?): Community
+    - settings: CommunitySettings
+    + create(ownerIdentityId, networkId, profile, settings): Community
     + joinWithInvite(member): void
+    + isAutoJoinEnabled(): boolean
     + leave(member): void
     + banMember(actor, member): void
     + unbanMember(actor, member): void
@@ -115,7 +116,7 @@ package "communities/domain" {
     - communityId: CommunityId
     - channelId: CommunityChannelId
     - authorIdentityId: IdentityId
-    - encryptedPayload: CommunityChannelMessageEncryptedPayload
+    - payload: CommunityChannelMessagePayload
     - signature: Signature
     - createdAt: Timestamp
     - attachmentExternalIdentifiers: CommunityChannelAttachmentId[]
@@ -156,6 +157,13 @@ package "communities/domain" {
     - banner: CommunityBanner?
   }
 
+  class CommunitySettings {
+    - createdAt: Timestamp
+    - discoverable: boolean
+    - visibility: CommunityVisibility
+    - autoJoinEnabled: boolean
+  }
+
   class CommunityInvite {
     - token: CommunityInviteToken
     - communityId: CommunityId
@@ -194,8 +202,11 @@ package "communities/domain" {
   class CommunityRoleId
   class CommunityRoleName
   class CommunityChannelMessageId
+  class CommunityChannelMessagePayload
   class CommunityChannelMessageEncryptedPayload
+  class CommunityChannelMessagePlaintextPayload
   class CommunityChannelAttachmentId
+  class CommunityVisibility
   class CommunityChannelMessageReactionEmoji
   class CommunityInviteToken
   class CommunityInviteMaxUses
@@ -218,6 +229,7 @@ package "communities/domain" {
   interface CommunityChannelMessageRepository {
     + findById(communityId, channelId, messageId): CommunityChannelMessage?
     + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
+    + searchPublicByChannel(communityId, channelId, query, limit): CommunityChannelMessage[]
     + save(message): void
   }
 
@@ -263,6 +275,7 @@ package "communities/domain" {
   CommunityRole --> CommunityPermission
   CommunityChannels *-- CommunityTextChannel
   CommunityChannels *-- CommunityVoiceChannel
+  CommunitySettings --> CommunityVisibility
   CommunityTextChannel --> CommunityChannelId
   CommunityTextChannel --> CommunityChannelName
   CommunityTextChannel --> CommunityChannelPermissions
@@ -274,7 +287,9 @@ package "communities/domain" {
   CommunityChannelMessage --> CommunityId
   CommunityChannelMessage --> CommunityChannelId
   CommunityChannelMessage --> IdentityId
-  CommunityChannelMessage --> CommunityChannelMessageEncryptedPayload
+  CommunityChannelMessage --> CommunityChannelMessagePayload
+  CommunityChannelMessagePayload --> CommunityChannelMessageEncryptedPayload
+  CommunityChannelMessagePayload --> CommunityChannelMessagePlaintextPayload
   CommunityChannelMessage --> CommunityChannelAttachmentId
   CommunityChannelMessageReaction --> CommunityId
   CommunityChannelMessageReaction --> CommunityChannelId

@@ -7,6 +7,7 @@ import { CommunityName } from '../../../domain/value-objects/CommunityName';
 
 export class CommunityProfileUpdateMessage {
   public readonly actorIdentityId: IdentityId;
+  public readonly autoJoinEnabled?: boolean;
   public readonly avatar?: CommunityAvatar;
   public readonly banner?: CommunityBanner;
   public readonly description: CommunityDescription;
@@ -20,8 +21,10 @@ export class CommunityProfileUpdateMessage {
     avatar?: string,
     banner?: string,
     discoverable?: boolean,
+    autoJoinEnabled?: boolean,
   ) {
     this.actorIdentityId = new IdentityId(actorIdentityId);
+    this.autoJoinEnabled = autoJoinEnabled;
     this.name = new CommunityName(name);
     this.description = new CommunityDescription(description);
     this.avatar = avatar ? new CommunityAvatar(avatar) : undefined;

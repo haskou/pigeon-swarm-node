@@ -2,6 +2,10 @@ import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class PatchCommunityBody {
   @IsOptional()
+  @IsBoolean()
+  public readonly autoJoinEnabled?: boolean;
+
+  @IsOptional()
   @IsString()
   public readonly avatar?: string;
 

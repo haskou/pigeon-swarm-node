@@ -17,6 +17,7 @@ import { DeleteCommunityMemberByIdRoute } from '@app/apps/apis/communities-api/r
 import { DeleteCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberRoute';
 import { DeleteCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityRoleRoute';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
+import { SearchCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessageSearchRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
@@ -65,6 +66,7 @@ import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNet
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
+import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
 import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/PatchNotificationRoute';
@@ -242,6 +244,7 @@ export default class Server {
           GetNodeRoute,
           GetNodeNetworksRoute,
           PostNodeNetworkRoute,
+          PostNodePublicNetworkRoute,
           PutNodeOwnerRoute,
           GetPeersRoute,
           GetNotificationsRoute,
@@ -295,6 +298,7 @@ export default class Server {
           PostCommunityInviteRoute,
           PostCommunityInviteAcceptRoute,
           GetCommunityChannelsRoute,
+          SearchCommunityChannelMessagesRoute,
           PostCommunityTextChannelRoute,
           PostCommunityVoiceChannelRoute,
           PatchCommunityChannelRoute,

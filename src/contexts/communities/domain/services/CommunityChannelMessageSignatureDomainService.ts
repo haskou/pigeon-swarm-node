@@ -2,11 +2,21 @@ import { PublicKey, Signature } from '@haskou/value-objects';
 
 import { CommunityChannelMessage } from '../CommunityChannelMessage';
 
-type CommunityChannelMessageSignaturePayload = Omit<
-  ReturnType<CommunityChannelMessage['toPrimitives']>,
-  'editedAt' | 'mentions' | 'pollId' | 'signature'
-> & {
-  mentions?: ReturnType<CommunityChannelMessage['toPrimitives']>['mentions'];
+type CommunityChannelMessageMentionPrimitives = ReturnType<
+  CommunityChannelMessage['toPrimitives']
+>['mentions'];
+
+type CommunityChannelMessageSignaturePayload = {
+  attachmentExternalIdentifiers: string[];
+  authorIdentityId: string;
+  channelId: string;
+  communityId: string;
+  createdAt: number;
+  encryptedPayload?: string;
+  id: string;
+  mentions?: CommunityChannelMessageMentionPrimitives;
+  plaintextPayload?: string;
+  type: 'poll' | 'sent';
 };
 type CommunityChannelMessageDeletionSignaturePayload = {
   actorIdentityId: string;
@@ -23,9 +33,10 @@ type CommunityChannelMessageEditionSignaturePayload = {
   channelId: string;
   communityId: string;
   createdAt: number;
-  encryptedPayload: string;
+  encryptedPayload?: string;
   id: string;
-  mentions?: ReturnType<CommunityChannelMessage['toPrimitives']>['mentions'];
+  mentions?: CommunityChannelMessageMentionPrimitives;
+  plaintextPayload?: string;
   type: 'edited';
 };
 type CommunityChannelSignaturePayload =
@@ -74,6 +85,7 @@ export class CommunityChannelMessageSignatureDomainService {
       encryptedPayload: payload.encryptedPayload,
       id: payload.id,
       mentions: this.mentions(payload.mentions),
+      plaintextPayload: payload.plaintextPayload,
       type: payload.type,
     };
   }
@@ -90,6 +102,7 @@ export class CommunityChannelMessageSignatureDomainService {
       encryptedPayload: payload.encryptedPayload,
       id: payload.id,
       mentions: this.mentions(payload.mentions),
+      plaintextPayload: payload.plaintextPayload,
       type: payload.type,
     };
   }

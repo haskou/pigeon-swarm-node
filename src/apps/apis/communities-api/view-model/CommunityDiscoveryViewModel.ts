@@ -52,6 +52,7 @@ export class CommunityDiscoveryViewModel {
     const request = this.findPendingRequest(community);
 
     return {
+      autoJoinEnabled: primitives.autoJoinEnabled,
       avatar: primitives.avatar,
       banner: primitives.banner,
       description: primitives.description,

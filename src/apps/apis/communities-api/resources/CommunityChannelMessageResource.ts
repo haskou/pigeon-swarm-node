@@ -13,6 +13,7 @@ export interface CommunityChannelMessageResource {
     targetId: string | undefined;
     type: CommunityMentionTypeValue;
   }[];
+  plaintextPayload?: string;
   reactions: {
     authorIdentityId: string;
     createdAt: number;

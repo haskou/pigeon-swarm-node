@@ -87,9 +87,14 @@ package "nodes" {
       -saver: NodeSaverService
       -eventPublisher: DomainEventPublisher
       +addNetwork(message: NodeNetworkAdderMessage): Promise<void>
+      +addPublicNetwork(message: NodePublicNetworkAdderMessage): Promise<void>
     }
 
     class NodeNetworkAdderMessage {
+      -network: Network
+    }
+
+    class NodePublicNetworkAdderMessage {
       -network: Network
     }
 
@@ -125,6 +130,7 @@ package "nodes" {
     NodeNetworkAdder --> NodeLoaderService
     NodeNetworkAdder --> NodeSaverService
     NodeNetworkAdder --> NodeNetworkAdderMessage
+    NodeNetworkAdder --> NodePublicNetworkAdderMessage
     NodeLoader --> NodeLoaderService
     NodeOwnerAssigner --> NodeLoaderService
     NodeOwnerAssigner --> NodeSaverService

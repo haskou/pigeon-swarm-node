@@ -1,4 +1,6 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityProfile } from '@app/contexts/communities/domain/CommunityProfile';
+import { CommunitySettings } from '@app/contexts/communities/domain/CommunitySettings';
 import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasRenamedEvent';
@@ -10,6 +12,7 @@ import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
+import { CommunityVisibility } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
@@ -190,12 +193,54 @@ describe('Community', () => {
     );
   });
 
+  it('keeps community visibility as immutable settings', () => {
+    const community = Community.create(
+      owner,
+      networkId,
+      new CommunityProfile(
+        new CommunityName('Community'),
+        new CommunityDescription('Public community'),
+      ),
+      CommunitySettings.create(true, CommunityVisibility.PUBLIC),
+    );
+
+    community.updateProfile(
+      owner,
+      new CommunityName('Renamed'),
+      new CommunityDescription('Updated description'),
+      undefined,
+      undefined,
+    );
+
+    expect(community.toPrimitives().visibility).toBe('public');
+  });
+
+  it('updates auto join as community settings', () => {
+    const community = createCommunity();
+
+    community.updateProfile(
+      owner,
+      new CommunityName('Renamed'),
+      new CommunityDescription('Updated description'),
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(community.isAutoJoinEnabled()).toBe(true);
+    expect(community.toPrimitives().autoJoinEnabled).toBe(true);
+  });
+
   function createCommunity(): Community {
     return Community.create(
       owner,
       networkId,
-      new CommunityName('Community'),
-      new CommunityDescription('Private community'),
+      new CommunityProfile(
+        new CommunityName('Community'),
+        new CommunityDescription('Private community'),
+      ),
+      CommunitySettings.create(true),
     );
   }
 });

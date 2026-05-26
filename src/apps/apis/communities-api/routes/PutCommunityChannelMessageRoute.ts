@@ -1,5 +1,6 @@
 import { PutCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/PutCommunityChannelMessageBody';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/CommunityChannelMessageMention';
+import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/CommunityChannelMessagePayload';
 import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
@@ -7,7 +8,6 @@ import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelMessageEncryptedPayload } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
@@ -45,6 +45,10 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
     const communityChannelId = new CommunityChannelId(channelId);
     const targetMessageId = new CommunityChannelMessageId(messageId);
+    const payload = CommunityChannelMessagePayload.fromPrimitives({
+      encryptedPayload: body.encryptedPayload,
+      plaintextPayload: body.plaintextPayload,
+    });
     const targetMessage = await this.messageRepository().findById(
       new CommunityId(communityId),
       communityChannelId,
@@ -53,6 +57,7 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
     community.assertCanSendMessage(authorIdentityId, communityChannelId);
+    community.assertCanUseMessagePayload(payload);
     assert(
       targetMessage.getAuthorIdentityId().isEqual(authorIdentityId),
       new CommunityChannelMessageAuthorMismatchError(),
@@ -82,6 +87,7 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
         encryptedPayload: body.encryptedPayload,
         id: messageId,
         mentions: mentionPrimitives,
+        plaintextPayload: body.plaintextPayload,
         type: 'edited',
       },
       new Signature(body.signature),
@@ -92,7 +98,7 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
     }
 
     const message = targetMessage.edit(
-      new CommunityChannelMessageEncryptedPayload(body.encryptedPayload),
+      payload,
       new Signature(body.signature),
       new Timestamp(body.createdAt),
       (body.attachmentExternalIdentifiers ?? []).map(

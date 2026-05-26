@@ -154,6 +154,7 @@ describe('NodeStartupSynchronizer', () => {
 
   it('should publish community startup sync requests', async () => {
     const communityPrimitives: PrimitiveOf<Community> = {
+      autoJoinEnabled: false,
       avatar: undefined,
       bannedMemberIds: [],
       banner: undefined,

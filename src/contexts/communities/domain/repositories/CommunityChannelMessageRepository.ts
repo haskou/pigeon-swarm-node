@@ -15,6 +15,18 @@ export interface CommunityChannelMessageRepository {
     limit: number,
     beforeMessageId?: CommunityChannelMessageId,
   ): Promise<CommunityChannelMessage[]>;
+  searchPublicByChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    query: string,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]>;
+  searchPublicByChannels(
+    communityId: CommunityId,
+    channelIds: CommunityChannelId[],
+    query: string,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]>;
   delete(
     communityId: CommunityId,
     channelId: CommunityChannelId,
