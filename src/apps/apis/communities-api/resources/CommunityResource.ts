@@ -32,6 +32,7 @@ export interface CommunityMemberRolesResource {
 }
 
 export interface CommunityResource {
+  autoJoinEnabled: boolean;
   avatar?: string;
   banner?: string;
   bannedMemberIds: string[];

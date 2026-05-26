@@ -510,6 +510,7 @@ export default class Definitions {
   @given('I set a private community body')
   public iSetAPrivateCommunityBody(): void {
     this.body = JSON.stringify({
+      autoJoinEnabled: false,
       avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Private API community',
@@ -522,6 +523,7 @@ export default class Definitions {
   @given('I set a public community body')
   public iSetAPublicCommunityBody(): void {
     this.body = JSON.stringify({
+      autoJoinEnabled: false,
       avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Public API community',
@@ -532,9 +534,23 @@ export default class Definitions {
     });
   }
 
+  @given('I set an auto-join private community body')
+  public iSetAnAutoJoinPrivateCommunityBody(): void {
+    this.body = JSON.stringify({
+      autoJoinEnabled: true,
+      avatar: 'bafybeigcommunityavatar',
+      banner: 'bafybeigcommunitybanner',
+      description: 'Private API community',
+      discoverable: true,
+      name: 'API community',
+      networkId: this.currentNetworkId,
+    });
+  }
+
   @given('I set a hidden private community body')
   public iSetAHiddenPrivateCommunityBody(): void {
     this.body = JSON.stringify({
+      autoJoinEnabled: false,
       avatar: 'bafybeigcommunityavatar',
       banner: 'bafybeigcommunitybanner',
       description: 'Private API community',
@@ -548,12 +564,25 @@ export default class Definitions {
   public iSetACommunityProfileBodyWithEmptyChannelLists(): void {
     this.body = JSON.stringify({
       avatar: 'bafybeigcommunityavatarupdated',
+      autoJoinEnabled: false,
       banner: 'bafybeigcommunitybannerupdated',
       description: 'Updated private API community',
       discoverable: true,
       name: 'Updated API community',
       textChannels: [],
       voiceChannels: [],
+    });
+  }
+
+  @given('I set a community profile body enabling auto join')
+  public iSetACommunityProfileBodyEnablingAutoJoin(): void {
+    this.body = JSON.stringify({
+      avatar: 'bafybeigcommunityavatarupdated',
+      autoJoinEnabled: true,
+      banner: 'bafybeigcommunitybannerupdated',
+      description: 'Updated private API community',
+      discoverable: true,
+      name: 'Updated API community',
     });
   }
 

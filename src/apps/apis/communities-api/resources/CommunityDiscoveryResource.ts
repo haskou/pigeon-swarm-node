@@ -1,6 +1,7 @@
 import { CommunityMembershipRequestResource } from './CommunityMembershipRequestResource';
 
 export interface CommunityDiscoveryItemResource {
+  autoJoinEnabled: boolean;
   avatar?: string;
   banner?: string;
   description: string;

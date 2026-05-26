@@ -26,6 +26,7 @@ export class CommunityCreateMessage {
     avatar?: string,
     banner?: string,
     options: {
+      autoJoinEnabled?: boolean;
       discoverable?: boolean;
       visibility?: CommunityVisibilityValue;
     } = {},
@@ -41,6 +42,7 @@ export class CommunityCreateMessage {
     this.settings = CommunitySettings.create(
       options.discoverable ?? true,
       new CommunityVisibility(options.visibility ?? 'private'),
+      options.autoJoinEnabled ?? false,
     );
   }
 }

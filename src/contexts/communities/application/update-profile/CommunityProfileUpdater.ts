@@ -16,6 +16,7 @@ export class CommunityProfileUpdater {
       message.avatar,
       message.banner,
       message.discoverable,
+      message.autoJoinEnabled,
     );
 
     await this.repository.save(community);

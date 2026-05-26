@@ -3,6 +3,10 @@ import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class PostCommunityBody {
   @IsOptional()
+  @IsBoolean()
+  public readonly autoJoinEnabled?: boolean;
+
+  @IsOptional()
   @IsString()
   public readonly avatar?: string;
 

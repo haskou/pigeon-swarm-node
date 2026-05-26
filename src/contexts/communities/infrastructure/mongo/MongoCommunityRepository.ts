@@ -30,6 +30,7 @@ export class MongoCommunityRepository implements CommunityRepository {
 
     return {
       _id: primitives.id,
+      autoJoinEnabled: primitives.autoJoinEnabled,
       avatar: primitives.avatar,
       bannedMemberIds: primitives.bannedMemberIds,
       banner: primitives.banner,
@@ -50,6 +51,7 @@ export class MongoCommunityRepository implements CommunityRepository {
 
   private toDomain(document: MongoCommunityDocument): Community {
     return Community.fromPrimitives({
+      autoJoinEnabled: document.autoJoinEnabled ?? false,
       avatar: document.avatar,
       bannedMemberIds: document.bannedMemberIds || [],
       banner: document.banner,

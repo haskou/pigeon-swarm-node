@@ -23,6 +23,7 @@ describe('CommunityProfileUpdater', () => {
       'bafybeigavatar',
       'bafybeigbanner',
       false,
+      true,
     );
 
     const result = await updater.update(community, message);
@@ -34,6 +35,7 @@ describe('CommunityProfileUpdater', () => {
       message.avatar,
       message.banner,
       message.discoverable,
+      message.autoJoinEnabled,
     );
     expect(repository.save).toHaveBeenCalledWith(community);
     expect(result).toBe(community);

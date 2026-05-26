@@ -160,6 +160,18 @@ export class CommunityMembershipRequest extends AggregateRoot {
     );
   }
 
+  public acceptAutomatically(ownerIdentityId: IdentityId): void {
+    this.assertPending();
+    this.status = CommunityRequestStatus.ACCEPTED;
+    this.timestamps = this.timestamps.touch();
+    this.record(
+      new CommunityMembershipRequestWasAcceptedEvent(
+        this.communityId.valueOf(),
+        this.eventAttributes(ownerIdentityId),
+      ),
+    );
+  }
+
   public decline(
     actorIdentityId: IdentityId,
     ownerIdentityId: IdentityId,
@@ -190,6 +202,10 @@ export class CommunityMembershipRequest extends AggregateRoot {
 
   public isPending(): boolean {
     return this.status.isPending();
+  }
+
+  public isAccepted(): boolean {
+    return this.status.isAccepted();
   }
 
   public isInvitation(): boolean {

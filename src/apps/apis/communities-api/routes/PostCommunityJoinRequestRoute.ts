@@ -20,7 +20,6 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
     const requests = this.membershipRequests();
 
     community.assertIsNotBanned(actorIdentityId);
-
     const existingRequests = await requests.findByCommunityAndIdentity(
       new CommunityId(communityId),
       actorIdentityId,
@@ -28,6 +27,24 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
     const pendingRequest = existingRequests.find((existingRequest) =>
       existingRequest.isPending(),
     );
+    const acceptedRequest = existingRequests.find((existingRequest) =>
+      existingRequest.isAccepted(),
+    );
+
+    if (pendingRequest && community.isAutoJoinEnabled()) {
+      pendingRequest.acceptAutomatically(community.getOwnerIdentityId());
+      community.joinWithInvite(actorIdentityId);
+      await this.repository().save(community);
+      await requests.save(pendingRequest);
+      await this.eventPublisher.publish(community.pullDomainEvents());
+      await this.eventPublisher.publish(pendingRequest.pullDomainEvents());
+
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .send(
+          new CommunityMembershipRequestViewModel(pendingRequest).toResource(),
+        );
+    }
 
     if (pendingRequest) {
       return response
@@ -37,11 +54,36 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
         );
     }
 
+    if (community.isMember(actorIdentityId) && acceptedRequest) {
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .send(
+          new CommunityMembershipRequestViewModel(acceptedRequest).toResource(),
+        );
+    }
+
     const membershipRequest = CommunityMembershipRequest.request(
       community.getId(),
       actorIdentityId,
       community.getOwnerIdentityId(),
     );
+
+    if (community.isAutoJoinEnabled()) {
+      membershipRequest.acceptAutomatically(community.getOwnerIdentityId());
+      community.joinWithInvite(actorIdentityId);
+      await this.repository().save(community);
+      await requests.save(membershipRequest);
+      await this.eventPublisher.publish(community.pullDomainEvents());
+      await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
+
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .send(
+          new CommunityMembershipRequestViewModel(
+            membershipRequest,
+          ).toResource(),
+        );
+    }
 
     await requests.save(membershipRequest);
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());

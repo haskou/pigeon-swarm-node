@@ -34,6 +34,7 @@ export interface MongoCommunityMemberRoleDocument {
 
 export interface MongoCommunityDocument {
   _id: string;
+  autoJoinEnabled?: boolean;
   avatar?: string;
   banner?: string;
   bannedMemberIds?: string[];

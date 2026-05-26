@@ -24,8 +24,9 @@ package "communities/domain" {
     - membership: CommunityMembership
     - channels: CommunityChannels
     - settings: CommunitySettings
-    + create(ownerIdentityId, networkId, name, description, banner?, visibility?): Community
+    + create(ownerIdentityId, networkId, profile, settings): Community
     + joinWithInvite(member): void
+    + isAutoJoinEnabled(): boolean
     + leave(member): void
     + banMember(actor, member): void
     + unbanMember(actor, member): void
@@ -160,6 +161,7 @@ package "communities/domain" {
     - createdAt: Timestamp
     - discoverable: boolean
     - visibility: CommunityVisibility
+    - autoJoinEnabled: boolean
   }
 
   class CommunityInvite {

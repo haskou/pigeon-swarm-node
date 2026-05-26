@@ -23,6 +23,10 @@ export class CommunityRequestStatus extends Enum<CommunityRequestStatusValue> {
     return Object.values(statuses);
   }
 
+  public isAccepted(): boolean {
+    return this.isEqual(CommunityRequestStatus.ACCEPTED);
+  }
+
   public isPending(): boolean {
     return this.isEqual(CommunityRequestStatus.PENDING);
   }

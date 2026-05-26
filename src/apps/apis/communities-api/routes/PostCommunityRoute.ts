@@ -26,6 +26,7 @@ export class PostCommunityRoute extends CommunityRouteSupport {
         body.avatar,
         body.banner,
         {
+          autoJoinEnabled: body.autoJoinEnabled,
           discoverable: body.discoverable,
           visibility: body.visibility,
         },
