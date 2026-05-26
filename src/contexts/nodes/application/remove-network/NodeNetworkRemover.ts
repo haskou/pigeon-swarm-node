@@ -18,8 +18,8 @@ export default class NodeNetworkRemover {
 
     node.removeNetwork(message.networkId);
 
-    await this.saver.saveNode(node);
     await this.cleaner.clean(message.networkId);
+    await this.saver.saveNode(node);
     await this.eventPublisher.publish(node.pullDomainEvents());
   }
 }

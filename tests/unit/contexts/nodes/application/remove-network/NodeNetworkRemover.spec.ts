@@ -27,7 +27,7 @@ describe('NodeNetworkRemover', () => {
     remover = new NodeNetworkRemover(loader, saver, cleaner, eventPublisher);
   });
 
-  it('should remove a network, save, clean data and publish events', async () => {
+  it('should remove a network, clean data, save and publish events', async () => {
     const networkId = NetworkId.generate();
     const message = new NodeNetworkRemoverMessage(networkId.valueOf());
     const events = [mock<DomainEvent>()];
@@ -39,9 +39,12 @@ describe('NodeNetworkRemover', () => {
 
     expect(loader.loadNode).toHaveBeenCalledTimes(1);
     expect(node.removeNetwork).toHaveBeenCalledWith(message.networkId);
-    expect(saver.saveNode).toHaveBeenCalledWith(node);
     expect(cleaner.clean).toHaveBeenCalledWith(message.networkId);
+    expect(saver.saveNode).toHaveBeenCalledWith(node);
     expect(eventPublisher.publish).toHaveBeenCalledWith(events);
+    expect(cleaner.clean.mock.invocationCallOrder[0]).toBeLessThan(
+      saver.saveNode.mock.invocationCallOrder[0],
+    );
   });
 
   it('should not save or clean when the domain removal fails', async () => {
@@ -57,6 +60,20 @@ describe('NodeNetworkRemover', () => {
     await expect(remover.remove(message)).rejects.toThrow(expectedError);
     expect(saver.saveNode).not.toHaveBeenCalled();
     expect(cleaner.clean).not.toHaveBeenCalled();
+    expect(eventPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('should not save or publish events when cleanup fails', async () => {
+    const networkId = NetworkId.generate();
+    const message = new NodeNetworkRemoverMessage(networkId.valueOf());
+    const expectedError = new Error('cleanup failed');
+
+    loader.loadNode.mockResolvedValue(node);
+    cleaner.clean.mockRejectedValue(expectedError);
+
+    await expect(remover.remove(message)).rejects.toThrow(expectedError);
+    expect(node.removeNetwork).toHaveBeenCalledWith(message.networkId);
+    expect(saver.saveNode).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 });
