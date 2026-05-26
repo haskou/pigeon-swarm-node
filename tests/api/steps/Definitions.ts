@@ -2056,6 +2056,12 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/node/networks/');
   }
 
+  @given('I sign the current node public network request')
+  public async iSignTheCurrentNodePublicNetworkRequest(): Promise<void> {
+    this.body = this.body ?? '{}';
+    await this.signCurrentRequest('POST', '/node/networks/public/');
+  }
+
   @given('I set a conversation invitation notification body')
   public async iSetAConversationInvitationNotificationBody(): Promise<void> {
     const inviterKeyPair = await this.ensureIdentityKeyPair();

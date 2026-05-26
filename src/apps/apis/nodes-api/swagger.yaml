@@ -58,6 +58,28 @@ paths:
                 $ref: '#/components/schemas/NetworksResource'
         '403':
           description: The authenticated identity is not the node owner.
+  /node/networks/public/:
+    post:
+      tags:
+        - nodes
+      summary: Add generated public node network
+      description: Creates a public network with a backend-generated network id and the fixed name `public`. Unsigned while the node has no owner; signed by the owner once claimed. A node can only have one public network.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Public network added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworksResource'
+        '403':
+          description: The authenticated identity is not the node owner.
+        '409':
+          description: The node already has a public network.
   /node/owner/:
     put:
       tags:

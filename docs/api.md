@@ -573,6 +573,23 @@ Implemented:
 - persist the network in MongoDB
 - synchronize the runtime IPFS network registry after saving
 
+### Add generated public node network
+
+```http
+POST /node/networks/public
+```
+
+Request body: none.
+
+Implemented:
+
+- create a public network with a backend-generated `networkId`
+- use the fixed network name `public`
+- allow unsigned creation while the node has no owner
+- require signed request auth from the owner after the node is claimed
+- reject the request when the node already has a public network
+- persist the network in MongoDB and synchronize the runtime IPFS network registry
+
 ### Put local node owner
 
 ```http
