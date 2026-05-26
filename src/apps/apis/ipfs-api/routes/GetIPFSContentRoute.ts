@@ -8,6 +8,16 @@ import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Response } from 'express';
 import { Get, JsonController, Param, Res } from 'routing-controllers';
 
+type IPFSContentResponse =
+  | {
+      kind: 'binary';
+      bytes: Buffer;
+    }
+  | {
+      kind: 'json';
+      content: unknown;
+    };
+
 @JsonController('/ipfs')
 export class GetIPFSContentRoute extends Route {
   private contentDisposition(filename: string): string {
@@ -47,6 +57,49 @@ export class GetIPFSContentRoute extends Route {
     }
   }
 
+  private async getPublicJSON(cid: IPFSId): Promise<unknown | undefined> {
+    try {
+      return await this.ipfs().getJSON(cid);
+    } catch (error: unknown) {
+      if (error instanceof IPFSContentNotFoundError) {
+        return undefined;
+      }
+
+      throw error;
+    }
+  }
+
+  private async getFirstAvailableContent(
+    cid: IPFSId,
+  ): Promise<IPFSContentResponse> {
+    try {
+      return await Promise.any([
+        this.getPublicBytes(cid).then((bytes) => {
+          if (bytes === undefined) {
+            throw new IPFSContentNotFoundError(cid.valueOf());
+          }
+
+          return {
+            kind: 'binary' as const,
+            bytes,
+          };
+        }),
+        this.getPublicJSON(cid).then((content) => {
+          if (content === undefined) {
+            throw new IPFSContentNotFoundError(cid.valueOf());
+          }
+
+          return {
+            kind: 'json' as const,
+            content,
+          };
+        }),
+      ]);
+    } catch {
+      throw new IPFSContentNotFoundError(cid.valueOf());
+    }
+  }
+
   private ipfs(): IPFS {
     return this.get<IPFS>(IPFS);
   }
@@ -58,9 +111,9 @@ export class GetIPFSContentRoute extends Route {
   ): Promise<Response> {
     try {
       const ipfsId = new IPFSId(cid);
-      const publicBytes = await this.getPublicBytes(ipfsId);
+      const content = await this.getFirstAvailableContent(ipfsId);
 
-      if (publicBytes !== undefined) {
+      if (content.kind === 'binary') {
         const metadata = await this.contentResponseMetadata(ipfsId);
         response.status(HttpRouteStatusEnum.OK).type(metadata.contentType);
 
@@ -71,12 +124,10 @@ export class GetIPFSContentRoute extends Route {
           );
         }
 
-        return response.send(publicBytes);
+        return response.send(content.bytes);
       }
 
-      const content = await this.ipfs().getJSON(ipfsId);
-
-      return response.status(HttpRouteStatusEnum.OK).json(content);
+      return response.status(HttpRouteStatusEnum.OK).json(content.content);
     } catch (error: unknown) {
       if (error instanceof IPFSContentNotFoundError) {
         return response
