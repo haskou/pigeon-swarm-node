@@ -12,7 +12,7 @@ export interface CommunityDiscoveryItemResource {
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  visibility: 'private';
+  visibility: 'private' | 'public';
 }
 
 export interface CommunityDiscoveryResource {

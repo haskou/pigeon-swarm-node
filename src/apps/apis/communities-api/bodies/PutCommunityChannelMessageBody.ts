@@ -20,9 +20,10 @@ export class PutCommunityChannelMessageBody {
   @IsInt()
   public readonly createdAt: number;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  public readonly encryptedPayload: string;
+  public readonly encryptedPayload?: string;
 
   @IsOptional()
   @IsArray()
@@ -30,6 +31,11 @@ export class PutCommunityChannelMessageBody {
   @ValidateNested({ each: true })
   @Type(() => CommunityMessageMentionBody)
   public readonly mentions?: CommunityMessageMentionBody[];
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly plaintextPayload?: string;
 
   @IsString()
   @IsNotEmpty()

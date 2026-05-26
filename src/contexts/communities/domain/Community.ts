@@ -1,9 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
-import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
+import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
+import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
 import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 import { CommunityChannels } from './CommunityChannels';
 import { CommunityMembership } from './CommunityMembership';
@@ -15,6 +16,7 @@ import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
 import { CommunityMemberBannedError } from './errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
+import { CommunityMessageSearchUnavailableError } from './errors/CommunityMessageSearchUnavailableError';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
@@ -40,20 +42,17 @@ export class Community extends AggregateRoot {
   public static create(
     ownerIdentityId: IdentityId,
     networkId: NetworkId,
-    name: CommunityName,
-    description: CommunityDescription,
-    avatar?: CommunityAvatar,
-    banner?: CommunityBanner,
-    discoverable = true,
+    profile: CommunityProfile,
+    settings: CommunitySettings,
   ): Community {
     return new Community(
       CommunityId.generate(),
       networkId,
       ownerIdentityId,
-      new CommunityProfile(name, description, avatar, banner),
+      profile,
       CommunityMembership.create([ownerIdentityId], CommunityRoles.default()),
       new CommunityChannels([], []),
-      CommunitySettings.create(Timestamp.now(), discoverable),
+      settings,
     );
   }
 
@@ -86,6 +85,7 @@ export class Community extends AggregateRoot {
       CommunitySettings.fromPrimitives({
         createdAt: primitives.createdAt,
         discoverable: primitives.discoverable,
+        visibility: primitives.visibility,
       }),
     );
   }
@@ -107,10 +107,6 @@ export class Community extends AggregateRoot {
       this.ownerIdentityId.isEqual(identityId),
       new CommunityOwnerMismatchError(),
     );
-  }
-
-  private visibility(): 'private' {
-    return 'private';
   }
 
   private hasPermission(
@@ -288,6 +284,19 @@ export class Community extends AggregateRoot {
         this.assertPermission(identityId, CommunityPermission.MENTION_ROLES);
       }
     }
+  }
+
+  public assertCanUseMessagePayload(
+    payload: CommunityChannelMessagePayload,
+  ): void {
+    payload.assertMatchesVisibility(this.settings.getVisibility());
+  }
+
+  public assertCanSearchMessages(): void {
+    assert(
+      this.settings.getVisibility().isPublic(),
+      new CommunityMessageSearchUnavailableError(),
+    );
   }
 
   public assertCanConnectVoice(
@@ -582,6 +591,10 @@ export class Community extends AggregateRoot {
     return this.networkId.isEqual(networkId);
   }
 
+  public isPublic(): boolean {
+    return this.settings.getVisibility().isPublic();
+  }
+
   public isOwner(identityId: IdentityId): boolean {
     return this.ownerIdentityId.isEqual(identityId);
   }
@@ -605,6 +618,22 @@ export class Community extends AggregateRoot {
     identityId: IdentityId,
   ): ReturnType<CommunityChannels['toPrimitives']> {
     return this.channels.visiblePrimitivesFor((permissions) => {
+      if (this.isOwner(identityId)) {
+        return true;
+      }
+
+      return this.membership
+        .getRoles()
+        .memberHasAnyRole(identityId, permissions.getVisibleRoleIds());
+    });
+  }
+
+  public visibleTextChannelIdsFor(
+    identityId: IdentityId,
+  ): CommunityChannelId[] {
+    this.assertIsMember(identityId);
+
+    return this.channels.visibleTextChannelIdsFor((permissions) => {
       if (this.isOwner(identityId)) {
         return true;
       }
@@ -645,7 +674,7 @@ export class Community extends AggregateRoot {
       ownerIdentityId: this.ownerIdentityId.valueOf(),
       roles: this.membership.toPrimitives().roles,
       textChannels: channels.textChannels,
-      visibility: this.visibility(),
+      visibility: settings.visibility,
       voiceChannels: channels.voiceChannels,
     };
   }

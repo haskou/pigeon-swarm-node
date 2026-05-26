@@ -25,7 +25,10 @@ export class PostCommunityRoute extends CommunityRouteSupport {
         body.description,
         body.avatar,
         body.banner,
-        body.discoverable,
+        {
+          discoverable: body.discoverable,
+          visibility: body.visibility,
+        },
       ),
     );
 

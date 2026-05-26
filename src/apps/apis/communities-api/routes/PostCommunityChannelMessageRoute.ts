@@ -2,12 +2,12 @@ import { PostCommunityChannelMessageBody } from '@app/apps/apis/communities-api/
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
+import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/CommunityChannelMessagePayload';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelMessageEncryptedPayload } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
@@ -43,8 +43,13 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
     const authorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
     const communityChannelId = new CommunityChannelId(channelId);
+    const payload = CommunityChannelMessagePayload.fromPrimitives({
+      encryptedPayload: body.encryptedPayload,
+      plaintextPayload: body.plaintextPayload,
+    });
 
     community.assertCanSendMessage(authorIdentityId, communityChannelId);
+    community.assertCanUseMessagePayload(payload);
 
     const message = CommunityChannelMessage.create(
       new CommunityChannelMessageMetadata(
@@ -54,7 +59,7 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
         authorIdentityId,
         new Timestamp(body.createdAt),
       ),
-      new CommunityChannelMessageEncryptedPayload(body.encryptedPayload),
+      payload,
       new Signature(body.signature),
       (body.attachmentExternalIdentifiers ?? []).map(
         (externalIdentifier) =>

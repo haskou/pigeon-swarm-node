@@ -140,4 +140,12 @@ export class CommunityChannels {
         .map((channel) => channel.toPrimitives()),
     };
   }
+
+  public visibleTextChannelIdsFor(
+    canView: (permissions: CommunityChannelPermissions) => boolean,
+  ): CommunityChannelId[] {
+    return this.textChannels
+      .filter((channel) => canView(channel.getPermissions()))
+      .map((channel) => channel.getId());
+  }
 }

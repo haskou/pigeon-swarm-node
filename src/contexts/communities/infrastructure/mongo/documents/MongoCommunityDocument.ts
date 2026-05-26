@@ -1,3 +1,5 @@
+import { CommunityVisibilityValue } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
+
 export interface MongoCommunityTextChannelDocument {
   createdAt: number;
   id: string;
@@ -45,7 +47,7 @@ export interface MongoCommunityDocument {
   ownerIdentityId: string;
   roles?: MongoCommunityRoleDocument[];
   textChannels: MongoCommunityTextChannelDocument[];
-  visibility: 'private';
+  visibility: CommunityVisibilityValue;
   voiceChannels?: MongoCommunityVoiceChannelDocument[];
 }
 import { CommunityPermissionValue } from '@app/contexts/communities/domain/value-objects/CommunityPermission';

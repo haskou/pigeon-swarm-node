@@ -92,6 +92,18 @@ export class MongoCommunityMessageReactionRepository {
     channelId: CommunityChannelId,
     messageIds: CommunityChannelMessageId[],
   ): Promise<CommunityChannelMessageReaction[]> {
+    return this.findByMessageIdsInChannels(
+      communityId,
+      [channelId],
+      messageIds,
+    );
+  }
+
+  public async findByMessageIdsInChannels(
+    communityId: CommunityId,
+    channelIds: CommunityChannelId[],
+    messageIds: CommunityChannelMessageId[],
+  ): Promise<CommunityChannelMessageReaction[]> {
     if (messageIds.length === 0) {
       return [];
     }
@@ -100,7 +112,9 @@ export class MongoCommunityMessageReactionRepository {
       await this.collection()
     )
       .find({
-        channelId: channelId.valueOf(),
+        channelId: {
+          $in: channelIds.map((channelId) => channelId.valueOf()),
+        },
         communityId: communityId.valueOf(),
         messageId: {
           $in: messageIds.map((messageId) => messageId.valueOf()),

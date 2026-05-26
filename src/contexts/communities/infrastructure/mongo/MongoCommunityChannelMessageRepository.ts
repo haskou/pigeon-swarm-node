@@ -8,6 +8,7 @@ import { MongoCommunityChannelMessageDocument } from './documents/MongoCommunity
 
 export class MongoCommunityChannelMessageRepository {
   private static readonly COLLECTION = 'community_channel_messages';
+  private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
   constructor(private readonly mongo: MongoDB) {}
 
@@ -32,6 +33,7 @@ export class MongoCommunityChannelMessageRepository {
       editedAt: primitives.editedAt,
       encryptedPayload: primitives.encryptedPayload,
       mentions: primitives.mentions,
+      plaintextPayload: primitives.plaintextPayload,
       pollId: primitives.pollId,
       signature: primitives.signature,
       type: primitives.type,
@@ -51,10 +53,18 @@ export class MongoCommunityChannelMessageRepository {
       encryptedPayload: document.encryptedPayload,
       id: document._id,
       mentions: document.mentions || [],
+      plaintextPayload: document.plaintextPayload,
       pollId: document.pollId,
       signature: document.signature,
       type: document.type,
     });
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(
+      MongoCommunityChannelMessageRepository.REGEX_SPECIAL_CHARACTERS,
+      '\\$&',
+    );
   }
 
   public async findById(
@@ -107,6 +117,47 @@ export class MongoCommunityChannelMessageRepository {
     )
       .find({
         communityId: communityId.valueOf(),
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return documents.reverse().map((document) => this.toDomain(document));
+  }
+
+  public async searchPublicByChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    query: string,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]> {
+    return this.searchPublicByChannels(communityId, [channelId], query, limit);
+  }
+
+  public async searchPublicByChannels(
+    communityId: CommunityId,
+    channelIds: CommunityChannelId[],
+    query: string,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]> {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery || channelIds.length === 0) {
+      return [];
+    }
+
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        channelId: {
+          $in: channelIds.map((channelId) => channelId.valueOf()),
+        },
+        communityId: communityId.valueOf(),
+        plaintextPayload: {
+          $options: 'i',
+          $regex: this.escapeRegex(trimmedQuery),
+        },
       })
       .sort({ createdAt: -1 })
       .limit(limit)

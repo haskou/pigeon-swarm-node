@@ -1803,19 +1803,26 @@ Request:
   "description": "Private workspace",
   "avatar": "<publicAvatarCid>",
   "banner": "<publicBannerCid>",
-  "discoverable": true
+  "discoverable": true,
+  "visibility": "private"
 }
 ```
 
 Implemented:
 
-- create a private community in the requested network
+- create a community in the requested network
 - set the authenticated identity as owner
 - add the owner as the first member
 - store `avatar` as an optional public IPFS CID, not as base64
 - store `banner` as an optional public IPFS CID, not as base64
 - default `discoverable` to `true`; set it to `false` to hide the community
   from `GET /communities/discover`
+- default `visibility` to `private`
+- accept `visibility: "public"` to create a plaintext community whose text
+  channel messages are stored as `plaintextPayload` and can be searched
+- keep `visibility` immutable; update profile endpoints cannot change it
+- require private communities to send `encryptedPayload`
+- require public communities to send `plaintextPayload`
 
 ### Get community
 
@@ -2484,6 +2491,20 @@ Request:
 }
 ```
 
+For public communities, send `plaintextPayload` instead of
+`encryptedPayload`:
+
+```json
+{
+  "id": "<clientGeneratedMessageId>",
+  "createdAt": 1773848829055,
+  "plaintextPayload": "Plain public message that can be indexed",
+  "signature": "<messageSignature>",
+  "mentions": [],
+  "attachmentExternalIdentifiers": []
+}
+```
+
 Response:
 
 ```json
@@ -2502,6 +2523,9 @@ Response:
 }
 ```
 
+Public community responses contain `plaintextPayload` instead of
+`encryptedPayload`.
+
 Implemented:
 
 - require signed request auth from a community member
@@ -2513,7 +2537,9 @@ Implemented:
   - `here` requires `mention_here`
   - `role` requires `mention_roles`
   - `identity` mentions do not require a special permission
-- store `encryptedPayload` as opaque client-encrypted text
+- store `encryptedPayload` as opaque client-encrypted text for private
+  communities
+- store `plaintextPayload` as indexable plain text for public communities
 - store attachment CIDs only; private attachment bytes must be encrypted by the
   client and published first with `POST /ipfs/private`
 - validate the message signature against this canonical payload:
@@ -2533,6 +2559,23 @@ Implemented:
       "targetId": "<roleId>"
     }
   ],
+  "type": "sent"
+}
+```
+
+For public communities, the canonical payload replaces `encryptedPayload` with
+`plaintextPayload` in the same key order used by the backend:
+
+```json
+{
+  "attachmentExternalIdentifiers": [],
+  "authorIdentityId": "<identityId>",
+  "channelId": "<channelId>",
+  "communityId": "<communityId>",
+  "createdAt": 1773848829055,
+  "id": "<messageId>",
+  "mentions": [],
+  "plaintextPayload": "Plain public message that can be indexed",
   "type": "sent"
 }
 ```
@@ -2564,6 +2607,8 @@ Request:
 }
 ```
 
+Public community edits send `plaintextPayload` instead of `encryptedPayload`.
+
 The edition signature must be generated from this canonical payload:
 
 ```json
@@ -2579,6 +2624,9 @@ The edition signature must be generated from this canonical payload:
   "type": "edited"
 }
 ```
+
+For public communities, the edition canonical payload replaces
+`encryptedPayload` with `plaintextPayload`.
 
 The edited message is published to WebSocket clients as
 `communities.v1.channel.message.was_edited`. The event attributes include
@@ -2637,6 +2685,71 @@ Response:
     }
   ],
   "nextBeforeMessageId": "<messageId>"
+}
+```
+
+Public community messages contain `plaintextPayload` instead of
+`encryptedPayload`.
+
+### Search public channel messages
+
+```http
+GET /communities/{communityId}/channels/{channelId}/messages/search?query=pigeon&limit=20
+```
+
+The request is signed as
+`GET /communities/{communityId}/channels/{channelId}/messages/search`; query
+string values are not part of the signed path.
+
+Implemented:
+
+- require signed request auth from a community member
+- require the member to be able to view the text channel
+- only work for `visibility: "public"` communities
+- search `plaintextPayload`; private encrypted messages are not searchable by
+  the backend
+- return the same `CommunityChannelMessagesResource` shape as the normal list
+  endpoint
+
+### Search public community messages
+
+```http
+GET /communities/{communityId}/messages/search?query=pigeon&limit=20
+```
+
+The request is signed as `GET /communities/{communityId}/messages/search`;
+query string values are not part of the signed path.
+
+Implemented:
+
+- require signed request auth from a community member
+- only work for `visibility: "public"` communities
+- search `plaintextPayload` across all text channels visible to the
+  authenticated member
+- exclude hidden channels the member cannot see through roles
+- return message resources with their real `channelId`, so frontend can jump
+  to the right channel/message
+- private encrypted messages are not searchable by the backend
+
+Response:
+
+```json
+{
+  "communityId": "<communityId>",
+  "messages": [
+    {
+      "id": "<messageId>",
+      "communityId": "<communityId>",
+      "channelId": "<channelId>",
+      "authorIdentityId": "<identityId>",
+      "plaintextPayload": "Plain public message that matched",
+      "attachmentExternalIdentifiers": [],
+      "mentions": [],
+      "reactions": [],
+      "type": "sent",
+      "createdAt": 1773848869055
+    }
+  ]
 }
 ```
 
@@ -2782,7 +2895,9 @@ Implemented:
 ### Community keys
 
 The backend does not generate, store or decrypt community keys. Frontend owns
-the symmetric community key lifecycle.
+the symmetric community key lifecycle for private communities. Public
+communities do not need a community encryption key for channel messages because
+they store searchable `plaintextPayload`.
 
 Recommended MVP flow:
 
