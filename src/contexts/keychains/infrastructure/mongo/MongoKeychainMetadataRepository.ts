@@ -51,6 +51,7 @@ export default class MongoKeychainMetadataRepository {
       {
         $set: {
           cid: document.cid,
+          keychain: document.keychain,
           ownerIdentityId: document.ownerIdentityId,
           previousCid: document.previousCid,
           receivedAt: document.receivedAt,

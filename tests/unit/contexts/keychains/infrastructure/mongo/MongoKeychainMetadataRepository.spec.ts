@@ -38,6 +38,7 @@ describe('MongoKeychainMetadataRepository', () => {
       {
         $set: {
           cid: document.cid,
+          keychain: document.keychain,
           ownerIdentityId: document.ownerIdentityId,
           previousCid: document.previousCid,
           receivedAt: expect.any(Number),

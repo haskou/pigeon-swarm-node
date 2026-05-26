@@ -80,8 +80,8 @@ export class GetIPFSContentRoute extends Route {
           }
 
           return {
-            kind: 'binary' as const,
             bytes,
+            kind: 'binary' as const,
           };
         }),
         this.getPublicJSON(cid).then((content) => {
@@ -90,8 +90,8 @@ export class GetIPFSContentRoute extends Route {
           }
 
           return {
-            kind: 'json' as const,
             content,
+            kind: 'json' as const,
           };
         }),
       ]);

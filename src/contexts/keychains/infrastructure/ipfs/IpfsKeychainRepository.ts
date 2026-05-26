@@ -95,6 +95,56 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     );
   }
 
+  private async findLocalCandidateReferences(
+    metadata: MongoKeychainMetadataDocument[],
+  ): Promise<KeychainCandidate[]> {
+    const candidates: KeychainCandidate[] = [];
+
+    for (const document of metadata) {
+      const candidate = document.keychain
+        ? this.mapper.toDomain(document.keychain)
+        : await this.findCandidateFromCid(new IPFSId(document.cid));
+
+      if (candidate) {
+        candidates.push({
+          externalIdentifier: new KeychainExternalIdentifier(document.cid),
+          keychain: candidate,
+          source: 'local',
+        });
+      }
+    }
+
+    return candidates;
+  }
+
+  private async findRemoteCandidateReferences(
+    ownerIdentityId: IdentityId,
+    knownCids: Set<string>,
+  ): Promise<KeychainCandidate[]> {
+    const cidStrings = await this.ipfsManager.getRecordCandidates(
+      this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
+    );
+    const candidates: KeychainCandidate[] = [];
+
+    for (const cidString of cidStrings) {
+      if (knownCids.has(cidString)) {
+        continue;
+      }
+
+      const candidate = await this.findCandidateFromCid(new IPFSId(cidString));
+
+      if (candidate) {
+        candidates.push({
+          externalIdentifier: new KeychainExternalIdentifier(cidString),
+          keychain: candidate,
+          source: 'remote',
+        });
+      }
+    }
+
+    return candidates;
+  }
+
   public async findByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
@@ -115,48 +165,16 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   ): Promise<KeychainCandidate[]> {
     const metadata =
       await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId);
-    const candidates: KeychainCandidate[] = [];
+    const localCandidates = await this.findLocalCandidateReferences(metadata);
 
-    for (const document of metadata) {
-      const candidate = await this.findCandidateFromCid(
-        new IPFSId(document.cid),
-      );
-
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new KeychainExternalIdentifier(document.cid),
-          keychain: candidate,
-          source: 'local',
-        });
-      }
+    if (localCandidates.length > 0) {
+      return localCandidates;
     }
 
-    if (candidates.length > 0) {
-      return candidates;
-    }
-
-    const cidStrings = await this.ipfsManager.getRecordCandidates(
-      this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
+    return this.findRemoteCandidateReferences(
+      ownerIdentityId,
+      new Set(metadata.map((document) => document.cid)),
     );
-    const knownCids = new Set(metadata.map((document) => document.cid));
-
-    for (const cidString of cidStrings) {
-      if (knownCids.has(cidString)) {
-        continue;
-      }
-
-      const candidate = await this.findCandidateFromCid(new IPFSId(cidString));
-
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new KeychainExternalIdentifier(cidString),
-          keychain: candidate,
-          source: 'remote',
-        });
-      }
-    }
-
-    return candidates;
   }
 
   public async save(
