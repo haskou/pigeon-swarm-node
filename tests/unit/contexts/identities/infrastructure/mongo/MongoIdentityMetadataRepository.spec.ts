@@ -41,6 +41,7 @@ describe('MongoIdentityMetadataRepository', () => {
         $set: {
           cid: expectedDocument.cid,
           handle: expectedDocument.handle,
+          identity: expectedDocument.identity,
           identityId: expectedDocument.identityId,
           networkIds: expectedDocument.networkIds,
           previousCid: expectedDocument.previousCid,

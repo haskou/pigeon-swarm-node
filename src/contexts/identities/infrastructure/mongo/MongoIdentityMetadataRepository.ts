@@ -105,6 +105,7 @@ export default class MongoIdentityMetadataRepository {
         $set: {
           cid: document.cid,
           handle: document.handle,
+          identity: document.identity,
           identityId: document.identityId,
           networkIds: document.networkIds,
           previousCid: document.previousCid,

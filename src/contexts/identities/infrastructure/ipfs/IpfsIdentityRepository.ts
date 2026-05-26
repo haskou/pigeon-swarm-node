@@ -142,13 +142,18 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       const id = new IdentityId(metadata.identityId);
       const cid = new IPFSId(metadata.cid);
       const document =
-        await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
+        metadata.identity ??
+        (await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid));
       const candidate = this.mapper.toDomain(document);
 
       if (!this.validator.isValidFor(id, candidate)) {
         await this.deleteMetadata(cid);
 
         return undefined;
+      }
+
+      if (!metadata.identity) {
+        await this.saveMetadata(candidate, cid);
       }
 
       return candidate;

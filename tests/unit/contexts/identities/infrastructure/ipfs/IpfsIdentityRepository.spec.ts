@@ -351,6 +351,30 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
 
+    it('should use cached identity metadata without reading IPFS', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const cidString = 'bafycachedidentity';
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          _id: primitives.id + ':' + cidString,
+          cid: cidString,
+          identity: mapper.toDocument(identity),
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
     it('should reject a DHT candidate with a missing previous identity', async () => {
       const previousIdentity = await mother.build();
       const previousPrimitives = previousIdentity.toPrimitives();
