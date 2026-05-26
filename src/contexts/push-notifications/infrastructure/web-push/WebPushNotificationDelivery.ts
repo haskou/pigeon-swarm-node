@@ -1,3 +1,4 @@
+import Kernel from '@app/Kernel';
 import { createRequire } from 'module';
 
 import { PushNotificationDelivery } from '../../application/send/PushNotificationDelivery';
@@ -29,6 +30,7 @@ type WebPushModule = {
 export class WebPushNotificationDelivery implements PushNotificationDelivery {
   private readonly configuration = new PushVapidConfiguration();
   private readonly webPush = this.loadWebPush();
+  private hasLoggedDisabledDelivery = false;
 
   constructor() {
     if (this.isConfigured() && this.webPush) {
@@ -44,6 +46,10 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
 
       return nodeRequire('web-push') as WebPushModule;
     } catch {
+      Kernel.logger?.warn(
+        'Web Push delivery is disabled because the web-push module could not be loaded.',
+      );
+
       return undefined;
     }
   }
@@ -52,6 +58,17 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
     const statusCode = (error as WebPushError).statusCode;
 
     return statusCode === 404 || statusCode === 410;
+  }
+
+  private logDisabledDelivery(): void {
+    if (this.hasLoggedDisabledDelivery) {
+      return;
+    }
+
+    this.hasLoggedDisabledDelivery = true;
+    Kernel.logger?.warn(
+      'Web Push delivery is disabled. Configure PUSH_VAPID_PUBLIC_KEY and PUSH_VAPID_PRIVATE_KEY to send push notifications.',
+    );
   }
 
   public isConfigured(): boolean {
@@ -63,6 +80,8 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
     payload: PushNotificationPayload,
   ): Promise<boolean> {
     if (!this.isConfigured() || !this.webPush) {
+      this.logDisabledDelivery();
+
       return true;
     }
 
@@ -83,6 +102,10 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
 
       return true;
     } catch (error: unknown) {
+      Kernel.logger?.warn(
+        `Web Push delivery failed for endpoint "${primitives.endpoint}": ${String(error)}`,
+      );
+
       return !this.isGone(error);
     }
   }

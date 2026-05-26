@@ -74,6 +74,36 @@ describe('PushNotificationDispatcher', () => {
     expect(delivery.send).not.toHaveBeenCalled();
   });
 
+  it('sends push notifications even when websocket is connected', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const subscription = createSubscription(recipientIdentityId);
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      presences: [createAvailablePresence(recipientIdentityId.valueOf())],
+      subscriptions: [subscription],
+    });
+    const event = new TestDomainEvent('conversation-id', {
+      authorId: authorIdentityId.valueOf(),
+      eventName: 'conversations.v1.message.was_sent',
+      messageId: 'message-id',
+      participantIds: [
+        authorIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+      ],
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).toHaveBeenCalledWith(
+      subscription,
+      expect.objectContaining({
+        type: 'message',
+      }),
+    );
+  });
+
   it('keeps invitation push notifications while recipient is busy', async () => {
     const recipientIdentityId = await generateIdentityId();
     const subscription = createSubscription(recipientIdentityId);
@@ -148,21 +178,36 @@ function createBusyPresence(identityId: string): IdentityPresence {
   });
 }
 
+function createAvailablePresence(identityId: string): IdentityPresence {
+  return IdentityPresence.fromPrimitives({
+    identityId,
+    lastActivityAt: 1770000000000,
+    lastHeartbeatAt: 1770000000000,
+    status: 'available',
+    updatedAt: 1770000000000,
+  });
+}
+
 function mockDelivery(result: boolean): PushNotificationDelivery {
   return {
     send: jest.fn().mockResolvedValue(result),
   };
 }
 
-function mockPresenceRepository(
-  busyIdentityIds: string[],
-): MongoIdentityPresenceRepository {
+function mockPresenceRepository(options: {
+  busyIdentityIds: string[];
+  presences: IdentityPresence[];
+}): MongoIdentityPresenceRepository {
   return {
-    findByIdentityId: jest.fn(async (identityId: IdentityId) =>
-      busyIdentityIds.includes(identityId.valueOf())
-        ? createBusyPresence(identityId.valueOf())
-        : undefined,
-    ),
+    findByIdentityId: jest.fn(async (identityId: IdentityId) => {
+      if (options.busyIdentityIds.includes(identityId.valueOf())) {
+        return createBusyPresence(identityId.valueOf());
+      }
+
+      return options.presences.find((presence) =>
+        presence.getIdentityId().isEqual(identityId),
+      );
+    }),
   } as unknown as MongoIdentityPresenceRepository;
 }
 
@@ -182,12 +227,16 @@ function mockRepository(
 function createDispatcher(options: {
   busyIdentityIds?: string[];
   delivery: PushNotificationDelivery;
+  presences?: IdentityPresence[];
   repository?: PushSubscriptionRepository;
   subscriptions: PushSubscription[];
 }): PushNotificationDispatcher {
   return new PushNotificationDispatcher(
     options.repository ?? mockRepository(options.subscriptions),
-    mockPresenceRepository(options.busyIdentityIds ?? []),
+    mockPresenceRepository({
+      busyIdentityIds: options.busyIdentityIds ?? [],
+      presences: options.presences ?? [],
+    }),
     options.delivery,
   );
 }
