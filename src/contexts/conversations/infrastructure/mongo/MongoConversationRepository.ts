@@ -209,14 +209,7 @@ export default class MongoConversationRepository implements Repository {
     const conversations: Conversation[] = [];
 
     for (const document of documents) {
-      conversations.push(
-        this.mapper.toDomain(
-          document,
-          await this.findMessagesByConversationId(
-            new ConversationId(document._id),
-          ),
-        ),
-      );
+      conversations.push(this.mapper.toDomain(document));
     }
 
     return conversations;
