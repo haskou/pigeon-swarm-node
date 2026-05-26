@@ -50,6 +50,10 @@ export default class IPFSNetworkRegistry {
     return `${this.storagePath}/shared-peer-private-key.pb`;
   }
 
+  private getNetworkStorageLocation(id: string): string {
+    return `${this.storagePath}/${id}`;
+  }
+
   // eslint-disable-next-line max-len
   private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
     if (this.state.sharedPeerPrivateKey) {
@@ -118,7 +122,7 @@ export default class IPFSNetworkRegistry {
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<IPFSNetwork> {
     const key = config.getKey();
-    const storageLocation = `${this.storagePath}/${config.getId()}`;
+    const storageLocation = this.getNetworkStorageLocation(config.getId());
 
     if (key) {
       const connection = await PrivateIPFS.create({
@@ -188,6 +192,14 @@ export default class IPFSNetworkRegistry {
     const [network] = this.networks.splice(index, 1);
 
     await network.stop();
+  }
+
+  public async deleteNetwork(id: string): Promise<void> {
+    await this.removeNetwork(id);
+    await fs.rm(this.getNetworkStorageLocation(id), {
+      force: true,
+      recursive: true,
+    });
   }
 
   public find(id: string): IPFSNetwork {

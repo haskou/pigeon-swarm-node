@@ -288,6 +288,7 @@ Event contracts used by frontend:
 | `keychains.v1.keychain.was_published` | owner identity id | owner is the aggregate id |
 | `nodes.v1.node.heartbeat.was_sent` | node id | `owner`, `networks` |
 | `nodes.v1.node.network.was_added` | node id | node/network metadata |
+| `nodes.v1.node.network.was_removed` | node id | `networkId` |
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
@@ -589,6 +590,25 @@ Implemented:
 - require signed request auth from the owner after the node is claimed
 - reject the request when the node already has a public network
 - persist the network in MongoDB and synchronize the runtime IPFS network registry
+
+### Delete local node network
+
+```http
+DELETE /node/networks/{networkId}
+```
+
+Request body: none.
+
+Implemented:
+
+- allow unsigned network deletion while the node has no owner
+- require signed request auth from the owner after the node is claimed
+- remove the network from local node metadata
+- stop the runtime IPFS network and delete the local IPFS storage folder for that network
+- delete local MongoDB data scoped to that network:
+  conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and IPFS replication records
+- preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
+- delete identity metadata only when the deleted network was its only network
 
 ### Put local node owner
 

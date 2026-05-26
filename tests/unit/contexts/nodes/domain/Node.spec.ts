@@ -1,6 +1,8 @@
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
+import { NodeNetworkWasRemoved } from '@app/contexts/nodes/domain/events/NodeNetworkWasRemoved';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -87,6 +89,44 @@ describe('Node', () => {
 
       expect(() => node.addNetwork(secondPublic)).toThrow(
         NodeCannotHaveMoreThanOnePublicNetworkError,
+      );
+    });
+  });
+
+  describe('removeNetwork', () => {
+    it('should remove a network and record a NodeNetworkWasRemoved event', () => {
+      const networkId = NetworkId.generate();
+      const network = networkMother.withId(networkId).withoutKey().build();
+
+      node.addNetwork(network);
+      node.pullDomainEvents();
+      node.removeNetwork(networkId);
+
+      expect(node.toPrimitives().networks[networkId.valueOf()]).toBeUndefined();
+      expect(node.pullDomainEvents()).toEqual([
+        expect.any(NodeNetworkWasRemoved),
+      ]);
+    });
+
+    it('should remove a network even when the map key is a different value object instance', () => {
+      const networkId = NetworkId.generate();
+      const network = networkMother.withId(networkId).withoutKey().build();
+      const restored = Node.fromPrimitives({
+        id: mother.id.valueOf(),
+        networks: {
+          [networkId.valueOf()]: network.toPrimitives(),
+        },
+        owner: undefined,
+      });
+
+      restored.removeNetwork(new NetworkId(networkId.valueOf()));
+
+      expect(restored.toPrimitives().networks).toEqual({});
+    });
+
+    it('should throw when removing an unknown network', () => {
+      expect(() => node.removeNetwork(NetworkId.generate())).toThrow(
+        NodeNetworkNotFoundError,
       );
     });
   });

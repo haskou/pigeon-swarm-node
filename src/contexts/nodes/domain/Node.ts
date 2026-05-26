@@ -5,8 +5,10 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
+import { NodeNetworkWasRemoved } from './events/NodeNetworkWasRemoved';
 import { Network } from './Network';
 
 export class Node extends AggregateRoot {
@@ -39,6 +41,12 @@ export class Node extends AggregateRoot {
     return publicNetworks.length <= 1;
   }
 
+  private findNetworkKey(networkId: NetworkId): NetworkId | undefined {
+    return Array.from(this.networks.keys()).find((candidate) =>
+      candidate.isEqual(networkId),
+    );
+  }
+
   public addNetwork(network: Network): void {
     this.networks.set(network.getId(), network);
 
@@ -48,6 +56,19 @@ export class Node extends AggregateRoot {
     );
 
     this.record(new NodeNetworkWasAdded(this.id.valueOf()));
+  }
+
+  public removeNetwork(networkId: NetworkId): void {
+    const persistedNetworkId = this.findNetworkKey(networkId);
+
+    assert(persistedNetworkId, new NodeNetworkNotFoundError(networkId));
+
+    this.networks.delete(persistedNetworkId);
+    this.record(
+      new NodeNetworkWasRemoved(this.id.valueOf(), {
+        networkId: networkId.valueOf(),
+      }),
+    );
   }
 
   public assignOwner(

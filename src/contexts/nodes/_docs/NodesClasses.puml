@@ -90,12 +90,29 @@ package "nodes" {
       +addPublicNetwork(message: NodePublicNetworkAdderMessage): Promise<void>
     }
 
+    class NodeNetworkRemover {
+      -loader: NodeLoaderService
+      -saver: NodeSaverService
+      -cleaner: NodeNetworkDataCleaner
+      -eventPublisher: DomainEventPublisher
+      +remove(message: NodeNetworkRemoverMessage): Promise<void>
+    }
+
     class NodeNetworkAdderMessage {
       -network: Network
     }
 
     class NodePublicNetworkAdderMessage {
       -network: Network
+    }
+
+    class NodeNetworkRemoverMessage {
+      +networkId: NetworkId
+      +constructor(networkId: string)
+    }
+
+    interface NodeNetworkDataCleaner {
+      +clean(networkId: NetworkId): Promise<void>
     }
 
     class NodeOwnerAssignerMessage {
@@ -131,6 +148,10 @@ package "nodes" {
     NodeNetworkAdder --> NodeSaverService
     NodeNetworkAdder --> NodeNetworkAdderMessage
     NodeNetworkAdder --> NodePublicNetworkAdderMessage
+    NodeNetworkRemover --> NodeLoaderService
+    NodeNetworkRemover --> NodeSaverService
+    NodeNetworkRemover --> NodeNetworkDataCleaner
+    NodeNetworkRemover --> NodeNetworkRemoverMessage
     NodeLoader --> NodeLoaderService
     NodeOwnerAssigner --> NodeLoaderService
     NodeOwnerAssigner --> NodeSaverService
