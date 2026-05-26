@@ -115,7 +115,6 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   ): Promise<KeychainCandidate[]> {
     const metadata =
       await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId);
-    const knownCids = new Set(metadata.map((document) => document.cid));
     const candidates: KeychainCandidate[] = [];
 
     for (const document of metadata) {
@@ -127,13 +126,19 @@ export default class IpfsKeychainRepository implements KeychainRepository {
         candidates.push({
           externalIdentifier: new KeychainExternalIdentifier(document.cid),
           keychain: candidate,
+          source: 'local',
         });
       }
+    }
+
+    if (candidates.length > 0) {
+      return candidates;
     }
 
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
     );
+    const knownCids = new Set(metadata.map((document) => document.cid));
 
     for (const cidString of cidStrings) {
       if (knownCids.has(cidString)) {
@@ -146,6 +151,7 @@ export default class IpfsKeychainRepository implements KeychainRepository {
         candidates.push({
           externalIdentifier: new KeychainExternalIdentifier(cidString),
           keychain: candidate,
+          source: 'remote',
         });
       }
     }

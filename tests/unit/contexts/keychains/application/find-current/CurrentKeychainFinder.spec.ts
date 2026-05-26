@@ -3,9 +3,11 @@ import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/
 import { KeychainNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainNotFoundError';
 import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
+import { KeychainMother } from '../../../../mothers/KeychainMother';
 
 describe('CurrentKeychainFinder', () => {
   let repository: MockProxy<KeychainRepository>;
@@ -26,5 +28,29 @@ describe('CurrentKeychainFinder', () => {
     await expect(
       finder.find(new CurrentKeychainFindMessage(ownerIdentityId)),
     ).rejects.toThrow(KeychainNotFoundError);
+  });
+
+  it('should validate local metadata candidates without resolving previous keychains', async () => {
+    const mother = await KeychainMother.create();
+    const keychain = mother
+      .withVersion(2)
+      .withPreviousKeychainExternalIdentifier('bafy-previous')
+      .build();
+
+    repository.findCandidateReferencesByOwnerId.mockResolvedValue([
+      {
+        externalIdentifier: new KeychainExternalIdentifier('bafy-current'),
+        keychain,
+        source: 'local',
+      },
+    ]);
+
+    const result = await finder.find(
+      new CurrentKeychainFindMessage(mother.ownerIdentityId.valueOf()),
+    );
+
+    expect(result.keychain).toEqual(keychain);
+    expect(validator.isValidChainFor).not.toHaveBeenCalled();
+    expect(repository.findByExternalIdentifier).not.toHaveBeenCalled();
   });
 });
