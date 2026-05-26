@@ -2,7 +2,6 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 const communityPrimitiveKeys = [
-  'autoJoinEnabled',
   'createdAt',
   'description',
   'id',
