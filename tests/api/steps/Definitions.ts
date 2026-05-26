@@ -2062,6 +2062,32 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/node/networks/public/');
   }
 
+  @given('I sign the current node network deletion request for network {string}')
+  public async iSignTheCurrentNodeNetworkDeletionRequestForNetwork(
+    networkId: string,
+  ): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('DELETE', `/node/networks/${networkId}/`);
+  }
+
+  @given(
+    'another identity signs the current node network deletion request for network {string}',
+  )
+  public async anotherIdentitySignsTheCurrentNodeNetworkDeletionRequestForNetwork(
+    networkId: string,
+  ): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/node/networks/${networkId}/`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I set a conversation invitation notification body')
   public async iSetAConversationInvitationNotificationBody(): Promise<void> {
     const inviterKeyPair = await this.ensureIdentityKeyPair();

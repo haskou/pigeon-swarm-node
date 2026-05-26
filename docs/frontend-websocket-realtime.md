@@ -277,6 +277,7 @@ Frontend should switch on `event.type`.
 | `keychains.v1.keychain.was_published` | Owner identity id | none | Owner identity id | Refetch current keychain if it belongs to the session identity. |
 | `nodes.v1.node.heartbeat.was_sent` | Node id | `owner`, `networks` | All authenticated clients on the local node | Refetch `GET /peers`. |
 | `nodes.v1.node.network.was_added` | Node id | implementation-specific node metadata | All authenticated clients on the local node | Refetch `GET /node/networks` and `GET /peers`. |
+| `nodes.v1.node.network.was_removed` | Node id | `networkId` | All authenticated clients on the local node | Refetch `GET /node/networks` and `GET /peers`; local data for that network is no longer available. |
 | `presence.v1.identity_presence.was_updated` | Identity id | `identityId`, `status`, `customMessage`, `lastHeartbeatAt`, `lastActivityAt`, `updatedAt`, `networkIds` | `identityId` | Update cached presence for that identity or refetch `GET /presence/{identityId}`. |
 
 Sync events such as `*.sync_requested` and `*.sync_available` are node-to-node
