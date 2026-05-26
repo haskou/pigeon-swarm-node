@@ -30,3 +30,22 @@ Feature: Post community join request API
     When I GET the current community
     Then response code is equal to 200
     And response body should contain "Private API community"
+
+  Scenario: Auto-join community accepts membership immediately
+    Given I am an anonymous user
+    And I register an in-memory IPFS network "communities-api-auto-join-network"
+    And I set an auto-join private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And response body should contain "autoJoinEnabled"
+    And response body should contain "true"
+    And I remember the current community
+    And the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And response body should contain "accepted"
+    And the community member signs the current community request
+    When I GET the current community
+    Then response code is equal to 200
+    And response body should contain "Private API community"

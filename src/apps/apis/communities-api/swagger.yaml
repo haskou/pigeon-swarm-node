@@ -528,7 +528,7 @@ paths:
       tags:
         - communities
       summary: Request to join a private community
-      description: Creates a pending join request. The requester is not added to memberIds until the community owner accepts the request.
+      description: Creates a pending join request when autoJoinEnabled is false. If autoJoinEnabled is true, the request is immediately accepted and the requester is added to memberIds.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -537,7 +537,7 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
-          description: Pending join request created.
+          description: Pending or auto-accepted join request.
           content:
             application/json:
               schema:
@@ -1104,6 +1104,7 @@ components:
         - voiceChannels
         - visibility
         - discoverable
+        - autoJoinEnabled
         - createdAt
       properties:
         id:
@@ -1119,6 +1120,9 @@ components:
         discoverable:
           type: boolean
           description: Whether this private community appears in discovery search results.
+        autoJoinEnabled:
+          type: boolean
+          description: Whether non-banned identities can join without owner approval.
         avatar:
           type: string
           description: Public IPFS CID for the community avatar/icon.
@@ -1260,6 +1264,7 @@ components:
         - membershipStatus
         - visibility
         - discoverable
+        - autoJoinEnabled
       properties:
         id:
           type: string
@@ -1276,6 +1281,9 @@ components:
           enum:
             - true
           description: Discovery only returns communities where this flag is true.
+        autoJoinEnabled:
+          type: boolean
+          description: Whether the community accepts join requests immediately.
         avatar:
           type: string
         banner:
@@ -1606,6 +1614,10 @@ components:
           type: boolean
           default: true
           description: Set false to keep this community out of discovery search results.
+        autoJoinEnabled:
+          type: boolean
+          default: false
+          description: Set true to let any non-banned identity join without owner approval.
         visibility:
           type: string
           default: private
@@ -1634,6 +1646,9 @@ components:
         discoverable:
           type: boolean
           description: Set false to keep this community out of discovery search results.
+        autoJoinEnabled:
+          type: boolean
+          description: Set true to let any non-banned identity join without owner approval.
     PostCommunityMemberBody:
       type: object
       required:

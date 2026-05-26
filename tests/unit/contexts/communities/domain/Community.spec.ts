@@ -215,6 +215,23 @@ describe('Community', () => {
     expect(community.toPrimitives().visibility).toBe('public');
   });
 
+  it('updates auto join as community settings', () => {
+    const community = createCommunity();
+
+    community.updateProfile(
+      owner,
+      new CommunityName('Renamed'),
+      new CommunityDescription('Updated description'),
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(community.isAutoJoinEnabled()).toBe(true);
+    expect(community.toPrimitives().autoJoinEnabled).toBe(true);
+  });
+
   function createCommunity(): Community {
     return Community.create(
       owner,

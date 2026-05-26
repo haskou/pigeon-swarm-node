@@ -83,6 +83,7 @@ export class Community extends AggregateRoot {
         ),
       ),
       CommunitySettings.fromPrimitives({
+        autoJoinEnabled: primitives.autoJoinEnabled,
         createdAt: primitives.createdAt,
         discoverable: primitives.discoverable,
         visibility: primitives.visibility,
@@ -551,12 +552,17 @@ export class Community extends AggregateRoot {
     avatar?: CommunityAvatar,
     banner?: CommunityBanner,
     discoverable?: boolean,
+    autoJoinEnabled?: boolean,
   ): void {
     this.assertOwner(actor);
     this.profile = new CommunityProfile(name, description, avatar, banner);
 
     if (discoverable !== undefined) {
       this.settings.updateDiscoverable(discoverable);
+    }
+
+    if (autoJoinEnabled !== undefined) {
+      this.settings.updateAutoJoinEnabled(autoJoinEnabled);
     }
 
     this.record(
@@ -593,6 +599,10 @@ export class Community extends AggregateRoot {
 
   public isPublic(): boolean {
     return this.settings.getVisibility().isPublic();
+  }
+
+  public isAutoJoinEnabled(): boolean {
+    return this.settings.isAutoJoinEnabled();
   }
 
   public isOwner(identityId: IdentityId): boolean {
@@ -660,6 +670,7 @@ export class Community extends AggregateRoot {
     const settings = this.settings.toPrimitives();
 
     return {
+      autoJoinEnabled: settings.autoJoinEnabled,
       avatar: this.profile.getAvatar()?.valueOf(),
       bannedMemberIds: this.membership.toPrimitives().bannedMemberIds,
       banner: this.profile.getBanner()?.valueOf(),

@@ -1725,6 +1725,7 @@ Response:
       "textChannels": [],
       "visibility": "private",
       "discoverable": true,
+      "autoJoinEnabled": false,
       "createdAt": 1773848829055
     }
   ]
@@ -1772,7 +1773,8 @@ Response:
         "updatedAt": 1773848829055
       },
       "visibility": "private",
-      "discoverable": true
+      "discoverable": true,
+      "autoJoinEnabled": false
     }
   ]
 }
@@ -1804,6 +1806,7 @@ Request:
   "avatar": "<publicAvatarCid>",
   "banner": "<publicBannerCid>",
   "discoverable": true,
+  "autoJoinEnabled": false,
   "visibility": "private"
 }
 ```
@@ -1817,6 +1820,9 @@ Implemented:
 - store `banner` as an optional public IPFS CID, not as base64
 - default `discoverable` to `true`; set it to `false` to hide the community
   from `GET /communities/discover`
+- default `autoJoinEnabled` to `false`; set it to `true` to let any non-banned
+  identity join through `POST /communities/{communityId}/join-requests`
+  without owner approval
 - default `visibility` to `private`
 - accept `visibility: "public"` to create a plaintext community whose text
   channel messages are stored as `plaintextPayload` and can be searched
@@ -1849,7 +1855,8 @@ Request:
   "description": "Updated private workspace",
   "avatar": "<publicAvatarCid>",
   "banner": "<publicBannerCid>",
-  "discoverable": false
+  "discoverable": false,
+  "autoJoinEnabled": true
 }
 ```
 
@@ -1860,6 +1867,8 @@ Implemented:
 - omit `avatar` to remove the avatar
 - omit `banner` to remove the banner
 - update `discoverable` without changing membership or invitation behavior
+- update `autoJoinEnabled`; when enabled, join requests are accepted
+  immediately and the requester is added to `memberIds`
 
 ### List community members
 
@@ -1926,8 +1935,11 @@ Implemented:
 
 - require signed request auth from the requester
 - reject banned identities
-- create a pending `request`
-- do not add the requester to `memberIds` until the owner accepts
+- create a pending `request` when `autoJoinEnabled` is false
+- when `autoJoinEnabled` is true, create and immediately accept the `request`
+  and add the requester to `memberIds`
+- do not add the requester to `memberIds` until the owner accepts, unless
+  `autoJoinEnabled` is true
 - return an existing pending request for the same requester idempotently
 
 ### List community membership requests

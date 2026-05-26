@@ -26,3 +26,21 @@ Feature: Patch community API
     And response body should contain "Updated API community"
     And response body should contain "general"
     And response body should contain "voice"
+
+  Scenario: Updating community profile enables auto join
+    Given I am an anonymous user
+    And I register an in-memory IPFS network "communities-api-profile-auto-join-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community profile body enabling auto join
+    And I sign the current community profile update request
+    When I PATCH the current community
+    Then response code is equal to 200
+    And response body should contain "autoJoinEnabled"
+    And the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And response body should contain "accepted"

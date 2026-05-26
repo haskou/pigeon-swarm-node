@@ -37,6 +37,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
         body.avatar,
         body.banner,
         body.discoverable,
+        body.autoJoinEnabled,
       ),
     );
     await this.eventPublisher.publish(community.pullDomainEvents());
@@ -46,6 +47,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
       CommunityModerationAction.COMMUNITY_UPDATED,
       this.communityTarget(community),
       {
+        autoJoinEnabled: body.autoJoinEnabled,
         avatar: body.avatar,
         banner: body.banner,
         description: body.description,
