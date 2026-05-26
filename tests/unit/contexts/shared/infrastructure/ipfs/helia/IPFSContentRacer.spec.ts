@@ -63,6 +63,46 @@ describe('IPFSContentRacer', () => {
     });
   });
 
+  describe('raceGetRecordCandidates', () => {
+    it('should collect unique resolved record values', async () => {
+      const network1 = mock<IPFSNetwork>();
+      const network2 = mock<IPFSNetwork>();
+      const network3 = mock<IPFSNetwork>();
+
+      network1.getRecord.mockResolvedValue('cid-a');
+      network2.getRecord.mockResolvedValue('cid-a');
+      network3.getRecord.mockResolvedValue('cid-b');
+
+      const result = await racer.raceGetRecordCandidates(
+        [network1, network2, network3],
+        'my-key',
+      );
+
+      expect(result).toEqual(['cid-a', 'cid-b']);
+      expect(network1.getRecord).toHaveBeenCalledWith(
+        'my-key',
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should ignore missing and failed record lookups', async () => {
+      const network1 = mock<IPFSNetwork>();
+      const network2 = mock<IPFSNetwork>();
+      const network3 = mock<IPFSNetwork>();
+
+      network1.getRecord.mockResolvedValue(undefined);
+      network2.getRecord.mockRejectedValue(new Error('timeout'));
+      network3.getRecord.mockResolvedValue('cid-b');
+
+      const result = await racer.raceGetRecordCandidates(
+        [network1, network2, network3],
+        'my-key',
+      );
+
+      expect(result).toEqual(['cid-b']);
+    });
+  });
+
   describe('raceStat', () => {
     it('should resolve when any network stat succeeds and pass signal', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');

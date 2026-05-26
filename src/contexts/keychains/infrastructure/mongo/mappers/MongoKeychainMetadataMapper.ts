@@ -15,6 +15,14 @@ export default class MongoKeychainMetadataMapper {
     return {
       _id: `${primitives.ownerIdentityId}:${cid.valueOf()}`,
       cid: cid.valueOf(),
+      keychain: {
+        _id: primitives.ownerIdentityId,
+        encryptedPayload: primitives.encryptedPayload,
+        previousCid: primitives.previousKeychainExternalIdentifier,
+        signature: primitives.signature,
+        timestamp: primitives.timestamp,
+        version: primitives.version,
+      },
       ownerIdentityId: primitives.ownerIdentityId,
       previousCid: primitives.previousKeychainExternalIdentifier,
       receivedAt: receivedAt.valueOf(),

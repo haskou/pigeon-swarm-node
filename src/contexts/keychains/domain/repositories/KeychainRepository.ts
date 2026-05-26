@@ -7,6 +7,7 @@ import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIde
 export interface KeychainCandidate {
   externalIdentifier: KeychainExternalIdentifier;
   keychain: Keychain;
+  source?: 'local' | 'remote';
 }
 
 export interface KeychainRepository {

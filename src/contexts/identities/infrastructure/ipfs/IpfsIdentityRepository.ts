@@ -138,10 +138,30 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   private async findCandidateFromMetadata(
     metadata: MongoIdentityMetadataDocument,
   ): Promise<Identity | undefined> {
-    return this.findCandidateFromCid(
-      new IdentityId(metadata.identityId),
-      new IPFSId(metadata.cid),
-    );
+    try {
+      const id = new IdentityId(metadata.identityId);
+      const cid = new IPFSId(metadata.cid);
+      const document =
+        metadata.identity ??
+        (await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid));
+      const candidate = this.mapper.toDomain(document);
+
+      if (!this.validator.isValidFor(id, candidate)) {
+        await this.deleteMetadata(cid);
+
+        return undefined;
+      }
+
+      if (!metadata.identity) {
+        await this.saveMetadata(candidate, cid);
+      }
+
+      return candidate;
+    } catch {
+      await this.deleteMetadata(new IPFSId(metadata.cid));
+
+      return undefined;
+    }
   }
 
   public async findById(id: IdentityId): Promise<Identity> {
@@ -186,11 +206,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     const candidates: IdentityCandidate[] = [];
 
     for (const document of metadata) {
-      const candidate = await this.findCandidateFromCid(
-        id,
-        new IPFSId(document.cid),
-        false,
-      );
+      const candidate = await this.findCandidateFromMetadata(document);
 
       if (candidate) {
         candidates.push({
@@ -198,6 +214,10 @@ export default class IpfsIdentityRepository implements IdentityRepository {
           identity: candidate,
         });
       }
+    }
+
+    if (candidates.length > 0) {
+      return candidates;
     }
 
     const knownCids = new Set(metadata.map((document) => document.cid));

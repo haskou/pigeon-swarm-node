@@ -96,14 +96,12 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
-        'pigeon-swarm_identity-' + primitives.id,
-      );
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should add the DHT head when mongo has a different candidate', async () => {
+    it('should not wait for DHT candidates when mongo has a valid candidate', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -137,13 +135,11 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(mongoCidString),
       );
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).not.toHaveBeenCalledWith(
         new IPFSId(dhtCidString),
       );
-      expect(metadataRepository.save.mock.calls[0][1]).toEqual(
-        new IPFSId(dhtCidString),
-      );
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(1);
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
@@ -319,6 +315,64 @@ describe('IpfsIdentityRepository', () => {
         new IPFSId(candidateCidString),
       );
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
+    });
+
+    it('should not resolve previous identity versions for trusted mongo metadata', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafypreviousidentity';
+      const currentCidString = 'bafycurrentidentity';
+      const candidate = await previousIdentity.updateProfile(
+        new Profile(new ProfileName('Jane')),
+        mother.password,
+        new IdentityExternalIdentifier(previousCidString),
+      );
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          _id: previousPrimitives.id + ':' + currentCidString,
+          cid: currentCidString,
+          identityId: previousPrimitives.id,
+          previousCid: previousCidString,
+          receivedAt: Date.now(),
+          version: candidate.toPrimitives().version,
+        },
+      ]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(candidate));
+
+      const result = await repository.findById(
+        new IdentityId(previousPrimitives.id),
+      );
+
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(currentCidString),
+      );
+      expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
+    });
+
+    it('should use cached identity metadata without reading IPFS', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const cidString = 'bafycachedidentity';
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          _id: primitives.id + ':' + cidString,
+          cid: cidString,
+          identity: mapper.toDocument(identity),
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(result.toPrimitives()).toEqual(primitives);
     });
 
     it('should reject a DHT candidate with a missing previous identity', async () => {
