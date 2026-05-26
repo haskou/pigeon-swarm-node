@@ -167,17 +167,19 @@ describe('IPFS', () => {
       const secondNetwork = mock<IPFSNetwork>();
       const thirdNetwork = mock<IPFSNetwork>();
 
-      firstNetwork.getRecord.mockResolvedValue('cid-a');
-      secondNetwork.getRecord.mockResolvedValue('cid-a');
-      thirdNetwork.getRecord.mockResolvedValue('cid-b');
       registry.getAll.mockReturnValue([
         firstNetwork,
         secondNetwork,
         thirdNetwork,
       ]);
+      racer.raceGetRecordCandidates.mockResolvedValue(['cid-a', 'cid-b']);
 
       const result = await ipfs.getRecordCandidates('my-key');
 
+      expect(racer.raceGetRecordCandidates).toHaveBeenCalledWith(
+        [firstNetwork, secondNetwork, thirdNetwork],
+        'my-key',
+      );
       expect(result).toEqual(['cid-a', 'cid-b']);
     });
 
@@ -185,12 +187,15 @@ describe('IPFS', () => {
       const firstNetwork = mock<IPFSNetwork>();
       const secondNetwork = mock<IPFSNetwork>();
 
-      firstNetwork.getRecord.mockResolvedValue(undefined);
-      secondNetwork.getRecord.mockResolvedValue('cid-b');
       registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      racer.raceGetRecordCandidates.mockResolvedValue(['cid-b']);
 
       const result = await ipfs.getRecordCandidates('my-key');
 
+      expect(racer.raceGetRecordCandidates).toHaveBeenCalledWith(
+        [firstNetwork, secondNetwork],
+        'my-key',
+      );
       expect(result).toEqual(['cid-b']);
     });
   });

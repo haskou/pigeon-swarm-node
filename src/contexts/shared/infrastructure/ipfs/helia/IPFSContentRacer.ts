@@ -114,4 +114,30 @@ export default class IPFSContentRacer {
       clearTimeout(timeout);
     }
   }
+
+  public async raceGetRecordCandidates(
+    networks: IPFSNetwork[],
+    key: string,
+  ): Promise<string[]> {
+    const controller = new AbortController();
+    const timeout = this.startTimeout(controller);
+
+    try {
+      const results = await Promise.allSettled(
+        networks.map((network) => network.getRecord(key, controller.signal)),
+      );
+
+      return [
+        ...new Set(
+          results
+            .filter((result) => result.status === 'fulfilled')
+            .map((result) => result.value)
+            .filter((value) => value !== undefined),
+        ),
+      ];
+    } finally {
+      controller.abort();
+      clearTimeout(timeout);
+    }
+  }
 }

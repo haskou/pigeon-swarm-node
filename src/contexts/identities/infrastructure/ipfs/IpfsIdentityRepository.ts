@@ -200,6 +200,10 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       }
     }
 
+    if (candidates.length > 0) {
+      return candidates;
+    }
+
     const knownCids = new Set(metadata.map((document) => document.cid));
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + id.valueOf(),

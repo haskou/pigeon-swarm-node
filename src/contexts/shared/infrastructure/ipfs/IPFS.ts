@@ -149,11 +149,7 @@ export default class IPFS {
   public async getRecordCandidates(key: string): Promise<string[]> {
     await this.initialize();
 
-    const results = await Promise.all(
-      this.registry.getAll().map((network) => network.getRecord(key)),
-    );
-
-    return [...new Set(results.filter((value) => value !== undefined))];
+    return this.racer.raceGetRecordCandidates(this.registry.getAll(), key);
   }
 
   public async getRecordFromNetwork(

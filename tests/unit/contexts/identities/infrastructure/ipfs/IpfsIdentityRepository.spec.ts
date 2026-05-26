@@ -96,14 +96,12 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
-        'pigeon-swarm_identity-' + primitives.id,
-      );
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should add the DHT head when mongo has a different candidate', async () => {
+    it('should not wait for DHT candidates when mongo has a valid candidate', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -137,13 +135,11 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(mongoCidString),
       );
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).not.toHaveBeenCalledWith(
         new IPFSId(dhtCidString),
       );
-      expect(metadataRepository.save.mock.calls[0][1]).toEqual(
-        new IPFSId(dhtCidString),
-      );
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(1);
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
