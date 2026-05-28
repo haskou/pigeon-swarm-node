@@ -12,7 +12,7 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityChannelsRoute extends CommunityRouteSupport {
-  private static readonly THREAD_SUMMARY_LIMIT_PER_CHANNEL = 10;
+  private static readonly THREAD_SUMMARY_LIMIT_PER_CHANNEL = 2;
 
   private callRepository(): MongoCallRepository {
     return new MongoCallRepository(this.get<MongoDB>(MongoDB));
