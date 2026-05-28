@@ -16,6 +16,7 @@ type CommunityChannelMessageSignaturePayload = {
   id: string;
   mentions?: CommunityChannelMessageMentionPrimitives;
   plaintextPayload?: string;
+  replyToMessageId?: string;
   type: 'poll' | 'sent';
 };
 type CommunityChannelMessageDeletionSignaturePayload = {
@@ -37,6 +38,7 @@ type CommunityChannelMessageEditionSignaturePayload = {
   id: string;
   mentions?: CommunityChannelMessageMentionPrimitives;
   plaintextPayload?: string;
+  replyToMessageId?: string;
   type: 'edited';
 };
 type CommunityChannelSignaturePayload =
@@ -86,6 +88,7 @@ export class CommunityChannelMessageSignatureDomainService {
       id: payload.id,
       mentions: this.mentions(payload.mentions),
       plaintextPayload: payload.plaintextPayload,
+      replyToMessageId: payload.replyToMessageId,
       type: payload.type,
     };
   }
@@ -103,6 +106,7 @@ export class CommunityChannelMessageSignatureDomainService {
       id: payload.id,
       mentions: this.mentions(payload.mentions),
       plaintextPayload: payload.plaintextPayload,
+      replyToMessageId: payload.replyToMessageId,
       type: payload.type,
     };
   }

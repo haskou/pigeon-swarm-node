@@ -160,12 +160,28 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}'
   /communities/{communityId}/channels/{channelId}/messages:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages'
+  /communities/me/drafts:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1me~1drafts'
+  /communities/{communityId}/channels/{channelId}/draft:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1draft'
+  /communities/{communityId}/channels/{channelId}/pins:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1pins'
   /communities/{communityId}/channels/{channelId}/messages/search:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1search'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}'
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}~1pin'
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}/thread:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}~1thread'
   /conversations:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
+  /conversations/me/drafts:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1me~1drafts'
+  /conversations/{conversationId}/draft:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1draft'
+  /conversations/{conversationId}/pins:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1pins'
   /conversations/{conversationId}/messages:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages'
   /conversations/{conversationId}/messages/read-until:
@@ -174,6 +190,10 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}'
   /conversations/{conversationId}/messages/{messageId}/around:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}~1around'
+  /conversations/{conversationId}/messages/{messageId}/pin:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}~1pin'
+  /conversations/{conversationId}/messages/{messageId}/thread:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}~1thread'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /identities/{reference}:

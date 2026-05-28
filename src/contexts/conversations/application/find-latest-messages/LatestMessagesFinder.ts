@@ -11,6 +11,7 @@ import { MessageReactionRepository } from '@app/contexts/conversations/domain/re
 import { LatestMessagesFindMessage } from './messages/LatestMessagesFindMessage';
 import { MessageFindMessage } from './messages/MessageFindMessage';
 import { MessagesAroundFindMessage } from './messages/MessagesAroundFindMessage';
+import { ThreadMessagesFindMessage } from './messages/ThreadMessagesFindMessage';
 
 export default class LatestMessagesFinder {
   constructor(
@@ -75,6 +76,18 @@ export default class LatestMessagesFinder {
     return this.conversationRepository.findMessageById(
       message.conversationId,
       message.messageId,
+    );
+  }
+
+  public async findThread(
+    message: ThreadMessagesFindMessage,
+  ): Promise<Message[]> {
+    await this.ensureRequesterCanReadConversation(message);
+
+    return this.conversationRepository.findThreadMessages(
+      message.conversationId,
+      message.messageId,
+      message.limit,
     );
   }
 }

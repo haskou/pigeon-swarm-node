@@ -20,6 +20,7 @@ export interface CommunityChannelMessageResource {
     emoji: string;
   }[];
   pollId?: string;
+  replyToMessageId?: string;
   signature?: string;
   type: 'poll' | 'sent';
 }

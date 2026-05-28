@@ -125,6 +125,79 @@ paths:
       responses:
         '200':
           description: Messages marked as read.
+  /conversations/me/drafts:
+    get:
+      tags:
+        - conversations
+      summary: List authenticated identity conversation drafts
+      description: Drafts are MongoDB-only opaque encrypted payloads owned by the authenticated identity.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Conversation drafts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDraftsResource'
+  /conversations/{conversationId}/draft:
+    put:
+      tags:
+        - conversations
+      summary: Save authenticated identity draft for a conversation
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationDraftBody'
+      responses:
+        '200':
+          description: Draft saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDraftResource'
+    delete:
+      tags:
+        - conversations
+      summary: Delete authenticated identity draft for a conversation
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Draft deleted.
+  /conversations/{conversationId}/pins:
+    get:
+      tags:
+        - conversations
+      summary: List pinned messages for a conversation
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Conversation pinned messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationMessagePinsResource'
   /conversations/{conversationId}/messages/{messageId}:
     get:
       tags:
@@ -265,6 +338,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageReactionResource'
+  /conversations/{conversationId}/messages/{messageId}/pin:
+    post:
+      tags:
+        - conversations
+      summary: Pin a conversation message
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Message pinned.
+    delete:
+      tags:
+        - conversations
+      summary: Unpin a conversation message
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Message unpinned.
   /conversations/{conversationId}/messages/{messageId}/around:
     get:
       tags:
@@ -298,6 +408,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagesAroundResource'
+  /conversations/{conversationId}/messages/{messageId}/thread:
+    get:
+      tags:
+        - conversations
+      summary: Get replies for a conversation message thread
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Messages whose replyToMessageId points to the requested message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesResource'
 components:
   parameters:
     ConversationId:
@@ -483,6 +621,66 @@ components:
           type: string
           description: Emoji reaction to add or remove. Reactions are unique by conversation, message, author and emoji.
           example: 👍
+    ConversationDraftBody:
+      type: object
+      required:
+        - encryptedPayload
+      properties:
+        encryptedPayload:
+          type: string
+          description: Opaque encrypted draft payload owned by the authenticated identity.
+        updatedAt:
+          type: integer
+    ConversationDraftResource:
+      type: object
+      required:
+        - conversationId
+        - encryptedPayload
+        - updatedAt
+      properties:
+        conversationId:
+          type: string
+        encryptedPayload:
+          type: string
+        updatedAt:
+          type: integer
+    ConversationDraftsResource:
+      type: object
+      required:
+        - drafts
+      properties:
+        drafts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationDraftResource'
+    ConversationMessagePinResource:
+      type: object
+      required:
+        - createdAt
+        - message
+        - messageId
+        - pinnedByIdentityId
+      properties:
+        createdAt:
+          type: integer
+        messageId:
+          type: string
+        pinnedByIdentityId:
+          type: string
+        message:
+          $ref: '#/components/schemas/MessageResource'
+    ConversationMessagePinsResource:
+      type: object
+      required:
+        - conversationId
+        - pins
+      properties:
+        conversationId:
+          type: string
+        pins:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationMessagePinResource'
     MessageReactionResource:
       type: object
       required:

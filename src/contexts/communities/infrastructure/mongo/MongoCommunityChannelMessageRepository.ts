@@ -35,6 +35,7 @@ export class MongoCommunityChannelMessageRepository {
       mentions: primitives.mentions,
       plaintextPayload: primitives.plaintextPayload,
       pollId: primitives.pollId,
+      replyToMessageId: primitives.replyToMessageId,
       signature: primitives.signature,
       type: primitives.type,
     };
@@ -55,6 +56,7 @@ export class MongoCommunityChannelMessageRepository {
       mentions: document.mentions || [],
       plaintextPayload: document.plaintextPayload,
       pollId: document.pollId,
+      replyToMessageId: document.replyToMessageId,
       signature: document.signature,
       type: document.type,
     });
@@ -123,6 +125,27 @@ export class MongoCommunityChannelMessageRepository {
       .toArray();
 
     return documents.reverse().map((document) => this.toDomain(document));
+  }
+
+  public async findThreadMessages(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    rootMessageId: CommunityChannelMessageId,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        replyToMessageId: rootMessageId.valueOf(),
+      })
+      .sort({ createdAt: 1 })
+      .limit(limit)
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
   }
 
   public async searchPublicByChannel(

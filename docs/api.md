@@ -259,6 +259,8 @@ Event contracts used by frontend:
 | `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
 | `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
+| `conversations.v1.message.was_pinned` | conversation id | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds` |
+| `conversations.v1.message.was_unpinned` | conversation id | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds` |
 | `conversations.v1.messages.were_read` | conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` |
 | `conversations.v1.message.reaction.was_added` | conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` |
 | `conversations.v1.message.reaction.was_removed` | conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` |
@@ -278,6 +280,8 @@ Event contracts used by frontend:
 | `communities.v1.member.was_left` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
 | `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
+| `communities.v1.channel.message.was_pinned` | community id | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds` |
+| `communities.v1.channel.message.was_unpinned` | community id | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.reaction.was_added` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds` |
 | `communities.v1.channel.message.reaction.was_removed` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds` |
 | `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
@@ -1450,6 +1454,121 @@ Implemented:
   window
 - support reply navigation when the replied-to message is not currently loaded
 
+### Get conversation thread replies
+
+```http
+GET /conversations/{conversationId}/messages/{messageId}/thread?limit=50
+```
+
+Response:
+
+```json
+{
+  "conversationId": "one-to-one:<deterministic-id>",
+  "messages": [
+    {
+      "id": "<replyMessageId>",
+      "conversationId": "one-to-one:<deterministic-id>",
+      "authorIdentityId": "<identityId>",
+      "type": "sent",
+      "createdAt": 1773848829055,
+      "encryptedPayload": "<encryptedMessagePayload>",
+      "previousMessageIds": ["<messageId>"],
+      "replyToMessageId": "<messageId>",
+      "attachmentExternalIdentifiers": [],
+      "reactions": []
+    }
+  ],
+  "nextBeforeMessageId": "<replyMessageId>"
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- return messages whose `replyToMessageId` points to the requested root message
+- order replies from oldest to newest
+
+### Conversation drafts
+
+```http
+GET /conversations/me/drafts
+PUT /conversations/{conversationId}/draft
+DELETE /conversations/{conversationId}/draft
+```
+
+Save request:
+
+```json
+{
+  "encryptedPayload": "<encryptedDraftPayload>",
+  "updatedAt": 1773848829055
+}
+```
+
+List response:
+
+```json
+{
+  "drafts": [
+    {
+      "conversationId": "one-to-one:<deterministic-id>",
+      "encryptedPayload": "<encryptedDraftPayload>",
+      "updatedAt": 1773848829055
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- drafts are MongoDB-only and scoped to the authenticated identity
+- the backend treats `encryptedPayload` as opaque client-encrypted data
+- saving or deleting a draft requires conversation participation
+
+### Conversation pins
+
+```http
+GET /conversations/{conversationId}/pins
+POST /conversations/{conversationId}/messages/{messageId}/pin
+DELETE /conversations/{conversationId}/messages/{messageId}/pin
+```
+
+List response:
+
+```json
+{
+  "conversationId": "one-to-one:<deterministic-id>",
+  "pins": [
+    {
+      "messageId": "<messageId>",
+      "pinnedByIdentityId": "<identityId>",
+      "createdAt": 1773848829055,
+      "message": {
+        "id": "<messageId>",
+        "conversationId": "one-to-one:<deterministic-id>",
+        "authorIdentityId": "<identityId>",
+        "type": "sent",
+        "createdAt": 1773848829055,
+        "encryptedPayload": "<encryptedMessagePayload>",
+        "previousMessageIds": [],
+        "attachmentExternalIdentifiers": [],
+        "reactions": []
+      }
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- require the authenticated identity to be a conversation participant
+- pins are MongoDB-only metadata; message IPFS documents are not rewritten
+- pinning validates that the target message exists locally
+
 ### Send message
 
 ```http
@@ -2530,6 +2649,7 @@ Request:
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
   "signature": "<messageSignature>",
+  "replyToMessageId": "<messageId>",
   "mentions": [
     {
       "type": "role",
@@ -2566,6 +2686,7 @@ Response:
   "signature": "<messageSignature>",
   "attachmentExternalIdentifiers": [],
   "mentions": [],
+  "replyToMessageId": "<messageId>",
   "reactions": [],
   "type": "sent",
   "createdAt": 1773848829055
@@ -2591,6 +2712,8 @@ Implemented:
 - store `plaintextPayload` as indexable plain text for public communities
 - store attachment CIDs only; private attachment bytes must be encrypted by the
   client and published first with `POST /ipfs/private`
+- allow threads by sending `replyToMessageId` with the id of an existing
+  channel message in the same community channel
 - validate the message signature against this canonical payload:
 
 ```json
@@ -2608,6 +2731,7 @@ Implemented:
       "targetId": "<roleId>"
     }
   ],
+  "replyToMessageId": "<messageId>",
   "type": "sent"
 }
 ```
@@ -2739,6 +2863,123 @@ Response:
 
 Public community messages contain `plaintextPayload` instead of
 `encryptedPayload`.
+
+### Get community channel thread replies
+
+```http
+GET /communities/{communityId}/channels/{channelId}/messages/{messageId}/thread?limit=50
+```
+
+Response:
+
+```json
+{
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "messages": [
+    {
+      "id": "<replyMessageId>",
+      "communityId": "<communityId>",
+      "channelId": "<channelId>",
+      "authorIdentityId": "<identityId>",
+      "createdAt": 1773848869055,
+      "encryptedPayload": "<encryptedMessagePayload>",
+      "replyToMessageId": "<messageId>",
+      "reactions": [],
+      "type": "sent"
+    }
+  ],
+  "nextBeforeMessageId": "<replyMessageId>"
+}
+```
+
+Implemented:
+
+- require signed request auth from a community member
+- require the member to be able to view the text channel
+- return messages whose `replyToMessageId` points to the requested root message
+- order replies from oldest to newest
+
+### Community channel drafts
+
+```http
+GET /communities/me/drafts
+PUT /communities/{communityId}/channels/{channelId}/draft
+DELETE /communities/{communityId}/channels/{channelId}/draft
+```
+
+Save request:
+
+```json
+{
+  "encryptedPayload": "<encryptedDraftPayload>",
+  "updatedAt": 1773848829055
+}
+```
+
+List response:
+
+```json
+{
+  "drafts": [
+    {
+      "communityId": "<communityId>",
+      "channelId": "<channelId>",
+      "encryptedPayload": "<encryptedDraftPayload>",
+      "updatedAt": 1773848829055
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- drafts are MongoDB-only and scoped to the authenticated identity
+- the backend treats `encryptedPayload` as opaque client-encrypted data
+- saving or deleting a draft requires access to the target text channel
+
+### Community channel pins
+
+```http
+GET /communities/{communityId}/channels/{channelId}/pins
+POST /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin
+DELETE /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin
+```
+
+List response:
+
+```json
+{
+  "communityId": "<communityId>",
+  "channelId": "<channelId>",
+  "pins": [
+    {
+      "messageId": "<messageId>",
+      "pinnedByIdentityId": "<identityId>",
+      "createdAt": 1773848829055,
+      "message": {
+        "id": "<messageId>",
+        "communityId": "<communityId>",
+        "channelId": "<channelId>",
+        "authorIdentityId": "<identityId>",
+        "createdAt": 1773848869055,
+        "encryptedPayload": "<encryptedMessagePayload>",
+        "reactions": [],
+        "type": "sent"
+      }
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth
+- listing pins requires channel visibility
+- pinning and unpinning requires `manage_messages`
+- pins are MongoDB-only metadata; message payload documents are not rewritten
+- pinning validates that the target channel message exists
 
 ### Search public channel messages
 

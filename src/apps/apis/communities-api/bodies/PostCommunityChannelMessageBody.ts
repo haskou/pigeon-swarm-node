@@ -41,6 +41,11 @@ export class PostCommunityChannelMessageBody {
   @IsNotEmpty()
   public readonly plaintextPayload?: string;
 
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly replyToMessageId?: string;
+
   @IsString()
   @IsNotEmpty()
   public readonly signature: string;

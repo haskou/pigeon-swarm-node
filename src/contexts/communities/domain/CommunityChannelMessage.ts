@@ -58,6 +58,9 @@ export class CommunityChannelMessage {
         new CommunityChannelId(primitives.channelId),
         new IdentityId(primitives.authorIdentityId),
         new Timestamp(primitives.createdAt),
+        primitives.replyToMessageId
+          ? new CommunityChannelMessageId(primitives.replyToMessageId)
+          : undefined,
       ),
       primitives.encryptedPayload || primitives.plaintextPayload
         ? CommunityChannelMessagePayload.fromPrimitives({
@@ -134,6 +137,7 @@ export class CommunityChannelMessage {
       mentions: this.mentions.map((mention) => mention.toPrimitives()),
       plaintextPayload: payload?.plaintextPayload,
       pollId: this.pollId?.valueOf(),
+      replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
       signature: this.signature?.valueOf(),
       type: this.type(),
     };

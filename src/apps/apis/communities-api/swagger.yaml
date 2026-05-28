@@ -727,6 +727,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
+  /communities/me/drafts:
+    get:
+      tags:
+        - communities
+      summary: List authenticated identity community channel drafts
+      description: Drafts are MongoDB-only opaque encrypted payloads owned by the authenticated identity.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community channel drafts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelDraftsResource'
+  /communities/{communityId}/channels/{channelId}/draft:
+    put:
+      tags:
+        - communities
+      summary: Save authenticated identity draft for a community text channel
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityChannelDraftBody'
+      responses:
+        '200':
+          description: Draft saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelDraftResource'
+    delete:
+      tags:
+        - communities
+      summary: Delete authenticated identity draft for a community text channel
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Draft deleted.
+  /communities/{communityId}/channels/{channelId}/pins:
+    get:
+      tags:
+        - communities
+      summary: List pinned messages for a community text channel
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community channel pinned messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessagePinsResource'
   /communities/{communityId}/channels/{channelId}/messages:
     get:
       tags:
@@ -934,6 +1022,88 @@ paths:
                 $ref: '#/components/schemas/DeletedCommunityChannelMessageResource'
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the deletion signature is invalid.
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin:
+    post:
+      tags:
+        - communities
+      summary: Pin a community text channel message
+      description: Requires manage_messages for the community channel.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Message pinned.
+    delete:
+      tags:
+        - communities
+      summary: Unpin a community text channel message
+      description: Requires manage_messages for the community channel.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Message unpinned.
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}/thread:
+    get:
+      tags:
+        - communities
+      summary: Get replies for a community channel message thread
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Messages whose replyToMessageId points to the requested message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityChannelMessagesResource'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}/reactions:
     post:
       tags:
@@ -1512,6 +1682,9 @@ components:
         pollId:
           type: string
           description: Present for poll timeline items. The value matches id.
+        replyToMessageId:
+          type: string
+          description: Optional id of the message this channel message replies to.
         createdAt:
           type: integer
         editedAt:
@@ -1553,6 +1726,72 @@ components:
               - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
         nextBeforeMessageId:
           type: string
+    CommunityChannelDraftBody:
+      type: object
+      required:
+        - encryptedPayload
+      properties:
+        encryptedPayload:
+          type: string
+          description: Opaque encrypted draft payload owned by the authenticated identity.
+        updatedAt:
+          type: integer
+    CommunityChannelDraftResource:
+      type: object
+      required:
+        - communityId
+        - channelId
+        - encryptedPayload
+        - updatedAt
+      properties:
+        communityId:
+          type: string
+        channelId:
+          type: string
+        encryptedPayload:
+          type: string
+        updatedAt:
+          type: integer
+    CommunityChannelDraftsResource:
+      type: object
+      required:
+        - drafts
+      properties:
+        drafts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityChannelDraftResource'
+    CommunityChannelMessagePinResource:
+      type: object
+      required:
+        - createdAt
+        - message
+        - messageId
+        - pinnedByIdentityId
+      properties:
+        createdAt:
+          type: integer
+        messageId:
+          type: string
+        pinnedByIdentityId:
+          type: string
+        message:
+          $ref: '#/components/schemas/CommunityChannelMessageResource'
+    CommunityChannelMessagePinsResource:
+      type: object
+      required:
+        - communityId
+        - channelId
+        - pins
+      properties:
+        communityId:
+          type: string
+        channelId:
+          type: string
+        pins:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityChannelMessagePinResource'
     CommunityMessageSearchResource:
       type: object
       required:
@@ -1804,6 +2043,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityMessageMentionResource'
+        replyToMessageId:
+          type: string
+          description: Optional id of the existing channel message this message replies to. Include it in the signed canonical payload when present.
     CommunityMessageMentionResource:
       type: object
       required:

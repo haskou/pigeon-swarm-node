@@ -15,6 +15,7 @@ export interface MongoCommunityChannelMessageDocument {
   }[];
   plaintextPayload?: string;
   pollId?: string;
+  replyToMessageId?: string;
   signature?: string;
   type: 'poll' | 'sent';
 }
