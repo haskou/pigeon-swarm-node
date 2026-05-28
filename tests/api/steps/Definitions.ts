@@ -1157,6 +1157,41 @@ export default class Definitions {
     });
   }
 
+  @given('I set an encrypted community channel reply body')
+  public async iSetAnEncryptedCommunityChannelReplyBody(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const id = `community-message:${Date.now()}:${randomUUID()}`;
+    const createdAt = Date.now();
+    const payload = {
+      attachmentExternalIdentifiers: [] as string[],
+      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      createdAt,
+      encryptedPayload: 'encrypted-community-channel-reply-payload',
+      id,
+      replyToMessageId: this.communityChannelMessageId,
+      type: 'sent',
+    };
+
+    this.body = JSON.stringify({
+      attachmentExternalIdentifiers: [],
+      createdAt,
+      encryptedPayload: 'encrypted-community-channel-reply-payload',
+      id,
+      replyToMessageId: this.communityChannelMessageId,
+      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+    });
+  }
+
   @given('I set a plaintext community channel message body')
   public async iSetAPlaintextCommunityChannelMessageBody(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {

@@ -1,5 +1,7 @@
 import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -10,8 +12,16 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityChannelsRoute extends CommunityRouteSupport {
+  private static readonly THREAD_SUMMARY_LIMIT_PER_CHANNEL = 10;
+
   private callRepository(): MongoCallRepository {
     return new MongoCallRepository(this.get<MongoDB>(MongoDB));
+  }
+
+  private channelMessageRepository(): MongoCommunityChannelMessageRepository {
+    return new MongoCommunityChannelMessageRepository(
+      this.get<MongoDB>(MongoDB),
+    );
   }
 
   private async findConnectedIdentityIdsByChannelId(
@@ -53,6 +63,15 @@ export class GetCommunityChannelsRoute extends CommunityRouteSupport {
     community.assertIsMember(actorIdentityId);
     const connectedIdentityIdsByChannelId =
       await this.findConnectedIdentityIdsByChannelId(communityId);
+    const visibleTextChannelIds = community
+      .visibleChannelsFor(actorIdentityId)
+      .textChannels.map((channel) => new CommunityChannelId(channel.id));
+    const threadSummariesByChannelId =
+      await this.channelMessageRepository().findThreadSummariesByChannel(
+        new CommunityId(communityId),
+        visibleTextChannelIds,
+        GetCommunityChannelsRoute.THREAD_SUMMARY_LIMIT_PER_CHANNEL,
+      );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -61,6 +80,7 @@ export class GetCommunityChannelsRoute extends CommunityRouteSupport {
           community,
           actorIdentityId,
           connectedIdentityIdsByChannelId,
+          threadSummariesByChannelId,
         ).toResource(),
       );
   }

@@ -6,6 +6,23 @@ import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityC
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { MongoCommunityChannelMessageDocument } from './documents/MongoCommunityChannelMessageDocument';
 
+export interface CommunityChannelThreadSummary {
+  lastReplyAt: number;
+  lastReplyMessageId: string;
+  replyCount: number;
+  rootMessageId: string;
+}
+
+interface CommunityChannelThreadSummaryDocument {
+  _id: {
+    channelId: string;
+    rootMessageId: string;
+  };
+  lastReplyAt: number;
+  lastReplyMessageId: string;
+  replyCount: number;
+}
+
 export class MongoCommunityChannelMessageRepository {
   private static readonly COLLECTION = 'community_channel_messages';
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
@@ -146,6 +163,68 @@ export class MongoCommunityChannelMessageRepository {
       .toArray();
 
     return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findThreadSummariesByChannel(
+    communityId: CommunityId,
+    channelIds: CommunityChannelId[],
+    limitPerChannel: number,
+  ): Promise<Map<string, CommunityChannelThreadSummary[]>> {
+    if (channelIds.length === 0) {
+      return new Map();
+    }
+
+    const summaries = await (
+      await this.collection()
+    )
+      .aggregate<CommunityChannelThreadSummaryDocument>([
+        {
+          $match: {
+            channelId: {
+              $in: channelIds.map((channelId) => channelId.valueOf()),
+            },
+            communityId: communityId.valueOf(),
+            replyToMessageId: { $exists: true, $ne: null },
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: {
+              channelId: '$channelId',
+              rootMessageId: '$replyToMessageId',
+            },
+            lastReplyAt: { $first: '$createdAt' },
+            lastReplyMessageId: { $first: '$_id' },
+            replyCount: { $sum: 1 },
+          },
+        },
+        { $sort: { lastReplyAt: -1 } },
+      ])
+      .toArray();
+    const summariesByChannelId = new Map<
+      string,
+      CommunityChannelThreadSummary[]
+    >();
+
+    for (const summary of summaries) {
+      const channelSummaries =
+        summariesByChannelId.get(summary._id.channelId) || [];
+
+      if (channelSummaries.length >= limitPerChannel) {
+        continue;
+      }
+
+      channelSummaries.push({
+        lastReplyAt: summary.lastReplyAt,
+        lastReplyMessageId: summary.lastReplyMessageId,
+        replyCount: summary.replyCount,
+        rootMessageId: summary._id.rootMessageId,
+      });
+      summariesByChannelId.set(summary._id.channelId, channelSummaries);
+    }
+
+    return summariesByChannelId;
   }
 
   public async searchPublicByChannel(

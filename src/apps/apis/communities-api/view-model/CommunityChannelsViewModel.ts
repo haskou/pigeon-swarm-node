@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelThreadSummary } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { CommunityChannelsResource } from '../resources/CommunityChannelsResource';
@@ -11,6 +12,10 @@ export class CommunityChannelsViewModel {
       string,
       string[]
     > = new Map(),
+    private readonly threadSummariesByChannelId: Map<
+      string,
+      CommunityChannelThreadSummary[]
+    > = new Map(),
   ) {}
 
   public toResource(): CommunityChannelsResource {
@@ -18,7 +23,10 @@ export class CommunityChannelsViewModel {
 
     return {
       channels: [
-        ...primitives.textChannels,
+        ...primitives.textChannels.map((channel) => ({
+          ...channel,
+          threads: this.threadSummariesByChannelId.get(channel.id) || [],
+        })),
         ...primitives.voiceChannels.map((channel) => ({
           ...channel,
           connectedIdentityIds:

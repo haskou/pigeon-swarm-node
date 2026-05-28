@@ -3,7 +3,15 @@ export interface CommunityTextChannelResource {
   id: string;
   name: string;
   permissions: CommunityChannelPermissionsResource;
+  threads?: CommunityChannelThreadSummaryResource[];
   type: 'text';
+}
+
+export interface CommunityChannelThreadSummaryResource {
+  lastReplyAt: number;
+  lastReplyMessageId: string;
+  replyCount: number;
+  rootMessageId: string;
 }
 
 export interface CommunityVoiceChannelResource {
