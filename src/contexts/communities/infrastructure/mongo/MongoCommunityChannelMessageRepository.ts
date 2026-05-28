@@ -25,6 +25,7 @@ interface CommunityChannelThreadSummaryDocument {
 
 export class MongoCommunityChannelMessageRepository {
   private static readonly COLLECTION = 'community_channel_messages';
+  private static readonly THREAD_SUMMARY_CANDIDATE_MULTIPLIER = 25;
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
   constructor(private readonly mongo: MongoDB) {}
@@ -83,6 +84,17 @@ export class MongoCommunityChannelMessageRepository {
     return value.replace(
       MongoCommunityChannelMessageRepository.REGEX_SPECIAL_CHARACTERS,
       '\\$&',
+    );
+  }
+
+  private threadSummaryCandidateLimit(
+    channelIds: CommunityChannelId[],
+    limitPerChannel: number,
+  ): number {
+    return (
+      channelIds.length *
+      limitPerChannel *
+      MongoCommunityChannelMessageRepository.THREAD_SUMMARY_CANDIDATE_MULTIPLIER
     );
   }
 
@@ -188,6 +200,9 @@ export class MongoCommunityChannelMessageRepository {
           },
         },
         { $sort: { createdAt: -1 } },
+        {
+          $limit: this.threadSummaryCandidateLimit(channelIds, limitPerChannel),
+        },
         {
           $group: {
             _id: {
