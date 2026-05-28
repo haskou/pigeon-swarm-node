@@ -1231,6 +1231,27 @@ components:
           type: integer
         permissions:
           $ref: '#/components/schemas/CommunityChannelPermissionsResource'
+        threads:
+          type: array
+          description: Recent active threads for this text channel, newest activity first.
+          items:
+            $ref: '#/components/schemas/CommunityChannelThreadSummaryResource'
+    CommunityChannelThreadSummaryResource:
+      type: object
+      required:
+        - rootMessageId
+        - replyCount
+        - lastReplyAt
+        - lastReplyMessageId
+      properties:
+        rootMessageId:
+          type: string
+        replyCount:
+          type: integer
+        lastReplyAt:
+          type: integer
+        lastReplyMessageId:
+          type: string
     CommunityVoiceChannelResource:
       type: object
       required:

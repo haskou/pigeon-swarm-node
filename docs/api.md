@@ -2363,7 +2363,15 @@ Response:
       "permissions": {
         "visibleRoleIds": ["everyone"]
       },
-      "createdAt": 1773848829055
+      "createdAt": 1773848829055,
+      "threads": [
+        {
+          "rootMessageId": "<messageId>",
+          "replyCount": 4,
+          "lastReplyAt": 1773848929055,
+          "lastReplyMessageId": "<messageId>"
+        }
+      ]
     },
     {
       "id": "<channelId>",
@@ -2385,6 +2393,9 @@ Implemented:
 - only allow community members to list channel metadata
 - omit channels that are not visible to the authenticated member roles
 - return both text and voice channels
+- include up to 2 recent active thread summaries per text channel, ordered by
+  newest reply activity and calculated from MongoDB metadata without hydrating
+  message payloads
 - include `connectedIdentityIds` for voice channels, derived from identities
   currently `joined` to the active call scoped to that voice channel
 
