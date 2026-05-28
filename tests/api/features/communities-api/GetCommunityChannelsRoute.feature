@@ -30,3 +30,35 @@ Feature: Get community channels API
     And response body should contain "threads"
     And response body should contain "replyCount"
     And response body should contain "lastReplyMessageId"
+
+  Scenario: Do not list threads whose root message was deleted
+    Given I am an anonymous user
+    And I register an in-memory IPFS network "communities-api-deleted-channel-threads-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I remember the current community text channel
+    And I set an encrypted community channel message body
+    And I sign the current community channel message request
+    When I POST a message to the current community text channel
+    Then response code is equal to 200
+    And I remember the current community channel message as thread root
+    And I set an encrypted community channel reply body
+    And I sign the current community channel message request
+    When I POST a message to the current community text channel
+    Then response code is equal to 200
+    And I restore the remembered community channel thread root message
+    And I set a delete community channel message body
+    And I sign the current community channel message deletion request
+    When I DELETE the current community channel message
+    Then response code is equal to 200
+    And I sign the current community channels request
+    When I GET channels from the current community
+    Then response code is equal to 200
+    And response body should not contain "threads"

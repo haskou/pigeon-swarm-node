@@ -36,6 +36,7 @@ export default class Definitions {
   private callId: string | undefined;
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
+  private communityThreadRootMessageId: string | undefined;
   private communityId: string | undefined;
   private communityInviteToken: string | undefined;
   private communityMembershipRequestId: string | undefined;
@@ -68,6 +69,7 @@ export default class Definitions {
     this.callId = undefined;
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
+    this.communityThreadRootMessageId = undefined;
     this.communityId = undefined;
     this.communityInviteToken = undefined;
     this.communityMembershipRequestId = undefined;
@@ -1190,6 +1192,24 @@ export default class Definitions {
       replyToMessageId: this.communityChannelMessageId,
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });
+  }
+
+  @given('I remember the current community channel message as thread root')
+  public iRememberTheCurrentCommunityChannelMessageAsThreadRoot(): void {
+    if (!this.communityChannelMessageId) {
+      throw new Error('Community channel message must be created first.');
+    }
+
+    this.communityThreadRootMessageId = this.communityChannelMessageId;
+  }
+
+  @given('I restore the remembered community channel thread root message')
+  public iRestoreTheRememberedCommunityChannelThreadRootMessage(): void {
+    if (!this.communityThreadRootMessageId) {
+      throw new Error('Community channel thread root must be remembered first.');
+    }
+
+    this.communityChannelMessageId = this.communityThreadRootMessageId;
   }
 
   @given('I set a plaintext community channel message body')

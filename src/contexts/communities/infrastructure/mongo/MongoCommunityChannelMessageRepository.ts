@@ -200,6 +200,32 @@ export class MongoCommunityChannelMessageRepository {
           },
         },
         { $sort: { lastReplyAt: -1 } },
+        {
+          $lookup: {
+            as: 'rootMessages',
+            from: MongoCommunityChannelMessageRepository.COLLECTION,
+            let: {
+              channelId: '$_id.channelId',
+              communityId: communityId.valueOf(),
+              rootMessageId: '$_id.rootMessageId',
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$_id', '$$rootMessageId'] },
+                      { $eq: ['$channelId', '$$channelId'] },
+                      { $eq: ['$communityId', '$$communityId'] },
+                    ],
+                  },
+                },
+              },
+              { $limit: 1 },
+            ],
+          },
+        },
+        { $match: { rootMessages: { $ne: [] } } },
       ])
       .toArray();
     const summariesByChannelId = new Map<

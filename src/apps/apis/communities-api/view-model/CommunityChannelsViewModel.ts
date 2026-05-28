@@ -23,10 +23,11 @@ export class CommunityChannelsViewModel {
 
     return {
       channels: [
-        ...primitives.textChannels.map((channel) => ({
-          ...channel,
-          threads: this.threadSummariesByChannelId.get(channel.id) || [],
-        })),
+        ...primitives.textChannels.map((channel) => {
+          const threads = this.threadSummariesByChannelId.get(channel.id) || [];
+
+          return threads.length > 0 ? { ...channel, threads } : channel;
+        }),
         ...primitives.voiceChannels.map((channel) => ({
           ...channel,
           connectedIdentityIds:
