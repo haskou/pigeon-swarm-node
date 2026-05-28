@@ -114,6 +114,10 @@ class SingleConversationRepository implements ConversationRepository {
     return { messages: [] };
   }
 
+  public async findThreadMessages(): Promise<Message[]> {
+    return [];
+  }
+
   public async findOneToOne(): Promise<undefined> {
     return undefined;
   }

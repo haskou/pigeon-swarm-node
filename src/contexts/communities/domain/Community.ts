@@ -328,6 +328,14 @@ export class Community extends AggregateRoot {
     this.assertPermission(actor, CommunityPermission.MANAGE_MESSAGES);
   }
 
+  public assertCanManageMessages(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+    this.assertPermission(identityId, CommunityPermission.MANAGE_MESSAGES);
+  }
+
   public leave(member: IdentityId): void {
     this.assertIsMember(member);
     assert(

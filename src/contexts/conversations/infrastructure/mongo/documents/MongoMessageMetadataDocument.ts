@@ -11,6 +11,7 @@ export interface MongoMessageMetadataDocument {
   type: MessageTypeValue;
   createdAt: number;
   receivedAt: number;
+  replyToMessageId: string | undefined;
   targetMessageId: string | undefined;
   valid: boolean;
 }

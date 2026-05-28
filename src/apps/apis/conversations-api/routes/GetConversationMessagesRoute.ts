@@ -1,6 +1,7 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
+import { ThreadMessagesFindMessage } from '@app/contexts/conversations/application/find-latest-messages/messages/ThreadMessagesFindMessage';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MongoPollRepository } from '@app/contexts/polls/infrastructure/mongo/MongoPollRepository';
@@ -176,5 +177,46 @@ export class GetConversationMessagesRoute extends Route {
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(new MessagesAroundViewModel(messages, reactions).toResource());
+  }
+
+  @Get('/:conversationId/messages/:messageId/thread')
+  public async getThreadMessages(
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
+    @QueryParam('limit') limit: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<Response> {
+    const requesterIdentityId =
+      await this.signedRequestAuthenticator.authenticate(request);
+    const safeLimit = Math.min(
+      Math.max(Number(limit) || GetConversationMessagesRoute.DEFAULT_LIMIT, 1),
+      GetConversationMessagesRoute.MAX_LIMIT,
+    );
+    const messages = await this.finder.findThread(
+      new ThreadMessagesFindMessage(
+        conversationId,
+        messageId,
+        requesterIdentityId.valueOf(),
+        safeLimit,
+      ),
+    );
+    const reactions = await this.finder.findReactionsFor(
+      new ConversationId(conversationId),
+      messages,
+    );
+
+    return response
+      .status(HttpRouteStatusEnum.OK)
+      .send(
+        new MessagesViewModel(
+          conversationId,
+          messages,
+          [],
+          [],
+          safeLimit,
+          reactions,
+        ).toResource(),
+      );
   }
 }

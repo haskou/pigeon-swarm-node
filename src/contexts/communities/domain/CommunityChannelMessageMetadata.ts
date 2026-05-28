@@ -12,6 +12,7 @@ export class CommunityChannelMessageMetadata {
     private readonly channelId: CommunityChannelId,
     private readonly authorIdentityId: IdentityId,
     private readonly createdAt: Timestamp,
+    private readonly replyToMessageId?: CommunityChannelMessageId,
   ) {}
 
   public getId(): CommunityChannelMessageId {
@@ -32,5 +33,9 @@ export class CommunityChannelMessageMetadata {
 
   public getCreatedAt(): Timestamp {
     return this.createdAt;
+  }
+
+  public getReplyToMessageId(): CommunityChannelMessageId | undefined {
+    return this.replyToMessageId;
   }
 }

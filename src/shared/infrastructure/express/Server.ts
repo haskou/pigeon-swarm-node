@@ -9,6 +9,8 @@ import { PostCallParticipantHeartbeatRoute } from '@app/apps/apis/calls-api/rout
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
 import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
+import { CommunityChannelDraftsRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelDraftsRoute';
+import { CommunityChannelMessagePinsRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelMessagePinsRoute';
 import { CommunityMessageReactionRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelMessageReactionRoute';
 import { DeleteCommunityBanRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityBanRoute';
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
@@ -44,6 +46,8 @@ import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/ro
 import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
 import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
+import { ConversationDraftsRoute } from '@app/apps/apis/conversations-api/routes/ConversationDraftsRoute';
+import { ConversationMessagePinsRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessagePinsRoute';
 import { ConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessageReactionRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
@@ -233,6 +237,8 @@ export default class Server {
           PostConversationRoute,
           GetConversationsRoute,
           PostConversationMessageRoute,
+          ConversationDraftsRoute,
+          ConversationMessagePinsRoute,
           ConversationMessageReactionRoute,
           DeleteConversationMessageRoute,
           PutConversationMessagesReadUntilRoute,
@@ -307,6 +313,8 @@ export default class Server {
           CommunityChannelPermissionsRoute,
           DeleteCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
+          CommunityChannelDraftsRoute,
+          CommunityChannelMessagePinsRoute,
           PostCommunityChannelMessageRoute,
           PutCommunityChannelMessageRoute,
           CommunityMessageReactionRoute,

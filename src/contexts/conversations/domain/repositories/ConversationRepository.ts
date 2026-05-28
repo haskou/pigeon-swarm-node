@@ -55,6 +55,11 @@ export interface ConversationRepository {
     before: number,
     after: number,
   ): Promise<ConversationMessagesAround>;
+  findThreadMessages(
+    conversationId: ConversationId,
+    rootMessageId: MessageId,
+    limit: number,
+  ): Promise<Message[]>;
   countUnreadByRecipient(
     recipientIdentityId: IdentityId,
     conversationIds: ConversationId[],

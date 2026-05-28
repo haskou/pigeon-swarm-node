@@ -3,6 +3,7 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/Commun
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/CommunityChannelMessagePayload';
+import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
@@ -51,6 +52,18 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
     community.assertCanSendMessage(authorIdentityId, communityChannelId);
     community.assertCanUseMessagePayload(payload);
 
+    if (body.replyToMessageId) {
+      const replyTarget = await this.messageRepository().findById(
+        new CommunityId(communityId),
+        communityChannelId,
+        new CommunityChannelMessageId(body.replyToMessageId),
+      );
+
+      if (!replyTarget) {
+        throw new CommunityChannelMessageNotFoundError();
+      }
+    }
+
     const message = CommunityChannelMessage.create(
       new CommunityChannelMessageMetadata(
         new CommunityChannelMessageId(body.id),
@@ -58,6 +71,9 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
         communityChannelId,
         authorIdentityId,
         new Timestamp(body.createdAt),
+        body.replyToMessageId
+          ? new CommunityChannelMessageId(body.replyToMessageId)
+          : undefined,
       ),
       payload,
       new Signature(body.signature),

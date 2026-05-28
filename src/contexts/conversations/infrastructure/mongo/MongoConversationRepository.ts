@@ -371,6 +371,35 @@ export default class MongoConversationRepository implements Repository {
     };
   }
 
+  public async findThreadMessages(
+    conversationId: ConversationId,
+    rootMessageId: MessageId,
+    limit: number,
+  ): Promise<Message[]> {
+    const documents = await (
+      await this.messageMetadataCollection()
+    )
+      .find({
+        conversationId: conversationId.valueOf(),
+        replyToMessageId: rootMessageId.valueOf(),
+        valid: true,
+      })
+      .sort({ createdAt: 1 })
+      .limit(limit)
+      .toArray();
+    const messages: Message[] = [];
+
+    for (const document of documents) {
+      const message = await this.findMessageFromMetadata(document);
+
+      if (message) {
+        messages.push(message);
+      }
+    }
+
+    return messages;
+  }
+
   public async findMessageCandidates(
     conversationId: ConversationId,
     limit: number,

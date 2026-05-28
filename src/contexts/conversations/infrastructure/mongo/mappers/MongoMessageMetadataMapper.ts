@@ -26,6 +26,7 @@ export default class MongoMessageMetadataMapper {
       networkId: networkId?.valueOf(),
       receivedAt: receivedAt.valueOf(),
       recipientIds,
+      replyToMessageId: primitives.replyToMessageId,
       targetMessageId: primitives.targetMessageId,
       type: primitives.type,
       valid,
