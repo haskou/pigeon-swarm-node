@@ -3339,6 +3339,19 @@ PUSH_VAPID_PRIVATE_KEY=<base64urlPrivateKey>
 PUSH_VAPID_SUBJECT=mailto:admin@example.com
 ```
 
+Generate VAPID keys once per deployment:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+After changing VAPID values, restart the backend process. Docker deployments
+must also include the `web-push` package in runtime dependencies; verify with:
+
+```bash
+node -e "console.log(require.resolve('web-push'))"
+```
+
 If VAPID keys are not configured, subscription endpoints still work but backend
 does not send outbound Web Push requests.
 

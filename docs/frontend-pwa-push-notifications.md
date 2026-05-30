@@ -24,6 +24,25 @@ If `enabled` is `false`, do not call `pushManager.subscribe`. Backend only
 reports push as enabled when both public and private VAPID keys are configured,
 even though it only returns the public key to clients.
 
+Backend operators generate VAPID keys once per deployment:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+They must configure:
+
+```dotenv
+PUSH_VAPID_PUBLIC_KEY=<generatedPublicKey>
+PUSH_VAPID_PRIVATE_KEY=<generatedPrivateKey>
+PUSH_VAPID_SUBJECT=mailto:admin@example.com
+```
+
+If production returns `enabled: false`, frontend should treat push as disabled
+and report a backend configuration issue. If production returns `enabled: true`
+but delivery still fails, use `POST /push/test` to inspect the push provider
+status.
+
 Register the browser subscription after login/session restore:
 
 ```http
