@@ -250,6 +250,8 @@ paths:
     $ref: './push-api/swagger.yaml#/paths/~1push~1vapid-public-key'
   /push/subscriptions:
     $ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'
+  /push/test:
+    $ref: './push-api/swagger.yaml#/paths/~1push~1test'
   /stickers/packs:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs'
   /stickers/me:

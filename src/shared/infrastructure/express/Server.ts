@@ -86,6 +86,7 @@ import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresence
 import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresenceRoute';
 import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/DeletePushSubscriptionRoute';
 import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
+import { PostPushTestRoute } from '@app/apps/apis/push-api/routes/PostPushTestRoute';
 import { PutPushSubscriptionRoute } from '@app/apps/apis/push-api/routes/PutPushSubscriptionRoute';
 import { DeleteFavoriteStickerRoute } from '@app/apps/apis/stickers-api/routes/DeleteFavoriteStickerRoute';
 import { DeleteSavedStickerPackRoute } from '@app/apps/apis/stickers-api/routes/DeleteSavedStickerPackRoute';
@@ -269,6 +270,7 @@ export default class Server {
           GetPushVapidPublicKeyRoute,
           PutPushSubscriptionRoute,
           DeletePushSubscriptionRoute,
+          PostPushTestRoute,
           GetStickerPacksRoute,
           GetStickerPackRoute,
           GetStickerUserLibraryRoute,

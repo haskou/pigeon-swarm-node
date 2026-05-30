@@ -68,6 +68,34 @@ paths:
                 properties:
                   deleted:
                     type: boolean
+  /push/test:
+    post:
+      tags:
+        - push
+      summary: Send a manual test push to the authenticated identity subscriptions
+      description: |
+        Sends a visible diagnostic Web Push payload. Pass `endpoint` to test one
+        concrete subscription, for example an iOS/WebKit
+        `https://web.push.apple.com/...` endpoint. Omit `endpoint` to test all
+        subscriptions registered for the authenticated identity.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushTestBody'
+      responses:
+        '200':
+          description: Test push delivery diagnostics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushTestResource'
 components:
   parameters:
     XIdentityId:
@@ -141,3 +169,41 @@ components:
           type: integer
         identityId:
           type: string
+    PushTestBody:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          description: Optional concrete subscription endpoint to test.
+    PushTestDeliveryResource:
+      type: object
+      required:
+        - delivered
+        - endpoint
+        - endpointHost
+        - removed
+      properties:
+        body:
+          type: string
+        delivered:
+          type: boolean
+        endpoint:
+          type: string
+        endpointHost:
+          type: string
+        error:
+          type: string
+        removed:
+          type: boolean
+          description: True when backend deleted the subscription after a 404/410 provider response.
+        statusCode:
+          type: integer
+    PushTestResource:
+      type: object
+      required:
+        - deliveries
+      properties:
+        deliveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/PushTestDeliveryResource'
