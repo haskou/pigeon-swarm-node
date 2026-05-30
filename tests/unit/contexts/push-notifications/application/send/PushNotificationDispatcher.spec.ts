@@ -1,6 +1,9 @@
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
-import { PushNotificationDelivery } from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
+import {
+  PushNotificationDelivery,
+  PushNotificationDeliveryResult,
+} from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { PushSubscription } from '@app/contexts/push-notifications/domain/PushSubscription';
 import { PushSubscriptionRepository } from '@app/contexts/push-notifications/domain/repositories/PushSubscriptionRepository';
@@ -188,9 +191,26 @@ function createAvailablePresence(identityId: string): IdentityPresence {
   });
 }
 
-function mockDelivery(result: boolean): PushNotificationDelivery {
+function mockDelivery(delivered: boolean): PushNotificationDelivery {
   return {
-    send: jest.fn().mockResolvedValue(result),
+    send: jest.fn().mockResolvedValue(
+      deliveryResult({
+        delivered,
+        shouldDeleteSubscription: !delivered,
+      }),
+    ),
+  };
+}
+
+function deliveryResult(options: {
+  delivered: boolean;
+  shouldDeleteSubscription: boolean;
+}): PushNotificationDeliveryResult {
+  return {
+    delivered: options.delivered,
+    endpoint: 'https://push.test/subscription',
+    endpointHost: 'push.test',
+    shouldDeleteSubscription: options.shouldDeleteSubscription,
   };
 }
 

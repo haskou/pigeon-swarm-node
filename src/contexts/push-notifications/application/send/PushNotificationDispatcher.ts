@@ -208,9 +208,9 @@ export class PushNotificationDispatcher {
       await this.subscriptionRepository.findByIdentityId(identityId);
 
     for (const subscription of subscriptions) {
-      const delivered = await this.delivery.send(subscription, payload);
+      const deliveryResult = await this.delivery.send(subscription, payload);
 
-      if (!delivered) {
+      if (deliveryResult.shouldDeleteSubscription) {
         await this.subscriptionRepository.deleteByEndpoint(
           subscription.getEndpoint(),
         );

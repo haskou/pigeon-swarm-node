@@ -5,7 +5,14 @@ import { RoutePrefix } from './RoutePrefix';
 
 export class PublicStaticContent {
   private readonly publicPath = path.resolve(process.cwd(), 'public');
-  private readonly staticMiddleware = express.static(this.publicPath);
+  private readonly staticMiddleware = express.static(this.publicPath, {
+    setHeaders: (response, filePath) => {
+      if (path.basename(filePath) === 'sw.js') {
+        response.setHeader('Cache-Control', 'no-store');
+      }
+    },
+  });
+
   private readonly indexPath = path.join(this.publicPath, 'index.html');
 
   constructor(private readonly routePrefix: RoutePrefix) {}

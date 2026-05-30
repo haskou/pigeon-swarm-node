@@ -1,12 +1,16 @@
 import Kernel from '@app/Kernel';
 import { createRequire } from 'module';
 
-import { PushNotificationDelivery } from '../../application/send/PushNotificationDelivery';
+import {
+  PushNotificationDelivery,
+  PushNotificationDeliveryResult,
+} from '../../application/send/PushNotificationDelivery';
 import { PushNotificationPayload } from '../../application/send/PushNotificationPayload';
 import { PushSubscription } from '../../domain/PushSubscription';
 import { PushVapidConfiguration } from './PushVapidConfiguration';
 
 type WebPushError = Error & {
+  body?: unknown;
   statusCode?: number;
 };
 
@@ -19,11 +23,16 @@ type WebPushSubscription = {
   };
 };
 
+type WebPushSendResult = {
+  body?: string;
+  statusCode?: number;
+};
+
 type WebPushModule = {
   sendNotification(
     subscription: WebPushSubscription,
     payload: string,
-  ): Promise<void>;
+  ): Promise<WebPushSendResult>;
   setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
 };
 
@@ -60,6 +69,79 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
     return statusCode === 404 || statusCode === 410;
   }
 
+  private endpointHost(endpoint: string): string {
+    try {
+      return new URL(endpoint).host;
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  private errorBody(error: unknown): string | undefined {
+    const body = (error as WebPushError).body;
+
+    if (body === undefined || body === null) {
+      return undefined;
+    }
+
+    return typeof body === 'string' ? body : JSON.stringify(body);
+  }
+
+  private disabledDeliveryResult(
+    endpoint: string,
+  ): PushNotificationDeliveryResult {
+    return {
+      delivered: false,
+      endpoint,
+      endpointHost: this.endpointHost(endpoint),
+      error: 'Web Push delivery is disabled.',
+      shouldDeleteSubscription: false,
+    };
+  }
+
+  private successDeliveryResult(
+    endpoint: string,
+    sendResult: WebPushSendResult,
+  ): PushNotificationDeliveryResult {
+    return {
+      body: sendResult.body,
+      delivered: true,
+      endpoint,
+      endpointHost: this.endpointHost(endpoint),
+      shouldDeleteSubscription: false,
+      statusCode: sendResult.statusCode,
+    };
+  }
+
+  private failedDeliveryResult(
+    endpoint: string,
+    error: unknown,
+  ): PushNotificationDeliveryResult {
+    return {
+      body: this.errorBody(error),
+      delivered: false,
+      endpoint,
+      endpointHost: this.endpointHost(endpoint),
+      error: String(error),
+      shouldDeleteSubscription: this.isGone(error),
+      statusCode: (error as WebPushError).statusCode,
+    };
+  }
+
+  private logFailedDelivery(result: PushNotificationDeliveryResult): void {
+    Kernel.logger?.warn(
+      JSON.stringify({
+        body: result.body,
+        endpoint: result.endpoint,
+        endpointHost: result.endpointHost,
+        error: result.error,
+        message: 'Web Push delivery failed.',
+        shouldDeleteSubscription: result.shouldDeleteSubscription,
+        statusCode: result.statusCode,
+      }),
+    );
+  }
+
   private logDisabledDelivery(): void {
     if (this.hasLoggedDisabledDelivery) {
       return;
@@ -78,17 +160,17 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
   public async send(
     subscription: PushSubscription,
     payload: PushNotificationPayload,
-  ): Promise<boolean> {
+  ): Promise<PushNotificationDeliveryResult> {
+    const primitives = subscription.toPrimitives();
+
     if (!this.isConfigured() || !this.webPush) {
       this.logDisabledDelivery();
 
-      return true;
+      return this.disabledDeliveryResult(primitives.endpoint);
     }
 
-    const primitives = subscription.toPrimitives();
-
     try {
-      await this.webPush.sendNotification(
+      const sendResult = await this.webPush.sendNotification(
         {
           endpoint: primitives.endpoint,
           expirationTime: primitives.expirationTime ?? null,
@@ -100,13 +182,13 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
         JSON.stringify(payload),
       );
 
-      return true;
+      return this.successDeliveryResult(primitives.endpoint, sendResult);
     } catch (error: unknown) {
-      Kernel.logger?.warn(
-        `Web Push delivery failed for endpoint "${primitives.endpoint}": ${String(error)}`,
-      );
+      const result = this.failedDeliveryResult(primitives.endpoint, error);
 
-      return !this.isGone(error);
+      this.logFailedDelivery(result);
+
+      return result;
     }
   }
 }

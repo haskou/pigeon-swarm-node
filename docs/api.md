@@ -3416,6 +3416,55 @@ Response:
 Backend also removes stale subscriptions automatically when the push provider
 returns `404` or `410`.
 
+Push delivery failures are logged with structured JSON including:
+
+- `endpoint`
+- `endpointHost`
+- `statusCode`
+- `body`
+- `error`
+- `shouldDeleteSubscription`
+
+### Send test push
+
+```http
+POST /push/test
+```
+
+Requires signed HTTP headers. Use this to isolate backend/provider delivery
+from service worker handling. Send an empty body to test every subscription for
+the authenticated identity, or pass one concrete endpoint to test only that
+subscription.
+
+Request body:
+
+```json
+{
+  "endpoint": "https://web.push.apple.com/..."
+}
+```
+
+Response:
+
+```json
+{
+  "deliveries": [
+    {
+      "endpoint": "https://web.push.apple.com/...",
+      "endpointHost": "web.push.apple.com",
+      "delivered": false,
+      "statusCode": 403,
+      "body": "<provider error body>",
+      "error": "<provider error>",
+      "removed": false
+    }
+  ]
+}
+```
+
+`removed` is `true` when the provider returned `404` or `410` and backend
+removed the stale subscription.
+
 ## Stickers API
 
 Sticker files are public IPFS assets. Upload the binary first with

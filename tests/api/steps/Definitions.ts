@@ -2238,6 +2238,11 @@ export default class Definitions {
     await this.signCurrentRequest('DELETE', '/push/subscriptions');
   }
 
+  @given('I sign the current push test request')
+  public async iSignTheCurrentPushTestRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/push/test');
+  }
+
   @given('I set a sticker pack body')
   public iSetAStickerPackBody(): void {
     const suffix = this.stickerPackId ? 'secondary' : 'primary';

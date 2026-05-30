@@ -52,6 +52,43 @@ DELETE /push/subscriptions
 
 Send the same body shape used for registration.
 
+Debug a concrete subscription:
+
+```http
+POST /push/test
+```
+
+Signed with the normal HTTP signature headers. Send `{}` to test every
+subscription for the authenticated identity, or pass a concrete endpoint to
+target one iOS/WebKit subscription:
+
+```json
+{
+  "endpoint": "https://web.push.apple.com/..."
+}
+```
+
+Backend responds with provider diagnostics:
+
+```json
+{
+  "deliveries": [
+    {
+      "endpoint": "https://web.push.apple.com/...",
+      "endpointHost": "web.push.apple.com",
+      "delivered": false,
+      "statusCode": 403,
+      "body": "<provider error body>",
+      "error": "<provider error>",
+      "removed": false
+    }
+  ]
+}
+```
+
+`removed` is `true` when the push provider returned `404` or `410` and backend
+removed the stale subscription.
+
 ## Frontend Flow
 
 1. Register the service worker.
@@ -98,3 +135,9 @@ message and call categories. Invitation notifications are still delivered.
 
 Frontend should still avoid local sounds while busy, matching the existing
 presence behavior.
+
+## Service Worker Cache
+
+Backend serves `/sw.js` with `Cache-Control: no-store` when the service worker
+file exists in `public/`, so browser clients should not get stuck on an old
+service worker during push debugging.
