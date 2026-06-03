@@ -1,5 +1,9 @@
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
+import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
+import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
+import { NotificationScopeSettingsRepository } from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
+import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import {
   PushNotificationDelivery,
   PushNotificationDeliveryResult,
@@ -244,6 +248,22 @@ function mockRepository(
   };
 }
 
+function emptySettingsRepository(): NotificationScopeSettingsRepository {
+  return {
+    delete: jest.fn(),
+    findByIdentityId: jest.fn(
+      async (): Promise<NotificationScopeSettings[]> => [],
+    ),
+    findByScope: jest.fn(
+      async (
+        _identityId: IdentityId,
+        _scope: NotificationSettingScope,
+      ): Promise<NotificationScopeSettings | undefined> => undefined,
+    ),
+    save: jest.fn(),
+  };
+}
+
 function createDispatcher(options: {
   busyIdentityIds?: string[];
   delivery: PushNotificationDelivery;
@@ -258,5 +278,6 @@ function createDispatcher(options: {
       presences: options.presences ?? [],
     }),
     options.delivery,
+    new NotificationDeliveryPreferenceChecker(emptySettingsRepository()),
   );
 }
