@@ -75,15 +75,15 @@ After changing these values, restart the backend process. In Docker, rebuild or
 reinstall dependencies so the runtime contains the `web-push` package:
 
 ```bash
-docker compose build --no-cache pigeon_swarm
-docker compose up -d pigeon_swarm
+docker compose build --no-cache backend
+docker compose up -d backend
 ```
 
 Verify the runtime:
 
 ```bash
 curl http://localhost:8080/api/push/vapid-public-key
-docker compose exec pigeon_swarm node -e "console.log(require.resolve('web-push'))"
+docker compose exec backend node -e "console.log(require.resolve('web-push'))"
 ```
 
 The API should return `enabled: true` and the Node command should print the
