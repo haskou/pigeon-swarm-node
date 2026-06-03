@@ -2228,6 +2228,22 @@ export default class Definitions {
     await this.signCurrentRequest('GET', '/notifications/');
   }
 
+  @given('I sign the current notification settings request')
+  public async iSignTheCurrentNotificationSettingsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/notification-settings/');
+  }
+
+  @given('I sign the current notification scope settings request')
+  public async iSignTheCurrentNotificationScopeSettingsRequest(): Promise<void> {
+    await this.signCurrentRequest('PUT', '/notification-settings/scopes');
+  }
+
+  @given('I sign the current notification scope settings reset request')
+  public async iSignTheCurrentNotificationScopeSettingsResetRequest(): Promise<void> {
+    await this.signCurrentRequest('DELETE', '/notification-settings/scopes');
+  }
+
   @given('I sign the current push subscription request')
   public async iSignTheCurrentPushSubscriptionRequest(): Promise<void> {
     await this.signCurrentRequest('PUT', '/push/subscriptions');

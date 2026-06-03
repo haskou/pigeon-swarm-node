@@ -1,3 +1,6 @@
+import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
+import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
+import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
@@ -7,10 +10,25 @@ import { PushNotificationDelivery } from './PushNotificationDelivery';
 import { PushNotificationPayload } from './PushNotificationPayload';
 
 type PushNotificationIntent = {
+  mentionsEveryoneOrHere: boolean;
+  mentionsRecipientIdentityIds: IdentityId[];
+  mentionsRoleIdentityIds: IdentityId[];
   payload: PushNotificationPayload;
   respectBusy: boolean;
   recipientIdentityIds: IdentityId[];
+  scope: PushNotificationScope;
 };
+
+type PushNotificationScope =
+  | {
+      conversationId: string;
+      type: typeof NotificationSettingScopeType.CONVERSATION;
+    }
+  | {
+      channelId: string;
+      communityId: string;
+      type: typeof NotificationSettingScopeType.COMMUNITY_CHANNEL;
+    };
 
 export class PushNotificationDispatcher {
   private static identityIdsFrom(value: unknown): IdentityId[] {
@@ -29,10 +47,55 @@ export class PushNotificationDispatcher {
     return typeof value === 'string' ? new IdentityId(value) : undefined;
   }
 
+  private static objectField(value: object, field: string): unknown {
+    return Object.entries(value).find(([key]) => key === field)?.[1];
+  }
+
+  private static scopeFromCallScope(value: unknown): PushNotificationScope {
+    if (!value || typeof value !== 'object') {
+      return {
+        conversationId: '',
+        type: NotificationSettingScopeType.CONVERSATION,
+      };
+    }
+
+    const type = PushNotificationDispatcher.objectField(value, 'type');
+    const communityId = PushNotificationDispatcher.objectField(
+      value,
+      'communityId',
+    );
+    const channelId = PushNotificationDispatcher.objectField(
+      value,
+      'channelId',
+    );
+    const conversationId = PushNotificationDispatcher.objectField(
+      value,
+      'conversationId',
+    );
+
+    if (
+      type === NotificationSettingScopeType.COMMUNITY_CHANNEL &&
+      typeof communityId === 'string' &&
+      typeof channelId === 'string'
+    ) {
+      return {
+        channelId,
+        communityId,
+        type: NotificationSettingScopeType.COMMUNITY_CHANNEL,
+      };
+    }
+
+    return {
+      conversationId: typeof conversationId === 'string' ? conversationId : '',
+      type: NotificationSettingScopeType.CONVERSATION,
+    };
+  }
+
   constructor(
     private readonly subscriptionRepository: PushSubscriptionRepository,
     private readonly presenceRepository: MongoIdentityPresenceRepository,
     private readonly delivery: PushNotificationDelivery,
+    private readonly preferenceChecker: NotificationDeliveryPreferenceChecker,
   ) {}
 
   private withoutActor(
@@ -60,6 +123,13 @@ export class PushNotificationDispatcher {
     );
 
     return {
+      mentionsEveryoneOrHere: Boolean(event.attributes.mentionsEveryoneOrHere),
+      mentionsRecipientIdentityIds: PushNotificationDispatcher.identityIdsFrom(
+        event.attributes.mentionedIdentityIds,
+      ),
+      mentionsRoleIdentityIds: PushNotificationDispatcher.identityIdsFrom(
+        event.attributes.mentionedRoleMemberIds,
+      ),
       payload: {
         body: 'You have a new message.',
         data: {
@@ -72,6 +142,10 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      scope: {
+        conversationId: event.aggregateId,
+        type: NotificationSettingScopeType.CONVERSATION,
+      },
     };
   }
 
@@ -85,6 +159,13 @@ export class PushNotificationDispatcher {
     );
 
     return {
+      mentionsEveryoneOrHere: Boolean(event.attributes.mentionsEveryoneOrHere),
+      mentionsRecipientIdentityIds: PushNotificationDispatcher.identityIdsFrom(
+        event.attributes.mentionedIdentityIds,
+      ),
+      mentionsRoleIdentityIds: PushNotificationDispatcher.identityIdsFrom(
+        event.attributes.mentionedRoleMemberIds,
+      ),
       payload: {
         body: 'You have a new community message.',
         data: {
@@ -98,6 +179,11 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      scope: {
+        channelId: String(event.attributes.channelId),
+        communityId: event.aggregateId,
+        type: NotificationSettingScopeType.COMMUNITY_CHANNEL,
+      },
     };
   }
 
@@ -109,6 +195,9 @@ export class PushNotificationDispatcher {
     const isCallNotification = notificationType === 'missed_call';
 
     return {
+      mentionsEveryoneOrHere: false,
+      mentionsRecipientIdentityIds: [],
+      mentionsRoleIdentityIds: [],
       payload: {
         body: this.notificationBody(notificationType),
         data: {
@@ -121,6 +210,10 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds: recipientIdentityId ? [recipientIdentityId] : [],
       respectBusy: isCallNotification,
+      scope: {
+        conversationId: event.aggregateId,
+        type: NotificationSettingScopeType.CONVERSATION,
+      },
     };
   }
 
@@ -136,6 +229,9 @@ export class PushNotificationDispatcher {
     );
 
     return {
+      mentionsEveryoneOrHere: false,
+      mentionsRecipientIdentityIds: [],
+      mentionsRoleIdentityIds: [],
       payload: {
         body: 'Someone is calling you.',
         data: {
@@ -148,6 +244,9 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      scope: PushNotificationDispatcher.scopeFromCallScope(
+        event.attributes.scope,
+      ),
     };
   }
 
@@ -197,10 +296,27 @@ export class PushNotificationDispatcher {
 
   private async sendToIdentity(
     identityId: IdentityId,
-    payload: PushNotificationPayload,
-    respectBusy: boolean,
+    intent: PushNotificationIntent,
   ): Promise<void> {
-    if (await this.shouldSkipForBusy(identityId, respectBusy)) {
+    if (await this.shouldSkipForBusy(identityId, intent.respectBusy)) {
+      return;
+    }
+
+    const shouldSendPush = await this.preferenceChecker.shouldSendPush(
+      new NotificationDeliveryShouldSendPushMessage(
+        identityId.valueOf(),
+        intent.scope,
+        intent.mentionsRecipientIdentityIds.some((mentionedIdentityId) =>
+          mentionedIdentityId.isEqual(identityId),
+        ),
+        intent.mentionsEveryoneOrHere,
+        intent.mentionsRoleIdentityIds.some((mentionedRoleIdentityId) =>
+          mentionedRoleIdentityId.isEqual(identityId),
+        ),
+      ),
+    );
+
+    if (!shouldSendPush) {
       return;
     }
 
@@ -208,7 +324,10 @@ export class PushNotificationDispatcher {
       await this.subscriptionRepository.findByIdentityId(identityId);
 
     for (const subscription of subscriptions) {
-      const deliveryResult = await this.delivery.send(subscription, payload);
+      const deliveryResult = await this.delivery.send(
+        subscription,
+        intent.payload,
+      );
 
       if (deliveryResult.shouldDeleteSubscription) {
         await this.subscriptionRepository.deleteByEndpoint(
@@ -226,11 +345,7 @@ export class PushNotificationDispatcher {
     }
 
     for (const recipientIdentityId of intent.recipientIdentityIds) {
-      await this.sendToIdentity(
-        recipientIdentityId,
-        intent.payload,
-        intent.respectBusy,
-      );
+      await this.sendToIdentity(recipientIdentityId, intent);
     }
   }
 }

@@ -1,0 +1,214 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Notification Settings API
+  version: 1.0.0
+  description: Authenticated per-identity notification mute and delivery preferences.
+tags:
+  - name: notification-settings
+paths:
+  /notification-settings/:
+    get:
+      tags:
+        - notification-settings
+      summary: List authenticated identity notification settings
+      description: |
+        Returns the explicit notification setting overrides owned by the
+        authenticated identity. Missing scopes inherit the default behavior:
+        all messages, mobile push enabled, no mention suppression and no mute.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Notification settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettingsResource'
+  /notification-settings/scopes:
+    put:
+      tags:
+        - notification-settings
+      summary: Upsert notification settings for one scope
+      description: |
+        Creates or replaces the authenticated identity notification settings for
+        a conversation, community, or community channel. Community-channel
+        settings override community settings. Conversation settings apply only
+        to that conversation.
+
+        `mutedUntil` semantics:
+        - omitted: not muted
+        - integer timestamp: muted until that instant
+        - null: muted until manually reset
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutNotificationScopeSettingsBody'
+      responses:
+        '200':
+          description: Scope settings updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationScopeSettingsResource'
+    delete:
+      tags:
+        - notification-settings
+      summary: Reset notification settings for one scope
+      description: Deletes the explicit override for a scope so it inherits defaults or parent community settings.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteNotificationScopeSettingsBody'
+      responses:
+        '200':
+          description: Scope settings reset.
+components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XNonce:
+      in: header
+      name: X-Nonce
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    NotificationScope:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - conversation
+            - community
+            - community_channel
+        conversationId:
+          type: string
+        communityId:
+          type: string
+        channelId:
+          type: string
+      oneOf:
+        - required:
+            - type
+            - conversationId
+        - required:
+            - type
+            - communityId
+        - required:
+            - type
+            - communityId
+            - channelId
+    PutNotificationScopeSettingsBody:
+      type: object
+      required:
+        - scope
+        - notificationLevel
+      properties:
+        scope:
+          $ref: '#/components/schemas/NotificationScope'
+        notificationLevel:
+          type: string
+          enum:
+            - all
+            - mentions
+            - none
+        mutedUntil:
+          nullable: true
+          type: integer
+          description: Omit for unmuted, timestamp for temporary mute, null for manual reset/unmute only.
+        suppressEveryoneAndHere:
+          type: boolean
+          default: false
+        suppressRoleMentions:
+          type: boolean
+          default: false
+        mobilePushEnabled:
+          type: boolean
+          default: true
+        hideMutedChannels:
+          type: boolean
+          default: false
+    DeleteNotificationScopeSettingsBody:
+      type: object
+      required:
+        - scope
+      properties:
+        scope:
+          $ref: '#/components/schemas/NotificationScope'
+    NotificationScopeSettingsResource:
+      type: object
+      required:
+        - scope
+        - notificationLevel
+        - suppressEveryoneAndHere
+        - suppressRoleMentions
+        - mobilePushEnabled
+        - hideMutedChannels
+        - updatedAt
+      properties:
+        scope:
+          $ref: '#/components/schemas/NotificationScope'
+        notificationLevel:
+          type: string
+          enum:
+            - all
+            - mentions
+            - none
+        mutedUntil:
+          nullable: true
+          type: integer
+        suppressEveryoneAndHere:
+          type: boolean
+        suppressRoleMentions:
+          type: boolean
+        mobilePushEnabled:
+          type: boolean
+        hideMutedChannels:
+          type: boolean
+        updatedAt:
+          type: integer
+    NotificationSettingsResource:
+      type: object
+      required:
+        - scopes
+      properties:
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationScopeSettingsResource'

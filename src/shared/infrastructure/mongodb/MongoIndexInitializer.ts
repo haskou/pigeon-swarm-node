@@ -107,6 +107,14 @@ export class MongoIndexInitializer {
       ],
       name: 'identity_presence_expiration_idx',
     },
+    {
+      collection: 'notification_scope_settings',
+      keys: [
+        ['identityId', 1],
+        ['scopeKey', 1],
+      ],
+      name: 'notification_scope_settings_identity_scope_idx',
+    },
   ];
 
   constructor(private readonly mongo: MongoDB) {}
