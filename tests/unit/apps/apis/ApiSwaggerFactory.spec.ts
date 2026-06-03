@@ -20,6 +20,7 @@ describe('ApiSwaggerFactory', () => {
         'keychains-api',
         'link-previews-api',
         'nodes-api',
+        'notification-settings-api',
         'notifications-api',
         'polls-api',
         'presence-api',
@@ -34,6 +35,9 @@ describe('ApiSwaggerFactory', () => {
       expect(specs['keychains-api']).toContain('/keychains/:');
       expect(specs['link-previews-api']).toContain('/link-previews:');
       expect(specs['nodes-api']).toContain('/node/:');
+      expect(specs['notification-settings-api']).toContain(
+        '/notification-settings/:',
+      );
       expect(specs['notifications-api']).toContain('/notifications/:');
       expect(specs['presence-api']).toContain('/presence/:');
       expect(specs['push-api']).toContain('/push/subscriptions:');
@@ -68,6 +72,9 @@ describe('ApiSwaggerFactory', () => {
         "$ref: './nodes-api/swagger.yaml#/paths/~1node~1'",
       );
       expect(spec).toContain(
+        "$ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings~1'",
+      );
+      expect(spec).toContain(
         "$ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'",
       );
       expect(spec).toContain(
@@ -95,6 +102,8 @@ describe('ApiSwaggerFactory', () => {
         'keychains-api': '/api/swagger/keychains-api/swagger.yaml',
         'link-previews-api': '/api/swagger/link-previews-api/swagger.yaml',
         'nodes-api': '/api/swagger/nodes-api/swagger.yaml',
+        'notification-settings-api':
+          '/api/swagger/notification-settings-api/swagger.yaml',
         'notifications-api': '/api/swagger/notifications-api/swagger.yaml',
         'polls-api': '/api/swagger/polls-api/swagger.yaml',
         'presence-api': '/api/swagger/presence-api/swagger.yaml',
