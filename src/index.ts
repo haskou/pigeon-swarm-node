@@ -56,6 +56,8 @@ import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replicatio
 import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
+import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
+import { MongoNotificationScopeSettingsRepository } from '@app/contexts/notification-settings/infrastructure/mongo/MongoNotificationScopeSettingsRepository';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
@@ -144,6 +146,9 @@ async function init() {
     new MongoPushSubscriptionRepository(mongo),
     new MongoIdentityPresenceRepository(mongo),
     new WebPushNotificationDelivery(),
+    new NotificationDeliveryPreferenceChecker(
+      new MongoNotificationScopeSettingsRepository(mongo),
+    ),
   );
 
   kernel.addConsumerInstances(

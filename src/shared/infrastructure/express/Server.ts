@@ -73,6 +73,9 @@ import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
+import { DeleteNotificationScopeSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/DeleteNotificationScopeSettingsRoute';
+import { GetNotificationSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/GetNotificationSettingsRoute';
+import { PutNotificationScopeSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/PutNotificationScopeSettingsRoute';
 import { GetNotificationsRoute } from '@app/apps/apis/notifications-api/routes/GetNotificationsRoute';
 import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/PatchNotificationRoute';
 import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/PostNotificationRoute';
@@ -259,6 +262,9 @@ export default class Server {
           GetNotificationsRoute,
           PostNotificationRoute,
           PatchNotificationRoute,
+          GetNotificationSettingsRoute,
+          PutNotificationScopeSettingsRoute,
+          DeleteNotificationScopeSettingsRoute,
           GetPresenceRoute,
           PutPresenceRoute,
           DeletePresenceCustomMessageRoute,

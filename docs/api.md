@@ -3315,6 +3315,158 @@ Implemented:
 - allow recipient-only accept and decline
 - mark accepted or declined notifications as read
 
+## Notification Settings HTTP API
+
+Notification settings are authenticated, per-identity preferences stored in
+MongoDB. They are not published to IPFS.
+
+Scopes:
+
+- `conversation`: applies to one conversation.
+- `community`: applies to one community.
+- `community_channel`: applies to one community text/voice channel and overrides
+  the parent community setting.
+
+Resolution order:
+
+1. exact `community_channel` setting
+2. parent `community` setting
+3. default behavior
+
+Conversation settings do not inherit from communities.
+
+Default behavior when no explicit setting exists:
+
+- `notificationLevel`: `all`
+- `mutedUntil`: omitted
+- `suppressEveryoneAndHere`: `false`
+- `suppressRoleMentions`: `false`
+- `mobilePushEnabled`: `true`
+- `hideMutedChannels`: `false`
+
+`mutedUntil` semantics:
+
+- omitted: not muted
+- integer timestamp in milliseconds: muted until that instant
+- `null`: muted until the setting is reset
+
+`notificationLevel` values:
+
+- `all`: push can be delivered for all matching events.
+- `mentions`: push is delivered only when backend receives mention metadata for
+  the recipient, `@everyone`/`@here`, or a mentioned role.
+- `none`: push is not delivered for that scope.
+
+Backend currently uses these settings to suppress Web Push delivery. WebSocket
+events are still delivered so clients can keep local state synchronized.
+Frontend should use the same settings locally for sounds, badges, visible
+notification counters and "hide muted channels".
+
+Mention-only behavior depends on message events carrying mention metadata:
+
+```json
+{
+  "mentionedIdentityIds": ["<identityId>"],
+  "mentionedRoleMemberIds": ["<identityId>"],
+  "mentionsEveryoneOrHere": true
+}
+```
+
+For encrypted messages where backend cannot inspect the payload, frontend must
+send/publish this metadata if it wants backend-side `mentions` filtering to be
+accurate. Without metadata, `mentions` behaves as "do not push ordinary
+messages".
+
+### List notification settings
+
+```http
+GET /notification-settings/
+```
+
+Requires signed request headers. Returns only the authenticated identity's
+explicit overrides:
+
+```json
+{
+  "scopes": [
+    {
+      "scope": {
+        "type": "community_channel",
+        "communityId": "6a...",
+        "channelId": "6b..."
+      },
+      "notificationLevel": "mentions",
+      "mutedUntil": 1780000000000,
+      "suppressEveryoneAndHere": true,
+      "suppressRoleMentions": false,
+      "mobilePushEnabled": true,
+      "hideMutedChannels": true,
+      "updatedAt": 1780000000000
+    }
+  ]
+}
+```
+
+### Upsert scope notification settings
+
+```http
+PUT /notification-settings/scopes
+```
+
+Signed body examples:
+
+Mute a conversation until manually reset:
+
+```json
+{
+  "scope": {
+    "type": "conversation",
+    "conversationId": "one-to-one:..."
+  },
+  "notificationLevel": "none",
+  "mutedUntil": null,
+  "mobilePushEnabled": false
+}
+```
+
+Set a community channel to mentions only:
+
+```json
+{
+  "scope": {
+    "type": "community_channel",
+    "communityId": "6a...",
+    "channelId": "6b..."
+  },
+  "notificationLevel": "mentions",
+  "suppressEveryoneAndHere": false,
+  "suppressRoleMentions": true,
+  "mobilePushEnabled": true,
+  "hideMutedChannels": false
+}
+```
+
+Response is the updated scope resource.
+
+### Reset scope notification settings
+
+```http
+DELETE /notification-settings/scopes
+```
+
+Signed body:
+
+```json
+{
+  "scope": {
+    "type": "community",
+    "communityId": "6a..."
+  }
+}
+```
+
+Deletes the explicit override. The scope then inherits from its parent/default.
+
 ## Push Notification HTTP API
 
 PWA Web Push is used only as a wake-up/UX channel for the browser. It does not
@@ -3329,7 +3481,9 @@ Backend sends push for:
 - incoming conversation calls
 
 When the recipient presence is `busy`, backend suppresses pushes for message
-and call categories. Invitation notifications are still delivered.
+and call categories. Invitation notifications are still delivered. Notification
+settings can additionally suppress push delivery by conversation, community or
+community channel.
 
 Server operators must configure:
 
