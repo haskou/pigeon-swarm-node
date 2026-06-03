@@ -61,6 +61,27 @@ export class MongoIndexInitializer {
       name: 'community_channel_message_reactions_message_idx',
     },
     {
+      collection: 'polls',
+      keys: [
+        ['scope.type', 1],
+        ['scope.communityId', 1],
+        ['scope.channelId', 1],
+        ['createdAt', -1],
+        ['_id', -1],
+      ],
+      name: 'polls_community_channel_timeline_idx',
+    },
+    {
+      collection: 'polls',
+      keys: [
+        ['scope.type', 1],
+        ['scope.conversationId', 1],
+        ['createdAt', -1],
+        ['_id', -1],
+      ],
+      name: 'polls_group_conversation_timeline_idx',
+    },
+    {
       collection: 'community_membership_requests',
       keys: [
         ['communityId', 1],
@@ -85,6 +106,14 @@ export class MongoIndexInitializer {
         ['status', 1],
       ],
       name: 'identity_presence_expiration_idx',
+    },
+    {
+      collection: 'notification_scope_settings',
+      keys: [
+        ['identityId', 1],
+        ['scopeKey', 1],
+      ],
+      name: 'notification_scope_settings_identity_scope_idx',
     },
   ];
 

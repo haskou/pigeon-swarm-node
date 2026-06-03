@@ -48,6 +48,47 @@ SERVICE_NAME=pigeon-swarm
 | `TRANSPORT_MAX_RETRIES` | Adapter default | No | Retry count for AMQP operations. |
 | `TRANSPORT_RETRY_DELAY` | Adapter default | No | Delay between retries (ms). |
 
+## PWA Web Push Variables
+
+Web Push requires VAPID keys. Without them, `GET /push/vapid-public-key`
+returns `{ "enabled": false, "publicKey": null }`, browsers must not call
+`pushManager.subscribe`, and backend will not send outbound push notifications.
+
+Generate one key pair per deployment:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Configure the generated values:
+
+```dotenv
+PUSH_VAPID_PUBLIC_KEY=<generatedPublicKey>
+PUSH_VAPID_PRIVATE_KEY=<generatedPrivateKey>
+PUSH_VAPID_SUBJECT=mailto:admin@example.com
+```
+
+`PUSH_VAPID_SUBJECT` identifies the service operator to push providers. Use a
+real contact email for production.
+
+After changing these values, restart the backend process. In Docker, rebuild or
+reinstall dependencies so the runtime contains the `web-push` package:
+
+```bash
+docker compose build --no-cache pigeon_swarm
+docker compose up -d pigeon_swarm
+```
+
+Verify the runtime:
+
+```bash
+curl http://localhost:8080/api/push/vapid-public-key
+docker compose exec pigeon_swarm node -e "console.log(require.resolve('web-push'))"
+```
+
+The API should return `enabled: true` and the Node command should print the
+installed `web-push` module path.
+
 ## IPFS Variables
 
 | Variable | Default | Required | Description |
@@ -86,6 +127,9 @@ ROUTE_PREFIX=/api
 IPFS_STORAGE_PATH=./ipfs_storage
 TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
+PUSH_VAPID_PUBLIC_KEY=<generatedPublicKey>
+PUSH_VAPID_PRIVATE_KEY=<generatedPrivateKey>
+PUSH_VAPID_SUBJECT=mailto:admin@example.com
 ```
 
 Use `TRANSPORT_DSN=libp2p-gossipsub://` to publish and subscribe through the

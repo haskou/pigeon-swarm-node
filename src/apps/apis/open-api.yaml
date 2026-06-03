@@ -13,6 +13,7 @@ tags:
   - name: link-previews
   - name: nodes
   - name: notifications
+  - name: notification-settings
   - name: presence
   - name: polls
   - name: push
@@ -228,6 +229,10 @@ paths:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'
   /notifications/{notificationId}:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1{notificationId}'
+  /notification-settings/:
+    $ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings~1'
+  /notification-settings/scopes:
+    $ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings~1scopes'
   /presence/:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1'
   /presence/{identityId}:
