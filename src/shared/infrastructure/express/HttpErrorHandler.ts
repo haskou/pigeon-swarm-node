@@ -65,6 +65,21 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
     );
   }
 
+  private logUnhandledError(error: Error): void {
+    const message = `Unhandled error: ${error.message}`;
+    const stackTrace = error.stack || 'No stack trace available';
+
+    if (Kernel.logger) {
+      Kernel.logger.error(message);
+      Kernel.logger.info(stackTrace);
+
+      return;
+    }
+
+    process.stderr.write(`${message}\n`);
+    process.stdout.write(`${stackTrace}\n`);
+  }
+
   // eslint-disable-next-line complexity
   public error(
     error: Error,
@@ -118,8 +133,7 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
       return;
     } else {
       if (this.OUTPUT_ERROR_LOG_ENVS.includes(process.env.NODE_ENV || '')) {
-        Kernel.logger.error(`Unhandled error: ${error.message}`);
-        Kernel.logger.info(error.stack || 'No stack trace available');
+        this.logUnhandledError(error);
       }
 
       response.status(HttpRouteStatusEnum.INTERNAL_SERVER_ERROR).json({
