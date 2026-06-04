@@ -187,6 +187,18 @@ export default class MongoConversationRepository implements Repository {
     );
   }
 
+  public async findMetadataById(
+    conversationId: ConversationId,
+  ): Promise<Conversation | undefined> {
+    const document = await (
+      await this.collection()
+    ).findOne({
+      _id: conversationId.valueOf(),
+    });
+
+    return document ? this.mapper.toDomain(document) : undefined;
+  }
+
   public async findByParticipant(
     participantId: IdentityId,
     limit: number,

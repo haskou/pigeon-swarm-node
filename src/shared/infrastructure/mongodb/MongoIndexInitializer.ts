@@ -33,6 +33,58 @@ export class MongoIndexInitializer {
       name: 'communities_discoverable_networkId_createdAt_idx',
     },
     {
+      collection: 'conversations',
+      keys: [
+        ['participantIds', 1],
+        ['createdAt', -1],
+      ],
+      name: 'conversations_participantIds_createdAt_idx',
+    },
+    {
+      collection: 'conversation_messages',
+      keys: [
+        ['conversationId', 1],
+        ['valid', 1],
+        ['createdAt', -1],
+      ],
+      name: 'conversation_messages_conversation_valid_createdAt_idx',
+    },
+    {
+      collection: 'conversation_messages',
+      keys: [
+        ['conversationId', 1],
+        ['messageId', 1],
+        ['valid', 1],
+      ],
+      name: 'conversation_messages_conversation_message_valid_idx',
+    },
+    {
+      collection: 'conversation_messages',
+      keys: [
+        ['conversationId', 1],
+        ['replyToMessageId', 1],
+        ['valid', 1],
+        ['createdAt', 1],
+      ],
+      name: 'conversation_messages_thread_createdAt_idx',
+    },
+    {
+      collection: 'conversation_message_reactions',
+      keys: [
+        ['conversationId', 1],
+        ['messageId', 1],
+      ],
+      name: 'conversation_message_reactions_message_idx',
+    },
+    {
+      collection: 'conversation_unread_messages',
+      keys: [
+        ['recipientIdentityId', 1],
+        ['conversationId', 1],
+      ],
+      name: 'conversation_unread_messages_recipient_conversation_idx',
+    },
+    {
       collection: 'community_channel_messages',
       keys: [
         ['communityId', 1],

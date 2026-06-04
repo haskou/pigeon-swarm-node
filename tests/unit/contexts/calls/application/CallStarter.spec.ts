@@ -86,6 +86,12 @@ class SingleConversationRepository implements ConversationRepository {
     return this.conversation;
   }
 
+  public async findMetadataById(
+    conversationId: ConversationId,
+  ): Promise<Conversation | undefined> {
+    return this.findById(conversationId);
+  }
+
   public async findByParticipant(): Promise<Conversation[]> {
     return [];
   }

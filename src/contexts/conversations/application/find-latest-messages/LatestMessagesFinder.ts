@@ -22,7 +22,7 @@ export default class LatestMessagesFinder {
   private async ensureRequesterCanReadConversation(
     message: LatestMessagesFindMessage | MessageFindMessage,
   ): Promise<void> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.findMetadataById(
       message.conversationId,
     );
 
