@@ -158,6 +158,42 @@ describe('PushNotificationDispatcher', () => {
       subscription.getEndpoint(),
     );
   });
+
+  it('sends notification clear pushes only to the reader identity', async () => {
+    const readerIdentityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const readerSubscription = createSubscription(readerIdentityId);
+    const otherSubscription = createSubscription(otherIdentityId);
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      busyIdentityIds: [readerIdentityId.valueOf()],
+      delivery,
+      subscriptions: [readerSubscription, otherSubscription],
+    });
+    const event = new TestDomainEvent('conversation-id', {
+      eventName: 'conversations.v1.messages.were_read',
+      messageId: 'message-id',
+      participantIds: [readerIdentityId.valueOf(), otherIdentityId.valueOf()],
+      readerIdentityId: readerIdentityId.valueOf(),
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).toHaveBeenCalledTimes(1);
+    expect(delivery.send).toHaveBeenCalledWith(
+      readerSubscription,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          conversationId: 'conversation-id',
+          messageId: 'message-id',
+          tags: ['conversation:conversation-id'],
+        }),
+        tag: 'conversation:conversation-id',
+        tags: ['conversation:conversation-id'],
+        type: 'notifications_cleared',
+      }),
+    );
+  });
 });
 
 async function generateIdentityId(): Promise<IdentityId> {
@@ -242,7 +278,9 @@ function mockRepository(
     delete: jest.fn(),
     deleteByEndpoint: jest.fn(),
     findByIdentityId: jest.fn(async (identityId: IdentityId) =>
-      subscriptions.filter((subscription) => subscription.belongsTo(identityId)),
+      subscriptions.filter((subscription) =>
+        subscription.belongsTo(identityId),
+      ),
     ),
     save: jest.fn(),
   };

@@ -15,6 +15,7 @@ type PushNotificationIntent = {
   mentionsRoleIdentityIds: IdentityId[];
   payload: PushNotificationPayload;
   respectBusy: boolean;
+  respectPreferences: boolean;
   recipientIdentityIds: IdentityId[];
   scope: PushNotificationScope;
 };
@@ -142,6 +143,7 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      respectPreferences: true,
       scope: {
         conversationId: event.aggregateId,
         type: NotificationSettingScopeType.CONVERSATION,
@@ -179,6 +181,7 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      respectPreferences: true,
       scope: {
         channelId: String(event.attributes.channelId),
         communityId: event.aggregateId,
@@ -210,6 +213,7 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds: recipientIdentityId ? [recipientIdentityId] : [],
       respectBusy: isCallNotification,
+      respectPreferences: true,
       scope: {
         conversationId: event.aggregateId,
         type: NotificationSettingScopeType.CONVERSATION,
@@ -244,9 +248,48 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      respectPreferences: true,
       scope: PushNotificationDispatcher.scopeFromCallScope(
         event.attributes.scope,
       ),
+    };
+  }
+
+  private clearConversationNotificationsIntent(
+    event: DomainEvent,
+  ): PushNotificationIntent {
+    const readerIdentityId = PushNotificationDispatcher.optionalIdentityId(
+      event.attributes.readerIdentityId,
+    );
+    const tag = `conversation:${event.aggregateId}`;
+
+    return {
+      mentionsEveryoneOrHere: false,
+      mentionsRecipientIdentityIds: [],
+      mentionsRoleIdentityIds: [],
+      payload: {
+        body: '',
+        data: {
+          conversationId: event.aggregateId,
+          messageId: event.attributes.messageId,
+          scope: {
+            conversationId: event.aggregateId,
+            type: NotificationSettingScopeType.CONVERSATION,
+          },
+          tags: [tag],
+        },
+        tag,
+        tags: [tag],
+        title: 'Notifications updated',
+        type: 'notifications_cleared',
+      },
+      recipientIdentityIds: readerIdentityId ? [readerIdentityId] : [],
+      respectBusy: false,
+      respectPreferences: false,
+      scope: {
+        conversationId: event.aggregateId,
+        type: NotificationSettingScopeType.CONVERSATION,
+      },
     };
   }
 
@@ -276,6 +319,8 @@ export class PushNotificationDispatcher {
         return this.notificationIntent(event);
       case 'calls.v1.call.started':
         return this.callIntent(event);
+      case 'conversations.v1.messages.were_read':
+        return this.clearConversationNotificationsIntent(event);
       default:
         return undefined;
     }
@@ -302,22 +347,24 @@ export class PushNotificationDispatcher {
       return;
     }
 
-    const shouldSendPush = await this.preferenceChecker.shouldSendPush(
-      new NotificationDeliveryShouldSendPushMessage(
-        identityId.valueOf(),
-        intent.scope,
-        intent.mentionsRecipientIdentityIds.some((mentionedIdentityId) =>
-          mentionedIdentityId.isEqual(identityId),
+    if (intent.respectPreferences) {
+      const shouldSendPush = await this.preferenceChecker.shouldSendPush(
+        new NotificationDeliveryShouldSendPushMessage(
+          identityId.valueOf(),
+          intent.scope,
+          intent.mentionsRecipientIdentityIds.some((mentionedIdentityId) =>
+            mentionedIdentityId.isEqual(identityId),
+          ),
+          intent.mentionsEveryoneOrHere,
+          intent.mentionsRoleIdentityIds.some((mentionedRoleIdentityId) =>
+            mentionedRoleIdentityId.isEqual(identityId),
+          ),
         ),
-        intent.mentionsEveryoneOrHere,
-        intent.mentionsRoleIdentityIds.some((mentionedRoleIdentityId) =>
-          mentionedRoleIdentityId.isEqual(identityId),
-        ),
-      ),
-    );
+      );
 
-    if (!shouldSendPush) {
-      return;
+      if (!shouldSendPush) {
+        return;
+      }
     }
 
     const subscriptions =

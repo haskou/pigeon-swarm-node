@@ -42,6 +42,7 @@ import { MongoCommunityMessageReactionRepository } from '@app/contexts/communiti
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
@@ -237,6 +238,13 @@ async function init() {
       CallStartedEvent,
       CallStartedEvent.EVENT_NAME,
       'pigeon-swarm.send-push-when-call-started',
+      pushNotificationDispatcher,
+    ),
+    new SendPushNotificationWhenEventReceived(
+      messageBus,
+      ConversationMessagesWereReadEvent,
+      ConversationMessagesWereReadEvent.EVENT_NAME,
+      'pigeon-swarm.clear-push-when-conversation-messages-read',
       pushNotificationDispatcher,
     ),
   );
