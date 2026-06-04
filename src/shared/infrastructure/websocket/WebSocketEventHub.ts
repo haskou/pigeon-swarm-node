@@ -6,61 +6,13 @@ import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
-import { Document } from 'mongodb';
 import { RawData, WebSocket } from 'ws';
 
+import { CommunityRoutingDocument } from './CommunityRoutingDocument';
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
-
-type WebSocketRealtimeMessage =
-  | {
-      identityId: string;
-      type: 'connection_ack';
-    }
-  | {
-      identityId: string;
-      timestamp: number;
-      type: 'heartbeat_ack';
-    }
-  | {
-      event: unknown;
-      type: 'domain_event';
-    }
-  | {
-      active: boolean;
-      conversationId: string;
-      identityId: string;
-      scope: 'conversation';
-      timestamp: number;
-      type: 'typing';
-    }
-  | {
-      active: boolean;
-      channelId: string;
-      communityId: string;
-      identityId: string;
-      scope: 'community_channel';
-      timestamp: number;
-      type: 'typing';
-    };
-
-type WebSocketClientMessage = {
-  active?: boolean;
-  channelId?: string;
-  communityId?: string;
-  conversationId?: string;
-  scope?: string;
-  type?: string;
-};
-
-type ConversationRoutingDocument = Document & {
-  _id: string;
-  participantIds?: string[];
-};
-
-type CommunityRoutingDocument = Document & {
-  _id: string;
-  memberIds?: string[];
-};
+import { ConversationRoutingDocument } from './ConversationRoutingDocument';
+import { WebSocketClientMessage } from './WebSocketClientMessage';
+import { WebSocketRealtimeMessage } from './WebSocketRealtimeMessage';
 
 const identityAttributeKeys = [
   'authorIdentityId',

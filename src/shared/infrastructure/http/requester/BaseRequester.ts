@@ -1,56 +1,12 @@
 import axios from 'axios';
 import * as https from 'https';
 
+import { BaseHeaders } from './BaseHeaders';
+import { BaseOptions } from './BaseOptions';
+import { BaseResponse } from './BaseResponse';
+import { HttpMethod } from './HttpMethod';
 import { Requester } from './Requester';
-
-export interface BaseResponse<R> {
-  data: R;
-  status: number;
-  statusText: string;
-}
-
-export const HttpMethod = {
-  DELETE: 'DELETE',
-  GET: 'GET',
-  HEAD: 'HEAD',
-  OPTIONS: 'OPTIONS',
-  PATCH: 'PATCH',
-  POST: 'POST',
-  PUT: 'PUT',
-} as const;
-
-export type HttpMethod = (typeof HttpMethod)[keyof typeof HttpMethod];
-
-export interface BaseResponse<R> {
-  data: R;
-  status: number;
-  statusText: string;
-}
-
-export type BaseHeaders = Record<string, string | number | boolean>;
-
-export const responses = {
-  ARRAYBUFFER: 'arraybuffer',
-  DOCUMENT: 'document',
-  JSON: 'json',
-  STREAM: 'stream',
-  TEXT: 'text',
-} as const;
-
-export type ResponseType = (typeof responses)[keyof typeof responses];
-
-export interface BaseOptions {
-  url: string;
-  method: HttpMethod;
-  headers?: BaseHeaders;
-  data?: Record<string, unknown>;
-  params?: Record<string, unknown>;
-  timeout?: number;
-  httpsAgent?: https.Agent;
-  responseType?: ResponseType;
-  maxContentLength?: number;
-  maxBodyLength?: number;
-}
+import { ResponseType, responses } from './ResponseType';
 
 export class BaseRequester implements Requester {
   constructor(

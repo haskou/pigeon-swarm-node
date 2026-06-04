@@ -14,16 +14,7 @@ import InvalidDomainEventError from '../../errors/InvalidDomainEventError';
 import NoFailedMessagesError from '../../errors/NoFailedMessagesError';
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
-
-type DomainEventHandler = (event: DomainEvent) => Promise<void>;
-
-type ConsumerContext = {
-  bindingKey: string;
-  channel: Channel;
-  DomainEventInstance: Constructor<DomainEvent>;
-  handler: DomainEventHandler;
-  queueName: string;
-};
+import { ConsumerContext } from './ConsumerContext';
 
 export default class AmqpMessageBusAdapter implements MessageBusAdapter {
   private exchange!: string;

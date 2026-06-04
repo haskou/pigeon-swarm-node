@@ -1,17 +1,8 @@
 import { Collection, MongoServerError } from 'mongodb';
 
+import { ExistingIndex } from './ExistingIndex';
+import { IndexDefinition } from './IndexDefinition';
 import MongoDB from './MongoDB';
-
-type IndexDefinition = {
-  readonly collection: string;
-  readonly keys: ReadonlyArray<readonly [string, 1 | -1]>;
-  readonly name: string;
-};
-
-type ExistingIndex = {
-  readonly key: Record<string, unknown>;
-  readonly name?: string;
-};
 
 export class MongoIndexInitializer {
   private readonly indexes: IndexDefinition[] = [

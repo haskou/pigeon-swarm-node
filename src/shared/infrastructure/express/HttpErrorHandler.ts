@@ -9,31 +9,11 @@ import {
 
 import CustomHttpError from '../errors/CustomHttpError';
 import { HttpRouteStatusEnum } from '../ui/routes/HttpRouteStatusEnum';
-
-type ValidationError = {
-  property: string;
-  value: string;
-  constraints: string[];
-  children: ValidationError[];
-};
-
-type ErrorExplanation = {
-  errors?: Array<ValidationError>;
-};
-
-type FormattedValidationError = {
-  property: string;
-  value: string;
-  details: string[];
-};
-
-type PayloadTooLargeError = Error & {
-  status?: number;
-  statusCode?: number;
-  type?: string;
-};
-
-type ErrorResponseHandler = (error: Error, response: Response) => boolean;
+import { ErrorExplanation } from './ErrorExplanation';
+import { ErrorResponseHandler } from './ErrorResponseHandler';
+import { FormattedValidationError } from './FormattedValidationError';
+import { PayloadTooLargeError } from './PayloadTooLargeError';
+import { ValidationError } from './ValidationError';
 
 @Middleware({ type: 'after' })
 export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {

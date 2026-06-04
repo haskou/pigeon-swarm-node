@@ -1,28 +1,4 @@
-export type PubSubMessage = {
-  data?: Uint8Array;
-  msg?: {
-    data?: Uint8Array;
-    topic?: string;
-  };
-  topic?: string;
-};
-
-export type PubSubEvent = CustomEvent<PubSubMessage>;
-
-export type Libp2pPubSubService = {
-  addEventListener(
-    eventName: string,
-    handler: (event: PubSubEvent) => void,
-  ): void;
-  publish(topic: string, payload: Uint8Array): Promise<unknown>;
-  subscribe(topic: string): Promise<void> | void;
-};
-
-export type Libp2pPubSubNode = {
-  services: {
-    pubsub: Libp2pPubSubService;
-  };
-};
+import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 
 export class Libp2pGossipsubRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof import('helia')>;

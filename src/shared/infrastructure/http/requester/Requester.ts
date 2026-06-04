@@ -1,4 +1,6 @@
-import { HttpMethod, BaseHeaders, BaseResponse } from './BaseRequester';
+import { BaseHeaders } from './BaseHeaders';
+import { BaseResponse } from './BaseResponse';
+import { HttpMethod } from './HttpMethod';
 
 export interface Requester {
   request<R>(

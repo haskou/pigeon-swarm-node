@@ -6,20 +6,9 @@ import {
   createHash,
 } from 'crypto';
 
-interface ClearEnvelope {
-  encrypted: false;
-  payload: string;
-}
-
-interface EncryptedEnvelope {
-  algorithm: 'aes-256-gcm';
-  encrypted: true;
-  iv: string;
-  payload: string;
-  tag: string;
-}
-
-type PubSubNetworkEnvelope = ClearEnvelope | EncryptedEnvelope;
+import { ClearEnvelope } from './ClearEnvelope';
+import { EncryptedEnvelope } from './EncryptedEnvelope';
+import { PubSubNetworkEnvelope } from './PubSubNetworkEnvelope';
 
 export default class PubSubNetworkMessageCodec {
   private static readonly algorithm = 'aes-256-gcm';
