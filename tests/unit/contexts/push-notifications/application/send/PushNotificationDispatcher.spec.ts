@@ -1,3 +1,4 @@
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
 import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
@@ -111,6 +112,30 @@ describe('PushNotificationDispatcher', () => {
     );
   });
 
+  it('does not send stale message pushes when the message was already read', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+      unreadMessages: [],
+    });
+    const event = new TestDomainEvent('conversation-id', {
+      authorId: authorIdentityId.valueOf(),
+      eventName: 'conversations.v1.message.was_sent',
+      messageId: 'message-id',
+      participantIds: [
+        authorIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+      ],
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).not.toHaveBeenCalled();
+  });
+
   it('keeps invitation push notifications while recipient is busy', async () => {
     const recipientIdentityId = await generateIdentityId();
     const subscription = createSubscription(recipientIdentityId);
@@ -156,6 +181,42 @@ describe('PushNotificationDispatcher', () => {
 
     expect(repository.deleteByEndpoint).toHaveBeenCalledWith(
       subscription.getEndpoint(),
+    );
+  });
+
+  it('sends notification clear pushes only to the reader identity', async () => {
+    const readerIdentityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const readerSubscription = createSubscription(readerIdentityId);
+    const otherSubscription = createSubscription(otherIdentityId);
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      busyIdentityIds: [readerIdentityId.valueOf()],
+      delivery,
+      subscriptions: [readerSubscription, otherSubscription],
+    });
+    const event = new TestDomainEvent('conversation-id', {
+      eventName: 'conversations.v1.messages.were_read',
+      messageId: 'message-id',
+      participantIds: [readerIdentityId.valueOf(), otherIdentityId.valueOf()],
+      readerIdentityId: readerIdentityId.valueOf(),
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).toHaveBeenCalledTimes(1);
+    expect(delivery.send).toHaveBeenCalledWith(
+      readerSubscription,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          conversationId: 'conversation-id',
+          messageId: 'message-id',
+          tags: ['conversation:conversation-id'],
+        }),
+        tag: 'conversation:conversation-id',
+        tags: ['conversation:conversation-id'],
+        type: 'notifications_cleared',
+      }),
     );
   });
 });
@@ -242,10 +303,34 @@ function mockRepository(
     delete: jest.fn(),
     deleteByEndpoint: jest.fn(),
     findByIdentityId: jest.fn(async (identityId: IdentityId) =>
-      subscriptions.filter((subscription) => subscription.belongsTo(identityId)),
+      subscriptions.filter((subscription) =>
+        subscription.belongsTo(identityId),
+      ),
     ),
     save: jest.fn(),
   };
+}
+
+function mockConversationRepository(
+  unreadMessages?: string[],
+): ConversationRepository {
+  return {
+    hasUnreadMessageForRecipient: jest.fn(
+      async (
+        recipientIdentityId: IdentityId,
+        conversationId,
+        messageId,
+      ): Promise<boolean> => {
+        if (!unreadMessages) {
+          return true;
+        }
+
+        return unreadMessages.includes(
+          `${recipientIdentityId.valueOf()}:${conversationId.valueOf()}:${messageId.valueOf()}`,
+        );
+      },
+    ),
+  } as unknown as ConversationRepository;
 }
 
 function emptySettingsRepository(): NotificationScopeSettingsRepository {
@@ -270,6 +355,7 @@ function createDispatcher(options: {
   presences?: IdentityPresence[];
   repository?: PushSubscriptionRepository;
   subscriptions: PushSubscription[];
+  unreadMessages?: string[];
 }): PushNotificationDispatcher {
   return new PushNotificationDispatcher(
     options.repository ?? mockRepository(options.subscriptions),
@@ -277,6 +363,7 @@ function createDispatcher(options: {
       busyIdentityIds: options.busyIdentityIds ?? [],
       presences: options.presences ?? [],
     }),
+    mockConversationRepository(options.unreadMessages),
     options.delivery,
     new NotificationDeliveryPreferenceChecker(emptySettingsRepository()),
   );

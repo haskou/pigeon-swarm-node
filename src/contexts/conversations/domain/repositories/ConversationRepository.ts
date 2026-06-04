@@ -71,6 +71,11 @@ export interface ConversationRepository {
     recipientIdentityId: IdentityId,
     conversationIds: ConversationId[],
   ): Promise<Map<string, number>>;
+  hasUnreadMessageForRecipient(
+    recipientIdentityId: IdentityId,
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<boolean>;
   findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,

@@ -1,3 +1,6 @@
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
 import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
@@ -15,8 +18,13 @@ type PushNotificationIntent = {
   mentionsRoleIdentityIds: IdentityId[];
   payload: PushNotificationPayload;
   respectBusy: boolean;
+  respectPreferences: boolean;
   recipientIdentityIds: IdentityId[];
   scope: PushNotificationScope;
+  unreadMessage?: {
+    conversationId: ConversationId;
+    messageId: MessageId;
+  };
 };
 
 type PushNotificationScope =
@@ -45,6 +53,21 @@ export class PushNotificationDispatcher {
 
   private static optionalIdentityId(value: unknown): IdentityId | undefined {
     return typeof value === 'string' ? new IdentityId(value) : undefined;
+  }
+
+  private static unreadMessageFromEvent(
+    event: DomainEvent,
+  ): PushNotificationIntent['unreadMessage'] {
+    const messageId = event.attributes.messageId;
+
+    if (typeof messageId !== 'string') {
+      return undefined;
+    }
+
+    return {
+      conversationId: new ConversationId(event.aggregateId),
+      messageId: new MessageId(messageId),
+    };
   }
 
   private static objectField(value: object, field: string): unknown {
@@ -94,6 +117,7 @@ export class PushNotificationDispatcher {
   constructor(
     private readonly subscriptionRepository: PushSubscriptionRepository,
     private readonly presenceRepository: MongoIdentityPresenceRepository,
+    private readonly conversationRepository: ConversationRepository,
     private readonly delivery: PushNotificationDelivery,
     private readonly preferenceChecker: NotificationDeliveryPreferenceChecker,
   ) {}
@@ -142,10 +166,12 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      respectPreferences: true,
       scope: {
         conversationId: event.aggregateId,
         type: NotificationSettingScopeType.CONVERSATION,
       },
+      unreadMessage: PushNotificationDispatcher.unreadMessageFromEvent(event),
     };
   }
 
@@ -179,6 +205,7 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      respectPreferences: true,
       scope: {
         channelId: String(event.attributes.channelId),
         communityId: event.aggregateId,
@@ -210,6 +237,7 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds: recipientIdentityId ? [recipientIdentityId] : [],
       respectBusy: isCallNotification,
+      respectPreferences: true,
       scope: {
         conversationId: event.aggregateId,
         type: NotificationSettingScopeType.CONVERSATION,
@@ -244,9 +272,48 @@ export class PushNotificationDispatcher {
       },
       recipientIdentityIds,
       respectBusy: true,
+      respectPreferences: true,
       scope: PushNotificationDispatcher.scopeFromCallScope(
         event.attributes.scope,
       ),
+    };
+  }
+
+  private clearConversationNotificationsIntent(
+    event: DomainEvent,
+  ): PushNotificationIntent {
+    const readerIdentityId = PushNotificationDispatcher.optionalIdentityId(
+      event.attributes.readerIdentityId,
+    );
+    const tag = `conversation:${event.aggregateId}`;
+
+    return {
+      mentionsEveryoneOrHere: false,
+      mentionsRecipientIdentityIds: [],
+      mentionsRoleIdentityIds: [],
+      payload: {
+        body: '',
+        data: {
+          conversationId: event.aggregateId,
+          messageId: event.attributes.messageId,
+          scope: {
+            conversationId: event.aggregateId,
+            type: NotificationSettingScopeType.CONVERSATION,
+          },
+          tags: [tag],
+        },
+        tag,
+        tags: [tag],
+        title: 'Notifications updated',
+        type: 'notifications_cleared',
+      },
+      recipientIdentityIds: readerIdentityId ? [readerIdentityId] : [],
+      respectBusy: false,
+      respectPreferences: false,
+      scope: {
+        conversationId: event.aggregateId,
+        type: NotificationSettingScopeType.CONVERSATION,
+      },
     };
   }
 
@@ -276,6 +343,8 @@ export class PushNotificationDispatcher {
         return this.notificationIntent(event);
       case 'calls.v1.call.started':
         return this.callIntent(event);
+      case 'conversations.v1.messages.were_read':
+        return this.clearConversationNotificationsIntent(event);
       default:
         return undefined;
     }
@@ -294,6 +363,21 @@ export class PushNotificationDispatcher {
     return presence?.isBusy() || false;
   }
 
+  private async shouldSkipForReadMessage(
+    identityId: IdentityId,
+    intent: PushNotificationIntent,
+  ): Promise<boolean> {
+    if (!intent.unreadMessage) {
+      return false;
+    }
+
+    return !(await this.conversationRepository.hasUnreadMessageForRecipient(
+      identityId,
+      intent.unreadMessage.conversationId,
+      intent.unreadMessage.messageId,
+    ));
+  }
+
   private async sendToIdentity(
     identityId: IdentityId,
     intent: PushNotificationIntent,
@@ -302,22 +386,28 @@ export class PushNotificationDispatcher {
       return;
     }
 
-    const shouldSendPush = await this.preferenceChecker.shouldSendPush(
-      new NotificationDeliveryShouldSendPushMessage(
-        identityId.valueOf(),
-        intent.scope,
-        intent.mentionsRecipientIdentityIds.some((mentionedIdentityId) =>
-          mentionedIdentityId.isEqual(identityId),
-        ),
-        intent.mentionsEveryoneOrHere,
-        intent.mentionsRoleIdentityIds.some((mentionedRoleIdentityId) =>
-          mentionedRoleIdentityId.isEqual(identityId),
-        ),
-      ),
-    );
-
-    if (!shouldSendPush) {
+    if (await this.shouldSkipForReadMessage(identityId, intent)) {
       return;
+    }
+
+    if (intent.respectPreferences) {
+      const shouldSendPush = await this.preferenceChecker.shouldSendPush(
+        new NotificationDeliveryShouldSendPushMessage(
+          identityId.valueOf(),
+          intent.scope,
+          intent.mentionsRecipientIdentityIds.some((mentionedIdentityId) =>
+            mentionedIdentityId.isEqual(identityId),
+          ),
+          intent.mentionsEveryoneOrHere,
+          intent.mentionsRoleIdentityIds.some((mentionedRoleIdentityId) =>
+            mentionedRoleIdentityId.isEqual(identityId),
+          ),
+        ),
+      );
+
+      if (!shouldSendPush) {
+        return;
+      }
     }
 
     const subscriptions =

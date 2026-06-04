@@ -142,10 +142,59 @@ Possible `type` values:
 - `message`
 - `notification`
 - `call`
+- `notifications_cleared`
 
 Service worker should call `self.registration.showNotification(title, ...)` and
 handle `notificationclick` by focusing/opening the app and routing using
 `payload.data`.
+
+### Clearing displayed notifications
+
+Conversation message pushes use a stable notification tag:
+
+```text
+conversation:<conversationId>
+```
+
+When a user marks conversation messages as read from any device through
+`PUT /conversations/{conversationId}/messages/read-until`, backend sends a push
+control payload to that same identity's subscriptions:
+
+```json
+{
+  "type": "notifications_cleared",
+  "title": "Notifications updated",
+  "body": "",
+  "tag": "conversation:<conversationId>",
+  "tags": ["conversation:<conversationId>"],
+  "data": {
+    "conversationId": "<conversationId>",
+    "messageId": "<readUntilMessageId>",
+    "tags": ["conversation:<conversationId>"],
+    "scope": {
+      "type": "conversation",
+      "conversationId": "<conversationId>"
+    }
+  }
+}
+```
+
+The service worker must not display this payload. It should close already shown
+notifications whose `notification.tag` is listed in `payload.tags` or
+`payload.data.tags`:
+
+```ts
+const notifications = await self.registration.getNotifications();
+
+for (const notification of notifications) {
+  if (payload.tags?.includes(notification.tag)) {
+    notification.close();
+  }
+}
+```
+
+This signal bypasses busy-state and notification preference suppression because
+it is a synchronization control message, not a user-facing alert.
 
 ## Busy Presence
 

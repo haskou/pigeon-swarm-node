@@ -253,46 +253,46 @@ Implemented:
 
 Event contracts used by frontend:
 
-| Event type | Aggregate id | Attributes used by clients/routing |
-| --- | --- | --- |
-| `conversations.v1.conversation.was_created` | conversation id | `networkId`, `participantIds` |
-| `conversations.v1.message.was_sent` | conversation id | `messageId`, `authorId`, `networkId`, `participantIds` |
-| `conversations.v1.message.was_edited` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
-| `conversations.v1.message.was_deleted` | conversation id | `messageId`, `targetMessageId`, `networkId`, `participantIds` |
-| `conversations.v1.message.was_pinned` | conversation id | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds` |
-| `conversations.v1.message.was_unpinned` | conversation id | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds` |
-| `conversations.v1.messages.were_read` | conversation id | `messageId`, `readerIdentityId`, `networkId`, `participantIds` |
-| `conversations.v1.message.reaction.was_added` | conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` |
-| `conversations.v1.message.reaction.was_removed` | conversation id | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds` |
-| `calls.v1.call.started` | call id | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status` |
-| `calls.v1.participant.joined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status` |
-| `calls.v1.participant.left` | call id | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status` |
-| `calls.v1.participant.declined` | call id | `callId`, `networkId`, `scope`, `participantIds`, `declinedIdentityId`, `status` |
-| `calls.v1.participant.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status` |
-| `calls.v1.call.ended` | call id | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status` |
-| `calls.v1.call.missed` | call id | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status` |
-| `calls.v1.signal.sent` | call id | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
-| `communities.v1.channel.was_created` | community id | `communityId`, `networkId`, `memberIds`, `channel` |
-| `communities.v1.channel.was_renamed` | community id | `communityId`, `networkId`, `memberIds`, `channelId`, `name` |
-| `communities.v1.channel.was_deleted` | community id | `communityId`, `networkId`, `memberIds`, `channelId` |
-| `communities.v1.community.was_updated` | community id | `communityId`, `networkId`, `memberIds`, `community` |
-| `communities.v1.member.was_added` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
-| `communities.v1.member.was_left` | community id | `communityId`, `networkId`, `memberIds`, `identityId`, `community` |
-| `communities.v1.channel.message.was_sent` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds` |
-| `communities.v1.channel.message.was_deleted` | community id | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds` |
-| `communities.v1.channel.message.was_pinned` | community id | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds` |
-| `communities.v1.channel.message.was_unpinned` | community id | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds` |
-| `communities.v1.channel.message.reaction.was_added` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds` |
-| `communities.v1.channel.message.reaction.was_removed` | community id | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds` |
-| `notifications.v1.notification.was_created` | notification id | `recipientIdentityId`, `type` |
-| `notifications.v1.notification.was_accepted` | notification id | `recipientIdentityId` |
-| `notifications.v1.notification.was_declined` | notification id | `recipientIdentityId` |
-| `identities.v1.identity.was_created` | identity id | `networkIds` |
-| `identities.v1.identity.was_updated` | identity id | `networkIds` |
-| `keychains.v1.keychain.was_published` | owner identity id | owner is the aggregate id |
-| `nodes.v1.node.heartbeat.was_sent` | node id | `owner`, `networks` |
-| `nodes.v1.node.network.was_added` | node id | node/network metadata |
-| `nodes.v1.node.network.was_removed` | node id | `networkId` |
+| Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                   |
+| ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `conversations.v1.conversation.was_created`           | conversation id   | `networkId`, `participantIds`                                                                                        |
+| `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                               |
+| `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                        |
+| `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                        |
+| `conversations.v1.message.was_pinned`                 | conversation id   | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds`                                                     |
+| `conversations.v1.message.was_unpinned`               | conversation id   | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds`                                                   |
+| `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                       |
+| `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
+| `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
+| `calls.v1.call.started`                               | call id           | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status`                                      |
+| `calls.v1.participant.joined`                         | call id           | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status`                                       |
+| `calls.v1.participant.left`                           | call id           | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status`                                         |
+| `calls.v1.participant.declined`                       | call id           | `callId`, `networkId`, `scope`, `participantIds`, `declinedIdentityId`, `status`                                     |
+| `calls.v1.participant.missed`                         | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status`                                       |
+| `calls.v1.call.ended`                                 | call id           | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status`                                      |
+| `calls.v1.call.missed`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status`                                      |
+| `calls.v1.signal.sent`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
+| `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
+| `communities.v1.channel.was_deleted`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`                                                                 |
+| `communities.v1.community.was_updated`                | community id      | `communityId`, `networkId`, `memberIds`, `community`                                                                 |
+| `communities.v1.member.was_added`                     | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                   |
+| `communities.v1.member.was_left`                      | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                   |
+| `communities.v1.channel.message.was_sent`             | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                |
+| `communities.v1.channel.message.was_deleted`          | community id      | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds`          |
+| `communities.v1.channel.message.was_pinned`           | community id      | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds`                              |
+| `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                            |
+| `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
+| `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
+| `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                        |
+| `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                |
+| `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                |
+| `identities.v1.identity.was_created`                  | identity id       | `networkIds`                                                                                                         |
+| `identities.v1.identity.was_updated`                  | identity id       | `networkIds`                                                                                                         |
+| `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                            |
+| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks`                                                                                                  |
+| `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                |
+| `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                          |
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
@@ -1705,6 +1705,9 @@ Implemented:
 - publish `ConversationMessagesWereReadEvent` with `messageId`,
   `readerIdentityId`, `networkId` and `participantIds`
 - consuming nodes apply the same unread-flag deletion locally
+- send a Web Push control payload of type `notifications_cleared` to the
+  reader identity subscriptions so service workers can close displayed
+  notifications tagged as `conversation:<conversationId>`
 
 ### Add message reaction
 

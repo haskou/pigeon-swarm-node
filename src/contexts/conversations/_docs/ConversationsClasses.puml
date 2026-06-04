@@ -121,6 +121,7 @@ package "conversations.domain" {
     +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
     +findSyncScopes(): Promise<object[]>
     +countUnreadByRecipient(recipientIdentityId: IdentityId, conversationIds: ConversationId[]): Promise<Map<string, number>>
+    +hasUnreadMessageForRecipient(recipientIdentityId: IdentityId, conversationId: ConversationId, messageId: MessageId): Promise<boolean>
     +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId): Promise<void>
     +registerUnreadForMessage(conversation: Conversation, message: Message): Promise<void>
   }
