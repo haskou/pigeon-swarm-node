@@ -1,9 +1,7 @@
 import Libp2pGossipsubTransport from '@app/shared/infrastructure/pubsub/libp2p/Libp2pGossipsubTransport';
-import {
-  Libp2pGossipsubRuntimeAdapter,
-  Libp2pPubSubNode,
-  PubSubEvent,
-} from '@app/shared/infrastructure/pubsub/libp2p/Libp2pGossipsubRuntimeAdapter';
+import { Libp2pGossipsubRuntimeAdapter } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pGossipsubRuntimeAdapter';
+import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
+import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('Libp2pGossipsubTransport', () => {
@@ -40,9 +38,8 @@ describe('Libp2pGossipsubTransport', () => {
 
     await transport.subscribe('pigeon.identities', handler);
 
-    const listener = (
-      node.services.pubsub.addEventListener as jest.Mock
-    ).mock.calls[0][1] as (event: PubSubEvent) => void;
+    const listener = (node.services.pubsub.addEventListener as jest.Mock).mock
+      .calls[0][1] as (event: PubSubEvent) => void;
 
     listener(
       new CustomEvent('message', {
