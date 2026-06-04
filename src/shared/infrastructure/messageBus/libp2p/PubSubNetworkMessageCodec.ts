@@ -6,23 +6,53 @@ import {
   createHash,
 } from 'crypto';
 
-interface ClearEnvelope {
-  encrypted: false;
-  payload: string;
-}
-
-interface EncryptedEnvelope {
-  algorithm: 'aes-256-gcm';
-  encrypted: true;
-  iv: string;
-  payload: string;
-  tag: string;
-}
-
-type PubSubNetworkEnvelope = ClearEnvelope | EncryptedEnvelope;
+import { ClearEnvelope } from './ClearEnvelope';
+import { EncryptedEnvelope } from './EncryptedEnvelope';
+import { PubSubNetworkEnvelope } from './PubSubNetworkEnvelope';
 
 export default class PubSubNetworkMessageCodec {
   private static readonly algorithm = 'aes-256-gcm';
+
+  private assertEnvelope(
+    value: unknown,
+  ): asserts value is PubSubNetworkEnvelope {
+    if (!this.isEnvelope(value)) {
+      throw new Error('Invalid pubsub network message envelope.');
+    }
+  }
+
+  private hasStringProperty(
+    value: Record<string, unknown>,
+    property: string,
+  ): boolean {
+    return typeof value[property] === 'string';
+  }
+
+  private isClearEnvelope(value: Record<string, unknown>): boolean {
+    return (
+      value.encrypted === false && this.hasStringProperty(value, 'payload')
+    );
+  }
+
+  private isEncryptedEnvelope(value: Record<string, unknown>): boolean {
+    return (
+      value.algorithm === PubSubNetworkMessageCodec.algorithm &&
+      value.encrypted === true &&
+      this.hasStringProperty(value, 'iv') &&
+      this.hasStringProperty(value, 'payload') &&
+      this.hasStringProperty(value, 'tag')
+    );
+  }
+
+  private isEnvelope(value: unknown): value is PubSubNetworkEnvelope {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+
+    const envelope = value as Record<string, unknown>;
+
+    return this.isClearEnvelope(envelope) || this.isEncryptedEnvelope(envelope);
+  }
 
   private encryptionKey(network: IPFSNetwork): Buffer {
     const key = network.getConfig().getKey();
@@ -82,7 +112,9 @@ export default class PubSubNetworkMessageCodec {
   }
 
   public decode(payload: string, network: IPFSNetwork): string {
-    const envelope = JSON.parse(payload) as PubSubNetworkEnvelope;
+    const envelope = JSON.parse(payload) as unknown;
+
+    this.assertEnvelope(envelope);
 
     if (!envelope.encrypted) {
       return envelope.payload;

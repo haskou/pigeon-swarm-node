@@ -4,7 +4,7 @@ export interface Message {
   event: string;
   exchange: string;
   type: string;
-  occurred_on: string;
+  occurred_on: string | number;
   aggregate_id: string;
   attributes: Record<string, unknown>;
   event_id: string;

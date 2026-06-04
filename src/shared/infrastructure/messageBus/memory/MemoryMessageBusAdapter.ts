@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import Kernel from '@app/Kernel';
 import { Constructor } from '@app/shared/domain/Constructor';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
@@ -6,41 +5,97 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
 
-export default class MemoryMessageBusAdapter implements MessageBusAdapter {
-  public static memoryMessages: {
-    [key: string]: {
-      routingKey: string;
-      event: string;
-      exchange: string;
-    }[];
-  } = {};
+type MemoryMessage = {
+  routingKey: string;
+  event: string;
+  exchange: string;
+};
 
-  public static errorMemoryMessages: { [key: string]: string[] } = {};
+export default class MemoryMessageBusAdapter implements MessageBusAdapter {
+  public static memoryMessages: Record<string, MemoryMessage[]> = {};
+
+  public static errorMemoryMessages: Record<string, string[]> = {};
 
   private getQueueNameFromDomainEvent(
     domainEvent: DomainEvent,
     exchange: string,
   ): string[] {
-    const consumers = Kernel.consumers;
-    const queues = [];
-    for (const consumer of consumers) {
-      if (
-        consumer.eventName === domainEvent.eventName() &&
-        consumer.exchange === exchange
-      ) {
-        queues.push(consumer.queueName);
-      }
+    return Kernel.consumers
+      .filter(
+        (consumer) =>
+          consumer.eventName === domainEvent.eventName() &&
+          consumer.exchange === exchange,
+      )
+      .map((consumer) => consumer.queueName);
+  }
+
+  private ensureQueue(queueName: string): void {
+    MemoryMessageBusAdapter.memoryMessages[queueName] ??= [];
+    MemoryMessageBusAdapter.errorMemoryMessages[queueName] ??= [];
+  }
+
+  private matchesSubscription(
+    message: MemoryMessage,
+    bindingKey: string,
+    exchange: string,
+  ): boolean {
+    return message.routingKey === bindingKey && message.exchange === exchange;
+  }
+
+  private toDomainEvent(
+    message: MemoryMessage,
+    DomainEventInstance: Constructor<DomainEvent>,
+  ): DomainEvent {
+    const event = JSON.parse(message.event) as Message;
+
+    return new DomainEventInstance(
+      event.aggregate_id,
+      event.attributes,
+      event.event_id,
+      new Date(event.occurred_on),
+      event.user_id,
+    );
+  }
+
+  private recordHandlerError(queueName: string, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+
+    Kernel.logger.error(message);
+    this.ensureQueue(queueName);
+    MemoryMessageBusAdapter.errorMemoryMessages[queueName].push(message);
+  }
+
+  private async handleQueuedMessage(
+    queueName: string,
+    bindingKey: string,
+    DomainEventInstance: Constructor<DomainEvent>,
+    exchange: string,
+    handler: (event: DomainEvent) => Promise<void>,
+  ): Promise<void> {
+    const message = MemoryMessageBusAdapter.memoryMessages[queueName]?.pop();
+
+    if (!message || !this.matchesSubscription(message, bindingKey, exchange)) {
+      return;
     }
 
-    return queues;
+    try {
+      await handler(this.toDomainEvent(message, DomainEventInstance));
+    } catch (error: unknown) {
+      this.recordHandlerError(queueName, error);
+    }
   }
 
   public consumeDlx(
-    _queueName: string,
-    _DomainEventInstance: Constructor<DomainEvent>,
-    _handler: (event: DomainEvent) => Promise<void>,
-    _messagesToRetry?: number,
+    queueName: string,
+    DomainEventInstance: Constructor<DomainEvent>,
+    handler: (event: DomainEvent) => Promise<void>,
+    messagesToRetry?: number,
   ): Promise<void> {
+    void queueName;
+    void DomainEventInstance;
+    void handler;
+    void messagesToRetry;
+
     throw new Error('Method not implemented.');
   }
 
@@ -52,40 +107,17 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
     await Promise.resolve(
-      // eslint-disable-next-line sonarjs/cognitive-complexity
-      setInterval(async () => {
-        if (MemoryMessageBusAdapter.memoryMessages[queueName]) {
-          const msg = MemoryMessageBusAdapter.memoryMessages[queueName].pop();
-
-          if (
-            msg &&
-            msg.routingKey === bindingKey &&
-            msg.exchange === exchange
-          ) {
-            const message = JSON.parse(msg.event) as Message;
-            const event = new DomainEventInstance(
-              message.aggregate_id,
-              message.attributes,
-              message.event_id,
-              new Date(message.occurred_on),
-              message.user_id,
-            );
-            try {
-              await handler(event);
-            } catch (error: unknown) {
-              Kernel.logger.error((error as Error).message);
-
-              // eslint-disable-next-line max-depth
-              if (!MemoryMessageBusAdapter.errorMemoryMessages[queueName]) {
-                MemoryMessageBusAdapter.errorMemoryMessages[queueName] = [];
-              }
-              MemoryMessageBusAdapter.errorMemoryMessages[queueName].push(
-                (error as Error).message,
-              );
-            }
-          }
-        }
-      }, 50),
+      setInterval(
+        () =>
+          void this.handleQueuedMessage(
+            queueName,
+            bindingKey,
+            DomainEventInstance,
+            exchange,
+            handler,
+          ),
+        50,
+      ),
     );
   }
 
@@ -105,13 +137,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
         );
 
         for (const queue of queues) {
-          if (!MemoryMessageBusAdapter.memoryMessages[queue]) {
-            MemoryMessageBusAdapter.memoryMessages[queue] = [];
-          }
-
-          if (!MemoryMessageBusAdapter.errorMemoryMessages[queue]) {
-            MemoryMessageBusAdapter.errorMemoryMessages[queue] = [];
-          }
+          this.ensureQueue(queue);
 
           MemoryMessageBusAdapter.memoryMessages[queue].push({
             event: domainEvent.decode(),

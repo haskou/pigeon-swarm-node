@@ -1,21 +1,8 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-export type WebSocketDomainEvent = {
-  aggregate_id: string;
-  attributes: Record<string, unknown>;
-  causation_id?: string;
-  correlation_id?: string;
-  event_id: string;
-  occurred_on: number;
-  type: string;
-};
-
-type CallEventType = 'declined' | 'ended' | 'missed';
-
-type ConversationScope = {
-  conversationId?: string;
-  type?: string;
-};
+import { CallEventType } from './CallEventType';
+import { ConversationScope } from './ConversationScope';
+import { WebSocketDomainEvent } from './WebSocketDomainEvent';
 
 export class ConversationCallEventRealtimeMapper {
   private isRecord(value: unknown): value is Record<string, unknown> {

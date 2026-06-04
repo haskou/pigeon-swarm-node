@@ -4,12 +4,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { PublicKey, Signature } from '@haskou/value-objects';
 import { IncomingMessage } from 'http';
 
-type WebSocketCredentials = {
-  identityId: string;
-  nonce: string;
-  signature: string;
-  timestamp: string;
-};
+import { WebSocketCredentials } from './WebSocketCredentials';
 
 export class WebSocketConnectionAuthenticator {
   private static readonly maximumClockSkewInMilliseconds = 5 * 60 * 1000;

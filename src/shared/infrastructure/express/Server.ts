@@ -104,21 +104,18 @@ import { PostStickerRoute } from '@app/apps/apis/stickers-api/routes/PostSticker
 import { PostUsedStickerRoute } from '@app/apps/apis/stickers-api/routes/PostUsedStickerRoute';
 import { PutFavoriteStickerRoute } from '@app/apps/apis/stickers-api/routes/PutFavoriteStickerRoute';
 import { PutSavedStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PutSavedStickerPackRoute';
-import * as express from 'express';
-import * as shttp from 'http';
 import { createExpressServer } from 'routing-controllers';
 
 import { ServerNotRunningError } from '../errors/ServerNotRunningError';
 import ConsumeDlxRoute from '../ui/routes/ConsumeDlxRoute';
 import HealthRoute from '../ui/routes/HealthRoute';
 import { WebSocketRealtimeServer } from '../websocket/WebSocketRealtimeServer';
+import { HttpApp } from './HttpApp';
 import { HttpErrorHandler } from './HttpErrorHandler';
+import { HttpServer } from './HttpServer';
 import { PublicStaticContent } from './PublicStaticContent';
 import { RoutePrefix } from './RoutePrefix';
-
-type HttpApp = express.Application;
-type HttpServer = shttp.Server;
-type SwaggerRouteMap = Record<string, string>;
+import { SwaggerRouteMap } from './SwaggerRouteMap';
 
 export default class Server {
   private _app: HttpApp | undefined;
