@@ -1,3 +1,6 @@
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
 import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
@@ -18,6 +21,10 @@ type PushNotificationIntent = {
   respectPreferences: boolean;
   recipientIdentityIds: IdentityId[];
   scope: PushNotificationScope;
+  unreadMessage?: {
+    conversationId: ConversationId;
+    messageId: MessageId;
+  };
 };
 
 type PushNotificationScope =
@@ -46,6 +53,21 @@ export class PushNotificationDispatcher {
 
   private static optionalIdentityId(value: unknown): IdentityId | undefined {
     return typeof value === 'string' ? new IdentityId(value) : undefined;
+  }
+
+  private static unreadMessageFromEvent(
+    event: DomainEvent,
+  ): PushNotificationIntent['unreadMessage'] {
+    const messageId = event.attributes.messageId;
+
+    if (typeof messageId !== 'string') {
+      return undefined;
+    }
+
+    return {
+      conversationId: new ConversationId(event.aggregateId),
+      messageId: new MessageId(messageId),
+    };
   }
 
   private static objectField(value: object, field: string): unknown {
@@ -95,6 +117,7 @@ export class PushNotificationDispatcher {
   constructor(
     private readonly subscriptionRepository: PushSubscriptionRepository,
     private readonly presenceRepository: MongoIdentityPresenceRepository,
+    private readonly conversationRepository: ConversationRepository,
     private readonly delivery: PushNotificationDelivery,
     private readonly preferenceChecker: NotificationDeliveryPreferenceChecker,
   ) {}
@@ -148,6 +171,7 @@ export class PushNotificationDispatcher {
         conversationId: event.aggregateId,
         type: NotificationSettingScopeType.CONVERSATION,
       },
+      unreadMessage: PushNotificationDispatcher.unreadMessageFromEvent(event),
     };
   }
 
@@ -339,11 +363,30 @@ export class PushNotificationDispatcher {
     return presence?.isBusy() || false;
   }
 
+  private async shouldSkipForReadMessage(
+    identityId: IdentityId,
+    intent: PushNotificationIntent,
+  ): Promise<boolean> {
+    if (!intent.unreadMessage) {
+      return false;
+    }
+
+    return !(await this.conversationRepository.hasUnreadMessageForRecipient(
+      identityId,
+      intent.unreadMessage.conversationId,
+      intent.unreadMessage.messageId,
+    ));
+  }
+
   private async sendToIdentity(
     identityId: IdentityId,
     intent: PushNotificationIntent,
   ): Promise<void> {
     if (await this.shouldSkipForBusy(identityId, intent.respectBusy)) {
+      return;
+    }
+
+    if (await this.shouldSkipForReadMessage(identityId, intent)) {
       return;
     }
 

@@ -1,3 +1,4 @@
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
 import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
@@ -109,6 +110,30 @@ describe('PushNotificationDispatcher', () => {
         type: 'message',
       }),
     );
+  });
+
+  it('does not send stale message pushes when the message was already read', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+      unreadMessages: [],
+    });
+    const event = new TestDomainEvent('conversation-id', {
+      authorId: authorIdentityId.valueOf(),
+      eventName: 'conversations.v1.message.was_sent',
+      messageId: 'message-id',
+      participantIds: [
+        authorIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+      ],
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).not.toHaveBeenCalled();
   });
 
   it('keeps invitation push notifications while recipient is busy', async () => {
@@ -286,6 +311,28 @@ function mockRepository(
   };
 }
 
+function mockConversationRepository(
+  unreadMessages?: string[],
+): ConversationRepository {
+  return {
+    hasUnreadMessageForRecipient: jest.fn(
+      async (
+        recipientIdentityId: IdentityId,
+        conversationId,
+        messageId,
+      ): Promise<boolean> => {
+        if (!unreadMessages) {
+          return true;
+        }
+
+        return unreadMessages.includes(
+          `${recipientIdentityId.valueOf()}:${conversationId.valueOf()}:${messageId.valueOf()}`,
+        );
+      },
+    ),
+  } as unknown as ConversationRepository;
+}
+
 function emptySettingsRepository(): NotificationScopeSettingsRepository {
   return {
     delete: jest.fn(),
@@ -308,6 +355,7 @@ function createDispatcher(options: {
   presences?: IdentityPresence[];
   repository?: PushSubscriptionRepository;
   subscriptions: PushSubscription[];
+  unreadMessages?: string[];
 }): PushNotificationDispatcher {
   return new PushNotificationDispatcher(
     options.repository ?? mockRepository(options.subscriptions),
@@ -315,6 +363,7 @@ function createDispatcher(options: {
       busyIdentityIds: options.busyIdentityIds ?? [],
       presences: options.presences ?? [],
     }),
+    mockConversationRepository(options.unreadMessages),
     options.delivery,
     new NotificationDeliveryPreferenceChecker(emptySettingsRepository()),
   );

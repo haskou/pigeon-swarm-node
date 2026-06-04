@@ -146,6 +146,7 @@ async function init() {
   const pushNotificationDispatcher = new PushNotificationDispatcher(
     new MongoPushSubscriptionRepository(mongo),
     new MongoIdentityPresenceRepository(mongo),
+    conversationRepository,
     new WebPushNotificationDelivery(),
     new NotificationDeliveryPreferenceChecker(
       new MongoNotificationScopeSettingsRepository(mongo),

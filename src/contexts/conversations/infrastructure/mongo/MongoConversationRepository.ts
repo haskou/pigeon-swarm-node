@@ -342,6 +342,25 @@ export default class MongoConversationRepository implements Repository {
     );
   }
 
+  public async hasUnreadMessageForRecipient(
+    recipientIdentityId: IdentityId,
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<boolean> {
+    const document = await (
+      await this.unreadCollection()
+    ).findOne(
+      {
+        _id: `${conversationId.valueOf()}:${recipientIdentityId.valueOf()}:${messageId.valueOf()}`,
+      },
+      {
+        projection: { _id: 1 },
+      },
+    );
+
+    return document !== null;
+  }
+
   public async findMessagesAround(
     conversationId: ConversationId,
     messageId: MessageId,
