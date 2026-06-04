@@ -85,6 +85,14 @@ export class MongoIndexInitializer {
       name: 'conversation_unread_messages_recipient_conversation_idx',
     },
     {
+      collection: 'conversation_message_pins',
+      keys: [
+        ['conversationId', 1],
+        ['createdAt', -1],
+      ],
+      name: 'conversation_message_pins_conversation_createdAt_idx',
+    },
+    {
       collection: 'community_channel_messages',
       keys: [
         ['communityId', 1],

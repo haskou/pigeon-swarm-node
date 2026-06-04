@@ -50,7 +50,7 @@ export class ConversationMessagePinsRoute extends Route {
     identityId: IdentityId,
   ) {
     const conversation =
-      await this.conversationRepository().findById(conversationId);
+      await this.conversationRepository().findMetadataById(conversationId);
 
     if (!conversation) {
       throw new ConversationNotFoundError(conversationId);
