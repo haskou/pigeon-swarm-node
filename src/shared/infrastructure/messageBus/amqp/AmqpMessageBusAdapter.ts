@@ -5,6 +5,7 @@ import { UUID } from '@haskou/value-objects';
 import amqplib, {
   Channel,
   ConsumeMessage,
+  GetMessage,
   MessagePropertyHeaders,
   Options,
 } from 'amqplib';
@@ -14,40 +15,34 @@ import NoFailedMessagesError from '../../errors/NoFailedMessagesError';
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
 
+type DomainEventHandler = (event: DomainEvent) => Promise<void>;
+
+type ConsumerContext = {
+  bindingKey: string;
+  channel: Channel;
+  DomainEventInstance: Constructor<DomainEvent>;
+  handler: DomainEventHandler;
+  queueName: string;
+};
+
 export default class AmqpMessageBusAdapter implements MessageBusAdapter {
   private exchange!: string;
   private _channel!: Channel;
   private delayConsumers: string[] = [];
 
-  private async handle(
-    msg: ConsumeMessage,
-    DomainEventInstance: Constructor<DomainEvent>,
-    handler: (event: DomainEvent) => Promise<void>,
-    channel: Channel,
-    queueName: string,
-    bindingKey: string,
-  ) {
+  private async handle(msg: ConsumeMessage, context: ConsumerContext) {
     const message = JSON.parse(msg.content.toString()) as Message;
     Kernel.logger.info(
-      `AMQP Message bus (${queueName}) handling message: ${JSON.stringify(message)}`,
+      `AMQP Message bus (${context.queueName}) handling message: ${JSON.stringify(message)}`,
     );
     try {
       const domainEvent = this.instanceDomainEvent(
-        DomainEventInstance,
+        context.DomainEventInstance,
         message,
       );
-      await handler(domainEvent);
+      await context.handler(domainEvent);
     } catch (error) {
-      await this.handleError(
-        msg,
-        message,
-        channel,
-        queueName,
-        bindingKey,
-        DomainEventInstance,
-        handler,
-        error,
-      );
+      await this.handleError(msg, message, context, error);
     }
   }
 
@@ -68,15 +63,10 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
     throw new InvalidDomainEventError(JSON.stringify(message));
   }
 
-  // eslint-disable-next-line max-params
   private async handleError(
     msg: ConsumeMessage,
     message: Message,
-    channel: Channel,
-    queueName: string,
-    bindingKey: string,
-    DomainEventInstance: Constructor<DomainEvent>,
-    handler: (event: DomainEvent) => Promise<void>,
+    context: ConsumerContext,
     error: unknown,
   ) {
     Kernel.logger.error((error as Error).message);
@@ -87,125 +77,98 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
       (!headers?.retries ||
         headers?.retries <= process.env.TRANSPORT_MAX_RETRIES)
     ) {
-      await this.retry(
-        message,
-        headers,
-        channel,
-        queueName,
-        bindingKey,
-        DomainEventInstance,
-        handler,
-      );
+      await this.retry(message, headers, context);
     } else {
-      await this.sendToDlx(
-        message,
-        channel,
-        queueName,
-        bindingKey,
-        DomainEventInstance,
-        error?.toString(),
-      );
+      await this.sendToDlx(message, context, error?.toString());
     }
   }
 
   private async retry(
     message: Message,
     headers: MessagePropertyHeaders,
-    channel: Channel,
-    queueName: string,
-    bindingKey: string,
-    DomainEventInstance: Constructor<DomainEvent>,
-    handler: (event: DomainEvent) => Promise<void>,
+    context: ConsumerContext,
   ) {
     const retry = Number(headers.retries || 1);
     Kernel.logger.info(`Retry # ${retry}`);
     const delayTime: number = Number(process.env.TRANSPORT_RETRY_DELAY) || 1000;
     const delayTimeInMs = retry * delayTime;
-    const delayedQueueName = `${queueName}_delayed_${delayTimeInMs}`;
-    const delayedRoutingKey = `${queueName}_${bindingKey}_delayed_${delayTimeInMs}`;
+    const delayedQueueName = `${context.queueName}_delayed_${delayTimeInMs}`;
+    const delayedRoutingKey = `${context.queueName}_${context.bindingKey}_delayed_${delayTimeInMs}`;
     const index = this.delayConsumers.indexOf(delayedQueueName);
     const consumerTag = `${delayedQueueName}_${UUID.generate().valueOf()}`;
 
     if (index === -1) {
-      await channel.assertExchange(this.exchange, 'topic', { durable: true });
-      await channel.assertQueue(delayedQueueName, {
+      await context.channel.assertExchange(this.exchange, 'topic', {
+        durable: true,
+      });
+      await context.channel.assertQueue(delayedQueueName, {
         autoDelete: true,
         deadLetterExchange: this.exchange,
         deadLetterRoutingKey: delayedRoutingKey,
         durable: false,
         messageTtl: delayTimeInMs,
       });
-      await channel.bindQueue(
+      await context.channel.bindQueue(
         delayedQueueName,
         this.exchange,
         delayedRoutingKey,
       );
       this.delayConsumers.push(delayedQueueName);
-      await channel.consume(
+      await context.channel.consume(
         delayedQueueName,
         async (msg: ConsumeMessage | null) => {
           if (!msg) {
             return;
           }
           await new Promise((f) => setTimeout(f, delayTimeInMs));
-          await this.handle(
-            msg,
-            DomainEventInstance,
-            handler,
-            channel,
-            queueName,
-            bindingKey,
-          );
+          await this.handle(msg, context);
           const index = this.delayConsumers.indexOf(delayedQueueName);
 
           if (index !== -1) {
             this.delayConsumers.splice(index, 1);
           }
-          await channel.cancel(consumerTag);
+          await context.channel.cancel(consumerTag);
         },
         { consumerTag, noAck: true },
       );
     }
     try {
       const domainEvent = this.instanceDomainEvent(
-        DomainEventInstance,
+        context.DomainEventInstance,
         message,
       );
-      channel.publish(
+      context.channel.publish(
         this.exchange,
         delayedRoutingKey,
         Buffer.from(JSON.stringify(message)),
         this.opts(domainEvent, retry),
       );
     } catch (error: unknown) {
-      await channel.cancel(consumerTag);
+      await context.channel.cancel(consumerTag);
       Kernel.logger.error((error as Error).message);
     }
   }
 
   private async sendToDlx(
     message: Message,
-    channel: Channel,
-    queueName: string,
-    bindingKey: string,
-    DomainEventInstance: Constructor<DomainEvent>,
+    context: ConsumerContext,
     error?: string,
   ): Promise<void> {
-    await channel.assertExchange(this.exchange, 'topic');
-    const dlxQueueName = `${queueName}_dlx`;
-    const dlxRoutingKey = `${queueName}_${bindingKey}_dlx`;
-    await channel.assertQueue(dlxQueueName, {
+    await context.channel.assertExchange(this.exchange, 'topic');
+    const dlxQueueName = `${context.queueName}_dlx`;
+    const dlxRoutingKey = `${context.queueName}_${context.bindingKey}_dlx`;
+    await context.channel.assertQueue(dlxQueueName, {
       deadLetterExchange: this.exchange,
       deadLetterRoutingKey: dlxRoutingKey,
       durable: true,
     });
-    await channel.bindQueue(dlxQueueName, this.exchange, dlxRoutingKey);
+    await context.channel.bindQueue(dlxQueueName, this.exchange, dlxRoutingKey);
     try {
       const domainEvent = this.instanceDomainEvent(
-        DomainEventInstance,
+        context.DomainEventInstance,
         message,
       );
-      channel.publish(
+      context.channel.publish(
         this.exchange,
         dlxRoutingKey,
         Buffer.from(JSON.stringify(message)),
@@ -282,6 +245,42 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
     };
   }
 
+  private getMessagesToRetry(
+    requestedMessagesToRetry: number | undefined,
+    availableMessages: number,
+  ): number {
+    return requestedMessagesToRetry ?? availableMessages;
+  }
+
+  private async retryDlxMessage(
+    msg: ConsumeMessage | GetMessage,
+    DomainEventInstance: Constructor<DomainEvent>,
+    handler: (event: DomainEvent) => Promise<void>,
+    channel: Channel,
+  ): Promise<void> {
+    const content = msg.content.toString();
+
+    Kernel.logger.info(`Retrying message from DLX ${content}`);
+
+    try {
+      const message = JSON.parse(content) as Message;
+      const domainEvent = this.instanceDomainEvent(
+        DomainEventInstance,
+        message,
+      );
+
+      await handler(domainEvent);
+      Kernel.logger.info(`${content} succesfully handled.`);
+      channel.ack(msg);
+    } catch (error: Error | unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      Kernel.logger.error(`${content} error with ${errorMessage}.`);
+      channel.nack(msg);
+    }
+  }
+
   public async areQueuesBound(): Promise<boolean> {
     if (Kernel.consumers.length === 0) {
       return false;
@@ -298,7 +297,6 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
     return true;
   }
 
-  // eslint-disable-next-line sonarjs/cognitive-complexity
   public async consumeDlx(
     queueName: string,
     DomainEventInstance: Constructor<DomainEvent>,
@@ -311,43 +309,24 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
       Kernel.logger.error(`AMQP Message bus event error`);
     });
     const queue = await channel.checkQueue(dlxQueueName);
-
-    if (undefined === messagesToRetry) {
-      // eslint-disable-next-line no-param-reassign
-      messagesToRetry = queue.messageCount;
-    }
-    Kernel.logger.info(
-      // eslint-disable-next-line max-len
-      `Retrying ${messagesToRetry} messages from DLX ${dlxQueueName}`,
+    const messagesToRetryCount = this.getMessagesToRetry(
+      messagesToRetry,
+      queue.messageCount,
     );
 
-    if (messagesToRetry > 0 && queue.messageCount !== 0) {
-      for (let index = 0; index < messagesToRetry; index++) {
+    Kernel.logger.info(
+      `Retrying ${messagesToRetryCount} messages from DLX ${dlxQueueName}`,
+    );
+
+    if (messagesToRetryCount > 0 && queue.messageCount !== 0) {
+      for (let index = 0; index < messagesToRetryCount; index++) {
         const msg = await channel.get(dlxQueueName);
 
-        if (msg !== false) {
-          Kernel.logger.info(
-            `Retrying message from DLX ${msg.content.toString()}`,
-          );
-          const message = JSON.parse(msg.content.toString()) as Message;
-          // eslint-disable-next-line max-depth
-          try {
-            const domainEvent = this.instanceDomainEvent(
-              DomainEventInstance,
-              message,
-            );
-            await handler(domainEvent);
-            Kernel.logger.info(
-              `${msg.content.toString()} succesfully handled.`,
-            );
-            channel.ack(msg);
-          } catch (error: Error | unknown) {
-            Kernel.logger.error(
-              `${msg.content.toString()} error with ${(error as Error).message}.`,
-            );
-            channel.nack(msg);
-          }
+        if (msg === false) {
+          continue;
         }
+
+        await this.retryDlxMessage(msg, DomainEventInstance, handler, channel);
       }
 
       return;
@@ -367,19 +346,20 @@ export default class AmqpMessageBusAdapter implements MessageBusAdapter {
     await channel.assertExchange(exchange, 'topic');
     await channel.prefetch(1);
     await channel.bindQueue(queueName, exchange, bindingKey);
+    const context: ConsumerContext = {
+      bindingKey,
+      channel,
+      DomainEventInstance,
+      handler,
+      queueName,
+    };
+
     await channel.consume(queueName, async (msg: ConsumeMessage | null) => {
       if (!msg) {
         return;
       }
 
-      await this.handle(
-        msg,
-        DomainEventInstance,
-        handler,
-        channel,
-        queueName,
-        bindingKey,
-      );
+      await this.handle(msg, context);
       channel.ack(msg);
     });
   }
