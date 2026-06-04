@@ -42,7 +42,7 @@ export class ConversationDraftsRoute extends Route {
     identityId: IdentityId,
   ): Promise<void> {
     const conversation =
-      await this.conversationRepository().findById(conversationId);
+      await this.conversationRepository().findMetadataById(conversationId);
 
     if (!conversation) {
       throw new ConversationNotFoundError(conversationId);

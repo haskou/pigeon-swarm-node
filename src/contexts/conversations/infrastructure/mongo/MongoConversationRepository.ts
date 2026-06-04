@@ -187,6 +187,18 @@ export default class MongoConversationRepository implements Repository {
     );
   }
 
+  public async findMetadataById(
+    conversationId: ConversationId,
+  ): Promise<Conversation | undefined> {
+    const document = await (
+      await this.collection()
+    ).findOne({
+      _id: conversationId.valueOf(),
+    });
+
+    return document ? this.mapper.toDomain(document) : undefined;
+  }
+
   public async findByParticipant(
     participantId: IdentityId,
     limit: number,
@@ -265,6 +277,26 @@ export default class MongoConversationRepository implements Repository {
     });
 
     return metadata ? this.findMessageFromMetadata(metadata) : undefined;
+  }
+
+  public async hasMessage(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<boolean> {
+    const metadata = await (
+      await this.messageMetadataCollection()
+    ).findOne(
+      {
+        conversationId: conversationId.valueOf(),
+        messageId: messageId.valueOf(),
+        valid: true,
+      },
+      {
+        projection: { _id: 1 },
+      },
+    );
+
+    return metadata !== null;
   }
 
   public async countUnreadByRecipient(

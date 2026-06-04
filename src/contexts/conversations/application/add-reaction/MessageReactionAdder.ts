@@ -20,7 +20,7 @@ export default class MessageReactionAdder {
   public async add(
     message: MessageReactionAddMessage,
   ): Promise<MessageReaction> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.findMetadataById(
       message.conversationId,
     );
 
@@ -30,7 +30,7 @@ export default class MessageReactionAdder {
       new ConversationParticipantNotFoundError(),
     );
     assert(
-      await this.conversationRepository.findMessageById(
+      await this.conversationRepository.hasMessage(
         message.conversationId,
         message.messageId,
       ),

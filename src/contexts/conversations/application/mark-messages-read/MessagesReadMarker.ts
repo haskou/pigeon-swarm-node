@@ -12,7 +12,7 @@ export default class MessagesReadMarker {
   ) {}
 
   public async mark(message: MessagesReadMarkMessage): Promise<void> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.findMetadataById(
       message.conversationId,
     );
 

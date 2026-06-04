@@ -86,6 +86,12 @@ class SingleConversationRepository implements ConversationRepository {
     return this.conversation;
   }
 
+  public async findMetadataById(
+    conversationId: ConversationId,
+  ): Promise<Conversation | undefined> {
+    return this.findById(conversationId);
+  }
+
   public async findByParticipant(): Promise<Conversation[]> {
     return [];
   }
@@ -104,6 +110,10 @@ class SingleConversationRepository implements ConversationRepository {
 
   public async findMessageById(): Promise<Message | undefined> {
     return undefined;
+  }
+
+  public async hasMessage(): Promise<boolean> {
+    return false;
   }
 
   public async findMessageCandidates(): Promise<ConversationMessageCandidate[]> {

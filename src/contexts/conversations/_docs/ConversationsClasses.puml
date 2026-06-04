@@ -112,9 +112,11 @@ package "conversations.domain" {
   interface ConversationRepository {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
+    +findMetadataById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId, networkId: NetworkId): Promise<OneToOneConversation>
     +findGroup(id: ConversationId): Promise<GroupConversation>
     +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
+    +hasMessage(conversationId: ConversationId, messageId: MessageId): Promise<boolean>
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
     +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
     +findSyncScopes(): Promise<object[]>

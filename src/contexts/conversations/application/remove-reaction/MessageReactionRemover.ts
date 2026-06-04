@@ -20,7 +20,7 @@ export default class MessageReactionRemover {
   public async remove(
     message: MessageReactionRemoveMessage,
   ): Promise<MessageReaction> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.findMetadataById(
       message.conversationId,
     );
 
@@ -30,7 +30,7 @@ export default class MessageReactionRemover {
       new ConversationParticipantNotFoundError(),
     );
     assert(
-      await this.conversationRepository.findMessageById(
+      await this.conversationRepository.hasMessage(
         message.conversationId,
         message.messageId,
       ),

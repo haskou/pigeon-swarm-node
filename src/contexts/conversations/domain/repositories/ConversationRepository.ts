@@ -27,6 +27,9 @@ export interface ConversationMessagesAround {
 
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;
+  findMetadataById(
+    conversationId: ConversationId,
+  ): Promise<Conversation | undefined>;
   findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
@@ -49,6 +52,10 @@ export interface ConversationRepository {
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
+  hasMessage(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<boolean>;
   findMessagesAround(
     conversationId: ConversationId,
     messageId: MessageId,
