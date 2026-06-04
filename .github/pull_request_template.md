@@ -1,16 +1,20 @@
-### **🛠 Changes**
+## Summary
 
-Here provide examples of the changes you’ve made in this *pull request*. Include a detailed list if possible.
- This will help the reviewer.
+- 
 
-### **🧠 Reason for the Change**
+## Contract Changes
 
-Why did you decide to make these changes? Were there any trade-offs you had to consider?
+- [ ] No public API, websocket, pub/sub, push, sync, or persistence contract changes.
+- [ ] Contract changes are documented in the relevant API docs, OpenAPI specs, or protocol docs.
 
-### **🧪 Local or Development Testing Plan (Automatic or Manual)**
+## Tests
 
-How did you ensure these changes are safe to deploy to production?
+- [ ] Unit tests
+- [ ] Acceptance/integration tests
+- [ ] `yarn lint`
+- [ ] `yarn build`
+- [ ] Other:
 
-### **📸 Screenshots (Optional)**
+## Notes
 
-If you made UI changes, what do the before and after look like?
+- 

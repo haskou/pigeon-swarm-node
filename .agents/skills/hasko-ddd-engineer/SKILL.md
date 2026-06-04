@@ -26,6 +26,27 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - Treat PR comments as actionable engineering feedback unless they are clearly informational.
 - If a public contract changes, explain the change for consumers of that contract.
 
+## Project conventions
+
+- Prefer project aliases such as `@app/...` for source imports when the project defines them.
+- Keep relative imports for tests when the repository convention or TypeScript config requires tests not to use source aliases.
+- Every method should have an explicit return type unless the local framework pattern makes that impossible.
+- Every class member should declare visibility explicitly: `public`, `private`, or `protected`.
+- Dependency injection should follow the project's application/infrastructure pattern. Do not couple use cases or domain classes to a concrete DI container, service locator, or framework decorator.
+- Application APIs commonly use:
+  - `bodies/` for HTTP body DTO validation.
+  - `requests/` for presentation-to-application request objects.
+  - `routes/` for thin HTTP controllers.
+  - `resources/` or `view-models/` for API response shape.
+  - `voters/` or policies for authorization decisions when the project already uses them.
+- Asynchronous apps commonly use:
+  - `events/` for integration/domain event mapping when applicable.
+  - `consumers/` for message-bus consumers.
+- Source layout should remain close to:
+  - `src/apps/<app-name>/...`
+  - `src/contexts/<bounded-context>/{application,domain,infrastructure}/...`
+  - `src/shared/{application,domain,infrastructure}/...`
+
 ## Domain rules
 
 - Domain objects receive value objects and domain objects, not primitive props bags.
@@ -39,6 +60,25 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - Do not introduce magic strings. Put named domain values behind value objects, constants, or existing enum-style domain values.
 - Avoid cross-context domain calls. Coordinate through application services, repositories, domain events, pub/sub, jobs, or API flows.
 - Domain events should describe something that happened in ubiquitous language. They should not be transport DTOs with domain-ish names.
+
+## Encapsulation, getters, and setters
+
+- Do not add getters or setters to domain/application objects just to make tests easier or to let callers inspect internals.
+- Public getters are allowed only when they expose a genuine boundary value or a stable domain concept that callers are meant to know. They are not a license to pull primitives out and make decisions elsewhere.
+- Setters are almost always wrong in domain code. Prefer intent-revealing behavior:
+  - `message.edit(payload, editedBy, editedAt)` instead of `message.setPayload(payload)`.
+  - `community.renameChannel(channelId, name, actor)` instead of `channel.setName(name)`.
+  - `identity.updateProfile(profile, timestamp)` instead of `identity.setProfile(profile)`.
+- If a test needs to inspect state after behavior, prefer testing observable domain behavior, recorded domain events, repository persistence, or serialized shape at a boundary.
+- If application code needs a getter to compare, filter, authorize, or branch, move that question into the aggregate, entity, value object, collection, or policy.
+- Avoid JavaBean-style `getX()` / `setX()` APIs in domain/application. Use ubiquitous-language methods:
+  - `belongsTo(identityId)`.
+  - `wasCreatedBy(identityId)`.
+  - `canBeEditedBy(identityId)`.
+  - `hasParticipant(identityId)`.
+  - `includesPermission(permission)`.
+- Do not expose mutable arrays, maps, or nested objects. Return domain collections, immutable copies, or answer the question through behavior.
+- A getter returning a primitive from a value object is a Demeter warning. At boundaries it may be acceptable; in domain/application decisions it is usually a design bug.
 
 ## Application rules
 
@@ -328,6 +368,17 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - Add or update focused unit tests for non-trivial domain/application behavior.
 - Add or update acceptance or integration tests when routes, workflows, or public contracts change.
 - Keep acceptance features separated by route or workflow. Do not create giant catch-all feature files.
+- Unit tests should use the repository's existing Jest conventions. If the project uses `jest-mock-extended`, prefer it over hand-rolled mocks.
+- Prefer AAA structure: arrange, act, assert.
+- Use object mothers/builders when creating complex aggregates, entities, value objects, or persisted fixtures. Keep mothers under the existing test mother folder convention.
+- Unit specs should live under the repository's unit test tree and mirror the behavior under test, for example `tests/unit/.../CommunityRole.spec.ts`.
+- Acceptance scenarios should live in the existing feature folders:
+  - API routes under `tests/api/features`.
+  - Consumers under `tests/consumers/features`.
+  - Commands under `tests/commands/features` when that folder exists.
+- Acceptance scenarios should read like user/system behavior. Use `Given`, `When`, `Then`; avoid scenario names that only repeat implementation method names.
+- Cover happy path, negative path, and meaningful domain errors when the behavior has rules.
+- Do not assert private state through getters added for tests. Exercise behavior and assert domain events, returned results, persistence, resources, or public contract shape.
 - Public endpoint changes must update the project's API docs and machine-readable contract files when they exist.
 - Domain or event changes should update context docs and diagrams when the project maintains them.
 - Pub/sub, websocket, sync, push, and job contracts should be documented with payload shape, routing, recipients, side effects, and consumer action.
