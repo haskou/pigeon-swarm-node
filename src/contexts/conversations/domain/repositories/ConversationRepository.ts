@@ -52,6 +52,10 @@ export interface ConversationRepository {
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
+  hasMessage(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<boolean>;
   findMessagesAround(
     conversationId: ConversationId,
     messageId: MessageId,

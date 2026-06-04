@@ -37,7 +37,7 @@ export class CallScopeResolver {
   ): Promise<ResolvedCallScope> {
     const conversationId = message.getConversationId();
     const conversation =
-      await this.conversationRepository.findById(conversationId);
+      await this.conversationRepository.findMetadataById(conversationId);
 
     if (
       !conversation ||
