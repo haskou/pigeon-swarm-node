@@ -1,11 +1,11 @@
 import Event from './Event';
+import { EventConstructor } from './EventConstructor';
 
 interface EventConsumer {
   consume(
     queueName: string,
     bindingKey: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    domainEvent: any,
+    domainEvent: EventConstructor<Event>,
     exchange: string,
     handler: (event: Event) => Promise<void>,
   ): Promise<void>;

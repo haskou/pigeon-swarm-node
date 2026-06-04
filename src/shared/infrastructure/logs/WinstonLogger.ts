@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import Kernel from '@app/Kernel';
 import expressWinston from 'express-winston';
 import winston, { Logger, format } from 'winston';
@@ -8,6 +7,7 @@ import Log from './Log';
 
 export default class WinstonLogger implements Log {
   private prefix: string = '';
+
   private readonly opts = {
     format: format.combine(
       format.timestamp({
@@ -19,8 +19,7 @@ export default class WinstonLogger implements Log {
     transports: [
       new winston.transports.Console({ level: process.env.LOG_LEVEL }),
       new winston.transports.File({
-        // eslint-disable-next-line max-len
-        filename: `${Kernel.rootDirectory}/${process.env.LOG_URL || 'logs'}/${process.env.SERVICE_NAME || 'service'}.log`,
+        filename: this.getLogFileName(),
         level: process.env.LOG_LEVEL,
       }),
     ],
@@ -29,6 +28,13 @@ export default class WinstonLogger implements Log {
   private _logger: Logger;
 
   constructor(private readonly server?: Server) {}
+
+  private getLogFileName(): string {
+    const logDirectory = process.env.LOG_URL || 'logs';
+    const serviceName = process.env.SERVICE_NAME || 'service';
+
+    return `${Kernel.rootDirectory}/${logDirectory}/${serviceName}.log`;
+  }
 
   public error(message: string): void {
     this.logger.error(this.prefix + message);

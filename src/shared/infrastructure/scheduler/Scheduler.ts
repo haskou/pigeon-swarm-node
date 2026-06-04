@@ -28,8 +28,7 @@ export default abstract class Scheduler {
     return Kernel.di.getService<T>(service);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  public async init(): Promise<void> {
+  public init(): Promise<void> {
     let parsedCronExpression: string;
     try {
       parsedCronExpression = this.parseCronExpression();
@@ -49,5 +48,7 @@ export default abstract class Scheduler {
         Kernel.logger?.error?.(error.message);
       }
     });
+
+    return Promise.resolve();
   }
 }

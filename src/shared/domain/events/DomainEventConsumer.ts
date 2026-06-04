@@ -4,8 +4,7 @@ interface DomainEventConsumer {
   consume(
     queueName: string,
     bindingKey: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    domainEvent: any,
+    domainEvent: typeof DomainEvent,
     exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void>;
