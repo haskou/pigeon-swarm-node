@@ -28,8 +28,6 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 
 ## Project conventions
 
-- Prefer project aliases such as `@app/...` for source imports when the project defines them.
-- Keep relative imports for tests when the repository convention or TypeScript config requires tests not to use source aliases.
 - Every method should have an explicit return type unless the local framework pattern makes that impossible.
 - Every class member should declare visibility explicitly: `public`, `private`, or `protected`.
 - Dependency injection should follow the project's application/infrastructure pattern. Do not couple use cases or domain classes to a concrete DI container, service locator, or framework decorator.
@@ -368,7 +366,7 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - Add or update focused unit tests for non-trivial domain/application behavior.
 - Add or update acceptance or integration tests when routes, workflows, or public contracts change.
 - Keep acceptance features separated by route or workflow. Do not create giant catch-all feature files.
-- Unit tests should use the repository's existing Jest conventions. If the project uses `jest-mock-extended`, prefer it over hand-rolled mocks.
+- Unit tests should use the repository's existing test framework and mocking conventions.
 - Prefer AAA structure: arrange, act, assert.
 - Use object mothers/builders when creating complex aggregates, entities, value objects, or persisted fixtures. Keep mothers under the existing test mother folder convention.
 - Unit specs should live under the repository's unit test tree and mirror the behavior under test, for example `tests/unit/.../CommunityRole.spec.ts`.
