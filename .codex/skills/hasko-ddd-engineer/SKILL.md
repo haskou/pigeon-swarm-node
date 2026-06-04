@@ -16,6 +16,17 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - For a backend slice, inspect at least one nearby aggregate/entity, use case, message/command/query, repository, route/controller, mapper/resource, and test.
 - For a frontend slice, inspect the existing feature boundary, application service/hook, domain model, API gateway, component structure, and tests.
 - When a project uses a value-object library, follow its comparison, validation, and serialization rules instead of treating value objects as decorated primitives.
+- Open the focused reference files in `references/` only when the task touches that topic:
+  - `references/aggregates.md` for aggregate roots, child entities, invariants, lifecycle transitions, and aggregate-emitted events.
+  - `references/bounded-contexts.md` for cross-context changes, context maps, shared kernels, and anticorruption layers.
+  - `references/contract-changes.md` for APIs, events, websocket, pub/sub, push, jobs, persistence schemas, and downstream consumers.
+  - `references/cqrs-read-models.md` for queries, search, dashboards, projections, read models, and read-only screens.
+  - `references/domain-events.md` for domain events, integration events, eventual consistency, outbox/event publication, and event consumers.
+  - `references/domain-modeling-decisions.md` for deciding whether a concept is a value object, entity, aggregate, policy, specification, factory, read model, or process manager.
+  - `references/naming-rules.md` for naming classes, files, folders, messages, commands, queries, ports, events, and tests.
+  - `references/pr-checklist.md` for PR handoff, review responses, and final verification summaries.
+  - `references/repositories-transactions.md` for repository boundaries, transactions, units of work, concurrency, outbox, and query persistence.
+  - `references/value-objects.md` for value-object behavior, primitive conversion, serialization, equality, sorting, filtering, and authorization decisions.
 
 ## Operating mode
 
