@@ -1,9 +1,16 @@
+import { Collection, MongoServerError } from 'mongodb';
+
 import MongoDB from './MongoDB';
 
 type IndexDefinition = {
   readonly collection: string;
   readonly keys: ReadonlyArray<readonly [string, 1 | -1]>;
   readonly name: string;
+};
+
+type ExistingIndex = {
+  readonly key: Record<string, unknown>;
+  readonly name?: string;
 };
 
 export class MongoIndexInitializer {
@@ -139,13 +146,40 @@ export class MongoIndexInitializer {
     );
   }
 
+  private async findExistingIndex(
+    collection: Collection,
+    index: IndexDefinition,
+  ): Promise<ExistingIndex | undefined> {
+    try {
+      const existingIndex = (await collection.indexes()).find(
+        (candidate) => candidate.name === index.name,
+      );
+
+      if (!existingIndex) {
+        return undefined;
+      }
+
+      return {
+        key: existingIndex.key,
+        name: existingIndex.name,
+      };
+    } catch (error) {
+      if (
+        error instanceof MongoServerError &&
+        error.codeName === 'NamespaceNotFound'
+      ) {
+        return undefined;
+      }
+
+      throw error;
+    }
+  }
+
   public async ensure(): Promise<void> {
     for (const index of this.indexes) {
       const collection = await this.mongo.getCollection(index.collection);
       const keys = Object.fromEntries(index.keys);
-      const existingIndex = (await collection.indexes()).find(
-        (candidate) => candidate.name === index.name,
-      );
+      const existingIndex = await this.findExistingIndex(collection, index);
 
       if (
         existingIndex?.key &&
