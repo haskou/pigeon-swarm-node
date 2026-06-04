@@ -248,6 +248,13 @@
           }
         ]
       }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Program > :matches(ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExportNamedDeclaration[declaration.type='ClassDeclaration'], ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration'], ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']) ~ :matches(ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExportNamedDeclaration[declaration.type='ClassDeclaration'], ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration'], ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration'])",
+        "message": "Keep one top-level class, type, or interface per file. Move additional declarations to their own file when touching this code."
+      }
     ]
   },
   "overrides": [
