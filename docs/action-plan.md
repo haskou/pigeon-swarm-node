@@ -1,44 +1,49 @@
 # Pigeon Swarm Action Plan
 
-Last updated: 2026-05-28.
+Last updated: 2026-06-05.
 
 Keep this file short. Completed slices should live in Git history, API docs,
 OpenAPI, context docs and tests instead of remaining here as stale backlog.
 
-## Current Slice: Product Usability For Discord-Like Communities
+## Current Slice: Startup Sync And Storage Hardening
 
-Goal: add user-facing collaboration primitives that make busy communities easier
-to read and navigate without changing the P2P/storage model unnecessarily.
+Goal: keep node startup quiet and scalable while keeping MongoDB projections
+fast for the current Discord-like product surface.
 
 Scope:
 
-1. Threads:
-   - let users open a focused discussion from a message
-   - support threads in group conversations and community text channels
-   - expose thread summaries in message resources without loading full thread
-     history
-   - emit websocket events when thread messages are created or updated
-2. Pins:
-   - pin and unpin messages in conversations and community channels
-   - return pinned messages through dedicated list endpoints and channel state
-   - gate community pins behind message-management permissions
-   - sync pin/unpin events between nodes
-3. Drafts:
-   - store per-identity drafts for conversations and community channels
-   - keep drafts out of IPFS
-   - sync drafts between the user's nodes only
-   - add endpoints to upsert, fetch and delete drafts
-4. Forum channels:
+1. Startup sync fanout:
+   - cap startup sync requests per context and globally
+   - keep caps configurable through environment variables
+   - report omitted request counts in startup logs
+   - keep retry behavior for eventual peer discovery
+2. Storage performance:
+   - keep hot MongoDB reads backed by explicit indexes
+   - avoid hydrating IPFS payloads for list/auth checks
+   - keep index startup idempotent when an existing named index has stale keys
+3. Technical quality:
+   - remove avoidable `any`/eslint suppressions from shared bootstrapping code
+   - keep shared infrastructure declarations focused
+   - maintain direct tests for startup sync policy behavior
+
+Out of scope for this slice:
+
+- forum channels
+- large call SFU/relay topology
+- frontend contract changes
+
+## Later Slice: Forum Channels
+
+Goal: add forum-style community channels without changing existing text channel
+contracts.
+
+Scope:
+
+1. Forum channels:
    - add a community channel type for forum-style posts
    - model each post as a titled topic with replies
    - reuse message permissions, attachments, polls, stickers and moderation
    - keep text channels unchanged
-
-Out of scope for this slice:
-
-- new infrastructure transports
-- changing existing text channel contracts unless needed for shared primitives
-- full search/ranking UX beyond the existing search capabilities
 
 ## Later Slice: Startup Sync Hardening
 

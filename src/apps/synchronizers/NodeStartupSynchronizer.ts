@@ -13,9 +13,11 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { UUID } from '@haskou/value-objects';
 
-import NodeStartupSyncReadiness from './NodeStartupSyncReadiness';
+import type NodeStartupSyncReadiness from './NodeStartupSyncReadiness';
 
-type LatestVersionByResource = Map<string, number>;
+import { LatestVersionByResource } from './LatestVersionByResource';
+import { NodeStartupSynchronizerDependencies } from './NodeStartupSynchronizerDependencies';
+import NodeStartupSyncPolicy from './NodeStartupSyncPolicy';
 
 export interface NodeStartupSyncResult {
   communityRequests: number;
@@ -25,6 +27,7 @@ export interface NodeStartupSyncResult {
   identityRequests: number;
   keychainRequests: number;
   networkIds: string[];
+  omittedRequests: number;
   publishedEvents: number;
   requestId: string;
   requesterNodeId: string;
@@ -32,15 +35,27 @@ export interface NodeStartupSyncResult {
 }
 
 export default class NodeStartupSynchronizer {
-  constructor(
-    private readonly nodeLoader: NodeLoader,
-    private readonly readiness: NodeStartupSyncReadiness,
-    private readonly identityMetadataRepository: IdentityMetadataRepository,
-    private readonly keychainMetadataRepository: KeychainMetadataRepository,
-    private readonly conversationRepository: MongoConversationRepository,
-    private readonly communityRepository: MongoCommunityRepository,
-    private readonly eventPublisher: DomainEventPublisher,
-  ) {}
+  private readonly communityRepository: MongoCommunityRepository;
+  private readonly conversationRepository: MongoConversationRepository;
+  private readonly eventPublisher: DomainEventPublisher;
+  private readonly identityMetadataRepository: IdentityMetadataRepository;
+  private readonly keychainMetadataRepository: KeychainMetadataRepository;
+  private readonly nodeLoader: NodeLoader;
+  private readonly policy: NodeStartupSyncPolicy;
+  private readonly readiness: NodeStartupSyncReadiness;
+  private syncAttempt = 0;
+
+  constructor(dependencies: NodeStartupSynchronizerDependencies) {
+    this.communityRepository = dependencies.communityRepository;
+    this.conversationRepository = dependencies.conversationRepository;
+    this.eventPublisher = dependencies.eventPublisher;
+    this.identityMetadataRepository = dependencies.identityMetadataRepository;
+    this.keychainMetadataRepository = dependencies.keychainMetadataRepository;
+    this.nodeLoader = dependencies.nodeLoader;
+    this.policy =
+      dependencies.policy ?? NodeStartupSyncPolicy.fromEnvironment();
+    this.readiness = dependencies.readiness;
+  }
 
   private getLatestVersions<T extends { version: number }>(
     documents: T[],
@@ -140,6 +155,10 @@ export default class NodeStartupSynchronizer {
   }
 
   public async synchronize(): Promise<NodeStartupSyncResult> {
+    const syncAttempt = this.syncAttempt;
+
+    this.syncAttempt += 1;
+
     const requestId = UUID.generate().toString();
     const node = await this.nodeLoader.loadNode();
     const nodePrimitives = node.toPrimitives();
@@ -162,21 +181,50 @@ export default class NodeStartupSynchronizer {
       keychainMetadata,
       (document) => document.ownerIdentityId,
     );
+    const limitedIdentityVersions = new Map(
+      this.policy.limitIdentities([...identityVersions.entries()], syncAttempt),
+    );
+    const limitedKeychainVersions = new Map(
+      this.policy.limitKeychains([...keychainVersions.entries()], syncAttempt),
+    );
+    const limitedConversationScopes = this.policy.limitConversations(
+      conversationScopes,
+      syncAttempt,
+    );
     const communityRequests = await this.communityRequests(
       requestId,
       requesterNodeId,
     );
-    const events = [
+    const limitedCommunityRequests = this.policy.limitCommunities(
+      communityRequests,
+      syncAttempt,
+    );
+    const rawPlannedRequests =
+      networkIds.length +
+      identityVersions.size +
+      keychainVersions.size +
+      conversationScopes.length +
+      communityRequests.length;
+    const plannedEvents = [
       ...this.identityNetworkRequests(requestId, requesterNodeId, networkIds),
-      ...this.identityRequests(requestId, requesterNodeId, identityVersions),
-      ...this.keychainRequests(requestId, requesterNodeId, keychainVersions),
+      ...this.identityRequests(
+        requestId,
+        requesterNodeId,
+        limitedIdentityVersions,
+      ),
+      ...this.keychainRequests(
+        requestId,
+        requesterNodeId,
+        limitedKeychainVersions,
+      ),
       ...this.conversationRequests(
         requestId,
         requesterNodeId,
-        conversationScopes,
+        limitedConversationScopes,
       ),
-      ...communityRequests,
+      ...limitedCommunityRequests,
     ];
+    const events = this.policy.limitTotal(plannedEvents);
 
     const totalRequests = events.length;
 
@@ -185,13 +233,14 @@ export default class NodeStartupSynchronizer {
     }
 
     return {
-      communityRequests: communityRequests.length,
+      communityRequests: limitedCommunityRequests.length,
       connectedPeerCount,
-      conversationRequests: conversationScopes.length,
+      conversationRequests: limitedConversationScopes.length,
       identityNetworkRequests: networkIds.length,
-      identityRequests: identityVersions.size,
-      keychainRequests: keychainVersions.size,
+      identityRequests: limitedIdentityVersions.size,
+      keychainRequests: limitedKeychainVersions.size,
       networkIds,
+      omittedRequests: rawPlannedRequests - events.length,
       publishedEvents: totalRequests,
       requesterNodeId,
       requestId,
