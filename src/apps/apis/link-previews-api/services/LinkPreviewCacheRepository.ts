@@ -1,11 +1,7 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { LinkPreviewResource } from '../resources/LinkPreviewResource';
-
-type LinkPreviewCacheDocument = LinkPreviewResource & {
-  _id: string;
-  expiresAt: number;
-};
+import { LinkPreviewCacheDocument } from './documents/LinkPreviewCacheDocument';
 
 export class LinkPreviewCacheRepository {
   private static readonly COLLECTION = 'link_preview_cache';

@@ -1,10 +1,6 @@
-import { PollResource } from '@app/apps/apis/polls-api/resources/PollResource';
+import { CommunityChannelTimelineItemResource } from './CommunityChannelTimelineItemResource';
 
-import { CommunityChannelMessageResource } from './CommunityChannelMessageResource';
-
-export type CommunityChannelTimelineItemResource =
-  | CommunityChannelMessageResource
-  | PollResource;
+export { CommunityChannelTimelineItemResource } from './CommunityChannelTimelineItemResource';
 
 export interface CommunityChannelMessagesResource {
   channelId: string;

@@ -1,8 +1,6 @@
-export type CallIceServerResource = {
-  credential?: string;
-  urls: string[];
-  username?: string;
-};
+import { CallIceServerResource } from './CallIceServerResource';
+
+export { CallIceServerResource } from './CallIceServerResource';
 
 export type CallIceServersResource = {
   iceServers: CallIceServerResource[];

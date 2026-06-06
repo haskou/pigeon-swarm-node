@@ -9,6 +9,4 @@ export interface CommunityMembershipRequestResource {
   updatedAt: number;
 }
 
-export interface CommunityMembershipRequestsResource {
-  requests: CommunityMembershipRequestResource[];
-}
+export { CommunityMembershipRequestsResource } from './CommunityMembershipRequestsResource';

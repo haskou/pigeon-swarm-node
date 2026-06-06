@@ -1,12 +1,6 @@
-export type PushTestDeliveryResource = {
-  body?: string;
-  delivered: boolean;
-  endpoint: string;
-  endpointHost: string;
-  error?: string;
-  removed: boolean;
-  statusCode?: number;
-};
+import { PushTestDeliveryResource } from './PushTestDeliveryResource';
+
+export { PushTestDeliveryResource } from './PushTestDeliveryResource';
 
 export type PushTestResource = {
   deliveries: PushTestDeliveryResource[];

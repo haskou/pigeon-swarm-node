@@ -2,14 +2,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { LinkPreviewRateLimitExceededError } from '../errors/LinkPreviewRateLimitExceededError';
-import {
-  LinkPreviewRateBucket,
-  LinkPreviewRatePolicy,
-} from './LinkPreviewRatePolicy';
-
-type LinkPreviewRateLimitDocument = LinkPreviewRateBucket & {
-  _id: string;
-};
+import { LinkPreviewRateLimitDocument } from './documents/LinkPreviewRateLimitDocument';
+import { LinkPreviewRatePolicy } from './LinkPreviewRatePolicy';
 
 export class LinkPreviewRateLimiter {
   private static readonly COLLECTION = 'link_preview_rate_limits';

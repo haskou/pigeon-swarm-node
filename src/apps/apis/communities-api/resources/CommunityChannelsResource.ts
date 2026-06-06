@@ -1,9 +1,6 @@
-import { CommunityTextChannelResource } from './CommunityTextChannelResource';
-import { CommunityVoiceChannelResource } from './CommunityVoiceChannelResource';
+import { CommunityChannelResource } from './CommunityChannelResource';
 
-export type CommunityChannelResource =
-  | CommunityTextChannelResource
-  | CommunityVoiceChannelResource;
+export { CommunityChannelResource } from './CommunityChannelResource';
 
 export interface CommunityChannelsResource {
   channels: CommunityChannelResource[];

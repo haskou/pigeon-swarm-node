@@ -1,20 +1,6 @@
-import { CommunityMembershipRequestResource } from './CommunityMembershipRequestResource';
+import { CommunityDiscoveryItemResource } from './CommunityDiscoveryItemResource';
 
-export interface CommunityDiscoveryItemResource {
-  autoJoinEnabled: boolean;
-  avatar?: string;
-  banner?: string;
-  description: string;
-  discoverable: true;
-  id: string;
-  memberCount: number;
-  membershipRequest?: CommunityMembershipRequestResource;
-  membershipStatus: 'invited' | 'member' | 'none' | 'requested';
-  name: string;
-  networkId: string;
-  ownerIdentityId: string;
-  visibility: 'private' | 'public';
-}
+export { CommunityDiscoveryItemResource } from './CommunityDiscoveryItemResource';
 
 export interface CommunityDiscoveryResource {
   communities: CommunityDiscoveryItemResource[];
