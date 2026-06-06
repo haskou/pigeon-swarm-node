@@ -1,4 +1,6 @@
-export type ConversationCallEventType = 'declined' | 'ended' | 'missed';
+import { ConversationCallEventType } from './ConversationCallEventType';
+
+export { ConversationCallEventType } from './ConversationCallEventType';
 
 export interface ConversationCallEventResource {
   actorIdentityId: string;
