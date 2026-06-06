@@ -1,0 +1,40 @@
+name: Real Transport E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  RealTransport:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Cache MongoDB Memory Server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-memory-server-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            mongodb-memory-server-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-engines
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run real transport E2E
+        run: yarn test:e2e:real-transport
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
