@@ -1,6 +1,12 @@
 # Installation and Environment Variables
 
-This document explains how to run `pigeon-swarm` locally and how environment variables are interpreted.
+This document explains how to run `pigeon-swarm-node` locally and how
+environment variables are interpreted.
+
+For the complete self-hosted app image that composes frontend and backend, use
+[`haskou/pigeon-swarm`](https://github.com/haskou/pigeon-swarm). This repository
+is the backend node source; the standalone frontend source lives in
+[`haskou/pigeon-swarm-ui`](https://github.com/haskou/pigeon-swarm-ui).
 
 ## Quick Start
 
@@ -22,6 +28,21 @@ SERVICE_NAME=pigeon-swarm
 ```
 
 3. Start the app with `yarn local` or `docker compose up`
+
+## Frontend Static Assets
+
+The backend can serve static files from the root `public/` directory. This is
+where a built frontend can be placed when packaging a single deployable app.
+
+`public/` is intentionally ignored by git in this repository. Treat it as a
+runtime/build artifact, not backend source. For local backend development it can
+be empty; API routes and Swagger still work normally. For combined frontend +
+backend deployments, prefer the Docker Compose/image repository:
+[`haskou/pigeon-swarm`](https://github.com/haskou/pigeon-swarm).
+
+If `ROUTE_PREFIX` is configured, HTTP requests under that prefix go to the API.
+Other paths can be served from `public/` so browser refreshes and direct frontend
+routes resolve to the bundled frontend.
 
 ## Core Variables
 

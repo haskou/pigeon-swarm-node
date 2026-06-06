@@ -70,7 +70,6 @@ payloads and publish encrypted keychain updates.
 Primary API documentation:
 
 - [HTTP API](./docs/api.md)
-- [PubSub sync protocol](./docs/pubsub-sync-protocol.md)
 - [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
 
 When the server is running, Swagger UI is available at:
@@ -114,8 +113,19 @@ make build
 make start
 make stop
 make test
-make log
+make logs
 ```
+
+This repository contains the backend node source. The full self-hosted
+application image and Docker Compose setup that bundles frontend and backend
+lives in [`haskou/pigeon-swarm`](https://github.com/haskou/pigeon-swarm).
+The standalone frontend source lives in
+[`haskou/pigeon-swarm-ui`](https://github.com/haskou/pigeon-swarm-ui).
+
+The backend can serve static frontend assets from `public/`. That directory is
+ignored in this source repository because it is a build/deployment artifact:
+place the frontend build output there only in local runtime images or release
+packaging, not as backend source.
 
 ## Runtime Dependencies
 
