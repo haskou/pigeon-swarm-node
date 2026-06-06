@@ -1,8 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
-import { CommunityProfile } from '../../../domain/CommunityProfile';
-import { CommunitySettings } from '../../../domain/CommunitySettings';
+import { CommunityProfile } from '../../../domain/entities/profile/CommunityProfile';
+import { CommunitySettings } from '../../../domain/entities/profile/CommunitySettings';
 import { CommunityAvatar } from '../../../domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '../../../domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '../../../domain/value-objects/CommunityDescription';

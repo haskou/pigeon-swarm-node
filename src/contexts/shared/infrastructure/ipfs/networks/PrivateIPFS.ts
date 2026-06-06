@@ -1,13 +1,8 @@
 import { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
-import { PrivateKey } from '@haskou/value-objects';
 
 import { HeliaIPFS } from '../helia/HeliaIPFS';
-import { IPFSConnection, IPFSOptions } from '../helia/IPFSConnection';
-
-export type PrivateIPFSOptions = IPFSOptions & {
-  key: PrivateKey;
-  name: string;
-};
+import { IPFSConnection } from '../helia/IPFSConnection';
+import { PrivateIPFSOptions } from './PrivateIPFSOptions';
 
 export class PrivateIPFS extends HeliaIPFS {
   private static connectionPool: Record<string, HeliaInstance> = {};

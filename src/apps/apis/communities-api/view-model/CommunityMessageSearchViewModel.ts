@@ -1,5 +1,5 @@
-import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
-import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 
 import { CommunityMessageSearchResource } from '../resources/CommunityMessageSearchResource';
 import { CommunityChannelMessageViewModel } from './CommunityChannelMessageViewModel';

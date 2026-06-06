@@ -3,12 +3,9 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { Keychain } from '../Keychain';
 import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
+import { KeychainCandidate } from './types/KeychainCandidate';
 
-export interface KeychainCandidate {
-  externalIdentifier: KeychainExternalIdentifier;
-  keychain: Keychain;
-  source?: 'local' | 'remote';
-}
+export { KeychainCandidate } from './types/KeychainCandidate';
 
 export interface KeychainRepository {
   findByExternalIdentifier(

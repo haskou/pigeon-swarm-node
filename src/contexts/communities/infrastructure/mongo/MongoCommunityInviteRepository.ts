@@ -1,6 +1,6 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { CommunityInvite } from '../../domain/CommunityInvite';
+import { CommunityInvite } from '../../domain/entities/invites/CommunityInvite';
 import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
 import { CommunityInviteRepository as InviteRepository } from '../../domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';

@@ -1,12 +1,9 @@
 import { Enum } from '@haskou/value-objects';
 
-export type MessageTypeValue = 'deleted' | 'edited' | 'poll' | 'sent';
-const messageTypes: Record<string, MessageTypeValue> = {
-  DELETED: 'deleted',
-  EDITED: 'edited',
-  POLL: 'poll',
-  SENT: 'sent',
-};
+import { messageTypes } from './types/MessageTypes';
+import { MessageTypeValue } from './types/MessageTypeValue';
+
+export { MessageTypeValue } from './types/MessageTypeValue';
 
 export class MessageType extends Enum<MessageTypeValue> {
   public static readonly DELETED = new MessageType(messageTypes.DELETED);

@@ -14,8 +14,9 @@ import heliaRuntimeAdapter, {
 } from './adapters/HeliaRuntimeAdapter';
 import { HeliaIPFSParser } from './HeliaIPFSParser';
 import HeliaPinningStrategy from './HeliaPinningStrategy';
-import { IPFSConnection, IPFSOptions } from './IPFSConnection';
+import { IPFSConnection } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
+import { IPFSOptions } from './IPFSOptions';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {

@@ -1,4 +1,4 @@
-import { CommunityInvite } from '@app/contexts/communities/domain/CommunityInvite';
+import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { EncryptedCommunityInviteKey } from '@app/contexts/communities/domain/value-objects/EncryptedCommunityInviteKey';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';

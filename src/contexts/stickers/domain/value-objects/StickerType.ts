@@ -1,14 +1,10 @@
 import { Enum } from '@haskou/value-objects';
 
 import { InvalidStickerTypeError } from '../errors/InvalidStickerTypeError';
+import { stickerTypes } from './types/StickerTypes';
+import { StickerTypeValue } from './types/StickerTypeValue';
 
-export type StickerTypeValue = 'animated' | 'static' | 'video';
-
-const stickerTypes: Record<string, StickerTypeValue> = {
-  ANIMATED: 'animated',
-  STATIC: 'static',
-  VIDEO: 'video',
-};
+export { StickerTypeValue } from './types/StickerTypeValue';
 
 export class StickerType extends Enum<StickerTypeValue> {
   public static readonly ANIMATED = new StickerType(stickerTypes.ANIMATED);

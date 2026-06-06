@@ -1,4 +1,4 @@
-import { CommunityChannelMessage } from '../CommunityChannelMessage';
+import { CommunityChannelMessage } from '../entities/messages/CommunityChannelMessage';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../value-objects/CommunityId';

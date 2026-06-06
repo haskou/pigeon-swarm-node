@@ -5,13 +5,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { NotificationSettingScope } from '../../../domain/value-objects/NotificationSettingScope';
 import { NotificationSettingScopeType } from '../../../domain/value-objects/NotificationSettingScopeType';
-
-export type NotificationDeliveryScopePrimitives = {
-  channelId?: string;
-  communityId?: string;
-  conversationId?: string;
-  type: string;
-};
+import { NotificationDeliveryScopePrimitives } from './types/NotificationDeliveryScopePrimitives';
 
 export class NotificationDeliveryShouldSendPushMessage {
   constructor(

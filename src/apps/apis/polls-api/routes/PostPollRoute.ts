@@ -1,5 +1,5 @@
-import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
-import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMetadata';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { PollCreateMessage } from '@app/contexts/polls/application/create/messages/PollCreateMessage';
 import { PollCreator } from '@app/contexts/polls/application/create/PollCreator';

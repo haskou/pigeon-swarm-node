@@ -1,10 +1,7 @@
-import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
-import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
+import { MongoCommunityMessageReactionRepository as ReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
@@ -14,12 +11,7 @@ import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
-type ReactionRepository = MongoCommunityMessageReactionRepository;
-type CommunitySyncData = {
-  community: Community | undefined;
-  messages: CommunityChannelMessage[];
-  reactions: CommunityChannelMessageReaction[];
-};
+import { CommunitySyncData } from './CommunitySyncData';
 
 export default class RespondToCommunitySyncRequest extends Consumer {
   private static readonly MESSAGE_CANDIDATE_LIMIT = 100;

@@ -1,6 +1,6 @@
-import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/CommunityModerationLogDetails';
-import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/CommunityModerationLogEntry';
-import { CommunityModerationTarget } from '@app/contexts/communities/domain/CommunityModerationTarget';
+import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
+import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
+import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';

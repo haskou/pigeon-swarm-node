@@ -1,4 +1,4 @@
-import { CommunityTextChannel } from '@app/contexts/communities/domain/CommunityTextChannel';
+import { CommunityTextChannel } from '@app/contexts/communities/domain/entities/channels/CommunityTextChannel';
 
 import { CommunityTextChannelResource } from '../resources/CommunityTextChannelResource';
 

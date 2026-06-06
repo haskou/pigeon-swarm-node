@@ -1,9 +1,4 @@
-export type MongoNotificationSettingScopeDocument = {
-  channelId?: string;
-  communityId?: string;
-  conversationId?: string;
-  type: string;
-};
+import { MongoNotificationSettingScopeDocument } from './MongoNotificationSettingScopeDocument';
 
 export type MongoNotificationScopeSettingsDocument = {
   _id: string;

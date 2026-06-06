@@ -7,7 +7,7 @@ import heliaRuntimeAdapter, {
   RuntimeBlockstore,
   RuntimeDatastore,
 } from './adapters/HeliaRuntimeAdapter';
-import { IPFSOptions } from './IPFSConnection';
+import { IPFSOptions } from './IPFSOptions';
 import { ConnectionGater } from './types/ConnectionGater';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 import { PeerId } from './types/PeerId';

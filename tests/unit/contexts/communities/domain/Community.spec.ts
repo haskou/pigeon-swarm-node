@@ -1,11 +1,12 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityProfile } from '@app/contexts/communities/domain/CommunityProfile';
-import { CommunitySettings } from '@app/contexts/communities/domain/CommunitySettings';
+import { CommunityProfile } from '@app/contexts/communities/domain/entities/profile/CommunityProfile';
+import { CommunitySettings } from '@app/contexts/communities/domain/entities/profile/CommunitySettings';
 import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasRenamedEvent';
 import { CommunityMemberWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasAddedEvent';
 import { CommunityMemberWasLeftEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasLeftEvent';
+import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
 import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
@@ -25,8 +26,30 @@ describe('Community', () => {
   );
   const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
 
+  it('records community creation metadata for realtime delivery', () => {
+    const community = createCommunity();
+    const events = community.pullDomainEvents();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toBeInstanceOf(CommunityWasCreatedEvent);
+    expect(events[0].attributes).toMatchObject({
+      community: {
+        id: community.getId().valueOf(),
+        memberIds: [owner.valueOf()],
+        name: 'Community',
+        networkId: networkId.valueOf(),
+        ownerIdentityId: owner.valueOf(),
+      },
+      communityId: community.getId().valueOf(),
+      memberIds: [owner.valueOf()],
+      networkId: networkId.valueOf(),
+      ownerIdentityId: owner.valueOf(),
+    });
+  });
+
   it('records channel metadata events for members', () => {
     const community = createCommunity();
+    community.pullDomainEvents();
     const channel = community.addTextChannel(
       owner,
       new CommunityChannelName('general'),
@@ -66,6 +89,7 @@ describe('Community', () => {
 
   it('records voice channel creation with empty connected identities', () => {
     const community = createCommunity();
+    community.pullDomainEvents();
     const channel = community.addVoiceChannel(
       owner,
       new CommunityChannelName('voice'),
@@ -85,6 +109,7 @@ describe('Community', () => {
 
   it('records member and profile metadata events', () => {
     const community = createCommunity();
+    community.pullDomainEvents();
 
     community.addMember(owner, member);
     community.updateProfile(
@@ -122,6 +147,7 @@ describe('Community', () => {
 
   it('records member leave metadata events', () => {
     const community = createCommunity();
+    community.pullDomainEvents();
 
     community.addMember(owner, member);
     community.pullDomainEvents();
@@ -150,6 +176,7 @@ describe('Community', () => {
 
   it('allows the owner to kick a member without banning them', () => {
     const community = createCommunity();
+    community.pullDomainEvents();
 
     community.addMember(owner, member);
     community.pullDomainEvents();

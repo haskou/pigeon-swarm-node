@@ -1,6 +1,6 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { CommunityChannelMessage } from '../../domain/CommunityChannelMessage';
+import { CommunityChannelMessage } from '../../domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';

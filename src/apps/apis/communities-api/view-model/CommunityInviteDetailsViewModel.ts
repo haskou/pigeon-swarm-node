@@ -1,5 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityInvite } from '@app/contexts/communities/domain/CommunityInvite';
+import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 
 import { CommunityInviteDetailsResource } from '../resources/CommunityInviteDetailsResource';
 import { CommunityInviteViewModel } from './CommunityInviteViewModel';

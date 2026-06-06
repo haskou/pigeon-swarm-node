@@ -1,13 +1,16 @@
 import { Enum } from '@haskou/value-objects';
 
-export type PollStatusValue = 'closed' | 'open';
+import { pollStatuses } from './types/PollStatuses';
+import { PollStatusValue } from './types/PollStatusValue';
+
+export { PollStatusValue } from './types/PollStatusValue';
 
 export class PollStatus extends Enum<PollStatusValue> {
-  public static readonly CLOSED = new PollStatus('closed');
-  public static readonly OPEN = new PollStatus('open');
+  public static readonly CLOSED = new PollStatus(pollStatuses.CLOSED);
+  public static readonly OPEN = new PollStatus(pollStatuses.OPEN);
 
   public getValues(): PollStatusValue[] {
-    return ['closed', 'open'];
+    return Object.values(pollStatuses);
   }
 
   public isClosed(): boolean {

@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-import { CommunityMembershipRequest } from '../CommunityMembershipRequest';
+import { CommunityMembershipRequest } from '../entities/membership/CommunityMembershipRequest';
 import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityRequestId } from '../value-objects/CommunityRequestId';
 

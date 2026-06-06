@@ -1,4 +1,4 @@
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
+import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 
 import { CommunityMembershipRequestResource } from '../resources/CommunityMembershipRequestResource';
 

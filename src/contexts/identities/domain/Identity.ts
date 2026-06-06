@@ -20,12 +20,11 @@ import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignature
 import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
 import { Profile } from './Profile';
+import { PreviousIdentityReference as PreviousReference } from './types/PreviousIdentityReference';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from './value-objects/IdentityVersion';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 import { ProfileName } from './value-objects/ProfileName';
-
-type PreviousReference = IdentityExternalIdentifier;
 
 export class Identity extends AggregateRoot {
   private readonly previousIdentityExternalIdentifier?: PreviousReference;

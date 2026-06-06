@@ -1,12 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Keychain } from '../Keychain';
-import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
 import { KeychainSignatureDomainService } from './KeychainSignatureDomainService';
-
-type PreviousKeychainFinder = (
-  externalIdentifier: KeychainExternalIdentifier,
-) => Promise<Keychain | undefined>;
+import { PreviousKeychainFinder } from './types/PreviousKeychainFinder';
 
 export class KeychainCandidateValidationDomainService {
   constructor(

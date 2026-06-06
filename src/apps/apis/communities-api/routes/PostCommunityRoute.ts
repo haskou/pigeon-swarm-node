@@ -33,6 +33,8 @@ export class PostCommunityRoute extends CommunityRouteSupport {
       ),
     );
 
+    await this.eventPublisher.publish(community.pullDomainEvents());
+
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(new CommunityViewModel(community).toResource());

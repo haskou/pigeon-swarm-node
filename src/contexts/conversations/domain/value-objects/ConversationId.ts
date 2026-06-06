@@ -1,9 +1,7 @@
 import { ShortId, StringValueObject } from '@haskou/value-objects';
 import { createHash } from 'crypto';
 
-type DeterministicConversationIdSource = {
-  valueOf(): string;
-};
+import { DeterministicConversationIdSource } from './types/DeterministicConversationIdSource';
 
 export class ConversationId extends StringValueObject {
   public static group(): ConversationId {

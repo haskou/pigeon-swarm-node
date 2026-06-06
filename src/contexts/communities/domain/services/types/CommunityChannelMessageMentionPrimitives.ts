@@ -1,4 +1,4 @@
-import { CommunityChannelMessage } from '../../CommunityChannelMessage';
+import { CommunityChannelMessage } from '../../entities/messages/CommunityChannelMessage';
 
 export type CommunityChannelMessageMentionPrimitives = ReturnType<
   CommunityChannelMessage['toPrimitives']

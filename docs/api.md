@@ -267,6 +267,7 @@ Event contracts used by frontend:
 | `calls.v1.call.ended`                                 | call id           | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status`                                      |
 | `calls.v1.call.missed`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status`                                      |
 | `calls.v1.signal.sent`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
 | `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
 | `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
 | `communities.v1.channel.was_deleted`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`                                                                 |
@@ -2602,6 +2603,33 @@ Implemented:
 
 Community metadata changes are published as WebSocket domain events and routed
 to every connected identity in `memberIds`.
+
+Community creation:
+
+```json
+{
+  "type": "communities.v1.community.was_created",
+  "aggregate_id": "<communityId>",
+  "attributes": {
+    "communityId": "<communityId>",
+    "networkId": "<networkId>",
+    "ownerIdentityId": "<identityId>",
+    "memberIds": ["<identityId>"],
+    "community": {
+      "id": "<communityId>",
+      "networkId": "<networkId>",
+      "ownerIdentityId": "<identityId>",
+      "name": "Pigeon Lab",
+      "description": "Private workspace",
+      "memberIds": ["<identityId>"],
+      "textChannels": [],
+      "voiceChannels": [],
+      "visibility": "private",
+      "createdAt": 1773848829055
+    }
+  }
+}
+```
 
 Channel creation:
 

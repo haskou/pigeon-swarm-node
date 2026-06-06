@@ -1,23 +1,10 @@
 import { Enum } from '@haskou/value-objects';
 
 import { InvalidPresenceStatusError } from '../errors/InvalidPresenceStatusError';
+import { presenceStatuses } from './types/PresenceStatuses';
+import { PresenceStatusValue } from './types/PresenceStatusValue';
 
-export type PresenceStatusValue =
-  | 'available'
-  | 'away'
-  | 'busy'
-  | 'custom'
-  | 'disconnected'
-  | 'invisible';
-
-const presenceStatuses: Record<string, PresenceStatusValue> = {
-  AVAILABLE: 'available',
-  AWAY: 'away',
-  BUSY: 'busy',
-  CUSTOM: 'custom',
-  DISCONNECTED: 'disconnected',
-  INVISIBLE: 'invisible',
-};
+export { PresenceStatusValue } from './types/PresenceStatusValue';
 
 export class PresenceStatus extends Enum<PresenceStatusValue> {
   public static readonly AVAILABLE = new PresenceStatus(

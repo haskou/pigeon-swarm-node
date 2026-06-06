@@ -2,9 +2,9 @@ import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttp
 import { CommunityFinder } from '@app/contexts/communities/application/find-community/CommunityFinder';
 import { CommunityFindMessage } from '@app/contexts/communities/application/find-community/messages/CommunityFindMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/CommunityModerationLogDetails';
-import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/CommunityModerationLogEntry';
-import { CommunityModerationTarget } from '@app/contexts/communities/domain/CommunityModerationTarget';
+import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
+import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
+import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';

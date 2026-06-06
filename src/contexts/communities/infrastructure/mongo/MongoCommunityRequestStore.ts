@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { CommunityMembershipRequest } from '../../domain/CommunityMembershipRequest';
+import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
 import { CommunityRequestStore } from '../../domain/repositories/CommunityRequestStore';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityRequestId } from '../../domain/value-objects/CommunityRequestId';

@@ -1,4 +1,4 @@
-import { CommunityVoiceChannel } from '@app/contexts/communities/domain/CommunityVoiceChannel';
+import { CommunityVoiceChannel } from '@app/contexts/communities/domain/entities/channels/CommunityVoiceChannel';
 
 import { CommunityVoiceChannelResource } from '../resources/CommunityVoiceChannelResource';
 

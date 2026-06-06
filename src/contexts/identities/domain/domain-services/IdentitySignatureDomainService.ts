@@ -1,13 +1,7 @@
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import {
-  EncryptedKeyPair,
-  PrimitiveOf,
-  Signature,
-} from '@haskou/value-objects';
+import { EncryptedKeyPair, Signature } from '@haskou/value-objects';
 
-import { Identity } from '../Identity';
-
-type IdentitySignaturePayload = Omit<PrimitiveOf<Identity>, 'signature'>;
+import { IdentitySignaturePayload } from './types/IdentitySignaturePayload';
 
 export class IdentitySignatureDomainService {
   private getCanonicalPayload(

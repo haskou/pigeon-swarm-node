@@ -1,6 +1,6 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { CommunityModerationLogEntry } from '../../domain/CommunityModerationLogEntry';
+import { CommunityModerationLogEntry } from '../../domain/entities/moderation/CommunityModerationLogEntry';
 import { CommunityModerationLogRepository as LogRepository } from '../../domain/repositories/CommunityModerationLogRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityModerationLogId } from '../../domain/value-objects/CommunityModerationLogId';

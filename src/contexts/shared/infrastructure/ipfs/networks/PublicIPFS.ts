@@ -1,7 +1,8 @@
 import { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 
 import { HeliaIPFS } from '../helia/HeliaIPFS';
-import { IPFSConnection, IPFSOptions } from '../helia/IPFSConnection';
+import { IPFSConnection } from '../helia/IPFSConnection';
+import { IPFSOptions } from '../helia/IPFSOptions';
 
 export class PublicIPFS extends HeliaIPFS {
   private static connectionPool: Record<string, HeliaInstance> = {};
