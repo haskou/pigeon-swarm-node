@@ -10,33 +10,8 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
 import { PushSubscriptionRepository } from '../../domain/repositories/PushSubscriptionRepository';
 import { PushNotificationDelivery } from './PushNotificationDelivery';
-import { PushNotificationPayload } from './PushNotificationPayload';
-
-type PushNotificationIntent = {
-  mentionsEveryoneOrHere: boolean;
-  mentionsRecipientIdentityIds: IdentityId[];
-  mentionsRoleIdentityIds: IdentityId[];
-  payload: PushNotificationPayload;
-  respectBusy: boolean;
-  respectPreferences: boolean;
-  recipientIdentityIds: IdentityId[];
-  scope: PushNotificationScope;
-  unreadMessage?: {
-    conversationId: ConversationId;
-    messageId: MessageId;
-  };
-};
-
-type PushNotificationScope =
-  | {
-      conversationId: string;
-      type: typeof NotificationSettingScopeType.CONVERSATION;
-    }
-  | {
-      channelId: string;
-      communityId: string;
-      type: typeof NotificationSettingScopeType.COMMUNITY_CHANNEL;
-    };
+import { PushNotificationIntent } from './types/PushNotificationIntent';
+import { PushNotificationScope } from './types/PushNotificationScope';
 
 export class PushNotificationDispatcher {
   private static identityIdsFrom(value: unknown): IdentityId[] {

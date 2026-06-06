@@ -1,19 +1,13 @@
 import { Enum } from '@haskou/value-objects';
 
 import { InvalidIPFSContentReplicationPriorityError } from '../errors/InvalidIPFSContentReplicationPriorityError';
+import { PriorityValue } from './types/PriorityValue';
 
-export type IPFSContentReplicationPriorityValue =
-  | 'cold'
-  | 'critical'
-  | 'normal';
-
-const priorities: Record<string, IPFSContentReplicationPriorityValue> = {
+const priorities: Record<string, PriorityValue> = {
   COLD: 'cold',
   CRITICAL: 'critical',
   NORMAL: 'normal',
 };
-
-type PriorityValue = IPFSContentReplicationPriorityValue;
 
 export class IPFSContentReplicationPriority extends Enum<PriorityValue> {
   public static readonly COLD = new IPFSContentReplicationPriority(
@@ -41,7 +35,7 @@ export class IPFSContentReplicationPriority extends Enum<PriorityValue> {
     }
   }
 
-  public getValues(): IPFSContentReplicationPriorityValue[] {
+  public getValues(): PriorityValue[] {
     return Object.values(priorities);
   }
 }
