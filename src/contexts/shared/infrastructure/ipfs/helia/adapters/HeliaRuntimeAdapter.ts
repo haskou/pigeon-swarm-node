@@ -1,5 +1,6 @@
 import type { json as createHeliaJsonClient } from '@helia/json';
 import type { unixfs as createHeliaUnixfsClient } from '@helia/unixfs';
+import type * as GossipsubModule from '@libp2p/gossipsub';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
 import type { MemoryBlockstore } from 'blockstore-core';
@@ -25,6 +26,7 @@ export class HeliaRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
+  private gossipsubModulePromise?: Promise<typeof GossipsubModule>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private pnetModulePromise?: Promise<typeof import('@libp2p/pnet')>;
   private multiaddrModulePromise?: Promise<
@@ -79,6 +81,13 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof import('@helia/unixfs')>('@helia/unixfs');
 
     return this.heliaUnixfsModulePromise;
+  }
+
+  private loadGossipsubModule(): Promise<typeof GossipsubModule> {
+    this.gossipsubModulePromise ??=
+      this.nativeImport<typeof GossipsubModule>('@libp2p/gossipsub');
+
+    return this.gossipsubModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
@@ -196,6 +205,24 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private async withGossipsub(
+    defaults: Libp2pDefaults,
+  ): Promise<Libp2pDefaults> {
+    const gossipsubModule = await this.loadGossipsubModule();
+    const config = defaults as unknown as {
+      services?: Record<string, unknown>;
+    };
+
+    config.services = {
+      ...(config.services || {}),
+      pubsub: gossipsubModule.gossipsub({
+        allowPublishToZeroTopicPeers: true,
+      }) as unknown,
+    };
+
+    return defaults;
+  }
+
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
@@ -257,7 +284,7 @@ export class HeliaRuntimeAdapter {
       return this.withoutNetwork(defaults);
     }
 
-    return defaults;
+    return this.withGossipsub(defaults);
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {

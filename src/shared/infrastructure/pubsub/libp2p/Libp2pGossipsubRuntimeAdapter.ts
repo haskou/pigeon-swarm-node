@@ -3,9 +3,7 @@ import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 export class Libp2pGossipsubRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof import('helia')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
-  private gossipsubModulePromise?: Promise<
-    typeof import('@chainsafe/libp2p-gossipsub')
-  >;
+  private gossipsubModulePromise?: Promise<typeof import('@libp2p/gossipsub')>;
 
   private async nativeImport<TModule>(modulePath: string): Promise<TModule> {
     if (process.env.JEST_WORKER_ID !== undefined) {
@@ -33,12 +31,11 @@ export class Libp2pGossipsubRuntimeAdapter {
     return this.libp2pModulePromise;
   }
 
-  private loadGossipsubModule(): Promise<
-    typeof import('@chainsafe/libp2p-gossipsub')
-  > {
-    this.gossipsubModulePromise ??= this.nativeImport<
-      typeof import('@chainsafe/libp2p-gossipsub')
-    >('@chainsafe/libp2p-gossipsub');
+  private loadGossipsubModule(): Promise<typeof import('@libp2p/gossipsub')> {
+    this.gossipsubModulePromise ??=
+      this.nativeImport<typeof import('@libp2p/gossipsub')>(
+        '@libp2p/gossipsub',
+      );
 
     return this.gossipsubModulePromise;
   }
