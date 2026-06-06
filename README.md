@@ -70,7 +70,6 @@ payloads and publish encrypted keychain updates.
 Primary API documentation:
 
 - [HTTP API](./docs/api.md)
-- [WebSocket realtime contract](./docs/frontend-websocket-realtime.md)
 - [PubSub sync protocol](./docs/pubsub-sync-protocol.md)
 - [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
 
@@ -153,10 +152,6 @@ The backend is responsible for:
 This is active development software. APIs are becoming more stable, but schema
 and domain contracts may still change as conversations, communities, calls and
 sync behavior mature.
-
-For current implementation priorities, see:
-
-- [Action plan](./docs/action-plan.md)
 
 ## License
 

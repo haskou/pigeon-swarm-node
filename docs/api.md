@@ -20,11 +20,6 @@ contract.
   identifiers, never as domain concepts.
 - Node-to-node missed-message recovery is documented separately in
   [PubSub Sync Protocol](pubsub-sync-protocol.md).
-- Keychain design is documented separately in [Keychains](keychains.md).
-- Frontend PWA push registration is documented separately in
-  [Frontend PWA Push Notifications](frontend-pwa-push-notifications.md).
-- Frontend WebSocket usage is documented separately in
-  [Frontend Realtime WebSocket](frontend-websocket-realtime.md).
 
 ## Authentication
 
