@@ -6,12 +6,10 @@ import { CommunityRole } from '../../domain/CommunityRole';
 import { CommunityRepository } from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
-import {
-  MongoCommunityDocument,
-  MongoCommunityRoleDocument,
-  MongoCommunityTextChannelDocument,
-  MongoCommunityVoiceChannelDocument,
-} from './documents/MongoCommunityDocument';
+import { MongoCommunityDocument } from './documents/MongoCommunityDocument';
+import { MongoCommunityRoleDocument } from './documents/MongoCommunityRoleDocument';
+import { MongoCommunityTextChannelDocument } from './documents/MongoCommunityTextChannelDocument';
+import { MongoCommunityVoiceChannelDocument } from './documents/MongoCommunityVoiceChannelDocument';
 
 export class MongoCommunityRepository implements CommunityRepository {
   private static readonly COLLECTION = 'communities';

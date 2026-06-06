@@ -1,6 +1,5 @@
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
-import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { createHash } from 'crypto';
 
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
@@ -8,40 +7,9 @@ import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
 import { IPFSReplicationPolicy } from '../../domain/IPFSReplicationPolicy';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
-
-type NodeRepositoryWithLocalNodeId = NodeRepository & {
-  loadLocalNodeId?(): Promise<{
-    valueOf(): string;
-  }>;
-};
-type NetworkReplicationStatus = {
-  activeNodeCount: number;
-  desiredReplicas: number;
-  knownReplicaNodeIds: string[];
-  knownReplicas: number;
-  localResponsible: boolean;
-  networkId: string;
-  releaseLocalReplica: boolean;
-  responsibleNodeIds: string[];
-};
-
-export type IPFSContentReplicationStatus = {
-  cid: string;
-  contentType: string;
-  context: string;
-  createdAt: number;
-  filename?: string;
-  networks: NetworkReplicationStatus[];
-  ownerIdentityId?: string;
-  priority: string;
-  sizeBytes: number;
-  updatedAt: number;
-};
-
-export type IPFSReplicationStatus = {
-  contents: IPFSContentReplicationStatus[];
-  localNodeId: string;
-};
+import { IPFSContentReplicationStatus } from './types/IPFSContentReplicationStatus';
+import { IPFSReplicationStatus } from './types/IPFSReplicationStatus';
+import { NodeRepositoryWithLocalNodeId } from './types/NodeRepositoryWithLocalNodeId';
 
 export default class IPFSReplicationStatusFinder {
   private static readonly ACTIVE_PEER_WINDOW_MS = 15 * 60 * 1000;

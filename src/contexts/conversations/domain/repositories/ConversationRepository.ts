@@ -6,24 +6,9 @@ import { Message } from '../Message';
 import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
-
-export interface ConversationMessageCandidate {
-  authorIdentityId: string;
-  createdAt: number;
-  messageId: string;
-  messageType: string;
-}
-
-export interface ConversationSyncScope {
-  conversationId: string;
-  networkId: string;
-}
-
-export interface ConversationMessagesAround {
-  messages: Message[];
-  nextCursor?: string;
-  previousCursor?: string;
-}
+import { ConversationMessageCandidate } from './types/ConversationMessageCandidate';
+import { ConversationMessagesAround } from './types/ConversationMessagesAround';
+import { ConversationSyncScope } from './types/ConversationSyncScope';
 
 export interface ConversationRepository {
   findById(conversationId: ConversationId): Promise<Conversation | undefined>;

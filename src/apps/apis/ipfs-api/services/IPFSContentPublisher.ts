@@ -1,62 +1,19 @@
-import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
 import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
 import { maxIPFSContentSizeBytes } from '../IPFSContentLimits';
+import { IPFSClient } from './types/IPFSClient';
+import { IPFSContentDocument } from './types/IPFSContentDocument';
+import { NodeRepository } from './types/NodeRepository';
+import { PublishContentParams } from './types/PublishContentParams';
+import { PublishedIPFSContent } from './types/PublishedIPFSContent';
+import { ReplicationRegistrar } from './types/ReplicationRegistrar';
 
 const defaultContentType = 'application/octet-stream';
 const privateUploadContext = 'ipfs_private_upload';
 const publicUploadContext = IPFSContentReplicationContext.PUBLIC_UPLOAD;
-
-type NodeRepository = {
-  loadLocalNodeId?(): Promise<{
-    valueOf(): string;
-  }>;
-  loadLocalNode(): Promise<{
-    toPrimitives(): {
-      id: string;
-    };
-  }>;
-};
-type IPFSClient = {
-  addBytesToAll(data: Uint8Array): Promise<{
-    valueOf(): string;
-  }>;
-  addJSONToAll(data: unknown): Promise<{
-    valueOf(): string;
-  }>;
-  getNetworks(): Promise<
-    {
-      getId(): string;
-    }[]
-  >;
-};
-type ReplicationRegistrar = Pick<IPFSContentReplicationRegistrar, 'register'>;
-type PublishContentParams = {
-  body: Buffer;
-  contentType?: string;
-  filename?: string;
-  ownerIdentityId: IdentityId;
-};
-type PublishedIPFSContent = {
-  cid: string;
-  contentType: string;
-  encrypted?: true;
-  filename?: string;
-  size: number;
-};
-type IPFSContentDocument = {
-  contentType: string;
-  data?: string;
-  encrypted?: true;
-  encryptedData?: string;
-  filename?: string;
-  size: number;
-  uploadedAt: number;
-  uploadedByIdentityId: string;
-};
 
 export default class IPFSContentPublisher {
   constructor(

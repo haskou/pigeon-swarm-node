@@ -9,12 +9,10 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityRepository } from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import {
-  ConversationMessageCandidate,
-  ConversationMessagesAround,
-  ConversationRepository,
-  ConversationSyncScope,
-} from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
+import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
+import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { Message } from '@app/contexts/conversations/domain/Message';

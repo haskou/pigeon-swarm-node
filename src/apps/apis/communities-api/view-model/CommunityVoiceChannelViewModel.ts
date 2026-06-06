@@ -1,6 +1,6 @@
 import { CommunityVoiceChannel } from '@app/contexts/communities/domain/CommunityVoiceChannel';
 
-import { CommunityVoiceChannelResource } from '../resources/CommunityResource';
+import { CommunityVoiceChannelResource } from '../resources/CommunityVoiceChannelResource';
 
 export class CommunityVoiceChannelViewModel {
   constructor(private readonly channel: CommunityVoiceChannel) {}

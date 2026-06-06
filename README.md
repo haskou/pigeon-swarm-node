@@ -178,6 +178,8 @@ sync behavior mature.
 Pigeon Swarm is licensed under the PolyForm Noncommercial License 1.0.0.
 Commercial use requires a separate commercial license from the author.
 
+See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
+
 ## Disclaimer
 
 Pigeon Swarm is not affiliated with, endorsed by, or sponsored by Discord Inc.

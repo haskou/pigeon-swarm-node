@@ -2,31 +2,15 @@ import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fsSync from 'fs';
 import { createHash, createPrivateKey } from 'node:crypto';
 
-import type { Libp2pPrivateKeyLike } from '../networks/adapters/Libp2pKeyAdapter';
-
 import heliaRuntimeAdapter, {
   Libp2pDefaults,
   RuntimeBlockstore,
   RuntimeDatastore,
 } from './adapters/HeliaRuntimeAdapter';
 import { IPFSOptions } from './IPFSConnection';
-
-type PeerId = { toString(): string };
-
-export type ConnectionGater = {
-  denyDialPeer: (peerId: PeerId) => Promise<boolean>;
-  denyInboundEncryptedConnection: (peerId: PeerId) => Promise<boolean>;
-  denyOutboundConnection: (peerId: PeerId) => Promise<boolean>;
-};
-
-export type ParsedHeliaIPFSOptions = {
-  blockstore: RuntimeBlockstore;
-  datastore: RuntimeDatastore;
-  libp2p: Libp2pDefaults & {
-    connectionGater: ConnectionGater;
-    privateKey?: Libp2pPrivateKeyLike;
-  };
-};
+import { ConnectionGater } from './types/ConnectionGater';
+import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
+import { PeerId } from './types/PeerId';
 
 export class HeliaIPFSParser {
   private static readonly blockedPeers: string[] = [];

@@ -2,26 +2,9 @@ import { NotificationStateValue } from '@app/contexts/notifications/domain/value
 import { NotificationStatusValue } from '@app/contexts/notifications/domain/value-objects/NotificationStatus';
 import { NotificationTypeValue } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 
-export type MongoConversationInvitationPayloadDocument = {
-  conversationId: string;
-  encryptedConversationKey: string;
-  inviterIdentityId: string;
-  inviterSignature: string;
-  recipientIdentityId: string;
-};
-export type MongoCommunityInvitationPayloadDocument = {
-  communityId: string;
-  encryptedCommunityKey: string;
-  inviterIdentityId: string;
-  inviterSignature: string;
-  recipientIdentityId: string;
-};
-export type MongoMissedCallPayloadDocument = {
-  callId: string;
-  callerIdentityId: string;
-  networkId: string;
-  recipientIdentityId: string;
-};
+import { MongoCommunityInvitationPayloadDocument } from './MongoCommunityInvitationPayloadDocument';
+import { MongoConversationInvitationPayloadDocument } from './MongoConversationInvitationPayloadDocument';
+import { MongoMissedCallPayloadDocument } from './MongoMissedCallPayloadDocument';
 
 export type MongoNotificationDocument = {
   _id: string;

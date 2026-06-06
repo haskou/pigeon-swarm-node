@@ -5,16 +5,12 @@ import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from './CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
+import { CommunityChannelMessageAttachments as Attachments } from './types/CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions as Mentions } from './types/CommunityChannelMessageMentions';
 import { CommunityChannelAttachmentId } from './value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from './value-objects/CommunityChannelMessageId';
 import { CommunityId } from './value-objects/CommunityId';
-
-type Attachments = CommunityChannelAttachmentId[];
-type Mentions = CommunityChannelMessageMention[];
-export type CommunityChannelMessagePrimitives = ReturnType<
-  CommunityChannelMessage['toPrimitives']
->;
 
 export class CommunityChannelMessage {
   public static create(

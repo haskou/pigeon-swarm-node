@@ -1,50 +1,9 @@
 import { PublicKey, Signature } from '@haskou/value-objects';
 
-import { CommunityChannelMessage } from '../CommunityChannelMessage';
-
-type CommunityChannelMessageMentionPrimitives = ReturnType<
-  CommunityChannelMessage['toPrimitives']
->['mentions'];
-
-type CommunityChannelMessageSignaturePayload = {
-  attachmentExternalIdentifiers: string[];
-  authorIdentityId: string;
-  channelId: string;
-  communityId: string;
-  createdAt: number;
-  encryptedPayload?: string;
-  id: string;
-  mentions?: CommunityChannelMessageMentionPrimitives;
-  plaintextPayload?: string;
-  replyToMessageId?: string;
-  type: 'poll' | 'sent';
-};
-type CommunityChannelMessageDeletionSignaturePayload = {
-  actorIdentityId: string;
-  channelId: string;
-  communityId: string;
-  createdAt: number;
-  id: string;
-  targetMessageId: string;
-  type: 'deleted';
-};
-type CommunityChannelMessageEditionSignaturePayload = {
-  attachmentExternalIdentifiers: string[];
-  authorIdentityId: string;
-  channelId: string;
-  communityId: string;
-  createdAt: number;
-  encryptedPayload?: string;
-  id: string;
-  mentions?: CommunityChannelMessageMentionPrimitives;
-  plaintextPayload?: string;
-  replyToMessageId?: string;
-  type: 'edited';
-};
-type CommunityChannelSignaturePayload =
-  | CommunityChannelMessageSignaturePayload
-  | CommunityChannelMessageDeletionSignaturePayload
-  | CommunityChannelMessageEditionSignaturePayload;
+import { CommunityChannelMessageDeletionSignaturePayload } from './types/CommunityChannelMessageDeletionSignaturePayload';
+import { CommunityChannelMessageEditionSignaturePayload } from './types/CommunityChannelMessageEditionSignaturePayload';
+import { CommunityChannelMessageSignaturePayload } from './types/CommunityChannelMessageSignaturePayload';
+import { CommunityChannelSignaturePayload } from './types/CommunityChannelSignaturePayload';
 
 export class CommunityChannelMessageSignatureDomainService {
   private isMessagePayload(

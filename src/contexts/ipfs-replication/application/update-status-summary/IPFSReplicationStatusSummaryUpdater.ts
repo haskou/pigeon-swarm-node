@@ -4,7 +4,7 @@ import { Integer, Timestamp } from '@haskou/value-objects';
 import { IPFSReplicationStatusSummary } from '../../domain/IPFSReplicationStatusSummary';
 import { IPFSReplicationStatusSummaryRepository } from '../../domain/repositories/IPFSReplicationStatusSummaryRepository';
 import { IPFSContentSize } from '../../domain/value-objects/IPFSContentSize';
-import { IPFSReplicationStatus } from '../find-status/IPFSReplicationStatusFinder';
+import { IPFSReplicationStatus } from '../find-status/types/IPFSReplicationStatus';
 
 export default class IPFSReplicationStatusSummaryUpdater {
   constructor(

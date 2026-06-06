@@ -1,5 +1,3 @@
-import type { json as createHeliaJsonClient } from '@helia/json';
-import type { unixfs as createHeliaUnixfsClient } from '@helia/unixfs';
 import type * as GossipsubModule from '@libp2p/gossipsub';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
@@ -12,15 +10,21 @@ import type { Key as DatastoreKey } from 'interface-datastore/key';
 import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
 
-export type HeliaJSONClient = ReturnType<typeof createHeliaJsonClient>;
-export type HeliaUnixfsClient = ReturnType<typeof createHeliaUnixfsClient>;
-export type HeliaLibp2pConfig = Parameters<typeof createLibp2p>[0];
-export type HeliaInstance = HeliaCore.Helia;
-export type Libp2pDefaults = ReturnType<typeof HeliaCore.libp2pDefaults>;
-export type RuntimeBlockstore = FsBlockstore | MemoryBlockstore;
-export type RuntimeDatastore = FsDatastore | MemoryDatastore;
-export type DatastoreKeyLike = DatastoreKey;
-export type ParsedCidLike = MultiformatsCid;
+import type { HeliaInstance } from './types/HeliaInstance';
+import type { HeliaJSONClient } from './types/HeliaJSONClient';
+import type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
+import type { HeliaUnixfsClient } from './types/HeliaUnixfsClient';
+import type { Libp2pDefaults } from './types/Libp2pDefaults';
+
+export type { DatastoreKeyLike } from './types/DatastoreKeyLike';
+export type { HeliaInstance } from './types/HeliaInstance';
+export type { HeliaJSONClient } from './types/HeliaJSONClient';
+export type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
+export type { HeliaUnixfsClient } from './types/HeliaUnixfsClient';
+export type { Libp2pDefaults } from './types/Libp2pDefaults';
+export type { ParsedCidLike } from './types/ParsedCidLike';
+export type { RuntimeBlockstore } from './types/RuntimeBlockstore';
+export type { RuntimeDatastore } from './types/RuntimeDatastore';
 
 export class HeliaRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof HeliaCore>;

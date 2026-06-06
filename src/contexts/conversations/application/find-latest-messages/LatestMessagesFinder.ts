@@ -2,11 +2,9 @@ import { ConversationNotFoundError } from '@app/contexts/conversations/domain/er
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
-import {
-  ConversationMessagesAround,
-  ConversationRepository,
-} from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { MessageReactionRepository } from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
+import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 
 import { LatestMessagesFindMessage } from './messages/LatestMessagesFindMessage';
 import { MessageFindMessage } from './messages/MessageFindMessage';

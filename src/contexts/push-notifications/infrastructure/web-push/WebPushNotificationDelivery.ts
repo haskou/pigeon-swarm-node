@@ -8,33 +8,9 @@ import {
 import { PushNotificationPayload } from '../../application/send/PushNotificationPayload';
 import { PushSubscription } from '../../domain/PushSubscription';
 import { PushVapidConfiguration } from './PushVapidConfiguration';
-
-type WebPushError = Error & {
-  body?: unknown;
-  statusCode?: number;
-};
-
-type WebPushSubscription = {
-  endpoint: string;
-  expirationTime: number | null;
-  keys: {
-    auth: string;
-    p256dh: string;
-  };
-};
-
-type WebPushSendResult = {
-  body?: string;
-  statusCode?: number;
-};
-
-type WebPushModule = {
-  sendNotification(
-    subscription: WebPushSubscription,
-    payload: string,
-  ): Promise<WebPushSendResult>;
-  setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
-};
+import { WebPushError } from './types/WebPushError';
+import { WebPushModule } from './types/WebPushModule';
+import { WebPushSendResult } from './types/WebPushSendResult';
 
 export class WebPushNotificationDelivery implements PushNotificationDelivery {
   private readonly configuration = new PushVapidConfiguration();
