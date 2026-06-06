@@ -11,7 +11,6 @@ import { PostIdentityBody } from '../bodies/PostIdentityBody';
 import { PostIdentityRequest } from '../requests/PostIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';
 
-// TODO: Test
 @JsonController('/identities')
 export class PostIdentityRoute extends Route {
   private readonly identityCreator: IdentityCreator =
