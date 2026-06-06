@@ -1,36 +1,9 @@
 import { CommunityVisibilityValue } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
 
-export interface MongoCommunityTextChannelDocument {
-  createdAt: number;
-  id: string;
-  name: string;
-  permissions?: MongoCommunityChannelPermissionsDocument;
-  type: 'text';
-}
-
-export interface MongoCommunityVoiceChannelDocument {
-  createdAt: number;
-  id: string;
-  name: string;
-  permissions?: MongoCommunityChannelPermissionsDocument;
-  type: 'voice';
-}
-
-export interface MongoCommunityChannelPermissionsDocument {
-  visibleRoleIds: string[];
-}
-
-export interface MongoCommunityRoleDocument {
-  builtIn: boolean;
-  id: string;
-  name: string;
-  permissions: CommunityPermissionValue[];
-}
-
-export interface MongoCommunityMemberRoleDocument {
-  identityId: string;
-  roleIds: string[];
-}
+import { MongoCommunityMemberRoleDocument } from './MongoCommunityMemberRoleDocument';
+import { MongoCommunityRoleDocument } from './MongoCommunityRoleDocument';
+import { MongoCommunityTextChannelDocument } from './MongoCommunityTextChannelDocument';
+import { MongoCommunityVoiceChannelDocument } from './MongoCommunityVoiceChannelDocument';
 
 export interface MongoCommunityDocument {
   _id: string;
@@ -51,4 +24,3 @@ export interface MongoCommunityDocument {
   visibility: CommunityVisibilityValue;
   voiceChannels?: MongoCommunityVoiceChannelDocument[];
 }
-import { CommunityPermissionValue } from '@app/contexts/communities/domain/value-objects/CommunityPermission';
