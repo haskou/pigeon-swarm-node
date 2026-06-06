@@ -2,12 +2,9 @@ import { lookup } from 'dns/promises';
 import net from 'net';
 
 import { InvalidLinkPreviewUrlError } from '../errors/InvalidLinkPreviewUrlError';
+import { ResolvedLinkPreviewUrl } from './url-resolution/ResolvedLinkPreviewUrl';
 
-export type ResolvedLinkPreviewUrl = {
-  address: string;
-  family: 4 | 6;
-  url: URL;
-};
+export { ResolvedLinkPreviewUrl } from './url-resolution/ResolvedLinkPreviewUrl';
 
 export class LinkPreviewUrlGuard {
   private static readonly ALLOWED_PROTOCOLS = ['http:', 'https:'];

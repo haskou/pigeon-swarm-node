@@ -2,15 +2,9 @@ import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import {
-  CallSignalRateBucket,
-  CallSignalRatePolicy,
-} from './CallSignalRatePolicy';
+import { CallSignalRateLimitDocument } from './CallSignalRateLimitDocument';
+import { CallSignalRatePolicy } from './CallSignalRatePolicy';
 import { CallSignalRateLimitExceededError } from './errors/CallSignalRateLimitExceededError';
-
-type CallSignalRateLimitDocument = CallSignalRateBucket & {
-  _id: string;
-};
 
 export class CallSignalRateLimiter {
   private static readonly COLLECTION = 'call_signal_rate_limits';
