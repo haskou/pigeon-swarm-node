@@ -31,6 +31,7 @@ export class OneToOneConversation extends Conversation {
       new ConversationWasCreatedEvent(conversation.toPrimitives().id, {
         networkId: conversation.toPrimitives().networkId,
         participantIds: conversation.toPrimitives().participantIds,
+        type: conversation.toPrimitives().type,
       }),
     );
 

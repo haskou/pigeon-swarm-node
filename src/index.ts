@@ -9,6 +9,7 @@ import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pu
 import RegisterCommunityMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
+import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
@@ -98,6 +99,7 @@ async function init() {
     SynchronizeKeychainWhenUpdated,
     RespondToKeychainSyncRequest,
     RegisterKeychainWhenSyncAvailable,
+    RegisterConversationWhenAnnounced,
     RegisterMessageWhenAnnounced,
     RegisterMessageEditionWhenAnnounced,
     RegisterMessageDeletionWhenAnnounced,

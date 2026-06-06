@@ -29,13 +29,6 @@ export default class ConversationMessageRegistrar {
   }
 
   public async register(message: RegisterConversationMessage): Promise<void> {
-    const conversation = await this.repository.findById(message.conversationId);
-
-    assert(
-      conversation !== undefined,
-      new ConversationNotFoundError(message.conversationId),
-    );
-
     const candidate = await this.repository.findCandidateMessageById(
       message.conversationId,
       message.messageId,
@@ -43,6 +36,20 @@ export default class ConversationMessageRegistrar {
 
     assert(
       candidate !== undefined,
+      new ConversationNotFoundError(message.conversationId),
+    );
+
+    await this.registerCandidate(message, candidate);
+  }
+
+  public async registerCandidate(
+    message: RegisterConversationMessage,
+    candidate: Message,
+  ): Promise<void> {
+    const conversation = await this.repository.findById(message.conversationId);
+
+    assert(
+      conversation !== undefined,
       new ConversationNotFoundError(message.conversationId),
     );
 

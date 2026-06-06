@@ -29,19 +29,39 @@ export default class ConversationSyncResponder {
       return;
     }
 
-    const messageCandidates = await this.repository.findMessageCandidates(
+    const messages = await this.repository.findLatestMessages(
       message.conversationId,
       ConversationSyncResponder.MESSAGE_CANDIDATE_LIMIT,
+    );
+    const conversation = await this.repository.findMetadataById(
+      message.conversationId,
     );
     const reactionCandidates = await this.reactionRepository.findCandidates(
       message.conversationId,
     );
+    const conversationPrimitives = conversation?.toPrimitives();
+    const messageCandidates = messages.map((candidate) => ({
+      authorIdentityId: candidate.getAuthorId().valueOf(),
+      createdAt: candidate.toPrimitives().createdAt,
+      message: candidate.toPrimitives(),
+      messageId: candidate.getId().valueOf(),
+      messageType: candidate.getType().valueOf(),
+    }));
     const messageCandidateIds = new Set(
       messageCandidates.map((candidate) => candidate.messageId),
     );
 
     await this.eventPublisher.publish([
       new ConversationSyncAvailableEvent(message.conversationId.valueOf(), {
+        conversation: conversationPrimitives
+          ? {
+              id: conversationPrimitives.id,
+              name: conversationPrimitives.name,
+              networkId: conversationPrimitives.networkId,
+              participantIds: conversationPrimitives.participantIds,
+              type: conversationPrimitives.type,
+            }
+          : undefined,
         messageCandidates,
         networkId: message.networkId.valueOf(),
         reactionCandidates: reactionCandidates

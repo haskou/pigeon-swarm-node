@@ -42,6 +42,7 @@ export class GroupConversation extends Conversation {
         name: conversation.toPrimitives().name,
         networkId: conversation.toPrimitives().networkId,
         participantIds: conversation.toPrimitives().participantIds,
+        type: conversation.toPrimitives().type,
       }),
     );
 

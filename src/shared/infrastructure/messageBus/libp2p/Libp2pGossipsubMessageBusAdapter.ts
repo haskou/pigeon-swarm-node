@@ -3,16 +3,22 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import { Constructor } from '@app/shared/domain/Constructor';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTransport';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
 import PubSubNetworkMessageCodec from './PubSubNetworkMessageCodec';
 import PubSubTopicResolver from './PubSubTopicResolver';
 
+type SubscriptionHandler = (event: DomainEvent) => Promise<void>;
+
 export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
   private readonly topicResolver: PubSubTopicResolver;
   private readonly codec: PubSubNetworkMessageCodec;
-  private readonly subscribedTopics = new Set<string>();
+  private readonly subscriptionHandlers = new Map<
+    string,
+    SubscriptionHandler[]
+  >();
 
   constructor(
     private readonly transport: PubSubTransport,
@@ -88,18 +94,21 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     bindingKey: string,
     network: IPFSNetwork,
     DomainEventInstance: Constructor<DomainEvent>,
-    handler: (event: DomainEvent) => Promise<void>,
+    handler: SubscriptionHandler,
   ): Promise<void> {
     const topic = this.networkTopic(bindingKey, network);
     const subscriptionKey = `${topic}:${bindingKey}`;
+    const handlers = this.subscriptionHandlers.get(subscriptionKey);
 
-    if (this.subscribedTopics.has(subscriptionKey)) {
+    if (handlers) {
+      handlers.push(handler);
+
       return;
     }
 
-    this.subscribedTopics.add(subscriptionKey);
+    this.subscriptionHandlers.set(subscriptionKey, [handler]);
 
-    await this.transport.subscribe(topic, async (payload) => {
+    await network.subscribePubSub(topic, async (payload) => {
       const message = JSON.parse(
         this.codec.decode(payload, network),
       ) as Message;
@@ -108,7 +117,15 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         return;
       }
 
-      await handler(this.instanceDomainEvent(DomainEventInstance, message));
+      const event = this.instanceDomainEvent(DomainEventInstance, message);
+
+      webSocketEventHub.publish([event]);
+
+      await Promise.all(
+        (this.subscriptionHandlers.get(subscriptionKey) || []).map(
+          (subscriptionHandler) => subscriptionHandler(event),
+        ),
+      );
     });
   }
 
@@ -171,7 +188,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         await Promise.all(
           domainEvents.flatMap((event) =>
             this.networksForEvent(event).map((network) =>
-              this.transport.publish(
+              network.publishPubSub(
                 this.networkTopic(event.eventName(), network),
                 this.codec.encode(event.decode(), network),
               ),

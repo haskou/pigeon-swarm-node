@@ -125,11 +125,11 @@ describe('Libp2pGossipsubAdapter', () => {
 
     await adapter.publish([event]);
 
-    expect(transport.publish).toHaveBeenCalledWith(
+    expect(publicNetwork.publishPubSub).toHaveBeenCalledWith(
       'pigeon-swarm.networks.public-network-id.identities.v1.announcements',
       expect.stringContaining('"encrypted":false'),
     );
-    expect(transport.publish).toHaveBeenCalledWith(
+    expect(privateNetwork.publishPubSub).toHaveBeenCalledWith(
       'pigeon-swarm.networks.private-network-id.identities.v1.announcements',
       expect.stringContaining('"encrypted":true'),
     );
@@ -145,7 +145,7 @@ describe('Libp2pGossipsubAdapter', () => {
     let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
 
     networkRegistry.getAll.mockReturnValue([privateNetwork]);
-    transport.subscribe.mockImplementation(async (_topic, callback) => {
+    privateNetwork.subscribePubSub.mockImplementation(async (_topic, callback) => {
       subscribedHandler = callback;
     });
     adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
@@ -159,15 +159,51 @@ describe('Libp2pGossipsubAdapter', () => {
     );
     await adapter.publish([event]);
 
-    const encryptedPayload = transport.publish.mock.calls[0][1];
+    const encryptedPayload = privateNetwork.publishPubSub.mock.calls[0][1];
 
     await subscribedHandler?.(encryptedPayload);
 
-    expect(transport.subscribe).toHaveBeenCalledWith(
+    expect(privateNetwork.subscribePubSub).toHaveBeenCalledWith(
       'pigeon-swarm.networks.private-network-id.identities.v1.announcements',
       expect.any(Function),
     );
     expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should fan out network payloads to every consumer on the same topic', async () => {
+    const firstHandler = jest.fn();
+    const secondHandler = jest.fn();
+    const network = createNetwork({ id: 'network-id' });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([network]);
+    network.subscribePubSub.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+
+    await adapter.consume(
+      'queue-a',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      firstHandler,
+    );
+    await adapter.consume(
+      'queue-b',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      secondHandler,
+    );
+    await adapter.publish([event]);
+
+    await subscribedHandler?.(network.publishPubSub.mock.calls[0][1]);
+
+    expect(network.subscribePubSub).toHaveBeenCalledTimes(1);
+    expect(firstHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(secondHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
   });
 });

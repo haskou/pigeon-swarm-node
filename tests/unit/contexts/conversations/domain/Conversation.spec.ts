@@ -64,6 +64,9 @@ describe('Conversation', () => {
       expect(events).toEqual([expect.any(ConversationMessageWasSentEvent)]);
       expect(events[0].attributes).toEqual({
         authorId: author.valueOf(),
+        conversationName: undefined,
+        conversationType: 'one-to-one',
+        message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
