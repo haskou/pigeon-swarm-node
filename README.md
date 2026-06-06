@@ -4,7 +4,7 @@
 
 # pigeon-swarm-node
 
-`pigeon-swarm-node` is the backend node for a Discord-ish, peer-to-peer
+`pigeon-swarm-node` is the backend node for Pigeon Swarm, a peer-to-peer
 communication platform designed to be hard to censor, hard to capture, and easy
 to self-host.
 
@@ -15,7 +15,8 @@ publishes content to IPFS networks, and exchanges domain events with other
 nodes through libp2p GossipSub.
 
 Think of it as a self-hosted chat and community node with a little BitTorrent
-energy, a little Discord shape, and a stubborn preference for user-owned keys.
+energy, a little modern community-chat shape, and a stubborn preference for
+user-owned keys.
 
 ## Why pigeons?
 
@@ -30,49 +31,56 @@ The goal is a practical architecture where communities can run their own nodes,
 share networks deliberately, keep private material client-side, and continue
 communicating even when individual nodes disappear.
 
-## Capabilities
+## Networks and communities
 
-- Local identity publishing and profile updates, including handles, avatar and
-  banner CIDs.
-- Client-owned encrypted keychains for conversations and communities.
-- One-to-one and group conversations with encrypted messages, replies,
-  attachments and deletion tombstones.
-- Private communities with owners, members, text channels and encrypted channel
-  messages.
-- Actionable notifications for conversation, group conversation and community
-  invitations.
-- Public and private IPFS uploads for profile media and encrypted attachments.
-- Node ownership, network management, peer heartbeats and startup
-  synchronization.
-- WebSocket delivery for routed domain events.
-- Realtime call signalling for one-to-one, group and community channel calls.
+Pigeon Swarm separates node-level access from community-level access.
+
+Networks define which nodes can discover, connect, and exchange events with each
+other. A public network can be discovered and joined openly. A private network
+requires permission before outside nodes can connect, so unknown nodes cannot
+simply appear and participate.
+
+Communities define the social spaces that users interact with inside those
+networks. A public community can be visible and accessible to users in the
+network. A private community can restrict who can see it, join it, or participate
+in its channels and conversations.
+
+In short: networks control node access, while communities control user and
+content access. This keeps infrastructure boundaries separate from social
+boundaries, because mixing both into one permission model is how software slowly
+turns into soup.
 
 ## Architecture
 
 The backend is organized around bounded contexts:
 
-- `identities`: public identity documents, profiles and network membership.
-- `keychains`: encrypted client keychain publications.
-- `conversations`: one-to-one and group chat state.
-- `communities`: private communities, members, channels and channel messages.
-- `notifications`: invitation notifications and recipient actions.
-- `calls`: call lifecycle and WebRTC signalling events.
-- `nodes`: local node metadata, ownership, networks, peers and sync.
-- `shared`: IPFS, MongoDB, message bus, HTTP, WebSocket and common value
-  objects.
+* `identities`: public identity documents, profiles and network membership.
+* `keychains`: encrypted client keychain publications.
+* `conversations`: one-to-one and group chat state.
+* `communities`: public/private communities, members, roles, channels and
+  channel messages.
+* `notifications`: invitation notifications and recipient actions.
+* `calls`: call lifecycle and WebRTC signalling events.
+* `nodes`: local node metadata, ownership, networks, peers and sync.
+* `presence`: ephemeral identity connection state.
+* `push-notifications`: Web Push subscriptions and outbound delivery.
+* `notification-settings`: per-scope mute and notification preferences.
+* `stickers`: sticker packs, sticker assets and user sticker state.
+* `polls`: polls, votes and poll lifecycle for conversations and communities.
+* `ipfs-replication`: local replica policy, claims and replication summaries.
+* `shared`: common value objects plus IPFS, MongoDB, message bus, HTTP,
+  WebSocket and dependency-injection infrastructure.
 
-The backend does not receive private keys or decrypted conversation/community
-keys. Clients generate identity material, encrypt local secrets, sign domain
-payloads and publish encrypted keychain updates.
+The backend does not receive private keys, passwords, or decrypted
+conversation/community keys. Clients generate identity material, encrypt local
+secrets, sign domain payloads, and publish encrypted keychain updates.
 
 ## API Surface
 
 Primary API documentation:
 
-- [HTTP API](./docs/api.md)
-- [WebSocket realtime contract](./docs/frontend-websocket-realtime.md)
-- [PubSub sync protocol](./docs/pubsub-sync-protocol.md)
-- [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
+* [HTTP API](./docs/api.md)
+* [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
 
 When the server is running, Swagger UI is available at:
 
@@ -91,8 +99,8 @@ yarn
 Create a local `.env` from the documented configuration and choose how nodes
 exchange events:
 
-- `TRANSPORT_DSN=in-memory` for local tests and single-node development.
-- `TRANSPORT_DSN=libp2p-gossipsub` for node-to-node gossip event exchange.
+* `TRANSPORT_DSN=in-memory` for local tests and single-node development.
+* `TRANSPORT_DSN=libp2p-gossipsub` for node-to-node gossip event exchange.
 
 See [docs/INSTALLATION.md](./docs/INSTALLATION.md) for the full environment
 setup.
@@ -115,17 +123,28 @@ make build
 make start
 make stop
 make test
-make log
+make logs
 ```
+
+This repository contains the backend node source. The full self-hosted
+application image and Docker Compose setup that bundles frontend and backend
+lives in [`haskou/pigeon-swarm`](https://github.com/haskou/pigeon-swarm).
+The standalone frontend source lives in
+[`haskou/pigeon-swarm-ui`](https://github.com/haskou/pigeon-swarm-ui).
+
+The backend can serve static frontend assets from `public/`. That directory is
+ignored in this source repository because it is a build/deployment artifact:
+place the frontend build output there only in local runtime images or release
+packaging, not as backend source.
 
 ## Runtime Dependencies
 
 The node expects:
 
-- MongoDB for local persistent state.
-- IPFS network configuration for content publication and retrieval.
-- Libp2p GossipSub transport for node-to-node event propagation.
-- Signed HTTP/WebSocket requests from clients.
+* MongoDB for local persistent state.
+* IPFS network configuration for content publication and retrieval.
+* Libp2p GossipSub transport for node-to-node event propagation.
+* Signed HTTP/WebSocket requests from clients.
 
 For local development, the repository includes Docker Compose configuration and
 test-friendly in-memory network helpers.
@@ -134,19 +153,19 @@ test-friendly in-memory network helpers.
 
 Clients are responsible for:
 
-- generating identity keypairs;
-- keeping passwords and private keys local;
-- encrypting keychains before publication;
-- encrypting private attachments before IPFS upload;
-- signing HTTP requests and domain payloads.
+* generating identity keypairs;
+* keeping passwords and private keys local;
+* encrypting keychains before publication;
+* encrypting private attachments before IPFS upload;
+* signing HTTP requests and domain payloads.
 
 The backend is responsible for:
 
-- verifying signed HTTP/WebSocket requests;
-- validating domain invariants;
-- storing opaque encrypted payloads;
-- routing events only to related identities;
-- syncing public domain metadata across configured networks.
+* verifying signed HTTP/WebSocket requests;
+* validating domain invariants;
+* storing opaque encrypted payloads;
+* routing events only to related identities;
+* syncing public domain metadata across configured networks.
 
 ## Project Status
 
@@ -154,6 +173,12 @@ This is active development software. APIs are becoming more stable, but schema
 and domain contracts may still change as conversations, communities, calls and
 sync behavior mature.
 
-For current implementation priorities, see:
+## License
 
-- [Action plan](./docs/action-plan.md)
+Pigeon Swarm is licensed under the PolyForm Noncommercial License 1.0.0.
+Commercial use requires a separate commercial license from the author.
+
+## Disclaimer
+
+Pigeon Swarm is not affiliated with, endorsed by, or sponsored by Discord Inc.
+Discord is a trademark of Discord Inc.

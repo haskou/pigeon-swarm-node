@@ -33,7 +33,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "@haskou/value-objects": "^2.6.0",
     "@helia/json": "^5.0.7",

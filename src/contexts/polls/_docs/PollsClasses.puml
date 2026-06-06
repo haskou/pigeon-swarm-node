@@ -1,0 +1,62 @@
+@startuml PollsClasses
+title Polls context
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "polls/domain" {
+  class Poll <<AggregateRoot>>
+  class PollContent <<ValueObject>>
+  class PollLifecycle <<ValueObject>>
+  class PollOption <<Entity>>
+  class PollScope <<ValueObject>>
+  class PollVote <<Entity>>
+
+  interface PollRepository
+
+  class PollWasCreatedEvent <<DomainEvent>>
+  class PollWasClosedEvent <<DomainEvent>>
+  class PollVoteWasCastEvent <<DomainEvent>>
+  class PollVoteWasRemovedEvent <<DomainEvent>>
+}
+
+package "polls/application" {
+  class PollCreator
+  class PollCloser
+  class PollVoteCaster
+  class PollVoteRemover
+
+  class PollCreateMessage
+  class PollCloseMessage
+  class PollVoteCastMessage
+  class PollVoteRemoveMessage
+}
+
+package "polls/infrastructure" {
+  class MongoPollRepository
+}
+
+Poll *-- PollContent
+Poll *-- PollLifecycle
+Poll *-- PollScope
+Poll *-- PollOption
+Poll *-- PollVote
+
+Poll ..> PollWasCreatedEvent
+Poll ..> PollWasClosedEvent
+Poll ..> PollVoteWasCastEvent
+Poll ..> PollVoteWasRemovedEvent
+
+PollCreator ..> PollCreateMessage
+PollCreator ..> PollRepository
+PollCloser ..> PollCloseMessage
+PollCloser ..> PollRepository
+PollVoteCaster ..> PollVoteCastMessage
+PollVoteCaster ..> PollRepository
+PollVoteRemover ..> PollVoteRemoveMessage
+PollVoteRemover ..> PollRepository
+
+MongoPollRepository ..|> PollRepository
+MongoPollRepository ..> Poll
+
+@enduml
