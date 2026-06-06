@@ -16,6 +16,8 @@
     "test:api:only": "NODE_ENV=test cucumber-js -p api --publish-quiet --tags @Only",
     "test:consumer": "NODE_ENV=test cucumber-js -p consumer --publish-quiet",
     "test:consumer:only": "NODE_ENV=test cucumber-js -p consumer --publish-quiet --tags @Only",
+    "test:e2e:real-transport": "npm-run-all test:e2e:real-transport:conversation",
+    "test:e2e:real-transport:conversation": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-real-node-gossipsub.ts",
     "test:scheduler": "NODE_ENV=test cucumber-js -p scheduler --publish-quiet",
     "test:scheduler:only": "NODE_ENV=test cucumber-js -p scheduler --publish-quiet --tags @Only",
     "test:ci": "npm-run-all test:unit test:api test:consumer test:scheduler",
