@@ -4,13 +4,7 @@ import { Request } from 'express';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from './SignedHttpRequestVerifier';
-
-interface SignedRequestNonceDocument {
-  _id: string;
-  createdAt: number;
-  identityId: string;
-  nonce: string;
-}
+import { SignedRequestNonceDocument } from './SignedRequestNonceDocument';
 
 export class SignedHttpRequestAuthenticator {
   private static readonly COLLECTION = 'signed_request_nonces';
