@@ -1,47 +1,38 @@
 import { Enum } from '@haskou/value-objects';
 
-const targetTypes = {
-  CHANNEL: 'channel',
-  COMMUNITY: 'community',
-  INVITE: 'invite',
-  MEMBER: 'member',
-  MEMBERSHIP_REQUEST: 'membership_request',
-  MESSAGE: 'message',
-  ROLE: 'role',
-} as const;
-
-type TargetTypeValue = (typeof targetTypes)[keyof typeof targetTypes];
+import { communityModerationTargetTypes } from './types/CommunityModerationTargetTypes';
+import { CommunityModerationTargetTypeValue as TargetTypeValue } from './types/CommunityModerationTargetTypeValue';
 
 export class CommunityModerationTargetType extends Enum<TargetTypeValue> {
   public static readonly CHANNEL = new CommunityModerationTargetType(
-    targetTypes.CHANNEL,
+    communityModerationTargetTypes.CHANNEL,
   );
 
   public static readonly COMMUNITY = new CommunityModerationTargetType(
-    targetTypes.COMMUNITY,
+    communityModerationTargetTypes.COMMUNITY,
   );
 
   public static readonly INVITE = new CommunityModerationTargetType(
-    targetTypes.INVITE,
+    communityModerationTargetTypes.INVITE,
   );
 
   public static readonly MEMBER = new CommunityModerationTargetType(
-    targetTypes.MEMBER,
+    communityModerationTargetTypes.MEMBER,
   );
 
   public static readonly MEMBERSHIP_REQUEST = new CommunityModerationTargetType(
-    targetTypes.MEMBERSHIP_REQUEST,
+    communityModerationTargetTypes.MEMBERSHIP_REQUEST,
   );
 
   public static readonly MESSAGE = new CommunityModerationTargetType(
-    targetTypes.MESSAGE,
+    communityModerationTargetTypes.MESSAGE,
   );
 
   public static readonly ROLE = new CommunityModerationTargetType(
-    targetTypes.ROLE,
+    communityModerationTargetTypes.ROLE,
   );
 
   public getValues(): TargetTypeValue[] {
-    return Object.values(targetTypes);
+    return Object.values(communityModerationTargetTypes);
   }
 }

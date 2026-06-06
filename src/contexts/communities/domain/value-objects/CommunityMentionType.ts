@@ -1,33 +1,29 @@
 import { Enum } from '@haskou/value-objects';
 
-export type CommunityMentionTypeValue =
-  | 'everyone'
-  | 'here'
-  | 'identity'
-  | 'role';
+import { communityMentionTypes } from './types/CommunityMentionTypes';
+import { CommunityMentionTypeValue } from './types/CommunityMentionTypeValue';
 
-const mentionTypes: Record<string, CommunityMentionTypeValue> = {
-  EVERYONE: 'everyone',
-  HERE: 'here',
-  IDENTITY: 'identity',
-  ROLE: 'role',
-};
+export { CommunityMentionTypeValue } from './types/CommunityMentionTypeValue';
 
 export class CommunityMentionType extends Enum<CommunityMentionTypeValue> {
   public static readonly EVERYONE = new CommunityMentionType(
-    mentionTypes.EVERYONE,
+    communityMentionTypes.EVERYONE,
   );
 
-  public static readonly HERE = new CommunityMentionType(mentionTypes.HERE);
+  public static readonly HERE = new CommunityMentionType(
+    communityMentionTypes.HERE,
+  );
 
   public static readonly IDENTITY = new CommunityMentionType(
-    mentionTypes.IDENTITY,
+    communityMentionTypes.IDENTITY,
   );
 
-  public static readonly ROLE = new CommunityMentionType(mentionTypes.ROLE);
+  public static readonly ROLE = new CommunityMentionType(
+    communityMentionTypes.ROLE,
+  );
 
   public getValues(): CommunityMentionTypeValue[] {
-    return Object.values(mentionTypes);
+    return Object.values(communityMentionTypes);
   }
 
   public isEveryone(): boolean {

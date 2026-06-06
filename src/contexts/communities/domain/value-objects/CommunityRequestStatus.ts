@@ -1,26 +1,25 @@
 import { Enum } from '@haskou/value-objects';
 
-export type CommunityRequestStatusValue = 'accepted' | 'declined' | 'pending';
+import { communityRequestStatuses } from './types/CommunityRequestStatuses';
+import { CommunityRequestStatusValue } from './types/CommunityRequestStatusValue';
 
-const statuses: Record<string, CommunityRequestStatusValue> = {
-  ACCEPTED: 'accepted',
-  DECLINED: 'declined',
-  PENDING: 'pending',
-};
+export { CommunityRequestStatusValue } from './types/CommunityRequestStatusValue';
 
 export class CommunityRequestStatus extends Enum<CommunityRequestStatusValue> {
   public static readonly ACCEPTED = new CommunityRequestStatus(
-    statuses.ACCEPTED,
+    communityRequestStatuses.ACCEPTED,
   );
 
   public static readonly DECLINED = new CommunityRequestStatus(
-    statuses.DECLINED,
+    communityRequestStatuses.DECLINED,
   );
 
-  public static readonly PENDING = new CommunityRequestStatus(statuses.PENDING);
+  public static readonly PENDING = new CommunityRequestStatus(
+    communityRequestStatuses.PENDING,
+  );
 
   public getValues(): CommunityRequestStatusValue[] {
-    return Object.values(statuses);
+    return Object.values(communityRequestStatuses);
   }
 
   public isAccepted(): boolean {
