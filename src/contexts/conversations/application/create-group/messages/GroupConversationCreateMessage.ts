@@ -3,13 +3,9 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { GroupConversationName } from '../../../domain/value-objects/GroupConversationName';
+import { GroupConversationCreatePayload } from './types/GroupConversationCreatePayload';
 
-export type GroupConversationCreatePayload = {
-  keychainExternalIdentifier: string;
-  name: string;
-  networkId: string;
-  participantIds: string[];
-};
+export { GroupConversationCreatePayload } from './types/GroupConversationCreatePayload';
 
 export class GroupConversationCreateMessage {
   public readonly keychainExternalIdentifier: KeychainExternalIdentifier;

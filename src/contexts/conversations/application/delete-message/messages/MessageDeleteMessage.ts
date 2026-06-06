@@ -3,12 +3,9 @@ import { Signature, Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { MessageId } from '../../../domain/value-objects/MessageId';
+import { MessageDeletePayload } from './types/MessageDeletePayload';
 
-export type MessageDeletePayload = {
-  createdAt: number;
-  id: string;
-  signature: string;
-};
+export { MessageDeletePayload } from './types/MessageDeletePayload';
 
 export class MessageDeleteMessage {
   public readonly authorIdentityId: IdentityId;
