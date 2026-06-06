@@ -2,23 +2,12 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Signature } from '@haskou/value-objects';
 
 import { MessageMetadata } from './MessageMetadata';
+import { AttachmentExternalIdentifiers } from './types/AttachmentExternalIdentifiers';
+import { MessageBasePrimitives } from './types/MessageBasePrimitives';
 import { MessageSignaturePayload } from './types/MessageSignaturePayload';
-import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageId } from './value-objects/MessageId';
 import { MessageType } from './value-objects/MessageType';
-
-type AttachmentExternalIdentifiers = AttachmentExternalIdentifier[];
-type MessageBasePrimitives = {
-  attachmentExternalIdentifiers: string[];
-  authorId: string;
-  conversationId: string;
-  createdAt: number;
-  id: string;
-  previousMessageIds: string[];
-  replyToMessageId?: string;
-  signature: string;
-};
 
 export abstract class Message {
   private readonly attachmentExternalIdentifiers: AttachmentExternalIdentifiers;

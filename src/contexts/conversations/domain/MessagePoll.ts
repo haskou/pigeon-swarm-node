@@ -4,18 +4,11 @@ import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
+import { MessagePollCreateData } from './types/MessagePollCreateData';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageId } from './value-objects/MessageId';
 
-export type MessagePollCreateData = {
-  authorId: IdentityId;
-  conversationId: ConversationId;
-  createdAt?: Timestamp;
-  id?: MessageId;
-  pollId: PollId;
-  previousMessageIds?: MessageId[];
-  signature: Signature;
-};
+export { MessagePollCreateData } from './types/MessagePollCreateData';
 
 export class MessagePoll extends Message {
   public static create(data: MessagePollCreateData): MessagePoll {
