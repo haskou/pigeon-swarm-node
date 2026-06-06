@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Signature } from '@haskou/value-objects';
 
 import { MessageMetadata } from './MessageMetadata';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
@@ -55,6 +56,10 @@ export abstract class Message {
 
   public getAuthorId(): IdentityId {
     return this.metadata.getAuthorId();
+  }
+
+  public getSignature(): Signature {
+    return this.metadata.getSignature();
   }
 
   public abstract getType(): MessageType;

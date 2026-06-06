@@ -1,10 +1,8 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { InvalidMessageSignatureError } from '@app/contexts/conversations/domain/errors/InvalidMessageSignatureError';
 import { MessageEdited } from '@app/contexts/conversations/domain/MessageEdited';
 import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { MessageSignatureDomainService } from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
-import { PublicKey } from '@haskou/value-objects';
 
 import { MessageEditMessage } from './messages/MessageEditMessage';
 
@@ -36,15 +34,7 @@ export default class MessageEditor {
       },
     );
 
-    const isValidSignature = this.signatureService.isValidSignature(
-      PublicKey.fromPEM(message.authorIdentityId.toString()),
-      editedMessage.toPrimitives(),
-      message.signature,
-    );
-
-    if (!isValidSignature) {
-      throw new InvalidMessageSignatureError();
-    }
+    this.signatureService.assertValidMessageSignature(editedMessage);
 
     await this.conversationRepository.save(conversation);
     await this.conversationRepository.registerUnreadForMessage(

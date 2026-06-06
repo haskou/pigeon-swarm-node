@@ -1,11 +1,13 @@
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
+  assert,
   EncryptedKeyPair,
   PrimitiveOf,
   PublicKey,
   Signature,
 } from '@haskou/value-objects';
 
+import { InvalidMessageSignatureError } from '../errors/InvalidMessageSignatureError';
 import { Message } from '../Message';
 
 type MessageSignaturePayload = Omit<PrimitiveOf<Message>, 'signature'> & {
@@ -50,6 +52,17 @@ export class MessageSignatureDomainService {
     return publicKey.isValidSignature(
       this.serializePayload(payload),
       signature,
+    );
+  }
+
+  public assertValidMessageSignature(message: Message): void {
+    assert(
+      this.isValidSignature(
+        message.getAuthorId(),
+        message.toPrimitives(),
+        message.getSignature(),
+      ),
+      new InvalidMessageSignatureError(),
     );
   }
 }

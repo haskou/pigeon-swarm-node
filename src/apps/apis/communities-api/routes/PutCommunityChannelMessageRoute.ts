@@ -3,7 +3,6 @@ import { CommunityChannelMessageMention } from '@app/contexts/communities/domain
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/CommunityChannelMessagePayload';
 import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
-import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
@@ -13,7 +12,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
 import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { assert, PublicKey, Signature, Timestamp } from '@haskou/value-objects';
+import { assert, Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -76,8 +75,8 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
     community.assertCanMention(authorIdentityId, mentions);
     const mentionPrimitives = mentions.map((mention) => mention.toPrimitives());
 
-    const isValidSignature = this.signatureService.isValidSignature(
-      PublicKey.fromPEM(authorIdentityId.toString()),
+    this.signatureService.assertValidSignature(
+      authorIdentityId,
       {
         attachmentExternalIdentifiers: body.attachmentExternalIdentifiers ?? [],
         authorIdentityId: authorIdentityId.valueOf(),
@@ -92,10 +91,6 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
       },
       new Signature(body.signature),
     );
-
-    if (!isValidSignature) {
-      throw new InvalidCommunityChannelMessageSignatureError();
-    }
 
     const message = targetMessage.edit(
       payload,

@@ -4,7 +4,6 @@ import { CommunityChannelMessageMention } from '@app/contexts/communities/domain
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/CommunityChannelMessagePayload';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
-import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
@@ -14,7 +13,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
 import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { PublicKey, Signature, Timestamp } from '@haskou/value-objects';
+import { Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -93,15 +92,11 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
     );
     community.assertCanMention(authorIdentityId, message.getMentions());
     const primitives = message.toPrimitives();
-    const isValidSignature = this.signatureService.isValidSignature(
-      PublicKey.fromPEM(authorIdentityId.toString()),
+    this.signatureService.assertValidSignature(
+      authorIdentityId,
       primitives,
       new Signature(body.signature),
     );
-
-    if (!isValidSignature) {
-      throw new InvalidCommunityChannelMessageSignatureError();
-    }
 
     await this.messageRepository().save(message);
     const communityPrimitives = community.toPrimitives();

@@ -1,7 +1,6 @@
-import { assert, PublicKey, Signature } from '@haskou/value-objects';
+import { assert } from '@haskou/value-objects';
 
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
-import { InvalidMessageSignatureError } from '../../domain/errors/InvalidMessageSignatureError';
 import { RemoteMessageCandidateMismatchError } from '../../domain/errors/RemoteMessageCandidateMismatchError';
 import { Message } from '../../domain/Message';
 import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
@@ -56,13 +55,7 @@ export default class ConversationMessageRegistrar {
     this.assertCandidateMatchesAnnouncement(message, candidate);
     const isAlreadyRegistered = conversation.findMessageById(message.messageId);
 
-    const isValidSignature = this.signatureService.isValidSignature(
-      PublicKey.fromPEM(candidate.getAuthorId().toString()),
-      candidate.toPrimitives(),
-      new Signature(candidate.toPrimitives().signature),
-    );
-
-    assert(isValidSignature, new InvalidMessageSignatureError());
+    this.signatureService.assertValidMessageSignature(candidate);
 
     conversation.registerMessage(candidate);
     await this.repository.save(conversation);
