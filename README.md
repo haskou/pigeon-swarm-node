@@ -157,3 +157,8 @@ sync behavior mature.
 For current implementation priorities, see:
 
 - [Action plan](./docs/action-plan.md)
+
+## License
+
+Pigeon Swarm is licensed under the PolyForm Noncommercial License 1.0.0.
+Commercial use requires a separate commercial license from the author.
