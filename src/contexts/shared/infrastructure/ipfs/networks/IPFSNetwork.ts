@@ -92,6 +92,17 @@ export class IPFSNetwork {
     return this.connection.getRecord(key, signal);
   }
 
+  public publishPubSub(topic: string, payload: string): Promise<void> {
+    return this.connection.publishPubSub(topic, payload);
+  }
+
+  public subscribePubSub(
+    topic: string,
+    handler: (payload: string) => Promise<void>,
+  ): Promise<void> {
+    return this.connection.subscribePubSub(topic, handler);
+  }
+
   public async blockPeer(peerId: string): Promise<void> {
     return this.connection.blockPeer(peerId);
   }

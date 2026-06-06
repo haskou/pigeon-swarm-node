@@ -1,4 +1,6 @@
 import Kernel from '@app/Kernel';
+import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
+import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
@@ -110,6 +112,25 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   private hasPeers(): boolean {
     return this.getPeers().length > 0;
+  }
+
+  private getPubSubMessage(event: PubSubEvent): {
+    data?: Uint8Array;
+    topic?: string;
+  } {
+    return event.detail.msg || event.detail;
+  }
+
+  private getPubSubService(): Libp2pPubSubService {
+    const services = this.heliaCore.libp2p.services as unknown as {
+      pubsub?: Libp2pPubSubService;
+    };
+
+    if (!services.pubsub) {
+      throw new Error('IPFS network does not expose a pubsub service.');
+    }
+
+    return services.pubsub;
   }
 
   private isAsyncIterableBytes(
@@ -321,6 +342,38 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     return undefined;
+  }
+
+  public async publishPubSub(topic: string, payload: string): Promise<void> {
+    const pubsub = this.getPubSubService();
+
+    await pubsub.publish(topic, new TextEncoder().encode(payload));
+  }
+
+  public async subscribePubSub(
+    topic: string,
+    handler: (payload: string) => Promise<void>,
+  ): Promise<void> {
+    const pubsub = this.getPubSubService();
+    const listener = (event: PubSubEvent): void => {
+      const message = this.getPubSubMessage(event);
+
+      if (message.topic !== topic || !message.data) {
+        return;
+      }
+
+      handler(new TextDecoder().decode(message.data)).catch(
+        (error: unknown) => {
+          Kernel.logger.error(
+            `IPFS pubsub handler failed for topic "${topic}": ${String(error)}`,
+          );
+        },
+      );
+    };
+
+    await pubsub.subscribe(topic);
+    pubsub.addEventListener('message', listener);
+    pubsub.addEventListener('gossipsub:message', listener);
   }
 
   public async blockPeer(peerId: string): Promise<void> {

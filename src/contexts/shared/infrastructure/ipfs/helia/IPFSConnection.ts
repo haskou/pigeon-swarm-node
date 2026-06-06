@@ -16,6 +16,11 @@ export interface IPFSConnection {
   getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T>;
   putRecord(key: string, value: string, signal?: AbortSignal): Promise<void>;
   getRecord(key: string, signal?: AbortSignal): Promise<string | undefined>;
+  publishPubSub(topic: string, payload: string): Promise<void>;
+  subscribePubSub(
+    topic: string,
+    handler: (payload: string) => Promise<void>,
+  ): Promise<void>;
   blockPeer(peerId: string): Promise<void>;
   getPeers(): string[];
   getPeerId(): string;
