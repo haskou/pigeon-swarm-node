@@ -3,15 +3,13 @@ import http from 'http';
 import https from 'https';
 
 import { LinkPreviewFetchError } from '../errors/LinkPreviewFetchError';
+import { FetchedLinkPreviewHtml } from './fetching/FetchedLinkPreviewHtml';
 import {
   LinkPreviewUrlGuard,
   ResolvedLinkPreviewUrl,
 } from './LinkPreviewUrlGuard';
 
-export type FetchedLinkPreviewHtml = {
-  finalUrl: URL;
-  html: string;
-};
+export { FetchedLinkPreviewHtml } from './fetching/FetchedLinkPreviewHtml';
 
 export class LinkPreviewHttpFetcher {
   private static readonly MAX_REDIRECTS = 5;

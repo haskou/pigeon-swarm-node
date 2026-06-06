@@ -1,7 +1,6 @@
-export type CallSignalRateBucket = {
-  count: number;
-  resetAt: number;
-};
+import { CallSignalRateBucket } from './CallSignalRateBucket';
+
+export { CallSignalRateBucket } from './CallSignalRateBucket';
 
 export class CallSignalRatePolicy {
   public static readonly DEFAULT_LIMIT_PER_MINUTE = 120;

@@ -1,7 +1,4 @@
-export type LinkPreviewRateBucket = {
-  count: number;
-  resetAt: number;
-};
+export { LinkPreviewRateBucket } from './rate-limits/LinkPreviewRateBucket';
 
 export class LinkPreviewRatePolicy {
   public static readonly DEFAULT_LIMIT_PER_MINUTE = 30;

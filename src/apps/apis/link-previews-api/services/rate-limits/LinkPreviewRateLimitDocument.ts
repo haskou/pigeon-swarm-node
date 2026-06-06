@@ -1,4 +1,4 @@
-import { LinkPreviewRateBucket } from '../LinkPreviewRatePolicy';
+import { LinkPreviewRateBucket } from './LinkPreviewRateBucket';
 
 export type LinkPreviewRateLimitDocument = LinkPreviewRateBucket & {
   _id: string;
