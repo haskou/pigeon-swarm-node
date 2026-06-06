@@ -22,33 +22,15 @@ import { MessageEdited } from './MessageEdited';
 import { MessageFactory } from './MessageFactory';
 import { MessagePoll } from './MessagePoll';
 import { MessageSent } from './MessageSent';
-import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
+import { MessageEditOptions } from './types/MessageEditOptions';
+import { MessagePollOptions } from './types/MessagePollOptions';
+import { MessageSendOptions } from './types/MessageSendOptions';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { GroupConversationName } from './value-objects/GroupConversationName';
 import { MessageId } from './value-objects/MessageId';
 import { MessageType } from './value-objects/MessageType';
-
-type MessageSendOptions = {
-  attachmentExternalIdentifiers?: AttachmentExternalIdentifier[];
-  createdAt?: Timestamp;
-  id?: MessageId;
-  previousMessageIds?: MessageId[];
-  replyToMessageId?: MessageId;
-};
-
-type MessageEditOptions = {
-  createdAt?: Timestamp;
-  id?: MessageId;
-  previousMessageIds?: MessageId[];
-};
-
-type MessagePollOptions = {
-  createdAt?: Timestamp;
-  id?: MessageId;
-  previousMessageIds?: MessageId[];
-};
 
 export class Conversation extends AggregateRoot {
   public static fromPrimitives(

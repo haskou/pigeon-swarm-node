@@ -1,4 +1,4 @@
-import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/CommunityChannelMessage';
+import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
 
 const communityChannelMessagePrimitiveKeys = [
   'attachmentExternalIdentifiers',
