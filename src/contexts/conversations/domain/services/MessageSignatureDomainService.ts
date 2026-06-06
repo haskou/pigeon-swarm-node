@@ -2,17 +2,13 @@ import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
   assert,
   EncryptedKeyPair,
-  PrimitiveOf,
   PublicKey,
   Signature,
 } from '@haskou/value-objects';
 
 import { InvalidMessageSignatureError } from '../errors/InvalidMessageSignatureError';
 import { Message } from '../Message';
-
-type MessageSignaturePayload = Omit<PrimitiveOf<Message>, 'signature'> & {
-  encryptedPayload?: string;
-};
+import { MessageSignaturePayload } from '../types/MessageSignaturePayload';
 
 export class MessageSignatureDomainService {
   private getCanonicalPayload(
@@ -59,7 +55,7 @@ export class MessageSignatureDomainService {
     assert(
       this.isValidSignature(
         message.getAuthorId(),
-        message.toPrimitives(),
+        message.toSignaturePayload(),
         message.getSignature(),
       ),
       new InvalidMessageSignatureError(),
