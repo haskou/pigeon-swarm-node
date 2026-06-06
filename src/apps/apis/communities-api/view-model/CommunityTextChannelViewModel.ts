@@ -1,6 +1,6 @@
 import { CommunityTextChannel } from '@app/contexts/communities/domain/CommunityTextChannel';
 
-import { CommunityTextChannelResource } from '../resources/CommunityResource';
+import { CommunityTextChannelResource } from '../resources/CommunityTextChannelResource';
 
 export class CommunityTextChannelViewModel {
   constructor(private readonly channel: CommunityTextChannel) {}

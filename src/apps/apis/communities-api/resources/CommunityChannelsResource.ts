@@ -1,7 +1,5 @@
-import {
-  CommunityTextChannelResource,
-  CommunityVoiceChannelResource,
-} from './CommunityResource';
+import { CommunityTextChannelResource } from './CommunityTextChannelResource';
+import { CommunityVoiceChannelResource } from './CommunityVoiceChannelResource';
 
 export type CommunityChannelResource =
   | CommunityTextChannelResource
