@@ -1,5 +1,6 @@
-import { PublicKey, Signature } from '@haskou/value-objects';
+import { assert, PublicKey, Signature } from '@haskou/value-objects';
 
+import { InvalidCommunityChannelMessageSignatureError } from '../errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageDeletionSignaturePayload } from './types/CommunityChannelMessageDeletionSignaturePayload';
 import { CommunityChannelMessageEditionSignaturePayload } from './types/CommunityChannelMessageEditionSignaturePayload';
 import { CommunityChannelMessageSignaturePayload } from './types/CommunityChannelMessageSignaturePayload';
@@ -134,6 +135,17 @@ export class CommunityChannelMessageSignatureDomainService {
   ): boolean {
     return this.getCompatiblePayloads(payload).some((compatiblePayload) =>
       publicKey.isValidSignature(JSON.stringify(compatiblePayload), signature),
+    );
+  }
+
+  public assertValidSignature(
+    publicKey: PublicKey,
+    payload: CommunityChannelSignaturePayload,
+    signature: Signature,
+  ): void {
+    assert(
+      this.isValidSignature(publicKey, payload, signature),
+      new InvalidCommunityChannelMessageSignatureError(),
     );
   }
 }

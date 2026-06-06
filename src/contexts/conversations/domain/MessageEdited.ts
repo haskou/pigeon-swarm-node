@@ -3,6 +3,7 @@ import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
+import { MessageSignaturePayload } from './types/MessageSignaturePayload';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
@@ -72,6 +73,13 @@ export class MessageEdited extends Message {
   public toPrimitives() {
     return {
       ...super.toPrimitives(),
+      encryptedPayload: this.encryptedPayload.valueOf(),
+    };
+  }
+
+  public toSignaturePayload(): MessageSignaturePayload {
+    return {
+      ...super.toSignaturePayload(),
       encryptedPayload: this.encryptedPayload.valueOf(),
     };
   }

@@ -1,6 +1,5 @@
 import { DeleteCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityChannelMessageBody';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
-import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
@@ -9,7 +8,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { assert, PublicKey, Signature } from '@haskou/value-objects';
+import { assert, Signature } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -54,8 +53,8 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
       communityChannelId,
     );
 
-    const isValidSignature = this.signatureService.isValidSignature(
-      PublicKey.fromPEM(actorIdentityId.toString()),
+    this.signatureService.assertValidSignature(
+      actorIdentityId,
       {
         actorIdentityId: actorIdentityId.valueOf(),
         channelId,
@@ -67,10 +66,6 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
       },
       new Signature(body.signature),
     );
-
-    if (!isValidSignature) {
-      throw new InvalidCommunityChannelMessageSignatureError();
-    }
 
     await this.messageRepository().delete(
       new CommunityId(communityId),

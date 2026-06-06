@@ -1,6 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Signature } from '@haskou/value-objects';
 
 import { MessageMetadata } from './MessageMetadata';
+import { MessageSignaturePayload } from './types/MessageSignaturePayload';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageId } from './value-objects/MessageId';
@@ -45,6 +47,25 @@ export abstract class Message {
     };
   }
 
+  protected baseSignaturePayload(): Omit<
+    MessageSignaturePayload,
+    'encryptedPayload' | 'targetMessageId' | 'type'
+  > {
+    return {
+      attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
+        (externalIdentifier) => externalIdentifier.valueOf(),
+      ),
+      authorId: this.metadata.getAuthorId().valueOf(),
+      conversationId: this.metadata.getConversationId().valueOf(),
+      createdAt: this.metadata.getCreatedAt().valueOf(),
+      id: this.metadata.getId().valueOf(),
+      previousMessageIds: this.metadata
+        .getPreviousMessageIds()
+        .map((messageId) => messageId.valueOf()),
+      replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
+    };
+  }
+
   public getId(): MessageId {
     return this.metadata.getId();
   }
@@ -55,6 +76,10 @@ export abstract class Message {
 
   public getAuthorId(): IdentityId {
     return this.metadata.getAuthorId();
+  }
+
+  public getSignature(): Signature {
+    return this.metadata.getSignature();
   }
 
   public abstract getType(): MessageType;
@@ -74,6 +99,14 @@ export abstract class Message {
   public toPrimitives() {
     return {
       ...this.basePrimitives(),
+      targetMessageId: this.getTargetMessageId()?.valueOf(),
+      type: this.getType().valueOf(),
+    };
+  }
+
+  public toSignaturePayload(): MessageSignaturePayload {
+    return {
+      ...this.baseSignaturePayload(),
       targetMessageId: this.getTargetMessageId()?.valueOf(),
       type: this.getType().valueOf(),
     };

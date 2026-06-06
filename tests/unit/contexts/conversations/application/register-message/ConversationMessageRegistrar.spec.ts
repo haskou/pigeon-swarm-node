@@ -50,7 +50,6 @@ describe('ConversationMessageRegistrar', () => {
 
     repository.findById.mockResolvedValue(conversation);
     repository.findCandidateMessageById.mockResolvedValue(candidate);
-    signatureService.isValidSignature.mockReturnValue(true);
 
     await registrar.register(
       new RegisterConversationMessage(
@@ -59,7 +58,9 @@ describe('ConversationMessageRegistrar', () => {
       ),
     );
 
-    expect(signatureService.isValidSignature).toHaveBeenCalledTimes(1);
+    expect(signatureService.assertValidMessageSignature).toHaveBeenCalledWith(
+      candidate,
+    );
     expect(repository.save).toHaveBeenCalledWith(conversation);
     expect(repository.registerUnreadForMessage).toHaveBeenCalledWith(
       conversation,
@@ -77,7 +78,6 @@ describe('ConversationMessageRegistrar', () => {
     conversation.registerMessage(candidate);
     repository.findById.mockResolvedValue(conversation);
     repository.findCandidateMessageById.mockResolvedValue(candidate);
-    signatureService.isValidSignature.mockReturnValue(true);
 
     await registrar.register(
       new RegisterConversationMessage(
@@ -86,6 +86,9 @@ describe('ConversationMessageRegistrar', () => {
       ),
     );
 
+    expect(signatureService.assertValidMessageSignature).toHaveBeenCalledWith(
+      candidate,
+    );
     expect(repository.save).toHaveBeenCalledWith(conversation);
     expect(repository.registerUnreadForMessage).not.toHaveBeenCalled();
     expect(conversation.toPrimitives().messages).toHaveLength(1);
@@ -109,7 +112,7 @@ describe('ConversationMessageRegistrar', () => {
       ),
     ).rejects.toThrow(RemoteMessageCandidateMismatchError);
 
-    expect(signatureService.isValidSignature).not.toHaveBeenCalled();
+    expect(signatureService.assertValidMessageSignature).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
   });
 
@@ -134,7 +137,7 @@ describe('ConversationMessageRegistrar', () => {
       ),
     ).rejects.toThrow(RemoteMessageCandidateMismatchError);
 
-    expect(signatureService.isValidSignature).not.toHaveBeenCalled();
+    expect(signatureService.assertValidMessageSignature).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
   });
 
@@ -146,7 +149,9 @@ describe('ConversationMessageRegistrar', () => {
 
     repository.findById.mockResolvedValue(conversation);
     repository.findCandidateMessageById.mockResolvedValue(candidate);
-    signatureService.isValidSignature.mockReturnValue(false);
+    signatureService.assertValidMessageSignature.mockImplementation(() => {
+      throw new InvalidMessageSignatureError();
+    });
 
     await expect(
       registrar.register(
@@ -177,7 +182,6 @@ describe('ConversationMessageRegistrar', () => {
 
     repository.findById.mockResolvedValue(conversation);
     repository.findCandidateMessageById.mockResolvedValue(candidate);
-    signatureService.isValidSignature.mockReturnValue(true);
 
     await expect(
       registrar.register(
