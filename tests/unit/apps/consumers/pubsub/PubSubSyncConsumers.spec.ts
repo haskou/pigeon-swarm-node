@@ -439,16 +439,27 @@ describe('PubSub sync consumers', () => {
   it('registers valid messages announced by conversation sync responses', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
     const reactionRegistrar = mock<MessageReactionRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
     const consumer = new RegisterMessagesWhenSyncAvailable(
       eventConsumer,
       registrar,
       reactionRegistrar,
+      conversationRegistrar,
       suppressionTracker,
     );
 
     await consumer.handler(
       new ConversationSyncAvailableEvent(conversationId, {
         messageCandidates: [{ messageId }, { messageId: 42 }, null],
+        conversation: {
+          id: conversationId,
+          networkId: '550e8400-e29b-41d4-a716-446655440011',
+          participantIds: [
+            'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+            'MCowBQYDK2VwAyEA2+5oVbSUaiTZLcwruvmBmtHLgo+LVCmaw4kG9AQPx20=',
+          ],
+          type: 'one-to-one',
+        },
       }),
     );
 
@@ -464,16 +475,75 @@ describe('PubSub sync consumers', () => {
     expect(registrar.register.mock.calls[0][0].messageId.valueOf()).toBe(
       messageId,
     );
+    expect(conversationRegistrar.register).toHaveBeenCalledTimes(1);
+    expect(conversationRegistrar.register).toHaveBeenCalledWith(
+      expect.any(RegisterConversationMetadataMessage),
+    );
+    expect(
+      conversationRegistrar.register.mock.calls[0][0].conversationId.valueOf(),
+    ).toBe(conversationId);
     expect(reactionRegistrar.register).not.toHaveBeenCalled();
+  });
+
+  it('registers embedded message candidates announced by conversation sync responses', async () => {
+    const registrar = mock<ConversationMessageRegistrar>();
+    const reactionRegistrar = mock<MessageReactionRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
+    const consumer = new RegisterMessagesWhenSyncAvailable(
+      eventConsumer,
+      registrar,
+      reactionRegistrar,
+      conversationRegistrar,
+      suppressionTracker,
+    );
+    const authorId =
+      'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+
+    await consumer.handler(
+      new ConversationSyncAvailableEvent(conversationId, {
+        conversation: {
+          id: conversationId,
+          networkId: '550e8400-e29b-41d4-a716-446655440011',
+          participantIds: [authorId],
+          type: 'one-to-one',
+        },
+        messageCandidates: [
+          {
+            message: {
+              attachmentExternalIdentifiers: [],
+              authorId,
+              conversationId,
+              createdAt: 1778513696020,
+              encryptedPayload: 'encrypted-message-payload',
+              id: messageId,
+              previousMessageIds: [],
+              signature:
+                'J3F0mR6aZyVIC3THJwTGQ4cV7wb3PWyfzv/dbqydslhDpb6dApp8kiTD8lB8gFkcXTKTO/rMP44jXWhfpaGCDw==',
+              type: 'sent',
+            },
+            messageId,
+          },
+        ],
+      }),
+    );
+
+    expect(registrar.register).not.toHaveBeenCalled();
+    expect(registrar.registerCandidate).toHaveBeenCalledTimes(1);
+    expect(registrar.registerCandidate).toHaveBeenCalledWith(
+      expect.any(RegisterConversationMessage),
+      expect.any(MessageSent),
+    );
   });
 
   it('registers valid reactions announced by conversation sync responses', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
     const reactionRegistrar = mock<MessageReactionRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
     const consumer = new RegisterMessagesWhenSyncAvailable(
       eventConsumer,
       registrar,
       reactionRegistrar,
+      conversationRegistrar,
       suppressionTracker,
     );
 

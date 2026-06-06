@@ -149,6 +149,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
       this.eventConsumer(),
       this.fakeUseCase<ConversationMessageRegistrar>('register'),
       this.fakeUseCase<MessageReactionRegistrar>('register'),
+      this.fakeUseCase<ConversationRegistrar>('register'),
       this.suppressionTracker as unknown as SyncResponseSuppressionTracker,
     );
 

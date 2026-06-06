@@ -108,6 +108,29 @@ async function main(): Promise<void> {
     await nodeBMessages;
     await waitForMessage(nodeB, nodeBIdentity, conversation.id, messageFromA.id);
 
+    await stopNode(nodeB);
+    const offlineMessageFromA = await sendConversationMessage(
+      nodeA,
+      nodeAIdentity,
+      conversation.id,
+      [messageFromA.id],
+      'node-a-offline-message-payload',
+    );
+
+    await startNode(nodeB, mongo.getUri());
+    await waitForMessage(
+      nodeB,
+      nodeBIdentity,
+      conversation.id,
+      offlineMessageFromA.id,
+    );
+    await waitForConversationTimeline(
+      nodeB,
+      nodeBIdentity,
+      conversation.id,
+      [messageFromA.id, offlineMessageFromA.id],
+    );
+
     const nodeAMessages = listenForDomainEvents(
       nodeA,
       nodeAIdentity,
@@ -118,7 +141,7 @@ async function main(): Promise<void> {
       nodeB,
       nodeBIdentity,
       conversation.id,
-      [messageFromA.id],
+      [offlineMessageFromA.id],
       'node-b-reply-payload',
     );
     await nodeAMessages;
@@ -127,13 +150,13 @@ async function main(): Promise<void> {
       nodeA,
       nodeAIdentity,
       conversation.id,
-      [messageFromA.id, messageFromB.id],
+      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
     );
     await waitForConversationTimeline(
       nodeB,
       nodeBIdentity,
       conversation.id,
-      [messageFromA.id, messageFromB.id],
+      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
     );
 
     console.info(
@@ -141,6 +164,7 @@ async function main(): Promise<void> {
         {
           conversationId: conversation.id,
           messageFromA: messageFromA.id,
+          offlineMessageFromA: offlineMessageFromA.id,
           messageFromB: messageFromB.id,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
