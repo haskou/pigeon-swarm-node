@@ -1,14 +1,8 @@
-export interface MongoFavoriteStickerDocument {
-  favoritedAt: number;
-  packId: string;
-  stickerId: string;
-}
+import { MongoFavoriteStickerDocument } from './MongoFavoriteStickerDocument';
+import { MongoRecentStickerDocument } from './MongoRecentStickerDocument';
 
-export interface MongoRecentStickerDocument {
-  packId: string;
-  stickerId: string;
-  usedAt: number;
-}
+export { MongoFavoriteStickerDocument } from './MongoFavoriteStickerDocument';
+export { MongoRecentStickerDocument } from './MongoRecentStickerDocument';
 
 export interface MongoStickerUserLibraryDocument {
   _id: string;

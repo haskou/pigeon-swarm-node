@@ -1,4 +1,4 @@
-import { IPFSContentReplicationPriorityValue } from '../../../domain/value-objects/IPFSContentReplicationPriority';
+import { PriorityValue } from '../../../domain/value-objects/types/PriorityValue';
 
 export interface MongoIPFSContentReplicationDocument {
   _id: string;
@@ -8,7 +8,7 @@ export interface MongoIPFSContentReplicationDocument {
   filename?: string;
   networkIds: string[];
   ownerIdentityId?: string;
-  priority: IPFSContentReplicationPriorityValue;
+  priority: PriorityValue;
   sizeBytes: number;
   updatedAt: number;
 }

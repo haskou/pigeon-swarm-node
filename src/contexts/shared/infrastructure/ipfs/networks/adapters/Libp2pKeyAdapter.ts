@@ -1,7 +1,8 @@
 import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 
-export type Libp2pPrivateKeyLike = Libp2pPrivateKey;
-type Libp2pKeysModule = typeof import('@libp2p/crypto/keys');
+import { Libp2pKeysModule } from './types/Libp2pKeysModule';
+
+export { Libp2pPrivateKeyLike } from './types/Libp2pPrivateKeyLike';
 
 export class Libp2pKeyAdapter {
   private keysModulePromise?: Promise<Libp2pKeysModule>;

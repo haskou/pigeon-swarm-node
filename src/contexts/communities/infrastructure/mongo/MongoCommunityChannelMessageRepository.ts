@@ -5,23 +5,10 @@ import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelI
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { MongoCommunityChannelMessageDocument } from './documents/MongoCommunityChannelMessageDocument';
+import { CommunityChannelThreadSummary } from './types/CommunityChannelThreadSummary';
+import { CommunityChannelThreadSummaryDocument } from './types/CommunityChannelThreadSummaryDocument';
 
-export interface CommunityChannelThreadSummary {
-  lastReplyAt: number;
-  lastReplyMessageId: string;
-  replyCount: number;
-  rootMessageId: string;
-}
-
-interface CommunityChannelThreadSummaryDocument {
-  _id: {
-    channelId: string;
-    rootMessageId: string;
-  };
-  lastReplyAt: number;
-  lastReplyMessageId: string;
-  replyCount: number;
-}
+export { CommunityChannelThreadSummary } from './types/CommunityChannelThreadSummary';
 
 export class MongoCommunityChannelMessageRepository {
   private static readonly COLLECTION = 'community_channel_messages';

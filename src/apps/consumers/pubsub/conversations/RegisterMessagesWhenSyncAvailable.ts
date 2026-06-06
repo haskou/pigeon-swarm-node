@@ -13,25 +13,9 @@ import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 import { PrimitiveOf } from '@haskou/value-objects';
 
-type MessageCandidate = {
-  message?: unknown;
-  messageId: string;
-};
-
-type ConversationCandidate = {
-  id: string;
-  name?: string;
-  networkId: string;
-  participantIds: string[];
-  type: string;
-};
-
-type ReactionCandidate = {
-  authorId: string;
-  createdAt: number;
-  emoji: string;
-  messageId: string;
-};
+import { ConversationCandidate } from './types/ConversationCandidate';
+import { MessageCandidate } from './types/MessageCandidate';
+import { ReactionCandidate } from './types/ReactionCandidate';
 
 export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   public static QUEUE_NAME =

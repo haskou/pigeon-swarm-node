@@ -8,12 +8,13 @@ import {
 } from '@haskou/value-objects';
 
 import { KeychainWasPublishedEvent } from './events/KeychainWasPublishedEvent';
+import { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
 import { EncryptedKeychainPayload } from './value-objects/EncryptedKeychainPayload';
 import { KeychainExternalIdentifier } from './value-objects/KeychainExternalIdentifier';
 import { KeychainVersion } from './value-objects/KeychainVersion';
 
 type PreviousReference = KeychainExternalIdentifier;
-export type KeychainSignaturePayload = Omit<PrimitiveOf<Keychain>, 'signature'>;
+export { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
 
 export class Keychain extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Keychain>): Keychain {
