@@ -1,0 +1,31 @@
+name: Request Pigeon Swarm Docker image
+
+on:
+  workflow_run:
+    workflows: ["Node.js CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch Docker image publish
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Request image publish
+        env:
+          GH_TOKEN: ${{ secrets.PIGEON_SWARM_DISPATCH_TOKEN }}
+        run: |
+          gh api --method POST repos/haskou/pigeon-swarm/dispatches \
+            -f event_type=source-published
