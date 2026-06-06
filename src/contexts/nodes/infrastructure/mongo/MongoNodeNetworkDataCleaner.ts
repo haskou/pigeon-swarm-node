@@ -1,6 +1,5 @@
 import { MongoCallDocument } from '@app/contexts/calls/infrastructure/mongo/documents/MongoCallDocument';
 import { MongoCommunityChannelMessageDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityChannelMessageDocument';
-import { MongoCommunityChannelMessageReactionDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityChannelMessageReactionDocument';
 import { MongoCommunityDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityDocument';
 import { MongoCommunityInviteDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityInviteDocument';
 import { MongoCommunityModerationLogDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityModerationLogDocument';
@@ -21,10 +20,9 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { NodeNetworkDataCleaner } from '../../domain/services/NodeNetworkDataCleaner';
-
-type CommunityIdentifier = Pick<MongoCommunityDocument, '_id'>;
-type CommunityReactionDocument = MongoCommunityChannelMessageReactionDocument;
-type ConversationIdentifier = Pick<MongoConversationDocument, '_id'>;
+import { CommunityIdentifier } from './types/CommunityIdentifier';
+import { CommunityReactionDocument } from './types/CommunityReactionDocument';
+import { ConversationIdentifier } from './types/ConversationIdentifier';
 
 export class MongoNodeNetworkDataCleaner implements NodeNetworkDataCleaner {
   private static readonly CALLS = 'calls';

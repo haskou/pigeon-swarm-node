@@ -12,10 +12,11 @@ import heliaRuntimeAdapter, {
   HeliaLibp2pConfig,
   ParsedCidLike,
 } from './adapters/HeliaRuntimeAdapter';
-import { HeliaIPFSParser, ParsedHeliaIPFSOptions } from './HeliaIPFSParser';
+import { HeliaIPFSParser } from './HeliaIPFSParser';
 import HeliaPinningStrategy from './HeliaPinningStrategy';
 import { IPFSConnection, IPFSOptions } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
+import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly RAW_CODEC_CODE = 0x55;
