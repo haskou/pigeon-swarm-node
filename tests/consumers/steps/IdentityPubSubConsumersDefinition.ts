@@ -8,6 +8,7 @@ import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/even
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
@@ -49,6 +50,7 @@ export default class IdentityPubSubConsumersDefinition extends PubSubConsumerTes
     const consumer = new RegisterIdentityWhenSyncAvailable(
       this.eventConsumer(),
       this.fakeUseCase<IdentityCandidateRegistrar>('register'),
+      this.fakeUseCase<DomainEventPublisher>('publish'),
       this.suppressionTracker as unknown as SyncResponseSuppressionTracker,
     );
 
@@ -82,9 +84,15 @@ export default class IdentityPubSubConsumersDefinition extends PubSubConsumerTes
 
   @then('the identity candidate registrar should receive the external identifier')
   public identityCandidateRegistrarShouldReceiveTheExternalIdentifier(): void {
-    const message = this.lastMessage<{
+    const registerCall = this.calls.find((call) => call.method === 'register');
+
+    if (!registerCall) {
+      throw new Error('Expected identity candidate registrar call.');
+    }
+
+    const message = registerCall.message as {
       externalIdentifier: { valueOf(): string };
-    }>();
+    };
 
     expect(message.externalIdentifier.valueOf()).to.equal(
       this.externalIdentifier,
