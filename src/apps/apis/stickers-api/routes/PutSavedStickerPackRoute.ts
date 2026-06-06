@@ -18,6 +18,7 @@ export class PutSavedStickerPackRoute extends StickerRouteSupport {
     const library = await new StickerPackSaver(
       this.packRepository(),
       this.libraryRepository(),
+      this.eventPublisher,
     ).save(new StickerPackSaveMessage(identityId.valueOf(), packId));
 
     return response

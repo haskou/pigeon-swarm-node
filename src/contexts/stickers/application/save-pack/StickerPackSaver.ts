@@ -1,23 +1,32 @@
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
 import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerPackSaveMessage } from './messages/StickerPackSaveMessage';
+import { StickerUserLibraryLookup } from './types/StickerUserLibraryLookup';
 
 export class StickerPackSaver {
   constructor(
     private readonly packRepository: StickerPackRepository,
     private readonly libraryRepository: StickerUserLibraryRepository,
+    private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
   private async findLibrary(
     message: StickerPackSaveMessage,
-  ): Promise<StickerUserLibrary> {
+  ): Promise<StickerUserLibraryLookup> {
     const library = await this.libraryRepository.findByIdentityId(
       message.identityId,
     );
 
-    return library ?? StickerUserLibrary.create(message.identityId);
+    return library
+      ? { created: false, library }
+      : {
+          created: true,
+          library: StickerUserLibrary.create(message.identityId),
+        };
   }
 
   public async save(
@@ -29,11 +38,15 @@ export class StickerPackSaver {
       throw new StickerPackNotFoundError();
     }
 
-    const library = await this.findLibrary(message);
+    const lookup = await this.findLibrary(message);
+    const { library } = lookup;
 
     library.savePack(message.packId);
 
     await this.libraryRepository.save(library);
+    await this.eventPublisher.publish(
+      lookup.created ? library.pullDomainEvents() : [],
+    );
 
     return library;
   }

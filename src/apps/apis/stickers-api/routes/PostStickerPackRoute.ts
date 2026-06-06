@@ -20,6 +20,7 @@ export class PostStickerPackRoute extends StickerRouteSupport {
     const pack = await new StickerPackCreator(
       this.packRepository(),
       this.libraryRepository(),
+      this.eventPublisher,
     ).create(
       new StickerPackCreateMessage(ownerIdentityId.valueOf(), body.name),
     );

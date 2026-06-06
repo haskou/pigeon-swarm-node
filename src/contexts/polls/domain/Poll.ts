@@ -6,11 +6,13 @@ import { PollAlreadyClosedError } from './errors/PollAlreadyClosedError';
 import { PollDuplicateOptionVoteError } from './errors/PollDuplicateOptionVoteError';
 import { PollMultipleVotesNotAllowedError } from './errors/PollMultipleVotesNotAllowedError';
 import { PollOptionNotFoundError } from './errors/PollOptionNotFoundError';
+import { PollWasCreatedEvent } from './events/PollWasCreatedEvent';
 import { PollContent } from './PollContent';
 import { PollLifecycle } from './PollLifecycle';
 import { PollOption } from './PollOption';
 import { PollScope } from './PollScope';
 import { PollVote } from './PollVote';
+import { PollCreationRecipients } from './types/PollCreationRecipients';
 import { PollId } from './value-objects/PollId';
 import { PollOptionId } from './value-objects/PollOptionId';
 import { PollQuestion } from './value-objects/PollQuestion';
@@ -23,8 +25,9 @@ export class Poll extends AggregateRoot {
     options: PollOption[],
     allowsMultipleVotes: boolean,
     expiresAt?: Timestamp,
+    recipients: PollCreationRecipients = {},
   ): Poll {
-    return new Poll(
+    const poll = new Poll(
       PollId.generate(),
       creatorIdentityId,
       scope,
@@ -33,6 +36,17 @@ export class Poll extends AggregateRoot {
       PollLifecycle.open(expiresAt),
       [],
     );
+    const primitives = poll.toPrimitives();
+
+    poll.record(
+      new PollWasCreatedEvent(scope.aggregateId(), {
+        ...recipients,
+        poll: primitives,
+        pollId: primitives.id,
+      }),
+    );
+
+    return poll;
   }
 
   public static fromPrimitives(primitives: PrimitiveOf<Poll>): Poll {

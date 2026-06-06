@@ -107,9 +107,14 @@ package "stickers/domain" {
     + save(library): void
   }
 
+  class StickerPackWasCreatedEvent <<DomainEvent>>
+  class StickerUserLibraryWasCreatedEvent <<DomainEvent>>
+
   StickerPack *-- Sticker
   Sticker *-- StickerDetails
   StickerUserLibrary *-- StickerReference
+  StickerPack ..> StickerPackWasCreatedEvent
+  StickerUserLibrary ..> StickerUserLibraryWasCreatedEvent
   StickerPackRepository ..> StickerPack
   StickerUserLibraryRepository ..> StickerUserLibrary
 }

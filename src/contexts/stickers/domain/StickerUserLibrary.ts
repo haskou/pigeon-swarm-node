@@ -2,6 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { StickerUserLibraryWasCreatedEvent } from './events/StickerUserLibraryWasCreatedEvent';
 import { StickerReference } from './StickerReference';
 import { StickerId } from './value-objects/StickerId';
 import { StickerPackId } from './value-objects/StickerPackId';
@@ -10,7 +11,17 @@ export class StickerUserLibrary extends AggregateRoot {
   private static readonly MAX_RECENT_STICKERS = 10;
 
   public static create(identityId: IdentityId): StickerUserLibrary {
-    return new StickerUserLibrary(identityId, [], [], []);
+    const library = new StickerUserLibrary(identityId, [], [], []);
+    const primitives = library.toPrimitives();
+
+    library.record(
+      new StickerUserLibraryWasCreatedEvent(identityId.valueOf(), {
+        identityId: primitives.identityId,
+        library: primitives,
+      }),
+    );
+
+    return library;
   }
 
   public static fromPrimitives(

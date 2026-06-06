@@ -4,6 +4,7 @@ import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { StickerNotFoundError } from './errors/StickerNotFoundError';
 import { StickerPackOwnerMismatchError } from './errors/StickerPackOwnerMismatchError';
+import { StickerPackWasCreatedEvent } from './events/StickerPackWasCreatedEvent';
 import { Sticker } from './Sticker';
 import { StickerDetails } from './StickerDetails';
 import { StickerId } from './value-objects/StickerId';
@@ -15,7 +16,7 @@ export class StickerPack extends AggregateRoot {
     ownerIdentityId: IdentityId,
     name: StickerPackName,
   ): StickerPack {
-    return new StickerPack(
+    const pack = new StickerPack(
       StickerPackId.generate(),
       ownerIdentityId,
       name,
@@ -23,6 +24,18 @@ export class StickerPack extends AggregateRoot {
       Timestamp.now(),
       Timestamp.now(),
     );
+
+    const primitives = pack.toPrimitives();
+
+    pack.record(
+      new StickerPackWasCreatedEvent(pack.id.valueOf(), {
+        ownerIdentityId: primitives.ownerIdentityId,
+        pack: primitives,
+        packId: primitives.id,
+      }),
+    );
+
+    return pack;
   }
 
   public static fromPrimitives(
