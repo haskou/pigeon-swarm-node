@@ -3,6 +3,11 @@ import { CommunityRoleResource } from './CommunityRoleResource';
 import { CommunityTextChannelResource } from './CommunityTextChannelResource';
 import { CommunityVoiceChannelResource } from './CommunityVoiceChannelResource';
 
+export { CommunityMemberRolesResource } from './CommunityMemberRolesResource';
+export { CommunityRoleResource } from './CommunityRoleResource';
+export { CommunityTextChannelResource } from './CommunityTextChannelResource';
+export { CommunityVoiceChannelResource } from './CommunityVoiceChannelResource';
+
 export interface CommunityResource {
   autoJoinEnabled: boolean;
   avatar?: string;
