@@ -3,21 +3,13 @@ import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
+import { MessageEditedCreateData } from './types/MessageEditedCreateData';
 import { MessageSignaturePayload } from './types/MessageSignaturePayload';
 import { ConversationId } from './value-objects/ConversationId';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { MessageId } from './value-objects/MessageId';
 
-export type MessageEditedCreateData = {
-  authorId: IdentityId;
-  conversationId: ConversationId;
-  createdAt?: Timestamp;
-  encryptedPayload: EncryptedMessagePayload;
-  id?: MessageId;
-  previousMessageIds?: MessageId[];
-  signature: Signature;
-  targetMessageId: MessageId;
-};
+export { MessageEditedCreateData } from './types/MessageEditedCreateData';
 
 export class MessageEdited extends Message {
   public static create(data: MessageEditedCreateData): MessageEdited {

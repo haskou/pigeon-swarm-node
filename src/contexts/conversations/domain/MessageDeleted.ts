@@ -3,18 +3,11 @@ import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
+import { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
 import { ConversationId } from './value-objects/ConversationId';
 import { MessageId } from './value-objects/MessageId';
 
-export type MessageDeletedCreateData = {
-  authorId: IdentityId;
-  conversationId: ConversationId;
-  createdAt?: Timestamp;
-  id?: MessageId;
-  previousMessageIds?: MessageId[];
-  signature: Signature;
-  targetMessageId: MessageId;
-};
+export { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
 
 export class MessageDeleted extends Message {
   public static create(data: MessageDeletedCreateData): MessageDeleted {
