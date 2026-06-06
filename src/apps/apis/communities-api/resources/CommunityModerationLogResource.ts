@@ -1,14 +1,7 @@
-export interface CommunityModerationLogTargetResource {
-  id: string;
-  type:
-    | 'channel'
-    | 'community'
-    | 'invite'
-    | 'member'
-    | 'membership_request'
-    | 'message'
-    | 'role';
-}
+import { CommunityModerationLogTargetResource } from './CommunityModerationLogTargetResource';
+
+export { CommunityModerationLogTargetResource } from './CommunityModerationLogTargetResource';
+export { CommunityModerationLogsResource } from './CommunityModerationLogsResource';
 
 export interface CommunityModerationLogResource {
   action:
@@ -34,9 +27,4 @@ export interface CommunityModerationLogResource {
   details: Record<string, unknown>;
   id: string;
   target: CommunityModerationLogTargetResource;
-}
-
-export interface CommunityModerationLogsResource {
-  logs: CommunityModerationLogResource[];
-  nextBeforeLogId?: string;
 }

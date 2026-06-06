@@ -5,12 +5,8 @@ import {
   CallIceServerResource,
   CallIceServersResource,
 } from './resources/CallIceServersResource';
-
-type Environment = NodeJS.ProcessEnv;
-type TurnCredentials = {
-  credential?: string;
-  username?: string;
-};
+import { CallIceServerEnvironment } from './types/CallIceServerEnvironment';
+import { TurnCredentials } from './types/TurnCredentials';
 
 export class CallIceServerConfig {
   private static readonly DEFAULT_CREDENTIAL_TTL_SECONDS = 3600;
@@ -40,7 +36,7 @@ export class CallIceServerConfig {
   }
 
   public static fromEnvironment(
-    environment: Environment = process.env,
+    environment: CallIceServerEnvironment = process.env,
   ): CallIceServerConfig {
     return new CallIceServerConfig(
       this.splitEnvironmentList(environment.CALLS_TURN_URLS),
