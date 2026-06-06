@@ -15,22 +15,24 @@ import NodeStartupSyncReadiness from './NodeStartupSyncReadiness';
 export function createNodeStartupSynchronizer(): NodeStartupSynchronizer {
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
 
-  return new NodeStartupSynchronizer(
-    Kernel.di.getService<NodeLoader>(NodeLoader),
-    new NodeStartupSyncReadiness(
+  return new NodeStartupSynchronizer({
+    communityRepository: new MongoCommunityRepository(mongo),
+    conversationRepository: Kernel.di.getService<MongoConversationRepository>(
+      MongoConversationRepository,
+    ),
+    eventPublisher: Kernel.di.getService<MessageBus>(MessageBus),
+    identityMetadataRepository:
+      Kernel.di.getService<MongoIdentityMetadataRepository>(
+        MongoIdentityMetadataRepository,
+      ),
+    keychainMetadataRepository:
+      Kernel.di.getService<MongoKeychainMetadataRepository>(
+        MongoKeychainMetadataRepository,
+      ),
+    nodeLoader: Kernel.di.getService<NodeLoader>(NodeLoader),
+    readiness: new NodeStartupSyncReadiness(
       Kernel.di.getService<NodeHeartbeatSender>(NodeHeartbeatSender),
       Kernel.di.getService<IPFS>(IPFS),
     ),
-    Kernel.di.getService<MongoIdentityMetadataRepository>(
-      MongoIdentityMetadataRepository,
-    ),
-    Kernel.di.getService<MongoKeychainMetadataRepository>(
-      MongoKeychainMetadataRepository,
-    ),
-    Kernel.di.getService<MongoConversationRepository>(
-      MongoConversationRepository,
-    ),
-    new MongoCommunityRepository(mongo),
-    Kernel.di.getService<MessageBus>(MessageBus),
-  );
+  });
 }

@@ -1,4 +1,5 @@
 import NodeStartupSynchronizer from '@app/apps/synchronizers/NodeStartupSynchronizer';
+import NodeStartupSyncPolicy from '@app/apps/synchronizers/NodeStartupSyncPolicy';
 import NodeStartupSyncReadiness from '@app/apps/synchronizers/NodeStartupSyncReadiness';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
@@ -55,15 +56,15 @@ describe('NodeStartupSynchronizer', () => {
         ]),
       ),
     );
-    synchronizer = new NodeStartupSynchronizer(
-      nodeLoader,
-      readiness,
+    synchronizer = new NodeStartupSynchronizer({
+      communityRepository,
+      conversationRepository,
+      eventPublisher,
       identityMetadataRepository,
       keychainMetadataRepository,
-      conversationRepository,
-      communityRepository,
-      eventPublisher,
-    );
+      nodeLoader,
+      readiness,
+    });
   });
 
   it('should prepare and publish scoped startup sync requests', async () => {
@@ -110,9 +111,9 @@ describe('NodeStartupSynchronizer', () => {
 
     expect(readiness.prepare).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
+      communityRequests: 0,
       connectedPeerCount: 2,
       conversationRequests: 1,
-      communityRequests: 0,
       identityNetworkRequests: 1,
       identityRequests: 1,
       keychainRequests: 1,
@@ -162,8 +163,8 @@ describe('NodeStartupSynchronizer', () => {
       description: 'Community description',
       discoverable: true,
       id: '550e8400-e29b-41d4-a716-446655440020',
-      memberRoles: [],
       memberIds: [],
+      memberRoles: [],
       name: 'Community',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       ownerIdentityId: 'identity-1',
@@ -200,8 +201,8 @@ describe('NodeStartupSynchronizer', () => {
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
     expect(result).toMatchObject({
-      connectedPeerCount: 2,
       communityRequests: 1,
+      connectedPeerCount: 2,
       conversationRequests: 0,
       identityNetworkRequests: 1,
       identityRequests: 0,
@@ -225,6 +226,155 @@ describe('NodeStartupSynchronizer', () => {
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
       requestId: result.requestId,
+    });
+  });
+
+  it('should cap startup sync fanout deterministically', async () => {
+    identityMetadataRepository.findAll.mockResolvedValue([
+      {
+        _id: 'identity-1-v1',
+        cid: 'bafyidentity1v1',
+        identityId: 'identity-1',
+        networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+      {
+        _id: 'identity-2-v1',
+        cid: 'bafyidentity2v1',
+        identityId: 'identity-2',
+        networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+    ]);
+    keychainMetadataRepository.findAll.mockResolvedValue([
+      {
+        _id: 'keychain-1',
+        cid: 'bafykeychain1',
+        ownerIdentityId: 'identity-1',
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+      {
+        _id: 'keychain-2',
+        cid: 'bafykeychain2',
+        ownerIdentityId: 'identity-2',
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+    ]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([
+      {
+        conversationId: 'one-to-one:first',
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+      },
+      {
+        conversationId: 'one-to-one:second',
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+      },
+    ]);
+    communityRepository.findAll.mockResolvedValue([]);
+    synchronizer = new NodeStartupSynchronizer({
+      communityRepository,
+      conversationRepository,
+      eventPublisher,
+      identityMetadataRepository,
+      keychainMetadataRepository,
+      nodeLoader,
+      policy: new NodeStartupSyncPolicy({
+        maxCommunityRequests: 1,
+        maxConversationRequests: 1,
+        maxIdentityRequests: 1,
+        maxKeychainRequests: 1,
+        maxTotalRequests: 3,
+      }),
+      readiness,
+    });
+
+    const result = await synchronizer.synchronize();
+    const publishedEvents = eventPublisher.publish.mock.calls[0][0];
+
+    expect(result).toMatchObject({
+      conversationRequests: 1,
+      identityNetworkRequests: 1,
+      identityRequests: 1,
+      keychainRequests: 1,
+      omittedRequests: 4,
+      publishedEvents: 3,
+      totalRequests: 3,
+    });
+    expect(publishedEvents).toEqual([
+      expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(IdentitySyncRequestedEvent),
+      expect.any(KeychainSyncRequestedEvent),
+    ]);
+  });
+
+  it('should rotate capped startup sync batches across retries', async () => {
+    identityMetadataRepository.findAll.mockResolvedValue([
+      {
+        _id: 'identity-1-v1',
+        cid: 'bafyidentity1v1',
+        identityId: 'identity-1',
+        networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+      {
+        _id: 'identity-2-v1',
+        cid: 'bafyidentity2v1',
+        identityId: 'identity-2',
+        networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+    ]);
+    keychainMetadataRepository.findAll.mockResolvedValue([]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([
+      {
+        conversationId: 'one-to-one:first',
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+      },
+      {
+        conversationId: 'one-to-one:second',
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+      },
+    ]);
+    communityRepository.findAll.mockResolvedValue([]);
+    synchronizer = new NodeStartupSynchronizer({
+      communityRepository,
+      conversationRepository,
+      eventPublisher,
+      identityMetadataRepository,
+      keychainMetadataRepository,
+      nodeLoader,
+      policy: new NodeStartupSyncPolicy({
+        maxCommunityRequests: 1,
+        maxConversationRequests: 1,
+        maxIdentityRequests: 1,
+        maxKeychainRequests: 1,
+        maxTotalRequests: 10,
+      }),
+      readiness,
+    });
+
+    await synchronizer.synchronize();
+    await synchronizer.synchronize();
+
+    const secondAttemptEvents = eventPublisher.publish.mock.calls[1][0];
+
+    expect(secondAttemptEvents[1].attributes).toMatchObject({
+      identityId: 'identity-2',
+    });
+    expect(secondAttemptEvents[2].attributes).toMatchObject({
+      conversationId: 'one-to-one:second',
     });
   });
 });

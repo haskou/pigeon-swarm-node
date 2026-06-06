@@ -76,6 +76,15 @@ export class MongoIndexInitializer {
       name: 'conversation_unread_messages_recipient_conversation_idx',
     },
     {
+      collection: 'conversation_unread_messages',
+      keys: [
+        ['recipientIdentityId', 1],
+        ['conversationId', 1],
+        ['messageId', 1],
+      ],
+      name: 'conversation_unread_messages_recipient_message_idx',
+    },
+    {
       collection: 'conversation_message_pins',
       keys: [
         ['conversationId', 1],
@@ -117,6 +126,15 @@ export class MongoIndexInitializer {
         ['messageId', 1],
       ],
       name: 'community_channel_message_reactions_message_idx',
+    },
+    {
+      collection: 'community_channel_message_pins',
+      keys: [
+        ['communityId', 1],
+        ['channelId', 1],
+        ['createdAt', -1],
+      ],
+      name: 'community_channel_message_pins_channel_createdAt_idx',
     },
     {
       collection: 'polls',

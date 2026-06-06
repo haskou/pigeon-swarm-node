@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 import NodeLoader from './contexts/nodes/application/load/NodeLoader';
+import { ServiceClass } from './shared/infrastructure/dependencyInjection/ServiceClass';
 import Scheduler from './shared/infrastructure/scheduler/Scheduler';
 import Consumer from './shared/infrastructure/ui/consumers/Consumer';
 
@@ -31,14 +32,15 @@ export default class Kernel {
     return Kernel._di;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private getConsumerFromClass(ClassDefinition: any): Consumer {
+  private getConsumerFromClass(
+    ClassDefinition: ServiceClass<Consumer>,
+  ): Consumer {
     return Kernel._di.getService(ClassDefinition) as Consumer;
   }
 
-  // eslint-disable-next-line max-len
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
-  private getSchedulerFromClass(ClassDefinition: any): Scheduler {
+  private getSchedulerFromClass(
+    ClassDefinition: ServiceClass<Scheduler>,
+  ): Scheduler {
     return Kernel._di.getService(ClassDefinition) as Scheduler;
   }
 
@@ -65,9 +67,7 @@ export default class Kernel {
     return this._server.run();
   }
 
-  // eslint-disable-next-line max-len
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
-  public addConsumers(...ClassDefinitions: any): void {
+  public addConsumers(...ClassDefinitions: ServiceClass<Consumer>[]): void {
     for (const ClassDefinition of ClassDefinitions) {
       const consumer = this.getConsumerFromClass(ClassDefinition);
       Kernel._consumers.push(consumer);
@@ -88,19 +88,15 @@ export default class Kernel {
     Kernel._consumers = [];
   }
 
-  // eslint-disable-next-line max-len
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
-  public addSchedulers(...ClassDefinitions: any): void {
+  public addSchedulers(...ClassDefinitions: ServiceClass<Scheduler>[]): void {
     for (const ClassDefinition of ClassDefinitions) {
       const scheduler = this.getSchedulerFromClass(ClassDefinition);
       Kernel.schedulers.push(scheduler);
     }
   }
 
-  // eslint-disable-next-line max-len
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
-  public addAcceptanceInstanceScheduler(instance: any): void {
-    Kernel.schedulers.push(instance as Scheduler);
+  public addAcceptanceInstanceScheduler(instance: Scheduler): void {
+    Kernel.schedulers.push(instance);
   }
 
   public removeSchedulers(): void {

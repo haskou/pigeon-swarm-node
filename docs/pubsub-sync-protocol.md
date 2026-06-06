@@ -77,6 +77,24 @@ discovery, then publishes sync requests. The wait is controlled by
 `0` in tests. Startup sync also schedules retries because peer discovery and
 gossip subscription propagation are eventually consistent.
 
+Startup sync is intentionally bounded. The requester emits a deterministic
+prefix of known resources instead of flooding large networks with every local
+resource at once. Limits are configured with:
+
+- `STARTUP_SYNC_MAX_CONTEXT_REQUESTS`: default per-context request cap.
+- `STARTUP_SYNC_MAX_IDENTITY_REQUESTS`
+- `STARTUP_SYNC_MAX_KEYCHAIN_REQUESTS`
+- `STARTUP_SYNC_MAX_CONVERSATION_REQUESTS`
+- `STARTUP_SYNC_MAX_COMMUNITY_REQUESTS`
+- `STARTUP_SYNC_MAX_TOTAL_REQUESTS`: final global cap across all startup sync
+  requests.
+
+The startup log includes `omittedRequests` so operators can see when the node
+has more local sync work than the current startup budget. Scheduled retries
+rotate each capped context batch, so later attempts cover resources that were
+omitted by earlier attempts while still keeping peer discovery and gossip fanout
+quiet under load.
+
 ## Identity Sync
 
 ### `identities.v1.identity.sync_requested`
