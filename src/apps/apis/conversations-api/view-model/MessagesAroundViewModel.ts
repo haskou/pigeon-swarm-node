@@ -1,6 +1,6 @@
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
-import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 
 import { MessagesAroundResource } from '../resources/MessagesResource';
 import { MessageViewModel } from './MessageViewModel';

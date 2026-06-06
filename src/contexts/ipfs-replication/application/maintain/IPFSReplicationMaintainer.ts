@@ -9,19 +9,11 @@ import { IPFSContentReplicationWasClaimedEvent } from '../../domain/events/IPFSC
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
-import IPFSReplicationStatusFinder, {
-  IPFSContentReplicationStatus,
-} from '../find-status/IPFSReplicationStatusFinder';
+import IPFSReplicationStatusFinder from '../find-status/IPFSReplicationStatusFinder';
+import { IPFSContentReplicationStatus } from '../find-status/types/IPFSContentReplicationStatus';
 import IPFSReplicationStatusSummaryUpdater from '../update-status-summary/IPFSReplicationStatusSummaryUpdater';
-
-export type IPFSReplicationMaintenanceResult = {
-  claimedReplicas: number;
-  failedClaims: number;
-  failedReleases: number;
-  releasedReplicas: number;
-};
-type IPFSContentNetworkReplicationStatus =
-  IPFSContentReplicationStatus['networks'][number];
+import { IPFSContentNetworkReplicationStatus } from './types/IPFSContentNetworkReplicationStatus';
+import { IPFSReplicationMaintenanceResult } from './types/IPFSReplicationMaintenanceResult';
 
 export default class IPFSReplicationMaintainer {
   constructor(
