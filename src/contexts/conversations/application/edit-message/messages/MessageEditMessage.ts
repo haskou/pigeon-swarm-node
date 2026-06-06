@@ -4,14 +4,9 @@ import { Signature, Timestamp } from '@haskou/value-objects';
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../../domain/value-objects/MessageId';
+import { MessageEditPayload } from './types/MessageEditPayload';
 
-export type MessageEditPayload = {
-  createdAt: number;
-  encryptedPayload: string;
-  id: string;
-  previousMessageIds?: string[];
-  signature: string;
-};
+export { MessageEditPayload } from './types/MessageEditPayload';
 
 export class MessageEditMessage {
   public readonly authorIdentityId: IdentityId;

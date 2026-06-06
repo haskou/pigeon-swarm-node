@@ -2,11 +2,9 @@ import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
-export type OneToOneConversationCreatePayload = {
-  keychainExternalIdentifier: string;
-  networkId: string;
-  participantIds: string[];
-};
+import { OneToOneConversationCreatePayload } from './types/OneToOneConversationCreatePayload';
+
+export { OneToOneConversationCreatePayload } from './types/OneToOneConversationCreatePayload';
 
 export class OneToOneConversationCreateMessage {
   public readonly keychainExternalIdentifier: KeychainExternalIdentifier;

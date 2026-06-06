@@ -5,16 +5,9 @@ import { AttachmentExternalIdentifier } from '../../../domain/value-objects/Atta
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../../domain/value-objects/MessageId';
+import { MessageSendPayload } from './types/MessageSendPayload';
 
-export type MessageSendPayload = {
-  attachmentExternalIdentifiers?: string[];
-  createdAt: number;
-  encryptedPayload: string;
-  id: string;
-  previousMessageIds?: string[];
-  replyToMessageId?: string;
-  signature: string;
-};
+export { MessageSendPayload } from './types/MessageSendPayload';
 
 export class MessageSendMessage {
   public readonly attachmentExternalIdentifiers: AttachmentExternalIdentifier[];
