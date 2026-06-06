@@ -7,6 +7,8 @@ import { StickerUserLibraryRepository } from '@app/contexts/stickers/domain/repo
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { MongoStickerPackRepository } from '@app/contexts/stickers/infrastructure/mongo/MongoStickerPackRepository';
 import { MongoStickerUserLibraryRepository } from '@app/contexts/stickers/infrastructure/mongo/MongoStickerUserLibraryRepository';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request } from 'express';
@@ -15,6 +17,9 @@ import { StickerUserLibraryResource } from '../resources/StickerUserLibraryResou
 import { StickerUserLibraryViewModel } from '../view-model/StickerUserLibraryViewModel';
 
 export abstract class StickerRouteSupport extends Route {
+  protected readonly eventPublisher: DomainEventPublisher =
+    this.get<MessageBus>(MessageBus);
+
   protected readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 

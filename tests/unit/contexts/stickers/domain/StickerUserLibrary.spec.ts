@@ -18,6 +18,16 @@ describe('StickerUserLibrary', () => {
     expect(library.toPrimitives().savedPackIds).toEqual([packId.valueOf()]);
   });
 
+  it('records a creation event', () => {
+    const library = StickerUserLibrary.create(identityId);
+    const events = library.pullDomainEvents();
+
+    expect(events).toHaveLength(1);
+    expect(events[0].eventName()).toBe(
+      'stickers.v1.user_library.was_created',
+    );
+  });
+
   it('favorites and unfavorites stickers', () => {
     const library = StickerUserLibrary.create(identityId);
     const packId = StickerPackId.generate();

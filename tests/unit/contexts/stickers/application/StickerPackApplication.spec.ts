@@ -12,6 +12,8 @@ import { StickerUserLibraryRepository } from '@app/contexts/stickers/domain/repo
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 class InMemoryStickerPackRepository implements StickerPackRepository {
   public readonly savedPacks: StickerPack[] = [];
@@ -75,6 +77,14 @@ class InMemoryStickerUserLibraryRepository
   }
 }
 
+class SpyDomainEventPublisher implements DomainEventPublisher {
+  public readonly publishedEvents: DomainEvent[] = [];
+
+  public async publish(domainEvents: DomainEvent[]): Promise<void> {
+    this.publishedEvents.push(...domainEvents);
+  }
+}
+
 describe('Sticker pack application services', () => {
   const ownerIdentityId =
     'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
@@ -90,16 +100,19 @@ describe('Sticker pack application services', () => {
   };
   let packRepository: InMemoryStickerPackRepository;
   let libraryRepository: InMemoryStickerUserLibraryRepository;
+  let eventPublisher: SpyDomainEventPublisher;
 
   beforeEach(() => {
     packRepository = new InMemoryStickerPackRepository();
     libraryRepository = new InMemoryStickerUserLibraryRepository();
+    eventPublisher = new SpyDomainEventPublisher();
   });
 
   it('creates a sticker pack and saves it in the owner library', async () => {
     const pack = await new StickerPackCreator(
       packRepository,
       libraryRepository,
+      eventPublisher,
     ).create(new StickerPackCreateMessage(ownerIdentityId, 'Pigeon moods'));
     const library = await libraryRepository.findByIdentityId(
       new IdentityId(ownerIdentityId),
@@ -109,12 +122,19 @@ describe('Sticker pack application services', () => {
     expect(library?.toPrimitives().savedPackIds).toEqual([
       pack.getId().valueOf(),
     ]);
+    expect(
+      eventPublisher.publishedEvents.map((event) => event.eventName()),
+    ).toEqual([
+      'stickers.v1.pack.was_created',
+      'stickers.v1.user_library.was_created',
+    ]);
   });
 
   it('adds, favorites and records sticker use through application messages', async () => {
     const pack = await new StickerPackCreator(
       packRepository,
       libraryRepository,
+      eventPublisher,
     ).create(new StickerPackCreateMessage(ownerIdentityId, 'Pigeon moods'));
     const updatedPack = await new StickerAdder(packRepository).add(
       new StickerAddMessage(pack.getId().valueOf(), ownerIdentityId, stickerDetails),

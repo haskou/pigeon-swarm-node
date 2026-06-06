@@ -4,6 +4,8 @@ import { HeliaIPFS } from '../helia/HeliaIPFS';
 import { IPFSConnection } from '../helia/IPFSConnection';
 import { PrivateIPFSOptions } from './PrivateIPFSOptions';
 
+export { PrivateIPFSOptions } from './PrivateIPFSOptions';
+
 export class PrivateIPFS extends HeliaIPFS {
   private static connectionPool: Record<string, HeliaInstance> = {};
 

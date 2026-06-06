@@ -66,6 +66,33 @@ describe('Poll', () => {
     });
   });
 
+  it('records a creation event with poll payload and routing recipients', () => {
+    const poll = Poll.create(
+      creator,
+      scope,
+      new PollQuestion('Choose one'),
+      options,
+      false,
+      undefined,
+      { memberIds: [creator.valueOf(), voter.valueOf()] },
+    );
+    const events = poll.pullDomainEvents();
+
+    expect(events).toHaveLength(1);
+    expect(events[0].eventName()).toBe('polls.v1.poll.was_created');
+    expect(JSON.parse(events[0].decode())).toMatchObject({
+      aggregate_id: scope.aggregateId(),
+      attributes: {
+        memberIds: [creator.valueOf(), voter.valueOf()],
+        poll: {
+          question: 'Choose one',
+        },
+        pollId: poll.getId().valueOf(),
+      },
+      type: 'polls.v1.poll.was_created',
+    });
+  });
+
   it('rejects multiple options when the poll is single-choice', () => {
     const poll = Poll.create(
       creator,

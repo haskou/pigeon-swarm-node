@@ -280,6 +280,9 @@ Event contracts used by frontend:
 | `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                            |
 | `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
 | `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
+| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `memberIds` or `participantIds`                                                                     |
+| `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                   |
+| `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                               |
 | `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                        |
 | `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                |
 | `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                |
