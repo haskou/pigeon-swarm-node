@@ -1,18 +1,21 @@
 import { Enum } from '@haskou/value-objects';
 
-export type PollScopeTypeValue = 'community_channel' | 'group_conversation';
+import { pollScopeTypes } from './types/PollScopeTypes';
+import { PollScopeTypeValue } from './types/PollScopeTypeValue';
+
+export { PollScopeTypeValue } from './types/PollScopeTypeValue';
 
 export class PollScopeType extends Enum<PollScopeTypeValue> {
   public static readonly COMMUNITY_CHANNEL = new PollScopeType(
-    'community_channel',
+    pollScopeTypes.COMMUNITY_CHANNEL,
   );
 
   public static readonly GROUP_CONVERSATION = new PollScopeType(
-    'group_conversation',
+    pollScopeTypes.GROUP_CONVERSATION,
   );
 
   public getValues(): PollScopeTypeValue[] {
-    return ['community_channel', 'group_conversation'];
+    return Object.values(pollScopeTypes);
   }
 
   public isCommunityChannel(): boolean {

@@ -1,4 +1,4 @@
-import { CommunityInvite } from '@app/contexts/communities/domain/CommunityInvite';
+import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 
 import { CommunityInviteResource } from '../resources/CommunityInviteResource';
 

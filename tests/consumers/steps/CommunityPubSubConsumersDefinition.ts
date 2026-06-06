@@ -3,7 +3,7 @@ import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/com
 import RegisterCommunityMessagesWhenSync from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';

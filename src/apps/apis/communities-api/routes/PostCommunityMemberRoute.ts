@@ -1,4 +1,4 @@
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
+import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';

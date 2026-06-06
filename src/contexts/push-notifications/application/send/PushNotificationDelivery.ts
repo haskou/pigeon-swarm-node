@@ -1,15 +1,6 @@
 import { PushSubscription } from '../../domain/PushSubscription';
 import { PushNotificationPayload } from './PushNotificationPayload';
-
-export type PushNotificationDeliveryResult = {
-  body?: string;
-  delivered: boolean;
-  endpoint: string;
-  endpointHost: string;
-  error?: string;
-  shouldDeleteSubscription: boolean;
-  statusCode?: number;
-};
+import { PushNotificationDeliveryResult } from './types/PushNotificationDeliveryResult';
 
 export interface PushNotificationDelivery {
   send(

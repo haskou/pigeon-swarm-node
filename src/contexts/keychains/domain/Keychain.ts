@@ -9,11 +9,11 @@ import {
 
 import { KeychainWasPublishedEvent } from './events/KeychainWasPublishedEvent';
 import { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
+import { PreviousKeychainReference as PreviousReference } from './types/PreviousKeychainReference';
 import { EncryptedKeychainPayload } from './value-objects/EncryptedKeychainPayload';
 import { KeychainExternalIdentifier } from './value-objects/KeychainExternalIdentifier';
 import { KeychainVersion } from './value-objects/KeychainVersion';
 
-type PreviousReference = KeychainExternalIdentifier;
 export { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
 
 export class Keychain extends AggregateRoot {

@@ -1,5 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
+import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { CommunityRequestNotFoundError } from '@app/contexts/communities/domain/errors/CommunityRequestNotFoundError';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';

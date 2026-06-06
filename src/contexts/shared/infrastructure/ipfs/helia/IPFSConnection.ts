@@ -1,11 +1,4 @@
-import type { Libp2pPrivateKeyLike } from '../networks/adapters/Libp2pKeyAdapter';
-
 import { IPFSId } from './IPFSId';
-
-export type IPFSOptions = {
-  storageLocation: 'memory' | string;
-  privateKey?: Libp2pPrivateKeyLike;
-};
 
 export interface IPFSConnection {
   stat(cid: IPFSId, offlineOnly: boolean, signal?: AbortSignal): Promise<void>;

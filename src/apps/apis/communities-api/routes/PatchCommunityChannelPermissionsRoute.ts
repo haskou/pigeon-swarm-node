@@ -1,4 +1,4 @@
-import { CommunityChannelPermissions } from '@app/contexts/communities/domain/CommunityChannelPermissions';
+import { CommunityChannelPermissions } from '@app/contexts/communities/domain/entities/channels/CommunityChannelPermissions';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';

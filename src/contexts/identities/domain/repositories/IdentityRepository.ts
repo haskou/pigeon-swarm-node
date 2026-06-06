@@ -3,11 +3,9 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Identity } from '../Identity';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../value-objects/ProfileHandle';
+import { IdentityCandidate } from './types/IdentityCandidate';
 
-export interface IdentityCandidate {
-  externalIdentifier: IdentityExternalIdentifier;
-  identity: Identity;
-}
+export { IdentityCandidate } from './types/IdentityCandidate';
 
 export interface IdentityRepository {
   save(identity: Identity): Promise<void>;

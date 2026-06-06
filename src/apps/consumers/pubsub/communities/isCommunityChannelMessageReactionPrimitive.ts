@@ -1,4 +1,4 @@
-import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 
 const communityChannelMessageReactionPrimitiveKeys = [
   'authorIdentityId',

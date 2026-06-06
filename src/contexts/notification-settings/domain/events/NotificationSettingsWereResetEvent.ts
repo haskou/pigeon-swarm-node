@@ -1,15 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-export type NotificationSettingsWereResetAttributes = {
-  identityId: string;
-  scope: {
-    channelId?: string;
-    communityId?: string;
-    conversationId?: string;
-    type: string;
-  };
-  scopeKey: string;
-};
+import { NotificationSettingsWereResetAttributes } from './types/NotificationSettingsWereResetAttributes';
 
 export class NotificationSettingsWereResetEvent extends DomainEvent {
   public static EVENT_NAME =

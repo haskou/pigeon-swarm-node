@@ -1,7 +1,7 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationRepository as Repository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
@@ -21,12 +21,7 @@ import { MongoMessageMetadataDocument } from './documents/MongoMessageMetadataDo
 import { MongoUnreadConversationMessageDocument } from './documents/MongoUnreadConversationMessageDocument';
 import MongoConversationMapper from './mappers/MongoConversationMapper';
 import MongoMessageMetadataMapper from './mappers/MongoMessageMetadataMapper';
-
-type Repository = ConversationRepository;
-type UnreadCount = {
-  conversationId: string;
-  unreadCount: number;
-};
+import { UnreadCount } from './types/UnreadCount';
 
 export default class MongoConversationRepository implements Repository {
   private static readonly COLLECTION = 'conversations';

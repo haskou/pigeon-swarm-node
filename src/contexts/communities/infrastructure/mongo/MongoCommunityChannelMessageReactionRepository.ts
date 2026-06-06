@@ -1,13 +1,11 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { createHash } from 'node:crypto';
 
-import { CommunityChannelMessageReaction } from '../../domain/CommunityChannelMessageReaction';
+import { CommunityChannelMessageReaction } from '../../domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
-import { MongoCommunityChannelMessageReactionDocument } from './documents/MongoCommunityChannelMessageReactionDocument';
-
-type ReactionDocument = MongoCommunityChannelMessageReactionDocument;
+import { MongoCommunityChannelMessageReactionDocument as ReactionDocument } from './documents/MongoCommunityChannelMessageReactionDocument';
 
 export class MongoCommunityMessageReactionRepository {
   private static readonly COLLECTION = 'community_channel_message_reactions';
@@ -38,7 +36,7 @@ export class MongoCommunityMessageReactionRepository {
 
   private toDocument(
     reaction: CommunityChannelMessageReaction,
-  ): MongoCommunityChannelMessageReactionDocument {
+  ): ReactionDocument {
     const primitives = reaction.toPrimitives();
 
     return {
@@ -53,7 +51,7 @@ export class MongoCommunityMessageReactionRepository {
   }
 
   private toDomain(
-    document: MongoCommunityChannelMessageReactionDocument,
+    document: ReactionDocument,
   ): CommunityChannelMessageReaction {
     return CommunityChannelMessageReaction.fromPrimitives({
       authorIdentityId: document.authorIdentityId,

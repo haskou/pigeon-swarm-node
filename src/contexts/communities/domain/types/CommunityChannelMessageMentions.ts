@@ -1,3 +1,3 @@
-import { CommunityChannelMessageMention } from '../CommunityChannelMessageMention';
+import { CommunityChannelMessageMention } from '../entities/messages/CommunityChannelMessageMention';
 
 export type CommunityChannelMessageMentions = CommunityChannelMessageMention[];

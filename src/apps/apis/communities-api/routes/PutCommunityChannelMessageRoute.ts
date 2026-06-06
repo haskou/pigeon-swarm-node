@@ -1,6 +1,6 @@
 import { PutCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/PutCommunityChannelMessageBody';
-import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/CommunityChannelMessageMention';
-import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/CommunityChannelMessagePayload';
+import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
+import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
 import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';

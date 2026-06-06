@@ -1,4 +1,4 @@
-import { CommunityInvite } from '@app/contexts/communities/domain/CommunityInvite';
+import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';

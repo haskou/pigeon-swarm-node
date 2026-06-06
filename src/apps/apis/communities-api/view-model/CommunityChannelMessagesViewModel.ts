@@ -1,6 +1,6 @@
 import { PollViewModel } from '@app/apps/apis/polls-api/view-model/PollViewModel';
-import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
-import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/CommunityChannelMessageReaction';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 
 import {

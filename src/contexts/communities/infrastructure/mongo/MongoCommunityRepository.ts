@@ -2,7 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Community } from '../../domain/Community';
-import { CommunityRole } from '../../domain/CommunityRole';
+import { CommunityRole } from '../../domain/entities/membership/CommunityRole';
 import { CommunityRepository } from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';

@@ -1,17 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-type IPFSContentReplicationWasRegisteredAttributes = {
-  cid: string;
-  contentType: string;
-  context: string;
-  createdAt: number;
-  filename?: string;
-  networkIds: string[];
-  ownerIdentityId?: string;
-  priority: string;
-  sizeBytes: number;
-  updatedAt: number;
-};
+import { IPFSContentReplicationWasRegisteredAttributes } from './types/IPFSContentReplicationWasRegisteredAttributes';
 
 export class IPFSContentReplicationWasRegisteredEvent extends DomainEvent {
   public static EVENT_NAME = 'ipfs.v1.content.replication.was_registered';

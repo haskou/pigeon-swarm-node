@@ -5,11 +5,7 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { NodePeerNetwork } from '../../../domain/NodePeerNetwork';
 import { NetworkName } from '../../../domain/value-objects/NetworkName';
-
-export type NodePeerRegisterNetworkPayload = {
-  id: string;
-  name: string;
-};
+import { NodePeerRegisterNetworkPayload } from './types/NodePeerRegisterNetworkPayload';
 
 export class NodePeerRegisterMessage {
   public readonly lastSeenAt: Timestamp;

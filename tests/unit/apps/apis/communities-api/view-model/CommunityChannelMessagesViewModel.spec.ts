@@ -1,5 +1,5 @@
 import { CommunityChannelMessagesViewModel } from '@app/apps/apis/communities-api/view-model/CommunityChannelMessagesViewModel';
-import { CommunityChannelMessage } from '@app/contexts/communities/domain/CommunityChannelMessage';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 

@@ -1,21 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-export type NotificationSettingsWereUpdatedAttributes = {
-  hideMutedChannels: boolean;
-  identityId: string;
-  mobilePushEnabled: boolean;
-  mutedUntil?: number | null;
-  notificationLevel: string;
-  scope: {
-    channelId?: string;
-    communityId?: string;
-    conversationId?: string;
-    type: string;
-  };
-  scopeKey: string;
-  suppressEveryoneAndHere: boolean;
-  suppressRoleMentions: boolean;
-};
+import { NotificationSettingsWereUpdatedAttributes } from './types/NotificationSettingsWereUpdatedAttributes';
 
 export class NotificationSettingsWereUpdatedEvent extends DomainEvent {
   public static EVENT_NAME =

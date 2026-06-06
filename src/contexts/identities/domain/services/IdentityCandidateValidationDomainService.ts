@@ -2,10 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { Identity } from '../Identity';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
-
-export type PreviousIdentityResolver = (
-  externalIdentifier: IdentityExternalIdentifier,
-) => Promise<Identity | undefined>;
+import { PreviousIdentityResolver } from './types/PreviousIdentityResolver';
 
 export class IdentityCandidateValidationDomainService {
   public isValidFor(identityId: IdentityId, candidate: Identity): boolean {

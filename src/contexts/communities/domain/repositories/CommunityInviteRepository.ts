@@ -1,4 +1,4 @@
-import { CommunityInvite } from '../CommunityInvite';
+import { CommunityInvite } from '../entities/invites/CommunityInvite';
 import { CommunityInviteToken } from '../value-objects/CommunityInviteToken';
 
 export interface CommunityInviteRepository {

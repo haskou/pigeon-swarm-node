@@ -6,10 +6,7 @@ import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuest
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
-export type PollCreateOptionPrimitives = {
-  id: string;
-  text: string;
-};
+import { PollCreateOptionPrimitives } from './types/PollCreateOptionPrimitives';
 
 export class PollCreateMessage {
   public readonly allowsMultipleVotes: boolean;

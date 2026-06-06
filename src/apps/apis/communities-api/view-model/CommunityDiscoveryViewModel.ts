@@ -1,5 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/CommunityMembershipRequest';
+import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import {

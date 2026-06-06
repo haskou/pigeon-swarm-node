@@ -7,13 +7,7 @@ import {
 } from '@haskou/value-objects';
 
 import { InvalidEncryptedCommunityInviteKeyError } from '../errors/InvalidEncryptedCommunityInviteKeyError';
-
-type KeyValue = {
-  algorithm: string;
-  ciphertext: string;
-  nonce: string;
-  version: number;
-};
+import { EncryptedCommunityInviteKeyValue as KeyValue } from './types/EncryptedCommunityInviteKeyValue';
 
 export class EncryptedCommunityInviteKey extends ValueObject<KeyValue> {
   private static readonly CURRENT_VERSION = 1;

@@ -1,4 +1,4 @@
-import { CommunityModerationLogEntry } from '../CommunityModerationLogEntry';
+import { CommunityModerationLogEntry } from '../entities/moderation/CommunityModerationLogEntry';
 import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityModerationLogId } from '../value-objects/CommunityModerationLogId';
 
