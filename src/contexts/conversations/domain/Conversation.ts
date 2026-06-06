@@ -174,6 +174,9 @@ export class Conversation extends AggregateRoot {
     this.record(
       new ConversationMessageWasSentEvent(this.id.valueOf(), {
         authorId: authorId.valueOf(),
+        conversationName: this.name?.valueOf(),
+        conversationType: this.type.valueOf(),
+        message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: this.networkId.valueOf(),
         participantIds: this.toPrimitives().participantIds,

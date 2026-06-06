@@ -2,6 +2,7 @@ import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/con
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
+import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
 import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
@@ -14,6 +15,8 @@ import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
+import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
+import { RegisterConversationMessage as RegisterConversationMetadataMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
@@ -21,8 +24,14 @@ import { ConversationSyncResponseMessage } from '@app/contexts/conversations/app
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
+import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import IdentityCandidateRegistrar from '@app/contexts/identities/application/register-candidate/IdentityCandidateRegistrar';
 import { RegisterIdentityCandidateMessage } from '@app/contexts/identities/application/register-candidate/messages/RegisterIdentityCandidateMessage';
 import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
@@ -49,6 +58,8 @@ import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/Nod
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { Signature } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
@@ -137,9 +148,11 @@ describe('PubSub sync consumers', () => {
 
   it('registers identities announced by sync responses', async () => {
     const registrar = mock<IdentityCandidateRegistrar>();
+    const publisher = mock<DomainEventPublisher>();
     const consumer = new RegisterIdentityWhenSyncAvailable(
       eventConsumer,
       registrar,
+      publisher,
       suppressionTracker,
     );
 
@@ -160,6 +173,7 @@ describe('PubSub sync consumers', () => {
     expect(
       registrar.register.mock.calls[0][0].externalIdentifier.valueOf(),
     ).toBe(externalIdentifier);
+    expect(publisher.publish).toHaveBeenCalledTimes(1);
   });
 
   it('registers and synchronizes keychain publication events', async () => {
@@ -237,9 +251,11 @@ describe('PubSub sync consumers', () => {
 
   it('registers announced conversation message mutations', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
     const sentConsumer = new RegisterMessageWhenAnnounced(
       eventConsumer,
       registrar,
+      conversationRegistrar,
     );
     const editedConsumer = new RegisterMessageEditionWhenAnnounced(
       eventConsumer,
@@ -273,6 +289,86 @@ describe('PubSub sync consumers', () => {
     );
   });
 
+  it('registers missing conversation metadata before announced messages', async () => {
+    const registrar = mock<ConversationMessageRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
+    const consumer = new RegisterMessageWhenAnnounced(
+      eventConsumer,
+      registrar,
+      conversationRegistrar,
+    );
+    const networkId = '123e4567-e89b-12d3-a456-426614174000';
+    const participantIds = [
+      new IdentityMother().id.valueOf(),
+      new IdentityMother().id.valueOf(),
+    ];
+
+    registrar.register
+      .mockRejectedValueOnce(
+        new ConversationNotFoundError(new ConversationId(conversationId)),
+      )
+      .mockResolvedValueOnce(undefined);
+
+    await consumer.handler(
+      new ConversationMessageWasSentEvent(conversationId, {
+        conversationType: 'one-to-one',
+        messageId,
+        networkId,
+        participantIds,
+      }),
+    );
+
+    expect(conversationRegistrar.register).toHaveBeenCalledWith(
+      expect.any(RegisterConversationMetadataMessage),
+    );
+    expect(
+      conversationRegistrar.register.mock.calls[0][0].conversationId.valueOf(),
+    ).toBe(conversationId);
+    expect(
+      conversationRegistrar.register.mock.calls[0][0].networkId.valueOf(),
+    ).toBe(networkId);
+    expect(registrar.register).toHaveBeenCalledTimes(2);
+  });
+
+  it('registers announced messages from the embedded encrypted candidate', async () => {
+    const registrar = mock<ConversationMessageRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
+    const consumer = new RegisterMessageWhenAnnounced(
+      eventConsumer,
+      registrar,
+      conversationRegistrar,
+    );
+    const authorId = new IdentityMother().id;
+    const candidate = MessageSent.create({
+      authorId,
+      conversationId: new ConversationId(conversationId),
+      encryptedPayload: new EncryptedMessagePayload('encrypted-payload'),
+      id: new MessageId(messageId),
+      signature: new Signature(
+        'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+      ),
+    });
+
+    await consumer.handler(
+      new ConversationMessageWasSentEvent(conversationId, {
+        conversationType: 'one-to-one',
+        message: candidate.toPrimitives(),
+        messageId,
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        participantIds: [authorId.valueOf()],
+      }),
+    );
+
+    expect(registrar.register).not.toHaveBeenCalled();
+    expect(registrar.registerCandidate).toHaveBeenCalledWith(
+      expect.any(RegisterConversationMessage),
+      expect.any(MessageSent),
+    );
+    expect(
+      registrar.registerCandidate.mock.calls[0][1].toPrimitives(),
+    ).toEqual(candidate.toPrimitives());
+  });
+
   it('responds to conversation sync requests', async () => {
     const responder = mock<ConversationSyncResponder>();
     const consumer = new RespondToConversationSyncRequest(
@@ -298,6 +394,45 @@ describe('PubSub sync consumers', () => {
     );
     expect(responder.respond.mock.calls[0][0].requestId?.valueOf()).toBe(
       'request-3',
+    );
+  });
+
+  it('registers conversations announced by conversation creation events', async () => {
+    const registrar = mock<ConversationRegistrar>();
+    const consumer = new RegisterConversationWhenAnnounced(
+      eventConsumer,
+      registrar,
+    );
+    const networkId = '123e4567-e89b-12d3-a456-426614174000';
+    const participantIds = [
+      new IdentityMother().id.valueOf(),
+      new IdentityMother().id.valueOf(),
+    ];
+
+    await consumer.handler(
+      new ConversationWasCreatedEvent(conversationId, {
+        networkId,
+        participantIds,
+        type: 'one-to-one',
+      }),
+    );
+
+    expect(registrar.register).toHaveBeenCalledWith(
+      expect.any(RegisterConversationMetadataMessage),
+    );
+    expect(registrar.register.mock.calls[0][0].conversationId.valueOf()).toBe(
+      conversationId,
+    );
+    expect(registrar.register.mock.calls[0][0].networkId.valueOf()).toBe(
+      networkId,
+    );
+    expect(
+      registrar.register.mock.calls[0][0].participantIds.map((identityId) =>
+        identityId.valueOf(),
+      ),
+    ).toEqual(participantIds);
+    expect(registrar.register.mock.calls[0][0].type.valueOf()).toBe(
+      'one-to-one',
     );
   });
 

@@ -7,6 +7,7 @@ import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversatio
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
@@ -53,6 +54,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     const consumer = new RegisterMessageWhenAnnounced(
       this.eventConsumer(),
       this.fakeUseCase<ConversationMessageRegistrar>('register'),
+      this.fakeUseCase<ConversationRegistrar>('register'),
     );
 
     await consumer.handler(
