@@ -20,14 +20,8 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request } from 'express';
 
-type ScopeAccess = {
-  recipients: {
-    memberIds?: string[];
-    participantIds?: string[];
-  };
-  scope: PollScope;
-};
-type CommunityMessageRepository = MongoCommunityChannelMessageRepository;
+import { CommunityMessageRepository } from './types/CommunityMessageRepository';
+import { PollScopeAccess } from './types/PollScopeAccess';
 
 export abstract class PollRouteSupport extends Route {
   protected readonly eventPublisher: DomainEventPublisher =
@@ -72,7 +66,7 @@ export abstract class PollRouteSupport extends Route {
     actor: IdentityId,
     communityId: string,
     channelId: string,
-  ): Promise<ScopeAccess> {
+  ): Promise<PollScopeAccess> {
     return this.communityChannelScopeAccess(
       actor,
       communityId,
@@ -85,7 +79,7 @@ export abstract class PollRouteSupport extends Route {
     actor: IdentityId,
     communityId: string,
     channelId: string,
-  ): Promise<ScopeAccess> {
+  ): Promise<PollScopeAccess> {
     return this.communityChannelScopeAccess(
       actor,
       communityId,
@@ -99,7 +93,7 @@ export abstract class PollRouteSupport extends Route {
     communityId: string,
     channelId: string,
     action: 'create' | 'vote',
-  ): Promise<ScopeAccess> {
+  ): Promise<PollScopeAccess> {
     const community = await this.communityRepository().findById(
       new CommunityId(communityId),
     );
@@ -133,7 +127,7 @@ export abstract class PollRouteSupport extends Route {
   protected async groupConversationScope(
     actor: IdentityId,
     conversationId: string,
-  ): Promise<ScopeAccess> {
+  ): Promise<PollScopeAccess> {
     const conversation = await this.conversationRepository().findById(
       new ConversationId(conversationId),
     );
@@ -160,7 +154,7 @@ export abstract class PollRouteSupport extends Route {
   protected async accessPollScope(
     actor: IdentityId,
     poll: Poll,
-  ): Promise<ScopeAccess> {
+  ): Promise<PollScopeAccess> {
     const scope = poll.getScope();
     const communityId = scope.getCommunityId();
     const channelId = scope.getChannelId();
@@ -184,7 +178,7 @@ export abstract class PollRouteSupport extends Route {
   protected async managePollScope(
     actor: IdentityId,
     poll: Poll,
-  ): Promise<ScopeAccess> {
+  ): Promise<PollScopeAccess> {
     const scope = poll.getScope();
     const communityId = scope.getCommunityId();
     const channelId = scope.getChannelId();
