@@ -5,14 +5,7 @@ import { Request } from 'express';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
-
-type SignedRequestPayload = {
-  bodyHash: string;
-  method: string;
-  nonce: string;
-  path: string;
-  timestamp: string;
-};
+import { SignedRequestPayload } from './SignedRequestPayload';
 
 export class SignedHttpRequestVerifier {
   private hashBody(body: unknown): string {

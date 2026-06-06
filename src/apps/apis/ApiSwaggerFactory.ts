@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-type SwaggerSpec = string;
+import { SwaggerSpec } from './SwaggerSpec';
 
 const swaggerFileByApi: Record<string, string> = {
   'calls-api': 'calls-api/swagger.yaml',

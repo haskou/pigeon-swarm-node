@@ -8,15 +8,7 @@ import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Response } from 'express';
 import { Get, JsonController, Param, Res } from 'routing-controllers';
 
-type IPFSContentResponse =
-  | {
-      kind: 'binary';
-      bytes: Buffer;
-    }
-  | {
-      kind: 'json';
-      content: unknown;
-    };
+import { IPFSContentResponse } from './IPFSContentResponse';
 
 @JsonController('/ipfs')
 export class GetIPFSContentRoute extends Route {
