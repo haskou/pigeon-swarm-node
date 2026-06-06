@@ -1,0 +1,57 @@
+@startuml IPFSReplicationClasses
+title IPFS replication context
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "ipfs-replication/domain" {
+  class IPFSContentReplication <<AggregateRoot>>
+  class IPFSContentReplicaClaim <<Entity>>
+  class IPFSReplicationPolicy <<DomainService>>
+  class IPFSReplicationStatusSummary <<ReadModel>>
+
+  interface IPFSContentReplicationRepository
+  interface IPFSReplicationStatusSummaryRepository
+
+  class IPFSContentReplicationWasRegisteredEvent <<DomainEvent>>
+  class IPFSContentReplicationWasClaimedEvent <<DomainEvent>>
+}
+
+package "ipfs-replication/application" {
+  class IPFSContentReplicationRegistrar
+  class IPFSContentReplicationMetadataRegistrar
+  class IPFSContentReplicaClaimRegistrar
+  class IPFSReplicationMaintainer
+  class IPFSReplicationStatusFinder
+  class IPFSReplicationStatusSummaryFinder
+  class IPFSReplicationStatusSummaryRefresher
+  class IPFSReplicationStatusSummaryUpdater
+}
+
+package "ipfs-replication/infrastructure" {
+  class MongoIPFSContentReplicationRepository
+  class MongoIPFSReplicationStatusSummaryRepository
+  class MongoIPFSReplicationStatusSummaryDocument
+}
+
+IPFSContentReplication *-- IPFSContentReplicaClaim
+IPFSReplicationPolicy ..> IPFSContentReplication
+
+IPFSContentReplication ..> IPFSContentReplicationWasRegisteredEvent
+IPFSContentReplication ..> IPFSContentReplicationWasClaimedEvent
+
+IPFSContentReplicationRegistrar ..> IPFSContentReplicationRepository
+IPFSContentReplicationMetadataRegistrar ..> IPFSContentReplicationRepository
+IPFSContentReplicaClaimRegistrar ..> IPFSContentReplicationRepository
+IPFSReplicationMaintainer ..> IPFSReplicationPolicy
+IPFSReplicationMaintainer ..> IPFSContentReplicationRepository
+IPFSReplicationStatusFinder ..> IPFSContentReplicationRepository
+IPFSReplicationStatusSummaryFinder ..> IPFSReplicationStatusSummaryRepository
+IPFSReplicationStatusSummaryRefresher ..> IPFSReplicationStatusSummaryRepository
+IPFSReplicationStatusSummaryUpdater ..> IPFSReplicationStatusSummaryRepository
+
+MongoIPFSContentReplicationRepository ..|> IPFSContentReplicationRepository
+MongoIPFSReplicationStatusSummaryRepository ..|> IPFSReplicationStatusSummaryRepository
+MongoIPFSReplicationStatusSummaryRepository ..> MongoIPFSReplicationStatusSummaryDocument
+
+@enduml

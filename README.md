@@ -30,23 +30,6 @@ The goal is a practical architecture where communities can run their own nodes,
 share networks deliberately, keep private material client-side, and continue
 communicating even when individual nodes disappear.
 
-## Capabilities
-
-- Local identity publishing and profile updates, including handles, avatar and
-  banner CIDs.
-- Client-owned encrypted keychains for conversations and communities.
-- One-to-one and group conversations with encrypted messages, replies,
-  attachments and deletion tombstones.
-- Private communities with owners, members, text channels and encrypted channel
-  messages.
-- Actionable notifications for conversation, group conversation and community
-  invitations.
-- Public and private IPFS uploads for profile media and encrypted attachments.
-- Node ownership, network management, peer heartbeats and startup
-  synchronization.
-- WebSocket delivery for routed domain events.
-- Realtime call signalling for one-to-one, group and community channel calls.
-
 ## Architecture
 
 The backend is organized around bounded contexts:
@@ -54,12 +37,19 @@ The backend is organized around bounded contexts:
 - `identities`: public identity documents, profiles and network membership.
 - `keychains`: encrypted client keychain publications.
 - `conversations`: one-to-one and group chat state.
-- `communities`: private communities, members, channels and channel messages.
+- `communities`: public/private communities, members, roles, channels and
+  channel messages.
 - `notifications`: invitation notifications and recipient actions.
 - `calls`: call lifecycle and WebRTC signalling events.
 - `nodes`: local node metadata, ownership, networks, peers and sync.
-- `shared`: IPFS, MongoDB, message bus, HTTP, WebSocket and common value
-  objects.
+- `presence`: ephemeral identity connection state.
+- `push-notifications`: Web Push subscriptions and outbound delivery.
+- `notification-settings`: per-scope mute and notification preferences.
+- `stickers`: sticker packs, sticker assets and user sticker state.
+- `polls`: polls, votes and poll lifecycle for conversations and communities.
+- `ipfs-replication`: local replica policy, claims and replication summaries.
+- `shared`: common value objects plus IPFS, MongoDB, message bus, HTTP,
+  WebSocket and dependency-injection infrastructure.
 
 The backend does not receive private keys or decrypted conversation/community
 keys. Clients generate identity material, encrypt local secrets, sign domain

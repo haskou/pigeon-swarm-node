@@ -1,0 +1,48 @@
+@startuml PushNotificationsClasses
+title Push notifications context
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "push-notifications/domain" {
+  class PushSubscription <<AggregateRoot>>
+  class PushSubscriptionEndpoint <<ValueObject>>
+  class PushSubscriptionKey <<ValueObject>>
+
+  interface PushSubscriptionRepository
+}
+
+package "push-notifications/application" {
+  class PushSubscriptionRegistrar
+  class PushSubscriptionRemover
+  class PushNotificationDispatcher
+  class PushNotificationDelivery <<Port>>
+  class PushNotificationPayload
+  class PushNotificationTester
+}
+
+package "push-notifications/infrastructure" {
+  class MongoPushSubscriptionRepository
+  class MongoPushSubscriptionDocument
+  class PushVapidConfiguration
+  class WebPushNotificationDelivery
+}
+
+PushSubscription *-- PushSubscriptionEndpoint
+PushSubscription *-- PushSubscriptionKey
+
+PushSubscriptionRegistrar ..> PushSubscriptionRepository
+PushSubscriptionRemover ..> PushSubscriptionRepository
+PushNotificationDispatcher ..> PushSubscriptionRepository
+PushNotificationDispatcher ..> PushNotificationDelivery
+PushNotificationDispatcher ..> PushNotificationPayload
+PushNotificationTester ..> PushNotificationDelivery
+
+MongoPushSubscriptionRepository ..|> PushSubscriptionRepository
+MongoPushSubscriptionRepository ..> MongoPushSubscriptionDocument
+MongoPushSubscriptionRepository ..> PushSubscription
+
+WebPushNotificationDelivery ..|> PushNotificationDelivery
+WebPushNotificationDelivery ..> PushVapidConfiguration
+
+@enduml

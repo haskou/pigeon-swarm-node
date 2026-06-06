@@ -1,0 +1,57 @@
+@startuml NotificationSettingsClasses
+title Notification settings context
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "notification-settings/domain" {
+  class NotificationScopeSettings <<AggregateRoot>>
+  class NotificationScopeSettingsPreferences <<ValueObject>>
+  class NotificationLevel <<ValueObject>>
+  class NotificationMuteUntil <<ValueObject>>
+  class NotificationSettingScope <<ValueObject>>
+  class NotificationSettingScopeType <<ValueObject>>
+
+  interface NotificationScopeSettingsRepository
+
+  class NotificationSettingsWereUpdatedEvent <<DomainEvent>>
+  class NotificationSettingsWereResetEvent <<DomainEvent>>
+}
+
+package "notification-settings/application" {
+  class NotificationSettingsFinder
+  class NotificationSettingsUpdater
+  class NotificationSettingsResetter
+  class NotificationSettingsServicesFactory
+  class NotificationSettingsFindMessage
+  class NotificationSettingsUpdateMessage
+  class NotificationSettingsResetMessage
+}
+
+package "notification-settings/infrastructure" {
+  class MongoNotificationScopeSettingsRepository
+}
+
+NotificationScopeSettings *-- NotificationScopeSettingsPreferences
+NotificationScopeSettings *-- NotificationSettingScope
+NotificationScopeSettingsPreferences *-- NotificationLevel
+NotificationScopeSettingsPreferences *-- NotificationMuteUntil
+NotificationSettingScope *-- NotificationSettingScopeType
+
+NotificationScopeSettings ..> NotificationSettingsWereUpdatedEvent
+NotificationScopeSettings ..> NotificationSettingsWereResetEvent
+
+NotificationSettingsFinder ..> NotificationSettingsFindMessage
+NotificationSettingsFinder ..> NotificationScopeSettingsRepository
+NotificationSettingsUpdater ..> NotificationSettingsUpdateMessage
+NotificationSettingsUpdater ..> NotificationScopeSettingsRepository
+NotificationSettingsResetter ..> NotificationSettingsResetMessage
+NotificationSettingsResetter ..> NotificationScopeSettingsRepository
+NotificationSettingsServicesFactory ..> NotificationSettingsFinder
+NotificationSettingsServicesFactory ..> NotificationSettingsUpdater
+NotificationSettingsServicesFactory ..> NotificationSettingsResetter
+
+MongoNotificationScopeSettingsRepository ..|> NotificationScopeSettingsRepository
+MongoNotificationScopeSettingsRepository ..> NotificationScopeSettings
+
+@enduml

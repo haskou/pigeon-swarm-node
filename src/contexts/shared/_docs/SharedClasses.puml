@@ -1,0 +1,82 @@
+@startuml SharedClasses
+title Shared context and infrastructure
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "shared/domain" {
+  class IdentityId <<ValueObject>>
+  class NetworkId <<ValueObject>>
+  class NodeId <<ValueObject>>
+  class Password <<ValueObject>>
+  class SyncRequestId <<ValueObject>>
+}
+
+package "shared/infrastructure/http" {
+  class HttpApp
+  class HttpServer
+  class ExpressRequest
+  class HttpClient <<Port>>
+  class AxiosHttpClient
+  class BaseRequester
+}
+
+package "shared/infrastructure/mongo" {
+  class MongoDB
+  class MongoIndexInitializer
+  class ExistingIndex
+  class IndexDefinition
+  class MongoProcessedDomainEventRepository
+}
+
+package "shared/infrastructure/ipfs" {
+  class IPFS <<Port>>
+  class HeliaIPFS
+  class HeliaIPFSParser
+  class HeliaPinningStrategy
+  class IPFSConnection
+  class IPFSContentRacer
+  class IPFSNetwork
+}
+
+package "shared/infrastructure/messaging" {
+  class DomainEventPublisher
+  class MessageBus
+  class Libp2pGossipsubMessageBusAdapter
+  class Libp2pGossipsubRuntimeAdapter
+}
+
+package "shared/infrastructure/websocket" {
+  class WebSocketServer
+  class WebSocketEventHub
+}
+
+package "shared/infrastructure/di" {
+  class DependencyInjection
+  class ServiceClass
+}
+
+HttpServer ..> HttpApp
+AxiosHttpClient ..|> HttpClient
+BaseRequester ..> HttpClient
+
+MongoIndexInitializer ..> MongoDB
+MongoProcessedDomainEventRepository ..> MongoDB
+MongoIndexInitializer ..> ExistingIndex
+MongoIndexInitializer ..> IndexDefinition
+
+HeliaIPFS ..|> IPFS
+HeliaIPFS ..> HeliaIPFSParser
+HeliaIPFS ..> HeliaPinningStrategy
+HeliaIPFS ..> IPFSConnection
+HeliaIPFS ..> IPFSContentRacer
+IPFSConnection ..> IPFSNetwork
+
+DomainEventPublisher ..> MessageBus
+Libp2pGossipsubMessageBusAdapter ..|> MessageBus
+Libp2pGossipsubMessageBusAdapter ..> Libp2pGossipsubRuntimeAdapter
+
+WebSocketEventHub ..> WebSocketServer
+DependencyInjection ..> ServiceClass
+
+@enduml
