@@ -1,3 +1,5 @@
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -55,7 +57,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
   ): Promise<CommunitySyncData> {
     const [community, messages, reactions] = await Promise.all([
       this.communityRepository.findById(communityId),
-      this.messageRepository.findByCommunity(
+      this.messageRepository.findSyncableByCommunity(
         communityId,
         RespondToCommunitySyncRequest.MESSAGE_CANDIDATE_LIMIT,
       ),
@@ -77,6 +79,17 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     networkId: NetworkId,
   ): boolean {
     return syncData.community?.belongsToNetwork(networkId) ?? false;
+  }
+
+  private syncableReactions(
+    reactions: CommunityChannelMessageReaction[],
+    messages: CommunityChannelMessage[],
+  ): CommunityChannelMessageReaction[] {
+    return reactions.filter((reaction) =>
+      messages.some((message) =>
+        message.isIdentifiedBy(reaction.getMessageId()),
+      ),
+    );
   }
 
   public async handler(event: DomainEvent): Promise<void> {
@@ -104,15 +117,21 @@ export default class RespondToCommunitySyncRequest extends Consumer {
       return;
     }
 
+    const messageCandidates = syncData.messages;
+    const reactionCandidates = this.syncableReactions(
+      syncData.reactions,
+      messageCandidates,
+    );
+
     await this.eventPublisher.publish([
       new CommunitySyncAvailableEvent(event.aggregateId, {
         community: syncData.community?.toPrimitives(),
         communityId: event.aggregateId,
-        messageCandidates: syncData.messages.map((message) =>
+        messageCandidates: messageCandidates.map((message) =>
           message.toPrimitives(),
         ),
         networkId: networkId.valueOf(),
-        reactionCandidates: syncData.reactions.map((reaction) =>
+        reactionCandidates: reactionCandidates.map((reaction) =>
           reaction.toPrimitives(),
         ),
         requestId,

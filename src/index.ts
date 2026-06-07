@@ -194,10 +194,14 @@ async function init() {
     ),
     new RegisterCommunityReactionWhenAdded(
       messageBus,
+      communityRepository,
+      communityMessageRepository,
       communityMessageReactionRepository,
     ),
     new RegisterCommunityReactionWhenRemoved(
       messageBus,
+      communityRepository,
+      communityMessageRepository,
       communityMessageReactionRepository,
     ),
     new RegisterIPFSReplicaClaimWhenClaimed(
