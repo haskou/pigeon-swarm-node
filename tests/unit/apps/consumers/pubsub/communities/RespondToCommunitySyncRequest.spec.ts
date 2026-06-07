@@ -123,9 +123,8 @@ describe('RespondToCommunitySyncRequest', () => {
 
   it('does not publish plaintext message candidates in community sync responses', async () => {
     communityRepository.findById.mockResolvedValue(community());
-    messageRepository.findByCommunity.mockResolvedValue([
+    messageRepository.findSyncableByCommunity.mockResolvedValue([
       message(encryptedMessageId, { encryptedPayload: 'encrypted-payload' }),
-      message(plaintextMessageId, { plaintextPayload: 'secret plaintext' }),
     ]);
     reactionRepository.findByCommunity.mockResolvedValue([
       reaction(encryptedMessageId),

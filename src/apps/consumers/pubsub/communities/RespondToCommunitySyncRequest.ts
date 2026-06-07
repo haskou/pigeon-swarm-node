@@ -57,7 +57,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
   ): Promise<CommunitySyncData> {
     const [community, messages, reactions] = await Promise.all([
       this.communityRepository.findById(communityId),
-      this.messageRepository.findByCommunity(
+      this.messageRepository.findSyncableByCommunity(
         communityId,
         RespondToCommunitySyncRequest.MESSAGE_CANDIDATE_LIMIT,
       ),
@@ -79,12 +79,6 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     networkId: NetworkId,
   ): boolean {
     return syncData.community?.belongsToNetwork(networkId) ?? false;
-  }
-
-  private syncableMessages(
-    messages: CommunityChannelMessage[],
-  ): CommunityChannelMessage[] {
-    return messages.filter((message) => !message.hasPlaintextPayload());
   }
 
   private syncableReactions(
@@ -123,7 +117,7 @@ export default class RespondToCommunitySyncRequest extends Consumer {
       return;
     }
 
-    const messageCandidates = this.syncableMessages(syncData.messages);
+    const messageCandidates = syncData.messages;
     const reactionCandidates = this.syncableReactions(
       syncData.reactions,
       messageCandidates,
