@@ -50,7 +50,7 @@ describe('Libp2pGossipsubTransport', () => {
       }),
     );
 
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(node.services.pubsub.subscribe).toHaveBeenCalledWith(
       'pigeon.identities',
