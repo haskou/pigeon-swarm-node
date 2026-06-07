@@ -3,6 +3,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTransport';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { PrivateKey } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -145,9 +146,11 @@ describe('Libp2pGossipsubAdapter', () => {
     let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
 
     networkRegistry.getAll.mockReturnValue([privateNetwork]);
-    privateNetwork.subscribePubSub.mockImplementation(async (_topic, callback) => {
-      subscribedHandler = callback;
-    });
+    privateNetwork.subscribePubSub.mockImplementation(
+      async (_topic, callback) => {
+        subscribedHandler = callback;
+      },
+    );
     adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
 
     await adapter.consume(
@@ -169,6 +172,71 @@ describe('Libp2pGossipsubAdapter', () => {
     );
     expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should publish network payloads to websockets after consumers accept them', async () => {
+    const handler = jest.fn();
+    const network = createNetwork({ id: 'network-id' });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([network]);
+    network.subscribePubSub.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+    await adapter.publish([event]);
+    await subscribedHandler?.(network.publishPubSub.mock.calls[0][1]);
+
+    expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(publishSpy).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
+
+    publishSpy.mockRestore();
+  });
+
+  it('should not publish rejected network payloads to websockets', async () => {
+    const expectedError = new Error('rejected remote event');
+    const handler = jest.fn().mockRejectedValue(expectedError);
+    const network = createNetwork({ id: 'network-id' });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([network]);
+    network.subscribePubSub.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+    await adapter.publish([event]);
+
+    await expect(
+      subscribedHandler?.(network.publishPubSub.mock.calls[0][1]),
+    ).rejects.toBe(expectedError);
+
+    expect(publishSpy).not.toHaveBeenCalled();
+
+    publishSpy.mockRestore();
   });
 
   it('should fan out network payloads to every consumer on the same topic', async () => {
