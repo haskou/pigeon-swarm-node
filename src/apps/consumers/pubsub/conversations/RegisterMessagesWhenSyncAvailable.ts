@@ -13,9 +13,16 @@ import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 import { PrimitiveOf } from '@haskou/value-objects';
 
-import { ConversationCandidate } from './types/ConversationCandidate';
 import { MessageCandidate } from './types/MessageCandidate';
 import { ReactionCandidate } from './types/ReactionCandidate';
+
+type ConversationMetadataCandidate = {
+  id: string;
+  name?: string;
+  networkId: string;
+  participantIds: string[];
+  type: string;
+};
 
 export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   public static QUEUE_NAME =
@@ -58,37 +65,6 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     );
   }
 
-  private isConversationCandidate(
-    candidate: unknown,
-  ): candidate is ConversationCandidate {
-    if (typeof candidate !== 'object' || candidate === null) {
-      return false;
-    }
-
-    const candidateRecord = candidate as Record<string, unknown>;
-
-    return (
-      typeof candidateRecord.id === 'string' &&
-      typeof candidateRecord.networkId === 'string' &&
-      typeof candidateRecord.type === 'string' &&
-      this.hasValidConversationName(candidateRecord) &&
-      this.hasValidParticipantIds(candidateRecord)
-    );
-  }
-
-  private hasValidConversationName(record: Record<string, unknown>): boolean {
-    return record.name === undefined || typeof record.name === 'string';
-  }
-
-  private hasValidParticipantIds(record: Record<string, unknown>): boolean {
-    return (
-      Array.isArray(record.participantIds) &&
-      record.participantIds.every(
-        (participantId) => typeof participantId === 'string',
-      )
-    );
-  }
-
   private isReactionCandidate(
     candidate: unknown,
   ): candidate is ReactionCandidate {
@@ -103,22 +79,6 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
       typeof candidateRecord.createdAt === 'number' &&
       typeof candidateRecord.emoji === 'string' &&
       typeof candidateRecord.messageId === 'string'
-    );
-  }
-
-  private async registerConversation(candidate: unknown): Promise<void> {
-    if (!this.isConversationCandidate(candidate)) {
-      return;
-    }
-
-    await this.conversationRegistrar.register(
-      new RegisterConversationMetadataMessage({
-        conversationId: candidate.id,
-        name: candidate.name,
-        networkId: candidate.networkId,
-        participantIds: candidate.participantIds,
-        type: candidate.type,
-      }),
     );
   }
 
@@ -139,6 +99,61 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     );
   }
 
+  private isRecord(candidate: unknown): candidate is Record<string, unknown> {
+    return (
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      !Array.isArray(candidate)
+    );
+  }
+
+  private isStringArray(candidate: unknown): candidate is string[] {
+    return (
+      Array.isArray(candidate) &&
+      candidate.every((item) => typeof item === 'string')
+    );
+  }
+
+  private isConversationMetadataCandidate(
+    candidate: unknown,
+  ): candidate is ConversationMetadataCandidate {
+    if (!this.isRecord(candidate)) {
+      return false;
+    }
+
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.networkId === 'string' &&
+      typeof candidate.type === 'string' &&
+      this.isStringArray(candidate.participantIds) &&
+      (candidate.name === undefined || typeof candidate.name === 'string')
+    );
+  }
+
+  private conversationMetadataFrom(
+    event: DomainEvent,
+  ): RegisterConversationMetadataMessage | undefined {
+    const candidate = event.attributes.conversation;
+
+    if (!this.isConversationMetadataCandidate(candidate)) {
+      return undefined;
+    }
+
+    if (candidate.id !== event.aggregateId) {
+      throw new Error(
+        'Conversation sync metadata does not match aggregate id.',
+      );
+    }
+
+    return new RegisterConversationMetadataMessage({
+      conversationId: candidate.id,
+      name: candidate.name,
+      networkId: candidate.networkId,
+      participantIds: candidate.participantIds,
+      type: candidate.type,
+    });
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     this.tracker.markAvailable(
       'conversation',
@@ -147,13 +162,16 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
         ? String(event.attributes.requestId)
         : undefined,
     );
-    await this.registerConversation(event.attributes.conversation);
-
     const candidates = Array.isArray(event.attributes.messageCandidates)
       ? event.attributes.messageCandidates.filter((candidate) =>
           this.isMessageCandidate(candidate),
         )
       : [];
+    const conversationMetadata = this.conversationMetadataFrom(event);
+
+    if (conversationMetadata) {
+      await this.conversationRegistrar.register(conversationMetadata);
+    }
 
     for (const candidate of candidates) {
       const message = new RegisterConversationMessage(

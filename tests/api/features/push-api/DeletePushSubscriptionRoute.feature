@@ -4,7 +4,7 @@ Feature: DELETE /push/subscriptions
     Given I set json body
       """
       {
-        "endpoint": "https://push.example.test/send/subscription-id",
+        "endpoint": "https://web.push.apple.com/send/subscription-id",
         "expirationTime": null,
         "keys": {
           "p256dh": "p256dh-key",
@@ -18,7 +18,7 @@ Feature: DELETE /push/subscriptions
     Given I set json body
       """
       {
-        "endpoint": "https://push.example.test/send/subscription-id",
+        "endpoint": "https://web.push.apple.com/send/subscription-id",
         "expirationTime": null,
         "keys": {
           "p256dh": "p256dh-key",

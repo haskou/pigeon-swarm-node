@@ -230,7 +230,9 @@ async function generateIdentityId(): Promise<IdentityId> {
 function createSubscription(identityId: IdentityId): PushSubscription {
   return PushSubscription.register(
     identityId,
-    new PushSubscriptionEndpoint(`https://push.test/${identityId.valueOf()}`),
+    new PushSubscriptionEndpoint(
+      `https://web.push.apple.com/${identityId.valueOf()}`,
+    ),
     new PushSubscriptionKey('p256dh-key'),
     new PushSubscriptionKey('auth-secret'),
     undefined,
@@ -273,8 +275,8 @@ function deliveryResult(options: {
 }): PushNotificationDeliveryResult {
   return {
     delivered: options.delivered,
-    endpoint: 'https://push.test/subscription',
-    endpointHost: 'push.test',
+    endpoint: 'https://web.push.apple.com/subscription',
+    endpointHost: 'web.push.apple.com',
     shouldDeleteSubscription: options.shouldDeleteSubscription,
   };
 }

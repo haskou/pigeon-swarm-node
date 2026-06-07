@@ -5,6 +5,17 @@ import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIde
 import { PreviousIdentityResolver } from './types/PreviousIdentityResolver';
 
 export class IdentityCandidateValidationDomainService {
+  private isValidPreviousLink(
+    candidate: Identity,
+    previousIdentity: Identity,
+  ): boolean {
+    return (
+      candidate.isNextVersionAfter(previousIdentity) &&
+      candidate.usesSameSigningKeyAs(previousIdentity) &&
+      candidate.keepsNetworksFrom(previousIdentity)
+    );
+  }
+
   public isValidFor(identityId: IdentityId, candidate: Identity): boolean {
     return candidate.isIdentifiedBy(identityId);
   }
@@ -45,11 +56,7 @@ export class IdentityCandidateValidationDomainService {
       return false;
     }
 
-    if (!candidate.isNextVersionAfter(previousIdentity)) {
-      return false;
-    }
-
-    if (!candidate.keepsNetworksFrom(previousIdentity)) {
+    if (!this.isValidPreviousLink(candidate, previousIdentity)) {
       return false;
     }
 

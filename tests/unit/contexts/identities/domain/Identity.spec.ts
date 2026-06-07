@@ -1,11 +1,11 @@
 import { IdentityCannotLeaveNetworkError } from '@app/contexts/identities/domain/errors/IdentityCannotLeaveNetworkError';
+import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
 import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
-import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
@@ -14,7 +14,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import { faker } from '@faker-js/faker';
-import { EncryptedKeyPair, KeyPair, PrimitiveOf } from '@haskou/value-objects';
+import { EncryptedKeyPair, PrimitiveOf } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 
@@ -94,35 +94,37 @@ describe('Identity', () => {
       );
     });
 
-    it('should throw InvalidIdentitySignatureError when a candidate is signed by a different public key than its claimed id', async () => {
-      const victimIdentity = mother.build();
-      const attackerPassword = new Password('Attacker-password11!');
-      const attackerKeyPair = await KeyPair.generate();
-      const attackerEncryptedKeyPair =
-        await attackerKeyPair.encryptKeyPair(attackerPassword);
-      const victimPrimitives = victimIdentity.toPrimitives();
-      const forgedPrimitives: PrimitiveOf<Identity> = {
-        ...victimPrimitives,
-        encryptedKeyPair: attackerEncryptedKeyPair.toPrimitives(),
-        id: new IdentityId(victimPrimitives.id).valueOf(),
-        profile: {
-          ...victimPrimitives.profile,
-          name: 'Mallory',
-        },
+    it('should reject a payload signed by a different key than the identity id', async () => {
+      const networkId = new NetworkId(faker.string.uuid());
+      const attackerIdentity = await Identity.create(
+        new ProfileName('Mallory'),
+        new Password(validPassword),
+        [networkId],
+      );
+      const victimIdentity = await Identity.create(
+        new ProfileName('Victim'),
+        new Password(validPassword),
+        [networkId],
+      );
+      const attackerPrimitives = attackerIdentity.toPrimitives();
+      const spoofedPrimitives: PrimitiveOf<Identity> = {
+        ...attackerPrimitives,
+        id: victimIdentity.toPrimitives().id,
         signature: '',
-        timestamp: victimPrimitives.timestamp + 1,
       };
-      const forgedSignature =
+      const spoofedSignature =
         await new IdentitySignatureDomainService().generateSignature(
-          forgedPrimitives,
-          EncryptedKeyPair.fromPrimitives(forgedPrimitives.encryptedKeyPair),
-          attackerPassword,
+          spoofedPrimitives,
+          EncryptedKeyPair.fromPrimitives(
+            attackerPrimitives.encryptedKeyPair,
+          ),
+          new Password(validPassword),
         );
 
       expect(() =>
         Identity.fromPrimitives({
-          ...forgedPrimitives,
-          signature: forgedSignature.valueOf(),
+          ...spoofedPrimitives,
+          signature: spoofedSignature.valueOf(),
         }),
       ).toThrow(InvalidIdentitySignatureError);
     });
@@ -229,6 +231,7 @@ describe('Identity', () => {
         previousIdentityExternalIdentifier.valueOf(),
       );
       expect(primitives.version).toBe(2);
+      expect(updatedIdentity.usesSameSigningKeyAs(identity)).toBe(true);
       expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
         IdentityWasUpdatedEvent,
       );

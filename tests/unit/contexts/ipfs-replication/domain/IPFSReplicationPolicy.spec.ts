@@ -37,7 +37,7 @@ describe('IPFSReplicationPolicy', () => {
     ).toBe(false);
   });
 
-  it('should release local replicas after responsible nodes have claimed', () => {
+  it('should not release local replicas solely from replica claims', () => {
     expect(
       policy.canReleaseLocalReplica({
         activeNodeCount: 10,
@@ -45,6 +45,6 @@ describe('IPFSReplicationPolicy', () => {
         localNodeId: 'node-4',
         responsibleNodeIds: ['node-1', 'node-2', 'node-3'],
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

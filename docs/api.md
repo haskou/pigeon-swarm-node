@@ -531,7 +531,10 @@ Implemented:
 
 ```http
 GET /node/networks
-X-Identity-Id: <optionalIdentityId>
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Nonce: <uniqueNonce>
+X-Signature: <signature>
 ```
 
 Response:
@@ -551,8 +554,10 @@ Response:
 Implemented:
 
 - return the networks configured for the local node
-- include private network `key` values only when `X-Identity-Id` matches the current node owner
-- omit private network `key` values for anonymous callers, non-owner identities or malformed identity headers
+- include private network `key` values only when the request is signed by the
+  current node owner
+- omit private network `key` values for anonymous callers, spoofed owner
+  headers, non-owner identities or malformed signatures
 
 ### Add local node network
 
@@ -604,8 +609,9 @@ Request body: none.
 
 Implemented:
 
-- allow unsigned network deletion while the node has no owner
-- require signed request auth from the owner after the node is claimed
+- require signed request auth from the node owner
+- reject deletion while the node has no owner because no identity can authorize
+  the destructive operation
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
 - delete local MongoDB data scoped to that network:
@@ -3565,11 +3571,11 @@ PUT /push/subscriptions
 
 Requires signed HTTP headers. The authenticated identity owns the subscription.
 
-Request body is the browser `PushSubscription.toJSON()` shape:
+Request body is the browser `PushSubscription.toJSON()` shape. The endpoint must use a supported Web Push provider host (`fcm.googleapis.com`, `updates.push.services.mozilla.com`, or `web.push.apple.com`):
 
 ```json
 {
-  "endpoint": "https://push.service/send/...",
+  "endpoint": "https://web.push.apple.com/send/...",
   "expirationTime": null,
   "keys": {
     "p256dh": "<browserP256dhKey>",
@@ -3582,7 +3588,7 @@ Response:
 
 ```json
 {
-  "endpoint": "https://push.service/send/...",
+  "endpoint": "https://web.push.apple.com/send/...",
   "expirationTime": null,
   "identityId": "<identityId>"
 }
@@ -3617,7 +3623,6 @@ Push delivery failures are logged with structured JSON including:
 - `endpoint`
 - `endpointHost`
 - `statusCode`
-- `body`
 - `error`
 - `shouldDeleteSubscription`
 
@@ -3650,8 +3655,7 @@ Response:
       "endpointHost": "web.push.apple.com",
       "delivered": false,
       "statusCode": 403,
-      "body": "<provider error body>",
-      "error": "<provider error>",
+      "error": "Web Push delivery failed.",
       "removed": false
     }
   ]

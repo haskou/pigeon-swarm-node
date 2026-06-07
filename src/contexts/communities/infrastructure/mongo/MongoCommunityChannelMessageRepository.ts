@@ -143,6 +143,27 @@ export class MongoCommunityChannelMessageRepository {
     return documents.reverse().map((document) => this.toDomain(document));
   }
 
+  public async findSyncableByCommunity(
+    communityId: CommunityId,
+    limit: number,
+  ): Promise<CommunityChannelMessage[]> {
+    const documents = await (
+      await this.collection()
+    )
+      .find({
+        $or: [
+          { plaintextPayload: { $exists: false } },
+          { plaintextPayload: null },
+        ],
+        communityId: communityId.valueOf(),
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return documents.reverse().map((document) => this.toDomain(document));
+  }
+
   public async findThreadMessages(
     communityId: CommunityId,
     channelId: CommunityChannelId,

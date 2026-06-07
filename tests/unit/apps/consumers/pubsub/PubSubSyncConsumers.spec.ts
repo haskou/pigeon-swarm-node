@@ -13,10 +13,10 @@ import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keycha
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
+import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
+import { RegisterConversationMessage as ConversationMetadataRegisterMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
-import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
-import { RegisterConversationMessage as RegisterConversationMetadataMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
@@ -289,7 +289,7 @@ describe('PubSub sync consumers', () => {
     );
   });
 
-  it('registers missing conversation metadata before announced messages', async () => {
+  it('does not synthesize missing conversation metadata from message announcements', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
     const conversationRegistrar = mock<ConversationRegistrar>();
     const consumer = new RegisterMessageWhenAnnounced(
@@ -297,37 +297,28 @@ describe('PubSub sync consumers', () => {
       registrar,
       conversationRegistrar,
     );
-    const networkId = '123e4567-e89b-12d3-a456-426614174000';
-    const participantIds = [
-      new IdentityMother().id.valueOf(),
-      new IdentityMother().id.valueOf(),
-    ];
-
-    registrar.register
-      .mockRejectedValueOnce(
-        new ConversationNotFoundError(new ConversationId(conversationId)),
-      )
-      .mockResolvedValueOnce(undefined);
-
-    await consumer.handler(
-      new ConversationMessageWasSentEvent(conversationId, {
-        conversationType: 'one-to-one',
-        messageId,
-        networkId,
-        participantIds,
-      }),
+    const expectedError = new ConversationNotFoundError(
+      new ConversationId(conversationId),
     );
 
-    expect(conversationRegistrar.register).toHaveBeenCalledWith(
-      expect.any(RegisterConversationMetadataMessage),
-    );
-    expect(
-      conversationRegistrar.register.mock.calls[0][0].conversationId.valueOf(),
-    ).toBe(conversationId);
-    expect(
-      conversationRegistrar.register.mock.calls[0][0].networkId.valueOf(),
-    ).toBe(networkId);
-    expect(registrar.register).toHaveBeenCalledTimes(2);
+    registrar.register.mockRejectedValueOnce(expectedError);
+
+    await expect(
+      consumer.handler(
+        new ConversationMessageWasSentEvent(conversationId, {
+          conversationType: 'one-to-one',
+          messageId,
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          participantIds: [
+            new IdentityMother().id.valueOf(),
+            new IdentityMother().id.valueOf(),
+          ],
+        }),
+      ),
+    ).rejects.toBe(expectedError);
+
+    expect(conversationRegistrar.register).not.toHaveBeenCalled();
+    expect(registrar.register).toHaveBeenCalledTimes(1);
   });
 
   it('registers announced messages from the embedded encrypted candidate', async () => {
@@ -364,9 +355,9 @@ describe('PubSub sync consumers', () => {
       expect.any(RegisterConversationMessage),
       expect.any(MessageSent),
     );
-    expect(
-      registrar.registerCandidate.mock.calls[0][1].toPrimitives(),
-    ).toEqual(candidate.toPrimitives());
+    expect(registrar.registerCandidate.mock.calls[0][1].toPrimitives()).toEqual(
+      candidate.toPrimitives(),
+    );
   });
 
   it('responds to conversation sync requests', async () => {
@@ -397,43 +388,52 @@ describe('PubSub sync consumers', () => {
     );
   });
 
-  it('registers conversations announced by conversation creation events', async () => {
+  it('registers valid conversation creation announcements before fan-out', async () => {
     const registrar = mock<ConversationRegistrar>();
     const consumer = new RegisterConversationWhenAnnounced(
       eventConsumer,
       registrar,
     );
-    const networkId = '123e4567-e89b-12d3-a456-426614174000';
-    const participantIds = [
-      new IdentityMother().id.valueOf(),
-      new IdentityMother().id.valueOf(),
-    ];
 
     await consumer.handler(
       new ConversationWasCreatedEvent(conversationId, {
-        networkId,
-        participantIds,
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        participantIds: [
+          new IdentityMother().id.valueOf(),
+          new IdentityMother().id.valueOf(),
+        ],
         type: 'one-to-one',
       }),
     );
 
     expect(registrar.register).toHaveBeenCalledWith(
-      expect.any(RegisterConversationMetadataMessage),
+      expect.any(ConversationMetadataRegisterMessage),
     );
     expect(registrar.register.mock.calls[0][0].conversationId.valueOf()).toBe(
       conversationId,
     );
-    expect(registrar.register.mock.calls[0][0].networkId.valueOf()).toBe(
-      networkId,
+  });
+
+  it('rejects malformed conversation creation announcements', async () => {
+    const registrar = mock<ConversationRegistrar>();
+    const consumer = new RegisterConversationWhenAnnounced(
+      eventConsumer,
+      registrar,
     );
-    expect(
-      registrar.register.mock.calls[0][0].participantIds.map((identityId) =>
-        identityId.valueOf(),
+
+    await expect(
+      consumer.handler(
+        new ConversationWasCreatedEvent(conversationId, {
+          participantIds: [
+            new IdentityMother().id.valueOf(),
+            new IdentityMother().id.valueOf(),
+          ],
+          type: 'one-to-one',
+        }),
       ),
-    ).toEqual(participantIds);
-    expect(registrar.register.mock.calls[0][0].type.valueOf()).toBe(
-      'one-to-one',
-    );
+    ).rejects.toThrow('Invalid conversation announcement.');
+
+    expect(registrar.register).not.toHaveBeenCalled();
   });
 
   it('registers valid messages announced by conversation sync responses', async () => {
@@ -475,13 +475,9 @@ describe('PubSub sync consumers', () => {
     expect(registrar.register.mock.calls[0][0].messageId.valueOf()).toBe(
       messageId,
     );
-    expect(conversationRegistrar.register).toHaveBeenCalledTimes(1);
     expect(conversationRegistrar.register).toHaveBeenCalledWith(
-      expect.any(RegisterConversationMetadataMessage),
+      expect.any(ConversationMetadataRegisterMessage),
     );
-    expect(
-      conversationRegistrar.register.mock.calls[0][0].conversationId.valueOf(),
-    ).toBe(conversationId);
     expect(reactionRegistrar.register).not.toHaveBeenCalled();
   });
 
@@ -527,12 +523,51 @@ describe('PubSub sync consumers', () => {
       }),
     );
 
+    expect(conversationRegistrar.register).toHaveBeenCalledWith(
+      expect.any(ConversationMetadataRegisterMessage),
+    );
     expect(registrar.register).not.toHaveBeenCalled();
     expect(registrar.registerCandidate).toHaveBeenCalledTimes(1);
     expect(registrar.registerCandidate).toHaveBeenCalledWith(
       expect.any(RegisterConversationMessage),
       expect.any(MessageSent),
     );
+  });
+
+  it('rejects conversation sync metadata for another aggregate', async () => {
+    const registrar = mock<ConversationMessageRegistrar>();
+    const reactionRegistrar = mock<MessageReactionRegistrar>();
+    const conversationRegistrar = mock<ConversationRegistrar>();
+    const consumer = new RegisterMessagesWhenSyncAvailable(
+      eventConsumer,
+      registrar,
+      reactionRegistrar,
+      conversationRegistrar,
+      suppressionTracker,
+    );
+
+    await expect(
+      consumer.handler(
+        new ConversationSyncAvailableEvent(conversationId, {
+          conversation: {
+            id: 'one-to-one:different',
+            networkId: '550e8400-e29b-41d4-a716-446655440011',
+            participantIds: [
+              'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+              'MCowBQYDK2VwAyEA2+5oVbSUaiTZLcwruvmBmtHLgo+LVCmaw4kG9AQPx20=',
+            ],
+            type: 'one-to-one',
+          },
+          messageCandidates: [{ messageId }],
+        }),
+      ),
+    ).rejects.toThrow(
+      'Conversation sync metadata does not match aggregate id.',
+    );
+
+    expect(conversationRegistrar.register).not.toHaveBeenCalled();
+    expect(registrar.register).not.toHaveBeenCalled();
+    expect(registrar.registerCandidate).not.toHaveBeenCalled();
   });
 
   it('registers valid reactions announced by conversation sync responses', async () => {
@@ -551,7 +586,8 @@ describe('PubSub sync consumers', () => {
       new ConversationSyncAvailableEvent(conversationId, {
         reactionCandidates: [
           {
-            authorId: 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+            authorId:
+              'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
             createdAt: 1778513696020,
             emoji: '👍',
             messageId,

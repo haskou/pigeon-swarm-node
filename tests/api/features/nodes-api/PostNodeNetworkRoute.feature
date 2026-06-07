@@ -70,7 +70,7 @@ Feature: Post node network
     When I POST to "/node/networks/public/"
     Then response code is equal to 200
 
-  Scenario: Delete a network before the node is owned
+  Scenario: Reject unsigned network deletion before the node is owned
     Given the local node has no owner and no networks
     And I set json body
       """
@@ -83,13 +83,7 @@ Feature: Post node network
     Then response code is equal to 200
 
     When I DELETE "/node/networks/550e8400-e29b-41d4-a716-446655440003/"
-    Then response code is equal to 200
-    And response data should match partially
-      """
-      {
-        "networks": []
-      }
-      """
+    Then response code is equal to 401
 
   Scenario: Delete a network as the owner
     Given the local node has no owner and no networks

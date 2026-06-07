@@ -183,8 +183,6 @@ components:
         - endpointHost
         - removed
       properties:
-        body:
-          type: string
         delivered:
           type: boolean
         endpoint:
