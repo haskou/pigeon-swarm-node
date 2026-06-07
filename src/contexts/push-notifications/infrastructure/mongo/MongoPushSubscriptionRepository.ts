@@ -44,6 +44,32 @@ export class MongoPushSubscriptionRepository implements Repository {
     });
   }
 
+  private async removeInvalidDocument(
+    document: MongoPushSubscriptionDocument,
+  ): Promise<void> {
+    await (
+      await this.collection()
+    ).deleteOne({
+      _id: document._id,
+    });
+  }
+
+  private async hydrateValidDocuments(
+    documents: MongoPushSubscriptionDocument[],
+  ): Promise<PushSubscription[]> {
+    const subscriptions: PushSubscription[] = [];
+
+    for (const document of documents) {
+      try {
+        subscriptions.push(this.toDomain(document));
+      } catch {
+        await this.removeInvalidDocument(document);
+      }
+    }
+
+    return subscriptions;
+  }
+
   public async delete(
     identityId: IdentityId,
     endpoint: PushSubscriptionEndpoint,
@@ -77,7 +103,7 @@ export class MongoPushSubscriptionRepository implements Repository {
       })
       .toArray();
 
-    return documents.map((document) => this.toDomain(document));
+    return this.hydrateValidDocuments(documents);
   }
 
   public async save(subscription: PushSubscription): Promise<void> {
