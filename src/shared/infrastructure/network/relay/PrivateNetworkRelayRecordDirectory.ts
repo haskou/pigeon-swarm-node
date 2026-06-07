@@ -85,7 +85,9 @@ export class PrivateNetworkRelayRecordDirectory {
 
     const publicConnection = await this.getPublicConnection();
     Kernel.logger.info(
-      `Publishing private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}"`,
+      `Publishing private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}" fingerprints="${privateNetworks
+        .map((network) => this.authenticator.fingerprint(network))
+        .join(',')}"`,
     );
 
     await Promise.all(
@@ -96,12 +98,16 @@ export class PrivateNetworkRelayRecordDirectory {
 
         await publicConnection.putRecord(lookupKey, cid.valueOf());
         Kernel.logger.debug(
-          `Published private relay record for network="${network.getId()}" cid="${cid.valueOf()}"`,
+          `Published private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
+            network,
+          )}" cid="${cid.valueOf()}"`,
         );
       }),
     );
     Kernel.logger.info(
-      `Published private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}"`,
+      `Published private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}" fingerprints="${privateNetworks
+        .map((network) => this.authenticator.fingerprint(network))
+        .join(',')}"`,
     );
   }
 
@@ -116,7 +122,9 @@ export class PrivateNetworkRelayRecordDirectory {
     const discoveredRecords: PublicRelayRecordPrimitives[] = [];
 
     Kernel.logger.info(
-      `Discovering private relay records: privateNetworks=${privateNetworks.length}`,
+      `Discovering private relay records: privateNetworks=${privateNetworks.length} fingerprints="${privateNetworks
+        .map((network) => this.authenticator.fingerprint(network))
+        .join(',')}"`,
     );
 
     await Promise.all(
@@ -143,13 +151,15 @@ export class PrivateNetworkRelayRecordDirectory {
           this.relayRecordRegistry.save(envelope.relayRecord);
           discoveredRecords.push(envelope.relayRecord);
           Kernel.logger.debug(
-            `Discovered private relay record for network="${network.getId()}" peerId="${envelope.relayRecord.peerId}"`,
+            `Discovered private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
+              network,
+            )}" peerId="${envelope.relayRecord.peerId}"`,
           );
         } catch (error: unknown) {
           Kernel.logger.debug(
-            `Private relay record lookup skipped for network="${network.getId()}": ${String(
-              error,
-            )}`,
+            `Private relay record lookup skipped for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
+              network,
+            )}": ${String(error)}`,
           );
         }
       }),

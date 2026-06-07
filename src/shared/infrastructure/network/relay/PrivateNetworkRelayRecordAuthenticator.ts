@@ -1,6 +1,6 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PrivateKey } from '@haskou/value-objects';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
@@ -60,6 +60,15 @@ export class PrivateNetworkRelayRecordAuthenticator {
     );
 
     return `${PrivateNetworkRelayRecordAuthenticator.recordPrefix}/${digest}`;
+  }
+
+  public fingerprint(network: IPFSNetwork): string {
+    const networkKey = this.requireNetworkKey(network);
+
+    return createHash('sha256')
+      .update(networkKey.valueOf())
+      .digest('base64url')
+      .slice(0, 16);
   }
 
   public sign(

@@ -33,6 +33,18 @@ describe('PrivateNetworkRelayRecordAuthenticator', () => {
     expect(authenticator.lookupKey(network)).not.toContain(networkKey);
   });
 
+  it('should expose a stable non-secret private network fingerprint', () => {
+    const network = privateNetwork(networkKey);
+
+    expect(authenticator.fingerprint(network)).toBe(
+      authenticator.fingerprint(privateNetwork(networkKey)),
+    );
+    expect(authenticator.fingerprint(network)).not.toContain(networkKey);
+    expect(authenticator.fingerprint(network)).not.toBe(
+      authenticator.fingerprint(privateNetwork(otherNetworkKey)),
+    );
+  });
+
   it('should verify envelopes created with the same private network key', () => {
     const network = privateNetwork(networkKey);
     const envelope = authenticator.sign(network, relayRecord);
