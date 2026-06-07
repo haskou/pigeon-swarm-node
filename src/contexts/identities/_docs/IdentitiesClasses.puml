@@ -51,7 +51,7 @@ package "identities.domain" {
 
   class IdentitySignatureDomainService {
     +generateSignature(payload, encryptedKeyPair, password): Promise<Signature>
-    +isValidSignature(encryptedKeyPair, payload, signature): boolean
+    +isValidSignature(identityId, payload, signature): boolean
   }
 
   class IdentityResolutionDomainService {

@@ -128,7 +128,7 @@ export class Identity extends AggregateRoot {
     );
     assert(
       new IdentitySignatureDomainService().isValidSignature(
-        this.encryptedKeyPair,
+        this.id,
         this.toPrimitives(),
         this.signature,
       ),
