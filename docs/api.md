@@ -3565,11 +3565,11 @@ PUT /push/subscriptions
 
 Requires signed HTTP headers. The authenticated identity owns the subscription.
 
-Request body is the browser `PushSubscription.toJSON()` shape:
+Request body is the browser `PushSubscription.toJSON()` shape. The endpoint must use a supported Web Push provider host (`fcm.googleapis.com`, `updates.push.services.mozilla.com`, or `web.push.apple.com`):
 
 ```json
 {
-  "endpoint": "https://push.service/send/...",
+  "endpoint": "https://web.push.apple.com/send/...",
   "expirationTime": null,
   "keys": {
     "p256dh": "<browserP256dhKey>",
@@ -3582,7 +3582,7 @@ Response:
 
 ```json
 {
-  "endpoint": "https://push.service/send/...",
+  "endpoint": "https://web.push.apple.com/send/...",
   "expirationTime": null,
   "identityId": "<identityId>"
 }
@@ -3617,7 +3617,6 @@ Push delivery failures are logged with structured JSON including:
 - `endpoint`
 - `endpointHost`
 - `statusCode`
-- `body`
 - `error`
 - `shouldDeleteSubscription`
 
@@ -3650,8 +3649,7 @@ Response:
       "endpointHost": "web.push.apple.com",
       "delivered": false,
       "statusCode": 403,
-      "body": "<provider error body>",
-      "error": "<provider error>",
+      "error": "Web Push delivery failed.",
       "removed": false
     }
   ]

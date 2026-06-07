@@ -1,5 +1,4 @@
 export type PushNotificationDeliveryResult = {
-  body?: string;
   delivered: boolean;
   endpoint: string;
   endpointHost: string;

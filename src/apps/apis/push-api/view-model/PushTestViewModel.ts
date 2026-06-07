@@ -8,7 +8,6 @@ export class PushTestViewModel {
   public toResource(): PushTestResource {
     return {
       deliveries: this.results.map((result) => ({
-        body: result.body,
         delivered: result.delivered,
         endpoint: result.endpoint,
         endpointHost: result.endpointHost,

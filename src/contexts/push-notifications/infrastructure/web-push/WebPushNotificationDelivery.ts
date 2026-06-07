@@ -51,16 +51,6 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
     }
   }
 
-  private errorBody(error: unknown): string | undefined {
-    const body = (error as WebPushError).body;
-
-    if (body === undefined || body === null) {
-      return undefined;
-    }
-
-    return typeof body === 'string' ? body : JSON.stringify(body);
-  }
-
   private disabledDeliveryResult(
     endpoint: string,
   ): PushNotificationDeliveryResult {
@@ -78,7 +68,6 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
     sendResult: WebPushSendResult,
   ): PushNotificationDeliveryResult {
     return {
-      body: sendResult.body,
       delivered: true,
       endpoint,
       endpointHost: this.endpointHost(endpoint),
@@ -92,11 +81,10 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
     error: unknown,
   ): PushNotificationDeliveryResult {
     return {
-      body: this.errorBody(error),
       delivered: false,
       endpoint,
       endpointHost: this.endpointHost(endpoint),
-      error: String(error),
+      error: 'Web Push delivery failed.',
       shouldDeleteSubscription: this.isGone(error),
       statusCode: (error as WebPushError).statusCode,
     };
@@ -105,7 +93,6 @@ export class WebPushNotificationDelivery implements PushNotificationDelivery {
   private logFailedDelivery(result: PushNotificationDeliveryResult): void {
     Kernel.logger?.warn(
       JSON.stringify({
-        body: result.body,
         endpoint: result.endpoint,
         endpointHost: result.endpointHost,
         error: result.error,
