@@ -24,6 +24,15 @@ export default class IPFSContentRacer {
     return setTimeout(() => controller.abort(), this.timeoutMs);
   }
 
+  private async fallbackAfterDirectLookup<T>(
+    timeout: ReturnType<typeof setTimeout>,
+    lookup: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    clearTimeout(timeout);
+
+    return lookup(new AbortController().signal);
+  }
+
   public async raceGetJSON<T>(
     networks: IPFSNetwork[],
     cid: IPFSId,
@@ -40,7 +49,9 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      return this.fallback.getJSON<T>(networks, cid, controller.signal);
+      return this.fallbackAfterDirectLookup(timeout, (signal) =>
+        this.fallback.getJSON<T>(networks, cid, signal),
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -62,7 +73,9 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      return this.fallback.getBytes(networks, cid, controller.signal);
+      return this.fallbackAfterDirectLookup(timeout, (signal) =>
+        this.fallback.getBytes(networks, cid, signal),
+      );
     } finally {
       clearTimeout(timeout);
     }

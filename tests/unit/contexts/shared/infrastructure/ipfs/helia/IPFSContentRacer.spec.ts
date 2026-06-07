@@ -59,6 +59,29 @@ describe('IPFSContentRacer', () => {
         cid,
         expect.any(AbortSignal),
       );
+      expect(fallback.getJSON.mock.calls[0][2]?.aborted).toBe(false);
+    });
+
+    it('should use a fresh signal when direct JSON lookup was aborted', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network = mock<IPFSNetwork>();
+      const expected = { name: 'fallback' };
+
+      racer = new IPFSContentRacer(1, fallback);
+      network.getJSON.mockImplementation(
+        (_ipfsId: IPFSId, signal?: AbortSignal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+      );
+      fallback.getJSON.mockResolvedValue(expected);
+
+      const result = await racer.raceGetJSON([network], cid);
+
+      expect(result).toEqual(expected);
+      expect(fallback.getJSON.mock.calls[0][2]?.aborted).toBe(false);
     });
   });
 
@@ -79,6 +102,29 @@ describe('IPFSContentRacer', () => {
         cid,
         expect.any(AbortSignal),
       );
+      expect(fallback.getBytes.mock.calls[0][2]?.aborted).toBe(false);
+    });
+
+    it('should use a fresh signal when direct bytes lookup was aborted', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network = mock<IPFSNetwork>();
+      const expected = Buffer.from('fallback-bytes');
+
+      racer = new IPFSContentRacer(1, fallback);
+      network.getBytes.mockImplementation(
+        (_ipfsId: IPFSId, signal?: AbortSignal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+      );
+      fallback.getBytes.mockResolvedValue(expected);
+
+      const result = await racer.raceGetBytes([network], cid);
+
+      expect(result).toEqual(expected);
+      expect(fallback.getBytes.mock.calls[0][2]?.aborted).toBe(false);
     });
   });
 
