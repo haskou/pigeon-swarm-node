@@ -15,6 +15,8 @@ export interface IPFSConnection {
     handler: (payload: string) => Promise<void>,
   ): Promise<void>;
   blockPeer(peerId: string): Promise<void>;
+  connect(multiaddrs: string[]): Promise<void>;
+  getMultiaddrs(): string[];
   getPeers(): string[];
   getPeerId(): string;
   stop(): Promise<void>;

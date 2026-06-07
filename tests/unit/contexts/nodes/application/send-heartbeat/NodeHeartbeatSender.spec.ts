@@ -1,7 +1,7 @@
 import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
-import { Node } from '@app/contexts/nodes/domain/Node';
-import { Network } from '@app/contexts/nodes/domain/Network';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
+import { Network } from '@app/contexts/nodes/domain/Network';
+import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
 import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
@@ -24,7 +24,7 @@ describe('NodeHeartbeatSender', () => {
     sender = new NodeHeartbeatSender(nodeRepository, eventPublisher);
   });
 
-  it('publishes a heartbeat without private network keys', async () => {
+  async function privateNodeFixture() {
     const keyPair = await KeyPair.generate();
     const { privateKey } = generateKeyPairSync('ed25519');
     const owner = new IdentityId(keyPair.toPrimitives().publicKey);
@@ -46,6 +46,12 @@ describe('NodeHeartbeatSender', () => {
       owner,
     );
 
+    return { networkId, node, owner };
+  }
+
+  it('publishes a heartbeat without private network keys', async () => {
+    const { networkId, node, owner } = await privateNodeFixture();
+
     nodeRepository.loadLocalNode.mockResolvedValue(node);
 
     await sender.send();
@@ -62,6 +68,37 @@ describe('NodeHeartbeatSender', () => {
         {
           id: networkId,
           name: 'private',
+        },
+      ],
+      owner: owner.valueOf(),
+    });
+  });
+
+  it('publishes IPFS peer addresses for local networks', async () => {
+    const { networkId, node, owner } = await privateNodeFixture();
+
+    nodeRepository.loadLocalNode.mockResolvedValue(node);
+    sender = new NodeHeartbeatSender(nodeRepository, eventPublisher, {
+      getNetworks: async () => [
+        {
+          getId: () => networkId,
+          getMultiaddrs: () => ['/ip4/127.0.0.1/tcp/4001/p2p/local-peer'],
+          getPeerId: () => 'local-peer',
+        },
+      ],
+    } as never);
+
+    await sender.send();
+
+    const event = eventPublisher.publish.mock.calls[0][0][0];
+
+    expect(event.attributes).toEqual({
+      networks: [
+        {
+          id: networkId,
+          multiaddrs: ['/ip4/127.0.0.1/tcp/4001/p2p/local-peer'],
+          name: 'private',
+          peerId: 'local-peer',
         },
       ],
       owner: owner.valueOf(),

@@ -28,6 +28,7 @@ import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
+import ConnectIPFSNetworkPeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/ConnectIPFSNetworkPeerWhenHeartbeatReceived';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import RegisterIdentityPresenceWhenUpdated from '@app/apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated';
 import SendPushNotificationWhenEventReceived from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived';
@@ -65,6 +66,7 @@ import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructu
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
 import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -110,6 +112,7 @@ async function init() {
     RegisterNodePeerWhenHeartbeatReceived,
   );
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
+  const ipfs = Kernel.di.getService<IPFS>(IPFS);
   const conversationRepository =
     Kernel.di.getService<MongoConversationRepository>(
       MongoConversationRepository,
@@ -156,6 +159,7 @@ async function init() {
   );
 
   kernel.addConsumerInstances(
+    new ConnectIPFSNetworkPeerWhenHeartbeatReceived(messageBus, ipfs),
     new MarkMessagesReadWhenAnnounced(
       messageBus,
       new MessagesReadRegistrar(conversationRepository),

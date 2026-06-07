@@ -107,6 +107,14 @@ export class IPFSNetwork {
     return this.connection.blockPeer(peerId);
   }
 
+  public async connect(multiaddrs: string[]): Promise<void> {
+    return this.connection.connect(multiaddrs);
+  }
+
+  public getMultiaddrs(): string[] {
+    return this.connection.getMultiaddrs();
+  }
+
   public getPeers(): string[] {
     return this.connection.getPeers();
   }

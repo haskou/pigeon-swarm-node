@@ -1,4 +1,9 @@
 export type NodeHeartbeatAttributes = {
-  networks: Array<{ id: string; name: string }>;
+  networks: Array<{
+    id: string;
+    multiaddrs?: string[];
+    name: string;
+    peerId?: string;
+  }>;
   owner?: string;
 };

@@ -1,8 +1,8 @@
+import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
-import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
 import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
@@ -12,22 +12,23 @@ import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
+import ConnectIPFSNetworkPeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/ConnectIPFSNetworkPeerWhenHeartbeatReceived';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
-import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
-import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
 import { RegisterConversationMessage as RegisterConversationMetadataMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
+import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
+import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
 import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
+import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
@@ -57,6 +58,7 @@ import { NodePeerRegisterMessage } from '@app/contexts/nodes/application/registe
 import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { Signature } from '@haskou/value-objects';
@@ -364,9 +366,9 @@ describe('PubSub sync consumers', () => {
       expect.any(RegisterConversationMessage),
       expect.any(MessageSent),
     );
-    expect(
-      registrar.registerCandidate.mock.calls[0][1].toPrimitives(),
-    ).toEqual(candidate.toPrimitives());
+    expect(registrar.registerCandidate.mock.calls[0][1].toPrimitives()).toEqual(
+      candidate.toPrimitives(),
+    );
   });
 
   it('responds to conversation sync requests', async () => {
@@ -450,7 +452,6 @@ describe('PubSub sync consumers', () => {
 
     await consumer.handler(
       new ConversationSyncAvailableEvent(conversationId, {
-        messageCandidates: [{ messageId }, { messageId: 42 }, null],
         conversation: {
           id: conversationId,
           networkId: '550e8400-e29b-41d4-a716-446655440011',
@@ -460,6 +461,7 @@ describe('PubSub sync consumers', () => {
           ],
           type: 'one-to-one',
         },
+        messageCandidates: [{ messageId }, { messageId: 42 }, null],
       }),
     );
 
@@ -551,7 +553,8 @@ describe('PubSub sync consumers', () => {
       new ConversationSyncAvailableEvent(conversationId, {
         reactionCandidates: [
           {
-            authorId: 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+            authorId:
+              'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
             createdAt: 1778513696020,
             emoji: '👍',
             messageId,
@@ -609,5 +612,47 @@ describe('PubSub sync consumers', () => {
       id: networkId,
       name: 'public',
     });
+  });
+
+  it('connects IPFS network peers announced by heartbeat events', async () => {
+    const nodeId = '550e8400-e29b-41d4-a716-446655440010';
+    const networkId = '550e8400-e29b-41d4-a716-446655440011';
+    const connect = jest.fn().mockResolvedValue(undefined);
+    const ipfs = {
+      getNetwork: jest.fn().mockResolvedValue({
+        connect,
+        getPeerId: () => 'local-peer',
+      }),
+    };
+    const consumer = new ConnectIPFSNetworkPeerWhenHeartbeatReceived(
+      eventConsumer,
+      ipfs as unknown as IPFS,
+    );
+
+    await consumer.init();
+    await consumer.handler(
+      new NodeHeartbeatWasSent(nodeId, {
+        networks: [
+          {
+            id: networkId,
+            multiaddrs: ['/ip4/127.0.0.1/tcp/4001/p2p/remote-peer'],
+            name: 'private',
+            peerId: 'remote-peer',
+          },
+        ],
+      }),
+    );
+
+    expect(eventConsumer.consume).toHaveBeenCalledWith(
+      ConnectIPFSNetworkPeerWhenHeartbeatReceived.QUEUE_NAME,
+      NodeHeartbeatWasSent.EVENT_NAME,
+      NodeHeartbeatWasSent,
+      'pigeon-swarm',
+      expect.any(Function),
+    );
+    expect(ipfs.getNetwork).toHaveBeenCalledWith(networkId);
+    expect(connect).toHaveBeenCalledWith([
+      '/ip4/127.0.0.1/tcp/4001/p2p/remote-peer',
+    ]);
   });
 });

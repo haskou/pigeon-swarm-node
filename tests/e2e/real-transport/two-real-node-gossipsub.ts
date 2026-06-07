@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 import 'module-alias/register';
-
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -76,6 +75,14 @@ async function main(): Promise<void> {
     await stopNode(nodeB);
 
     await startNode(nodeB, mongo.getUri());
+    const publicContent = Buffer.from('node-a-public-ipfs-content');
+    const publicContentCid = await publishPublicIPFSContent(
+      nodeA,
+      nodeAIdentity,
+      publicContent,
+    );
+
+    await waitForIPFSBytes(nodeB, publicContentCid, publicContent);
     await waitForIdentity(nodeB, nodeAIdentity.id);
     await waitForKeychain(nodeB, nodeAIdentity);
 
@@ -106,7 +113,12 @@ async function main(): Promise<void> {
       'node-a-message-payload',
     );
     await nodeBMessages;
-    await waitForMessage(nodeB, nodeBIdentity, conversation.id, messageFromA.id);
+    await waitForMessage(
+      nodeB,
+      nodeBIdentity,
+      conversation.id,
+      messageFromA.id,
+    );
 
     await stopNode(nodeB);
     const offlineMessageFromA = await sendConversationMessage(
@@ -124,12 +136,10 @@ async function main(): Promise<void> {
       conversation.id,
       offlineMessageFromA.id,
     );
-    await waitForConversationTimeline(
-      nodeB,
-      nodeBIdentity,
-      conversation.id,
-      [messageFromA.id, offlineMessageFromA.id],
-    );
+    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+    ]);
 
     const nodeAMessages = listenForDomainEvents(
       nodeA,
@@ -145,29 +155,33 @@ async function main(): Promise<void> {
       'node-b-reply-payload',
     );
     await nodeAMessages;
-    await waitForMessage(nodeA, nodeAIdentity, conversation.id, messageFromB.id);
-    await waitForConversationTimeline(
+    await waitForMessage(
       nodeA,
       nodeAIdentity,
       conversation.id,
-      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
+      messageFromB.id,
     );
-    await waitForConversationTimeline(
-      nodeB,
-      nodeBIdentity,
-      conversation.id,
-      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
-    );
+    await waitForConversationTimeline(nodeA, nodeAIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+      messageFromB.id,
+    ]);
+    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+      messageFromB.id,
+    ]);
 
     console.info(
       JSON.stringify(
         {
           conversationId: conversation.id,
           messageFromA: messageFromA.id,
-          offlineMessageFromA: offlineMessageFromA.id,
           messageFromB: messageFromB.id,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
+          offlineMessageFromA: offlineMessageFromA.id,
+          publicContentCid,
           result: 'PASS',
           transportDsn: 'libp2p-gossipsub://',
         },
@@ -180,6 +194,26 @@ async function main(): Promise<void> {
     await mongo.stop();
     await fs.remove(TMP_ROOT);
   }
+}
+
+async function publishPublicIPFSContent(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  bytes: Buffer,
+): Promise<string> {
+  const response = await request(
+    node,
+    'POST',
+    '/ipfs/public',
+    bytes,
+    identity,
+    {
+      'content-type': 'text/plain',
+      'x-filename': 'node-a-public-content.txt',
+    },
+  );
+
+  return response.cid;
 }
 
 function buildNodeRuntime(name: string, port: number): NodeRuntime {
@@ -339,7 +373,9 @@ async function publishKeychain(
   };
   const body = {
     ...bodyWithoutSignature,
-    signature: identity.keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    signature: identity.keyPair
+      .sign(JSON.stringify(signaturePayload))
+      .valueOf(),
   };
   const response = await request(node, 'POST', '/keychains/', body, identity);
 
@@ -402,7 +438,10 @@ async function waitForIdentity(
 ): Promise<void> {
   const path = `/identities/${encodeURIComponent(identityId)}`;
 
-  await waitFor(async () => (await requestMaybe(node, 'GET', path)) !== undefined, `${node.name} to sync identity`);
+  await waitFor(
+    async () => (await requestMaybe(node, 'GET', path)) !== undefined,
+    `${node.name} to sync identity`,
+  );
 }
 
 async function waitForKeychain(
@@ -412,7 +451,9 @@ async function waitForKeychain(
   const path = `/keychains/${encodeURIComponent(identity.id)}`;
 
   await waitFor(
-    async () => (await requestMaybe(node, 'GET', path, undefined, identity)) !== undefined,
+    async () =>
+      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
+      undefined,
     `${node.name} to sync keychain`,
   );
 }
@@ -435,7 +476,9 @@ async function waitForConversation(
       : response?.data;
 
     return Array.isArray(conversations)
-      ? conversations.some((conversation: { id: string }) => conversation.id === conversationId)
+      ? conversations.some(
+          (conversation: { id: string }) => conversation.id === conversationId,
+        )
       : false;
   }, `${node.name} to sync conversation`);
 }
@@ -451,9 +494,35 @@ async function waitForMessage(
   )}/messages/${encodeURIComponent(messageId)}`;
 
   await waitFor(
-    async () => (await requestMaybe(node, 'GET', path, undefined, identity)) !== undefined,
+    async () =>
+      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
+      undefined,
     `${node.name} to sync message ${messageId}`,
   );
+}
+
+async function waitForIPFSBytes(
+  node: NodeRuntime,
+  cid: string,
+  expectedBytes: Buffer,
+): Promise<void> {
+  await waitFor(async () => {
+    const response = await requestMaybe(
+      node,
+      'GET',
+      `/ipfs/${encodeURIComponent(cid)}`,
+    );
+
+    if (response === undefined) {
+      return false;
+    }
+
+    const bytes = Buffer.isBuffer(response)
+      ? response
+      : Buffer.from(String(response));
+
+    return bytes.equals(expectedBytes);
+  }, `${node.name} to fetch IPFS CID ${cid}`);
 }
 
 async function waitForConversationTimeline(
@@ -494,7 +563,14 @@ async function listenForDomainEvents(
 ): Promise<void> {
   const timestamp = String(Date.now());
   const nonce = randomUUID();
-  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, nonce, {});
+  const signature = signRequest(
+    identity.keyPair,
+    'GET',
+    '/ws',
+    timestamp,
+    nonce,
+    {},
+  );
   const query = new URLSearchParams({
     identityId: identity.id,
     nonce,
@@ -541,19 +617,27 @@ async function request(
   requestPath: string,
   body?: unknown,
   signer?: IdentityFixture,
+  extraHeaders: Record<string, string> = {},
 ): Promise<any> {
   const canonicalPath = requestPath.split('?')[0];
   const response = await axios.request({
     data: body,
-    headers: signer
-      ? signHeaders(signer, method, canonicalPath, body ?? {})
-      : {},
+    headers: {
+      ...(signer ? signHeaders(signer, method, canonicalPath, body ?? {}) : {}),
+      ...extraHeaders,
+    },
     method,
+    responseType:
+      method === 'GET' && requestPath.startsWith('/ipfs/')
+        ? 'arraybuffer'
+        : 'json',
     timeout: REQUEST_TIMEOUT_MS,
     url: `${node.baseUrl}${requestPath}`,
   });
 
-  return response.data;
+  return response.data instanceof ArrayBuffer
+    ? Buffer.from(response.data)
+    : response.data;
 }
 
 async function requestMaybe(

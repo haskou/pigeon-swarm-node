@@ -391,6 +391,26 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
   }
 
+  public async connect(multiaddrs: string[]): Promise<void> {
+    for (const address of multiaddrs) {
+      try {
+        const multiaddr = await heliaRuntimeAdapter.createMultiaddr(address);
+
+        await this.heliaCore.libp2p.dial(multiaddr);
+      } catch (error: unknown) {
+        Kernel.logger.debug(
+          `IPFS peer dial skipped for address "${address}": ${String(error)}`,
+        );
+      }
+    }
+  }
+
+  public getMultiaddrs(): string[] {
+    return this.heliaCore.libp2p
+      .getMultiaddrs()
+      .map((multiaddr) => multiaddr.toString());
+  }
+
   public getPeers(): string[] {
     return this.heliaCore.libp2p.getPeers().map((peer) => peer.toString());
   }
