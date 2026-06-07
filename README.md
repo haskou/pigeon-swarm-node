@@ -116,7 +116,10 @@ For NAT traversal experiments, a node can expose one public libp2p relay with
 private network through public IPFS routing. Those private relay directory
 records use lookup keys and signatures derived from the private network key, so
 unrelated public peers cannot enumerate private network ids or validate relay
-records. The public relay path is used only for fallback connectivity: private
+records. Relay nodes and leaf nodes retry private relay directory
+publish/discovery periodically, so discovery does not depend on the first public
+IPFS routing tick at startup. The public relay path is used only for fallback
+connectivity: private
 network events and IPFS content requests remain encrypted with the private
 network key.
 

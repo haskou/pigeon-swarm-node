@@ -10,6 +10,7 @@ describe('PublicRelayConfiguration', () => {
     expect(configuration.getRelayPort()).toBe(4011);
     expect(configuration.hasPublicHost()).toBe(false);
     expect(configuration.isRelayDiscoveryEnabled()).toBe(true);
+    expect(configuration.getPrivateRelayRecordRefreshMs()).toBe(15000);
     expect(configuration.getRelayRecordTtlMs()).toBe(300000);
     expect(configuration.getBootstrapRelayMultiaddrs()).toEqual([]);
   });
@@ -19,6 +20,7 @@ describe('PublicRelayConfiguration', () => {
       PIGEON_BOOTSTRAP_RELAY_MULTIADDRS:
         ' /dns4/relay-a.test/tcp/4011/p2p/12D3A, /ip4/203.0.113.7/tcp/4011/p2p/12D3B ',
       PIGEON_LIBP2P_PORT: '4101',
+      PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS: '7',
       PIGEON_PUBLIC_HOST: 'relay.example.com',
       PIGEON_RELAY_AUTO_ENABLE: 'true',
       PIGEON_RELAY_DISCOVERY_ENABLED: 'false',
@@ -34,6 +36,7 @@ describe('PublicRelayConfiguration', () => {
     expect(configuration.getPublicHost()).toBe('relay.example.com');
     expect(configuration.hasPublicHost()).toBe(true);
     expect(configuration.isRelayDiscoveryEnabled()).toBe(false);
+    expect(configuration.getPrivateRelayRecordRefreshMs()).toBe(7000);
     expect(configuration.getRelayRecordTtlMs()).toBe(120000);
     expect(configuration.getBootstrapRelayMultiaddrs()).toEqual([
       '/dns4/relay-a.test/tcp/4011/p2p/12D3A',

@@ -334,9 +334,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     });
 
-    if (this.hasPeers()) {
-      await this.publishRoutingRecord(key, value, signal);
-    }
+    await this.publishRoutingRecord(key, value, signal);
   }
 
   public async getRecord(

@@ -2,6 +2,7 @@ import { PublicRelayConfigurationOptions } from './PublicRelayConfigurationOptio
 
 export class PublicRelayConfiguration {
   private static readonly DEFAULT_LIBP2P_PORT = 4001;
+  private static readonly DEFAULT_PRIVATE_RELAY_RECORD_REFRESH_SECONDS = 15;
   private static readonly DEFAULT_RELAY_PORT = 4011;
   private static readonly DEFAULT_RELAY_RECORD_TTL_SECONDS = 300;
 
@@ -18,6 +19,10 @@ export class PublicRelayConfiguration {
       libp2pPort: Number(
         environment.PIGEON_LIBP2P_PORT ||
           PublicRelayConfiguration.DEFAULT_LIBP2P_PORT,
+      ),
+      privateRelayRecordRefreshSeconds: Number(
+        environment.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS ||
+          PublicRelayConfiguration.DEFAULT_PRIVATE_RELAY_RECORD_REFRESH_SECONDS,
       ),
       publicHost: environment.PIGEON_PUBLIC_HOST,
       relayAutoEnabled: environment.PIGEON_RELAY_AUTO_ENABLE === 'true',
@@ -51,6 +56,10 @@ export class PublicRelayConfiguration {
 
   public getLibp2pPort(): number {
     return this.options.libp2pPort;
+  }
+
+  public getPrivateRelayRecordRefreshMs(): number {
+    return this.options.privateRelayRecordRefreshSeconds * 1000;
   }
 
   public getRelayPort(): number {

@@ -73,6 +73,7 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { MongoIndexInitializer } from '@app/shared/infrastructure/mongodb/MongoIndexInitializer';
 import { MongoPublicRelayRecordRepository } from '@app/shared/infrastructure/network/relay/MongoPublicRelayRecordRepository';
 import { PrivateNetworkRelayRecordDirectory } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import { PublicRelayConfiguration } from '@app/shared/infrastructure/network/relay/PublicRelayConfiguration';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { PublicRelayRuntime } from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 
@@ -311,9 +312,11 @@ async function init() {
   console.timeEnd('IPFS Runtime');
 
   console.time('Private relay record discovery');
+  const relayConfiguration = PublicRelayConfiguration.fromEnvironment();
+
   await new PrivateNetworkRelayRecordDirectory(
     Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry),
-  ).start();
+  ).startDiscoveryRefresh(relayConfiguration.getPrivateRelayRecordRefreshMs());
   console.timeEnd('Private relay record discovery');
 
   console.time('Republish local routing records');

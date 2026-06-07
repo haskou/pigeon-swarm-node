@@ -36,6 +36,10 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     version: 1,
   };
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('should publish and discover relay records scoped by private network key', async () => {
     const publicConnection = new InMemoryPublicConnection();
     const registry = new PublicRelayRecordRegistry();
@@ -130,6 +134,24 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       relayRecord,
       relayRecord.signature,
     );
+  });
+
+  it('should refresh private relay discovery periodically', async () => {
+    jest.useFakeTimers();
+    const publicConnection = new InMemoryPublicConnection();
+    const directory = new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      new PublicRelayRecordRegistry(),
+      undefined,
+      async () => publicConnection,
+    );
+    const discover = jest.spyOn(directory, 'discover');
+
+    await directory.startDiscoveryRefresh(1000);
+    jest.advanceTimersByTime(1000);
+    await Promise.resolve();
+
+    expect(discover).toHaveBeenCalledTimes(2);
   });
 
   function privateNetwork(key: string): IPFSNetwork {

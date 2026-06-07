@@ -13,6 +13,8 @@ export class PrivateNetworkRelayRecordDirectory {
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
+  private discoveryInterval?: NodeJS.Timeout;
+
   private publicConnection?: Promise<IPFSConnection>;
 
   private readonly authenticator: PrivateNetworkRelayRecordAuthenticator;
@@ -163,6 +165,12 @@ export class PrivateNetworkRelayRecordDirectory {
   }
 
   public async start(): Promise<PublicRelayRecordPrimitives[]> {
+    return this.startDiscoveryRefresh(15000);
+  }
+
+  public async startDiscoveryRefresh(
+    intervalMs: number,
+  ): Promise<PublicRelayRecordPrimitives[]> {
     this.networkRegistry.onNetworkRegistered((network) => {
       if (!network.isPrivate()) {
         return;
@@ -176,6 +184,17 @@ export class PrivateNetworkRelayRecordDirectory {
         );
       });
     });
+
+    if (!this.discoveryInterval) {
+      this.discoveryInterval = setInterval(() => {
+        this.discover().catch((error: unknown) => {
+          Kernel.logger.debug(
+            `Private relay record discovery refresh failed: ${String(error)}`,
+          );
+        });
+      }, intervalMs);
+      this.discoveryInterval.unref?.();
+    }
 
     return this.discover();
   }

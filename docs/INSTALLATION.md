@@ -121,6 +121,7 @@ installed `web-push` module path.
 | `PIGEON_RELAY_PORT` | `4011` | No | Dedicated public relay listen port. Do not reuse the HTTP/Express port. |
 | `PIGEON_PUBLIC_HOST` | unset | Required for advertised public relay nodes | Public DNS name or IP used to build dialable relay multiaddrs. |
 | `PIGEON_RELAY_DISCOVERY_ENABLED` | `true` | No | Enables relay discovery/diagnostics feature flags. |
+| `PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS` | `15` | No | Interval for private-network relay directory publish/discovery retries. Keep it short enough to survive public IPFS routing warmup. |
 | `PIGEON_RELAY_RECORD_TTL_SECONDS` | `300` | No | TTL used when building signed public relay records. |
 | `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` | unset | No | Comma-separated public relay multiaddrs used as explicit bootstrap peers. Nodes can also discover relay records for private networks through the public IPFS routing layer when they know that private network key. |
 

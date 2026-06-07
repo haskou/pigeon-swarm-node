@@ -22,6 +22,7 @@ export class PublicRelayRuntime {
     failoverInterval?: NodeJS.Timeout;
     node?: PublicRelayRuntimeNode;
     networkRegistrationListenerStarted?: boolean;
+    privateRelayRecordRefreshInterval?: NodeJS.Timeout;
     relayStateLogged?: boolean;
     relayRecord?: PublicRelayDebugState['relayRecord'];
   } {
@@ -30,6 +31,7 @@ export class PublicRelayRuntime {
         failoverInterval?: NodeJS.Timeout;
         node?: PublicRelayRuntimeNode;
         networkRegistrationListenerStarted?: boolean;
+        privateRelayRecordRefreshInterval?: NodeJS.Timeout;
         relayStateLogged?: boolean;
         relayRecord?: PublicRelayDebugState['relayRecord'];
       };
@@ -181,6 +183,21 @@ export class PublicRelayRuntime {
     }, intervalMs);
   }
 
+  private startPrivateRelayRecordRefresh(): void {
+    if (this.state.privateRelayRecordRefreshInterval) {
+      return;
+    }
+
+    this.state.privateRelayRecordRefreshInterval = setInterval(() => {
+      if (!this.state.relayRecord) {
+        return;
+      }
+
+      void this.privateDirectory.publish(this.state.relayRecord);
+    }, this.configuration.getPrivateRelayRecordRefreshMs());
+    this.state.privateRelayRecordRefreshInterval.unref?.();
+  }
+
   private startFailoverMonitor(): void {
     if (
       this.state.failoverInterval ||
@@ -243,6 +260,7 @@ export class PublicRelayRuntime {
     }
 
     this.startRecordRefresh();
+    this.startPrivateRelayRecordRefresh();
 
     Kernel.logger.info(
       `Public relay runtime started peerId="${peerId || 'unknown'}" advertised=${Boolean(
