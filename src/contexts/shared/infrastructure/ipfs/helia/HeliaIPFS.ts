@@ -349,17 +349,19 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
     const decoder = new TextDecoder();
 
-    if (this.hasPeers()) {
-      try {
-        const value = await this.heliaCore.routing.get(
-          new TextEncoder().encode(key),
-          { signal },
-        );
+    const routingAbort = this.createRoutingAbortSignal(signal);
 
-        return decoder.decode(value);
-      } catch {
-        // Fallback to local datastore.
-      }
+    try {
+      const value = await this.heliaCore.routing.get(
+        new TextEncoder().encode(key),
+        { signal: routingAbort.signal },
+      );
+
+      return decoder.decode(value);
+    } catch {
+      // Fallback to local datastore.
+    } finally {
+      clearTimeout(routingAbort.timeout);
     }
 
     return undefined;
