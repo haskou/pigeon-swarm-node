@@ -95,6 +95,14 @@ export class CommunityChannelMessage {
     return this.metadata.getAuthorIdentityId();
   }
 
+  public isIdentifiedBy(messageId: CommunityChannelMessageId): boolean {
+    return this.metadata.getId().isEqual(messageId);
+  }
+
+  public hasPlaintextPayload(): boolean {
+    return this.payload?.isPlaintext() ?? false;
+  }
+
   public getMentions(): CommunityChannelMessageMention[] {
     return this.mentions;
   }

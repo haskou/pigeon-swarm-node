@@ -1,3 +1,5 @@
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -79,6 +81,23 @@ export default class RespondToCommunitySyncRequest extends Consumer {
     return syncData.community?.belongsToNetwork(networkId) ?? false;
   }
 
+  private syncableMessages(
+    messages: CommunityChannelMessage[],
+  ): CommunityChannelMessage[] {
+    return messages.filter((message) => !message.hasPlaintextPayload());
+  }
+
+  private syncableReactions(
+    reactions: CommunityChannelMessageReaction[],
+    messages: CommunityChannelMessage[],
+  ): CommunityChannelMessageReaction[] {
+    return reactions.filter((reaction) =>
+      messages.some((message) =>
+        message.isIdentifiedBy(reaction.getMessageId()),
+      ),
+    );
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
@@ -104,15 +123,21 @@ export default class RespondToCommunitySyncRequest extends Consumer {
       return;
     }
 
+    const messageCandidates = this.syncableMessages(syncData.messages);
+    const reactionCandidates = this.syncableReactions(
+      syncData.reactions,
+      messageCandidates,
+    );
+
     await this.eventPublisher.publish([
       new CommunitySyncAvailableEvent(event.aggregateId, {
         community: syncData.community?.toPrimitives(),
         communityId: event.aggregateId,
-        messageCandidates: syncData.messages.map((message) =>
+        messageCandidates: messageCandidates.map((message) =>
           message.toPrimitives(),
         ),
         networkId: networkId.valueOf(),
-        reactionCandidates: syncData.reactions.map((reaction) =>
+        reactionCandidates: reactionCandidates.map((reaction) =>
           reaction.toPrimitives(),
         ),
         requestId,
