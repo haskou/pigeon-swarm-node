@@ -102,6 +102,9 @@ describe('Libp2pGossipsubRuntimeAdapter', () => {
             type: 'bootstrap-discovery',
           },
         ],
+        transports: [
+          expect.any(Function),
+        ],
       }),
     );
   });

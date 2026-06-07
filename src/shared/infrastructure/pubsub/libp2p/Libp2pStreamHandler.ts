@@ -1,6 +1,6 @@
 import { Libp2pStream } from './Libp2pStream';
 
-export type Libp2pStreamHandler = (event: {
-  connection?: { remotePeer?: { toString(): string } };
-  stream: Libp2pStream;
-}) => void | Promise<void>;
+export type Libp2pStreamHandler = (
+  stream: Libp2pStream,
+  connection?: { remotePeer?: { toString(): string } },
+) => void | Promise<void>;

@@ -13,6 +13,39 @@ Pigeon Swarm currently mixes several concepts that should remain separate:
 
 The relay architecture must therefore be based primarily on libp2p peer identity, not application identity.
 
+## Current Implementation Status
+
+Implemented in this branch:
+
+- `PIGEON_RELAY_ENABLED=true` starts one public libp2p relay-capable node for
+  the backend node.
+- Helia's public relay service is used when available; the relay runtime keeps
+  relay service setup idempotent to avoid registering duplicate libp2p relay
+  protocols.
+- The public/fallback libp2p runtime bootstraps from
+  `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
+- Leaf nodes announce public or relayed multiaddrs on
+  `pigeon-swarm.public-relay.peers.v1`.
+- Public relay nodes subscribe to that peer-announcement topic so leaf nodes can
+  discover and dial one another after bootstrapping to the relay.
+- Private-network domain events are published both through the direct private
+  pnet topic and through an encrypted public fallback GossipSub topic derived
+  from the private network key.
+- Private IPFS content can be fetched over
+  `/pigeon-swarm/ipfs-content/1.0.0`; request and response payloads are
+  encrypted with the private network key and imported only when the resulting
+  CID matches the requested CID.
+- `yarn test:e2e:real-transport:relay-fallback` verifies one public relay and
+  two separate peer processes exchanging a private fallback event and private
+  IPFS bytes through that relay path.
+
+Still future work:
+
+- Persisted relay record discovery/health election. Today operators can provide
+  bootstrap relays through `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
+- Automatic relay failover from persisted records.
+- Admin controls for accepting, rejecting, or banning relay/peer records.
+
 ## Goals
 
 - Allow nodes behind NAT to participate by using reachable relay nodes.

@@ -9,6 +9,7 @@ import { Libp2pStreamHandler } from '@app/shared/infrastructure/pubsub/libp2p/Li
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
 import { IPFSId } from '../helia/IPFSId';
 import { IPFSNetwork } from '../networks/IPFSNetwork';
+import IPFSNetworkRegistry from '../networks/IPFSNetworkRegistry';
 import { ContentRequest } from './ContentRequest';
 import { ContentResponse } from './ContentResponse';
 import { DecodedRequest } from './DecodedRequest';
@@ -144,7 +145,7 @@ export class PublicIPFSContentFallback {
   }
 
   private incomingStreamHandler(): Libp2pStreamHandler {
-    return ({ stream }): void => {
+    return (stream): void => {
       this.handleStream(stream).catch(() => {
         stream.close().catch((): undefined => undefined);
       });
@@ -309,6 +310,19 @@ export class PublicIPFSContentFallback {
     }
 
     throw new IPFSContentNotFoundError(cid.valueOf());
+  }
+
+  public async serve(networks: IPFSNetwork[]): Promise<void> {
+    await this.ensureHandler(networks);
+  }
+
+  public async serveRegistry(
+    networkRegistry: IPFSNetworkRegistry,
+  ): Promise<void> {
+    await this.serve(networkRegistry.getAll());
+    networkRegistry.onNetworkRegistered((network) => {
+      void this.serve([network]);
+    });
   }
 
   public async getJSON<T>(

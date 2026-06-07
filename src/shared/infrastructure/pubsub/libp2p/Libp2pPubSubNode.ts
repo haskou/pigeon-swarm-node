@@ -10,12 +10,20 @@ export type Libp2pPubSubNode = {
   getConnections?: () => unknown[];
   getMultiaddrs?: () => unknown[];
   getPeers?: () => unknown[];
+  dial?: (
+    peer: unknown,
+    options?: { signal?: AbortSignal },
+  ) => Promise<unknown>;
   dialProtocol?: (
     peer: unknown,
-    protocol: string,
+    protocol: string | string[],
     options?: { signal?: AbortSignal },
   ) => Promise<Libp2pStream>;
-  handle?: (protocol: string, handler: Libp2pStreamHandler) => Promise<void>;
+  handle?: (
+    protocol: string | string[],
+    handler: Libp2pStreamHandler,
+    options?: unknown,
+  ) => Promise<void>;
   peerId?: { toString(): string };
   services: {
     pubsub: Libp2pPubSubService;

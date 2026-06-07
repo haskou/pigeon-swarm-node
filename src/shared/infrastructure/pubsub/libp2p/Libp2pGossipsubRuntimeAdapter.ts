@@ -1,6 +1,7 @@
 import NetworkDiagnosticsLogger from '../../network/NetworkDiagnosticsLogger';
 import { PublicRelayConfiguration } from '../../network/relay/PublicRelayConfiguration';
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
+import { PublicRelayPeerAnnouncer } from './PublicRelayPeerAnnouncer';
 
 export class Libp2pGossipsubRuntimeAdapter {
   private static readonly globalNodeKey = '__pigeonSwarmPublicLibp2pNode';
@@ -167,6 +168,7 @@ export class Libp2pGossipsubRuntimeAdapter {
       mode: 'public',
       name: 'standalone-gossipsub',
     });
+    await new PublicRelayPeerAnnouncer().start(node);
 
     return node;
   }

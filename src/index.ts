@@ -65,6 +65,7 @@ import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructu
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
 import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
+import { PublicIPFSContentFallback } from '@app/contexts/shared/infrastructure/ipfs/fallback/PublicIPFSContentFallback';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
@@ -289,6 +290,9 @@ async function init() {
   console.time('IPFS Runtime');
   const ipfsRuntime = new IPFSRuntime();
   await ipfsRuntime.run();
+  await new PublicIPFSContentFallback().serveRegistry(
+    Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry),
+  );
   console.timeEnd('IPFS Runtime');
 
   console.time('Republish local routing records');

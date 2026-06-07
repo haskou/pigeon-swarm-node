@@ -112,7 +112,9 @@ exchange events:
 For NAT traversal experiments, a node can expose one public libp2p relay with
 `PIGEON_RELAY_ENABLED=true`, `PIGEON_PUBLIC_HOST=<public-dns-or-ip>` and
 `PIGEON_RELAY_PORT=4011`. Other nodes can bootstrap against that relay through
-`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
+`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`. The public relay path is used only for
+fallback connectivity: private network events and IPFS content requests remain
+encrypted with the private network key.
 
 See [docs/INSTALLATION.md](./docs/INSTALLATION.md) for the full environment
 setup.
@@ -126,6 +128,7 @@ yarn test
 yarn test:unit
 yarn test:api
 yarn test:consumer
+yarn test:e2e:real-transport:relay-fallback
 ```
 
 Docker helpers are available through the `Makefile`:

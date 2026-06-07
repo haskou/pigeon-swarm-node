@@ -173,6 +173,13 @@ does not include the private `networkId`; the payload remains encrypted with the
 same private network key used by direct private-network pub/sub. This lets relay
 nodes move gossip without learning the private network id or payload.
 
+Leaf nodes announce their public/relayed libp2p multiaddrs on a public
+GossipSub peer-discovery topic. Relay nodes subscribe to that public topic so
+leaf nodes bootstrapped to the same relay can discover and dial one another.
+Only public `peerId` and public multiaddrs are announced there; private network
+ids, PSK values, private keys, application owner identity and identity metadata
+are not included.
+
 When direct private IPFS retrieval fails, the backend can also request content
 over the public fallback libp2p runtime with protocol
 `/pigeon-swarm/ipfs-content/1.0.0`. Requests and responses are encrypted with
@@ -189,6 +196,16 @@ ports:
   - "4001:4001"
   - "4011:4011"
 ```
+
+The focused real-transport smoke test for this path is:
+
+```bash
+yarn test:e2e:real-transport:relay-fallback
+```
+
+It starts one public relay process and two peer processes, then verifies both
+encrypted private fallback GossipSub and encrypted private IPFS content fetches
+through the public relay path.
 
 `GET /node/network/debug` returns sanitized runtime diagnostics so operators can
 check whether relay mode is enabled, running, advertised and bootstrapped. It
