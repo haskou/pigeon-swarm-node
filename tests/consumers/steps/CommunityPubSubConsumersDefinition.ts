@@ -218,7 +218,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
         findById: async (): Promise<undefined> => undefined,
       } as unknown as MongoCommunityRepository,
       {
-        findByCommunity: async (): Promise<[]> => [],
+        findSyncableByCommunity: async (): Promise<[]> => [],
       } as unknown as MongoCommunityChannelMessageRepository,
       {
         findByCommunity: async (): Promise<[]> => [],
@@ -245,7 +245,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
         findById: async (): Promise<undefined> => undefined,
       } as unknown as MongoCommunityRepository,
       {
-        findByCommunity: async (): Promise<unknown[]> => [
+        findSyncableByCommunity: async (): Promise<unknown[]> => [
           { toPrimitives: (): object => ({ id: this.messageId }) },
         ],
       } as unknown as MongoCommunityChannelMessageRepository,
@@ -307,7 +307,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
           }),
       } as unknown as MongoCommunityRepository,
       {
-        findByCommunity: async (): Promise<[]> => [],
+        findSyncableByCommunity: async (): Promise<[]> => [],
       } as unknown as MongoCommunityChannelMessageRepository,
       {
         findByCommunity: async (): Promise<[]> => [],
