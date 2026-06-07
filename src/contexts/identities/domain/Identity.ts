@@ -123,6 +123,10 @@ export class Identity extends AggregateRoot {
     this.previousIdentityExternalIdentifier = previousReference;
 
     assert(
+      this.hasIdentityIdBoundToSigningKey(),
+      new InvalidIdentitySignatureError(),
+    );
+    assert(
       new IdentitySignatureDomainService().isValidSignature(
         this.encryptedKeyPair,
         this.toPrimitives(),
@@ -134,6 +138,14 @@ export class Identity extends AggregateRoot {
       this.networks.length() > 0,
       new IdentityMustHaveAtLeastOneNetworkError(),
     );
+  }
+
+  private getSigningIdentityId(): IdentityId {
+    return new IdentityId(this.encryptedKeyPair.toPrimitives().publicKey);
+  }
+
+  private hasIdentityIdBoundToSigningKey(): boolean {
+    return this.id.isEqual(this.getSigningIdentityId());
   }
 
   private async signNextPrimitives(
@@ -198,6 +210,10 @@ export class Identity extends AggregateRoot {
 
   public isNextVersionAfter(previous: Identity): boolean {
     return this.version.isNextAfter(previous.version);
+  }
+
+  public usesSameSigningKeyAs(previous: Identity): boolean {
+    return this.getSigningIdentityId().isEqual(previous.getSigningIdentityId());
   }
 
   public keepsNetworksFrom(previous: Identity): boolean {
