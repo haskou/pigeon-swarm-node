@@ -257,6 +257,8 @@ components:
             - bootstrapRelayMultiaddrs
             - debugReason
             - discoveryEnabled
+            - discoveredRelayCount
+            - discoveredRelayMultiaddrs
             - listenAddresses
             - relayAdvertised
             - relayEnabled
@@ -274,6 +276,12 @@ components:
               type: string
             discoveryEnabled:
               type: boolean
+            discoveredRelayCount:
+              type: number
+            discoveredRelayMultiaddrs:
+              type: array
+              items:
+                type: string
             listenAddresses:
               type: array
               items:

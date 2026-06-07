@@ -3,6 +3,7 @@ export type PublicRelayRecordPayload = {
   issuedAt: number;
   multiaddrs: string[];
   peerId: string;
+  publicKey: string;
   role: 'relay';
   version: 1;
 };

@@ -11,6 +11,8 @@ export class NodeNetworkDebugViewModel {
         advertisedAddresses: this.publicRelay.advertisedAddresses,
         bootstrapRelayMultiaddrs: this.publicRelay.bootstrapRelayMultiaddrs,
         debugReason: this.publicRelay.debugReason,
+        discoveredRelayCount: this.publicRelay.discoveredRelayCount,
+        discoveredRelayMultiaddrs: this.publicRelay.discoveredRelayMultiaddrs,
         discoveryEnabled: this.publicRelay.discoveryEnabled,
         listenAddresses: this.publicRelay.listenAddresses,
         peerId: this.publicRelay.peerId,

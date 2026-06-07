@@ -28,6 +28,11 @@ Implemented in this branch:
   `pigeon-swarm.public-relay.peers.v1`.
 - Public relay nodes subscribe to that peer-announcement topic so leaf nodes can
   discover and dial one another after bootstrapping to the relay.
+- Relay-capable nodes publish signed relay records on
+  `pigeon-swarm.public-relays.v1`.
+- Peers validate relay records with the advertised libp2p public key, verify
+  that the public key maps to the advertised `peerId`, reject expired records,
+  store active records in memory and dial the advertised relay multiaddrs.
 - Private-network domain events are published both through the direct private
   pnet topic and through an encrypted public fallback GossipSub topic derived
   from the private network key.
@@ -41,9 +46,11 @@ Implemented in this branch:
 
 Still future work:
 
-- Persisted relay record discovery/health election. Today operators can provide
-  bootstrap relays through `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
-- Automatic relay failover from persisted records.
+- Persist relay records across process restarts. Today active records are kept
+  in runtime memory and operators can still seed initial relays through
+  `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
+- Automatic relay election/failover that can enable relay mode on another node
+  when every known relay is unhealthy.
 - Admin controls for accepting, rejecting, or banning relay/peer records.
 
 ## Goals

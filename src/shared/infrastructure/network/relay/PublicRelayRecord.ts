@@ -1,4 +1,5 @@
 import { PublicRelayRecordPayload } from './PublicRelayRecordPayload';
+import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 
 export class PublicRelayRecord {
   public constructor(
@@ -6,7 +7,7 @@ export class PublicRelayRecord {
     private readonly signature: string,
   ) {}
 
-  public toPrimitives() {
+  public toPrimitives(): PublicRelayRecordPrimitives {
     return {
       ...this.payload,
       signature: this.signature,

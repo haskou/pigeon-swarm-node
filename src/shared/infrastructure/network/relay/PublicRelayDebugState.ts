@@ -3,6 +3,8 @@ export type PublicRelayDebugState = {
   bootstrapRelayMultiaddrs: string[];
   debugReason: string;
   discoveryEnabled: boolean;
+  discoveredRelayCount: number;
+  discoveredRelayMultiaddrs: string[];
   listenAddresses: string[];
   peerId?: string;
   relayAdvertised: boolean;
@@ -12,6 +14,7 @@ export type PublicRelayDebugState = {
     issuedAt: number;
     multiaddrs: string[];
     peerId: string;
+    publicKey: string;
     role: 'relay';
     signature: string;
     version: 1;

@@ -180,6 +180,12 @@ Only public `peerId` and public multiaddrs are announced there; private network
 ids, PSK values, private keys, application owner identity and identity metadata
 are not included.
 
+Relay-capable nodes also publish signed public relay records on
+`pigeon-swarm.public-relays.v1`. Each record includes the relay `peerId`, public
+libp2p key, public relay multiaddr, issue time and expiry time. Peers verify the
+signature and that the public key matches the advertised `peerId` before storing
+or dialing the relay.
+
 When direct private IPFS retrieval fails, the backend can also request content
 over the public fallback libp2p runtime with protocol
 `/pigeon-swarm/ipfs-content/1.0.0`. Requests and responses are encrypted with

@@ -4,13 +4,16 @@ import Kernel from '@app/Kernel';
 import { PublicRelayAddressFactory } from './PublicRelayAddressFactory';
 import { PublicRelayConfiguration } from './PublicRelayConfiguration';
 import { PublicRelayDebugState } from './PublicRelayDebugState';
+import { PublicRelayRecordDiscovery } from './PublicRelayRecordDiscovery';
 import { PublicRelayRecordPayload } from './PublicRelayRecordPayload';
+import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 import { PublicRelayRecordSigner } from './PublicRelayRecordSigner';
 import { PublicRelayRuntimeAdapter } from './PublicRelayRuntimeAdapter';
 import { PublicRelayRuntimeNode } from './PublicRelayRuntimeNode';
 
 export class PublicRelayRuntime {
   private static readonly globalStateKey = '__pigeonSwarmPublicRelayRuntime';
+  private static readonly recordRefreshDivider = 3;
 
   private get state(): {
     node?: PublicRelayRuntimeNode;
@@ -39,6 +42,10 @@ export class PublicRelayRuntime {
       addressFactory,
     ),
     private readonly signer = new PublicRelayRecordSigner(),
+    private readonly relayRecordRegistry = new PublicRelayRecordRegistry(),
+    private readonly discovery = new PublicRelayRecordDiscovery(
+      relayRecordRegistry,
+    ),
   ) {}
 
   private buildDebugReason(): string {
@@ -63,7 +70,7 @@ export class PublicRelayRuntime {
     }
 
     const issuedAt = Date.now();
-    const payload: PublicRelayRecordPayload = {
+    const payload: Omit<PublicRelayRecordPayload, 'publicKey'> = {
       expiresAt: issuedAt + this.configuration.getRelayRecordTtlMs(),
       issuedAt,
       multiaddrs: [relayAddress],
@@ -79,6 +86,41 @@ export class PublicRelayRuntime {
     return record.toPrimitives();
   }
 
+  private async publishCurrentRelayRecord(): Promise<void> {
+    const peerId = this.state.node?.peerId?.toString();
+
+    if (!this.state.node || !peerId) {
+      return;
+    }
+
+    this.state.relayRecord = await this.buildRelayRecord(peerId);
+
+    if (!this.state.relayRecord) {
+      return;
+    }
+
+    void this.discovery.publish(this.state.node, this.state.relayRecord);
+  }
+
+  private startRecordRefresh(): void {
+    if (!this.state.node || !this.state.relayRecord) {
+      return;
+    }
+
+    void this.publishCurrentRelayRecord();
+    const intervalMs = Math.max(
+      1000,
+      Math.floor(
+        this.configuration.getRelayRecordTtlMs() /
+          PublicRelayRuntime.recordRefreshDivider,
+      ),
+    );
+
+    setInterval(() => {
+      void this.publishCurrentRelayRecord();
+    }, intervalMs);
+  }
+
   public async start(): Promise<void> {
     if (!this.configuration.isRelayEnabled() || this.state.node) {
       return;
@@ -92,6 +134,8 @@ export class PublicRelayRuntime {
     if (peerId) {
       this.state.relayRecord = await this.buildRelayRecord(peerId);
     }
+
+    this.startRecordRefresh();
 
     Kernel.logger.info(
       `Public relay runtime started peerId="${peerId || 'unknown'}" advertised=${Boolean(
@@ -111,6 +155,8 @@ export class PublicRelayRuntime {
       bootstrapRelayMultiaddrs:
         this.configuration.getBootstrapRelayMultiaddrs(),
       debugReason: this.buildDebugReason(),
+      discoveredRelayCount: this.relayRecordRegistry.all().length,
+      discoveredRelayMultiaddrs: this.relayRecordRegistry.multiaddrs(),
       discoveryEnabled: this.configuration.isRelayDiscoveryEnabled(),
       listenAddresses: [this.addressFactory.relayListenAddress()],
       peerId,

@@ -14,6 +14,9 @@ import Libp2pGossipsubTransport from '@app/shared/infrastructure/pubsub/libp2p/L
 import runtime from '@app/shared/infrastructure/pubsub/libp2p/Libp2pGossipsubRuntimeAdapter';
 import { PublicRelayAddressFactory } from '@app/shared/infrastructure/network/relay/PublicRelayAddressFactory';
 import { PublicRelayConfiguration } from '@app/shared/infrastructure/network/relay/PublicRelayConfiguration';
+import { PublicRelayRecordDiscovery } from '@app/shared/infrastructure/network/relay/PublicRelayRecordDiscovery';
+import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
+import { PublicRelayRecordSigner } from '@app/shared/infrastructure/network/relay/PublicRelayRecordSigner';
 import { PublicRelayRuntimeAdapter } from '@app/shared/infrastructure/network/relay/PublicRelayRuntimeAdapter';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
@@ -217,6 +220,10 @@ async function runParent(): Promise<void> {
         waitForChildEvent(peerB, 'peer-ready'),
       ]);
       await Promise.all([
+        waitForChildEvent(peerA, 'relay-record-discovered'),
+        waitForChildEvent(peerB, 'relay-record-discovered'),
+      ]);
+      await Promise.all([
         waitForChildEvent(peerA, 'peer-connected'),
         waitForChildEvent(peerB, 'peer-connected'),
       ]);
@@ -271,6 +278,26 @@ async function runRelay(): Promise<void> {
   if (!multiaddr) {
     throw new Error('Relay multiaddr was not created.');
   }
+
+  const record = await new PublicRelayRecordSigner()
+    .sign(
+      {
+        expiresAt: Date.now() + 300000,
+        issuedAt: Date.now(),
+        multiaddrs: [multiaddr],
+        peerId: peerId || '',
+        role: 'relay',
+        version: 1,
+      },
+      privateKey,
+    )
+    .then((signedRecord) => signedRecord.toPrimitives());
+  const discovery = new PublicRelayRecordDiscovery();
+
+  await discovery.publish(node, record);
+  setInterval(() => {
+    void discovery.publish(node, record);
+  }, 2000);
 
   emit({ multiaddr, type: 'relay-ready' });
   process.on('SIGTERM', () => {
@@ -328,12 +355,23 @@ async function runPeer(): Promise<void> {
 
 async function waitForPublicPeerConnection(): Promise<void> {
   const node = await runtime.createNode();
+  const relayRecordRegistry = new PublicRelayRecordRegistry();
   const deadline = Date.now() + WAIT_TIMEOUT_MS;
+  let relayRecordDiscovered = false;
+  let peerConnected = false;
 
   while (Date.now() < deadline) {
-    if ((node.getPeers?.() || []).length >= 2) {
-      emit({ type: 'peer-connected' });
+    if (!relayRecordDiscovered && relayRecordRegistry.all().length > 0) {
+      relayRecordDiscovered = true;
+      emit({ type: 'relay-record-discovered' });
+    }
 
+    if (!peerConnected && (node.getPeers?.() || []).length >= 2) {
+      peerConnected = true;
+      emit({ type: 'peer-connected' });
+    }
+
+    if (relayRecordDiscovered && peerConnected) {
       return;
     }
 

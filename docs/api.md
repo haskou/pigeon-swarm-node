@@ -659,6 +659,10 @@ Response:
     ],
     "debugReason": "Relay enabled and advertised with PIGEON_PUBLIC_HOST.",
     "discoveryEnabled": true,
+    "discoveredRelayCount": 1,
+    "discoveredRelayMultiaddrs": [
+      "/dns4/relay.example.com/tcp/4011/p2p/12D3Koo..."
+    ],
     "listenAddresses": [
       "/ip4/0.0.0.0/tcp/4011"
     ],
@@ -674,7 +678,8 @@ Implemented:
 
 - expose sanitized runtime connectivity diagnostics for the public relay layer
 - show whether the node relay is enabled, running and publicly advertised
-- show generated listen/advertise multiaddrs and configured bootstrap relays
+- show generated listen/advertise multiaddrs, configured bootstrap relays and
+  currently discovered signed relay records
 - never expose application owner ids, owner display names, private network ids,
   PSK/private network keys, relay signatures, local storage paths or private
   topology metadata

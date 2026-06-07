@@ -4,6 +4,8 @@ export type NodeNetworkDebugResource = {
     bootstrapRelayMultiaddrs: string[];
     debugReason: string;
     discoveryEnabled: boolean;
+    discoveredRelayCount: number;
+    discoveredRelayMultiaddrs: string[];
     listenAddresses: string[];
     peerId?: string;
     relayAdvertised: boolean;
