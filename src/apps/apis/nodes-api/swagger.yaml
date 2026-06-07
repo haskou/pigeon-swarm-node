@@ -141,7 +141,7 @@ paths:
       tags:
         - nodes
       summary: Get active peers
-      description: Returns nodes seen through heartbeat events during the active peer window. Network private keys are never included.
+      description: Returns nodes seen through heartbeat events during the active peer window. Network entries may include IPFS runtime dial hints (`peerId` and `multiaddrs`) used by nodes that share the same local network to connect their IPFS runtimes. Network private keys are never included.
       responses:
         '200':
           description: Active peers.
@@ -257,6 +257,14 @@ components:
                 type: string
               name:
                 type: string
+              peerId:
+                type: string
+                description: Optional IPFS peer id announced by the remote node for this network.
+              multiaddrs:
+                type: array
+                description: Optional IPFS multiaddrs announced by the remote node for this network. They are dial hints and can be stale or unreachable.
+                items:
+                  type: string
     PeersResource:
       type: object
       required:
