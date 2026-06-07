@@ -51,6 +51,8 @@ export class HeliaRuntimeAdapter {
 
   private datastoreFsModulePromise?: Promise<typeof import('datastore-fs')>;
 
+  private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
+
   private isJestRuntime(): boolean {
     return process.env.JEST_WORKER_ID !== undefined;
   }
@@ -92,6 +94,15 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof GossipsubModule>('@libp2p/gossipsub');
 
     return this.gossipsubModulePromise;
+  }
+
+  private loadBootstrapModule(): Promise<typeof import('@libp2p/bootstrap')> {
+    this.bootstrapModulePromise ??=
+      this.nativeImport<typeof import('@libp2p/bootstrap')>(
+        '@libp2p/bootstrap',
+      );
+
+    return this.bootstrapModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
@@ -227,6 +238,46 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private publicBootstrapMultiaddrs(): string[] {
+    if (process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED === 'false') {
+      return [];
+    }
+
+    return (
+      process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS ||
+      '/dnsaddr/bootstrap.libp2p.io'
+    )
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
+  private async withPublicBootstrap(
+    defaults: Libp2pDefaults,
+  ): Promise<Libp2pDefaults> {
+    const multiaddrs = this.publicBootstrapMultiaddrs();
+
+    if (multiaddrs.length === 0) {
+      return defaults;
+    }
+
+    const bootstrapModule = await this.loadBootstrapModule();
+    const config = defaults as unknown as {
+      peerDiscovery?: unknown[];
+    };
+
+    config.peerDiscovery = [
+      ...(config.peerDiscovery || []),
+      bootstrapModule.bootstrap({
+        list: multiaddrs,
+        tagName: 'pigeon-public-bootstrap',
+        tagTTL: Infinity,
+      }),
+    ];
+
+    return defaults;
+  }
+
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
@@ -288,7 +339,7 @@ export class HeliaRuntimeAdapter {
       return this.withoutNetwork(defaults);
     }
 
-    return this.withGossipsub(defaults);
+    return this.withGossipsub(await this.withPublicBootstrap(defaults));
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {

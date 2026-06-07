@@ -118,8 +118,10 @@ records use lookup keys and signatures derived from the private network key, so
 unrelated public peers cannot enumerate private network ids or validate relay
 records. Relay nodes and leaf nodes retry private relay directory
 publish/discovery periodically, so discovery does not depend on the first public
-IPFS routing tick at startup. The public relay path is used only for fallback
-connectivity: private
+IPFS routing tick at startup. The public Helia/IPFS runtime bootstraps to the
+public routing layer with `/dnsaddr/bootstrap.libp2p.io` by default so private
+relay records can be published and resolved before any private peers are known.
+The public relay path is used only for fallback connectivity: private
 network events and IPFS content requests remain encrypted with the private
 network key.
 
