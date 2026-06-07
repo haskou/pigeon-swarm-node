@@ -1,0 +1,64 @@
+import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import { PrivateNetworkRelayRecordAuthenticator } from '../../../../../../src/shared/infrastructure/network/relay/PrivateNetworkRelayRecordAuthenticator';
+import { PublicRelayRecordPrimitives } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
+
+describe('PrivateNetworkRelayRecordAuthenticator', () => {
+  const networkKey =
+    '-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGAjx38RTkT7ZsPCcTRgrTAWjBdk5+Pq+/a5h2dPLsw3\n-----END PRIVATE KEY-----\n';
+  const otherNetworkKey =
+    '-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGAjx38RTkT7ZsPCcTRgrTAWjBdk5+Pq+/a5h2dPLsw4\n-----END PRIVATE KEY-----\n';
+  const relayRecord: PublicRelayRecordPrimitives = {
+    expiresAt: 2000,
+    issuedAt: 1000,
+    multiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
+    peerId: '12D3Relay',
+    publicKey: 'relay-public-key',
+    role: 'relay',
+    signature: 'relay-signature',
+    version: 1,
+  };
+  const authenticator = new PrivateNetworkRelayRecordAuthenticator();
+
+  it('should derive a stable private lookup key from the network key', () => {
+    const network = privateNetwork(networkKey);
+
+    expect(authenticator.lookupKey(network)).toBe(
+      authenticator.lookupKey(privateNetwork(networkKey)),
+    );
+    expect(authenticator.lookupKey(network)).toContain(
+      'pigeon-swarm/private-relays/v1/',
+    );
+    expect(authenticator.lookupKey(network)).not.toContain(network.getId());
+    expect(authenticator.lookupKey(network)).not.toContain(networkKey);
+  });
+
+  it('should verify envelopes created with the same private network key', () => {
+    const network = privateNetwork(networkKey);
+    const envelope = authenticator.sign(network, relayRecord);
+
+    expect(authenticator.verify(network, envelope)).toBe(true);
+  });
+
+  it('should reject envelopes created with another private network key', () => {
+    const envelope = authenticator.sign(privateNetwork(networkKey), relayRecord);
+
+    expect(
+      authenticator.verify(privateNetwork(otherNetworkKey), envelope),
+    ).toBe(false);
+    expect(authenticator.lookupKey(privateNetwork(networkKey))).not.toBe(
+      authenticator.lookupKey(privateNetwork(otherNetworkKey)),
+    );
+  });
+
+  function privateNetwork(key: string): IPFSNetwork {
+    return new IPFSNetwork(
+      IPFSNetworkConfig.fromPrimitives({
+        id: '550e8400-e29b-41d4-a716-446655440123',
+        key,
+        name: 'private',
+      }),
+      {} as never,
+    );
+  }
+});

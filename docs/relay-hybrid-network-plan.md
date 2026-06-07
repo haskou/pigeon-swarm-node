@@ -9,7 +9,9 @@ Pigeon Swarm currently mixes several concepts that should remain separate:
 - libp2p peer identifiers (`peerId`) are cryptographic network identities.
 - Private IPFS networks use PSK/pnet and should remain the fast path for private network peers.
 - Public/fallback connectivity should not require an application owner identity.
-- A node should expose at most one relay server. Do not create one relay per network.
+- A node should expose at most one relay server. Discovery records may be
+  published per private network, but they point to the same node-scoped relay
+  server.
 
 The relay architecture must therefore be based primarily on libp2p peer identity, not application identity.
 
@@ -32,6 +34,10 @@ Implemented in this branch:
   discover and dial one another after bootstrapping to the relay.
 - Relay-capable nodes publish signed relay records on
   `pigeon-swarm.public-relays.v1`.
+- Relay-capable nodes publish private-network relay directory records through
+  the public IPFS routing layer. The directory lookup key and envelope
+  signature are derived from the private network key with HMAC, so only nodes
+  that know that private network key can discover and validate the record.
 - Peers validate relay records with the advertised libp2p public key, verify
   that the public key maps to the advertised `peerId`, reject expired records,
   persist active records in MongoDB and dial the advertised relay multiaddrs.
@@ -106,8 +112,10 @@ Relay is node-scoped:
 - `PIGEON_RELAY_ENABLED=true` starts at most one relay server for the node.
 - The relay server is part of the public/fallback connectivity layer.
 - The relay server is not scoped to a private network.
-- Private networks may use the relay for connectivity/fallback, but the relay
-  itself does not become a member of those networks.
+- Private networks may use the relay for connectivity/fallback. The relay
+  server itself remains node-scoped, while discovery records are scoped by the
+  private network key so unrelated networks cannot discover each other's relay
+  records.
 
 ### Address Generation
 
@@ -339,9 +347,36 @@ Relay discovery should use signed relay records.
 
 - `nodeId`: useful for app-level diagnostics, but not a trust anchor.
 
-Do not include `networkIds` or `ownerId` in the first public relay record
-version. They are not required for relay discovery and can leak private
-membership or identity information.
+Do not include `networkIds` or `ownerId` in public relay records. They are not
+required for relay discovery and can leak private membership or identity
+information.
+
+For private-network discovery, publish an envelope per private network through
+the public IPFS routing layer:
+
+```json
+{
+  "version": 1,
+  "relayRecord": {
+    "version": 1,
+    "role": "relay",
+    "peerId": "12D3Koo...",
+    "publicKey": "<base64url protobuf public key>",
+    "multiaddrs": [
+      "/dns4/relay.example.com/tcp/4011/p2p/12D3Koo..."
+    ],
+    "issuedAt": 1770000000000,
+    "expiresAt": 1770000300000,
+    "signature": "<relay peer signature>"
+  },
+  "signature": "<HMAC derived from private network key>"
+}
+```
+
+The DHT/routing lookup key is also derived from the private network key with
+HMAC. The envelope does not include `networkId`, PSK, private key, owner id or
+identity metadata. A node that does not know the private network key cannot
+calculate the lookup key or validate the envelope.
 
 ## Relay Record Signature
 
@@ -396,8 +431,11 @@ Possible storage mechanisms:
 The system should not rely on one single mechanism. A practical first version can use:
 
 1. configured bootstrap relay multiaddrs;
-2. public relay records;
-3. healthchecked local cache.
+2. private-network relay directory records discovered through public IPFS
+   routing with the private network key;
+3. public relay records learned through pubsub after at least one public peer is
+   connected;
+4. healthchecked local cache.
 
 ## Relay Health
 
@@ -667,7 +705,8 @@ This registry should be updated at:
 - Publish with short TTL.
 - Validate records before storing.
 - Store claimed and verified relay states separately.
-- Keep relay records node-scoped, not network-scoped.
+- Keep relay servers node-scoped, and publish private-network discovery
+  envelopes that point to those node-scoped relay records.
 - Do not include `ownerId` or private `networkIds`.
 
 ### Phase 6: Relay Discovery And Health

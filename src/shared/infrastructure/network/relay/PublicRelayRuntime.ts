@@ -1,6 +1,7 @@
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 
+import { PrivateNetworkRelayRecordDirectory } from './PrivateNetworkRelayRecordDirectory';
 import { PublicRelayAddressFactory } from './PublicRelayAddressFactory';
 import { PublicRelayConfiguration } from './PublicRelayConfiguration';
 import { PublicRelayDebugState } from './PublicRelayDebugState';
@@ -15,15 +16,19 @@ export class PublicRelayRuntime {
   private static readonly globalStateKey = '__pigeonSwarmPublicRelayRuntime';
   private static readonly recordRefreshDivider = 3;
 
+  private readonly privateDirectory: PrivateNetworkRelayRecordDirectory;
+
   private get state(): {
     failoverInterval?: NodeJS.Timeout;
     node?: PublicRelayRuntimeNode;
+    networkRegistrationListenerStarted?: boolean;
     relayRecord?: PublicRelayDebugState['relayRecord'];
   } {
     const globalState = globalThis as typeof globalThis & {
       [PublicRelayRuntime.globalStateKey]?: {
         failoverInterval?: NodeJS.Timeout;
         node?: PublicRelayRuntimeNode;
+        networkRegistrationListenerStarted?: boolean;
         relayRecord?: PublicRelayDebugState['relayRecord'];
       };
     };
@@ -48,7 +53,12 @@ export class PublicRelayRuntime {
     private readonly discovery = new PublicRelayRecordDiscovery(
       relayRecordRegistry,
     ),
-  ) {}
+  ) {
+    this.privateDirectory = new PrivateNetworkRelayRecordDirectory(
+      networkRegistry,
+      relayRecordRegistry,
+    );
+  }
 
   private buildDebugReason(): string {
     if (!this.configuration.isRelayEnabled()) {
@@ -132,6 +142,22 @@ export class PublicRelayRuntime {
     }
 
     void this.discovery.publish(this.state.node, this.state.relayRecord);
+    void this.privateDirectory.publish(this.state.relayRecord);
+  }
+
+  private publishRelayRecordWhenNetworkIsRegistered(): void {
+    if (this.state.networkRegistrationListenerStarted) {
+      return;
+    }
+
+    this.state.networkRegistrationListenerStarted = true;
+    this.networkRegistry.onNetworkRegistered((network) => {
+      if (!network.isPrivate() || !this.state.relayRecord) {
+        return;
+      }
+
+      void this.privateDirectory.publish(this.state.relayRecord);
+    });
   }
 
   private startRecordRefresh(): void {
@@ -182,6 +208,7 @@ export class PublicRelayRuntime {
 
   public async start(): Promise<void> {
     this.startFailoverMonitor();
+    this.publishRelayRecordWhenNetworkIsRegistered();
 
     if (!this.shouldStartRelay() || this.state.node) {
       return;
@@ -221,8 +248,8 @@ export class PublicRelayRuntime {
       discoveryEnabled: this.configuration.isRelayDiscoveryEnabled(),
       listenAddresses: [this.addressFactory.relayListenAddress()],
       peerId,
-      relayAutoEnabled: this.configuration.isRelayAutoEnabled(),
       relayAdvertised: Boolean(advertisedAddress),
+      relayAutoEnabled: this.configuration.isRelayAutoEnabled(),
       relayEnabled: this.configuration.isRelayEnabled(),
       relayRecord: this.state.relayRecord,
       running: Boolean(this.state.node),

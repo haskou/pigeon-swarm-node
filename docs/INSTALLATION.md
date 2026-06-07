@@ -122,7 +122,7 @@ installed `web-push` module path.
 | `PIGEON_PUBLIC_HOST` | unset | Required for advertised public relay nodes | Public DNS name or IP used to build dialable relay multiaddrs. |
 | `PIGEON_RELAY_DISCOVERY_ENABLED` | `true` | No | Enables relay discovery/diagnostics feature flags. |
 | `PIGEON_RELAY_RECORD_TTL_SECONDS` | `300` | No | TTL used when building signed public relay records. |
-| `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` | unset | No | Comma-separated public relay multiaddrs used as bootstrap peers. |
+| `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` | unset | No | Comma-separated public relay multiaddrs used as explicit bootstrap peers. Nodes can also discover relay records for private networks through the public IPFS routing layer when they know that private network key. |
 
 Private networks are no longer configured through environment variables.
 
@@ -177,6 +177,25 @@ Use multiple relays as a comma-separated list.
 GossipSub runtime. It is intentionally not injected into private IPFS/pnet
 instances, because a PSK-protected libp2p node cannot dial a public relay that
 does not know that PSK.
+
+`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is not the only discovery path. Relay
+nodes also publish a private-network relay directory record for every local
+private network:
+
+- the relay record itself is still signed by the relay libp2p peer key;
+- the directory lookup key is derived from the private network key with HMAC;
+- the stored envelope is authenticated with that same private network key;
+- the public envelope does not contain `networkId`, PSK, private key, owner id
+  or identity metadata;
+- a node that does not know the private network key cannot calculate the lookup
+  key or validate the envelope.
+
+On startup, and whenever a private network is added locally, the node queries
+that private lookup key through the public IPFS routing layer. If it finds a
+valid envelope, it stores the relay record locally and uses it for the
+public/fallback libp2p runtime. This lets a leaf node discover a reachable relay
+for its private network without manually configuring the relay multiaddr, as
+long as the public IPFS routing layer can find the directory record.
 
 Private-network domain events are also published through the public fallback
 GossipSub runtime when `TRANSPORT_DSN=libp2p-gossipsub://` and private networks
