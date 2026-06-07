@@ -604,8 +604,9 @@ Request body: none.
 
 Implemented:
 
-- allow unsigned network deletion while the node has no owner
-- require signed request auth from the owner after the node is claimed
+- require signed request auth from the node owner
+- reject deletion while the node has no owner because no identity can authorize
+  the destructive operation
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
 - delete local MongoDB data scoped to that network:
