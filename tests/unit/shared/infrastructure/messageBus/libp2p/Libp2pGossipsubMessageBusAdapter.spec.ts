@@ -134,6 +134,15 @@ describe('Libp2pGossipsubAdapter', () => {
       'pigeon-swarm.networks.private-network-id.identities.v1.announcements',
       expect.stringContaining('"encrypted":true'),
     );
+    expect(transport.publish).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^pigeon-swarm\.private-relay\.identities\.v1\.[A-Za-z0-9_-]+$/,
+      ),
+      expect.stringContaining('"encrypted":true'),
+    );
+    expect(transport.publish.mock.calls[0][0]).not.toContain(
+      'private-network-id',
+    );
   });
 
   it('should consume private network payloads after decrypting them', async () => {
@@ -172,6 +181,81 @@ describe('Libp2pGossipsubAdapter', () => {
     );
     expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should consume private fallback payloads after decrypting them', async () => {
+    const handler = jest.fn();
+    const privateNetwork = createNetwork({
+      id: 'private-network-id',
+      isPrivate: true,
+    });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    let fallbackHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([privateNetwork]);
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      fallbackHandler = callback;
+    });
+    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+    await adapter.publish([event]);
+
+    await fallbackHandler?.(transport.publish.mock.calls[0][1]);
+
+    expect(transport.subscribe).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^pigeon-swarm\.private-relay\.identities\.v1\.[A-Za-z0-9_-]+$/,
+      ),
+      expect.any(Function),
+    );
+    expect(transport.subscribe.mock.calls[0][0]).not.toContain(
+      'private-network-id',
+    );
+    expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should process an event only once when direct and fallback paths both deliver it', async () => {
+    const handler = jest.fn();
+    const privateNetwork = createNetwork({
+      id: 'private-network-id',
+      isPrivate: true,
+    });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    let directHandler: ((payload: string) => Promise<void>) | undefined;
+    let fallbackHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([privateNetwork]);
+    privateNetwork.subscribePubSub.mockImplementation(
+      async (_topic, callback) => {
+        directHandler = callback;
+      },
+    );
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      fallbackHandler = callback;
+    });
+    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+    await adapter.publish([event]);
+
+    await directHandler?.(privateNetwork.publishPubSub.mock.calls[0][1]);
+    await fallbackHandler?.(transport.publish.mock.calls[0][1]);
+
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it('should publish network payloads to websockets after consumers accept them', async () => {

@@ -1,7 +1,9 @@
 import NetworkDiagnosticsLogger from '../../network/NetworkDiagnosticsLogger';
+import { PublicRelayConfiguration } from '../../network/relay/PublicRelayConfiguration';
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 
 export class Libp2pGossipsubRuntimeAdapter {
+  private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
   private heliaModulePromise?: Promise<typeof import('helia')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private gossipsubModulePromise?: Promise<typeof import('@libp2p/gossipsub')>;
@@ -41,6 +43,15 @@ export class Libp2pGossipsubRuntimeAdapter {
     return this.gossipsubModulePromise;
   }
 
+  private loadBootstrapModule(): Promise<typeof import('@libp2p/bootstrap')> {
+    this.bootstrapModulePromise ??=
+      this.nativeImport<typeof import('@libp2p/bootstrap')>(
+        '@libp2p/bootstrap',
+      );
+
+    return this.bootstrapModulePromise;
+  }
+
   private withoutWebRtcTransports<
     TConfig extends {
       addresses?: { listen?: string[] };
@@ -63,14 +74,39 @@ export class Libp2pGossipsubRuntimeAdapter {
     };
   }
 
+  private async withBootstrapRelays<
+    TConfig extends { peerDiscovery?: unknown[] },
+  >(config: TConfig): Promise<TConfig> {
+    const relayMultiaddrs =
+      PublicRelayConfiguration.fromEnvironment().getBootstrapRelayMultiaddrs();
+
+    if (relayMultiaddrs.length === 0) {
+      return config;
+    }
+
+    const bootstrapModule = await this.loadBootstrapModule();
+
+    return {
+      ...config,
+      peerDiscovery: [
+        ...(config.peerDiscovery || []),
+        bootstrapModule.bootstrap({
+          list: relayMultiaddrs,
+          tagName: 'pigeon-relay-bootstrap',
+          tagTTL: Infinity,
+        }),
+      ],
+    };
+  }
+
   public async createNode(): Promise<Libp2pPubSubNode> {
     const [heliaModule, libp2pModule, gossipsubModule] = await Promise.all([
       this.loadHeliaModule(),
       this.loadLibp2pModule(),
       this.loadGossipsubModule(),
     ]);
-    const libp2pConfig = this.withoutWebRtcTransports(
-      heliaModule.libp2pDefaults(),
+    const libp2pConfig = await this.withBootstrapRelays(
+      this.withoutWebRtcTransports(heliaModule.libp2pDefaults()),
     );
     const configWithServices = libp2pConfig as unknown as {
       services: Record<string, unknown>;

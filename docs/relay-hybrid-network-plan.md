@@ -182,6 +182,12 @@ Express can expose debug/admin endpoints, but the libp2p relay should listen on 
 Relay discovery should be dynamic and must not restart private IPFS or private
 Gossipsub every time a remote relay appears, disappears, or changes health.
 
+Public relays are not injected into private `pnet` IPFS instances. A private
+libp2p node with a PSK protects every connection during upgrade, including a
+connection to a relay. Therefore a public relay that does not know the PSK
+cannot be used directly by that private instance. The public relay path belongs
+to the public/fallback libp2p runtime.
+
 There are two different kinds of changes:
 
 ### Remote Relay Set Changes
@@ -409,6 +415,19 @@ publicLibp2p:
 ```
 
 A single libp2p instance should not be treated as both public and private when pnet is enabled.
+
+The first fallback implemented for this model is private-network event gossip
+over the public runtime:
+
+- direct private IPFS pub/sub still publishes to
+  `pigeon-swarm.networks.<networkId>.<context>.<version>.announcements`;
+- public fallback pub/sub publishes the same encrypted payload to
+  `pigeon-swarm.private-relay.<context>.<version>.<hmac>`;
+- `<hmac>` is derived from the private network key and routing key;
+- the topic does not contain the private `networkId`;
+- the payload remains AES-GCM encrypted by `PubSubNetworkMessageCodec`;
+- consumers deduplicate by `event_id` when both direct and fallback paths
+  deliver the same event.
 
 ## Data Flow
 

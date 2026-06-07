@@ -13,8 +13,12 @@ import PubSubTopicResolver from './PubSubTopicResolver';
 type SubscriptionHandler = (event: DomainEvent) => Promise<void>;
 
 export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
+  private static readonly maxProcessedEventIds = 5000;
+
   private readonly topicResolver: PubSubTopicResolver;
   private readonly codec: PubSubNetworkMessageCodec;
+  private readonly processedEventIds: string[] = [];
+  private readonly processedEventIdSet = new Set<string>();
   private readonly subscriptionHandlers = new Map<
     string,
     SubscriptionHandler[]
@@ -47,6 +51,48 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
       routingKey,
       network.getId(),
     );
+  }
+
+  private privateFallbackTopic(
+    routingKey: string,
+    network: IPFSNetwork,
+  ): string | undefined {
+    const key = network.getConfig().getKey();
+
+    if (!network.isPrivate() || !key) {
+      return undefined;
+    }
+
+    return this.topicResolver.fromRoutingKeyForPrivateNetworkFallback(
+      routingKey,
+      key,
+    );
+  }
+
+  private shouldProcessEvent(event: DomainEvent): boolean {
+    if (!event.eventId) {
+      return true;
+    }
+
+    if (this.processedEventIdSet.has(event.eventId)) {
+      return false;
+    }
+
+    this.processedEventIdSet.add(event.eventId);
+    this.processedEventIds.push(event.eventId);
+
+    if (
+      this.processedEventIds.length >
+      Libp2pGossipsubAdapter.maxProcessedEventIds
+    ) {
+      const oldestEventId = this.processedEventIds.shift();
+
+      if (oldestEventId) {
+        this.processedEventIdSet.delete(oldestEventId);
+      }
+    }
+
+    return true;
   }
 
   private eventNetworkIds(event: DomainEvent): string[] {
@@ -119,6 +165,10 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
 
       const event = this.instanceDomainEvent(DomainEventInstance, message);
 
+      if (!this.shouldProcessEvent(event)) {
+        return;
+      }
+
       await Promise.all(
         (this.subscriptionHandlers.get(subscriptionKey) || []).map(
           (subscriptionHandler) => subscriptionHandler(event),
@@ -127,6 +177,74 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
 
       webSocketEventHub.publish([event]);
     });
+  }
+
+  private async subscribeToPrivateFallback(
+    bindingKey: string,
+    network: IPFSNetwork,
+    DomainEventInstance: Constructor<DomainEvent>,
+    handler: SubscriptionHandler,
+  ): Promise<void> {
+    const topic = this.privateFallbackTopic(bindingKey, network);
+
+    if (!topic) {
+      return;
+    }
+
+    const subscriptionKey = `${topic}:${bindingKey}`;
+    const handlers = this.subscriptionHandlers.get(subscriptionKey);
+
+    if (handlers) {
+      handlers.push(handler);
+
+      return;
+    }
+
+    this.subscriptionHandlers.set(subscriptionKey, [handler]);
+
+    await this.transport.subscribe(topic, async (payload) => {
+      const message = JSON.parse(
+        this.codec.decode(payload, network),
+      ) as Message;
+
+      if (message.type !== bindingKey) {
+        return;
+      }
+
+      const event = this.instanceDomainEvent(DomainEventInstance, message);
+
+      if (!this.shouldProcessEvent(event)) {
+        return;
+      }
+
+      await Promise.all(
+        (this.subscriptionHandlers.get(subscriptionKey) || []).map(
+          (subscriptionHandler) => subscriptionHandler(event),
+        ),
+      );
+
+      webSocketEventHub.publish([event]);
+    });
+  }
+
+  private async subscribeToNetworkAndFallback(
+    bindingKey: string,
+    network: IPFSNetwork,
+    DomainEventInstance: Constructor<DomainEvent>,
+    handler: SubscriptionHandler,
+  ): Promise<void> {
+    await this.subscribeToNetwork(
+      bindingKey,
+      network,
+      DomainEventInstance,
+      handler,
+    );
+    await this.subscribeToPrivateFallback(
+      bindingKey,
+      network,
+      DomainEventInstance,
+      handler,
+    );
   }
 
   public async consume(
@@ -141,7 +259,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         this.networkRegistry
           .getAll()
           .map((network) =>
-            this.subscribeToNetwork(
+            this.subscribeToNetworkAndFallback(
               bindingKey,
               network,
               DomainEventInstance,
@@ -151,7 +269,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
       );
 
       this.networkRegistry.onNetworkRegistered((network) => {
-        void this.subscribeToNetwork(
+        void this.subscribeToNetworkAndFallback(
           bindingKey,
           network,
           DomainEventInstance,
@@ -187,12 +305,23 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
       if (networks.length > 0) {
         await Promise.all(
           domainEvents.flatMap((event) =>
-            this.networksForEvent(event).map((network) =>
-              network.publishPubSub(
-                this.networkTopic(event.eventName(), network),
-                this.codec.encode(event.decode(), network),
-              ),
-            ),
+            this.networksForEvent(event).flatMap((network) => {
+              const encodedPayload = this.codec.encode(event.decode(), network);
+              const fallbackTopic = this.privateFallbackTopic(
+                event.eventName(),
+                network,
+              );
+
+              return [
+                network.publishPubSub(
+                  this.networkTopic(event.eventName(), network),
+                  encodedPayload,
+                ),
+                ...(fallbackTopic
+                  ? [this.transport.publish(fallbackTopic, encodedPayload)]
+                  : []),
+              ];
+            }),
           ),
         );
 

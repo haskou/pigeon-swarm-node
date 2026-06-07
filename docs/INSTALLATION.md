@@ -161,6 +161,18 @@ PIGEON_BOOTSTRAP_RELAY_MULTIADDRS=/dns4/relay.example.com/tcp/4011/p2p/<peerId>
 
 Use multiple relays as a comma-separated list.
 
+`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is used by the public/fallback libp2p
+GossipSub runtime. It is intentionally not injected into private IPFS/pnet
+instances, because a PSK-protected libp2p node cannot dial a public relay that
+does not know that PSK.
+
+Private-network domain events are also published through the public fallback
+GossipSub runtime when `TRANSPORT_DSN=libp2p-gossipsub://` and private networks
+exist. The fallback topic is derived from the private network key with HMAC and
+does not include the private `networkId`; the payload remains encrypted with the
+same private network key used by direct private-network pub/sub. This lets relay
+nodes move gossip without learning the private network id or payload.
+
 Docker deployments must publish both the main libp2p port and the relay port
 when those features are enabled:
 
@@ -176,9 +188,9 @@ does not expose relay signatures, owner ids, private network ids, PSK values or
 private topology.
 
 Important limitation: a public relay must not require the private network PSK.
-Private PSK networks remain private. Public relay/fallback connectivity is the
-NAT traversal layer; private payload confidentiality still belongs to the
-application/IPFS encryption model and the private network configuration.
+Private PSK networks remain private. IPFS private-network connections still use
+their own pnet/PSK path; public relay/fallback connectivity is used by the
+public GossipSub fallback layer and future application-level fallback streams.
 
 ### Important note about `IPFS_STORAGE_PATH=memory`
 

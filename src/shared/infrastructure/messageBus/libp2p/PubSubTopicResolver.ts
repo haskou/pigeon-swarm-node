@@ -1,3 +1,6 @@
+import { PrivateKey } from '@haskou/value-objects';
+import { createHmac } from 'crypto';
+
 export default class PubSubTopicResolver {
   private readonly defaultPrefix = 'pigeon-swarm';
 
@@ -28,5 +31,19 @@ export default class PubSubTopicResolver {
     }
 
     return `${this.getPrefix()}.networks.${networkId}.${context}.${version}.announcements`;
+  }
+
+  public fromRoutingKeyForPrivateNetworkFallback(
+    routingKey: string,
+    networkKey: PrivateKey,
+  ): string {
+    const [context, version] = routingKey.split('.');
+    const fallbackContext =
+      context && version ? `${context}.${version}` : 'raw';
+    const digest = createHmac('sha256', networkKey.valueOf())
+      .update(`${this.getPrefix()}.${routingKey}`)
+      .digest('base64url');
+
+    return `${this.getPrefix()}.private-relay.${fallbackContext}.${digest}`;
   }
 }
