@@ -1,5 +1,12 @@
 <p align="center">
   <img src="./docs/logo.png" alt="pigeon-swarm logo">
+  <br>
+  <a href="https://github.com/haskou/pigeon-swarm-node/actions/workflows/ci.yaml">
+    <img src="https://github.com/haskou/pigeon-swarm-node/actions/workflows/ci.yaml/badge.svg" alt="Node.js CI">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="License: PolyForm Noncommercial 1.0.0">
+  </a>
 </p>
 
 # pigeon-swarm-node
