@@ -109,6 +109,11 @@ exchange events:
 * `TRANSPORT_DSN=in-memory` for local tests and single-node development.
 * `TRANSPORT_DSN=libp2p-gossipsub` for node-to-node gossip event exchange.
 
+For NAT traversal experiments, a node can expose one public libp2p relay with
+`PIGEON_RELAY_ENABLED=true`, `PIGEON_PUBLIC_HOST=<public-dns-or-ip>` and
+`PIGEON_RELAY_PORT=4011`. Other nodes can bootstrap against that relay through
+`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
+
 See [docs/INSTALLATION.md](./docs/INSTALLATION.md) for the full environment
 setup.
 

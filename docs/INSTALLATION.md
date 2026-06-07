@@ -115,10 +115,70 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `PIGEON_LIBP2P_PORT` | `4001` | No | Main libp2p listen port used by IPFS/libp2p runtimes. |
+| `PIGEON_RELAY_ENABLED` | `false` | No | Starts one public relay server for this node when `true`. The relay is node-scoped, not network-scoped. |
+| `PIGEON_RELAY_PORT` | `4011` | No | Dedicated public relay listen port. Do not reuse the HTTP/Express port. |
+| `PIGEON_PUBLIC_HOST` | unset | Required for advertised public relay nodes | Public DNS name or IP used to build dialable relay multiaddrs. |
+| `PIGEON_RELAY_DISCOVERY_ENABLED` | `true` | No | Enables relay discovery/diagnostics feature flags. |
+| `PIGEON_RELAY_RECORD_TTL_SECONDS` | `300` | No | TTL used when building signed public relay records. |
+| `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` | unset | No | Comma-separated public relay multiaddrs used as bootstrap peers. |
 
 Private networks are no longer configured through environment variables.
 
 They must be added through application methods/use cases (for example, node network management flows) and are persisted in storage metadata.
+
+### Public Relay Configuration
+
+Relays are public/fallback connectivity infrastructure. They do not carry
+application owner identity, private network ids, PSK values, private network
+keys or identity metadata in their public debug payloads.
+
+A relay-capable node should expose a dedicated libp2p relay port:
+
+```dotenv
+PIGEON_RELAY_ENABLED=true
+PIGEON_RELAY_PORT=4011
+PIGEON_PUBLIC_HOST=relay.example.com
+```
+
+The generated public relay multiaddr has this shape:
+
+```txt
+/dns4/relay.example.com/tcp/4011/p2p/<peerId>
+```
+
+or, when `PIGEON_PUBLIC_HOST` is an IPv4 address:
+
+```txt
+/ip4/203.0.113.7/tcp/4011/p2p/<peerId>
+```
+
+Leaf nodes can use known relays by configuring:
+
+```dotenv
+PIGEON_BOOTSTRAP_RELAY_MULTIADDRS=/dns4/relay.example.com/tcp/4011/p2p/<peerId>
+```
+
+Use multiple relays as a comma-separated list.
+
+Docker deployments must publish both the main libp2p port and the relay port
+when those features are enabled:
+
+```yaml
+ports:
+  - "4001:4001"
+  - "4011:4011"
+```
+
+`GET /node/network/debug` returns sanitized runtime diagnostics so operators can
+check whether relay mode is enabled, running, advertised and bootstrapped. It
+does not expose relay signatures, owner ids, private network ids, PSK values or
+private topology.
+
+Important limitation: a public relay must not require the private network PSK.
+Private PSK networks remain private. Public relay/fallback connectivity is the
+NAT traversal layer; private payload confidentiality still belongs to the
+application/IPFS encryption model and the private network configuration.
 
 ### Important note about `IPFS_STORAGE_PATH=memory`
 
@@ -148,6 +208,13 @@ ROUTE_PREFIX=/api
 IPFS_STORAGE_PATH=./ipfs_storage
 TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
+PIGEON_LIBP2P_PORT=4001
+PIGEON_RELAY_ENABLED=false
+PIGEON_RELAY_PORT=4011
+PIGEON_PUBLIC_HOST=
+PIGEON_RELAY_DISCOVERY_ENABLED=true
+PIGEON_RELAY_RECORD_TTL_SECONDS=300
+PIGEON_BOOTSTRAP_RELAY_MULTIADDRS=
 PUSH_VAPID_PUBLIC_KEY=<generatedPublicKey>
 PUSH_VAPID_PRIVATE_KEY=<generatedPrivateKey>
 PUSH_VAPID_SUBJECT=mailto:admin@example.com

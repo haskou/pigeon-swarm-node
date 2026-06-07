@@ -640,6 +640,45 @@ Implemented:
 - persist owner state in MongoDB
 - load persisted node state when the API process starts
 
+### Get local node network debug
+
+```http
+GET /node/network/debug
+```
+
+Response:
+
+```json
+{
+  "publicRelay": {
+    "advertisedAddresses": [
+      "/dns4/relay.example.com/tcp/4011/p2p/12D3Koo..."
+    ],
+    "bootstrapRelayMultiaddrs": [
+      "/dns4/bootstrap.example.com/tcp/4011/p2p/12D3Koo..."
+    ],
+    "debugReason": "Relay enabled and advertised with PIGEON_PUBLIC_HOST.",
+    "discoveryEnabled": true,
+    "listenAddresses": [
+      "/ip4/0.0.0.0/tcp/4011"
+    ],
+    "peerId": "12D3Koo...",
+    "relayAdvertised": true,
+    "relayEnabled": true,
+    "running": true
+  }
+}
+```
+
+Implemented:
+
+- expose sanitized runtime connectivity diagnostics for the public relay layer
+- show whether the node relay is enabled, running and publicly advertised
+- show generated listen/advertise multiaddrs and configured bootstrap relays
+- never expose application owner ids, owner display names, private network ids,
+  PSK/private network keys, relay signatures, local storage paths or private
+  topology metadata
+
 ### Get active peers
 
 ```http

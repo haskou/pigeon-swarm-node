@@ -149,6 +149,10 @@ export default class IPFSNetworkRegistry {
     return Promise.resolve(this.exportSharedPeerPrivateKeyPem(privateKey));
   }
 
+  public getSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
+    return this.loadOrCreateSharedPeerPrivateKey();
+  }
+
   public async initialize(): Promise<void> {
     if (this.state.initialized) {
       return;

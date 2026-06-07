@@ -52,6 +52,10 @@ export class Libp2pKeyAdapter {
 
     return keysModule.privateKeyToProtobuf(privateKey);
   }
+
+  public peerIdFromPrivateKey(privateKey: Libp2pPrivateKey): string {
+    return privateKey.publicKey.toString();
+  }
 }
 
 const libp2pKeyAdapter = new Libp2pKeyAdapter();

@@ -67,6 +67,7 @@ import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychai
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { PostLinkPreviewRoute } from '@app/apps/apis/link-previews-api/routes/PostLinkPreviewRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
+import { GetNodeNetworkDebugRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworkDebugRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
@@ -250,6 +251,7 @@ export default class Server {
           PostPrivateIPFSContentRoute,
           PostPublicIPFSContentRoute,
           GetNodeRoute,
+          GetNodeNetworkDebugRoute,
           GetNodeNetworksRoute,
           DeleteNodeNetworkRoute,
           PostNodeNetworkRoute,

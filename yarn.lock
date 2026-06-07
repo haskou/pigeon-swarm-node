@@ -1368,6 +1368,18 @@
     protons-runtime "^5.6.0"
     uint8arraylist "^2.4.8"
 
+"@libp2p/bootstrap@^12.0.24":
+  version "12.0.24"
+  resolved "https://registry.yarnpkg.com/@libp2p/bootstrap/-/bootstrap-12.0.24.tgz#4e1389bf41494d82b0b8b145e0d2cc7c90647b9b"
+  integrity sha512-TE1mkUDgfCtMIY9jok/PnPdQDicH1ynwnH5znflpGynEACAVHQMg42CPb2TUWK0/go6uA/y7rQITji96K44PgQ==
+  dependencies:
+    "@libp2p/interface" "^3.2.3"
+    "@libp2p/interface-internal" "^3.1.6"
+    "@libp2p/peer-id" "^6.0.10"
+    "@multiformats/multiaddr" "^13.0.3"
+    "@multiformats/multiaddr-matcher" "^3.0.2"
+    main-event "^1.0.1"
+
 "@libp2p/bootstrap@^12.0.6":
   version "12.0.13"
   resolved "https://registry.yarnpkg.com/@libp2p/bootstrap/-/bootstrap-12.0.13.tgz#b675af2781cbb7f98523061eb0d0f2a3867f94de"

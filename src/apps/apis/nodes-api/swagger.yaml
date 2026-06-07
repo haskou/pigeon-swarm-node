@@ -110,6 +110,19 @@ paths:
           description: The authenticated identity is not the node owner.
         '409':
           description: The node already has a public network.
+  /node/network/debug:
+    get:
+      tags:
+        - nodes
+      summary: Get local node network debug
+      description: Returns sanitized runtime connectivity diagnostics for the public relay layer. The response never includes application owner ids, owner display names, private network ids, PSK/private network keys, relay signatures, local storage paths, or private topology metadata.
+      responses:
+        '200':
+          description: Sanitized local node network debug state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeNetworkDebugResource'
   /node/owner/:
     put:
       tags:
@@ -232,6 +245,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NetworkResource'
+    NodeNetworkDebugResource:
+      type: object
+      required:
+        - publicRelay
+      properties:
+        publicRelay:
+          type: object
+          required:
+            - advertisedAddresses
+            - bootstrapRelayMultiaddrs
+            - debugReason
+            - discoveryEnabled
+            - listenAddresses
+            - relayAdvertised
+            - relayEnabled
+            - running
+          properties:
+            advertisedAddresses:
+              type: array
+              items:
+                type: string
+            bootstrapRelayMultiaddrs:
+              type: array
+              items:
+                type: string
+            debugReason:
+              type: string
+            discoveryEnabled:
+              type: boolean
+            listenAddresses:
+              type: array
+              items:
+                type: string
+            peerId:
+              type: string
+            relayAdvertised:
+              type: boolean
+            relayEnabled:
+              type: boolean
+            running:
+              type: boolean
     PeerResource:
       type: object
       required:

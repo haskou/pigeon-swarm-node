@@ -65,10 +65,12 @@ import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructu
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
 import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { MongoIndexInitializer } from '@app/shared/infrastructure/mongodb/MongoIndexInitializer';
+import { PublicRelayRuntime } from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
 
@@ -277,6 +279,12 @@ async function init() {
   console.time('Load local node state');
   await kernel.loadLocalNodeState();
   console.timeEnd('Load local node state');
+
+  console.time('Public relay runtime');
+  await new PublicRelayRuntime(
+    Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry),
+  ).start();
+  console.timeEnd('Public relay runtime');
 
   console.time('IPFS Runtime');
   const ipfsRuntime = new IPFSRuntime();

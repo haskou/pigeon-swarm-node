@@ -6,6 +6,8 @@ services:
       context: .
     ports:
       - "8080:8080"
+      - "4001:4001"
+      - "4011:4011"
     volumes:
       - ./:/var/www
       - /var/www/node_modules

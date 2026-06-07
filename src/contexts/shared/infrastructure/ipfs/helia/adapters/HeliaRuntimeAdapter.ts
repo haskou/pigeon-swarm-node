@@ -27,6 +27,7 @@ export type { RuntimeBlockstore } from './types/RuntimeBlockstore';
 export type { RuntimeDatastore } from './types/RuntimeDatastore';
 
 export class HeliaRuntimeAdapter {
+  private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
@@ -71,6 +72,15 @@ export class HeliaRuntimeAdapter {
     this.heliaModulePromise ??= this.nativeImport<typeof HeliaCore>('helia');
 
     return this.heliaModulePromise;
+  }
+
+  private loadBootstrapModule(): Promise<typeof import('@libp2p/bootstrap')> {
+    this.bootstrapModulePromise ??=
+      this.nativeImport<typeof import('@libp2p/bootstrap')>(
+        '@libp2p/bootstrap',
+      );
+
+    return this.bootstrapModulePromise;
   }
 
   private loadHeliaJsonModule(): Promise<typeof import('@helia/json')> {
@@ -227,6 +237,37 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private async withBootstrapRelays(
+    defaults: Libp2pDefaults,
+  ): Promise<Libp2pDefaults> {
+    const relayMultiaddrs = (
+      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || ''
+    )
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+
+    if (relayMultiaddrs.length === 0) {
+      return defaults;
+    }
+
+    const bootstrapModule = await this.loadBootstrapModule();
+    const config = defaults as unknown as {
+      peerDiscovery?: unknown[];
+    };
+
+    config.peerDiscovery = [
+      ...(config.peerDiscovery || []),
+      bootstrapModule.bootstrap({
+        list: relayMultiaddrs,
+        tagName: 'pigeon-relay-bootstrap',
+        tagTTL: Infinity,
+      }),
+    ];
+
+    return defaults;
+  }
+
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
@@ -288,7 +329,7 @@ export class HeliaRuntimeAdapter {
       return this.withoutNetwork(defaults);
     }
 
-    return this.withGossipsub(defaults);
+    return this.withBootstrapRelays(await this.withGossipsub(defaults));
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {

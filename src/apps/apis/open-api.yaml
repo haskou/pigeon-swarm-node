@@ -221,6 +221,8 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1{networkId}~1'
   /node/networks/public/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1public~1'
+  /node/network/debug:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1network~1debug'
   /node/owner/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner~1'
   /peers/:
