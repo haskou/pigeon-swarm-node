@@ -531,7 +531,10 @@ Implemented:
 
 ```http
 GET /node/networks
-X-Identity-Id: <optionalIdentityId>
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Nonce: <uniqueNonce>
+X-Signature: <signature>
 ```
 
 Response:
@@ -551,8 +554,10 @@ Response:
 Implemented:
 
 - return the networks configured for the local node
-- include private network `key` values only when `X-Identity-Id` matches the current node owner
-- omit private network `key` values for anonymous callers, non-owner identities or malformed identity headers
+- include private network `key` values only when the request is signed by the
+  current node owner
+- omit private network `key` values for anonymous callers, spoofed owner
+  headers, non-owner identities or malformed signatures
 
 ### Add local node network
 

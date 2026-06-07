@@ -23,9 +23,12 @@ paths:
       tags:
         - nodes
       summary: Get local node networks
-      description: Private network keys are returned only when X-Identity-Id matches the current node owner.
+      description: Private network keys are returned only when the request is signed by the current node owner. Unsigned, malformed, or non-owner requests still receive networks without private keys.
       parameters:
         - $ref: '#/components/parameters/XOptionalIdentityId'
+        - $ref: '#/components/parameters/XOptionalTimestamp'
+        - $ref: '#/components/parameters/XOptionalNonce'
+        - $ref: '#/components/parameters/XOptionalSignature'
       responses:
         '200':
           description: Local node networks.
@@ -160,7 +163,25 @@ components:
       required: false
       schema:
         type: string
-      description: Optional identity used to decide whether private network keys can be included in GET /node/networks/. Only the node owner receives keys.
+      description: Optional identity used with a valid request signature to decide whether private network keys can be included in GET /node/networks/. Only the signed node owner receives keys.
+    XOptionalTimestamp:
+      in: header
+      name: X-Timestamp
+      required: false
+      schema:
+        type: string
+    XOptionalNonce:
+      in: header
+      name: X-Nonce
+      required: false
+      schema:
+        type: string
+    XOptionalSignature:
+      in: header
+      name: X-Signature
+      required: false
+      schema:
+        type: string
     XTimestamp:
       in: header
       name: X-Timestamp
