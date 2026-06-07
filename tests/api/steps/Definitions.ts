@@ -171,6 +171,15 @@ export default class Definitions {
     this.headers = {};
   }
 
+  @given('I spoof the current node owner identity header')
+  public iSpoofTheCurrentNodeOwnerIdentityHeader(): void {
+    if (!this.ownerIdentityId) {
+      throw new Error('Node owner identity must be initialized first.');
+    }
+
+    this.headers['x-identity-id'] = this.ownerIdentityId.valueOf();
+  }
+
   private async ensureIdentityKeyPair(): Promise<KeyPair> {
     if (!this.identityKeyPair) {
       this.identityKeyPair = await KeyPair.generate();
