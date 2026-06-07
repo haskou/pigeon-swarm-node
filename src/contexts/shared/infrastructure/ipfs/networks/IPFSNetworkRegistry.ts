@@ -2,6 +2,7 @@ import { createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
+import { IPFSOptions } from '../helia/IPFSOptions';
 import libp2pKeyAdapter, {
   Libp2pPrivateKeyLike,
 } from './adapters/Libp2pKeyAdapter';
@@ -52,6 +53,80 @@ export default class IPFSNetworkRegistry {
 
   private getNetworkStorageLocation(id: string): string {
     return `${this.storagePath}/${id}`;
+  }
+
+  private parseListenPortRange(): { end: number; start: number } | undefined {
+    const value = process.env.IPFS_LIBP2P_LISTEN_PORT_RANGE;
+
+    if (!value) {
+      return undefined;
+    }
+
+    const match = value.match(/^(\d+)-(\d+)$/);
+
+    if (!match) {
+      throw new Error('IPFS_LIBP2P_LISTEN_PORT_RANGE must be START-END.');
+    }
+
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+
+    if (start <= 0 || end < start || end > 65535) {
+      throw new Error('IPFS_LIBP2P_LISTEN_PORT_RANGE has invalid ports.');
+    }
+
+    return { end, start };
+  }
+
+  private getPortForNetwork(networkIndex: number): number | undefined {
+    const range = this.parseListenPortRange();
+
+    if (!range) {
+      return undefined;
+    }
+
+    const port = range.start + networkIndex;
+
+    if (port > range.end) {
+      throw new Error('IPFS libp2p listen port range is exhausted.');
+    }
+
+    return port;
+  }
+
+  private parseMultiaddrs(
+    value: string | undefined,
+    port?: number,
+  ): string[] | undefined {
+    const multiaddrs = (value || '')
+      .split(/[\s,]+/)
+      .map((address) => address.trim())
+      .map((address) =>
+        port === undefined ? address : address.replaceAll('{port}', `${port}`),
+      )
+      .filter((address) => address.length > 0);
+
+    return multiaddrs.length > 0 ? multiaddrs : undefined;
+  }
+
+  private createIPFSOptions(
+    storageLocation: string,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): IPFSOptions {
+    const port = this.getPortForNetwork(this.networks.length);
+
+    return {
+      announceMultiaddrs: this.parseMultiaddrs(
+        process.env.IPFS_LIBP2P_ANNOUNCE_MULTIADDRS,
+        port,
+      ),
+      listenMultiaddrs: this.parseMultiaddrs(
+        process.env.IPFS_LIBP2P_LISTEN_MULTIADDRS,
+        port,
+      ),
+      privateKey: sharedPrivateKey,
+      storageLocation,
+    };
   }
 
   // eslint-disable-next-line max-len
@@ -123,22 +198,19 @@ export default class IPFSNetworkRegistry {
   ): Promise<IPFSNetwork> {
     const key = config.getKey();
     const storageLocation = this.getNetworkStorageLocation(config.getId());
+    const options = this.createIPFSOptions(storageLocation, sharedPrivateKey);
 
     if (key) {
       const connection = await PrivateIPFS.create({
         key,
         name: config.getName(),
-        privateKey: sharedPrivateKey,
-        storageLocation,
+        ...options,
       });
 
       return new IPFSNetwork(config, connection);
     }
 
-    const connection = await PublicIPFS.create({
-      privateKey: sharedPrivateKey,
-      storageLocation,
-    });
+    const connection = await PublicIPFS.create(options);
 
     return new IPFSNetwork(config, connection);
   }

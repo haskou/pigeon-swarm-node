@@ -6,6 +6,7 @@ services:
       context: .
     ports:
       - "8080:8080"
+      - "4001-4010:4001-4010/tcp"
     volumes:
       - ./:/var/www
       - /var/www/node_modules
@@ -19,6 +20,8 @@ services:
       NODE_ENV: local
       MONGO_URL: mongodb://mongodb:27017
       MONGO_DATABASE: pigeon_swarm
+      IPFS_LIBP2P_LISTEN_PORT_RANGE: 4001-4010
+      IPFS_LIBP2P_LISTEN_MULTIADDRS: /ip4/0.0.0.0/tcp/{port}
 
   mongodb:
     container_name: "pigeon_swarm_mongodb"

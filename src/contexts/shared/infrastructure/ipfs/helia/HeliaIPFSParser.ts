@@ -75,6 +75,30 @@ export class HeliaIPFSParser {
     };
   }
 
+  private static applyNetworkAddresses(
+    libp2pConfig: ParsedHeliaIPFSOptions['libp2p'],
+    options: IPFSOptions,
+  ): void {
+    if (!options.listenMultiaddrs && !options.announceMultiaddrs) {
+      return;
+    }
+
+    const config = libp2pConfig as ParsedHeliaIPFSOptions['libp2p'] & {
+      addresses?: {
+        announce?: string[];
+        listen?: string[];
+      };
+    };
+
+    config.addresses = {
+      ...(config.addresses || {}),
+      ...(options.announceMultiaddrs
+        ? { announce: options.announceMultiaddrs }
+        : {}),
+      ...(options.listenMultiaddrs ? { listen: options.listenMultiaddrs } : {}),
+    };
+  }
+
   private static readBlockedPeersFromStorage(
     storageLocation: string,
   ): string[] {
@@ -136,6 +160,7 @@ export class HeliaIPFSParser {
         options.storageLocation,
       ),
     })) as ParsedHeliaIPFSOptions['libp2p'];
+    HeliaIPFSParser.applyNetworkAddresses(libp2pConfig, options);
 
     return {
       ...(await HeliaIPFSParser.parseStorageLocationOptions(options)),
@@ -144,7 +169,7 @@ export class HeliaIPFSParser {
         connectionGater,
         ...(options.privateKey ? { privateKey: options.privateKey } : {}),
       },
-    };
+    } satisfies ParsedHeliaIPFSOptions;
   }
 
   public static parsePrivateLibp2pConfig(

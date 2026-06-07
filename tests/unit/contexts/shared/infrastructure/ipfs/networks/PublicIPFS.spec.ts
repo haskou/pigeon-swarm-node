@@ -158,6 +158,25 @@ describe('PublicIPFS', () => {
       expect(result).toBeInstanceOf(PublicIPFS);
     });
 
+    it('should configure libp2p listen and announce addresses', async () => {
+      await PublicIPFS.create({
+        announceMultiaddrs: ['/dns4/pigeon.example/tcp/4001'],
+        listenMultiaddrs: ['/ip4/0.0.0.0/tcp/4001'],
+        storageLocation: 'memory',
+      });
+
+      expect(mockCreateHelia).toHaveBeenCalledWith(
+        expect.objectContaining({
+          libp2p: expect.objectContaining({
+            addresses: {
+              announce: ['/dns4/pigeon.example/tcp/4001'],
+              listen: ['/ip4/0.0.0.0/tcp/4001'],
+            },
+          }),
+        }),
+      );
+    });
+
     it('should reuse connection from pool on second call with same options', async () => {
       const options = { storageLocation: 'memory' as const };
 

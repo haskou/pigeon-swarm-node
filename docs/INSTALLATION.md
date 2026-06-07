@@ -23,6 +23,8 @@ NODE_ENV=development
 API_PORT=3000
 ROUTE_PREFIX=/api
 IPFS_STORAGE_PATH=./ipfs_storage
+IPFS_LIBP2P_LISTEN_PORT_RANGE=4001-4010
+IPFS_LIBP2P_LISTEN_MULTIADDRS=/ip4/0.0.0.0/tcp/{port}
 TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
 ```
@@ -115,6 +117,9 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `IPFS_LIBP2P_LISTEN_PORT_RANGE` | unset | Recommended for multi-node deployments | TCP port range assigned to local Helia/libp2p runtimes. One port is consumed per configured node network. |
+| `IPFS_LIBP2P_LISTEN_MULTIADDRS` | Helia defaults | Recommended for multi-node deployments | Comma/space-separated listen multiaddr templates. Use `{port}` with `IPFS_LIBP2P_LISTEN_PORT_RANGE`, for example `/ip4/0.0.0.0/tcp/{port}`. |
+| `IPFS_LIBP2P_ANNOUNCE_MULTIADDRS` | Helia defaults | Recommended when other hosts must dial this node | Comma/space-separated public/LAN dialable multiaddr templates announced in node heartbeat metadata. Use `{port}` with the configured range. |
 
 Private networks are no longer configured through environment variables.
 
@@ -139,6 +144,44 @@ Practical recommendation:
 - Use a real filesystem path in app/runtime environments.
 - Use explicit `storageLocation: 'memory'` only in isolated tests or direct connection creation flows.
 
+### Dialable IPFS ports
+
+Each configured node network runs its own Helia/libp2p runtime. Because of
+that, a node with a public network and one private network needs two libp2p TCP
+ports, a node with three networks needs three ports, and so on.
+
+For Docker/local deployments, expose a generous range and let the backend assign
+ports in registration order:
+
+```dotenv
+IPFS_LIBP2P_LISTEN_PORT_RANGE=4001-4010
+IPFS_LIBP2P_LISTEN_MULTIADDRS=/ip4/0.0.0.0/tcp/{port}
+```
+
+`docker-compose.yml` exposes `4001-4010/tcp` for this reason. If the node must
+be reachable from another machine, the host/router/firewall must also allow the
+same TCP range.
+
+When running multiple backend nodes on the same host, give each node a
+non-overlapping `IPFS_LIBP2P_LISTEN_PORT_RANGE`, for example `4001-4010` for the
+first node and `4011-4020` for the second one.
+
+When the node is behind Docker, Helia may otherwise announce container-only
+addresses. Set `IPFS_LIBP2P_ANNOUNCE_MULTIADDRS` to a host that remote nodes can
+actually dial:
+
+```dotenv
+# LAN example
+IPFS_LIBP2P_ANNOUNCE_MULTIADDRS=/ip4/192.168.1.30/tcp/{port}
+
+# DNS/public example
+IPFS_LIBP2P_ANNOUNCE_MULTIADDRS=/dns4/pigeon.example.com/tcp/{port}
+```
+
+The backend replaces `{port}` with the per-network port and publishes the final
+multiaddrs in `nodes.v1.node.heartbeat.was_sent`. Remote nodes only try those
+addresses for networks they also have registered locally.
+
 ## Example `.env`
 
 ```dotenv
@@ -146,6 +189,9 @@ NODE_ENV=development
 API_PORT=3000
 ROUTE_PREFIX=/api
 IPFS_STORAGE_PATH=./ipfs_storage
+IPFS_LIBP2P_LISTEN_PORT_RANGE=4001-4010
+IPFS_LIBP2P_LISTEN_MULTIADDRS=/ip4/0.0.0.0/tcp/{port}
+# IPFS_LIBP2P_ANNOUNCE_MULTIADDRS=/dns4/pigeon.example.com/tcp/{port}
 TRANSPORT_DSN=in-memory
 SERVICE_NAME=pigeon-swarm
 PUSH_VAPID_PUBLIC_KEY=<generatedPublicKey>

@@ -144,12 +144,20 @@ ignored in this source repository because it is a build/deployment artifact:
 place the frontend build output there only in local runtime images or release
 packaging, not as backend source.
 
+For multi-node IPFS content exchange, expose the Helia/libp2p TCP port range in
+addition to the HTTP API port. The default Docker Compose setup publishes
+`4001-4010/tcp`; configure `IPFS_LIBP2P_ANNOUNCE_MULTIADDRS` when other hosts
+must dial this node from LAN or the public Internet. See
+[docs/INSTALLATION.md](./docs/INSTALLATION.md#dialable-ipfs-ports).
+
 ## Runtime Dependencies
 
 The node expects:
 
 * MongoDB for local persistent state.
 * IPFS network configuration for content publication and retrieval.
+* Dialable Helia/libp2p TCP ports when other nodes must fetch IPFS CIDs from
+  this node directly.
 * Libp2p GossipSub transport for node-to-node event propagation.
 * Signed HTTP/WebSocket requests from clients.
 
