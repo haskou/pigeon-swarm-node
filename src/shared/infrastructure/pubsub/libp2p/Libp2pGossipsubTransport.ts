@@ -1,5 +1,6 @@
 import Kernel from '@app/Kernel';
 
+import NetworkDiagnosticsLogger from '../../network/NetworkDiagnosticsLogger';
 import { PubSubTransport } from '../PubSubTransport';
 import runtime, {
   Libp2pGossipsubRuntimeAdapter,
@@ -38,18 +39,37 @@ export default class Libp2pGossipsubTransport implements PubSubTransport {
       return;
     }
 
+    NetworkDiagnosticsLogger.logPubSub('received', await this.getNode(), {
+      mode: 'public',
+      name: 'standalone-gossipsub',
+      payloadBytes: message.data.byteLength,
+      topic,
+    });
+
     await handler(new TextDecoder().decode(message.data));
   }
 
   public async publish(topic: string, payload: string): Promise<void> {
     const node = await this.getNode();
+    const payloadBytes = new TextEncoder().encode(payload);
+
+    NetworkDiagnosticsLogger.logPubSub('publish', node, {
+      mode: 'public',
+      name: 'standalone-gossipsub',
+      payloadBytes: payloadBytes.byteLength,
+      topic,
+    });
 
     try {
-      await node.services.pubsub.publish(
-        topic,
-        new TextEncoder().encode(payload),
-      );
+      await node.services.pubsub.publish(topic, payloadBytes);
     } catch (error: unknown) {
+      NetworkDiagnosticsLogger.logPubSub('publish-failed', node, {
+        error,
+        mode: 'public',
+        name: 'standalone-gossipsub',
+        payloadBytes: payloadBytes.byteLength,
+        topic,
+      });
       Kernel.logger.warn(
         `PubSub publish failed for topic "${topic}": ${String(error)}`,
       );
@@ -70,6 +90,11 @@ export default class Libp2pGossipsubTransport implements PubSubTransport {
     };
 
     await node.services.pubsub.subscribe(topic);
+    NetworkDiagnosticsLogger.logPubSub('subscribe', node, {
+      mode: 'public',
+      name: 'standalone-gossipsub',
+      topic,
+    });
     node.services.pubsub.addEventListener('message', listener);
     node.services.pubsub.addEventListener('gossipsub:message', listener);
   }

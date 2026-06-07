@@ -1,3 +1,4 @@
+import NetworkDiagnosticsLogger from '../../network/NetworkDiagnosticsLogger';
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 
 export class Libp2pGossipsubRuntimeAdapter {
@@ -82,11 +83,24 @@ export class Libp2pGossipsubRuntimeAdapter {
       }) as unknown,
     };
 
-    return libp2pModule.createLibp2p(
+    const node = (await libp2pModule.createLibp2p(
       libp2pConfig as unknown as Parameters<
         typeof libp2pModule.createLibp2p
       >[0],
-    ) as unknown as Libp2pPubSubNode;
+    )) as unknown as Libp2pPubSubNode;
+
+    NetworkDiagnosticsLogger.logStartup(node, {
+      config: libp2pConfig,
+      mode: 'public',
+      name: 'standalone-gossipsub',
+      pskEnabled: false,
+    });
+    NetworkDiagnosticsLogger.attachConnectionEvents(node, {
+      mode: 'public',
+      name: 'standalone-gossipsub',
+    });
+
+    return node;
   }
 }
 

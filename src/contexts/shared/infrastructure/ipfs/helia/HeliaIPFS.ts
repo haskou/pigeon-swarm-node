@@ -1,4 +1,5 @@
 import Kernel from '@app/Kernel';
+import NetworkDiagnosticsLogger from '@app/shared/infrastructure/network/NetworkDiagnosticsLogger';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
@@ -33,6 +34,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
     Kernel.logger.info(
       `Started public network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
+    NetworkDiagnosticsLogger.logStartup(heliaCore.libp2p, {
+      config: parsedOptions.libp2p,
+      mode: 'public',
+      name: 'public',
+      pskEnabled: false,
+    });
+    NetworkDiagnosticsLogger.attachConnectionEvents(heliaCore.libp2p, {
+      mode: 'public',
+      name: 'public',
+    });
 
     return heliaCore;
   }
@@ -61,6 +72,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
+    NetworkDiagnosticsLogger.logStartup(heliaCore.libp2p, {
+      config: libp2pConfig,
+      mode: 'private',
+      name: networkName,
+      pskEnabled: true,
+    });
+    NetworkDiagnosticsLogger.attachConnectionEvents(heliaCore.libp2p, {
+      mode: 'private',
+      name: networkName,
+    });
 
     return heliaCore;
   }
@@ -348,8 +369,32 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   public async publishPubSub(topic: string, payload: string): Promise<void> {
     const pubsub = this.getPubSubService();
+    const payloadBytes = new TextEncoder().encode(payload);
 
-    await pubsub.publish(topic, new TextEncoder().encode(payload));
+    NetworkDiagnosticsLogger.logPubSub('publish', this.heliaCore.libp2p, {
+      mode: 'unknown',
+      name: this.options.storageLocation,
+      payloadBytes: payloadBytes.byteLength,
+      topic,
+    });
+
+    try {
+      await pubsub.publish(topic, payloadBytes);
+    } catch (error: unknown) {
+      NetworkDiagnosticsLogger.logPubSub(
+        'publish-failed',
+        this.heliaCore.libp2p,
+        {
+          error,
+          mode: 'unknown',
+          name: this.options.storageLocation,
+          payloadBytes: payloadBytes.byteLength,
+          topic,
+        },
+      );
+
+      throw error;
+    }
   }
 
   public async subscribePubSub(
@@ -364,6 +409,13 @@ export abstract class HeliaIPFS implements IPFSConnection {
         return;
       }
 
+      NetworkDiagnosticsLogger.logPubSub('received', this.heliaCore.libp2p, {
+        mode: 'unknown',
+        name: this.options.storageLocation,
+        payloadBytes: message.data.byteLength,
+        topic,
+      });
+
       handler(new TextDecoder().decode(message.data)).catch(
         (error: unknown) => {
           Kernel.logger.error(
@@ -374,6 +426,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     };
 
     await pubsub.subscribe(topic);
+    NetworkDiagnosticsLogger.logPubSub('subscribe', this.heliaCore.libp2p, {
+      mode: 'unknown',
+      name: this.options.storageLocation,
+      topic,
+    });
     pubsub.addEventListener('message', listener);
     pubsub.addEventListener('gossipsub:message', listener);
   }
