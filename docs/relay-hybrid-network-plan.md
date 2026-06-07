@@ -417,7 +417,7 @@ publicLibp2p:
 A single libp2p instance should not be treated as both public and private when pnet is enabled.
 
 The first fallback implemented for this model is private-network event gossip
-over the public runtime:
+over the public runtime, plus encrypted CID fetch streams:
 
 - direct private IPFS pub/sub still publishes to
   `pigeon-swarm.networks.<networkId>.<context>.<version>.announcements`;
@@ -428,6 +428,12 @@ over the public runtime:
 - the payload remains AES-GCM encrypted by `PubSubNetworkMessageCodec`;
 - consumers deduplicate by `event_id` when both direct and fallback paths
   deliver the same event.
+- content fetch uses `/pigeon-swarm/ipfs-content/1.0.0` over public libp2p;
+- fetch requests and responses are encrypted with the private network key;
+- relays and unrelated public peers do not see `networkId`, PSK, plaintext CID
+  or plaintext bytes;
+- received bytes/JSON are imported locally and accepted only if the resulting
+  CID exactly matches the requested CID.
 
 ## Data Flow
 
@@ -442,8 +448,9 @@ over the public runtime:
 1. Node cannot retrieve content through private IPFS.
 2. Node discovers verified relay or public peer.
 3. Node opens an authenticated public libp2p stream.
-4. Node requests encrypted blocks or encrypted payloads.
-5. Node validates bytes against CID or signed metadata.
+4. Node requests encrypted bytes or encrypted JSON by CID.
+5. Node imports the response into the local private network and validates the
+   resulting CID.
 6. Node stores valid bytes in local private blockstore.
 7. Application receives content through the same content abstraction.
 

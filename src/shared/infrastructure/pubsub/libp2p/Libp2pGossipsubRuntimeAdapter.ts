@@ -3,10 +3,22 @@ import { PublicRelayConfiguration } from '../../network/relay/PublicRelayConfigu
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 
 export class Libp2pGossipsubRuntimeAdapter {
+  private static readonly globalNodeKey = '__pigeonSwarmPublicLibp2pNode';
+
   private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
   private heliaModulePromise?: Promise<typeof import('helia')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private gossipsubModulePromise?: Promise<typeof import('@libp2p/gossipsub')>;
+
+  public static clearSharedNodeForTesting(): void {
+    const globalState = globalThis as typeof globalThis & {
+      [Libp2pGossipsubRuntimeAdapter.globalNodeKey]?:
+        | Promise<Libp2pPubSubNode>
+        | undefined;
+    };
+
+    delete globalState[Libp2pGossipsubRuntimeAdapter.globalNodeKey];
+  }
 
   private async nativeImport<TModule>(modulePath: string): Promise<TModule> {
     if (process.env.JEST_WORKER_ID !== undefined) {
@@ -41,6 +53,26 @@ export class Libp2pGossipsubRuntimeAdapter {
       );
 
     return this.gossipsubModulePromise;
+  }
+
+  private get sharedNodePromise(): Promise<Libp2pPubSubNode> | undefined {
+    const globalState = globalThis as typeof globalThis & {
+      [Libp2pGossipsubRuntimeAdapter.globalNodeKey]?:
+        | Promise<Libp2pPubSubNode>
+        | undefined;
+    };
+
+    return globalState[Libp2pGossipsubRuntimeAdapter.globalNodeKey];
+  }
+
+  private set sharedNodePromise(nodePromise: Promise<Libp2pPubSubNode>) {
+    const globalState = globalThis as typeof globalThis & {
+      [Libp2pGossipsubRuntimeAdapter.globalNodeKey]?:
+        | Promise<Libp2pPubSubNode>
+        | undefined;
+    };
+
+    globalState[Libp2pGossipsubRuntimeAdapter.globalNodeKey] = nodePromise;
   }
 
   private loadBootstrapModule(): Promise<typeof import('@libp2p/bootstrap')> {
@@ -99,7 +131,7 @@ export class Libp2pGossipsubRuntimeAdapter {
     };
   }
 
-  public async createNode(): Promise<Libp2pPubSubNode> {
+  private async createNewNode(): Promise<Libp2pPubSubNode> {
     const [heliaModule, libp2pModule, gossipsubModule] = await Promise.all([
       this.loadHeliaModule(),
       this.loadLibp2pModule(),
@@ -137,6 +169,16 @@ export class Libp2pGossipsubRuntimeAdapter {
     });
 
     return node;
+  }
+
+  public async createNode(): Promise<Libp2pPubSubNode> {
+    if (this.sharedNodePromise) {
+      return this.sharedNodePromise;
+    }
+
+    this.sharedNodePromise = this.createNewNode();
+
+    return this.sharedNodePromise;
   }
 }
 

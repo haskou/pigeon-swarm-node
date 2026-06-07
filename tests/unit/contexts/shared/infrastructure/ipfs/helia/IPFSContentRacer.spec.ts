@@ -1,15 +1,20 @@
 import { mock } from 'jest-mock-extended';
 
 import { IPFSContentNotFoundError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
+import { PublicIPFSContentFallback } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/fallback/PublicIPFSContentFallback';
 import IPFSContentRacer from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
 import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 
 describe('IPFSContentRacer', () => {
   let racer: IPFSContentRacer;
+  let fallback: jest.Mocked<PublicIPFSContentFallback>;
 
   beforeEach(() => {
-    racer = new IPFSContentRacer();
+    fallback = mock<PublicIPFSContentFallback>();
+    fallback.getJSON.mockRejectedValue(new IPFSContentNotFoundError('cid'));
+    fallback.getBytes.mockRejectedValue(new IPFSContentNotFoundError('cid'));
+    racer = new IPFSContentRacer(undefined, fallback);
   });
 
   describe('raceGetJSON', () => {
@@ -35,6 +40,44 @@ describe('IPFSContentRacer', () => {
 
       await expect(racer.raceGetJSON([network], cid)).rejects.toThrow(
         IPFSContentNotFoundError,
+      );
+    });
+
+    it('should use public fallback when direct JSON lookup fails', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network = mock<IPFSNetwork>();
+      const expected = { name: 'fallback' };
+
+      network.getJSON.mockRejectedValue(new Error('not found'));
+      fallback.getJSON.mockResolvedValue(expected);
+
+      const result = await racer.raceGetJSON([network], cid);
+
+      expect(result).toEqual(expected);
+      expect(fallback.getJSON).toHaveBeenCalledWith(
+        [network],
+        cid,
+        expect.any(AbortSignal),
+      );
+    });
+  });
+
+  describe('raceGetBytes', () => {
+    it('should use public fallback when direct bytes lookup fails', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network = mock<IPFSNetwork>();
+      const expected = Buffer.from('fallback-bytes');
+
+      network.getBytes.mockRejectedValue(new Error('not found'));
+      fallback.getBytes.mockResolvedValue(expected);
+
+      const result = await racer.raceGetBytes([network], cid);
+
+      expect(result).toEqual(expected);
+      expect(fallback.getBytes).toHaveBeenCalledWith(
+        [network],
+        cid,
+        expect.any(AbortSignal),
       );
     });
   });

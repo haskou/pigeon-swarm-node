@@ -68,6 +68,7 @@ describe('Libp2pGossipsubRuntimeAdapter', () => {
 
   afterEach(() => {
     process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS = originalBootstrapRelays;
+    Libp2pGossipsubRuntimeAdapter.clearSharedNodeForTesting();
     jest.clearAllMocks();
   });
 

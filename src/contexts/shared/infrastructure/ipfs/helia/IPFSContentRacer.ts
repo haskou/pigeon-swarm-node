@@ -1,11 +1,15 @@
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
+import { PublicIPFSContentFallback } from '../fallback/PublicIPFSContentFallback';
 import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
 
 export default class IPFSContentRacer {
   private readonly timeoutMs: number;
 
-  constructor(timeoutMs?: number) {
+  constructor(
+    timeoutMs?: number,
+    private readonly fallback = new PublicIPFSContentFallback(),
+  ) {
     this.timeoutMs =
       timeoutMs ??
       Number(
@@ -36,7 +40,7 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      throw new IPFSContentNotFoundError(cid.valueOf());
+      return this.fallback.getJSON<T>(networks, cid, controller.signal);
     } finally {
       clearTimeout(timeout);
     }
@@ -58,7 +62,7 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      throw new IPFSContentNotFoundError(cid.valueOf());
+      return this.fallback.getBytes(networks, cid, controller.signal);
     } finally {
       clearTimeout(timeout);
     }

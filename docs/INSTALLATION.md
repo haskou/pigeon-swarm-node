@@ -173,6 +173,14 @@ does not include the private `networkId`; the payload remains encrypted with the
 same private network key used by direct private-network pub/sub. This lets relay
 nodes move gossip without learning the private network id or payload.
 
+When direct private IPFS retrieval fails, the backend can also request content
+over the public fallback libp2p runtime with protocol
+`/pigeon-swarm/ipfs-content/1.0.0`. Requests and responses are encrypted with
+the private network key before being written to the public stream, so relay
+nodes do not see the requested CID, network id, PSK or payload. Received content
+is imported into the local private network and accepted only when the resulting
+CID exactly matches the requested CID.
+
 Docker deployments must publish both the main libp2p port and the relay port
 when those features are enabled:
 
@@ -190,7 +198,7 @@ private topology.
 Important limitation: a public relay must not require the private network PSK.
 Private PSK networks remain private. IPFS private-network connections still use
 their own pnet/PSK path; public relay/fallback connectivity is used by the
-public GossipSub fallback layer and future application-level fallback streams.
+public GossipSub fallback layer and application-level CID fetch streams.
 
 ### Important note about `IPFS_STORAGE_PATH=memory`
 
