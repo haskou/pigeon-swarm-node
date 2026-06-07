@@ -1,5 +1,4 @@
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
-import { RegisterConversationMessage as RegisterConversationMetadataMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
@@ -13,7 +12,6 @@ import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 import { PrimitiveOf } from '@haskou/value-objects';
 
-import { ConversationCandidate } from './types/ConversationCandidate';
 import { MessageCandidate } from './types/MessageCandidate';
 import { ReactionCandidate } from './types/ReactionCandidate';
 
@@ -25,10 +23,11 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     consumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
     private readonly reactionRegistrar: MessageReactionRegistrar,
-    private readonly conversationRegistrar: ConversationRegistrar,
+    _conversationRegistrar: ConversationRegistrar,
     private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
+    void _conversationRegistrar;
   }
 
   public get queueName(): string {
@@ -58,37 +57,6 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     );
   }
 
-  private isConversationCandidate(
-    candidate: unknown,
-  ): candidate is ConversationCandidate {
-    if (typeof candidate !== 'object' || candidate === null) {
-      return false;
-    }
-
-    const candidateRecord = candidate as Record<string, unknown>;
-
-    return (
-      typeof candidateRecord.id === 'string' &&
-      typeof candidateRecord.networkId === 'string' &&
-      typeof candidateRecord.type === 'string' &&
-      this.hasValidConversationName(candidateRecord) &&
-      this.hasValidParticipantIds(candidateRecord)
-    );
-  }
-
-  private hasValidConversationName(record: Record<string, unknown>): boolean {
-    return record.name === undefined || typeof record.name === 'string';
-  }
-
-  private hasValidParticipantIds(record: Record<string, unknown>): boolean {
-    return (
-      Array.isArray(record.participantIds) &&
-      record.participantIds.every(
-        (participantId) => typeof participantId === 'string',
-      )
-    );
-  }
-
   private isReactionCandidate(
     candidate: unknown,
   ): candidate is ReactionCandidate {
@@ -103,22 +71,6 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
       typeof candidateRecord.createdAt === 'number' &&
       typeof candidateRecord.emoji === 'string' &&
       typeof candidateRecord.messageId === 'string'
-    );
-  }
-
-  private async registerConversation(candidate: unknown): Promise<void> {
-    if (!this.isConversationCandidate(candidate)) {
-      return;
-    }
-
-    await this.conversationRegistrar.register(
-      new RegisterConversationMetadataMessage({
-        conversationId: candidate.id,
-        name: candidate.name,
-        networkId: candidate.networkId,
-        participantIds: candidate.participantIds,
-        type: candidate.type,
-      }),
     );
   }
 
@@ -147,8 +99,6 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
         ? String(event.attributes.requestId)
         : undefined,
     );
-    await this.registerConversation(event.attributes.conversation);
-
     const candidates = Array.isArray(event.attributes.messageCandidates)
       ? event.attributes.messageCandidates.filter((candidate) =>
           this.isMessageCandidate(candidate),

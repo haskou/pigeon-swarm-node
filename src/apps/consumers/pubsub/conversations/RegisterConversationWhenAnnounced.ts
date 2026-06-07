@@ -1,5 +1,4 @@
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
-import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
@@ -11,9 +10,10 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
 
   constructor(
     consumer: DomainEventConsumer,
-    private readonly registrar: ConversationRegistrar,
+    _registrar: ConversationRegistrar,
   ) {
     super(consumer);
+    void _registrar;
   }
 
   public get queueName(): string {
@@ -32,20 +32,9 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
     return process.env.SERVICE_NAME || 'pigeon-swarm';
   }
 
-  public async handler(event: DomainEvent): Promise<void> {
-    await this.registrar.register(
-      new RegisterConversationMessage({
-        conversationId: event.aggregateId,
-        name:
-          typeof event.attributes.name === 'string'
-            ? event.attributes.name
-            : undefined,
-        networkId: String(event.attributes.networkId),
-        participantIds: Array.isArray(event.attributes.participantIds)
-          ? event.attributes.participantIds.map(String)
-          : [],
-        type: String(event.attributes.type),
-      }),
-    );
+  public handler(_event: DomainEvent): Promise<void> {
+    void _event;
+
+    return Promise.resolve();
   }
 }
