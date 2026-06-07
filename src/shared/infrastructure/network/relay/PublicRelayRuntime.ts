@@ -16,11 +16,13 @@ export class PublicRelayRuntime {
   private static readonly recordRefreshDivider = 3;
 
   private get state(): {
+    failoverInterval?: NodeJS.Timeout;
     node?: PublicRelayRuntimeNode;
     relayRecord?: PublicRelayDebugState['relayRecord'];
   } {
     const globalState = globalThis as typeof globalThis & {
       [PublicRelayRuntime.globalStateKey]?: {
+        failoverInterval?: NodeJS.Timeout;
         node?: PublicRelayRuntimeNode;
         relayRecord?: PublicRelayDebugState['relayRecord'];
       };
@@ -50,6 +52,24 @@ export class PublicRelayRuntime {
 
   private buildDebugReason(): string {
     if (!this.configuration.isRelayEnabled()) {
+      if (
+        this.configuration.isRelayAutoEnabled() &&
+        !this.configuration.hasPublicHost()
+      ) {
+        return 'Relay auto-enable configured but PIGEON_PUBLIC_HOST is empty.';
+      }
+
+      if (
+        this.configuration.isRelayAutoEnabled() &&
+        this.relayRecordRegistry.all().length > 0
+      ) {
+        return 'Relay server disabled while another active public relay is known.';
+      }
+
+      if (this.configuration.isRelayAutoEnabled()) {
+        return 'Relay auto-enable configured and no active public relay is known.';
+      }
+
       return 'Relay server disabled by PIGEON_RELAY_ENABLED.';
     }
 
@@ -58,6 +78,18 @@ export class PublicRelayRuntime {
     }
 
     return 'Relay enabled and advertised with PIGEON_PUBLIC_HOST.';
+  }
+
+  private shouldStartRelay(): boolean {
+    if (this.configuration.isRelayEnabled()) {
+      return true;
+    }
+
+    return (
+      this.configuration.isRelayAutoEnabled() &&
+      this.configuration.hasPublicHost() &&
+      this.relayRecordRegistry.all().length === 0
+    );
   }
 
   private async buildRelayRecord(
@@ -121,8 +153,37 @@ export class PublicRelayRuntime {
     }, intervalMs);
   }
 
+  private startFailoverMonitor(): void {
+    if (
+      this.state.failoverInterval ||
+      !this.configuration.isRelayAutoEnabled()
+    ) {
+      return;
+    }
+
+    const intervalMs = Math.max(
+      1000,
+      Math.floor(
+        this.configuration.getRelayRecordTtlMs() /
+          PublicRelayRuntime.recordRefreshDivider,
+      ),
+    );
+
+    this.state.failoverInterval = setInterval(() => {
+      if (!this.state.node && this.shouldStartRelay()) {
+        this.start().catch((error: unknown) => {
+          Kernel.logger.warn(
+            `Public relay auto-enable failed: ${String(error)}`,
+          );
+        });
+      }
+    }, intervalMs);
+  }
+
   public async start(): Promise<void> {
-    if (!this.configuration.isRelayEnabled() || this.state.node) {
+    this.startFailoverMonitor();
+
+    if (!this.shouldStartRelay() || this.state.node) {
       return;
     }
 
@@ -160,6 +221,7 @@ export class PublicRelayRuntime {
       discoveryEnabled: this.configuration.isRelayDiscoveryEnabled(),
       listenAddresses: [this.addressFactory.relayListenAddress()],
       peerId,
+      relayAutoEnabled: this.configuration.isRelayAutoEnabled(),
       relayAdvertised: Boolean(advertisedAddress),
       relayEnabled: this.configuration.isRelayEnabled(),
       relayRecord: this.state.relayRecord,

@@ -667,6 +667,7 @@ Response:
       "/ip4/0.0.0.0/tcp/4011"
     ],
     "peerId": "12D3Koo...",
+    "relayAutoEnabled": false,
     "relayAdvertised": true,
     "relayEnabled": true,
     "running": true

@@ -17,6 +17,7 @@ export class NodeNetworkDebugViewModel {
         listenAddresses: this.publicRelay.listenAddresses,
         peerId: this.publicRelay.peerId,
         relayAdvertised: this.publicRelay.relayAdvertised,
+        relayAutoEnabled: this.publicRelay.relayAutoEnabled,
         relayEnabled: this.publicRelay.relayEnabled,
         running: this.publicRelay.running,
       },

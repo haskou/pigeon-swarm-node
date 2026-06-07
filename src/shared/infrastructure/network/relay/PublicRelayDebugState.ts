@@ -7,6 +7,7 @@ export type PublicRelayDebugState = {
   discoveredRelayMultiaddrs: string[];
   listenAddresses: string[];
   peerId?: string;
+  relayAutoEnabled: boolean;
   relayAdvertised: boolean;
   relayEnabled: boolean;
   relayRecord?: {

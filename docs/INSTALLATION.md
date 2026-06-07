@@ -117,6 +117,7 @@ installed `web-push` module path.
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
 | `PIGEON_LIBP2P_PORT` | `4001` | No | Main libp2p listen port used by IPFS/libp2p runtimes. |
 | `PIGEON_RELAY_ENABLED` | `false` | No | Starts one public relay server for this node when `true`. The relay is node-scoped, not network-scoped. |
+| `PIGEON_RELAY_AUTO_ENABLE` | `false` | No | Allows a publicly reachable node to start its relay automatically when no active signed relay records are known. Requires `PIGEON_PUBLIC_HOST`. |
 | `PIGEON_RELAY_PORT` | `4011` | No | Dedicated public relay listen port. Do not reuse the HTTP/Express port. |
 | `PIGEON_PUBLIC_HOST` | unset | Required for advertised public relay nodes | Public DNS name or IP used to build dialable relay multiaddrs. |
 | `PIGEON_RELAY_DISCOVERY_ENABLED` | `true` | No | Enables relay discovery/diagnostics feature flags. |
@@ -140,6 +141,17 @@ PIGEON_RELAY_ENABLED=true
 PIGEON_RELAY_PORT=4011
 PIGEON_PUBLIC_HOST=relay.example.com
 ```
+
+Publicly reachable nodes can also act as fallback relay candidates:
+
+```dotenv
+PIGEON_RELAY_AUTO_ENABLE=true
+PIGEON_PUBLIC_HOST=node.example.com
+```
+
+In auto mode the relay stays off while another active signed relay record is
+known. If all known records expire, the node starts its own public relay and
+publishes a fresh signed record.
 
 The generated public relay multiaddr has this shape:
 

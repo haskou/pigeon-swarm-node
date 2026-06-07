@@ -5,6 +5,7 @@ describe('PublicRelayConfiguration', () => {
     const configuration = PublicRelayConfiguration.fromEnvironment({});
 
     expect(configuration.isRelayEnabled()).toBe(false);
+    expect(configuration.isRelayAutoEnabled()).toBe(false);
     expect(configuration.getLibp2pPort()).toBe(4001);
     expect(configuration.getRelayPort()).toBe(4011);
     expect(configuration.hasPublicHost()).toBe(false);
@@ -19,6 +20,7 @@ describe('PublicRelayConfiguration', () => {
         ' /dns4/relay-a.test/tcp/4011/p2p/12D3A, /ip4/203.0.113.7/tcp/4011/p2p/12D3B ',
       PIGEON_LIBP2P_PORT: '4101',
       PIGEON_PUBLIC_HOST: 'relay.example.com',
+      PIGEON_RELAY_AUTO_ENABLE: 'true',
       PIGEON_RELAY_DISCOVERY_ENABLED: 'false',
       PIGEON_RELAY_ENABLED: 'true',
       PIGEON_RELAY_PORT: '4111',
@@ -26,6 +28,7 @@ describe('PublicRelayConfiguration', () => {
     });
 
     expect(configuration.isRelayEnabled()).toBe(true);
+    expect(configuration.isRelayAutoEnabled()).toBe(true);
     expect(configuration.getLibp2pPort()).toBe(4101);
     expect(configuration.getRelayPort()).toBe(4111);
     expect(configuration.getPublicHost()).toBe('relay.example.com');

@@ -8,6 +8,7 @@ export type NodeNetworkDebugResource = {
     discoveredRelayMultiaddrs: string[];
     listenAddresses: string[];
     peerId?: string;
+    relayAutoEnabled: boolean;
     relayAdvertised: boolean;
     relayEnabled: boolean;
     running: boolean;

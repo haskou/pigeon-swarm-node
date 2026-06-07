@@ -260,6 +260,7 @@ components:
             - discoveredRelayCount
             - discoveredRelayMultiaddrs
             - listenAddresses
+            - relayAutoEnabled
             - relayAdvertised
             - relayEnabled
             - running
@@ -288,6 +289,8 @@ components:
                 type: string
             peerId:
               type: string
+            relayAutoEnabled:
+              type: boolean
             relayAdvertised:
               type: boolean
             relayEnabled:

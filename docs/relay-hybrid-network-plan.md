@@ -19,6 +19,8 @@ Implemented in this branch:
 
 - `PIGEON_RELAY_ENABLED=true` starts one public libp2p relay-capable node for
   the backend node.
+- `PIGEON_RELAY_AUTO_ENABLE=true` lets a publicly reachable node start relay
+  mode when every known signed relay record has expired.
 - Helia's public relay service is used when available; the relay runtime keeps
   relay service setup idempotent to avoid registering duplicate libp2p relay
   protocols.
@@ -48,8 +50,9 @@ Implemented in this branch:
 
 Still future work:
 
-- Automatic relay election/failover that can enable relay mode on another node
-  when every known relay is unhealthy.
+- Deterministic relay election to avoid multiple auto-enabled public nodes
+  taking over at the same time. Current auto mode is conservative and
+  availability-first.
 - Admin controls for accepting, rejecting, or banning relay/peer records.
 
 ## Goals
@@ -83,6 +86,7 @@ Expose relay as an explicit capability:
 ```env
 PIGEON_LIBP2P_PORT=4001
 PIGEON_RELAY_ENABLED=false
+PIGEON_RELAY_AUTO_ENABLE=false
 PIGEON_RELAY_PORT=4011
 PIGEON_PUBLIC_HOST=
 PIGEON_RELAY_DISCOVERY_ENABLED=true

@@ -12,6 +12,7 @@ describe('NodeNetworkDebugViewModel', () => {
       discoveredRelayMultiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
       listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
       peerId: '12D3Relay',
+      relayAutoEnabled: false,
       relayAdvertised: true,
       relayEnabled: true,
       relayRecord: {
@@ -36,6 +37,7 @@ describe('NodeNetworkDebugViewModel', () => {
       discoveredRelayMultiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
       listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
       peerId: '12D3Relay',
+      relayAutoEnabled: false,
       relayAdvertised: true,
       relayEnabled: true,
       running: true,

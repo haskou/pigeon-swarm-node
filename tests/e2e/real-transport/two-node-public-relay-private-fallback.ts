@@ -255,15 +255,16 @@ async function runParent(): Promise<void> {
 
 async function runRelay(): Promise<void> {
   const relayPort = Number(process.env.PIGEON_RELAY_PORT);
-  const configuration = new PublicRelayConfiguration(
-    true,
-    relayPort + 1,
+  const configuration = new PublicRelayConfiguration({
+    bootstrapRelayMultiaddrs: [],
+    libp2pPort: relayPort + 1,
+    publicHost: '127.0.0.1',
+    relayAutoEnabled: false,
+    relayDiscoveryEnabled: true,
+    relayEnabled: true,
     relayPort,
-    '127.0.0.1',
-    true,
-    300,
-    [],
-  );
+    relayRecordTtlSeconds: 300,
+  });
   const addressFactory = new PublicRelayAddressFactory(configuration);
   const privateKey = await libp2pKeyAdapter.generateEd25519KeyPair();
   const node = await new PublicRelayRuntimeAdapter(
