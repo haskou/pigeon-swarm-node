@@ -1,8 +1,16 @@
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
+import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+
+type ConversationAnnouncementAttributes = {
+  name?: string;
+  networkId: string;
+  participantIds: string[];
+  type: string;
+};
 
 export default class RegisterConversationWhenAnnounced extends Consumer {
   public static QUEUE_NAME =
@@ -10,10 +18,9 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
 
   constructor(
     consumer: DomainEventConsumer,
-    _registrar: ConversationRegistrar,
+    private readonly registrar: ConversationRegistrar,
   ) {
     super(consumer);
-    void _registrar;
   }
 
   public get queueName(): string {
@@ -32,9 +39,49 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
     return process.env.SERVICE_NAME || 'pigeon-swarm';
   }
 
-  public handler(_event: DomainEvent): Promise<void> {
-    void _event;
+  private getAttributes(
+    event: DomainEvent,
+  ): ConversationAnnouncementAttributes {
+    const attributes = event.attributes;
+    const name = attributes.name;
+    const networkId = attributes.networkId;
+    const participantIds = attributes.participantIds;
+    const type = attributes.type;
 
-    return Promise.resolve();
+    if (
+      typeof networkId === 'string' &&
+      typeof type === 'string' &&
+      Array.isArray(participantIds) &&
+      participantIds.every(
+        (participantId) => typeof participantId === 'string',
+      ) &&
+      (name === undefined || typeof name === 'string')
+    ) {
+      const validatedAttributes = {
+        networkId,
+        participantIds,
+        type,
+      };
+
+      return typeof name === 'string'
+        ? {
+            ...validatedAttributes,
+            name,
+          }
+        : validatedAttributes;
+    }
+
+    throw new Error('Invalid conversation announcement.');
+  }
+
+  public async handler(event: DomainEvent): Promise<void> {
+    const attributes = this.getAttributes(event);
+
+    await this.registrar.register(
+      new RegisterConversationMessage({
+        conversationId: event.aggregateId,
+        ...attributes,
+      }),
+    );
   }
 }

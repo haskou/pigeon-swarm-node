@@ -1,4 +1,5 @@
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
+import { RegisterConversationMessage as RegisterConversationMetadataMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
@@ -15,6 +16,14 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { MessageCandidate } from './types/MessageCandidate';
 import { ReactionCandidate } from './types/ReactionCandidate';
 
+type ConversationMetadataCandidate = {
+  id: string;
+  name?: string;
+  networkId: string;
+  participantIds: string[];
+  type: string;
+};
+
 export default class RegisterMessagesWhenSyncAvailable extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.register-messages-when-sync-available';
@@ -23,11 +32,10 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     consumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
     private readonly reactionRegistrar: MessageReactionRegistrar,
-    _conversationRegistrar: ConversationRegistrar,
+    private readonly conversationRegistrar: ConversationRegistrar,
     private readonly tracker = SyncResponseSuppressionTracker.shared(),
   ) {
     super(consumer);
-    void _conversationRegistrar;
   }
 
   public get queueName(): string {
@@ -91,6 +99,61 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     );
   }
 
+  private isRecord(candidate: unknown): candidate is Record<string, unknown> {
+    return (
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      !Array.isArray(candidate)
+    );
+  }
+
+  private isStringArray(candidate: unknown): candidate is string[] {
+    return (
+      Array.isArray(candidate) &&
+      candidate.every((item) => typeof item === 'string')
+    );
+  }
+
+  private isConversationMetadataCandidate(
+    candidate: unknown,
+  ): candidate is ConversationMetadataCandidate {
+    if (!this.isRecord(candidate)) {
+      return false;
+    }
+
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.networkId === 'string' &&
+      typeof candidate.type === 'string' &&
+      this.isStringArray(candidate.participantIds) &&
+      (candidate.name === undefined || typeof candidate.name === 'string')
+    );
+  }
+
+  private conversationMetadataFrom(
+    event: DomainEvent,
+  ): RegisterConversationMetadataMessage | undefined {
+    const candidate = event.attributes.conversation;
+
+    if (!this.isConversationMetadataCandidate(candidate)) {
+      return undefined;
+    }
+
+    if (candidate.id !== event.aggregateId) {
+      throw new Error(
+        'Conversation sync metadata does not match aggregate id.',
+      );
+    }
+
+    return new RegisterConversationMetadataMessage({
+      conversationId: candidate.id,
+      name: candidate.name,
+      networkId: candidate.networkId,
+      participantIds: candidate.participantIds,
+      type: candidate.type,
+    });
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     this.tracker.markAvailable(
       'conversation',
@@ -104,6 +167,11 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
           this.isMessageCandidate(candidate),
         )
       : [];
+    const conversationMetadata = this.conversationMetadataFrom(event);
+
+    if (conversationMetadata) {
+      await this.conversationRegistrar.register(conversationMetadata);
+    }
 
     for (const candidate of candidates) {
       const message = new RegisterConversationMessage(
