@@ -169,7 +169,10 @@ export class Libp2pGossipsubRuntimeAdapter {
       mode: 'public',
       name: 'standalone-gossipsub',
     });
-    await new PublicRelayRecordDiscovery().start(node);
+    const relayRecordDiscovery = new PublicRelayRecordDiscovery();
+
+    await relayRecordDiscovery.start(node);
+    await relayRecordDiscovery.connectKnown(node);
     await new PublicRelayPeerAnnouncer().start(node);
 
     return node;

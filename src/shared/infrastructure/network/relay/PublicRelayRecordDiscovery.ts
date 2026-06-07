@@ -5,6 +5,7 @@ import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEven
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 import { PublicRelayRecordSigner } from './PublicRelayRecordSigner';
+import { RelayRecordHandler } from './RelayRecordHandler';
 
 export class PublicRelayRecordDiscovery {
   private static readonly topic = 'pigeon-swarm.public-relays.v1';
@@ -20,6 +21,7 @@ export class PublicRelayRecordDiscovery {
   public constructor(
     private readonly registry = new PublicRelayRecordRegistry(),
     private readonly signer = new PublicRelayRecordSigner(),
+    private readonly onValidRecord?: RelayRecordHandler,
   ) {}
 
   private nativeImport<TModule>(modulePath: string): Promise<TModule> {
@@ -133,6 +135,7 @@ export class PublicRelayRecordDiscovery {
     }
 
     this.registry.save(record);
+    await this.onValidRecord?.(record);
     await this.dialRecord(node, record);
   }
 
@@ -172,6 +175,12 @@ export class PublicRelayRecordDiscovery {
 
     node.services.pubsub.addEventListener('message', listener);
     node.services.pubsub.addEventListener('gossipsub:message', listener);
+  }
+
+  public async connectKnown(node: Libp2pPubSubNode): Promise<void> {
+    await Promise.all(
+      this.registry.all().map((record) => this.handleRecord(node, record)),
+    );
   }
 
   public async publish(

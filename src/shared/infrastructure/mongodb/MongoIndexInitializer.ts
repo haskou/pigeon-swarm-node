@@ -191,6 +191,11 @@ export class MongoIndexInitializer {
       ],
       name: 'notification_scope_settings_identity_scope_idx',
     },
+    {
+      collection: 'public_relay_records',
+      keys: [['expiresAt', 1]],
+      name: 'public_relay_records_expiresAt_idx',
+    },
   ];
 
   constructor(private readonly mongo: MongoDB) {}

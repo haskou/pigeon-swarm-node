@@ -1,7 +1,10 @@
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
+import { RelayRecordHandler } from './RelayRecordHandler';
 
 export class PublicRelayRecordRegistry {
   private static readonly globalStateKey = '__pigeonSwarmPublicRelayRecords';
+  private static readonly globalListenersKey =
+    '__pigeonSwarmPublicRelayRecordListeners';
 
   private get records(): Map<string, PublicRelayRecordPrimitives> {
     const globalState = globalThis as typeof globalThis & {
@@ -15,8 +18,23 @@ export class PublicRelayRecordRegistry {
     return globalState[PublicRelayRecordRegistry.globalStateKey];
   }
 
+  private get listeners(): RelayRecordHandler[] {
+    const globalState = globalThis as typeof globalThis & {
+      [PublicRelayRecordRegistry.globalListenersKey]?:
+        | RelayRecordHandler[]
+        | undefined;
+    };
+
+    globalState[PublicRelayRecordRegistry.globalListenersKey] ??= [];
+
+    return globalState[PublicRelayRecordRegistry.globalListenersKey];
+  }
+
   public save(record: PublicRelayRecordPrimitives): void {
     this.records.set(record.peerId, record);
+    this.listeners.forEach((listener): void => {
+      listener(record).catch((): undefined => undefined);
+    });
   }
 
   public all(now: number = Date.now()): PublicRelayRecordPrimitives[] {
@@ -39,5 +57,9 @@ export class PublicRelayRecordRegistry {
 
   public clear(): void {
     this.records.clear();
+  }
+
+  public onRecordSaved(listener: RelayRecordHandler): void {
+    this.listeners.push(listener);
   }
 }

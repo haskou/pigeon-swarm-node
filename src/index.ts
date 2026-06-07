@@ -71,6 +71,8 @@ import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { MongoIndexInitializer } from '@app/shared/infrastructure/mongodb/MongoIndexInitializer';
+import { MongoPublicRelayRecordRepository } from '@app/shared/infrastructure/network/relay/MongoPublicRelayRecordRepository';
+import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { PublicRelayRuntime } from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
@@ -119,6 +121,18 @@ async function init() {
     );
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
   await new MongoIndexInitializer(mongo).ensure();
+  const publicRelayRecordRepository = new MongoPublicRelayRecordRepository(
+    mongo,
+  );
+  const publicRelayRecordRegistry = new PublicRelayRecordRegistry();
+
+  publicRelayRecordRegistry.onRecordSaved((record) =>
+    publicRelayRecordRepository.save(record),
+  );
+  await publicRelayRecordRepository.deleteExpired();
+  (await publicRelayRecordRepository.findActive()).forEach((record) => {
+    publicRelayRecordRegistry.save(record);
+  });
   const identityMetadataRepository =
     Kernel.di.getService<MongoIdentityMetadataRepository>(
       MongoIdentityMetadataRepository,

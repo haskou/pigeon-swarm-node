@@ -1,3 +1,12 @@
+jest.mock('@app/Kernel', () => ({
+  __esModule: true,
+  default: {
+    logger: {
+      debug: jest.fn(),
+    },
+  },
+}));
+
 import { Libp2pPubSubNode } from '../../../../../../src/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
 import { PublicRelayRecordDiscovery } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordDiscovery';
 import { PublicRelayRecordPrimitives } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
@@ -5,11 +14,13 @@ import { PublicRelayRecordRegistry } from '../../../../../../src/shared/infrastr
 import { PublicRelayRecordSigner } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordSigner';
 
 describe('PublicRelayRecordDiscovery', () => {
+  const relayPeerId =
+    '12D3KooWFLpnXE1g65V26z5Lcw3Xia2e6HYetb6t1mGQARiStfk';
   const record: PublicRelayRecordPrimitives = {
     expiresAt: 2000,
     issuedAt: 1000,
-    multiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
-    peerId: '12D3Relay',
+    multiaddrs: [`/dns4/relay.test/tcp/4011/p2p/${relayPeerId}`],
+    peerId: relayPeerId,
     publicKey: 'public-key',
     role: 'relay',
     signature: 'signature',
@@ -70,6 +81,18 @@ describe('PublicRelayRecordDiscovery', () => {
       expect.any(Uint8Array),
     );
     expect(registry.all(1500)).toEqual([record]);
+  });
+
+  it('should validate known active relay records', async () => {
+    registry.save({
+      ...record,
+      expiresAt: Date.now() + 1000,
+    });
+    node.dial = jest.fn();
+
+    await new PublicRelayRecordDiscovery(registry, signer).connectKnown(node);
+
+    expect(signer.verify).toHaveBeenCalled();
   });
 
   async function emitRecord(

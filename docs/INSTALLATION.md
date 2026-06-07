@@ -184,7 +184,9 @@ Relay-capable nodes also publish signed public relay records on
 `pigeon-swarm.public-relays.v1`. Each record includes the relay `peerId`, public
 libp2p key, public relay multiaddr, issue time and expiry time. Peers verify the
 signature and that the public key matches the advertised `peerId` before storing
-or dialing the relay.
+or dialing the relay. Valid relay records are persisted in MongoDB until they
+expire, then rehydrated at startup so a node can reuse previously discovered
+relays without waiting for a fresh announcement.
 
 When direct private IPFS retrieval fails, the backend can also request content
 over the public fallback libp2p runtime with protocol
