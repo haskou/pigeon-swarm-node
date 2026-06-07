@@ -27,19 +27,10 @@ export class IPFSReplicationPolicy {
     localNodeId: string;
     responsibleNodeIds: string[];
   }): boolean {
-    const fullReplicationLimit =
-      IPFSReplicationPolicy.FULL_REPLICATION_NODE_LIMIT;
+    void params;
 
-    if (params.activeNodeCount <= fullReplicationLimit) {
-      return false;
-    }
-
-    if (params.responsibleNodeIds.includes(params.localNodeId)) {
-      return false;
-    }
-
-    return params.responsibleNodeIds.every((nodeId) =>
-      params.knownReplicaNodeIds.includes(nodeId),
-    );
+    // Remote replica claims are not proof that a responsible node holds
+    // content.
+    return false;
   }
 }
