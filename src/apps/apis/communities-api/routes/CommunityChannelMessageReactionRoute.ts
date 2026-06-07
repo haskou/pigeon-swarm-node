@@ -98,6 +98,7 @@ export class CommunityMessageReactionRoute extends CommunityRouteSupport {
     await this.eventPublisher.publish([
       new CommunityChannelMessageReactionWasAddedEvent(communityId, {
         ...reaction.toPrimitives(),
+        community: communityPrimitives,
         memberIds: communityPrimitives.memberIds,
         networkId: communityPrimitives.networkId,
       }),
@@ -133,6 +134,7 @@ export class CommunityMessageReactionRoute extends CommunityRouteSupport {
     await this.eventPublisher.publish([
       new CommunityChannelMessageReactionRemovedEvent(communityId, {
         ...reaction.toPrimitives(),
+        community: communityPrimitives,
         memberIds: communityPrimitives.memberIds,
         networkId: communityPrimitives.networkId,
       }),

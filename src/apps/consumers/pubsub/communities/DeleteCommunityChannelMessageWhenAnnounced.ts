@@ -1,19 +1,26 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
+import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import { assert, Signature } from '@haskou/value-objects';
 
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
 export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.delete-community-channel-message-when-announced';
+
+  private readonly signatureService =
+    new CommunityChannelMessageSignatureDomainService();
 
   constructor(
     consumer: DomainEventConsumer,
@@ -40,18 +47,64 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    if (isCommunityPrimitive(event.attributes.community)) {
-      await this.communityRepository.save(
-        Community.fromPrimitives(event.attributes.community),
-      );
+    if (!isCommunityPrimitive(event.attributes.community)) {
+      return;
     }
 
-    await this.messageRepository.delete(
-      new CommunityId(
-        String(event.attributes.communityId || event.aggregateId),
-      ),
-      new CommunityChannelId(String(event.attributes.channelId)),
-      new CommunityChannelMessageId(String(event.attributes.targetMessageId)),
+    const deletedByIdentityId = String(event.attributes.deletedByIdentityId);
+    const signature = String(event.attributes.signature || '');
+    const createdAt = Number(event.attributes.createdAt);
+
+    if (!deletedByIdentityId || !signature || !createdAt) {
+      return;
+    }
+
+    const community = Community.fromPrimitives(event.attributes.community);
+    const communityId = new CommunityId(
+      String(event.attributes.communityId || event.aggregateId),
     );
+    const channelId = new CommunityChannelId(
+      String(event.attributes.channelId),
+    );
+    const targetMessageId = new CommunityChannelMessageId(
+      String(event.attributes.targetMessageId),
+    );
+    const actorIdentityId = new IdentityId(deletedByIdentityId);
+    const targetMessage = await this.messageRepository.findById(
+      communityId,
+      channelId,
+      targetMessageId,
+    );
+
+    if (!community.getId().isEqual(communityId)) {
+      return;
+    }
+
+    assert(targetMessage, new CommunityChannelMessageNotFoundError());
+    community.assertCanDeleteMessage(
+      actorIdentityId,
+      targetMessage.getAuthorIdentityId(),
+      channelId,
+    );
+    this.signatureService.assertValidSignature(
+      actorIdentityId,
+      {
+        actorIdentityId: actorIdentityId.valueOf(),
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        createdAt,
+        id: String(event.attributes.messageId),
+        targetMessageId: targetMessageId.valueOf(),
+        type: 'deleted',
+      },
+      new Signature(signature),
+    );
+
+    await this.messageRepository.delete(
+      communityId,
+      channelId,
+      targetMessageId,
+    );
+    await this.communityRepository.save(community);
   }
 }
