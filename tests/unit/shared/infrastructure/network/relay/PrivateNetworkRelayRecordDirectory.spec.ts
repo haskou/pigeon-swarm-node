@@ -3,6 +3,7 @@ jest.mock('@app/Kernel', () => ({
   default: {
     logger: {
       debug: jest.fn(),
+      info: jest.fn(),
     },
   },
 }));

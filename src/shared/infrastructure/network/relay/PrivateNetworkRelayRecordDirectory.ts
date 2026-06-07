@@ -82,6 +82,9 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     const publicConnection = await this.getPublicConnection();
+    Kernel.logger.info(
+      `Publishing private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}"`,
+    );
 
     await Promise.all(
       privateNetworks.map(async (network) => {
@@ -95,6 +98,9 @@ export class PrivateNetworkRelayRecordDirectory {
         );
       }),
     );
+    Kernel.logger.info(
+      `Published private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}"`,
+    );
   }
 
   public async discover(): Promise<PublicRelayRecordPrimitives[]> {
@@ -106,6 +112,10 @@ export class PrivateNetworkRelayRecordDirectory {
 
     const publicConnection = await this.getPublicConnection();
     const discoveredRecords: PublicRelayRecordPrimitives[] = [];
+
+    Kernel.logger.info(
+      `Discovering private relay records: privateNetworks=${privateNetworks.length}`,
+    );
 
     await Promise.all(
       privateNetworks.map(async (network) => {
@@ -141,6 +151,12 @@ export class PrivateNetworkRelayRecordDirectory {
           );
         }
       }),
+    );
+
+    Kernel.logger.info(
+      `Discovered private relay records: privateNetworks=${privateNetworks.length} records=${discoveredRecords.length} relayPeerIds="${discoveredRecords
+        .map((record) => record.peerId)
+        .join(',')}"`,
     );
 
     return discoveredRecords;

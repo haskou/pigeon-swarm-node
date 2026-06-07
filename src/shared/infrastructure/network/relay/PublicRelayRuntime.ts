@@ -22,6 +22,7 @@ export class PublicRelayRuntime {
     failoverInterval?: NodeJS.Timeout;
     node?: PublicRelayRuntimeNode;
     networkRegistrationListenerStarted?: boolean;
+    relayStateLogged?: boolean;
     relayRecord?: PublicRelayDebugState['relayRecord'];
   } {
     const globalState = globalThis as typeof globalThis & {
@@ -29,6 +30,7 @@ export class PublicRelayRuntime {
         failoverInterval?: NodeJS.Timeout;
         node?: PublicRelayRuntimeNode;
         networkRegistrationListenerStarted?: boolean;
+        relayStateLogged?: boolean;
         relayRecord?: PublicRelayDebugState['relayRecord'];
       };
     };
@@ -206,11 +208,28 @@ export class PublicRelayRuntime {
     }, intervalMs);
   }
 
+  private logRelayState(): void {
+    if (this.state.relayStateLogged) {
+      return;
+    }
+
+    this.state.relayStateLogged = true;
+    Kernel.logger.info(
+      `Public relay state: running=${Boolean(
+        this.state.node,
+      )} enabled=${this.configuration.isRelayEnabled()} autoEnabled=${this.configuration.isRelayAutoEnabled()} advertised=${Boolean(
+        this.state.relayRecord,
+      )} discoveredRelays=${this.relayRecordRegistry.all().length} reason="${this.buildDebugReason()}"`,
+    );
+  }
+
   public async start(): Promise<void> {
     this.startFailoverMonitor();
     this.publishRelayRecordWhenNetworkIsRegistered();
 
     if (!this.shouldStartRelay() || this.state.node) {
+      this.logRelayState();
+
       return;
     }
 
@@ -230,6 +249,7 @@ export class PublicRelayRuntime {
         this.state.relayRecord,
       )}`,
     );
+    this.logRelayState();
   }
 
   public debugState(): PublicRelayDebugState {
