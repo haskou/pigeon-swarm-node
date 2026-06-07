@@ -5,14 +5,16 @@ import { InvalidProfileBannerError } from '@app/contexts/identities/domain/error
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
+import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import { faker } from '@faker-js/faker';
-import { PrimitiveOf } from '@haskou/value-objects';
+import { EncryptedKeyPair, KeyPair, PrimitiveOf } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 
@@ -90,6 +92,39 @@ describe('Identity', () => {
       expect(() => Identity.fromPrimitives(tampered)).toThrow(
         InvalidIdentitySignatureError,
       );
+    });
+
+    it('should throw InvalidIdentitySignatureError when a candidate is signed by a different public key than its claimed id', async () => {
+      const victimIdentity = mother.build();
+      const attackerPassword = new Password('Attacker-password11!');
+      const attackerKeyPair = await KeyPair.generate();
+      const attackerEncryptedKeyPair =
+        await attackerKeyPair.encryptKeyPair(attackerPassword);
+      const victimPrimitives = victimIdentity.toPrimitives();
+      const forgedPrimitives: PrimitiveOf<Identity> = {
+        ...victimPrimitives,
+        encryptedKeyPair: attackerEncryptedKeyPair.toPrimitives(),
+        id: new IdentityId(victimPrimitives.id).valueOf(),
+        profile: {
+          ...victimPrimitives.profile,
+          name: 'Mallory',
+        },
+        signature: '',
+        timestamp: victimPrimitives.timestamp + 1,
+      };
+      const forgedSignature =
+        await new IdentitySignatureDomainService().generateSignature(
+          forgedPrimitives,
+          EncryptedKeyPair.fromPrimitives(forgedPrimitives.encryptedKeyPair),
+          attackerPassword,
+        );
+
+      expect(() =>
+        Identity.fromPrimitives({
+          ...forgedPrimitives,
+          signature: forgedSignature.valueOf(),
+        }),
+      ).toThrow(InvalidIdentitySignatureError);
     });
 
     it('should return correct primitives', () => {

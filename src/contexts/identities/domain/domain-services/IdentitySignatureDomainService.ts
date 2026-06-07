@@ -1,3 +1,4 @@
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import { EncryptedKeyPair, Signature } from '@haskou/value-objects';
 
@@ -32,11 +33,11 @@ export class IdentitySignatureDomainService {
   }
 
   public isValidSignature(
-    encryptedKeyPair: EncryptedKeyPair,
+    identityId: IdentityId,
     payload: IdentitySignaturePayload,
     signature: Signature,
   ): boolean {
-    return encryptedKeyPair.isValidSignature(
+    return identityId.isValidSignature(
       this.serializePayload(payload),
       signature,
     );
