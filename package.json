@@ -35,7 +35,7 @@
   "author": "",
   "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
-    "@haskou/value-objects": "^2.6.0",
+    "@haskou/value-objects": "2.7.4",
     "@helia/json": "^5.0.7",
     "@helia/strings": "^5.0.7",
     "@helia/unixfs": "^7.0.4",
