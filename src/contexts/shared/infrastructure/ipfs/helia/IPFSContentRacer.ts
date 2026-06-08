@@ -24,21 +24,51 @@ export default class IPFSContentRacer {
     return setTimeout(() => controller.abort(), this.timeoutMs);
   }
 
+  private forwardAbortSignal(
+    source: AbortSignal | undefined,
+    target: AbortController,
+  ): void {
+    if (!source) {
+      return;
+    }
+
+    if (source.aborted) {
+      target.abort();
+
+      return;
+    }
+
+    source.addEventListener('abort', () => target.abort(), { once: true });
+  }
+
   private async fallbackAfterDirectLookup<T>(
     timeout: ReturnType<typeof setTimeout>,
     lookup: (signal: AbortSignal) => Promise<T>,
+    signal?: AbortSignal,
   ): Promise<T> {
     clearTimeout(timeout);
+    const fallbackController = new AbortController();
+    const fallbackTimeout = this.startTimeout(fallbackController);
 
-    return lookup(new AbortController().signal);
+    this.forwardAbortSignal(signal, fallbackController);
+
+    try {
+      return await lookup(fallbackController.signal);
+    } finally {
+      fallbackController.abort();
+      clearTimeout(fallbackTimeout);
+    }
   }
 
   public async raceGetJSON<T>(
     networks: IPFSNetwork[],
     cid: IPFSId,
+    signal?: AbortSignal,
   ): Promise<T> {
     const controller = new AbortController();
     const timeout = this.startTimeout(controller);
+
+    this.forwardAbortSignal(signal, controller);
 
     try {
       const result = await Promise.any(
@@ -49,8 +79,11 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      return this.fallbackAfterDirectLookup(timeout, (signal) =>
-        this.fallback.getJSON<T>(networks, cid, signal),
+      return this.fallbackAfterDirectLookup(
+        timeout,
+        (fallbackSignal) =>
+          this.fallback.getJSON<T>(networks, cid, fallbackSignal),
+        signal,
       );
     } finally {
       clearTimeout(timeout);
@@ -60,9 +93,12 @@ export default class IPFSContentRacer {
   public async raceGetBytes(
     networks: IPFSNetwork[],
     cid: IPFSId,
+    signal?: AbortSignal,
   ): Promise<Buffer> {
     const controller = new AbortController();
     const timeout = this.startTimeout(controller);
+
+    this.forwardAbortSignal(signal, controller);
 
     try {
       const result = await Promise.any(
@@ -73,8 +109,11 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      return this.fallbackAfterDirectLookup(timeout, (signal) =>
-        this.fallback.getBytes(networks, cid, signal),
+      return this.fallbackAfterDirectLookup(
+        timeout,
+        (fallbackSignal) =>
+          this.fallback.getBytes(networks, cid, fallbackSignal),
+        signal,
       );
     } finally {
       clearTimeout(timeout);

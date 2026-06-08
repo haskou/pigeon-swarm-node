@@ -38,7 +38,11 @@ describe('IPFS', () => {
       const result = await ipfs.getJSON(cid);
 
       expect(registry.initialize).toHaveBeenCalled();
-      expect(racer.raceGetJSON).toHaveBeenCalledWith([mockNetwork], cid);
+      expect(racer.raceGetJSON).toHaveBeenCalledWith(
+        [mockNetwork],
+        cid,
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
   });
@@ -136,7 +140,7 @@ describe('IPFS', () => {
       const cid = new IPFSId('bafytest');
       const expected = { data: 'specific' };
 
-      mockNetwork.getJSON.mockResolvedValue(expected);
+      racer.raceGetJSON.mockResolvedValue(expected);
 
       const result = await ipfs.getJSONFromNetwork(
         cid,
@@ -145,6 +149,11 @@ describe('IPFS', () => {
 
       expect(registry.find).toHaveBeenCalledWith(
         '550e8400-e29b-41d4-a716-446655440000',
+      );
+      expect(racer.raceGetJSON).toHaveBeenCalledWith(
+        [mockNetwork],
+        cid,
+        undefined,
       );
       expect(result).toEqual(expected);
     });

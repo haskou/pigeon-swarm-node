@@ -47,9 +47,16 @@ describe('IPFSContentRacer', () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
       const expected = { name: 'fallback' };
+      let fallbackSignalWasAborted = true;
 
       network.getJSON.mockRejectedValue(new Error('not found'));
-      fallback.getJSON.mockResolvedValue(expected);
+      fallback.getJSON.mockImplementation(
+        async (_networks, _cid, signal?: AbortSignal) => {
+          fallbackSignalWasAborted = Boolean(signal?.aborted);
+
+          return expected;
+        },
+      );
 
       const result = await racer.raceGetJSON([network], cid);
 
@@ -59,13 +66,14 @@ describe('IPFSContentRacer', () => {
         cid,
         expect.any(AbortSignal),
       );
-      expect(fallback.getJSON.mock.calls[0][2]?.aborted).toBe(false);
+      expect(fallbackSignalWasAborted).toBe(false);
     });
 
     it('should use a fresh signal when direct JSON lookup was aborted', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
       const expected = { name: 'fallback' };
+      let fallbackSignalWasAborted = true;
 
       racer = new IPFSContentRacer(1, fallback);
       network.getJSON.mockImplementation(
@@ -76,12 +84,18 @@ describe('IPFSContentRacer', () => {
             });
           }),
       );
-      fallback.getJSON.mockResolvedValue(expected);
+      fallback.getJSON.mockImplementation(
+        async (_networks, _cid, signal?: AbortSignal) => {
+          fallbackSignalWasAborted = Boolean(signal?.aborted);
+
+          return expected;
+        },
+      );
 
       const result = await racer.raceGetJSON([network], cid);
 
       expect(result).toEqual(expected);
-      expect(fallback.getJSON.mock.calls[0][2]?.aborted).toBe(false);
+      expect(fallbackSignalWasAborted).toBe(false);
     });
   });
 
@@ -90,9 +104,16 @@ describe('IPFSContentRacer', () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
       const expected = Buffer.from('fallback-bytes');
+      let fallbackSignalWasAborted = true;
 
       network.getBytes.mockRejectedValue(new Error('not found'));
-      fallback.getBytes.mockResolvedValue(expected);
+      fallback.getBytes.mockImplementation(
+        async (_networks, _cid, signal?: AbortSignal) => {
+          fallbackSignalWasAborted = Boolean(signal?.aborted);
+
+          return expected;
+        },
+      );
 
       const result = await racer.raceGetBytes([network], cid);
 
@@ -102,13 +123,14 @@ describe('IPFSContentRacer', () => {
         cid,
         expect.any(AbortSignal),
       );
-      expect(fallback.getBytes.mock.calls[0][2]?.aborted).toBe(false);
+      expect(fallbackSignalWasAborted).toBe(false);
     });
 
     it('should use a fresh signal when direct bytes lookup was aborted', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
       const expected = Buffer.from('fallback-bytes');
+      let fallbackSignalWasAborted = true;
 
       racer = new IPFSContentRacer(1, fallback);
       network.getBytes.mockImplementation(
@@ -119,12 +141,18 @@ describe('IPFSContentRacer', () => {
             });
           }),
       );
-      fallback.getBytes.mockResolvedValue(expected);
+      fallback.getBytes.mockImplementation(
+        async (_networks, _cid, signal?: AbortSignal) => {
+          fallbackSignalWasAborted = Boolean(signal?.aborted);
+
+          return expected;
+        },
+      );
 
       const result = await racer.raceGetBytes([network], cid);
 
       expect(result).toEqual(expected);
-      expect(fallback.getBytes.mock.calls[0][2]?.aborted).toBe(false);
+      expect(fallbackSignalWasAborted).toBe(false);
     });
   });
 

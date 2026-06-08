@@ -272,5 +272,87 @@ describe('IPFSNetworkRegistry', () => {
 
       expect(listener).toHaveBeenCalledWith(network);
     });
+
+    it('should reuse an in-flight registration for the same network id', async () => {
+      const registry = new IPFSNetworkRegistry();
+      const network = mock<IPFSNetwork>();
+      const listener = jest.fn();
+
+      (
+        registry as unknown as {
+          state: {
+            listeners: Array<(network: IPFSNetwork) => void>;
+            networks: IPFSNetwork[];
+            registrations: Map<string, Promise<IPFSNetwork>>;
+          };
+        }
+      ).state.networks = [];
+      (
+        registry as unknown as {
+          state: {
+            listeners: Array<(network: IPFSNetwork) => void>;
+            networks: IPFSNetwork[];
+            registrations: Map<string, Promise<IPFSNetwork>>;
+          };
+        }
+      ).state.listeners = [];
+      (
+        registry as unknown as {
+          state: {
+            listeners: Array<(network: IPFSNetwork) => void>;
+            networks: IPFSNetwork[];
+            registrations: Map<string, Promise<IPFSNetwork>>;
+          };
+        }
+      ).state.registrations = new Map();
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      const createNetworkFromConfig = jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              setTimeout(() => resolve(network), 5);
+            }),
+        );
+
+      registry.onNetworkRegistered(listener);
+
+      const config = new IPFSNetworkConfig(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'private_1',
+        new PrivateKey(validPem),
+      );
+      const [firstNetwork, secondNetwork] = await Promise.all([
+        registry.register(config),
+        registry.register(config),
+      ]);
+
+      expect(firstNetwork).toBe(network);
+      expect(secondNetwork).toBe(network);
+      expect(createNetworkFromConfig).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledTimes(1);
+      const registeredNetworks = (
+        registry as unknown as {
+          networks: IPFSNetwork[];
+        }
+      ).networks;
+
+      expect(registeredNetworks).toHaveLength(1);
+      expect(registeredNetworks[0]).toBe(network);
+    });
   });
 });

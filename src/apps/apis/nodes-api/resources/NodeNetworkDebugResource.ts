@@ -1,4 +1,12 @@
 export type NodeNetworkDebugResource = {
+  ipfsNetworks: Array<{
+    id: string;
+    name: string;
+    peerCount: number;
+    peerId?: string;
+    peers?: string[];
+    type: 'private' | 'public';
+  }>;
   publicRelay: {
     advertisedAddresses?: string[];
     bootstrapRelayCount: number;

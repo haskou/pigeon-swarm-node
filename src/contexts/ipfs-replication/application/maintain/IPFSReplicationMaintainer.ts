@@ -75,20 +75,39 @@ export default class IPFSReplicationMaintainer {
   }
 
   private createClaimAbortSignal(): {
+    controller: AbortController;
     signal: AbortSignal;
-    timeout: ReturnType<typeof setTimeout>;
   } {
     const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      this.contentClaimTimeoutMs(),
-    );
-
-    timeout.unref?.();
 
     return {
+      controller,
       signal: controller.signal,
-      timeout,
+    };
+  }
+
+  private claimTimeoutPromise(
+    abort: {
+      controller: AbortController;
+      signal: AbortSignal;
+    },
+    timeoutMs: number,
+  ): {
+    promise: Promise<never>;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
+    let timeout: ReturnType<typeof setTimeout>;
+    const promise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        abort.controller.abort();
+        reject(new Error('IPFS replica claim fetch timed out.'));
+      }, timeoutMs);
+      timeout.unref?.();
+    });
+
+    return {
+      promise,
+      timeout: timeout!,
     };
   }
 
@@ -99,23 +118,29 @@ export default class IPFSReplicationMaintainer {
     const cid = new IPFSId(content.cid);
     const context = new IPFSContentReplicationContext(content.context);
     const abort = this.createClaimAbortSignal();
+    const timeoutMs = this.contentClaimTimeoutMs();
+    const claimTimeout = this.claimTimeoutPromise(abort, timeoutMs);
+    let fetch: Promise<unknown>;
+
+    if (context.isPublicUpload()) {
+      fetch = this.ipfs.getBytesFromNetwork(
+        cid,
+        network.networkId,
+        abort.signal,
+      );
+    } else {
+      fetch = this.ipfs.getJSONFromNetwork<unknown>(
+        cid,
+        network.networkId,
+        abort.signal,
+      );
+    }
 
     try {
-      if (context.isPublicUpload()) {
-        await this.ipfs.getBytesFromNetwork(
-          cid,
-          network.networkId,
-          abort.signal,
-        );
-      } else {
-        await this.ipfs.getJSONFromNetwork<unknown>(
-          cid,
-          network.networkId,
-          abort.signal,
-        );
-      }
+      await Promise.race([fetch, claimTimeout.promise]);
     } finally {
-      clearTimeout(abort.timeout);
+      clearTimeout(claimTimeout.timeout);
+      fetch.catch((): void => undefined);
     }
   }
 

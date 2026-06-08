@@ -14,6 +14,7 @@ type IPFSNetworkRegistryState = {
   initialized: boolean;
   listeners: Array<(network: IPFSNetwork) => void>;
   networks: IPFSNetwork[];
+  registrations: Map<string, Promise<IPFSNetwork>>;
   sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
   sharedPeerPrivateKeyPem?: string;
 };
@@ -33,6 +34,7 @@ export default class IPFSNetworkRegistry {
       initialized: false,
       listeners: [],
       networks: [],
+      registrations: new Map(),
     };
 
     return globalState[globalRegistryStateKey];
@@ -143,6 +145,21 @@ export default class IPFSNetworkRegistry {
     return new IPFSNetwork(config, connection);
   }
 
+  private async createAndStoreNetwork(
+    config: IPFSNetworkConfig,
+  ): Promise<IPFSNetwork> {
+    const sharedPrivateKey = await this.loadOrCreateSharedPeerPrivateKey();
+    const network = await this.createNetworkFromConfig(
+      config,
+      sharedPrivateKey,
+    );
+
+    this.networks.push(network);
+    this.state.listeners.forEach((listener) => listener(network));
+
+    return network;
+  }
+
   public async getSharedPeerPrivateKeyPem(): Promise<string> {
     const privateKey = await this.loadOrCreateSharedPeerPrivateKey();
 
@@ -163,23 +180,28 @@ export default class IPFSNetworkRegistry {
   }
 
   public async register(config: IPFSNetworkConfig): Promise<IPFSNetwork> {
+    const networkId = config.getId();
     const existing = this.networks.find(
-      (network) => network.getId() === config.getId(),
+      (network) => network.getId() === networkId,
     );
 
     if (existing) {
       return existing;
     }
 
-    const sharedPrivateKey = await this.loadOrCreateSharedPeerPrivateKey();
-    const network = await this.createNetworkFromConfig(
-      config,
-      sharedPrivateKey,
-    );
-    this.networks.push(network);
-    this.state.listeners.forEach((listener) => listener(network));
+    const registration = this.state.registrations.get(networkId);
 
-    return network;
+    if (registration) {
+      return registration;
+    }
+
+    const nextRegistration = this.createAndStoreNetwork(config).finally(() => {
+      this.state.registrations.delete(networkId);
+    });
+
+    this.state.registrations.set(networkId, nextRegistration);
+
+    return nextRegistration;
   }
 
   public onNetworkRegistered(listener: (network: IPFSNetwork) => void): void {

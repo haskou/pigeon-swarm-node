@@ -1,3 +1,4 @@
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PublicRelayDebugState } from '@app/shared/infrastructure/network/relay/PublicRelayDebugState';
 
 import { NodeNetworkDebugResource } from '../resources/NodeNetworkDebugResource';
@@ -5,8 +6,31 @@ import { NodeNetworkDebugResource } from '../resources/NodeNetworkDebugResource'
 export class NodeNetworkDebugViewModel {
   public constructor(
     private readonly publicRelay: PublicRelayDebugState,
+    private readonly ipfsNetworks: IPFSNetwork[],
     private readonly exposeSensitiveDebug = false,
   ) {}
+
+  private ipfsNetworkResources(): NodeNetworkDebugResource['ipfsNetworks'] {
+    return this.ipfsNetworks.map((network) => {
+      const peers = network.getPeers();
+      const resource: NodeNetworkDebugResource['ipfsNetworks'][number] = {
+        id: network.getId(),
+        name: network.getName(),
+        peerCount: peers.length,
+        type: network.isPrivate() ? 'private' : 'public',
+      };
+
+      if (this.exposeSensitiveDebug) {
+        return {
+          ...resource,
+          peerId: network.getPeerId(),
+          peers,
+        };
+      }
+
+      return resource;
+    });
+  }
 
   public toResource(): NodeNetworkDebugResource {
     const publicRelay: NodeNetworkDebugResource['publicRelay'] = {
@@ -67,10 +91,14 @@ export class NodeNetworkDebugViewModel {
     };
 
     if (!this.exposeSensitiveDebug) {
-      return { publicRelay };
+      return {
+        ipfsNetworks: this.ipfsNetworkResources(),
+        publicRelay,
+      };
     }
 
     return {
+      ipfsNetworks: this.ipfsNetworkResources(),
       publicRelay: {
         ...publicRelay,
         advertisedAddresses: this.publicRelay.advertisedAddresses,

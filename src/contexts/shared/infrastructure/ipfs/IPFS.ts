@@ -67,16 +67,16 @@ export default class IPFS {
     await this.registry.removeNetwork(id);
   }
 
-  public async getJSON<T>(cid: IPFSId): Promise<T> {
+  public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
     await this.initialize();
 
-    return this.racer.raceGetJSON<T>(this.registry.getAll(), cid);
+    return this.racer.raceGetJSON<T>(this.registry.getAll(), cid, signal);
   }
 
-  public async getBytes(cid: IPFSId): Promise<Buffer> {
+  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
     await this.initialize();
 
-    return this.racer.raceGetBytes(this.registry.getAll(), cid);
+    return this.racer.raceGetBytes(this.registry.getAll(), cid, signal);
   }
 
   public async stat(
@@ -120,7 +120,7 @@ export default class IPFS {
 
     const network = this.registry.find(networkId);
 
-    return network.getJSON<T>(cid, signal);
+    return this.racer.raceGetJSON<T>([network], cid, signal);
   }
 
   public async getBytesFromNetwork(
@@ -132,7 +132,7 @@ export default class IPFS {
 
     const network = this.registry.find(networkId);
 
-    return network.getBytes(cid, signal);
+    return this.racer.raceGetBytes([network], cid, signal);
   }
 
   public async getRecord(key: string): Promise<string | undefined> {

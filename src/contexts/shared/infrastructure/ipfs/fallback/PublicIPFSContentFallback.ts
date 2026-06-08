@@ -20,7 +20,7 @@ export class PublicIPFSContentFallback {
     process.env.PIGEON_PUBLIC_IPFS_FALLBACK_MAX_BYTES || 10 * 1024 * 1024,
   );
 
-  private static handlerRegistered = false;
+  private static handlerRegisteredNodes = new WeakSet<object>();
   private static networks: IPFSNetwork[] = [];
 
   private readonly codec = new PubSubNetworkMessageCodec();
@@ -31,6 +31,21 @@ export class PublicIPFSContentFallback {
 
   private privateNetworks(networks: IPFSNetwork[]): IPFSNetwork[] {
     return networks.filter((network) => network.isPrivate());
+  }
+
+  private orderedPeers(
+    node: Libp2pPubSubNode,
+    networks: IPFSNetwork[],
+  ): unknown[] {
+    const peers = node.getPeers?.() || [];
+    const privatePeerIds = new Set(
+      networks.flatMap((network) => network.getPeers()),
+    );
+
+    return [
+      ...peers.filter((peer) => privatePeerIds.has(String(peer))),
+      ...peers.filter((peer) => !privatePeerIds.has(String(peer))),
+    ];
   }
 
   private appendNetworks(networks: IPFSNetwork[]): void {
@@ -50,11 +65,60 @@ export class PublicIPFSContentFallback {
     return Buffer.from(chunk.subarray());
   }
 
-  private async readStream(stream: Libp2pStream): Promise<string> {
+  private fallbackAbortedError(): Error {
+    return new Error('Public IPFS fallback request aborted.');
+  }
+
+  private async raceWithAbort<T>(
+    promise: Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    if (!signal) {
+      return promise;
+    }
+
+    if (signal.aborted) {
+      throw this.fallbackAbortedError();
+    }
+
+    promise.catch((): undefined => undefined);
+
+    let removeAbortListener = (): void => undefined;
+    const abortPromise = new Promise<never>((_, reject) => {
+      const abort = (): void => reject(this.fallbackAbortedError());
+
+      signal.addEventListener('abort', abort, { once: true });
+      removeAbortListener = (): void =>
+        signal.removeEventListener('abort', abort);
+    });
+
+    try {
+      return await Promise.race([promise, abortPromise]);
+    } finally {
+      removeAbortListener();
+    }
+  }
+
+  private async readStream(
+    stream: Libp2pStream,
+    signal?: AbortSignal,
+  ): Promise<string> {
     const chunks: Buffer[] = [];
     let size = 0;
+    const iterator: AsyncIterator<Uint8Array | { subarray(): Uint8Array }> =
+      stream[Symbol.asyncIterator]();
+    let finished = false;
 
-    for await (const chunk of stream) {
+    while (!finished) {
+      const result = await this.raceWithAbort(iterator.next(), signal);
+
+      if (result.done) {
+        finished = true;
+
+        break;
+      }
+
+      const chunk = result.value;
       const bytes = this.chunkToBytes(chunk);
       size += bytes.byteLength;
 
@@ -71,14 +135,15 @@ export class PublicIPFSContentFallback {
   private async writeStream(
     stream: Libp2pStream,
     payload: string,
+    signal?: AbortSignal,
   ): Promise<void> {
     const bytes = new TextEncoder().encode(payload);
 
     if (!stream.send(bytes) && stream.onDrain) {
-      await stream.onDrain();
+      await this.raceWithAbort(stream.onDrain(), signal);
     }
 
-    await stream.close();
+    await this.raceWithAbort(stream.close(), signal);
   }
 
   private decodeRequest(payload: string): DecodedRequest | undefined {
@@ -152,14 +217,17 @@ export class PublicIPFSContentFallback {
     };
   }
 
-  private async ensureHandler(networks: IPFSNetwork[]): Promise<void> {
+  private async ensureHandlerOnNode(
+    node: Libp2pPubSubNode,
+    networks: IPFSNetwork[],
+  ): Promise<void> {
     this.appendNetworks(networks);
 
-    if (PublicIPFSContentFallback.handlerRegistered) {
+    const nodeKey = node as unknown as object;
+
+    if (PublicIPFSContentFallback.handlerRegisteredNodes.has(nodeKey)) {
       return;
     }
-
-    const node = await this.runtimeAdapter.createNode();
 
     if (!node.handle) {
       return;
@@ -169,7 +237,14 @@ export class PublicIPFSContentFallback {
       PublicIPFSContentFallback.protocol,
       this.incomingStreamHandler(),
     );
-    PublicIPFSContentFallback.handlerRegistered = true;
+    PublicIPFSContentFallback.handlerRegisteredNodes.add(nodeKey);
+  }
+
+  private async ensureHandler(networks: IPFSNetwork[]): Promise<void> {
+    await this.ensureHandlerOnNode(
+      await this.runtimeAdapter.createNode(),
+      networks,
+    );
   }
 
   private async requestFromPeer(
@@ -191,10 +266,11 @@ export class PublicIPFSContentFallback {
     await this.writeStream(
       stream,
       this.codec.encode(JSON.stringify(request), network),
+      signal,
     );
 
     const response = JSON.parse(
-      this.codec.decode(await this.readStream(stream), network),
+      this.codec.decode(await this.readStream(stream, signal), network),
     ) as ContentResponse;
 
     if (!response.ok) {
@@ -291,10 +367,14 @@ export class PublicIPFSContentFallback {
 
     const privateNetworks = this.privateNetworks(networks);
     const node = await this.runtimeAdapter.createNode();
-    const peers = node.getPeers?.() || [];
+    const peers = this.orderedPeers(node, privateNetworks);
 
     for (const network of privateNetworks) {
       for (const peer of peers) {
+        if (signal?.aborted) {
+          throw new IPFSContentNotFoundError(cid.valueOf());
+        }
+
         const bytes = await this.requestBytesFromPeer(
           node,
           peer,
@@ -316,6 +396,23 @@ export class PublicIPFSContentFallback {
     await this.ensureHandler(networks);
   }
 
+  public async serveNode(
+    node: Libp2pPubSubNode,
+    networks: IPFSNetwork[],
+  ): Promise<void> {
+    await this.ensureHandlerOnNode(node, networks);
+  }
+
+  public async serveRegistryOnNode(
+    node: Libp2pPubSubNode,
+    networkRegistry: IPFSNetworkRegistry,
+  ): Promise<void> {
+    await this.serveNode(node, networkRegistry.getAll());
+    networkRegistry.onNetworkRegistered((network) => {
+      void this.serveNode(node, [network]);
+    });
+  }
+
   public async serveRegistry(
     networkRegistry: IPFSNetworkRegistry,
   ): Promise<void> {
@@ -334,10 +431,14 @@ export class PublicIPFSContentFallback {
 
     const privateNetworks = this.privateNetworks(networks);
     const node = await this.runtimeAdapter.createNode();
-    const peers = node.getPeers?.() || [];
+    const peers = this.orderedPeers(node, privateNetworks);
 
     for (const network of privateNetworks) {
       for (const peer of peers) {
+        if (signal?.aborted) {
+          throw new IPFSContentNotFoundError(cid.valueOf());
+        }
+
         const json = await this.requestJSONFromPeer<T>(
           node,
           peer,

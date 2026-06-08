@@ -85,6 +85,103 @@ describe('PublicIPFSContentFallback', () => {
       IPFSContentNotFoundError,
     );
   });
+
+  it('should try private IPFS peers before unrelated public peers', async () => {
+    const cid = new IPFSId('bafy-requested');
+    const response = codec.encode(
+      JSON.stringify({
+        json: { ok: true },
+        ok: true,
+      }),
+      network,
+    );
+    const dialProtocol = jest
+      .fn()
+      .mockResolvedValue(new FakeLibp2pStream(response));
+
+    network.getPeers.mockReturnValue(['private-peer']);
+    runtimeAdapter.createNode.mockResolvedValue({
+      dialProtocol,
+      getPeers: () => ['public-peer', 'private-peer'],
+      services: {
+        pubsub: {
+          addEventListener: jest.fn(),
+          publish: jest.fn(),
+          subscribe: jest.fn(),
+        },
+      },
+    });
+    network.addJSON.mockResolvedValue(cid);
+
+    const result = await fallback.getJSON([network], cid);
+
+    expect(result).toEqual({ ok: true });
+    expect(dialProtocol).toHaveBeenCalledTimes(1);
+    expect(dialProtocol).toHaveBeenCalledWith(
+      'private-peer',
+      '/pigeon-swarm/ipfs-content/1.0.0',
+      { signal: undefined },
+    );
+  });
+
+  it('should stop waiting when a fallback peer opens a stream but never responds', async () => {
+    const cid = new IPFSId('bafy-requested');
+    const controller = new AbortController();
+
+    network.getPeers.mockReturnValue(['private-peer']);
+    runtimeAdapter.createNode.mockResolvedValue({
+      dialProtocol: jest.fn().mockResolvedValue(new HangingLibp2pStream()),
+      getPeers: () => ['private-peer'],
+      services: {
+        pubsub: {
+          addEventListener: jest.fn(),
+          publish: jest.fn(),
+          subscribe: jest.fn(),
+        },
+      },
+    });
+
+    setTimeout(() => controller.abort(), 5);
+
+    await expect(fallback.getJSON([network], cid, controller.signal)).rejects.toThrow(
+      IPFSContentNotFoundError,
+    );
+  });
+
+  it('should register the content protocol on each supplied libp2p node', async () => {
+    const firstNode = {
+      handle: jest.fn().mockResolvedValue(undefined),
+      services: {
+        pubsub: {
+          addEventListener: jest.fn(),
+          publish: jest.fn(),
+          subscribe: jest.fn(),
+        },
+      },
+    };
+    const secondNode = {
+      handle: jest.fn().mockResolvedValue(undefined),
+      services: {
+        pubsub: {
+          addEventListener: jest.fn(),
+          publish: jest.fn(),
+          subscribe: jest.fn(),
+        },
+      },
+    };
+
+    await fallback.serveNode(firstNode, [network]);
+    await fallback.serveNode(secondNode, [network]);
+
+    expect(firstNode.handle).toHaveBeenCalledWith(
+      '/pigeon-swarm/ipfs-content/1.0.0',
+      expect.any(Function),
+    );
+    expect(secondNode.handle).toHaveBeenCalledWith(
+      '/pigeon-swarm/ipfs-content/1.0.0',
+      expect.any(Function),
+    );
+  });
 });
 
 class FakeLibp2pStream implements Libp2pStream {
@@ -108,6 +205,20 @@ class FakeLibp2pStream implements Libp2pStream {
 
   public sentPayload(): string {
     return this.sent;
+  }
+}
+
+class HangingLibp2pStream implements Libp2pStream {
+  public async *[Symbol.asyncIterator](): AsyncIterableIterator<Uint8Array> {
+    await new Promise((): void => undefined);
+  }
+
+  public close(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  public send(): boolean {
+    return true;
   }
 }
 

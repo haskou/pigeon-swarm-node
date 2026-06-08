@@ -19,11 +19,14 @@ export class GetNodeNetworkDebugRoute extends Route {
 
   @Get('/debug')
   public getDebug(@Res() response: Response): Response {
+    const networkRegistry = this.get<IPFSNetworkRegistry>(IPFSNetworkRegistry);
+
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
         new NodeNetworkDebugViewModel(
           this.relayRuntime.debugState(),
+          networkRegistry.getAll(),
           this.exposeSensitiveDebug(),
         ).toResource(),
       );
