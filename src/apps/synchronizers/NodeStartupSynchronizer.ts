@@ -53,6 +53,7 @@ export default class NodeStartupSynchronizer {
   private readonly nodeLoader: NodeLoader;
   private readonly policy: NodeStartupSyncPolicy;
   private readonly readiness: NodeStartupSyncReadiness;
+  private readonly lastNetworkPeerCounts = new Map<string, number>();
   private readonly lastReadyNetworks = new Map<string, boolean>();
   private readinessMonitor?: NodeJS.Timeout;
   private runningSynchronization?: Promise<NodeStartupSyncResult>;
@@ -215,21 +216,32 @@ export default class NodeStartupSynchronizer {
       );
   }
 
-  private updateLastReadyNetworks(
+  private updateLastNetworkState(
     networkReadiness: NodeStartupNetworkReadiness[],
   ): void {
     for (const network of networkReadiness) {
+      this.lastNetworkPeerCounts.set(network.networkId, network.peerCount);
       this.lastReadyNetworks.set(network.networkId, network.ready);
     }
   }
 
-  private hasReadyTransition(
+  private hasSyncTrigger(
     networkReadiness: NodeStartupNetworkReadiness[],
   ): boolean {
-    return networkReadiness.some(
-      (network) =>
-        network.ready && this.lastReadyNetworks.get(network.networkId) !== true,
-    );
+    return networkReadiness.some((network) => {
+      if (!network.ready) {
+        return false;
+      }
+
+      if (this.lastReadyNetworks.get(network.networkId) !== true) {
+        return true;
+      }
+
+      return (
+        network.peerCount >
+        (this.lastNetworkPeerCounts.get(network.networkId) || 0)
+      );
+    });
   }
 
   private async synchronizeNow(): Promise<NodeStartupSyncResult> {
@@ -245,7 +257,7 @@ export default class NodeStartupSynchronizer {
 
     const networkReadiness = await this.readiness.prepare(networkIds);
 
-    this.updateLastReadyNetworks(networkReadiness);
+    this.updateLastNetworkState(networkReadiness);
 
     const readyNetworkIds = new Set(
       networkReadiness
@@ -435,8 +447,8 @@ export default class NodeStartupSynchronizer {
     const networkIds = Object.keys(node.toPrimitives().networks);
     const networkReadiness = await this.readiness.inspect(networkIds);
 
-    if (!this.hasReadyTransition(networkReadiness)) {
-      this.updateLastReadyNetworks(networkReadiness);
+    if (!this.hasSyncTrigger(networkReadiness)) {
+      this.updateLastNetworkState(networkReadiness);
 
       return;
     }

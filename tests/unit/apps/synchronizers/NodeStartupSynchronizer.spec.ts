@@ -564,6 +564,47 @@ describe('NodeStartupSynchronizer', () => {
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 
+  it('should synchronize again when a peer appears in a ready network', async () => {
+    readiness.prepare
+      .mockResolvedValueOnce([
+        {
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          peerCount: 0,
+          ready: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          peerCount: 1,
+          ready: true,
+        },
+      ]);
+    readiness.inspect.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 1,
+        ready: true,
+      },
+    ]);
+    identityMetadataRepository.findAll.mockResolvedValue([]);
+    keychainMetadataRepository.findAll.mockResolvedValue([]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([]);
+    communityRepository.findAll.mockResolvedValue([]);
+
+    await synchronizer.synchronize();
+    eventPublisher.publish.mockClear();
+    await synchronizer.synchronizeWhenNetworkBecomesReady();
+
+    expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(eventPublisher.publish.mock.calls[0][0]).toEqual([
+      expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunityNetworkSyncRequestedEvent),
+      expect.any(KeychainNetworkSyncRequestedEvent),
+      expect.any(IPFSContentReplicationNetworkSyncRequestedEvent),
+    ]);
+  });
+
   it('should synchronize again when a network becomes ready', async () => {
     readiness.prepare
       .mockResolvedValueOnce([
