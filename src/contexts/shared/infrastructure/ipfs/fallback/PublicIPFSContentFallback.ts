@@ -252,6 +252,13 @@ export class PublicIPFSContentFallback {
       await this.runtimeAdapter.createNode(),
       networks,
     );
+
+    await Promise.all(
+      this.privateNetworks(networks)
+        .map((network) => network.getContentFallbackNode())
+        .filter((node): node is Libp2pPubSubNode => node !== undefined)
+        .map((node) => this.ensureHandlerOnNode(node, networks)),
+    );
   }
 
   private async requestFromPeer(
@@ -262,7 +269,7 @@ export class PublicIPFSContentFallback {
     signal?: AbortSignal,
   ): Promise<ContentResponse> {
     if (!node.dialProtocol) {
-      throw new Error('Public libp2p node cannot dial protocols.');
+      throw new Error('Libp2p node cannot dial content fallback protocol.');
     }
 
     const stream = await node.dialProtocol(
@@ -285,6 +292,19 @@ export class PublicIPFSContentFallback {
     }
 
     return response;
+  }
+
+  private async requestNodesFor(
+    network: IPFSNetwork,
+  ): Promise<Libp2pPubSubNode[]> {
+    const publicNode = await this.runtimeAdapter.createNode();
+    const privateNode = network.getContentFallbackNode();
+
+    if (!privateNode || privateNode === publicNode) {
+      return [publicNode];
+    }
+
+    return [privateNode, publicNode];
   }
 
   private async validateAndStoreBytes(
@@ -365,38 +385,119 @@ export class PublicIPFSContentFallback {
     }
   }
 
+  private async requestFirstFromNode<T>(
+    node: Libp2pPubSubNode,
+    privateNetworks: IPFSNetwork[],
+    network: IPFSNetwork,
+    cid: IPFSId,
+    request: (
+      node: Libp2pPubSubNode,
+      peer: unknown,
+      network: IPFSNetwork,
+      cid: IPFSId,
+      signal?: AbortSignal,
+    ) => Promise<T | undefined>,
+    signal?: AbortSignal,
+  ): Promise<T | undefined> {
+    for (const peer of this.orderedPeers(node, privateNetworks)) {
+      if (signal?.aborted) {
+        throw new IPFSContentNotFoundError(cid.valueOf());
+      }
+
+      const value = await request(node, peer, network, cid, signal);
+
+      if (value !== undefined) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async requestFirstFromNetwork<T>(
+    network: IPFSNetwork,
+    privateNetworks: IPFSNetwork[],
+    cid: IPFSId,
+    request: (
+      node: Libp2pPubSubNode,
+      peer: unknown,
+      network: IPFSNetwork,
+      cid: IPFSId,
+      signal?: AbortSignal,
+    ) => Promise<T | undefined>,
+    signal?: AbortSignal,
+  ): Promise<T | undefined> {
+    for (const node of await this.requestNodesFor(network)) {
+      const value = await this.requestFirstFromNode(
+        node,
+        privateNetworks,
+        network,
+        cid,
+        request,
+        signal,
+      );
+
+      if (value !== undefined) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async requestFirstFromNetworks<T>(
+    networks: IPFSNetwork[],
+    cid: IPFSId,
+    request: (
+      node: Libp2pPubSubNode,
+      peer: unknown,
+      network: IPFSNetwork,
+      cid: IPFSId,
+      signal?: AbortSignal,
+    ) => Promise<T | undefined>,
+    signal?: AbortSignal,
+  ): Promise<{ network: IPFSNetwork; value: T }> {
+    await this.ensureHandler(networks);
+
+    const privateNetworks = this.privateNetworks(networks);
+
+    for (const network of privateNetworks) {
+      const value = await this.requestFirstFromNetwork(
+        network,
+        privateNetworks,
+        cid,
+        request,
+        signal,
+      );
+
+      if (value !== undefined) {
+        return { network, value };
+      }
+    }
+
+    throw new IPFSContentNotFoundError(cid.valueOf());
+  }
+
   public async getBytes(
     networks: IPFSNetwork[],
     cid: IPFSId,
     signal?: AbortSignal,
   ): Promise<Buffer> {
-    await this.ensureHandler(networks);
-
-    const privateNetworks = this.privateNetworks(networks);
-    const node = await this.runtimeAdapter.createNode();
-    const peers = this.orderedPeers(node, privateNetworks);
-
-    for (const network of privateNetworks) {
-      for (const peer of peers) {
-        if (signal?.aborted) {
-          throw new IPFSContentNotFoundError(cid.valueOf());
-        }
-
-        const bytes = await this.requestBytesFromPeer(
+    const result = await this.requestFirstFromNetworks<Buffer>(
+      networks,
+      cid,
+      (node, peer, network, requestCid, requestSignal) =>
+        this.requestBytesFromPeer(
           node,
           peer,
           network,
-          cid,
-          signal,
-        );
+          requestCid,
+          requestSignal,
+        ),
+      signal,
+    );
 
-        if (bytes) {
-          return this.validateAndStoreBytes(network, cid, bytes);
-        }
-      }
-    }
-
-    throw new IPFSContentNotFoundError(cid.valueOf());
+    return this.validateAndStoreBytes(result.network, cid, result.value);
   }
 
   public async serve(networks: IPFSNetwork[]): Promise<void> {
@@ -434,32 +535,20 @@ export class PublicIPFSContentFallback {
     cid: IPFSId,
     signal?: AbortSignal,
   ): Promise<T> {
-    await this.ensureHandler(networks);
-
-    const privateNetworks = this.privateNetworks(networks);
-    const node = await this.runtimeAdapter.createNode();
-    const peers = this.orderedPeers(node, privateNetworks);
-
-    for (const network of privateNetworks) {
-      for (const peer of peers) {
-        if (signal?.aborted) {
-          throw new IPFSContentNotFoundError(cid.valueOf());
-        }
-
-        const json = await this.requestJSONFromPeer<T>(
+    const result = await this.requestFirstFromNetworks<T>(
+      networks,
+      cid,
+      (node, peer, network, requestCid, requestSignal) =>
+        this.requestJSONFromPeer<T>(
           node,
           peer,
           network,
-          cid,
-          signal,
-        );
+          requestCid,
+          requestSignal,
+        ),
+      signal,
+    );
 
-        if (json !== undefined) {
-          return this.validateAndStoreJSON<T>(network, cid, json);
-        }
-      }
-    }
-
-    throw new IPFSContentNotFoundError(cid.valueOf());
+    return this.validateAndStoreJSON<T>(result.network, cid, result.value);
   }
 }

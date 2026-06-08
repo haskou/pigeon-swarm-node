@@ -2,6 +2,7 @@ import Kernel from '@app/Kernel';
 import NetworkDiagnosticsLogger from '@app/shared/infrastructure/network/NetworkDiagnosticsLogger';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
+import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
@@ -440,6 +441,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
 
     return Buffer.concat(chunks);
+  }
+
+  public getContentFallbackNode(): Libp2pPubSubNode | undefined {
+    return this.heliaCore.libp2p as unknown as Libp2pPubSubNode;
   }
 
   public async removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void> {

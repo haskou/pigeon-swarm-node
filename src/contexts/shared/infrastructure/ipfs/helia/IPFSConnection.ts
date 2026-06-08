@@ -1,3 +1,5 @@
+import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
+
 import { Libp2pPrivateKeyLike } from '../networks/adapters/Libp2pKeyAdapter';
 import { IPFSId } from './IPFSId';
 
@@ -32,6 +34,7 @@ export interface IPFSConnection {
     handler: (payload: string) => Promise<void>,
   ): Promise<void>;
   blockPeer(peerId: string): Promise<void>;
+  getContentFallbackNode?(): Libp2pPubSubNode | undefined;
   getPeers(): string[];
   getPeerId(): string;
   stop(): Promise<void>;

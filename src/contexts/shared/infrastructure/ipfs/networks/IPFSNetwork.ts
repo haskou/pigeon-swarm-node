@@ -1,3 +1,5 @@
+import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
+
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
@@ -113,6 +115,10 @@ export class IPFSNetwork {
 
   public getPeerId(): string {
     return this.connection.getPeerId();
+  }
+
+  public getContentFallbackNode(): Libp2pPubSubNode | undefined {
+    return this.connection.getContentFallbackNode?.();
   }
 
   public async stop(): Promise<void> {

@@ -124,6 +124,58 @@ describe('PublicIPFSContentFallback', () => {
     );
   });
 
+  it('should request content through the private IPFS libp2p node first', async () => {
+    const cid = new IPFSId('bafy-requested');
+    const response = codec.encode(
+      JSON.stringify({
+        bytes: Buffer.from('private-content').toString('base64'),
+        ok: true,
+      }),
+      network,
+    );
+    const privateDialProtocol = jest
+      .fn()
+      .mockResolvedValue(new FakeLibp2pStream(response));
+    const publicDialProtocol = jest.fn();
+    const privateNode = {
+      dialProtocol: privateDialProtocol,
+      getPeers: () => ['private-peer'],
+      handle: jest.fn().mockResolvedValue(undefined),
+      services: {
+        pubsub: {
+          addEventListener: jest.fn(),
+          publish: jest.fn(),
+          subscribe: jest.fn(),
+        },
+      },
+    };
+
+    network.getPeers.mockReturnValue(['private-peer']);
+    network.getContentFallbackNode.mockReturnValue(privateNode);
+    runtimeAdapter.createNode.mockResolvedValue({
+      dialProtocol: publicDialProtocol,
+      getPeers: () => ['public-peer'],
+      services: {
+        pubsub: {
+          addEventListener: jest.fn(),
+          publish: jest.fn(),
+          subscribe: jest.fn(),
+        },
+      },
+    });
+    network.addBytes.mockResolvedValue(cid);
+
+    const result = await fallback.getBytes([network], cid);
+
+    expect(result).toEqual(Buffer.from('private-content'));
+    expect(privateDialProtocol).toHaveBeenCalledWith(
+      'private-peer',
+      '/pigeon-swarm/ipfs-content/1.0.0',
+      { signal: undefined },
+    );
+    expect(publicDialProtocol).not.toHaveBeenCalled();
+  });
+
   it('should stop waiting when a fallback peer opens a stream but never responds', async () => {
     const cid = new IPFSId('bafy-requested');
     const controller = new AbortController();
