@@ -61,6 +61,7 @@ describe('IPFSReplicationMaintainer', () => {
 
   it('continues maintaining replicas when one responsible CID cannot be fetched', async () => {
     const publishedEvents: DomainEvent[][] = [];
+    const providedContent: string[] = [];
     const savedClaims: unknown[] = [];
     const claimRepository: IPFSContentReplicaClaimRepository = {
       findByCids: async () => [],
@@ -77,6 +78,9 @@ describe('IPFSReplicationMaintainer', () => {
         return {};
       },
       getBytesFromNetwork: async () => Buffer.from([]),
+      provideContentFromNetwork: async (_cid: { valueOf(): string }) => {
+        providedContent.push(_cid.valueOf());
+      },
       removeJSONFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
@@ -100,6 +104,7 @@ describe('IPFSReplicationMaintainer', () => {
     });
     expect(savedClaims).toHaveLength(1);
     expect(publishedEvents).toHaveLength(1);
+    expect(providedContent).toEqual(['bafy-success']);
   });
 
   it('fetches public upload replicas as bytes', async () => {
@@ -123,6 +128,7 @@ describe('IPFSReplicationMaintainer', () => {
       getJSONFromNetwork: async () => {
         throw new Error('Public uploads must not be fetched as JSON.');
       },
+      provideContentFromNetwork: async (): Promise<void> => undefined,
       removeJSONFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
@@ -185,6 +191,7 @@ describe('IPFSReplicationMaintainer', () => {
         getJSONFromNetwork: async () => {
           throw new Error('Private uploads must not be fetched in this test.');
         },
+        provideContentFromNetwork: async (): Promise<void> => undefined,
         removeJSONFromNetwork: async (): Promise<void> => undefined,
       };
       const eventPublisher: DomainEventPublisher = {

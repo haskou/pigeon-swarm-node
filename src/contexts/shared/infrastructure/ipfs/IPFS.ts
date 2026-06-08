@@ -135,6 +135,18 @@ export default class IPFS {
     return this.racer.raceGetBytes([network], cid, signal);
   }
 
+  public async provideContentFromNetwork(
+    cid: IPFSId,
+    networkId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.initialize();
+
+    const network = this.registry.find(networkId);
+
+    await network.provideContent(cid, signal);
+  }
+
   public async getRecord(key: string): Promise<string | undefined> {
     await this.initialize();
 

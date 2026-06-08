@@ -50,6 +50,16 @@ export default class IPFSReplicationMaintainer {
     ]);
   }
 
+  private async publishLocalProvider(
+    content: IPFSContentReplicationStatus,
+    network: IPFSContentNetworkReplicationStatus,
+  ): Promise<void> {
+    await this.ipfs.provideContentFromNetwork(
+      new IPFSId(content.cid),
+      network.networkId,
+    );
+  }
+
   private hasLocalClaim(
     knownReplicaNodeIds: string[],
     localNodeId: string,
@@ -162,6 +172,7 @@ export default class IPFSReplicationMaintainer {
     localNodeId: string,
   ): Promise<number> {
     await this.fetchResponsibleReplica(content, network);
+    await this.publishLocalProvider(content, network);
 
     if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
       return 0;
@@ -214,6 +225,10 @@ export default class IPFSReplicationMaintainer {
     }
 
     try {
+      if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
+        await this.publishLocalProvider(content, network);
+      }
+
       result.releasedReplicas = await this.releaseExtraReplica(
         content,
         network,

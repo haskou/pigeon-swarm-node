@@ -189,6 +189,18 @@ describe('IPFSNetwork', () => {
     });
   });
 
+  describe('provideContent', () => {
+    it('should delegate to connection.provideContent', async () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const cid = new IPFSId('bafyprovider');
+
+      await network.provideContent(cid);
+
+      expect(connection.provideContent).toHaveBeenCalledWith(cid, undefined);
+    });
+  });
+
   describe('getRecord', () => {
     it('should delegate to connection.getRecord', async () => {
       const config = new IPFSNetworkConfig(networkId, 'net');

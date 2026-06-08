@@ -170,6 +170,22 @@ describe('IPFS', () => {
     });
   });
 
+  describe('provideContentFromNetwork', () => {
+    it('should publish a provider record for content in a specific network', async () => {
+      const cid = new IPFSId('bafyprovider');
+
+      await ipfs.provideContentFromNetwork(
+        cid,
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+
+      expect(registry.find).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+      expect(mockNetwork.provideContent).toHaveBeenCalledWith(cid, undefined);
+    });
+  });
+
   describe('getRecordCandidates', () => {
     it('should collect unique records from all networks', async () => {
       const firstNetwork = mock<IPFSNetwork>();

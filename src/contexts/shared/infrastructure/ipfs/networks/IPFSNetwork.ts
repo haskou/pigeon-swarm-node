@@ -87,6 +87,13 @@ export class IPFSNetwork {
     return this.connection.putRecord(key, value, signal);
   }
 
+  public async provideContent(
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this.connection.provideContent(cid, signal);
+  }
+
   public async getRecord(
     key: string,
     signal?: AbortSignal,
