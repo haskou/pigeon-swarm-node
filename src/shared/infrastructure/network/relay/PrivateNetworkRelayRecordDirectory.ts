@@ -23,7 +23,7 @@ export class PrivateNetworkRelayRecordDirectory {
   );
 
   private static readonly ipnsWindowMs = Number(
-    process.env.PIGEON_RELAY_DIRECTORY_IPNS_WINDOW_MS || 60000,
+    process.env.PIGEON_RELAY_DIRECTORY_IPNS_WINDOW_MS || 600000,
   );
 
   private readonly storagePath: string =

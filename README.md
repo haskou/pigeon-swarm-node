@@ -116,13 +116,13 @@ For NAT traversal experiments, a node can expose one public libp2p relay with
 only a manual override for tests or deployments that want to force one or more
 known relay multiaddrs while automatic relay discovery is warming up or
 unavailable; leaf nodes can otherwise discover relay records for a shared
-private network through public IPFS routing. Those private relay directory
-records store the encrypted relay envelope directly in the routing record, using
-lookup keys and encrypted payloads derived from the private network key, so
-unrelated public peers cannot enumerate private network ids or read relay peer
-metadata. Relay nodes also advertise the public relay multiaddr as the provider
-address for a deterministic private-directory CID, so leaf nodes still have a
-standard DHT rendezvous fallback when custom routing records are unavailable.
+private network through deterministic time-windowed IPNS records on public
+IPFS. Those private relay directory records point to encrypted public IPFS
+documents using IPNS names and encrypted payloads derived from the private
+network key, so unrelated public peers cannot enumerate private network ids or
+read relay peer
+metadata. Provider lookups remain diagnostic only because public DHT provider
+records can point at generic gateways instead of trusted Pigeon relays.
 Relay nodes and leaf nodes retry private relay directory publish/discovery
 periodically, so discovery does not depend on the first public IPFS routing tick
 at startup. `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` can be used to tune each
