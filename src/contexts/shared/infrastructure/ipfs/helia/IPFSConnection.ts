@@ -9,6 +9,11 @@ export interface IPFSConnection {
   getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T>;
   putRecord(key: string, value: string, signal?: AbortSignal): Promise<void>;
   getRecord(key: string, signal?: AbortSignal): Promise<string | undefined>;
+  provideRecord(key: string, signal?: AbortSignal): Promise<void>;
+  findRecordProviderMultiaddrs(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string[]>;
   publishPubSub(topic: string, payload: string): Promise<void>;
   subscribePubSub(
     topic: string,

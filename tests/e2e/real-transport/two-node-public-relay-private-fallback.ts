@@ -126,6 +126,14 @@ class InMemoryIPFSConnection implements IPFSConnection {
     return Promise.resolve(this.records.get(key));
   }
 
+  public provideRecord(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  public findRecordProviderMultiaddrs(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
   public async publishPubSub(topic: string, payload: string): Promise<void> {
     await Promise.all(
       (this.pubSubHandlers.get(topic) || []).map((handler) =>

@@ -35,7 +35,7 @@ export class PrivateNetworkRelayRecordDirectory {
     lastDiscoveredAt?: number;
     lastError?: string;
     lastLookupHadValue?: boolean;
-    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
     lastPublishedAt?: number;
     lastPublishedNetworkCount?: number;
     lastRequestedNetworkCount?: number;
@@ -46,7 +46,11 @@ export class PrivateNetworkRelayRecordDirectory {
             lastDiscoveredAt?: number;
             lastError?: string;
             lastLookupHadValue?: boolean;
-            lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+            lastLookupValueKind?:
+              | 'cid'
+              | 'inline-envelope'
+              | 'provider'
+              | 'unknown';
             lastPublishedAt?: number;
             lastPublishedNetworkCount?: number;
             lastRequestedNetworkCount?: number;
@@ -125,7 +129,7 @@ export class PrivateNetworkRelayRecordDirectory {
 
   private relayRecordEnvelopeKind(
     value: string,
-  ): 'cid' | 'inline-envelope' | 'unknown' {
+  ): 'cid' | 'inline-envelope' | 'provider' | 'unknown' {
     if (this.decodeEnvelopeRecord(value)) {
       return 'inline-envelope';
     }
@@ -135,6 +139,33 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     return 'unknown';
+  }
+
+  private peerIdFromMultiaddr(multiaddr: string): string | undefined {
+    return multiaddr.match(/\/p2p\/([^/]+)/)?.[1];
+  }
+
+  private relayRecordFromProviderMultiaddrs(
+    multiaddrs: string[],
+  ): PublicRelayRecordPrimitives | undefined {
+    const peerId = multiaddrs
+      .map((multiaddr) => this.peerIdFromMultiaddr(multiaddr))
+      .find((value): value is string => Boolean(value));
+
+    if (!peerId || multiaddrs.length === 0) {
+      return undefined;
+    }
+
+    return {
+      expiresAt: Date.now() + 300000,
+      issuedAt: Date.now(),
+      multiaddrs,
+      peerId,
+      publicKey: 'dht-provider-record',
+      role: 'relay',
+      signature: 'dht-provider-record',
+      version: 1,
+    };
   }
 
   private async loadEnvelopeRecord(
@@ -199,6 +230,7 @@ export class PrivateNetworkRelayRecordDirectory {
         const lookupKey = this.authenticator.lookupKey(network);
 
         await publicConnection.putRecord(lookupKey, JSON.stringify(envelope));
+        await publicConnection.provideRecord(lookupKey);
         Kernel.logger.debug(
           `Published private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
             network,
@@ -240,6 +272,21 @@ export class PrivateNetworkRelayRecordDirectory {
             Boolean(relayRecordEnvelope);
 
           if (!relayRecordEnvelope) {
+            const providerMultiaddrs =
+              await publicConnection.findRecordProviderMultiaddrs(lookupKey);
+            const relayRecord =
+              this.relayRecordFromProviderMultiaddrs(providerMultiaddrs);
+
+            if (!relayRecord) {
+              return;
+            }
+
+            this.directoryDebugState.lastLookupValueKind = 'provider';
+            this.relayRecordRegistry.save(relayRecord);
+            discoveredRecords.push(relayRecord);
+            this.directoryDebugState.lastDiscoveredAt = Date.now();
+            this.directoryDebugState.lastError = undefined;
+
             return;
           }
 
@@ -299,7 +346,7 @@ export class PrivateNetworkRelayRecordDirectory {
     lastDiscoveredAt?: number;
     lastError?: string;
     lastLookupHadValue?: boolean;
-    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
     lastPublishedAt?: number;
     lastPublishedNetworkCount?: number;
     lastRequestedNetworkCount?: number;

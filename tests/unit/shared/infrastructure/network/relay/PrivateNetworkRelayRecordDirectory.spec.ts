@@ -147,6 +147,32 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
+  it('should discover relay provider multiaddrs when custom DHT records are unavailable', async () => {
+    const publicConnection = new InMemoryPublicConnection();
+    const registry = new PublicRelayRecordRegistry();
+    const publisher = new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      new PublicRelayRecordRegistry(),
+      undefined,
+      async () => publicConnection,
+    );
+
+    registry.clear();
+    await publisher.publish(relayRecord);
+    publicConnection.clearRecords();
+
+    const discovered = await new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      registry,
+      undefined,
+      async () => publicConnection,
+    ).discover();
+
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0].peerId).toBe(relayRecord.peerId);
+    expect(discovered[0].multiaddrs).toEqual(relayRecord.multiaddrs);
+  });
+
   it('should refresh private relay discovery periodically', async () => {
     jest.useFakeTimers();
     const publicConnection = new InMemoryPublicConnection();
@@ -199,6 +225,7 @@ class InMemoryPublicConnection implements IPFSConnection {
   private readonly json = new Map<string, unknown>();
 
   private readonly records = new Map<string, string>();
+  private readonly providerMultiaddrs = new Map<string, string[]>();
 
   public stat(): Promise<void> {
     return Promise.resolve();
@@ -238,6 +265,10 @@ class InMemoryPublicConnection implements IPFSConnection {
     return JSON.stringify([...this.records.values()]);
   }
 
+  public clearRecords(): void {
+    this.records.clear();
+  }
+
   public addedJSONCount(): number {
     return this.json.size;
   }
@@ -250,6 +281,18 @@ class InMemoryPublicConnection implements IPFSConnection {
 
   public getRecord(key: string): Promise<string | undefined> {
     return Promise.resolve(this.records.get(key));
+  }
+
+  public provideRecord(key: string): Promise<void> {
+    this.providerMultiaddrs.set(key, [
+      '/dns4/relay.test/tcp/4011/p2p/12D3KooWDHwUoxY5MSJaTP66sbsMCFZEQwVVHS5EtemUrxtFqNGp',
+    ]);
+
+    return Promise.resolve();
+  }
+
+  public findRecordProviderMultiaddrs(key: string): Promise<string[]> {
+    return Promise.resolve(this.providerMultiaddrs.get(key) || []);
   }
 
   public publishPubSub(): Promise<void> {

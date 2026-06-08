@@ -9,6 +9,8 @@ import type * as HeliaCore from 'helia';
 import type { Key as DatastoreKey } from 'interface-datastore/key';
 import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
+import type * as MultiformatsDigest from 'multiformats/hashes/digest';
+import type * as Sha2Module from 'multiformats/hashes/sha2';
 
 import type { HeliaInstance } from './types/HeliaInstance';
 import type { HeliaJSONClient } from './types/HeliaJSONClient';
@@ -27,6 +29,8 @@ export type { RuntimeBlockstore } from './types/RuntimeBlockstore';
 export type { RuntimeDatastore } from './types/RuntimeDatastore';
 
 export class HeliaRuntimeAdapter {
+  private static readonly RAW_CODEC_CODE = 0x55;
+
   private static readonly DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS = [
     '/dnsaddr/am6.bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
     '/dnsaddr/sg1.bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',
@@ -49,6 +53,8 @@ export class HeliaRuntimeAdapter {
   >;
 
   private cidModulePromise?: Promise<typeof import('multiformats/cid')>;
+  private digestModulePromise?: Promise<typeof MultiformatsDigest>;
+  private sha2ModulePromise?: Promise<typeof Sha2Module>;
   private blockstoreCoreModulePromise?: Promise<
     typeof import('blockstore-core')
   >;
@@ -151,6 +157,22 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof import('multiformats/cid')>('multiformats/cid');
 
     return this.cidModulePromise;
+  }
+
+  private loadDigestModule(): Promise<typeof MultiformatsDigest> {
+    this.digestModulePromise ??= this.nativeImport<typeof MultiformatsDigest>(
+      'multiformats/hashes/digest',
+    );
+
+    return this.digestModulePromise;
+  }
+
+  private loadSha2Module(): Promise<typeof Sha2Module> {
+    this.sha2ModulePromise ??= this.nativeImport<typeof Sha2Module>(
+      'multiformats/hashes/sha2',
+    );
+
+    return this.sha2ModulePromise;
   }
 
   private loadBlockstoreCoreModule(): Promise<
@@ -390,6 +412,22 @@ export class HeliaRuntimeAdapter {
     const cidModule = await this.loadCidModule();
 
     return cidModule.CID.parse(value);
+  }
+
+  public async createRawSha256Cid(value: string): Promise<MultiformatsCid> {
+    const [cidModule, digestModule, sha2Module] = await Promise.all([
+      this.loadCidModule(),
+      this.loadDigestModule(),
+      this.loadSha2Module(),
+    ]);
+    const hash = await sha2Module.sha256.digest(
+      new TextEncoder().encode(value),
+    );
+
+    return cidModule.CID.createV1(
+      HeliaRuntimeAdapter.RAW_CODEC_CODE,
+      digestModule.create(hash.code, hash.digest),
+    );
   }
 
   public async createMemoryBlockstore(): Promise<MemoryBlockstore> {

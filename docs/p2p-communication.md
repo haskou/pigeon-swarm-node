@@ -121,7 +121,11 @@ clear. Nodes outside the private network can see only an opaque encrypted
 directory envelope. The envelope is stored inline in the routing record so a
 leaf node does not need to fetch an additional public CID before it can decrypt
 and dial the relay. Older CID-backed directory values are still accepted while
-the network rolls forward.
+the network rolls forward. Because public DHT nodes do not necessarily accept
+custom mutable record namespaces, relay nodes also publish a standard provider
+record for a deterministic CID derived from the private lookup key. Leaf nodes
+use that provider record as a fallback rendezvous when the custom routing record
+is not available.
 
 ```mermaid
 sequenceDiagram

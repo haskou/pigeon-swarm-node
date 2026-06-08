@@ -14,7 +14,12 @@ const mockHeliaNode = {
     isPinned: jest.fn(),
     rm: jest.fn(),
   },
-  routing: { get: jest.fn(), put: jest.fn() },
+  routing: {
+    findProviders: jest.fn(),
+    get: jest.fn(),
+    provide: jest.fn(),
+    put: jest.fn(),
+  },
 };
 
 async function* pinResults(cid: { toString(): string }) {

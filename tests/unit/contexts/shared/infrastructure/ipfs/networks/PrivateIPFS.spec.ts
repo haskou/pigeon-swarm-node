@@ -6,7 +6,12 @@ const mockHeliaNode = {
     getPeers: jest.fn().mockReturnValue([]),
     peerId: { toString: () => 'mock-peer-id' },
   },
-  routing: { get: jest.fn(), put: jest.fn() },
+  routing: {
+    findProviders: jest.fn(),
+    get: jest.fn(),
+    provide: jest.fn(),
+    put: jest.fn(),
+  },
 };
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);

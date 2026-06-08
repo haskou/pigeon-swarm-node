@@ -491,6 +491,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await this.publishRoutingRecord(key, value, signal);
   }
 
+  public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {
+    const cid = await heliaRuntimeAdapter.createRawSha256Cid(key);
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (!(await this.waitForPeers(routingAbort.signal))) {
+        throw new Error('No public IPFS peers available for DHT provide.');
+      }
+
+      await this.heliaCore.routing.provide(cid, {
+        signal: routingAbort.signal,
+      });
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `DHT provider publication skipped for key="${key}": ${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+  }
+
   public async getRecord(
     key: string,
     signal?: AbortSignal,
@@ -525,6 +546,37 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     return undefined;
+  }
+
+  public async findRecordProviderMultiaddrs(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const cid = await heliaRuntimeAdapter.createRawSha256Cid(key);
+    const routingAbort = this.createRoutingAbortSignal(signal);
+    const multiaddrs: string[] = [];
+
+    try {
+      if (!(await this.waitForPeers(routingAbort.signal))) {
+        throw new Error('No public IPFS peers available for DHT providers.');
+      }
+
+      for await (const provider of this.heliaCore.routing.findProviders(cid, {
+        signal: routingAbort.signal,
+      })) {
+        multiaddrs.push(
+          ...provider.multiaddrs.map((multiaddr) => multiaddr.toString()),
+        );
+      }
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `DHT provider lookup skipped for key="${key}": ${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+
+    return [...new Set(multiaddrs)];
   }
 
   public async publishPubSub(topic: string, payload: string): Promise<void> {

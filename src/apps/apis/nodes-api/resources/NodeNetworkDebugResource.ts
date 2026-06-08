@@ -17,7 +17,7 @@ export type NodeNetworkDebugResource = {
       lastDiscoveredAt?: number;
       lastError?: string;
       lastLookupHadValue?: boolean;
-      lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+      lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
       lastPublishedAt?: number;
       lastPublishedNetworkCount?: number;
       lastRequestedNetworkCount?: number;
