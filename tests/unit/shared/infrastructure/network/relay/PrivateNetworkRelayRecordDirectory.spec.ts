@@ -13,6 +13,7 @@ import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipf
 import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import { Libp2pPrivateKeyLike } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { PrivateNetworkRelayRecordDirectory } from '../../../../../../src/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { PublicRelayRecordDiscovery } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordDiscovery';
 import { PublicRelayRecordPrimitives } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
@@ -50,6 +51,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       registry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).publish(relayRecord);
 
     expect(publicConnection.serializedRecords()).not.toContain(
@@ -61,13 +63,23 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.serializedRecords()).not.toContain(
       relayRecord.multiaddrs[0],
     );
-    expect(publicConnection.addedJSONCount()).toBe(0);
+    expect(publicConnection.serializedJSON()).not.toContain(
+      relayRecord.peerId,
+    );
+    expect(publicConnection.serializedJSON()).not.toContain(
+      relayRecord.publicKey,
+    );
+    expect(publicConnection.serializedJSON()).not.toContain(
+      relayRecord.multiaddrs[0],
+    );
+    expect(publicConnection.addedJSONCount()).toBe(1);
 
     const discovered = await new PrivateNetworkRelayRecordDirectory(
       networkRegistry(privateNetwork(networkKey)),
       registry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).discover();
 
     expect(discovered).toEqual([relayRecord]);
@@ -84,6 +96,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       registry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).publish(relayRecord);
 
     const discovered = await new PrivateNetworkRelayRecordDirectory(
@@ -95,6 +108,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       registry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).discover();
 
     expect(discovered).toEqual([]);
@@ -125,6 +139,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       relayRegistry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).publish(relayRecord);
 
     const discovered = await new PrivateNetworkRelayRecordDirectory(
@@ -132,6 +147,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       leafRegistry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).discover();
 
     expect(discovered).toEqual([relayRecord]);
@@ -155,6 +171,35 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       new PublicRelayRecordRegistry(),
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
+    );
+
+    registry.clear();
+    await publisher.publish(relayRecord);
+    publicConnection.clearRecords();
+    publicConnection.clearIPNSRecords();
+
+    const discovered = await new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      registry,
+      undefined,
+      async () => publicConnection,
+      ipnsKeyGenerator,
+    ).discover();
+
+    expect(discovered).toEqual([]);
+    expect(registry.all()).toEqual([]);
+  });
+
+  it('should discover relay records from the deterministic IPNS directory when custom DHT records are unavailable', async () => {
+    const publicConnection = new InMemoryPublicConnection();
+    const registry = new PublicRelayRecordRegistry();
+    const publisher = new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      new PublicRelayRecordRegistry(),
+      undefined,
+      async () => publicConnection,
+      ipnsKeyGenerator,
     );
 
     registry.clear();
@@ -166,10 +211,11 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       registry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).discover();
 
-    expect(discovered).toEqual([]);
-    expect(registry.all()).toEqual([]);
+    expect(discovered).toEqual([relayRecord]);
+    expect(registry.all()).toEqual([relayRecord]);
   });
 
   it('should discover relay records from encrypted public pubsub envelopes', async () => {
@@ -180,6 +226,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       registry,
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     );
 
     registry.clear();
@@ -190,6 +237,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       new PublicRelayRecordRegistry(),
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     ).publish(relayRecord);
 
     expect(registry.all()).toEqual([relayRecord]);
@@ -203,6 +251,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       new PublicRelayRecordRegistry(),
       undefined,
       async () => publicConnection,
+      ipnsKeyGenerator,
     );
     const discover = jest.spyOn(directory, 'discover');
 
@@ -227,6 +276,16 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   function networkRegistry(network: IPFSNetwork): IPFSNetworkRegistry {
     return new SingleNetworkRegistry(network) as unknown as IPFSNetworkRegistry;
   }
+
+  function ipnsKeyGenerator(seed: Uint8Array): Promise<Libp2pPrivateKeyLike> {
+    const name = `ipns-${Buffer.from(seed).toString('base64url')}`;
+
+    return Promise.resolve({
+      publicKey: {
+        toString: () => name,
+      },
+    } as Libp2pPrivateKeyLike);
+  }
 });
 
 class SingleNetworkRegistry implements Partial<IPFSNetworkRegistry> {
@@ -246,6 +305,7 @@ class SingleNetworkRegistry implements Partial<IPFSNetworkRegistry> {
 class InMemoryPublicConnection implements IPFSConnection {
   private readonly json = new Map<string, unknown>();
 
+  private readonly ipnsRecords = new Map<string, string>();
   private readonly records = new Map<string, string>();
   private readonly providerMultiaddrs = new Map<string, string[]>();
   private readonly pubsubHandlers = new Map<
@@ -296,6 +356,10 @@ class InMemoryPublicConnection implements IPFSConnection {
     this.records.clear();
   }
 
+  public clearIPNSRecords(): void {
+    this.ipnsRecords.clear();
+  }
+
   public setProviderMultiaddrs(multiaddrs: string[]): void {
     this.providerMultiaddrOverride = multiaddrs;
   }
@@ -312,6 +376,25 @@ class InMemoryPublicConnection implements IPFSConnection {
 
   public getRecord(key: string): Promise<string | undefined> {
     return Promise.resolve(this.records.get(key));
+  }
+
+  public publishIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    value: string,
+  ): Promise<string> {
+    const name = privateKey.publicKey.toString();
+
+    this.ipnsRecords.set(name, value);
+
+    return Promise.resolve(name);
+  }
+
+  public resolveIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+  ): Promise<string | undefined> {
+    return Promise.resolve(
+      this.ipnsRecords.get(privateKey.publicKey.toString()),
+    );
   }
 
   public provideRecord(key: string): Promise<void> {

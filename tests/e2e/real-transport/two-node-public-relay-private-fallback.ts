@@ -4,7 +4,9 @@ import 'module-alias/register';
 import { PublicIPFSContentFallback } from '@app/contexts/shared/infrastructure/ipfs/fallback/PublicIPFSContentFallback';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
-import libp2pKeyAdapter from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
+import libp2pKeyAdapter, {
+  Libp2pPrivateKeyLike,
+} from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -63,6 +65,7 @@ class InMemoryIPFSConnection implements IPFSConnection {
   >();
   private readonly records = new Map<string, string>();
   private readonly bytes = new Map<string, Buffer>();
+  private readonly ipnsRecords = new Map<string, string>();
   private readonly json = new Map<string, unknown>();
 
   public constructor(
@@ -124,6 +127,25 @@ class InMemoryIPFSConnection implements IPFSConnection {
 
   public getRecord(key: string): Promise<string | undefined> {
     return Promise.resolve(this.records.get(key));
+  }
+
+  public publishIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    value: string,
+  ): Promise<string> {
+    const name = privateKey.publicKey.toString();
+
+    this.ipnsRecords.set(name, value);
+
+    return Promise.resolve(name);
+  }
+
+  public resolveIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+  ): Promise<string | undefined> {
+    return Promise.resolve(
+      this.ipnsRecords.get(privateKey.publicKey.toString()),
+    );
   }
 
   public provideRecord(): Promise<void> {
@@ -271,6 +293,7 @@ async function runRelay(): Promise<void> {
     relayDiscoveryEnabled: true,
     relayEnabled: true,
     relayPort,
+    privateRelayRecordRefreshSeconds: 5,
     relayRecordTtlSeconds: 300,
   });
   const addressFactory = new PublicRelayAddressFactory(configuration);

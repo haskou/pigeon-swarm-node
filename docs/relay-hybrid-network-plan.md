@@ -34,10 +34,11 @@ Implemented in this branch:
   discover and dial one another after bootstrapping to the relay.
 - Relay-capable nodes publish signed relay records on
   `pigeon-swarm.public-relays.v1`.
-- Relay-capable nodes publish private-network relay directory records through
-  the public IPFS routing layer. The directory lookup key and envelope
-  signature are derived from the private network key with HMAC, so only nodes
-  that know that private network key can discover and validate the record.
+- Relay-capable nodes publish encrypted private-network relay directory
+  documents to public IPFS and publish deterministic IPNS records pointing to
+  those documents. The IPNS key and encryption key are derived from the private
+  network key with separated HMAC contexts, so only nodes that know that
+  private network key can derive the IPNS name and decrypt the document.
 - Peers validate relay records with the advertised libp2p public key, verify
   that the public key maps to the advertised `peerId`, reject expired records,
   persist active records in MongoDB and dial the advertised relay multiaddrs.
@@ -351,32 +352,32 @@ Do not include `networkIds` or `ownerId` in public relay records. They are not
 required for relay discovery and can leak private membership or identity
 information.
 
-For private-network discovery, publish an envelope per private network through
-the public IPFS routing layer:
+For private-network discovery, publish an encrypted directory document per
+private network through public IPFS and point to it with deterministic IPNS:
 
 ```json
 {
   "version": 1,
-  "relayRecord": {
-    "version": 1,
-    "role": "relay",
-    "peerId": "12D3Koo...",
-    "publicKey": "<base64url protobuf public key>",
-    "multiaddrs": [
-      "/dns4/relay.example.com/tcp/4011/p2p/12D3Koo..."
-    ],
-    "issuedAt": 1770000000000,
-    "expiresAt": 1770000300000,
-    "signature": "<relay peer signature>"
-  },
-  "signature": "<HMAC derived from private network key>"
+  "updatedAt": 1770000000000,
+  "encryptedRelayRecords": [
+    {
+      "version": 2,
+      "encryptedRelayRecord": {
+        "algorithm": "aes-256-gcm",
+        "iv": "<base64url>",
+        "authTag": "<base64url>",
+        "ciphertext": "<base64url>"
+      }
+    }
+  ]
 }
 ```
 
-The DHT/routing lookup key is also derived from the private network key with
-HMAC. The envelope does not include `networkId`, PSK, private key, owner id or
-identity metadata. A node that does not know the private network key cannot
-calculate the lookup key or validate the envelope.
+The IPNS name is derived from the private network key with HMAC and a dedicated
+context. The document does not include `networkId`, PSK, private key, owner id,
+identity metadata, relay peer id, or relay multiaddrs in plaintext. A node that
+does not know the private network key cannot derive the IPNS name and cannot
+decrypt the relay records if it finds the document by other means.
 
 ## Relay Record Signature
 
@@ -423,6 +424,8 @@ Relay nodes should publish signed relay records to a public discovery layer.
 
 Possible storage mechanisms:
 
+- deterministic IPNS records pointing to encrypted public IPFS directory
+  documents;
 - public IPFS routing records;
 - public DHT records;
 - a public Gossipsub topic for relay announcements;
@@ -431,8 +434,8 @@ Possible storage mechanisms:
 The system should not rely on one single mechanism. A practical first version can use:
 
 1. configured bootstrap relay multiaddrs;
-2. private-network relay directory records discovered through public IPFS
-   routing with the private network key;
+2. private-network relay directory records resolved through deterministic IPNS
+   with the private network key;
 3. public relay records learned through pubsub after at least one public peer is
    connected;
 4. healthchecked local cache.

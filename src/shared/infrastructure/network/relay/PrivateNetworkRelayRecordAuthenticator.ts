@@ -17,6 +17,9 @@ export class PrivateNetworkRelayRecordAuthenticator {
   private static readonly encryptionContext =
     'pigeon-swarm.private-relay-record.encryption.v1';
 
+  private static readonly ipnsContext =
+    'pigeon-swarm.private-relay-record.ipns.v1';
+
   private static readonly lookupContext =
     'pigeon-swarm.private-relay-record.lookup.v1';
 
@@ -104,6 +107,14 @@ export class PrivateNetworkRelayRecordAuthenticator {
     );
 
     return `${PrivateNetworkRelayRecordAuthenticator.recordPrefix}/${digest}`;
+  }
+
+  public ipnsSeed(network: IPFSNetwork): Uint8Array {
+    const networkKey = this.requireNetworkKey(network);
+
+    return createHmac('sha256', networkKey.valueOf())
+      .update(PrivateNetworkRelayRecordAuthenticator.ipnsContext)
+      .digest();
   }
 
   public fingerprint(network: IPFSNetwork): string {

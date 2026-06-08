@@ -1,4 +1,5 @@
 import type * as GossipsubModule from '@libp2p/gossipsub';
+import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
 import type { MemoryBlockstore } from 'blockstore-core';
@@ -7,6 +8,8 @@ import type { MemoryDatastore } from 'datastore-core';
 import type { FsDatastore } from 'datastore-fs';
 import type * as HeliaCore from 'helia';
 import type { Key as DatastoreKey } from 'interface-datastore/key';
+import type * as IPNSModule from 'ipns';
+import type * as IPNSValidatorModule from 'ipns/validator';
 import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
 import type * as MultiformatsDigest from 'multiformats/hashes/digest';
@@ -42,6 +45,8 @@ export class HeliaRuntimeAdapter {
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
   private gossipsubModulePromise?: Promise<typeof GossipsubModule>;
+  private ipnsModulePromise?: Promise<typeof IPNSModule>;
+  private ipnsValidatorModulePromise?: Promise<typeof IPNSValidatorModule>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private pnetModulePromise?: Promise<typeof import('@libp2p/pnet')>;
   private multiaddrModulePromise?: Promise<
@@ -107,6 +112,19 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof GossipsubModule>('@libp2p/gossipsub');
 
     return this.gossipsubModulePromise;
+  }
+
+  private loadIPNSModule(): Promise<typeof IPNSModule> {
+    this.ipnsModulePromise ??= this.nativeImport<typeof IPNSModule>('ipns');
+
+    return this.ipnsModulePromise;
+  }
+
+  private loadIPNSValidatorModule(): Promise<typeof IPNSValidatorModule> {
+    this.ipnsValidatorModulePromise ??=
+      this.nativeImport<typeof IPNSValidatorModule>('ipns/validator');
+
+    return this.ipnsValidatorModulePromise;
   }
 
   private loadBootstrapModule(): Promise<typeof import('@libp2p/bootstrap')> {
@@ -382,6 +400,57 @@ export class HeliaRuntimeAdapter {
     const pnetModule = await this.loadPnetModule();
 
     return pnetModule.preSharedKey(config);
+  }
+
+  public async createMarshalledIPNSRecord(
+    privateKey: Libp2pPrivateKey,
+    value: string,
+    sequence: number | bigint,
+    lifetimeMs: number,
+  ): Promise<Uint8Array> {
+    const ipnsModule = await this.loadIPNSModule();
+    const record = await ipnsModule.createIPNSRecord(
+      privateKey,
+      value,
+      sequence,
+      lifetimeMs,
+    );
+
+    return ipnsModule.marshalIPNSRecord(record);
+  }
+
+  public async createIPNSRoutingKey(
+    privateKey: Libp2pPrivateKey,
+  ): Promise<Uint8Array> {
+    const ipnsModule = await this.loadIPNSModule();
+
+    return ipnsModule.multihashToIPNSRoutingKey(
+      privateKey.publicKey.toMultihash(),
+    );
+  }
+
+  public getIPNSName(privateKey: Libp2pPrivateKey): string {
+    return privateKey.publicKey.toString();
+  }
+
+  public async readIPNSRecordValue(
+    routingKey: Uint8Array,
+    marshalledRecord: Uint8Array,
+  ): Promise<string | undefined> {
+    const [ipnsModule, ipnsValidatorModule] = await Promise.all([
+      this.loadIPNSModule(),
+      this.loadIPNSValidatorModule(),
+    ]);
+
+    await ipnsValidatorModule.ipnsValidator(routingKey, marshalledRecord);
+
+    const record = ipnsModule.unmarshalIPNSRecord(marshalledRecord);
+
+    if (ipnsValidatorModule.validFor(record) <= 0) {
+      return undefined;
+    }
+
+    return record.value;
   }
 
   public async getLibp2pDefaults(options?: {

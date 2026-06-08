@@ -372,6 +372,16 @@ components:
                   type: number
                 lastError:
                   type: string
+                lastIPNSName:
+                  type: string
+                  description: Present only when DEBUG_NETWORK=true.
+                lastIPNSPublishedAt:
+                  type: number
+                lastIPNSResolvedAt:
+                  type: number
+                lastIPNSValue:
+                  type: string
+                  description: Present only when DEBUG_NETWORK=true.
                 lastLookupHadValue:
                   type: boolean
                 lastLookupValueKind:
@@ -379,6 +389,7 @@ components:
                   enum:
                     - cid
                     - inline-envelope
+                    - ipns
                     - provider
                     - unknown
                 lastPublishedAt:

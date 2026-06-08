@@ -17,6 +17,8 @@ describe('NodeNetworkDebugViewModel', () => {
         privateRelayDirectory: {
           discoveredRecordCount: 1,
           lastDiscoveredAt: 3000,
+          lastIPNSPublishedAt: 3800,
+          lastIPNSResolvedAt: 3900,
           lastLookupHadValue: true,
           lastLookupValueKind: 'inline-envelope',
           lastProviderLookupAt: 3500,
@@ -40,6 +42,8 @@ describe('NodeNetworkDebugViewModel', () => {
     expect(serializedResource).not.toContain('/dns4/relay.example.com');
     expect(serializedResource).not.toContain('/dns4/provider.example.com');
     expect(serializedResource).not.toContain('network-fingerprint');
+    expect(serializedResource).not.toContain('12D3SensitiveIPNSName');
+    expect(serializedResource).not.toContain('/ipfs/bafy-sensitive-relay-dir');
   });
 
   it('should expose sensitive relay diagnostics when debug is enabled', () => {
@@ -71,6 +75,10 @@ describe('NodeNetworkDebugViewModel', () => {
           discoveredRecordCount: 1,
           discoveredRelayPeerIds: ['12D3SensitiveRelay'],
           lastDiscoveredAt: 3000,
+          lastIPNSName: '12D3SensitiveIPNSName',
+          lastIPNSPublishedAt: 3800,
+          lastIPNSResolvedAt: 3900,
+          lastIPNSValue: '/ipfs/bafy-sensitive-relay-dir',
           lastLookupHadValue: true,
           lastLookupValueKind: 'inline-envelope',
           lastProviderLookupAt: 3500,
@@ -129,6 +137,10 @@ describe('NodeNetworkDebugViewModel', () => {
         discoveredRecordCount: 1,
         discoveredRelayPeerIds: ['12D3SensitiveRelay'],
         lastDiscoveredAt: 3000,
+        lastIPNSName: '12D3SensitiveIPNSName',
+        lastIPNSPublishedAt: 3800,
+        lastIPNSResolvedAt: 3900,
+        lastIPNSValue: '/ipfs/bafy-sensitive-relay-dir',
         lastLookupHadValue: true,
         lastLookupValueKind: 'inline-envelope',
         lastProviderLookupAt: 3500,

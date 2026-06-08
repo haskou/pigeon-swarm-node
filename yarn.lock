@@ -6057,6 +6057,22 @@ ipns@^10.0.2, ipns@^10.1.2:
     uint8arraylist "^2.4.8"
     uint8arrays "^5.1.0"
 
+ipns@^10.1.3:
+  version "10.1.6"
+  resolved "https://registry.yarnpkg.com/ipns/-/ipns-10.1.6.tgz#154f7358daa0fd218b797cc784db97a7403c8bee"
+  integrity sha512-mTACIdTBBXY5kbCo3t/M3ycNWbjajLrSXhTvjD0MEGyOUaI3uMv94JbJSHGaJ2xxRlpOrRk1ifToOsyPZiglnA==
+  dependencies:
+    "@libp2p/crypto" "^5.0.0"
+    "@libp2p/interface" "^3.0.2"
+    "@libp2p/logger" "^6.0.4"
+    cborg "^5.1.0"
+    interface-datastore "^9.0.2"
+    multiformats "^13.2.2"
+    protons-runtime "^6.0.1"
+    timestamp-nano "^1.0.1"
+    uint8arraylist "^2.4.8"
+    uint8arrays "^5.1.0"
+
 is-array-buffer@^3.0.4, is-array-buffer@^3.0.5:
   version "3.0.5"
   resolved "https://registry.yarnpkg.com/is-array-buffer/-/is-array-buffer-3.0.5.tgz#65742e1e687bd2cc666253068fd8707fe4d44280"

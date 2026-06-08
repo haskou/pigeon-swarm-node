@@ -22,6 +22,10 @@ export class NodeNetworkDebugViewModel {
         lastDiscoveredAt:
           this.publicRelay.privateRelayDirectory.lastDiscoveredAt,
         lastError: this.publicRelay.privateRelayDirectory.lastError,
+        lastIPNSPublishedAt:
+          this.publicRelay.privateRelayDirectory.lastIPNSPublishedAt,
+        lastIPNSResolvedAt:
+          this.publicRelay.privateRelayDirectory.lastIPNSResolvedAt,
         lastLookupHadValue:
           this.publicRelay.privateRelayDirectory.lastLookupHadValue,
         lastLookupValueKind:
@@ -69,6 +73,8 @@ export class NodeNetworkDebugViewModel {
           ...publicRelay.privateRelayDirectory,
           discoveredRelayPeerIds:
             this.publicRelay.privateRelayDirectory.discoveredRelayPeerIds,
+          lastIPNSName: this.publicRelay.privateRelayDirectory.lastIPNSName,
+          lastIPNSValue: this.publicRelay.privateRelayDirectory.lastIPNSValue,
           lastProviderLookupMultiaddrs:
             this.publicRelay.privateRelayDirectory.lastProviderLookupMultiaddrs,
           privateNetworkFingerprints:

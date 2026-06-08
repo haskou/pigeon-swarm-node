@@ -39,6 +39,14 @@ export class Libp2pKeyAdapter {
     );
   }
 
+  public generateEd25519KeyPairFromSeed(
+    seed: Uint8Array,
+  ): Promise<Libp2pPrivateKey> {
+    return this.loadKeysModule().then((keysModule) =>
+      keysModule.generateKeyPairFromSeed('Ed25519', seed),
+    );
+  }
+
   public async privateKeyFromProtobuf(
     protobuf: Uint8Array,
   ): Promise<Libp2pPrivateKey> {

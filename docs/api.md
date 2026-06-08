@@ -682,8 +682,10 @@ Response:
     "privateRelayDirectory": {
       "discoveredRecordCount": 1,
       "lastDiscoveredAt": 1780579039944,
+      "lastIPNSPublishedAt": 1780579040500,
+      "lastIPNSResolvedAt": 1780579040600,
       "lastLookupHadValue": true,
-      "lastLookupValueKind": "inline-envelope",
+      "lastLookupValueKind": "ipns",
       "lastPublishedAt": 1780579039000,
       "lastPublishedNetworkCount": 1,
       "lastProviderLookupAt": 1780579040000,
@@ -708,6 +710,9 @@ Implemented:
 - expose sanitized runtime connectivity diagnostics for the public relay layer by
   default
 - include detailed relay topology fields only when `DEBUG_NETWORK=true`
+- report IPNS relay-directory publication/resolution timestamps without
+  exposing the deterministic IPNS name or resolved `/ipfs/<cid>` unless
+  `DEBUG_NETWORK=true`
 - show whether the node relay is enabled, running and publicly advertised
 - show counts for configured bootstrap relays, listen addresses, discovered
   relays and private relay directory records

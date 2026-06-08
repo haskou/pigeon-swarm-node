@@ -1,11 +1,16 @@
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import libp2pKeyAdapter, {
+  Libp2pPrivateKeyLike,
+} from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 
 import { PrivateNetworkRelayRecordAuthenticator } from './PrivateNetworkRelayRecordAuthenticator';
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
+import { PrivateRelayDirectoryDocument } from './PrivateRelayDirectoryDocument';
+import { PrivateRelayIPNSKeyGenerator } from './PrivateRelayIPNSKeyGenerator';
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 
@@ -23,6 +28,11 @@ export class PrivateNetworkRelayRecordDirectory {
   private discoveryInterval?: NodeJS.Timeout;
 
   private publicConnection?: Promise<IPFSConnection>;
+
+  private readonly ipnsPrivateKeys = new Map<
+    string,
+    Promise<Libp2pPrivateKeyLike>
+  >();
 
   private readonly subscribedRelayTopics = new Set<string>();
 
@@ -46,6 +56,8 @@ export class PrivateNetworkRelayRecordDirectory {
     private readonly relayRecordRegistry = new PublicRelayRecordRegistry(),
     authenticator?: PrivateNetworkRelayRecordAuthenticator,
     private readonly publicConnectionFactory?: () => Promise<IPFSConnection>,
+    private readonly ipnsKeyGenerator: PrivateRelayIPNSKeyGenerator = (seed) =>
+      libp2pKeyAdapter.generateEd25519KeyPairFromSeed(seed),
   ) {
     this.authenticator =
       authenticator ?? new PrivateNetworkRelayRecordAuthenticator();
@@ -54,8 +66,17 @@ export class PrivateNetworkRelayRecordDirectory {
   private get directoryDebugState(): {
     lastDiscoveredAt?: number;
     lastError?: string;
+    lastIPNSName?: string;
+    lastIPNSPublishedAt?: number;
+    lastIPNSResolvedAt?: number;
+    lastIPNSValue?: string;
     lastLookupHadValue?: boolean;
-    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
+    lastLookupValueKind?:
+      | 'cid'
+      | 'inline-envelope'
+      | 'ipns'
+      | 'provider'
+      | 'unknown';
     lastPublishedAt?: number;
     lastPublishedNetworkCount?: number;
     lastProviderLookupAt?: number;
@@ -73,10 +94,15 @@ export class PrivateNetworkRelayRecordDirectory {
         | {
             lastDiscoveredAt?: number;
             lastError?: string;
+            lastIPNSName?: string;
+            lastIPNSPublishedAt?: number;
+            lastIPNSResolvedAt?: number;
+            lastIPNSValue?: string;
             lastLookupHadValue?: boolean;
             lastLookupValueKind?:
               | 'cid'
               | 'inline-envelope'
+              | 'ipns'
               | 'provider'
               | 'unknown';
             lastPublishedAt?: number;
@@ -105,6 +131,10 @@ export class PrivateNetworkRelayRecordDirectory {
 
   private relayTopic(network: IPFSNetwork): string {
     return this.authenticator.lookupKey(network).replaceAll('/', '.');
+  }
+
+  private ipnsKeyCacheKey(network: IPFSNetwork): string {
+    return this.authenticator.fingerprint(network);
   }
 
   private getPrivateNetworks() {
@@ -140,6 +170,46 @@ export class PrivateNetworkRelayRecordDirectory {
       publicConnection.getPeers().length;
     this.directoryDebugState.publicConnectionPeerId =
       publicConnection.getPeerId();
+  }
+
+  private getIPNSPrivateKey(
+    network: IPFSNetwork,
+  ): Promise<Libp2pPrivateKeyLike> {
+    const cacheKey = this.ipnsKeyCacheKey(network);
+
+    if (!this.ipnsPrivateKeys.has(cacheKey)) {
+      this.ipnsPrivateKeys.set(
+        cacheKey,
+        this.ipnsKeyGenerator(this.authenticator.ipnsSeed(network)),
+      );
+    }
+
+    return this.ipnsPrivateKeys.get(cacheKey) as Promise<Libp2pPrivateKeyLike>;
+  }
+
+  private isDirectoryDocument(
+    value: unknown,
+  ): value is PrivateRelayDirectoryDocument {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+
+    const candidate = value as Partial<PrivateRelayDirectoryDocument>;
+
+    return (
+      candidate.version === 1 &&
+      typeof candidate.updatedAt === 'number' &&
+      Array.isArray(candidate.encryptedRelayRecords) &&
+      candidate.encryptedRelayRecords.every((record) => this.isEnvelope(record))
+    );
+  }
+
+  private cidFromIPNSValue(value: string): IPFSId | undefined {
+    if (!value.startsWith('/ipfs/')) {
+      return undefined;
+    }
+
+    return new IPFSId(value.slice('/ipfs/'.length));
   }
 
   private isEnvelope(
@@ -257,6 +327,66 @@ export class PrivateNetworkRelayRecordDirectory {
     }
   }
 
+  private async publishRelayIPNSDocument(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+    relayRecord: PublicRelayRecordPrimitives,
+  ): Promise<void> {
+    const document: PrivateRelayDirectoryDocument = {
+      encryptedRelayRecords: [envelope],
+      updatedAt: Date.now(),
+      version: 1,
+    };
+    const documentCid = await publicConnection.addJSON(document);
+    const ipnsPrivateKey = await this.getIPNSPrivateKey(network);
+    const lifetimeMs = Math.max(60000, relayRecord.expiresAt - Date.now());
+    const ipnsValue = `/ipfs/${documentCid.valueOf()}`;
+    const ipnsName = await publicConnection.publishIPNSRecord(
+      ipnsPrivateKey,
+      ipnsValue,
+      Date.now(),
+      lifetimeMs,
+    );
+
+    this.directoryDebugState.lastIPNSName = ipnsName;
+    this.directoryDebugState.lastIPNSPublishedAt = Date.now();
+    this.directoryDebugState.lastIPNSValue = ipnsValue;
+  }
+
+  private async discoverRelayIPNSDocument(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<PublicRelayRecordPrimitives[]> {
+    const ipnsPrivateKey = await this.getIPNSPrivateKey(network);
+    const ipnsValue = await publicConnection.resolveIPNSRecord(ipnsPrivateKey);
+    const documentCid = ipnsValue
+      ? this.cidFromIPNSValue(ipnsValue)
+      : undefined;
+
+    this.directoryDebugState.lastIPNSName =
+      libp2pKeyAdapter.peerIdFromPrivateKey(ipnsPrivateKey);
+
+    if (!ipnsValue || !documentCid) {
+      return [];
+    }
+
+    this.directoryDebugState.lastIPNSResolvedAt = Date.now();
+    this.directoryDebugState.lastIPNSValue = ipnsValue;
+
+    const document = await publicConnection.getJSON<unknown>(documentCid);
+
+    if (!this.isDirectoryDocument(document)) {
+      return [];
+    }
+
+    return document.encryptedRelayRecords
+      .map((envelope) => this.authenticator.open(network, envelope))
+      .filter((relayRecord): relayRecord is PublicRelayRecordPrimitives =>
+        Boolean(relayRecord),
+      );
+  }
+
   private relayRecordEnvelopeKind(
     value: string,
   ): 'cid' | 'inline-envelope' | 'provider' | 'unknown' {
@@ -269,33 +399,6 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     return 'unknown';
-  }
-
-  private peerIdFromMultiaddr(multiaddr: string): string | undefined {
-    return multiaddr.match(/\/p2p\/([^/]+)/)?.[1];
-  }
-
-  private relayRecordFromProviderMultiaddrs(
-    multiaddrs: string[],
-  ): PublicRelayRecordPrimitives | undefined {
-    const peerId = multiaddrs
-      .map((multiaddr) => this.peerIdFromMultiaddr(multiaddr))
-      .find((value): value is string => Boolean(value));
-
-    if (!peerId || multiaddrs.length === 0) {
-      return undefined;
-    }
-
-    return {
-      expiresAt: Date.now() + 300000,
-      issuedAt: Date.now(),
-      multiaddrs,
-      peerId,
-      publicKey: 'dht-provider-record',
-      role: 'relay',
-      signature: 'dht-provider-record',
-      version: 1,
-    };
   }
 
   private async loadEnvelopeRecord(
@@ -379,6 +482,12 @@ export class PrivateNetworkRelayRecordDirectory {
         } finally {
           clearTimeout(provideAbort.timeout);
         }
+        await this.publishRelayIPNSDocument(
+          publicConnection,
+          network,
+          envelope,
+          relayRecord,
+        );
         await this.publishRelayEnvelope(publicConnection, network, envelope);
         Kernel.logger.debug(
           `Published private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
@@ -416,6 +525,21 @@ export class PrivateNetworkRelayRecordDirectory {
     await Promise.all(
       privateNetworks.map(async (network) => {
         try {
+          const ipnsRelayRecords = await this.discoverRelayIPNSDocument(
+            publicConnection,
+            network,
+          );
+
+          if (ipnsRelayRecords.length > 0) {
+            ipnsRelayRecords.forEach((relayRecord) => {
+              this.saveDiscoveredRelayRecord(relayRecord);
+              discoveredRecords.push(relayRecord);
+            });
+            this.directoryDebugState.lastLookupValueKind = 'ipns';
+
+            return;
+          }
+
           const lookupKey = this.authenticator.lookupKey(network);
           const getAbort =
             PrivateNetworkRelayRecordDirectory.createRoutingAbortSignal();
@@ -511,8 +635,17 @@ export class PrivateNetworkRelayRecordDirectory {
     discoveredRelayPeerIds: string[];
     lastDiscoveredAt?: number;
     lastError?: string;
+    lastIPNSName?: string;
+    lastIPNSPublishedAt?: number;
+    lastIPNSResolvedAt?: number;
+    lastIPNSValue?: string;
     lastLookupHadValue?: boolean;
-    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
+    lastLookupValueKind?:
+      | 'cid'
+      | 'inline-envelope'
+      | 'ipns'
+      | 'provider'
+      | 'unknown';
     lastPublishedAt?: number;
     lastPublishedNetworkCount?: number;
     lastProviderLookupAt?: number;
@@ -535,6 +668,10 @@ export class PrivateNetworkRelayRecordDirectory {
       discoveredRelayPeerIds: relayRecords.map((record) => record.peerId),
       lastDiscoveredAt: this.directoryDebugState.lastDiscoveredAt,
       lastError: this.directoryDebugState.lastError,
+      lastIPNSName: this.directoryDebugState.lastIPNSName,
+      lastIPNSPublishedAt: this.directoryDebugState.lastIPNSPublishedAt,
+      lastIPNSResolvedAt: this.directoryDebugState.lastIPNSResolvedAt,
+      lastIPNSValue: this.directoryDebugState.lastIPNSValue,
       lastLookupHadValue: this.directoryDebugState.lastLookupHadValue,
       lastLookupValueKind: this.directoryDebugState.lastLookupValueKind,
       lastProviderLookupAt: this.directoryDebugState.lastProviderLookupAt,
@@ -551,13 +688,13 @@ export class PrivateNetworkRelayRecordDirectory {
       lastPubSubReceivedAt: this.directoryDebugState.lastPubSubReceivedAt,
       lastRequestedNetworkCount:
         this.directoryDebugState.lastRequestedNetworkCount,
-      publicConnectionPeerCount:
-        this.directoryDebugState.publicConnectionPeerCount,
-      publicConnectionPeerId: this.directoryDebugState.publicConnectionPeerId,
       privateNetworkCount: privateNetworks.length,
       privateNetworkFingerprints: privateNetworks.map((network) =>
         this.authenticator.fingerprint(network),
       ),
+      publicConnectionPeerCount:
+        this.directoryDebugState.publicConnectionPeerCount,
+      publicConnectionPeerId: this.directoryDebugState.publicConnectionPeerId,
     };
   }
 

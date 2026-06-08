@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
+import { Libp2pPrivateKeyLike } from '../networks/adapters/Libp2pKeyAdapter';
 import heliaRuntimeAdapter, {
   DatastoreKeyLike,
   HeliaInstance,
@@ -557,6 +558,79 @@ export abstract class HeliaIPFS implements IPFSConnection {
     } catch (error: unknown) {
       Kernel.logger.debug(
         `DHT record lookup skipped for key="${key}": ${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+
+    return undefined;
+  }
+
+  public async publishIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    value: string,
+    sequence: number | bigint,
+    lifetimeMs: number,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const routingKey =
+      await heliaRuntimeAdapter.createIPNSRoutingKey(privateKey);
+    const marshalledRecord =
+      await heliaRuntimeAdapter.createMarshalledIPNSRecord(
+        privateKey,
+        value,
+        sequence,
+        lifetimeMs,
+      );
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (!(await this.waitForPeers(routingAbort.signal))) {
+        throw new Error('No public IPFS peers available for IPNS publication.');
+      }
+
+      await this.heliaCore.routing.put(routingKey, marshalledRecord, {
+        signal: routingAbort.signal,
+      });
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `IPNS record publication skipped name="${heliaRuntimeAdapter.getIPNSName(
+          privateKey,
+        )}": ${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+
+    return heliaRuntimeAdapter.getIPNSName(privateKey);
+  }
+
+  public async resolveIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
+    const routingKey =
+      await heliaRuntimeAdapter.createIPNSRoutingKey(privateKey);
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (!(await this.waitForPeers(routingAbort.signal))) {
+        throw new Error('No public IPFS peers available for IPNS resolution.');
+      }
+
+      const marshalledRecord = await this.heliaCore.routing.get(routingKey, {
+        signal: routingAbort.signal,
+      });
+
+      return heliaRuntimeAdapter.readIPNSRecordValue(
+        routingKey,
+        marshalledRecord,
+      );
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `IPNS record resolution skipped name="${heliaRuntimeAdapter.getIPNSName(
+          privateKey,
+        )}": ${String(error)}`,
       );
     } finally {
       clearTimeout(routingAbort.timeout);

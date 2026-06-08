@@ -16,8 +16,17 @@ export type NodeNetworkDebugResource = {
       discoveredRelayPeerIds?: string[];
       lastDiscoveredAt?: number;
       lastError?: string;
+      lastIPNSName?: string;
+      lastIPNSPublishedAt?: number;
+      lastIPNSResolvedAt?: number;
+      lastIPNSValue?: string;
       lastLookupHadValue?: boolean;
-      lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
+      lastLookupValueKind?:
+        | 'cid'
+        | 'inline-envelope'
+        | 'ipns'
+        | 'provider'
+        | 'unknown';
       lastPublishedAt?: number;
       lastPublishedNetworkCount?: number;
       lastProviderLookupAt?: number;

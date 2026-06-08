@@ -109,29 +109,34 @@ automatic relay discovery is warming up or unavailable. Normal leaf nodes should
 be able to discover relays through the private relay directory when the public
 IPFS routing layer can resolve the directory record.
 
-Relay records are advertised in two places:
+Relay records are advertised through complementary paths:
 
-* public GossipSub topic `pigeon-swarm.public-relays.v1`;
-* opaque private-network GossipSub topics carrying encrypted relay envelopes;
-* private relay directory records published through the public IPFS routing
-  layer, keyed and encrypted from the private network key.
+* public GossipSub topic `pigeon-swarm.public-relays.v1` for generic relay
+  announcements once public peers are already connected;
+* deterministic private-network IPNS directory records for cold-start discovery;
+* opaque private-network GossipSub topics carrying encrypted relay envelopes as
+  a best-effort realtime refresh path;
+* legacy custom routing records for compatibility and diagnostics.
 
-The private directory lets a node discover relays for a private network without
-publishing the private network id, relay peer id, or relay multiaddrs in the
-clear. Nodes outside the private network can see only an opaque encrypted
-directory envelope. The envelope is stored inline in the routing record so a
-leaf node does not need to fetch an additional public CID before it can decrypt
-and dial the relay. Older CID-backed directory values are still accepted while
-the network rolls forward. Because public DHT nodes do not necessarily accept
-custom mutable record namespaces, relay nodes also publish the encrypted
-directory envelope on an opaque public GossipSub topic derived from the private
-network key. Leaf nodes that share the private network key subscribe to the same
-topic, decrypt the envelope locally, and dial the relay. Public DHT provider
-lookups remain diagnostic only; provider records can point at generic public
-gateways, so they are not trusted as relay records. Each private-directory
-routing operation uses `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` when
-configured, or a short default timeout, to avoid blocking process schedulers
-while public DHT routing warms up.
+The deterministic private directory is the primary cold-start path. For every
+private network, backend derives an IPNS key from the private network key using
+an HMAC context. A relay node stores an encrypted directory document in public
+IPFS, then publishes an IPNS record whose value points to that document CID.
+Leaf nodes that share the same private network key derive the same IPNS name,
+resolve it through public IPFS routing, fetch the encrypted document, decrypt it
+locally, validate the signed relay record, and dial the relay.
+
+This does not publish the private network id, PSK, relay peer id, or relay
+multiaddrs in the clear. Nodes outside the private network can at most observe
+an opaque IPNS name and encrypted document. They cannot derive the name from a
+network they do not know and cannot decrypt the document if they discover it by
+other means.
+
+Public DHT provider lookups remain diagnostic only; provider records can point
+at generic public gateways, so they are not trusted as relay records. Each
+private-directory routing operation uses
+`PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` when configured, or a short default
+timeout, to avoid blocking process schedulers while public routing warms up.
 
 ```mermaid
 sequenceDiagram
@@ -143,10 +148,12 @@ sequenceDiagram
 
   R->>R: Start public relay runtime
   R->>Pub: Publish signed public relay record
-  R->>Pub: Publish encrypted private relay envelope on opaque topic
-  L->>Pub: Subscribe to opaque private relay topic
-  Pub-->>L: Return relay record for shared private network
-  L->>L: Verify record signature and private-network envelope
+  R->>Pub: Add encrypted private relay directory JSON
+  R->>Pub: Publish deterministic private-network IPNS record
+  L->>L: Derive same IPNS name from private network key
+  L->>Pub: Resolve IPNS and fetch encrypted directory JSON
+  Pub-->>L: Return encrypted relay directory
+  L->>L: Decrypt envelope and verify signed relay record
   L->>R: Dial relay/libp2p multiaddr
   L->>Priv: Use relay path for private network connectivity
 ```
