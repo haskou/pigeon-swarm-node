@@ -88,6 +88,7 @@ Primary API documentation:
 
 * [HTTP API](./docs/api.md)
 * [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
+* [P2P communication](./docs/p2p-communication.md)
 
 When the server is running, Swagger UI is available at:
 
