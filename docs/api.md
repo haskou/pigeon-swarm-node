@@ -673,22 +673,16 @@ Response:
 ```json
 {
   "publicRelay": {
-    "advertisedAddresses": [
-      "/dns4/relay.example.com/tcp/4011/p2p/12D3Koo..."
-    ],
-    "bootstrapRelayMultiaddrs": [
-      "/dns4/bootstrap.example.com/tcp/4011/p2p/12D3Koo..."
-    ],
+    "bootstrapRelayCount": 1,
     "debugReason": "Relay enabled and advertised with PIGEON_PUBLIC_HOST.",
     "discoveryEnabled": true,
     "discoveredRelayCount": 1,
-    "discoveredRelayMultiaddrs": [
-      "/dns4/relay.example.com/tcp/4011/p2p/12D3Koo..."
-    ],
-    "listenAddresses": [
-      "/ip4/0.0.0.0/tcp/4011"
-    ],
-    "peerId": "12D3Koo...",
+    "exposeSensitiveDebug": false,
+    "listenAddressCount": 1,
+    "privateRelayDirectory": {
+      "discoveredRecordCount": 1,
+      "privateNetworkCount": 1
+    },
     "relayAutoEnabled": false,
     "relayAdvertised": true,
     "relayEnabled": true,
@@ -699,13 +693,17 @@ Response:
 
 Implemented:
 
-- expose sanitized runtime connectivity diagnostics for the public relay layer
+- expose sanitized runtime connectivity diagnostics for the public relay layer by
+  default
+- include detailed relay topology fields only when `DEBUG_NETWORK=true`
 - show whether the node relay is enabled, running and publicly advertised
-- show generated listen/advertise multiaddrs, configured bootstrap relays and
-  currently discovered signed relay records
+- show counts for configured bootstrap relays, listen addresses, discovered
+  relays and private relay directory records
+- when `DEBUG_NETWORK=true`, the optional debug fields may include peer ids,
+  relay multiaddrs, relay signatures, public keys and private network
+  fingerprints for operational diagnostics
 - never expose application owner ids, owner display names, private network ids,
-  PSK/private network keys, relay signatures, local storage paths or private
-  topology metadata
+  PSK/private network keys, private keys or local storage paths
 
 ### Get active peers
 

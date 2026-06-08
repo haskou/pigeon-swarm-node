@@ -115,10 +115,10 @@ paths:
       tags:
         - nodes
       summary: Get local node network debug
-      description: Returns sanitized runtime connectivity diagnostics for the public relay layer. The response never includes application owner ids, owner display names, private network ids, PSK/private network keys, relay signatures, local storage paths, or private topology metadata.
+      description: Returns sanitized runtime connectivity diagnostics for the public relay layer by default. When DEBUG_NETWORK=true, optional debug fields may include relay topology details such as peer ids, relay multiaddrs, relay signatures, public keys and private network fingerprints. The response never includes application owner ids, owner display names, private network ids, PSK/private network keys, private keys or local storage paths.
       responses:
         '200':
-          description: Sanitized local node network debug state.
+          description: Local node network debug state.
           content:
             application/json:
               schema:
@@ -308,13 +308,13 @@ components:
         publicRelay:
           type: object
           required:
-            - advertisedAddresses
-            - bootstrapRelayMultiaddrs
+            - bootstrapRelayCount
             - debugReason
             - discoveryEnabled
             - discoveredRelayCount
-            - discoveredRelayMultiaddrs
-            - listenAddresses
+            - exposeSensitiveDebug
+            - listenAddressCount
+            - privateRelayDirectory
             - relayAutoEnabled
             - relayAdvertised
             - relayEnabled
@@ -322,10 +322,14 @@ components:
           properties:
             advertisedAddresses:
               type: array
+              description: Present only when DEBUG_NETWORK=true.
               items:
                 type: string
+            bootstrapRelayCount:
+              type: number
             bootstrapRelayMultiaddrs:
               type: array
+              description: Present only when DEBUG_NETWORK=true.
               items:
                 type: string
             debugReason:
@@ -336,20 +340,80 @@ components:
               type: number
             discoveredRelayMultiaddrs:
               type: array
+              description: Present only when DEBUG_NETWORK=true.
               items:
                 type: string
+            exposeSensitiveDebug:
+              type: boolean
             listenAddresses:
               type: array
+              description: Present only when DEBUG_NETWORK=true.
               items:
                 type: string
+            listenAddressCount:
+              type: number
             peerId:
               type: string
+              description: Present only when DEBUG_NETWORK=true.
+            privateRelayDirectory:
+              type: object
+              required:
+                - discoveredRecordCount
+                - privateNetworkCount
+              properties:
+                discoveredRecordCount:
+                  type: number
+                discoveredRelayPeerIds:
+                  type: array
+                  description: Present only when DEBUG_NETWORK=true.
+                  items:
+                    type: string
+                privateNetworkCount:
+                  type: number
+                privateNetworkFingerprints:
+                  type: array
+                  description: Present only when DEBUG_NETWORK=true.
+                  items:
+                    type: string
             relayAutoEnabled:
               type: boolean
             relayAdvertised:
               type: boolean
             relayEnabled:
               type: boolean
+            relayRecord:
+              type: object
+              description: Present only when DEBUG_NETWORK=true.
+              required:
+                - expiresAt
+                - issuedAt
+                - multiaddrs
+                - peerId
+                - publicKey
+                - role
+                - signature
+                - version
+              properties:
+                expiresAt:
+                  type: number
+                issuedAt:
+                  type: number
+                multiaddrs:
+                  type: array
+                  items:
+                    type: string
+                peerId:
+                  type: string
+                publicKey:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                    - relay
+                signature:
+                  type: string
+                version:
+                  type: number
             running:
               type: boolean
     PeerResource:

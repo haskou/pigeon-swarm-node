@@ -1,61 +1,123 @@
-import { NodeNetworkDebugViewModel } from '../../../../../../src/apps/apis/nodes-api/view-model/NodeNetworkDebugViewModel';
-import { PublicRelayDebugState } from '../../../../../../src/shared/infrastructure/network/relay/PublicRelayDebugState';
+import { NodeNetworkDebugViewModel } from '@app/apps/apis/nodes-api/view-model/NodeNetworkDebugViewModel';
+import { PublicRelayDebugState } from '@app/shared/infrastructure/network/relay/PublicRelayDebugState';
 
 describe('NodeNetworkDebugViewModel', () => {
-  it('should not expose relay signatures or private topology metadata', () => {
-    const resource = new NodeNetworkDebugViewModel({
-      advertisedAddresses: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
-      bootstrapRelayMultiaddrs: ['/dns4/bootstrap.test/tcp/4011/p2p/12D3Boot'],
+  it('should expose only sanitized relay diagnostics', () => {
+    const resource = new NodeNetworkDebugViewModel(relayDebugState()).toResource();
+    const serializedResource = JSON.stringify(resource);
+
+    expect(resource).toEqual({
+      publicRelay: {
+        bootstrapRelayCount: 1,
+        debugReason: 'Relay enabled and advertised with PIGEON_PUBLIC_HOST.',
+        discoveredRelayCount: 1,
+        discoveryEnabled: true,
+        exposeSensitiveDebug: false,
+        listenAddressCount: 1,
+        privateRelayDirectory: {
+          discoveredRecordCount: 1,
+          privateNetworkCount: 1,
+        },
+        relayAdvertised: true,
+        relayAutoEnabled: false,
+        relayEnabled: true,
+        running: true,
+      },
+    });
+    expect(serializedResource).not.toContain('12D3SensitiveRelay');
+    expect(serializedResource).not.toContain('/dns4/relay.example.com');
+    expect(serializedResource).not.toContain('network-fingerprint');
+  });
+
+  it('should expose sensitive relay diagnostics when debug is enabled', () => {
+    const resource = new NodeNetworkDebugViewModel(
+      relayDebugState(),
+      true,
+    ).toResource();
+
+    expect(resource).toEqual({
+      publicRelay: {
+        advertisedAddresses: [
+          '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+        ],
+        bootstrapRelayCount: 1,
+        bootstrapRelayMultiaddrs: [
+          '/dns4/bootstrap.example.com/tcp/4011/p2p/12D3SensitiveBootstrap',
+        ],
+        debugReason: 'Relay enabled and advertised with PIGEON_PUBLIC_HOST.',
+        discoveredRelayCount: 1,
+        discoveredRelayMultiaddrs: [
+          '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+        ],
+        discoveryEnabled: true,
+        exposeSensitiveDebug: true,
+        listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
+        listenAddressCount: 1,
+        peerId: '12D3SensitiveRelay',
+        privateRelayDirectory: {
+          discoveredRecordCount: 1,
+          discoveredRelayPeerIds: ['12D3SensitiveRelay'],
+          privateNetworkCount: 1,
+          privateNetworkFingerprints: ['network-fingerprint'],
+        },
+        relayAdvertised: true,
+        relayAutoEnabled: false,
+        relayEnabled: true,
+        relayRecord: {
+          expiresAt: 2000,
+          issuedAt: 1000,
+          multiaddrs: [
+            '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+          ],
+          peerId: '12D3SensitiveRelay',
+          publicKey: 'public-key',
+          role: 'relay',
+          signature: 'signature',
+          version: 1,
+        },
+        running: true,
+      },
+    });
+  });
+
+  function relayDebugState(): PublicRelayDebugState {
+    return {
+      advertisedAddresses: [
+        '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+      ],
+      bootstrapRelayMultiaddrs: [
+        '/dns4/bootstrap.example.com/tcp/4011/p2p/12D3SensitiveBootstrap',
+      ],
       debugReason: 'Relay enabled and advertised with PIGEON_PUBLIC_HOST.',
-      discoveryEnabled: true,
       discoveredRelayCount: 1,
-      discoveredRelayMultiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
+      discoveredRelayMultiaddrs: [
+        '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+      ],
+      discoveryEnabled: true,
       listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
-      peerId: '12D3Relay',
+      peerId: '12D3SensitiveRelay',
       privateRelayDirectory: {
         discoveredRecordCount: 1,
-        discoveredRelayPeerIds: ['12D3Relay'],
+        discoveredRelayPeerIds: ['12D3SensitiveRelay'],
         privateNetworkCount: 1,
-        privateNetworkFingerprints: ['safe-fingerprint'],
+        privateNetworkFingerprints: ['network-fingerprint'],
       },
-      relayAutoEnabled: false,
       relayAdvertised: true,
+      relayAutoEnabled: false,
       relayEnabled: true,
       relayRecord: {
         expiresAt: 2000,
         issuedAt: 1000,
-        multiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
-        peerId: '12D3Relay',
+        multiaddrs: [
+          '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+        ],
+        peerId: '12D3SensitiveRelay',
         publicKey: 'public-key',
         role: 'relay',
-        signature: 'signed-record',
+        signature: 'signature',
         version: 1,
       },
       running: true,
-    } satisfies PublicRelayDebugState).toResource();
-
-    expect(resource.publicRelay).toEqual({
-      advertisedAddresses: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
-      bootstrapRelayMultiaddrs: ['/dns4/bootstrap.test/tcp/4011/p2p/12D3Boot'],
-      debugReason: 'Relay enabled and advertised with PIGEON_PUBLIC_HOST.',
-      discoveryEnabled: true,
-      discoveredRelayCount: 1,
-      discoveredRelayMultiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
-      listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
-      peerId: '12D3Relay',
-      privateRelayDirectory: {
-        discoveredRecordCount: 1,
-        discoveredRelayPeerIds: ['12D3Relay'],
-        privateNetworkCount: 1,
-        privateNetworkFingerprints: ['safe-fingerprint'],
-      },
-      relayAutoEnabled: false,
-      relayAdvertised: true,
-      relayEnabled: true,
-      running: true,
-    });
-    expect(JSON.stringify(resource)).not.toContain('signature');
-    expect(JSON.stringify(resource)).not.toContain('owner');
-    expect(JSON.stringify(resource)).not.toContain('networkId');
-  });
+    };
+  }
 });

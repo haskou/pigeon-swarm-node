@@ -13,6 +13,10 @@ export class GetNodeNetworkDebugRoute extends Route {
     this.get<IPFSNetworkRegistry>(IPFSNetworkRegistry),
   );
 
+  private exposeSensitiveDebug(): boolean {
+    return process.env.DEBUG_NETWORK === 'true';
+  }
+
   @Get('/debug')
   public getDebug(@Res() response: Response): Response {
     return response
@@ -20,6 +24,7 @@ export class GetNodeNetworkDebugRoute extends Route {
       .send(
         new NodeNetworkDebugViewModel(
           this.relayRuntime.debugState(),
+          this.exposeSensitiveDebug(),
         ).toResource(),
       );
   }
