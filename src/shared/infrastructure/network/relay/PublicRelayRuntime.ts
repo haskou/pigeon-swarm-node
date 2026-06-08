@@ -23,6 +23,7 @@ export class PublicRelayRuntime {
     node?: PublicRelayRuntimeNode;
     networkRegistrationListenerStarted?: boolean;
     privateRelayRecordRefreshInterval?: NodeJS.Timeout;
+    relayRecordRefreshInterval?: NodeJS.Timeout;
     relayStateLogged?: boolean;
     relayRecord?: PublicRelayDebugState['relayRecord'];
   } {
@@ -32,6 +33,7 @@ export class PublicRelayRuntime {
         node?: PublicRelayRuntimeNode;
         networkRegistrationListenerStarted?: boolean;
         privateRelayRecordRefreshInterval?: NodeJS.Timeout;
+        relayRecordRefreshInterval?: NodeJS.Timeout;
         relayStateLogged?: boolean;
         relayRecord?: PublicRelayDebugState['relayRecord'];
       };
@@ -110,6 +112,7 @@ export class PublicRelayRuntime {
     peerId: string,
   ): Promise<PublicRelayDebugState['relayRecord'] | undefined> {
     const relayAddress = this.addressFactory.relayAdvertiseAddress(peerId);
+    const libp2pAddress = this.addressFactory.libp2pAdvertiseAddress(peerId);
 
     if (!relayAddress) {
       return undefined;
@@ -119,7 +122,9 @@ export class PublicRelayRuntime {
     const payload: Omit<PublicRelayRecordPayload, 'publicKey'> = {
       expiresAt: issuedAt + this.configuration.getRelayRecordTtlMs(),
       issuedAt,
-      multiaddrs: [relayAddress],
+      multiaddrs: [relayAddress, libp2pAddress].filter(
+        (address): address is string => Boolean(address),
+      ),
       peerId,
       role: 'relay',
       version: 1,
@@ -165,7 +170,11 @@ export class PublicRelayRuntime {
   }
 
   private startRecordRefresh(): void {
-    if (!this.state.node || !this.state.relayRecord) {
+    if (
+      this.state.relayRecordRefreshInterval ||
+      !this.state.node ||
+      !this.state.relayRecord
+    ) {
       return;
     }
 
@@ -178,9 +187,10 @@ export class PublicRelayRuntime {
       ),
     );
 
-    setInterval(() => {
+    this.state.relayRecordRefreshInterval = setInterval(() => {
       void this.publishCurrentRelayRecord();
     }, intervalMs);
+    this.state.relayRecordRefreshInterval.unref?.();
   }
 
   private startPrivateRelayRecordRefresh(): void {
@@ -223,6 +233,7 @@ export class PublicRelayRuntime {
         });
       }
     }, intervalMs);
+    this.state.failoverInterval.unref?.();
   }
 
   private logRelayState(): void {
@@ -286,6 +297,7 @@ export class PublicRelayRuntime {
       discoveryEnabled: this.configuration.isRelayDiscoveryEnabled(),
       listenAddresses: [this.addressFactory.relayListenAddress()],
       peerId,
+      privateRelayDirectory: this.privateDirectory.debugState(),
       relayAdvertised: Boolean(advertisedAddress),
       relayAutoEnabled: this.configuration.isRelayAutoEnabled(),
       relayEnabled: this.configuration.isRelayEnabled(),

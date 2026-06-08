@@ -296,9 +296,10 @@ async function runRelay(): Promise<void> {
   const discovery = new PublicRelayRecordDiscovery();
 
   await discovery.publish(node, record);
-  setInterval(() => {
+  const publishInterval = setInterval(() => {
     void discovery.publish(node, record);
   }, 2000);
+  publishInterval.unref?.();
 
   emit({ multiaddr, type: 'relay-ready' });
   process.on('SIGTERM', () => {

@@ -162,6 +162,7 @@ export class PublicRelayPeerAnnouncer {
         );
       });
     }, PublicRelayPeerAnnouncer.intervalMs);
+    this.interval.unref?.();
   }
 
   public stop(): void {

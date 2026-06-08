@@ -106,19 +106,20 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
-    await Promise.resolve(
-      setInterval(
-        () =>
-          void this.handleQueuedMessage(
-            queueName,
-            bindingKey,
-            DomainEventInstance,
-            exchange,
-            handler,
-          ),
-        50,
-      ),
+    const interval = setInterval(
+      () =>
+        void this.handleQueuedMessage(
+          queueName,
+          bindingKey,
+          DomainEventInstance,
+          exchange,
+          handler,
+        ),
+      50,
     );
+
+    interval.unref?.();
+    await Promise.resolve(interval);
   }
 
   public async publish(

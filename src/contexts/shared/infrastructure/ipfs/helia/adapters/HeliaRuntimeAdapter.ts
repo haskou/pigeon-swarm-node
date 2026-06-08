@@ -27,6 +27,13 @@ export type { RuntimeBlockstore } from './types/RuntimeBlockstore';
 export type { RuntimeDatastore } from './types/RuntimeDatastore';
 
 export class HeliaRuntimeAdapter {
+  private static readonly DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS = [
+    '/dnsaddr/am6.bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+    '/dnsaddr/sg1.bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',
+    '/dnsaddr/ny5.bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+    '/dnsaddr/sv15.bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+  ];
+
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
@@ -245,8 +252,15 @@ export class HeliaRuntimeAdapter {
 
     return (
       process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS ||
-      '/dnsaddr/bootstrap.libp2p.io'
+      HeliaRuntimeAdapter.DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS.join(',')
     )
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
+  private relayBootstrapMultiaddrs(): string[] {
+    return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
       .split(',')
       .map((address) => address.trim())
       .filter(Boolean);
@@ -276,6 +290,30 @@ export class HeliaRuntimeAdapter {
     ];
 
     return defaults;
+  }
+
+  public async withBootstrapRelays<
+    TConfig extends { peerDiscovery?: unknown[] },
+  >(config: TConfig): Promise<TConfig> {
+    const multiaddrs = this.relayBootstrapMultiaddrs();
+
+    if (multiaddrs.length === 0) {
+      return config;
+    }
+
+    const bootstrapModule = await this.loadBootstrapModule();
+
+    return {
+      ...config,
+      peerDiscovery: [
+        ...(config.peerDiscovery || []),
+        bootstrapModule.bootstrap({
+          list: multiaddrs,
+          tagName: 'pigeon-relay-bootstrap',
+          tagTTL: Infinity,
+        }),
+      ],
+    };
   }
 
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {

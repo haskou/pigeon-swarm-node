@@ -116,7 +116,7 @@ installed `web-push` module path.
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
 | `PIGEON_PUBLIC_BOOTSTRAP_ENABLED` | `true` | No | Enables explicit public libp2p bootstrap peers for the public Helia/IPFS runtime. |
-| `PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS` | `/dnsaddr/bootstrap.libp2p.io` | No | Comma-separated public bootstrap multiaddrs used so nodes can join the public routing/DHT layer before discovering private relay records. |
+| `PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS` | libp2p DNSADDR bootstrap peers with `/p2p/` ids | No | Comma-separated public bootstrap multiaddrs used so nodes can join the public routing/DHT layer before discovering private relay records. If overridden, every address must include the peer id (`/p2p/<peerId>` or compatible alias); a bare `/dnsaddr/bootstrap.libp2p.io` entry is ignored by `@libp2p/bootstrap`. |
 | `PIGEON_LIBP2P_PORT` | `4001` | No | Main libp2p listen port used by IPFS/libp2p runtimes. |
 | `PIGEON_RELAY_ENABLED` | `false` | No | Starts one public relay server for this node when `true`. The relay is node-scoped, not network-scoped. |
 | `PIGEON_RELAY_AUTO_ENABLE` | `false` | No | Allows a publicly reachable node to start its relay automatically when no active signed relay records are known. Requires `PIGEON_PUBLIC_HOST`. |

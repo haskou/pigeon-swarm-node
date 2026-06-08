@@ -2,6 +2,7 @@ import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fsSync from 'fs';
 import { createHash, createPrivateKey } from 'node:crypto';
 
+import libp2pKeyAdapter from '../networks/adapters/Libp2pKeyAdapter';
 import heliaRuntimeAdapter, {
   Libp2pDefaults,
   RuntimeBlockstore,
@@ -111,6 +112,47 @@ export class HeliaIPFSParser {
     return new Uint8Array(Buffer.from(swarmKey));
   }
 
+  private static publicHostProtocol(host: string): 'dns4' | 'ip4' {
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      return 'ip4';
+    }
+
+    return 'dns4';
+  }
+
+  private static configurePrivateNodeAddresses(
+    libp2pConfig: Libp2pDefaults,
+  ): void {
+    const port = process.env.PIGEON_LIBP2P_PORT;
+
+    if (!port) {
+      return;
+    }
+
+    const privateConfig = libp2pConfig as unknown as {
+      addresses?: {
+        announce?: string[];
+        listen?: string[];
+      };
+      privateKey?: Parameters<typeof libp2pKeyAdapter.peerIdFromPrivateKey>[0];
+    };
+
+    privateConfig.addresses = {
+      ...(privateConfig.addresses || {}),
+      listen: [`/ip4/0.0.0.0/tcp/${port}`],
+    };
+
+    if (process.env.PIGEON_PUBLIC_HOST && privateConfig.privateKey) {
+      privateConfig.addresses.announce = [
+        `/${HeliaIPFSParser.publicHostProtocol(
+          process.env.PIGEON_PUBLIC_HOST,
+        )}/${process.env.PIGEON_PUBLIC_HOST}/tcp/${port}/p2p/${libp2pKeyAdapter.peerIdFromPrivateKey(
+          privateConfig.privateKey,
+        )}`,
+      ];
+    }
+  }
+
   public static isInMemoryStorageLocation(storageLocation: string): boolean {
     return (
       storageLocation === 'memory' || storageLocation.startsWith('memory/')
@@ -162,6 +204,7 @@ export class HeliaIPFSParser {
         privateLibp2pConfig.connectionGater =
           parsedOptions.libp2p.connectionGater;
         privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
+        HeliaIPFSParser.configurePrivateNodeAddresses(libp2pConfig);
 
         return (
           heliaRuntimeAdapter
@@ -174,7 +217,7 @@ export class HeliaIPFSParser {
             .then((connectionProtector) => {
               privateLibp2pConfig.connectionProtector = connectionProtector;
 
-              return libp2pConfig;
+              return heliaRuntimeAdapter.withBootstrapRelays(libp2pConfig);
             })
         );
       }),

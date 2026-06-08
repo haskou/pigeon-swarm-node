@@ -1,7 +1,6 @@
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import Kernel from '@app/Kernel';
 
 import { PrivateNetworkRelayRecordAuthenticator } from './PrivateNetworkRelayRecordAuthenticator';
@@ -48,12 +47,15 @@ export class PrivateNetworkRelayRecordDirectory {
 
     this.publicConnection ??= this.networkRegistry
       .getSharedPeerPrivateKey()
-      .then((privateKey) =>
-        PublicIPFS.create({
+      .then(async (privateKey) => {
+        const { PublicIPFS } =
+          await import('@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS');
+
+        return PublicIPFS.create({
           privateKey,
           storageLocation: this.publicStorageLocation(),
-        }),
-      );
+        });
+      });
 
     return this.publicConnection;
   }
@@ -176,6 +178,25 @@ export class PrivateNetworkRelayRecordDirectory {
 
   public async start(): Promise<PublicRelayRecordPrimitives[]> {
     return this.startDiscoveryRefresh(15000);
+  }
+
+  public debugState(): {
+    discoveredRecordCount: number;
+    discoveredRelayPeerIds: string[];
+    privateNetworkCount: number;
+    privateNetworkFingerprints: string[];
+  } {
+    const privateNetworks = this.getPrivateNetworks();
+    const relayRecords = this.relayRecordRegistry.all();
+
+    return {
+      discoveredRecordCount: relayRecords.length,
+      discoveredRelayPeerIds: relayRecords.map((record) => record.peerId),
+      privateNetworkCount: privateNetworks.length,
+      privateNetworkFingerprints: privateNetworks.map((network) =>
+        this.authenticator.fingerprint(network),
+      ),
+    };
   }
 
   public async startDiscoveryRefresh(
