@@ -141,12 +141,13 @@ sequenceDiagram
 At startup, a node:
 
 1. Loads local node state and configured networks from MongoDB.
-2. Starts private and public IPFS runtimes for the configured networks.
-3. Starts the public relay runtime when enabled or auto-enabled.
-4. Publishes local routing records.
-5. Discovers private relay records.
-6. Runs startup sync so peers can request missing data from each other.
-7. Starts schedulers for heartbeat, presence expiration, call timeout,
+1. Starts private and public IPFS runtimes for the configured networks.
+1. Starts the public relay runtime when enabled or auto-enabled.
+1. Publishes local routing records.
+1. Discovers private relay records.
+1. Waits briefly for peer discovery per configured network.
+1. Runs startup sync for the networks that are ready.
+1. Starts schedulers for heartbeat, presence expiration, call timeout,
    replication maintenance, and routing-record republishing.
 
 ```mermaid
@@ -164,6 +165,13 @@ flowchart LR
 Startup sync is not a replacement for live gossip. It is a repair path: if a node
 was offline, it can ask connected peers for missing identity, keychain,
 conversation, and community data.
+
+Readiness is evaluated per network. A network is ready when its local IPFS
+runtime sees at least one peer before `STARTUP_SYNC_PEER_WAIT_MS` expires. Sync
+requests for conversations and communities are published only for ready
+networks. Networks without peers do not block healthy networks; they are retried
+by later startup-sync attempts. Global identity and keychain repair requests are
+published only when at least one network is ready.
 
 ## Domain Event Flow
 

@@ -14,6 +14,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 import { UUID } from '@haskou/value-objects';
 
 import type NodeStartupSyncReadiness from './NodeStartupSyncReadiness';
+import type { NodeStartupNetworkReadiness } from './NodeStartupSyncReadiness';
 
 import { LatestVersionByResource } from './LatestVersionByResource';
 import { NodeStartupSynchronizerDependencies } from './NodeStartupSynchronizerDependencies';
@@ -26,12 +27,15 @@ export interface NodeStartupSyncResult {
   identityNetworkRequests: number;
   identityRequests: number;
   keychainRequests: number;
+  networkReadiness: NodeStartupNetworkReadiness[];
   networkIds: string[];
   omittedRequests: number;
   publishedEvents: number;
+  readyNetworkIds: string[];
   requestId: string;
   requesterNodeId: string;
   totalRequests: number;
+  unreadyNetworkIds: string[];
 }
 
 export default class NodeStartupSynchronizer {
@@ -92,9 +96,9 @@ export default class NodeStartupSynchronizer {
   private identityNetworkRequests(
     requestId: string,
     requesterNodeId: string,
-    networkIds: string[],
+    networkIds: Set<string>,
   ): DomainEvent[] {
-    return networkIds.map(
+    return [...networkIds].map(
       (networkId) =>
         new IdentityNetworkSyncRequestedEvent(networkId, {
           networkId,
@@ -139,19 +143,22 @@ export default class NodeStartupSynchronizer {
   private async communityRequests(
     requestId: string,
     requesterNodeId: string,
+    readyNetworkIds: Set<string>,
   ): Promise<DomainEvent[]> {
     const communities = await this.communityRepository.findAll();
 
-    return communities.map((community) => {
-      const primitives = community.toPrimitives();
-
-      return new CommunitySyncRequestedEvent(primitives.id, {
-        communityId: primitives.id,
-        networkId: primitives.networkId,
-        requesterNodeId,
-        requestId,
-      });
-    });
+    return communities
+      .map((community) => community.toPrimitives())
+      .filter((community) => readyNetworkIds.has(community.networkId))
+      .map(
+        (community) =>
+          new CommunitySyncRequestedEvent(community.id, {
+            communityId: community.id,
+            networkId: community.networkId,
+            requesterNodeId,
+            requestId,
+          }),
+      );
   }
 
   public async synchronize(): Promise<NodeStartupSyncResult> {
@@ -165,7 +172,19 @@ export default class NodeStartupSynchronizer {
     const requesterNodeId = nodePrimitives.id;
     const networkIds = Object.keys(nodePrimitives.networks);
 
-    const connectedPeerCount = await this.readiness.prepare();
+    const networkReadiness = await this.readiness.prepare(networkIds);
+    const readyNetworkIds = new Set(
+      networkReadiness
+        .filter((network) => network.ready)
+        .map((network) => network.networkId),
+    );
+    const unreadyNetworkIds = networkIds.filter(
+      (networkId) => !readyNetworkIds.has(networkId),
+    );
+    const connectedPeerCount = networkReadiness.reduce(
+      (total, network) => total + network.peerCount,
+      0,
+    );
 
     const [identityMetadata, keychainMetadata, conversationScopes] =
       await Promise.all([
@@ -181,32 +200,51 @@ export default class NodeStartupSynchronizer {
       keychainMetadata,
       (document) => document.ownerIdentityId,
     );
-    const limitedIdentityVersions = new Map(
-      this.policy.limitIdentities([...identityVersions.entries()], syncAttempt),
-    );
-    const limitedKeychainVersions = new Map(
-      this.policy.limitKeychains([...keychainVersions.entries()], syncAttempt),
-    );
+    const shouldPublishGlobalRequests = readyNetworkIds.size > 0;
+    const limitedIdentityVersions = shouldPublishGlobalRequests
+      ? new Map(
+          this.policy.limitIdentities(
+            [...identityVersions.entries()],
+            syncAttempt,
+          ),
+        )
+      : new Map<string, number>();
+    const limitedKeychainVersions = shouldPublishGlobalRequests
+      ? new Map(
+          this.policy.limitKeychains(
+            [...keychainVersions.entries()],
+            syncAttempt,
+          ),
+        )
+      : new Map<string, number>();
     const limitedConversationScopes = this.policy.limitConversations(
-      conversationScopes,
+      conversationScopes.filter((scope) =>
+        readyNetworkIds.has(scope.networkId),
+      ),
       syncAttempt,
     );
     const communityRequests = await this.communityRequests(
       requestId,
       requesterNodeId,
+      readyNetworkIds,
     );
     const limitedCommunityRequests = this.policy.limitCommunities(
       communityRequests,
       syncAttempt,
     );
     const rawPlannedRequests =
-      networkIds.length +
+      readyNetworkIds.size +
       identityVersions.size +
       keychainVersions.size +
-      conversationScopes.length +
+      conversationScopes.filter((scope) => readyNetworkIds.has(scope.networkId))
+        .length +
       communityRequests.length;
     const plannedEvents = [
-      ...this.identityNetworkRequests(requestId, requesterNodeId, networkIds),
+      ...this.identityNetworkRequests(
+        requestId,
+        requesterNodeId,
+        readyNetworkIds,
+      ),
       ...this.identityRequests(
         requestId,
         requesterNodeId,
@@ -236,15 +274,18 @@ export default class NodeStartupSynchronizer {
       communityRequests: limitedCommunityRequests.length,
       connectedPeerCount,
       conversationRequests: limitedConversationScopes.length,
-      identityNetworkRequests: networkIds.length,
+      identityNetworkRequests: readyNetworkIds.size,
       identityRequests: limitedIdentityVersions.size,
       keychainRequests: limitedKeychainVersions.size,
       networkIds,
+      networkReadiness,
       omittedRequests: rawPlannedRequests - events.length,
       publishedEvents: totalRequests,
+      readyNetworkIds: [...readyNetworkIds],
       requesterNodeId,
       requestId,
       totalRequests,
+      unreadyNetworkIds,
     };
   }
 

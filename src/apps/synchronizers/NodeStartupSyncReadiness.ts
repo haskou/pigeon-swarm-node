@@ -1,6 +1,12 @@
 import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
+export type NodeStartupNetworkReadiness = {
+  networkId: string;
+  peerCount: number;
+  ready: boolean;
+};
+
 export default class NodeStartupSyncReadiness {
   constructor(
     private readonly heartbeatSender: NodeHeartbeatSender,
@@ -23,29 +29,48 @@ export default class NodeStartupSyncReadiness {
     });
   }
 
-  private async connectedPeerCount(): Promise<number> {
+  private async networkReadiness(
+    networkIds: string[],
+  ): Promise<NodeStartupNetworkReadiness[]> {
     const networks = await this.ipfs.getNetworks();
-    const peerIds = new Set(networks.flatMap((network) => network.getPeers()));
+    const networkIdsToCheck = new Set(networkIds);
 
-    return peerIds.size;
+    return networks
+      .filter((network) => networkIdsToCheck.has(network.getId()))
+      .map((network) => {
+        const peerCount = new Set(network.getPeers()).size;
+
+        return {
+          networkId: network.getId(),
+          peerCount,
+          ready: peerCount > 0,
+        };
+      });
   }
 
-  private async waitForPeerDiscovery(): Promise<number> {
+  private async waitForPeerDiscovery(
+    networkIds: string[],
+  ): Promise<NodeStartupNetworkReadiness[]> {
     const timeoutMs = this.getPeerWaitTimeoutMs();
     const deadline = Date.now() + timeoutMs;
-    let connectedPeerCount = await this.connectedPeerCount();
+    let networkReadiness = await this.networkReadiness(networkIds);
 
-    while (connectedPeerCount === 0 && Date.now() < deadline) {
+    while (
+      networkReadiness.some((network) => !network.ready) &&
+      Date.now() < deadline
+    ) {
       await this.sleep(500);
-      connectedPeerCount = await this.connectedPeerCount();
+      networkReadiness = await this.networkReadiness(networkIds);
     }
 
-    return connectedPeerCount;
+    return networkReadiness;
   }
 
-  public async prepare(): Promise<number> {
+  public async prepare(
+    networkIds: string[],
+  ): Promise<NodeStartupNetworkReadiness[]> {
     await this.heartbeatSender.send();
 
-    return this.waitForPeerDiscovery();
+    return this.waitForPeerDiscovery(networkIds);
   }
 }

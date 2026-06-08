@@ -41,7 +41,13 @@ describe('NodeStartupSynchronizer', () => {
     keychainMetadataRepository = mock<MongoKeychainMetadataRepository>();
     nodeLoader = mock<NodeLoader>();
     readiness = mock<NodeStartupSyncReadiness>();
-    readiness.prepare.mockResolvedValue(2);
+    readiness.prepare.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 2,
+        ready: true,
+      },
+    ]);
     nodeLoader.loadNode.mockResolvedValue(
       new Node(
         new NodeId(nodeId),
@@ -110,6 +116,9 @@ describe('NodeStartupSynchronizer', () => {
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
     expect(readiness.prepare).toHaveBeenCalledTimes(1);
+    expect(readiness.prepare).toHaveBeenCalledWith([
+      '123e4567-e89b-12d3-a456-426614174000',
+    ]);
     expect(result).toMatchObject({
       communityRequests: 0,
       connectedPeerCount: 2,
@@ -117,10 +126,19 @@ describe('NodeStartupSynchronizer', () => {
       identityNetworkRequests: 1,
       identityRequests: 1,
       keychainRequests: 1,
+      networkReadiness: [
+        {
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          peerCount: 2,
+          ready: true,
+        },
+      ],
       networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
       publishedEvents: 4,
+      readyNetworkIds: ['123e4567-e89b-12d3-a456-426614174000'],
       requesterNodeId: nodeId,
       totalRequests: 4,
+      unreadyNetworkIds: [],
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
@@ -150,6 +168,78 @@ describe('NodeStartupSynchronizer', () => {
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
       requestId: result.requestId,
+    });
+  });
+
+  it('should synchronize only networks that are ready', async () => {
+    nodeLoader.loadNode.mockResolvedValue(
+      new Node(
+        new NodeId(nodeId),
+        new Map([
+          [
+            new NetworkId('123e4567-e89b-12d3-a456-426614174000'),
+            new Network(
+              new NetworkId('123e4567-e89b-12d3-a456-426614174000'),
+              new NetworkName('public'),
+            ),
+          ],
+          [
+            new NetworkId('123e4567-e89b-12d3-a456-426614174001'),
+            new Network(
+              new NetworkId('123e4567-e89b-12d3-a456-426614174001'),
+              new NetworkName('private'),
+            ),
+          ],
+        ]),
+      ),
+    );
+    readiness.prepare.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 1,
+        ready: true,
+      },
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174001',
+        peerCount: 0,
+        ready: false,
+      },
+    ]);
+    identityMetadataRepository.findAll.mockResolvedValue([]);
+    keychainMetadataRepository.findAll.mockResolvedValue([]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([
+      {
+        conversationId: 'one-to-one:ready',
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+      },
+      {
+        conversationId: 'one-to-one:not-ready',
+        networkId: '123e4567-e89b-12d3-a456-426614174001',
+      },
+    ]);
+    communityRepository.findAll.mockResolvedValue([]);
+
+    const result = await synchronizer.synchronize();
+    const publishedEvents = eventPublisher.publish.mock.calls[0][0];
+
+    expect(result).toMatchObject({
+      connectedPeerCount: 1,
+      conversationRequests: 1,
+      identityNetworkRequests: 1,
+      readyNetworkIds: ['123e4567-e89b-12d3-a456-426614174000'],
+      totalRequests: 2,
+      unreadyNetworkIds: ['123e4567-e89b-12d3-a456-426614174001'],
+    });
+    expect(publishedEvents).toEqual([
+      expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(ConversationSyncRequestedEvent),
+    ]);
+    expect(publishedEvents[0].attributes).toMatchObject({
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+    });
+    expect(publishedEvents[1].attributes).toMatchObject({
+      conversationId: 'one-to-one:ready',
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
     });
   });
 
