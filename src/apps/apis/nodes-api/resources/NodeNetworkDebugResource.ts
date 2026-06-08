@@ -16,8 +16,11 @@ export type NodeNetworkDebugResource = {
       discoveredRelayPeerIds?: string[];
       lastDiscoveredAt?: number;
       lastError?: string;
+      lastIPNSDocumentEncryptedRecordCount?: number;
+      lastIPNSDocumentOpenedRecordCount?: number;
       lastIPNSName?: string;
       lastIPNSPublishedAt?: number;
+      lastIPNSRejectedReason?: string;
       lastIPNSResolvedAt?: number;
       lastIPNSValue?: string;
       lastLookupHadValue?: boolean;

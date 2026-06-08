@@ -372,11 +372,17 @@ components:
                   type: number
                 lastError:
                   type: string
+                lastIPNSDocumentEncryptedRecordCount:
+                  type: number
+                lastIPNSDocumentOpenedRecordCount:
+                  type: number
                 lastIPNSName:
                   type: string
                   description: Present only when DEBUG_NETWORK=true.
                 lastIPNSPublishedAt:
                   type: number
+                lastIPNSRejectedReason:
+                  type: string
                 lastIPNSResolvedAt:
                   type: number
                 lastIPNSValue:

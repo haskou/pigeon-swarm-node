@@ -70,8 +70,11 @@ export class PrivateNetworkRelayRecordDirectory {
   private get directoryDebugState(): {
     lastDiscoveredAt?: number;
     lastError?: string;
+    lastIPNSDocumentEncryptedRecordCount?: number;
+    lastIPNSDocumentOpenedRecordCount?: number;
     lastIPNSName?: string;
     lastIPNSPublishedAt?: number;
+    lastIPNSRejectedReason?: string;
     lastIPNSResolvedAt?: number;
     lastIPNSValue?: string;
     lastLookupHadValue?: boolean;
@@ -98,8 +101,11 @@ export class PrivateNetworkRelayRecordDirectory {
         | {
             lastDiscoveredAt?: number;
             lastError?: string;
+            lastIPNSDocumentEncryptedRecordCount?: number;
+            lastIPNSDocumentOpenedRecordCount?: number;
             lastIPNSName?: string;
             lastIPNSPublishedAt?: number;
+            lastIPNSRejectedReason?: string;
             lastIPNSResolvedAt?: number;
             lastIPNSValue?: string;
             lastLookupHadValue?: boolean;
@@ -390,6 +396,8 @@ export class PrivateNetworkRelayRecordDirectory {
         libp2pKeyAdapter.peerIdFromPrivateKey(ipnsPrivateKey);
 
       if (!ipnsValue || !documentCid) {
+        this.directoryDebugState.lastIPNSRejectedReason =
+          'missing_or_invalid_ipns_value';
         continue;
       }
 
@@ -399,18 +407,32 @@ export class PrivateNetworkRelayRecordDirectory {
       const document = await publicConnection.getJSON<unknown>(documentCid);
 
       if (!this.isDirectoryDocument(document)) {
+        this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount =
+          undefined;
+        this.directoryDebugState.lastIPNSDocumentOpenedRecordCount = undefined;
+        this.directoryDebugState.lastIPNSRejectedReason =
+          'invalid_directory_document';
         continue;
       }
 
+      this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount =
+        document.encryptedRelayRecords.length;
       const relayRecords = document.encryptedRelayRecords
         .map((envelope) => this.authenticator.open(network, envelope))
         .filter((relayRecord): relayRecord is PublicRelayRecordPrimitives =>
           Boolean(relayRecord),
         );
+      this.directoryDebugState.lastIPNSDocumentOpenedRecordCount =
+        relayRecords.length;
 
       if (relayRecords.length > 0) {
+        this.directoryDebugState.lastIPNSRejectedReason = undefined;
+
         return relayRecords;
       }
+
+      this.directoryDebugState.lastIPNSRejectedReason =
+        'no_decryptable_relay_records';
     }
 
     return [];
@@ -664,8 +686,11 @@ export class PrivateNetworkRelayRecordDirectory {
     discoveredRelayPeerIds: string[];
     lastDiscoveredAt?: number;
     lastError?: string;
+    lastIPNSDocumentEncryptedRecordCount?: number;
+    lastIPNSDocumentOpenedRecordCount?: number;
     lastIPNSName?: string;
     lastIPNSPublishedAt?: number;
+    lastIPNSRejectedReason?: string;
     lastIPNSResolvedAt?: number;
     lastIPNSValue?: string;
     lastLookupHadValue?: boolean;
@@ -697,8 +722,13 @@ export class PrivateNetworkRelayRecordDirectory {
       discoveredRelayPeerIds: relayRecords.map((record) => record.peerId),
       lastDiscoveredAt: this.directoryDebugState.lastDiscoveredAt,
       lastError: this.directoryDebugState.lastError,
+      lastIPNSDocumentEncryptedRecordCount:
+        this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount,
+      lastIPNSDocumentOpenedRecordCount:
+        this.directoryDebugState.lastIPNSDocumentOpenedRecordCount,
       lastIPNSName: this.directoryDebugState.lastIPNSName,
       lastIPNSPublishedAt: this.directoryDebugState.lastIPNSPublishedAt,
+      lastIPNSRejectedReason: this.directoryDebugState.lastIPNSRejectedReason,
       lastIPNSResolvedAt: this.directoryDebugState.lastIPNSResolvedAt,
       lastIPNSValue: this.directoryDebugState.lastIPNSValue,
       lastLookupHadValue: this.directoryDebugState.lastLookupHadValue,

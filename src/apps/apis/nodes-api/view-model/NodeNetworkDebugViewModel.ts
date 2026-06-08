@@ -22,8 +22,16 @@ export class NodeNetworkDebugViewModel {
         lastDiscoveredAt:
           this.publicRelay.privateRelayDirectory.lastDiscoveredAt,
         lastError: this.publicRelay.privateRelayDirectory.lastError,
+        lastIPNSDocumentEncryptedRecordCount:
+          this.publicRelay.privateRelayDirectory
+            .lastIPNSDocumentEncryptedRecordCount,
+        lastIPNSDocumentOpenedRecordCount:
+          this.publicRelay.privateRelayDirectory
+            .lastIPNSDocumentOpenedRecordCount,
         lastIPNSPublishedAt:
           this.publicRelay.privateRelayDirectory.lastIPNSPublishedAt,
+        lastIPNSRejectedReason:
+          this.publicRelay.privateRelayDirectory.lastIPNSRejectedReason,
         lastIPNSResolvedAt:
           this.publicRelay.privateRelayDirectory.lastIPNSResolvedAt,
         lastLookupHadValue:

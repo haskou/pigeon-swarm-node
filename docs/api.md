@@ -682,7 +682,10 @@ Response:
     "privateRelayDirectory": {
       "discoveredRecordCount": 1,
       "lastDiscoveredAt": 1780579039944,
+      "lastIPNSDocumentEncryptedRecordCount": 1,
+      "lastIPNSDocumentOpenedRecordCount": 1,
       "lastIPNSPublishedAt": 1780579040500,
+      "lastIPNSRejectedReason": null,
       "lastIPNSResolvedAt": 1780579040600,
       "lastLookupHadValue": true,
       "lastLookupValueKind": "ipns",

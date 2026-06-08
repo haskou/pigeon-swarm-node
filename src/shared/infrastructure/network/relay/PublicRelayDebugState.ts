@@ -13,6 +13,9 @@ export type PublicRelayDebugState = {
     lastDiscoveredAt?: number;
     lastError?: string;
     lastIPNSName?: string;
+    lastIPNSDocumentEncryptedRecordCount?: number;
+    lastIPNSDocumentOpenedRecordCount?: number;
+    lastIPNSRejectedReason?: string;
     lastIPNSPublishedAt?: number;
     lastIPNSResolvedAt?: number;
     lastIPNSValue?: string;
