@@ -72,7 +72,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.serializedJSON()).not.toContain(
       relayRecord.multiaddrs[0],
     );
-    expect(publicConnection.addedJSONCount()).toBe(1);
+    expect(publicConnection.addedJSONCount()).toBe(0);
 
     const discovered = await new PrivateNetworkRelayRecordDirectory(
       networkRegistry(privateNetwork(networkKey)),

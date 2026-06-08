@@ -11,12 +11,16 @@ import { PrivateNetworkRelayRecordAuthenticator } from './PrivateNetworkRelayRec
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
 import { PrivateRelayDirectoryDocument } from './PrivateRelayDirectoryDocument';
 import { PrivateRelayIPNSKeyGenerator } from './PrivateRelayIPNSKeyGenerator';
+import { PublicRelayRecordDiscovery } from './PublicRelayRecordDiscovery';
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 
 export class PrivateNetworkRelayRecordDirectory {
   private static readonly globalDebugStateKey =
     '__pigeonSwarmPrivateRelayRecordDirectoryDebug';
+
+  private static readonly inlineIPNSValuePrefix =
+    '/pigeon-swarm/private-relay/v1/';
 
   private static readonly routingTimeoutMs = Number(
     process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS || 5000,
@@ -41,6 +45,7 @@ export class PrivateNetworkRelayRecordDirectory {
   private readonly subscribedRelayTopics = new Set<string>();
 
   private readonly authenticator: PrivateNetworkRelayRecordAuthenticator;
+  private readonly publicRelayDiscovery: PublicRelayRecordDiscovery;
 
   private static createRoutingAbortSignal(): {
     signal: AbortSignal;
@@ -65,6 +70,9 @@ export class PrivateNetworkRelayRecordDirectory {
   ) {
     this.authenticator =
       authenticator ?? new PrivateNetworkRelayRecordAuthenticator();
+    this.publicRelayDiscovery = new PublicRelayRecordDiscovery(
+      relayRecordRegistry,
+    );
   }
 
   private get directoryDebugState(): {
@@ -235,6 +243,38 @@ export class PrivateNetworkRelayRecordDirectory {
     return new IPFSId(value.slice('/ipfs/'.length));
   }
 
+  private inlineEnvelopeIPNSValue(
+    envelope: PrivateNetworkRelayRecordEnvelope,
+  ): string {
+    return `${PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix}${Buffer.from(
+      JSON.stringify(envelope),
+    ).toString('base64url')}`;
+  }
+
+  private envelopeFromInlineIPNSValue(
+    value: string,
+  ): PrivateNetworkRelayRecordEnvelope | undefined {
+    if (
+      !value.startsWith(
+        PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix,
+      )
+    ) {
+      return undefined;
+    }
+
+    try {
+      const encodedEnvelope = value.slice(
+        PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix.length,
+      );
+
+      return this.decodeEnvelopeRecord(
+        Buffer.from(encodedEnvelope, 'base64url').toString('utf8'),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
   private isEnvelope(
     value: unknown,
   ): value is PrivateNetworkRelayRecordEnvelope {
@@ -323,6 +363,7 @@ export class PrivateNetworkRelayRecordDirectory {
     publicConnection: IPFSConnection,
     networks: IPFSNetwork[],
   ): Promise<void> {
+    await this.publicRelayDiscovery.startConnection(publicConnection);
     await Promise.all(
       networks.map((network) =>
         this.subscribeRelayTopic(publicConnection, network),
@@ -356,18 +397,12 @@ export class PrivateNetworkRelayRecordDirectory {
     envelope: PrivateNetworkRelayRecordEnvelope,
     relayRecord: PublicRelayRecordPrimitives,
   ): Promise<void> {
-    const document: PrivateRelayDirectoryDocument = {
-      encryptedRelayRecords: [envelope],
-      updatedAt: Date.now(),
-      version: 1,
-    };
-    const documentCid = await publicConnection.addJSON(document);
     const ipnsPrivateKey = await this.getIPNSPrivateKey(
       network,
       this.currentIPNSWindowId(),
     );
     const lifetimeMs = Math.max(60000, relayRecord.expiresAt - Date.now());
-    const ipnsValue = `/ipfs/${documentCid.valueOf()}`;
+    const ipnsValue = this.inlineEnvelopeIPNSValue(envelope);
     const ipnsName = await publicConnection.publishIPNSRecord(
       ipnsPrivateKey,
       ipnsValue,
@@ -378,6 +413,69 @@ export class PrivateNetworkRelayRecordDirectory {
     this.directoryDebugState.lastIPNSName = ipnsName;
     this.directoryDebugState.lastIPNSPublishedAt = Date.now();
     this.directoryDebugState.lastIPNSValue = ipnsValue;
+    this.directoryDebugState.lastLookupValueKind = 'ipns';
+  }
+
+  private async openRelayRecordsFromIPNSValue(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    ipnsValue: string,
+  ): Promise<PublicRelayRecordPrimitives[]> {
+    const inlineEnvelope = this.envelopeFromInlineIPNSValue(ipnsValue);
+
+    if (inlineEnvelope) {
+      this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount = 1;
+      const relayRecord = this.authenticator.open(network, inlineEnvelope);
+      this.directoryDebugState.lastIPNSDocumentOpenedRecordCount = relayRecord
+        ? 1
+        : 0;
+
+      return relayRecord ? [relayRecord] : [];
+    }
+
+    const documentCid = this.cidFromIPNSValue(ipnsValue);
+
+    if (!documentCid) {
+      this.directoryDebugState.lastIPNSRejectedReason =
+        'missing_or_invalid_ipns_value';
+
+      return [];
+    }
+
+    let document: unknown;
+
+    try {
+      document = await publicConnection.getJSON<unknown>(documentCid);
+    } catch (error: unknown) {
+      this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount = undefined;
+      this.directoryDebugState.lastIPNSDocumentOpenedRecordCount = undefined;
+      this.directoryDebugState.lastIPNSRejectedReason =
+        'ipns_document_fetch_failed';
+      this.directoryDebugState.lastError = String(error);
+
+      return [];
+    }
+
+    if (!this.isDirectoryDocument(document)) {
+      this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount = undefined;
+      this.directoryDebugState.lastIPNSDocumentOpenedRecordCount = undefined;
+      this.directoryDebugState.lastIPNSRejectedReason =
+        'invalid_directory_document';
+
+      return [];
+    }
+
+    this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount =
+      document.encryptedRelayRecords.length;
+    const relayRecords = document.encryptedRelayRecords
+      .map((envelope) => this.authenticator.open(network, envelope))
+      .filter((relayRecord): relayRecord is PublicRelayRecordPrimitives =>
+        Boolean(relayRecord),
+      );
+    this.directoryDebugState.lastIPNSDocumentOpenedRecordCount =
+      relayRecords.length;
+
+    return relayRecords;
   }
 
   private async discoverRelayIPNSDocument(
@@ -388,14 +486,11 @@ export class PrivateNetworkRelayRecordDirectory {
       const ipnsPrivateKey = await this.getIPNSPrivateKey(network, windowId);
       const ipnsValue =
         await publicConnection.resolveIPNSRecord(ipnsPrivateKey);
-      const documentCid = ipnsValue
-        ? this.cidFromIPNSValue(ipnsValue)
-        : undefined;
 
       this.directoryDebugState.lastIPNSName =
         libp2pKeyAdapter.peerIdFromPrivateKey(ipnsPrivateKey);
 
-      if (!ipnsValue || !documentCid) {
+      if (!ipnsValue) {
         this.directoryDebugState.lastIPNSRejectedReason =
           'missing_or_invalid_ipns_value';
         continue;
@@ -404,29 +499,15 @@ export class PrivateNetworkRelayRecordDirectory {
       this.directoryDebugState.lastIPNSResolvedAt = Date.now();
       this.directoryDebugState.lastIPNSValue = ipnsValue;
 
-      const document = await publicConnection.getJSON<unknown>(documentCid);
-
-      if (!this.isDirectoryDocument(document)) {
-        this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount =
-          undefined;
-        this.directoryDebugState.lastIPNSDocumentOpenedRecordCount = undefined;
-        this.directoryDebugState.lastIPNSRejectedReason =
-          'invalid_directory_document';
-        continue;
-      }
-
-      this.directoryDebugState.lastIPNSDocumentEncryptedRecordCount =
-        document.encryptedRelayRecords.length;
-      const relayRecords = document.encryptedRelayRecords
-        .map((envelope) => this.authenticator.open(network, envelope))
-        .filter((relayRecord): relayRecord is PublicRelayRecordPrimitives =>
-          Boolean(relayRecord),
-        );
-      this.directoryDebugState.lastIPNSDocumentOpenedRecordCount =
-        relayRecords.length;
+      const relayRecords = await this.openRelayRecordsFromIPNSValue(
+        publicConnection,
+        network,
+        ipnsValue,
+      );
 
       if (relayRecords.length > 0) {
         this.directoryDebugState.lastIPNSRejectedReason = undefined;
+        this.directoryDebugState.lastError = undefined;
 
         return relayRecords;
       }
@@ -757,7 +838,7 @@ export class PrivateNetworkRelayRecordDirectory {
     };
   }
 
-  public async startDiscoveryRefresh(
+  public startDiscoveryRefresh(
     intervalMs: number,
   ): Promise<PublicRelayRecordPrimitives[]> {
     this.networkRegistry.onNetworkRegistered((network) => {
@@ -785,6 +866,8 @@ export class PrivateNetworkRelayRecordDirectory {
       this.discoveryInterval.unref?.();
     }
 
-    return this.discover();
+    void this.discover();
+
+    return Promise.resolve(this.relayRecordRegistry.all());
   }
 }

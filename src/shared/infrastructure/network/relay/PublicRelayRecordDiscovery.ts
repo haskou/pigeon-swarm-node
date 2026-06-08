@@ -7,10 +7,20 @@ import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 import { PublicRelayRecordSigner } from './PublicRelayRecordSigner';
 import { RelayRecordHandler } from './RelayRecordHandler';
 
+type PublicRelayPubSubConnection = {
+  publishPubSub(topic: string, payload: string): Promise<void>;
+  subscribePubSub(
+    topic: string,
+    handler: (payload: string) => Promise<void>,
+  ): Promise<void>;
+};
+
 export class PublicRelayRecordDiscovery {
   private static readonly topic = 'pigeon-swarm.public-relays.v1';
 
   private readonly dialedRelays = new Set<string>();
+
+  private readonly startedConnections = new WeakSet<object>();
 
   private multiaddrModulePromise?: Promise<
     typeof import('@multiformats/multiaddr')
@@ -123,20 +133,50 @@ export class PublicRelayRecordDiscovery {
     }
   }
 
-  private async handleRecord(
-    node: Libp2pPubSubNode,
+  private async saveValidRecord(
     record: PublicRelayRecordPrimitives,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (
       !this.recordContainsPeerAddress(record) ||
       !(await this.signer.verify(record, record.signature))
     ) {
-      return;
+      return false;
     }
 
     this.registry.save(record);
     await this.onValidRecord?.(record);
+
+    return true;
+  }
+
+  private async handleRecord(
+    node: Libp2pPubSubNode,
+    record: PublicRelayRecordPrimitives,
+  ): Promise<void> {
+    if (!(await this.saveValidRecord(record))) {
+      return;
+    }
+
     await this.dialRecord(node, record);
+  }
+
+  private async handlePayload(
+    payload: string,
+    node?: Libp2pPubSubNode,
+  ): Promise<void> {
+    const parsedPayload = JSON.parse(payload);
+
+    if (!this.isRecord(parsedPayload)) {
+      return;
+    }
+
+    if (node) {
+      await this.handleRecord(node, parsedPayload);
+
+      return;
+    }
+
+    await this.saveValidRecord(parsedPayload);
   }
 
   private async handleEvent(
@@ -149,13 +189,7 @@ export class PublicRelayRecordDiscovery {
       return;
     }
 
-    const payload = JSON.parse(new TextDecoder().decode(message.data));
-
-    if (!this.isRecord(payload)) {
-      return;
-    }
-
-    await this.handleRecord(node, payload);
+    await this.handlePayload(new TextDecoder().decode(message.data), node);
   }
 
   public async start(node: Libp2pPubSubNode): Promise<void> {
@@ -180,6 +214,35 @@ export class PublicRelayRecordDiscovery {
   public async connectKnown(node: Libp2pPubSubNode): Promise<void> {
     await Promise.all(
       this.registry.all().map((record) => this.handleRecord(node, record)),
+    );
+  }
+
+  public async startConnection(
+    connection: PublicRelayPubSubConnection,
+  ): Promise<void> {
+    const connectionKey = connection as unknown as object;
+
+    if (this.startedConnections.has(connectionKey)) {
+      return;
+    }
+
+    this.startedConnections.add(connectionKey);
+    await connection.subscribePubSub(
+      PublicRelayRecordDiscovery.topic,
+      async (payload) => {
+        await this.handlePayload(payload);
+      },
+    );
+  }
+
+  public async publishConnection(
+    connection: PublicRelayPubSubConnection,
+    record: PublicRelayRecordPrimitives,
+  ): Promise<void> {
+    this.registry.save(record);
+    await connection.publishPubSub(
+      PublicRelayRecordDiscovery.topic,
+      JSON.stringify(record),
     );
   }
 

@@ -83,6 +83,37 @@ describe('PublicRelayRecordDiscovery', () => {
     expect(registry.all(1500)).toEqual([record]);
   });
 
+  it('should subscribe through a generic public pubsub connection', async () => {
+    const subscribedHandlers = new Map<string, (payload: string) => void>();
+    const connection = {
+      publishPubSub: jest.fn(),
+      subscribePubSub: jest.fn(
+        async (
+          topic: string,
+          handler: (payload: string) => Promise<void>,
+        ) => {
+          subscribedHandlers.set(topic, (payload) => {
+            void handler(payload);
+          });
+        },
+      ),
+    };
+
+    await new PublicRelayRecordDiscovery(registry, signer).startConnection(
+      connection,
+    );
+    subscribedHandlers.get('pigeon-swarm.public-relays.v1')?.(
+      JSON.stringify(record),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(connection.subscribePubSub).toHaveBeenCalledWith(
+      'pigeon-swarm.public-relays.v1',
+      expect.any(Function),
+    );
+    expect(registry.all(1500)).toEqual([record]);
+  });
+
   it('should validate known active relay records', async () => {
     registry.save({
       ...record,
