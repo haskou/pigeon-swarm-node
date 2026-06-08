@@ -1,5 +1,6 @@
 import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 
 export type NodeStartupNetworkReadiness = {
   networkId: string;
@@ -11,6 +12,7 @@ export default class NodeStartupSyncReadiness {
   constructor(
     private readonly heartbeatSender: NodeHeartbeatSender,
     private readonly ipfs: IPFS,
+    private readonly relayRecordRegistry = new PublicRelayRecordRegistry(),
   ) {}
 
   private getPeerWaitTimeoutMs(): number {
@@ -34,16 +36,18 @@ export default class NodeStartupSyncReadiness {
   ): Promise<NodeStartupNetworkReadiness[]> {
     const networks = await this.ipfs.getNetworks();
     const networkIdsToCheck = new Set(networkIds);
+    const hasFallbackRelay = this.relayRecordRegistry.fallbackAll().length > 0;
 
     return networks
       .filter((network) => networkIdsToCheck.has(network.getId()))
       .map((network) => {
         const peerCount = new Set(network.getPeers()).size;
+        const fallbackReady = network.isPrivate() && hasFallbackRelay;
 
         return {
           networkId: network.getId(),
           peerCount,
-          ready: peerCount > 0,
+          ready: peerCount > 0 || fallbackReady,
         };
       });
   }

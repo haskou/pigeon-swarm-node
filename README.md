@@ -117,11 +117,12 @@ only a manual override for tests or deployments that want to force one or more
 known relay multiaddrs while automatic relay discovery is warming up or
 unavailable; leaf nodes can otherwise discover relay records for a shared
 private network through deterministic time-windowed IPNS records on public
-IPFS. Those private relay directory records point to encrypted public IPFS
-documents using IPNS names and encrypted payloads derived from the private
+IPFS. Those private relay directory records store an encrypted relay envelope
+inline in the IPNS value using names and payloads derived from the private
 network key, so unrelated public peers cannot enumerate private network ids or
-read relay peer
-metadata. Provider lookups remain diagnostic only because public DHT provider
+read relay peer metadata. Discovered relay records are cached locally under
+`IPFS_STORAGE_PATH` and can be reused as bounded fallback candidates after a
+restart. Provider lookups remain diagnostic only because public DHT provider
 records can point at generic gateways instead of trusted Pigeon relays.
 Relay nodes and leaf nodes retry private relay directory publish/discovery
 periodically, so discovery does not depend on the first public IPFS routing tick

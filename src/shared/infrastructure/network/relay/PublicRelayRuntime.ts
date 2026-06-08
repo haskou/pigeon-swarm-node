@@ -203,7 +203,7 @@ export class PublicRelayRuntime {
         return;
       }
 
-      void this.privateDirectory.publish(this.state.relayRecord);
+      void this.publishCurrentRelayRecord();
     }, this.configuration.getPrivateRelayRecordRefreshMs());
     this.state.privateRelayRecordRefreshInterval.unref?.();
   }
@@ -295,6 +295,8 @@ export class PublicRelayRuntime {
       discoveredRelayCount: this.relayRecordRegistry.all().length,
       discoveredRelayMultiaddrs: this.relayRecordRegistry.multiaddrs(),
       discoveryEnabled: this.configuration.isRelayDiscoveryEnabled(),
+      fallbackRelayCount: this.relayRecordRegistry.fallbackAll().length,
+      fallbackRelayMultiaddrs: this.relayRecordRegistry.fallbackMultiaddrs(),
       listenAddresses: [this.addressFactory.relayListenAddress()],
       peerId,
       privateRelayDirectory: this.privateDirectory.debugState(),

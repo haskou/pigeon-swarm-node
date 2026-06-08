@@ -19,6 +19,10 @@ export class PublicRelayPeerAnnouncer {
 
   public constructor(private readonly forwardOnly = false) {}
 
+  private debug(message: string): void {
+    Kernel.logger?.debug?.(message);
+  }
+
   private nativeImport<TModule>(modulePath: string): Promise<TModule> {
     const importer = new Function('path', 'return import(path)') as (
       path: string,
@@ -98,7 +102,7 @@ export class PublicRelayPeerAnnouncer {
 
         return;
       } catch (error: unknown) {
-        Kernel.logger.debug(
+        this.debug(
           `Public relay peer dial failed peerId="${announcement.peerId}" address="${address}" error="${String(
             error,
           )}"`,
@@ -141,9 +145,7 @@ export class PublicRelayPeerAnnouncer {
     await node.services.pubsub.subscribe(PublicRelayPeerAnnouncer.topic);
     const listener = (event: PubSubEvent): void => {
       this.handleEvent(node, event).catch((error: unknown) => {
-        Kernel.logger.debug(
-          `Public relay peer announcement failed: ${String(error)}`,
-        );
+        this.debug(`Public relay peer announcement failed: ${String(error)}`);
       });
     };
 
@@ -157,7 +159,7 @@ export class PublicRelayPeerAnnouncer {
     await this.publish(node);
     this.interval = setInterval(() => {
       this.publish(node).catch((error: unknown) => {
-        Kernel.logger.debug(
+        this.debug(
           `Public relay peer announcement publish failed: ${String(error)}`,
         );
       });

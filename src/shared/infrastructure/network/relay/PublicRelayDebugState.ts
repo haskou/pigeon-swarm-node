@@ -5,6 +5,8 @@ export type PublicRelayDebugState = {
   discoveryEnabled: boolean;
   discoveredRelayCount: number;
   discoveredRelayMultiaddrs: string[];
+  fallbackRelayCount: number;
+  fallbackRelayMultiaddrs: string[];
   listenAddresses: string[];
   peerId?: string;
   privateRelayDirectory: {

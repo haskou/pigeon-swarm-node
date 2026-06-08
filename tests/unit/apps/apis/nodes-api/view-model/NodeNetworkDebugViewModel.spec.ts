@@ -13,6 +13,7 @@ describe('NodeNetworkDebugViewModel', () => {
         discoveredRelayCount: 1,
         discoveryEnabled: true,
         exposeSensitiveDebug: false,
+        fallbackRelayCount: 1,
         listenAddressCount: 1,
         privateRelayDirectory: {
           discoveredRecordCount: 1,
@@ -71,6 +72,10 @@ describe('NodeNetworkDebugViewModel', () => {
         ],
         discoveryEnabled: true,
         exposeSensitiveDebug: true,
+        fallbackRelayCount: 1,
+        fallbackRelayMultiaddrs: [
+          '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+        ],
         listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
         listenAddressCount: 1,
         peerId: '12D3SensitiveRelay',
@@ -137,6 +142,10 @@ describe('NodeNetworkDebugViewModel', () => {
         '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
       ],
       discoveryEnabled: true,
+      fallbackRelayCount: 1,
+      fallbackRelayMultiaddrs: [
+        '/dns4/relay.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+      ],
       listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
       peerId: '12D3SensitiveRelay',
       privateRelayDirectory: {

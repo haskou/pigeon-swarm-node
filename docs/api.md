@@ -678,6 +678,7 @@ Response:
     "discoveryEnabled": true,
     "discoveredRelayCount": 1,
     "exposeSensitiveDebug": false,
+    "fallbackRelayCount": 1,
     "listenAddressCount": 1,
     "privateRelayDirectory": {
       "discoveredRecordCount": 1,

@@ -15,6 +15,8 @@ export class NodeViewModel {
       discoveredRelayCount: 0,
       discoveredRelayMultiaddrs: [],
       discoveryEnabled: false,
+      fallbackRelayCount: 0,
+      fallbackRelayMultiaddrs: [],
       listenAddresses: [],
       privateRelayDirectory: {
         discoveredRecordCount: 0,

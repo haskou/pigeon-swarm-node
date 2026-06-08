@@ -120,12 +120,12 @@ Relay records are advertised through complementary paths:
 
 The deterministic private directory is the primary cold-start path. For every
 private network, backend derives IPNS keys from the private network key and a
-short time window using an HMAC context. A relay node stores an encrypted
-directory document in public IPFS, then publishes an IPNS record for the current
-window whose value points to that document CID. Leaf nodes that share the same
-private network key derive the same current and previous window IPNS names,
-resolve them through public IPFS routing, fetch encrypted documents, decrypt
-them locally, validate the signed relay record, and dial the relay.
+short time window using an HMAC context. A relay node publishes an IPNS record
+for the current window whose value contains an encrypted relay envelope inline.
+Leaf nodes that share the same private network key derive the same current and
+previous window IPNS names, resolve them through public IPFS routing, decrypt
+the envelope locally, validate the signed relay record, and dial the relay. The
+inline value avoids a second public IPFS block fetch for a tiny relay record.
 
 This does not publish the private network id, PSK, relay peer id, or relay
 multiaddrs in the clear. Nodes outside the private network can at most observe
@@ -133,6 +133,12 @@ opaque IPNS names and encrypted documents. They cannot derive the names from a
 network they do not know and cannot decrypt the documents if they discover them
 by other means. The time-windowed names also prevent a single stale IPNS routing
 record from pinning discovery to an obsolete document forever.
+
+Discovered relay records are cached locally at
+`${IPFS_STORAGE_PATH}/publicRelayRecords.json` by default. Active records are
+used immediately; recently expired records remain available for a bounded
+fallback window so nodes can bootstrap from a previously known relay after
+restart while fresh discovery warms up.
 
 Public DHT provider lookups remain diagnostic only; provider records can point
 at generic public gateways, so they are not trusted as relay records. Each

@@ -15,6 +15,7 @@ export class NodeNetworkDebugViewModel {
       discoveredRelayCount: this.publicRelay.discoveredRelayCount,
       discoveryEnabled: this.publicRelay.discoveryEnabled,
       exposeSensitiveDebug: this.exposeSensitiveDebug,
+      fallbackRelayCount: this.publicRelay.fallbackRelayCount,
       listenAddressCount: this.publicRelay.listenAddresses.length,
       privateRelayDirectory: {
         discoveredRecordCount:
@@ -75,6 +76,7 @@ export class NodeNetworkDebugViewModel {
         advertisedAddresses: this.publicRelay.advertisedAddresses,
         bootstrapRelayMultiaddrs: this.publicRelay.bootstrapRelayMultiaddrs,
         discoveredRelayMultiaddrs: this.publicRelay.discoveredRelayMultiaddrs,
+        fallbackRelayMultiaddrs: this.publicRelay.fallbackRelayMultiaddrs,
         listenAddresses: this.publicRelay.listenAddresses,
         peerId: this.publicRelay.peerId,
         privateRelayDirectory: {

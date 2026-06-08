@@ -31,6 +31,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     new PublicRelayRecordRegistry();
 
   private static readonly publicRelayRecordListeners = new WeakSet<object>();
+  private static readonly successfulPublicRelayDials = new Set<string>();
 
   private static skippedRoutingRecordPublications = 0;
 
@@ -84,7 +85,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   ): Promise<void> {
     await Promise.all(
       HeliaIPFS.publicRelayRecordRegistry
-        .all()
+        .fallbackAll()
         .map((record) =>
           HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
         ),
@@ -138,9 +139,18 @@ export abstract class HeliaIPFS implements IPFSConnection {
       multiaddrs.map(async (address) => {
         try {
           await dialer.dial(await heliaRuntimeAdapter.createMultiaddr(address));
-          Kernel.logger.info(
-            `Private network "${networkName}" connected to ${source} "${address}"`,
-          );
+          const dialKey = `${networkName}:${source}:${address}`;
+
+          if (!HeliaIPFS.successfulPublicRelayDials.has(dialKey)) {
+            HeliaIPFS.successfulPublicRelayDials.add(dialKey);
+            Kernel.logger.info(
+              `Private network "${networkName}" connected to ${source} "${address}"`,
+            );
+          } else {
+            Kernel.logger.debug(
+              `Private network "${networkName}" already connected to ${source} "${address}"`,
+            );
+          }
         } catch (error: unknown) {
           Kernel.logger.debug(
             `Private network "${networkName}" failed to connect to ${source} "${address}": ${String(

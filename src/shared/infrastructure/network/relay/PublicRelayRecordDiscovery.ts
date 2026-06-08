@@ -2,18 +2,11 @@ import Kernel from '@app/Kernel';
 import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 
+import { PublicRelayPubSubConnection } from './PublicRelayPubSubConnection';
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 import { PublicRelayRecordSigner } from './PublicRelayRecordSigner';
 import { RelayRecordHandler } from './RelayRecordHandler';
-
-type PublicRelayPubSubConnection = {
-  publishPubSub(topic: string, payload: string): Promise<void>;
-  subscribePubSub(
-    topic: string,
-    handler: (payload: string) => Promise<void>,
-  ): Promise<void>;
-};
 
 export class PublicRelayRecordDiscovery {
   private static readonly topic = 'pigeon-swarm.public-relays.v1';

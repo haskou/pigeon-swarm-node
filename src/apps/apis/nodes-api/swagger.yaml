@@ -313,6 +313,7 @@ components:
             - discoveryEnabled
             - discoveredRelayCount
             - exposeSensitiveDebug
+            - fallbackRelayCount
             - listenAddressCount
             - privateRelayDirectory
             - relayAutoEnabled
@@ -345,6 +346,13 @@ components:
                 type: string
             exposeSensitiveDebug:
               type: boolean
+            fallbackRelayCount:
+              type: number
+            fallbackRelayMultiaddrs:
+              type: array
+              description: Present only when DEBUG_NETWORK=true.
+              items:
+                type: string
             listenAddresses:
               type: array
               description: Present only when DEBUG_NETWORK=true.

@@ -8,6 +8,8 @@ export type NodeNetworkDebugResource = {
     discoveredRelayCount: number;
     discoveredRelayMultiaddrs?: string[];
     exposeSensitiveDebug: boolean;
+    fallbackRelayCount: number;
+    fallbackRelayMultiaddrs?: string[];
     listenAddresses?: string[];
     listenAddressCount: number;
     peerId?: string;
