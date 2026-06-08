@@ -1,7 +1,9 @@
-import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
-
 export type PrivateNetworkRelayRecordEnvelope = {
-  relayRecord: PublicRelayRecordPrimitives;
-  signature: string;
-  version: 1;
+  encryptedRelayRecord: {
+    algorithm: 'aes-256-gcm';
+    authTag: string;
+    ciphertext: string;
+    iv: string;
+  };
+  version: 2;
 };

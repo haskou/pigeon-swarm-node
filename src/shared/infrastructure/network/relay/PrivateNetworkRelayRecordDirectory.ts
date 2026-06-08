@@ -68,11 +68,30 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     const candidate = value as Partial<PrivateNetworkRelayRecordEnvelope>;
+    const encryptedRelayRecord = candidate.encryptedRelayRecord;
 
     return (
-      candidate.version === 1 &&
-      typeof candidate.signature === 'string' &&
-      Boolean(candidate.relayRecord)
+      candidate.version === 2 &&
+      this.isEncryptedRelayRecord(encryptedRelayRecord)
+    );
+  }
+
+  private isEncryptedRelayRecord(
+    value: unknown,
+  ): value is PrivateNetworkRelayRecordEnvelope['encryptedRelayRecord'] {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+
+    const candidate = value as Partial<
+      PrivateNetworkRelayRecordEnvelope['encryptedRelayRecord']
+    >;
+
+    return (
+      candidate.algorithm === 'aes-256-gcm' &&
+      typeof candidate.authTag === 'string' &&
+      typeof candidate.ciphertext === 'string' &&
+      typeof candidate.iv === 'string'
     );
   }
 
@@ -94,7 +113,7 @@ export class PrivateNetworkRelayRecordDirectory {
 
     await Promise.all(
       privateNetworks.map(async (network) => {
-        const envelope = this.authenticator.sign(network, relayRecord);
+        const envelope = this.authenticator.seal(network, relayRecord);
         const cid = await publicConnection.addJSON(envelope);
         const lookupKey = this.authenticator.lookupKey(network);
 
@@ -143,19 +162,22 @@ export class PrivateNetworkRelayRecordDirectory {
             new IPFSId(cid),
           );
 
-          if (
-            !this.isEnvelope(envelope) ||
-            !this.authenticator.verify(network, envelope)
-          ) {
+          if (!this.isEnvelope(envelope)) {
             return;
           }
 
-          this.relayRecordRegistry.save(envelope.relayRecord);
-          discoveredRecords.push(envelope.relayRecord);
+          const relayRecord = this.authenticator.open(network, envelope);
+
+          if (!relayRecord) {
+            return;
+          }
+
+          this.relayRecordRegistry.save(relayRecord);
+          discoveredRecords.push(relayRecord);
           Kernel.logger.debug(
             `Discovered private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
               network,
-            )}" peerId="${envelope.relayRecord.peerId}"`,
+            )}" peerId="${relayRecord.peerId}"`,
           );
         } catch (error: unknown) {
           Kernel.logger.debug(

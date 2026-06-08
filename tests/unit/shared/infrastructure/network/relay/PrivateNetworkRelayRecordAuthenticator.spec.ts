@@ -45,22 +45,36 @@ describe('PrivateNetworkRelayRecordAuthenticator', () => {
     );
   });
 
-  it('should verify envelopes created with the same private network key', () => {
+  it('should open envelopes sealed with the same private network key', () => {
     const network = privateNetwork(networkKey);
-    const envelope = authenticator.sign(network, relayRecord);
+    const envelope = authenticator.seal(network, relayRecord);
 
-    expect(authenticator.verify(network, envelope)).toBe(true);
+    expect(authenticator.open(network, envelope)).toEqual(relayRecord);
   });
 
-  it('should reject envelopes created with another private network key', () => {
-    const envelope = authenticator.sign(privateNetwork(networkKey), relayRecord);
+  it('should reject envelopes sealed with another private network key', () => {
+    const envelope = authenticator.seal(privateNetwork(networkKey), relayRecord);
 
     expect(
-      authenticator.verify(privateNetwork(otherNetworkKey), envelope),
-    ).toBe(false);
+      authenticator.open(privateNetwork(otherNetworkKey), envelope),
+    ).toBeUndefined();
     expect(authenticator.lookupKey(privateNetwork(networkKey))).not.toBe(
       authenticator.lookupKey(privateNetwork(otherNetworkKey)),
     );
+  });
+
+  it('should not expose the relay record in the private envelope', () => {
+    const envelope = authenticator.seal(
+      privateNetwork(networkKey),
+      relayRecord,
+    );
+    const serializedEnvelope = JSON.stringify(envelope);
+
+    expect(envelope.version).toBe(2);
+    expect(envelope.encryptedRelayRecord.algorithm).toBe('aes-256-gcm');
+    expect(serializedEnvelope).not.toContain(relayRecord.peerId);
+    expect(serializedEnvelope).not.toContain(relayRecord.publicKey);
+    expect(serializedEnvelope).not.toContain(relayRecord.multiaddrs[0]);
   });
 
   function privateNetwork(key: string): IPFSNetwork {

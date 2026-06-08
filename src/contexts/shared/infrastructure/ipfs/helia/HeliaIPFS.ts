@@ -1,9 +1,9 @@
 import Kernel from '@app/Kernel';
 import NetworkDiagnosticsLogger from '@app/shared/infrastructure/network/NetworkDiagnosticsLogger';
-import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
-import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
+import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
+import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
@@ -28,75 +28,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly ROUTING_RECORD_WARNING_FLUSH_MS = 5000;
   private static readonly publicRelayRecordRegistry =
     new PublicRelayRecordRegistry();
+
   private static readonly publicRelayRecordListeners = new WeakSet<object>();
+
   private static skippedRoutingRecordPublications = 0;
+
   private static skippedRoutingRecordPublicationSampleKey?: string;
+
   private static skippedRoutingRecordPublicationFlush?: NodeJS.Timeout;
+
   private readonly pinningStrategy: HeliaPinningStrategy;
-
-  public static async createPublicHeliaCore(
-    options: IPFSOptions,
-  ): Promise<HeliaInstance> {
-    const parsedOptions = await HeliaIPFSParser.parseOptions(options);
-    const heliaCore = await heliaRuntimeAdapter.createHelia(parsedOptions);
-
-    Kernel.logger.info(
-      `Started public network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
-    );
-    NetworkDiagnosticsLogger.logStartup(heliaCore.libp2p, {
-      config: parsedOptions.libp2p,
-      mode: 'public',
-      name: 'public',
-      pskEnabled: false,
-    });
-    NetworkDiagnosticsLogger.attachConnectionEvents(heliaCore.libp2p, {
-      mode: 'public',
-      name: 'public',
-    });
-
-    return heliaCore;
-  }
-
-  public static async createPrivateHeliaCore(
-    options: IPFSOptions,
-    networkKey: NetworkPrivateKey,
-    networkName: string,
-  ): Promise<HeliaInstance> {
-    const baseOptions: ParsedHeliaIPFSOptions =
-      await HeliaIPFSParser.parseOptions(options);
-    const libp2pConfig = await HeliaIPFSParser.parsePrivateLibp2pConfig(
-      options,
-      networkKey,
-    );
-
-    const libp2p = await heliaRuntimeAdapter.createLibp2p(
-      libp2pConfig as unknown as HeliaLibp2pConfig,
-    );
-    const heliaCore = await heliaRuntimeAdapter.createHelia({
-      blockstore: baseOptions.blockstore,
-      datastore: baseOptions.datastore,
-      libp2p,
-    } as unknown as Parameters<typeof heliaRuntimeAdapter.createHelia>[0]);
-
-    Kernel.logger.info(
-      `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
-    );
-    NetworkDiagnosticsLogger.logStartup(heliaCore.libp2p, {
-      config: libp2pConfig,
-      mode: 'private',
-      name: networkName,
-      pskEnabled: true,
-    });
-    NetworkDiagnosticsLogger.attachConnectionEvents(heliaCore.libp2p, {
-      mode: 'private',
-      name: networkName,
-    });
-    await HeliaIPFS.dialConfiguredBootstrapRelays(heliaCore, networkName);
-    await HeliaIPFS.dialKnownPublicRelayRecords(heliaCore, networkName);
-    HeliaIPFS.dialPublicRelayRecordsWhenDiscovered(heliaCore, networkName);
-
-    return heliaCore;
-  }
 
   private static configuredBootstrapRelayMultiaddrs(): string[] {
     return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
@@ -115,6 +56,25 @@ export abstract class HeliaIPFS implements IPFSConnection {
       HeliaIPFS.configuredBootstrapRelayMultiaddrs(),
       'configured bootstrap relay',
     );
+  }
+
+  private static registerSkippedRoutingRecordPublication(key: string): void {
+    HeliaIPFS.skippedRoutingRecordPublications += 1;
+    HeliaIPFS.skippedRoutingRecordPublicationSampleKey ??= key;
+
+    if (HeliaIPFS.skippedRoutingRecordPublicationFlush) {
+      return;
+    }
+
+    HeliaIPFS.skippedRoutingRecordPublicationFlush = setTimeout(() => {
+      Kernel.logger.debug(
+        `DHT record publications skipped: count=${HeliaIPFS.skippedRoutingRecordPublications} sampleKey="${HeliaIPFS.skippedRoutingRecordPublicationSampleKey}"`,
+      );
+      HeliaIPFS.skippedRoutingRecordPublications = 0;
+      HeliaIPFS.skippedRoutingRecordPublicationSampleKey = undefined;
+      HeliaIPFS.skippedRoutingRecordPublicationFlush = undefined;
+    }, HeliaIPFS.ROUTING_RECORD_WARNING_FLUSH_MS);
+    HeliaIPFS.skippedRoutingRecordPublicationFlush.unref?.();
   }
 
   private static async dialKnownPublicRelayRecords(
@@ -189,6 +149,70 @@ export abstract class HeliaIPFS implements IPFSConnection {
         }
       }),
     );
+  }
+
+  public static async createPublicHeliaCore(
+    options: IPFSOptions,
+  ): Promise<HeliaInstance> {
+    const parsedOptions = await HeliaIPFSParser.parseOptions(options);
+    const heliaCore = await heliaRuntimeAdapter.createHelia(parsedOptions);
+
+    Kernel.logger.info(
+      `Started public network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
+    );
+    NetworkDiagnosticsLogger.logStartup(heliaCore.libp2p, {
+      config: parsedOptions.libp2p,
+      mode: 'public',
+      name: 'public',
+      pskEnabled: false,
+    });
+    NetworkDiagnosticsLogger.attachConnectionEvents(heliaCore.libp2p, {
+      mode: 'public',
+      name: 'public',
+    });
+
+    return heliaCore;
+  }
+
+  public static async createPrivateHeliaCore(
+    options: IPFSOptions,
+    networkKey: NetworkPrivateKey,
+    networkName: string,
+  ): Promise<HeliaInstance> {
+    const baseOptions: ParsedHeliaIPFSOptions =
+      await HeliaIPFSParser.parseOptions(options);
+    const libp2pConfig = await HeliaIPFSParser.parsePrivateLibp2pConfig(
+      options,
+      networkKey,
+    );
+
+    const libp2p = await heliaRuntimeAdapter.createLibp2p(
+      libp2pConfig as unknown as HeliaLibp2pConfig,
+    );
+    const heliaCore = await heliaRuntimeAdapter.createHelia({
+      blockstore: baseOptions.blockstore,
+      datastore: baseOptions.datastore,
+      libp2p,
+    } as unknown as Parameters<typeof heliaRuntimeAdapter.createHelia>[0]);
+
+    Kernel.logger.info(
+      `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
+    );
+    NetworkDiagnosticsLogger.logStartup(heliaCore.libp2p, {
+      config: libp2pConfig,
+      mode: 'private',
+      name: networkName,
+      pskEnabled: true,
+    });
+    NetworkDiagnosticsLogger.attachConnectionEvents(heliaCore.libp2p, {
+      mode: 'private',
+      name: networkName,
+    });
+    await HeliaIPFS.dialConfiguredBootstrapRelays(heliaCore, networkName);
+    await HeliaIPFS.dialKnownPublicRelayRecords(heliaCore, networkName);
+    HeliaIPFS.dialPublicRelayRecordsWhenDiscovered(heliaCore, networkName);
+
+    return heliaCore;
   }
 
   constructor(
@@ -313,25 +337,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     } finally {
       clearTimeout(routingAbort.timeout);
     }
-  }
-
-  private static registerSkippedRoutingRecordPublication(key: string): void {
-    HeliaIPFS.skippedRoutingRecordPublications += 1;
-    HeliaIPFS.skippedRoutingRecordPublicationSampleKey ??= key;
-
-    if (HeliaIPFS.skippedRoutingRecordPublicationFlush) {
-      return;
-    }
-
-    HeliaIPFS.skippedRoutingRecordPublicationFlush = setTimeout(() => {
-      Kernel.logger.debug(
-        `DHT record publications skipped: count=${HeliaIPFS.skippedRoutingRecordPublications} sampleKey="${HeliaIPFS.skippedRoutingRecordPublicationSampleKey}"`,
-      );
-      HeliaIPFS.skippedRoutingRecordPublications = 0;
-      HeliaIPFS.skippedRoutingRecordPublicationSampleKey = undefined;
-      HeliaIPFS.skippedRoutingRecordPublicationFlush = undefined;
-    }, HeliaIPFS.ROUTING_RECORD_WARNING_FLUSH_MS);
-    HeliaIPFS.skippedRoutingRecordPublicationFlush.unref?.();
   }
 
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {

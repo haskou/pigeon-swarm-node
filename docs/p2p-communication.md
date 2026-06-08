@@ -111,10 +111,12 @@ Relay records are advertised in two places:
 
 * public GossipSub topic `pigeon-swarm.public-relays.v1`;
 * private relay directory records published through the public IPFS routing
-  layer, keyed and signed from the private network key.
+  layer, keyed and encrypted from the private network key.
 
 The private directory lets a node discover relays for a private network without
-publishing the private network id in the clear.
+publishing the private network id, relay peer id, or relay multiaddrs in the
+clear. Nodes outside the private network can see only an opaque encrypted
+directory envelope.
 
 ```mermaid
 sequenceDiagram
@@ -274,8 +276,7 @@ The HTTP API port is not enough for libp2p/IPFS. Express cannot replace the
 libp2p listener because the peer needs real libp2p multiaddrs for dialing,
 GossipSub, routing, and relay behavior.
 
-Relay records are signed with the node libp2p key and private directory records
-are authenticated with the private network key. A node owner identity is not
-required for relay advertisement, because a node can be unowned and identities
-do not have to be public.
-
+Public relay records are signed with the node libp2p key. Private directory
+records are looked up and encrypted with keys derived from the private network
+key. A node owner identity is not required for relay advertisement, because a
+node can be unowned and identities do not have to be public.

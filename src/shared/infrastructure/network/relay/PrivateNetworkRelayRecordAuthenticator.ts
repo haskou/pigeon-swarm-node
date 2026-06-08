@@ -1,31 +1,26 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PrivateKey } from '@haskou/value-objects';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+} from 'node:crypto';
 
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 
 export class PrivateNetworkRelayRecordAuthenticator {
+  private static readonly encryptionAlgorithm = 'aes-256-gcm';
+
+  private static readonly encryptionContext =
+    'pigeon-swarm.private-relay-record.encryption.v1';
+
   private static readonly lookupContext =
     'pigeon-swarm.private-relay-record.lookup.v1';
 
-  private static readonly signatureContext =
-    'pigeon-swarm.private-relay-record.signature.v1';
-
   private static readonly recordPrefix = 'pigeon-swarm/private-relays/v1';
-
-  private canonicalRelayRecord(record: PublicRelayRecordPrimitives): string {
-    return JSON.stringify({
-      expiresAt: record.expiresAt,
-      issuedAt: record.issuedAt,
-      multiaddrs: [...record.multiaddrs].sort(),
-      peerId: record.peerId,
-      publicKey: record.publicKey,
-      role: record.role,
-      signature: record.signature,
-      version: record.version,
-    });
-  }
 
   private getNetworkKey(network: IPFSNetwork): PrivateKey | undefined {
     return network.getConfig().getKey();
@@ -51,6 +46,55 @@ export class PrivateNetworkRelayRecordAuthenticator {
       .digest('base64url');
   }
 
+  private encryptionKey(networkKey: PrivateKey): Buffer {
+    return createHmac('sha256', networkKey.valueOf())
+      .update(PrivateNetworkRelayRecordAuthenticator.encryptionContext)
+      .digest();
+  }
+
+  private hasRelayRecordNumbers(
+    value: Partial<PublicRelayRecordPrimitives>,
+  ): boolean {
+    return (
+      typeof value.expiresAt === 'number' && typeof value.issuedAt === 'number'
+    );
+  }
+
+  private hasRelayRecordStrings(
+    value: Partial<PublicRelayRecordPrimitives>,
+  ): boolean {
+    return (
+      typeof value.peerId === 'string' &&
+      typeof value.publicKey === 'string' &&
+      typeof value.signature === 'string'
+    );
+  }
+
+  private hasRelayRecordMultiaddrs(
+    value: Partial<PublicRelayRecordPrimitives>,
+  ): boolean {
+    return (
+      Array.isArray(value.multiaddrs) &&
+      value.multiaddrs.every((address) => typeof address === 'string')
+    );
+  }
+
+  private isRelayRecord(value: unknown): value is PublicRelayRecordPrimitives {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+
+    const candidate = value as Partial<PublicRelayRecordPrimitives>;
+
+    return (
+      candidate.version === 1 &&
+      candidate.role === 'relay' &&
+      this.hasRelayRecordNumbers(candidate) &&
+      this.hasRelayRecordMultiaddrs(candidate) &&
+      this.hasRelayRecordStrings(candidate)
+    );
+  }
+
   public lookupKey(network: IPFSNetwork): string {
     const networkKey = this.requireNetworkKey(network);
     const digest = this.hmac(
@@ -71,35 +115,70 @@ export class PrivateNetworkRelayRecordAuthenticator {
       .slice(0, 16);
   }
 
-  public sign(
+  public seal(
     network: IPFSNetwork,
     relayRecord: PublicRelayRecordPrimitives,
   ): PrivateNetworkRelayRecordEnvelope {
     const networkKey = this.requireNetworkKey(network);
-    const canonicalRecord = this.canonicalRelayRecord(relayRecord);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv(
+      PrivateNetworkRelayRecordAuthenticator.encryptionAlgorithm,
+      this.encryptionKey(networkKey),
+      iv,
+    );
+    const ciphertext = Buffer.concat([
+      cipher.update(JSON.stringify(relayRecord), 'utf8'),
+      cipher.final(),
+    ]);
 
     return {
-      relayRecord,
-      signature: this.hmac(
-        networkKey,
-        PrivateNetworkRelayRecordAuthenticator.signatureContext,
-        canonicalRecord,
-      ),
-      version: 1,
+      encryptedRelayRecord: {
+        algorithm: PrivateNetworkRelayRecordAuthenticator.encryptionAlgorithm,
+        authTag: cipher.getAuthTag().toString('base64url'),
+        ciphertext: ciphertext.toString('base64url'),
+        iv: iv.toString('base64url'),
+      },
+      version: 2,
     };
   }
 
-  public verify(
+  public open(
     network: IPFSNetwork,
     envelope: PrivateNetworkRelayRecordEnvelope,
-  ): boolean {
-    const expectedEnvelope = this.sign(network, envelope.relayRecord);
-    const expectedSignature = Buffer.from(expectedEnvelope.signature);
-    const receivedSignature = Buffer.from(envelope.signature);
+  ): PublicRelayRecordPrimitives | undefined {
+    const networkKey = this.requireNetworkKey(network);
+    const encryptedRecord = envelope.encryptedRelayRecord;
 
-    return (
-      expectedSignature.byteLength === receivedSignature.byteLength &&
-      timingSafeEqual(expectedSignature, receivedSignature)
-    );
+    if (
+      envelope.version !== 2 ||
+      encryptedRecord.algorithm !==
+        PrivateNetworkRelayRecordAuthenticator.encryptionAlgorithm
+    ) {
+      return undefined;
+    }
+
+    try {
+      const decipher = createDecipheriv(
+        encryptedRecord.algorithm,
+        this.encryptionKey(networkKey),
+        Buffer.from(encryptedRecord.iv, 'base64url'),
+      );
+
+      decipher.setAuthTag(Buffer.from(encryptedRecord.authTag, 'base64url'));
+
+      const plaintext = Buffer.concat([
+        decipher.update(Buffer.from(encryptedRecord.ciphertext, 'base64url')),
+        decipher.final(),
+      ]).toString('utf8');
+      const relayRecord: unknown = JSON.parse(plaintext);
+
+      if (!this.isRelayRecord(relayRecord)) {
+        return undefined;
+      }
+
+      return relayRecord;
+    } catch {
+      return undefined;
+    }
   }
 }
