@@ -118,7 +118,10 @@ Relay records are advertised in two places:
 The private directory lets a node discover relays for a private network without
 publishing the private network id, relay peer id, or relay multiaddrs in the
 clear. Nodes outside the private network can see only an opaque encrypted
-directory envelope.
+directory envelope. The envelope is stored inline in the routing record so a
+leaf node does not need to fetch an additional public CID before it can decrypt
+and dial the relay. Older CID-backed directory values are still accepted while
+the network rolls forward.
 
 ```mermaid
 sequenceDiagram

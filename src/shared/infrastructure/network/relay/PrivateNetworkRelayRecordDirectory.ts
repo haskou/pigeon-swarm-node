@@ -76,6 +76,41 @@ export class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private decodeEnvelopeRecord(
+    value: string,
+  ): PrivateNetworkRelayRecordEnvelope | undefined {
+    try {
+      const envelope: unknown = JSON.parse(value);
+
+      if (this.isEnvelope(envelope)) {
+        return envelope;
+      }
+    } catch {
+      return undefined;
+    }
+
+    return undefined;
+  }
+
+  private async loadEnvelopeRecord(
+    publicConnection: IPFSConnection,
+    value: string,
+  ): Promise<PrivateNetworkRelayRecordEnvelope | undefined> {
+    const inlineEnvelope = this.decodeEnvelopeRecord(value);
+
+    if (inlineEnvelope) {
+      return inlineEnvelope;
+    }
+
+    const envelope = await publicConnection.getJSON<unknown>(new IPFSId(value));
+
+    if (!this.isEnvelope(envelope)) {
+      return undefined;
+    }
+
+    return envelope;
+  }
+
   private isEncryptedRelayRecord(
     value: unknown,
   ): value is PrivateNetworkRelayRecordEnvelope['encryptedRelayRecord'] {
@@ -114,14 +149,13 @@ export class PrivateNetworkRelayRecordDirectory {
     await Promise.all(
       privateNetworks.map(async (network) => {
         const envelope = this.authenticator.seal(network, relayRecord);
-        const cid = await publicConnection.addJSON(envelope);
         const lookupKey = this.authenticator.lookupKey(network);
 
-        await publicConnection.putRecord(lookupKey, cid.valueOf());
+        await publicConnection.putRecord(lookupKey, JSON.stringify(envelope));
         Kernel.logger.debug(
           `Published private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
             network,
-          )}" cid="${cid.valueOf()}"`,
+          )}"`,
         );
       }),
     );
@@ -152,17 +186,19 @@ export class PrivateNetworkRelayRecordDirectory {
       privateNetworks.map(async (network) => {
         try {
           const lookupKey = this.authenticator.lookupKey(network);
-          const cid = await publicConnection.getRecord(lookupKey);
+          const relayRecordEnvelope =
+            await publicConnection.getRecord(lookupKey);
 
-          if (!cid) {
+          if (!relayRecordEnvelope) {
             return;
           }
 
-          const envelope = await publicConnection.getJSON<unknown>(
-            new IPFSId(cid),
+          const envelope = await this.loadEnvelopeRecord(
+            publicConnection,
+            relayRecordEnvelope,
           );
 
-          if (!this.isEnvelope(envelope)) {
+          if (!envelope) {
             return;
           }
 

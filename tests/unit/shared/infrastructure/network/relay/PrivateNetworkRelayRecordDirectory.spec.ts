@@ -52,15 +52,16 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       async () => publicConnection,
     ).publish(relayRecord);
 
-    expect(publicConnection.serializedJSON()).not.toContain(
+    expect(publicConnection.serializedRecords()).not.toContain(
       relayRecord.peerId,
     );
-    expect(publicConnection.serializedJSON()).not.toContain(
+    expect(publicConnection.serializedRecords()).not.toContain(
       relayRecord.publicKey,
     );
-    expect(publicConnection.serializedJSON()).not.toContain(
+    expect(publicConnection.serializedRecords()).not.toContain(
       relayRecord.multiaddrs[0],
     );
+    expect(publicConnection.addedJSONCount()).toBe(0);
 
     const discovered = await new PrivateNetworkRelayRecordDirectory(
       networkRegistry(privateNetwork(networkKey)),
@@ -231,6 +232,14 @@ class InMemoryPublicConnection implements IPFSConnection {
 
   public serializedJSON(): string {
     return JSON.stringify([...this.json.values()]);
+  }
+
+  public serializedRecords(): string {
+    return JSON.stringify([...this.records.values()]);
+  }
+
+  public addedJSONCount(): number {
+    return this.json.size;
   }
 
   public putRecord(key: string, value: string): Promise<void> {
