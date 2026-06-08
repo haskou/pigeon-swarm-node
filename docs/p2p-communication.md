@@ -104,8 +104,10 @@ PIGEON_RELAY_PORT=4011
 ```
 
 `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is optional. It is a manual override for
-tests or deployments that want to force one known relay multiaddr. It should not
-be required for normal operation once public relay record discovery is working.
+tests or deployments that want to force one or more known relay multiaddrs while
+automatic relay discovery is warming up or unavailable. Normal leaf nodes should
+be able to discover relays through the private relay directory when the public
+IPFS routing layer can resolve the directory record.
 
 Relay records are advertised in two places:
 
@@ -269,8 +271,10 @@ Useful log categories:
   events, relay discovery refreshes, and skipped DHT record publication batches.
 * `warn`: actual degraded behavior that should be investigated.
 
-If `DEBUG_NETWORK=true`, detailed network diagnostics are emitted through debug
-logs. With `LOG_LEVEL=info`, those diagnostics should stay hidden.
+If `DEBUG_NETWORK=true`, detailed network diagnostics are enabled for startup
+addresses, peer connect/disconnect events and pubsub publish/receive activity.
+These diagnostics are emitted at `debug` level, so they are visible only when
+`DEBUG_NETWORK=true` and `LOG_LEVEL=debug`.
 
 ## Operational Notes
 

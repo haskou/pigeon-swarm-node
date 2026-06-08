@@ -23,7 +23,7 @@ NODE_ENV=development
 API_PORT=3000
 ROUTE_PREFIX=/api
 IPFS_STORAGE_PATH=./ipfs_storage
-TRANSPORT_DSN=in-memory
+TRANSPORT_DSN=in-memory://
 SERVICE_NAME=pigeon-swarm
 ```
 
@@ -57,15 +57,21 @@ routes resolve to the bundled frontend.
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `LOG_LEVEL` | App internal default | No | Log level (`error`, `warn`, `info`, etc.). |
-| `LOG_URL` | unset | No | External logging endpoint, if configured. |
-| `SERVICE_NAME` | unset | Recommended | Service name used in logs and message bus metadata. |
+| `LOG_LEVEL` | App internal default | No | Minimum log level (`error`, `warn`, `info`, `debug`). Console logs are human-readable and colored; file logs remain JSON. |
+| `DEBUG_NETWORK` | `false` | No | Enables verbose network diagnostics. These are emitted at `debug` level, so they are visible only when `DEBUG_NETWORK=true` and `LOG_LEVEL=debug`. |
+| `LOG_URL` | `logs` | No | Local log directory relative to the repository root. This is not an external logging endpoint. |
+| `SERVICE_NAME` | `service` | Recommended | Service name used for the local log filename and message bus metadata. |
+
+`DEBUG_NETWORK` does not raise the log level by itself. It only enables
+additional network diagnostics; `LOG_LEVEL=debug` is still required to print
+them. `LOG_URL` is a local filesystem directory for JSON log files, not a remote
+logging URL.
 
 ## Message Bus Variables
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...`, `in-memory...` or `libp2p-gossipsub://`). |
+| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...`, `in-memory://` or `libp2p-gossipsub://`). Use `libp2p-gossipsub://` for node-to-node sync. |
 | `TRANSPORT_MAX_RETRIES` | Adapter default | No | Retry count for AMQP operations. |
 | `TRANSPORT_RETRY_DELAY` | Adapter default | No | Delay between retries (ms). |
 
@@ -125,7 +131,7 @@ installed `web-push` module path.
 | `PIGEON_RELAY_DISCOVERY_ENABLED` | `true` | No | Enables relay discovery/diagnostics feature flags. |
 | `PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS` | `15` | No | Interval for private-network relay directory publish/discovery retries. Keep it short enough to survive public IPFS routing warmup. |
 | `PIGEON_RELAY_RECORD_TTL_SECONDS` | `300` | No | TTL used when building signed public relay records. |
-| `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` | unset | No | Comma-separated public relay multiaddrs used as explicit bootstrap peers. Nodes can also discover relay records for private networks through the public IPFS routing layer when they know that private network key. |
+| `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` | unset | No | Optional comma-separated relay multiaddrs used as a manual override while automatic relay discovery is warming up or unavailable. Normal leaf nodes should discover relays through the encrypted private relay directory when public IPFS routing can resolve it. |
 
 Private networks are no longer configured through environment variables.
 
@@ -176,29 +182,34 @@ PIGEON_BOOTSTRAP_RELAY_MULTIADDRS=/dns4/relay.example.com/tcp/4011/p2p/<peerId>
 
 Use multiple relays as a comma-separated list.
 
-`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is used by the public/fallback libp2p
-GossipSub runtime. It is intentionally not injected into private IPFS/pnet
-instances, because a PSK-protected libp2p node cannot dial a public relay that
-does not know that PSK.
+`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is optional. It is a manual override for
+tests or deployments that want to force one or more known relay multiaddrs while
+automatic relay discovery is warming up or unavailable. Normal leaf nodes should
+be able to discover relays through the private relay directory when the public
+IPFS routing layer can resolve the directory record. The backend may try these
+configured multiaddrs from the private IPFS runtime and from public fallback
+connectivity paths; an address that cannot serve the relevant protocol/network
+is skipped by the runtime.
 
 `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is not the only discovery path. Relay
 nodes also publish a private-network relay directory record for every local
 private network:
 
-- the relay record itself is still signed by the relay libp2p peer key;
+- the public relay record itself is signed by the relay libp2p peer key;
 - the directory lookup key is derived from the private network key with HMAC;
-- the stored envelope is authenticated with that same private network key;
-- the public envelope does not contain `networkId`, PSK, private key, owner id
-  or identity metadata;
+- the stored directory envelope is encrypted with a key derived from that same
+  private network key;
+- the public envelope does not contain `networkId`, relay `peerId`, relay
+  multiaddrs, PSK, private key, owner id or identity metadata;
 - a node that does not know the private network key cannot calculate the lookup
-  key or validate the envelope.
+  key or decrypt the envelope.
 
 On startup, and whenever a private network is added locally, the node queries
 that private lookup key through the public IPFS routing layer. If it finds a
-valid envelope, it stores the relay record locally and uses it for the
-public/fallback libp2p runtime. This lets a leaf node discover a reachable relay
-for its private network without manually configuring the relay multiaddr, as
-long as the public IPFS routing layer can find the directory record.
+valid envelope, it decrypts and stores the relay record locally and uses it for
+fallback connectivity. This lets a leaf node discover a reachable relay for its
+private network without manually configuring the relay multiaddr, as long as the
+public IPFS routing layer can find the directory record.
 
 The public IPFS routing layer needs public peers before it can publish or read
 those records. By default the backend adds `/dnsaddr/bootstrap.libp2p.io` as an
@@ -299,7 +310,7 @@ NODE_ENV=development
 API_PORT=3000
 ROUTE_PREFIX=/api
 IPFS_STORAGE_PATH=./ipfs_storage
-TRANSPORT_DSN=in-memory
+TRANSPORT_DSN=in-memory://
 SERVICE_NAME=pigeon-swarm
 PIGEON_LIBP2P_PORT=4001
 PIGEON_RELAY_ENABLED=false

@@ -107,14 +107,15 @@ yarn
 Create a local `.env` from the documented configuration and choose how nodes
 exchange events:
 
-* `TRANSPORT_DSN=in-memory` for local tests and single-node development.
-* `TRANSPORT_DSN=libp2p-gossipsub` for node-to-node gossip event exchange.
+* `TRANSPORT_DSN=in-memory://` for local tests and single-node development.
+* `TRANSPORT_DSN=libp2p-gossipsub://` for node-to-node gossip event exchange.
 
 For NAT traversal experiments, a node can expose one public libp2p relay with
 `PIGEON_RELAY_ENABLED=true`, `PIGEON_PUBLIC_HOST=<public-dns-or-ip>` and
 `PIGEON_RELAY_PORT=4011`. `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is optional and is
-only a manual override for tests or deployments that want to force one known
-relay multiaddr; leaf nodes can otherwise discover relay records for a shared
+only a manual override for tests or deployments that want to force one or more
+known relay multiaddrs while automatic relay discovery is warming up or
+unavailable; leaf nodes can otherwise discover relay records for a shared
 private network through public IPFS routing. Those private relay directory
 records use lookup keys and encrypted payloads derived from the private network
 key, so unrelated public peers cannot enumerate private network ids or read
