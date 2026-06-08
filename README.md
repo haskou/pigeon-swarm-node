@@ -111,8 +111,9 @@ exchange events:
 
 For NAT traversal experiments, a node can expose one public libp2p relay with
 `PIGEON_RELAY_ENABLED=true`, `PIGEON_PUBLIC_HOST=<public-dns-or-ip>` and
-`PIGEON_RELAY_PORT=4011`. Other nodes can bootstrap against that relay through
-`PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`, or discover relay records for a shared
+`PIGEON_RELAY_PORT=4011`. `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS` is optional and is
+only a manual override for tests or deployments that want to force one known
+relay multiaddr; leaf nodes can otherwise discover relay records for a shared
 private network through public IPFS routing. Those private relay directory
 records use lookup keys and signatures derived from the private network key, so
 unrelated public peers cannot enumerate private network ids or validate relay

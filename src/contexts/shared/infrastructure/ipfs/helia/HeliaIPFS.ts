@@ -2,6 +2,8 @@ import Kernel from '@app/Kernel';
 import NetworkDiagnosticsLogger from '@app/shared/infrastructure/network/NetworkDiagnosticsLogger';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
+import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
+import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
@@ -24,6 +26,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly RAW_CODEC_CODE = 0x55;
   private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
   private static readonly ROUTING_RECORD_WARNING_FLUSH_MS = 5000;
+  private static readonly publicRelayRecordRegistry =
+    new PublicRelayRecordRegistry();
+  private static readonly publicRelayRecordListeners = new WeakSet<object>();
   private static skippedRoutingRecordPublications = 0;
   private static skippedRoutingRecordPublicationSampleKey?: string;
   private static skippedRoutingRecordPublicationFlush?: NodeJS.Timeout;
@@ -87,6 +92,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
       name: networkName,
     });
     await HeliaIPFS.dialConfiguredBootstrapRelays(heliaCore, networkName);
+    await HeliaIPFS.dialKnownPublicRelayRecords(heliaCore, networkName);
+    HeliaIPFS.dialPublicRelayRecordsWhenDiscovered(heliaCore, networkName);
 
     return heliaCore;
   }
@@ -102,7 +109,62 @@ export abstract class HeliaIPFS implements IPFSConnection {
     heliaCore: HeliaInstance,
     networkName: string,
   ): Promise<void> {
-    const multiaddrs = HeliaIPFS.configuredBootstrapRelayMultiaddrs();
+    await HeliaIPFS.dialMultiaddrs(
+      heliaCore,
+      networkName,
+      HeliaIPFS.configuredBootstrapRelayMultiaddrs(),
+      'configured bootstrap relay',
+    );
+  }
+
+  private static async dialKnownPublicRelayRecords(
+    heliaCore: HeliaInstance,
+    networkName: string,
+  ): Promise<void> {
+    await Promise.all(
+      HeliaIPFS.publicRelayRecordRegistry
+        .all()
+        .map((record) =>
+          HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
+        ),
+    );
+  }
+
+  private static dialPublicRelayRecordsWhenDiscovered(
+    heliaCore: HeliaInstance,
+    networkName: string,
+  ): void {
+    const listenerKey = heliaCore.libp2p as unknown as object;
+
+    if (HeliaIPFS.publicRelayRecordListeners.has(listenerKey)) {
+      return;
+    }
+
+    HeliaIPFS.publicRelayRecordListeners.add(listenerKey);
+    HeliaIPFS.publicRelayRecordRegistry.onRecordSaved((record) =>
+      HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
+    );
+  }
+
+  private static async dialPublicRelayRecord(
+    heliaCore: HeliaInstance,
+    networkName: string,
+    record: PublicRelayRecordPrimitives,
+  ): Promise<void> {
+    await HeliaIPFS.dialMultiaddrs(
+      heliaCore,
+      networkName,
+      record.multiaddrs,
+      `public relay record peerId="${record.peerId}"`,
+    );
+  }
+
+  private static async dialMultiaddrs(
+    heliaCore: HeliaInstance,
+    networkName: string,
+    multiaddrs: string[],
+    source: string,
+  ): Promise<void> {
     const dialer = heliaCore.libp2p as unknown as {
       dial?: (address: unknown) => Promise<unknown>;
     };
@@ -116,11 +178,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
         try {
           await dialer.dial(await heliaRuntimeAdapter.createMultiaddr(address));
           Kernel.logger.info(
-            `Private network "${networkName}" connected to bootstrap relay "${address}"`,
+            `Private network "${networkName}" connected to ${source} "${address}"`,
           );
         } catch (error: unknown) {
-          Kernel.logger.warn(
-            `Private network "${networkName}" failed to connect to bootstrap relay "${address}": ${String(
+          Kernel.logger.debug(
+            `Private network "${networkName}" failed to connect to ${source} "${address}": ${String(
               error,
             )}`,
           );
@@ -262,7 +324,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     HeliaIPFS.skippedRoutingRecordPublicationFlush = setTimeout(() => {
-      Kernel.logger.warn(
+      Kernel.logger.debug(
         `DHT record publications skipped: count=${HeliaIPFS.skippedRoutingRecordPublications} sampleKey="${HeliaIPFS.skippedRoutingRecordPublicationSampleKey}"`,
       );
       HeliaIPFS.skippedRoutingRecordPublications = 0;

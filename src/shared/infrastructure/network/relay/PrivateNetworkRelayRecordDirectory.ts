@@ -86,7 +86,7 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     const publicConnection = await this.getPublicConnection();
-    Kernel.logger.info(
+    Kernel.logger.debug(
       `Publishing private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}" fingerprints="${privateNetworks
         .map((network) => this.authenticator.fingerprint(network))
         .join(',')}"`,
@@ -106,7 +106,7 @@ export class PrivateNetworkRelayRecordDirectory {
         );
       }),
     );
-    Kernel.logger.info(
+    Kernel.logger.debug(
       `Published private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}" fingerprints="${privateNetworks
         .map((network) => this.authenticator.fingerprint(network))
         .join(',')}"`,
@@ -123,7 +123,7 @@ export class PrivateNetworkRelayRecordDirectory {
     const publicConnection = await this.getPublicConnection();
     const discoveredRecords: PublicRelayRecordPrimitives[] = [];
 
-    Kernel.logger.info(
+    Kernel.logger.debug(
       `Discovering private relay records: privateNetworks=${privateNetworks.length} fingerprints="${privateNetworks
         .map((network) => this.authenticator.fingerprint(network))
         .join(',')}"`,
@@ -167,7 +167,7 @@ export class PrivateNetworkRelayRecordDirectory {
       }),
     );
 
-    Kernel.logger.info(
+    Kernel.logger.debug(
       `Discovered private relay records: privateNetworks=${privateNetworks.length} records=${discoveredRecords.length} relayPeerIds="${discoveredRecords
         .map((record) => record.peerId)
         .join(',')}"`,
