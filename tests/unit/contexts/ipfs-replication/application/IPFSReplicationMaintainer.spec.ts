@@ -104,13 +104,19 @@ describe('IPFSReplicationMaintainer', () => {
 
   it('fetches public upload replicas as bytes', async () => {
     const fetchedBytes: string[] = [];
+    let fetchSignal: AbortSignal | undefined;
     const claimRepository: IPFSContentReplicaClaimRepository = {
       findByCids: async () => [],
       save: async () => undefined,
     };
     const ipfs = {
-      getBytesFromNetwork: async (_cid: { valueOf(): string }) => {
+      getBytesFromNetwork: async (
+        _cid: { valueOf(): string },
+        _networkId: string,
+        signal?: AbortSignal,
+      ) => {
         fetchedBytes.push(_cid.valueOf());
+        fetchSignal = signal;
 
         return Buffer.from('public');
       },
@@ -161,5 +167,6 @@ describe('IPFSReplicationMaintainer', () => {
     expect(result.failedClaims).toBe(0);
     expect(result.claimedReplicas).toBe(1);
     expect(fetchedBytes).toEqual(['bafy-public']);
+    expect(fetchSignal).toBeInstanceOf(AbortSignal);
   });
 });

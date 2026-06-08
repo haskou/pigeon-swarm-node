@@ -114,23 +114,25 @@ export default class IPFS {
   public async getJSONFromNetwork<T>(
     cid: IPFSId,
     networkId: string,
+    signal?: AbortSignal,
   ): Promise<T> {
     await this.initialize();
 
     const network = this.registry.find(networkId);
 
-    return network.getJSON<T>(cid);
+    return network.getJSON<T>(cid, signal);
   }
 
   public async getBytesFromNetwork(
     cid: IPFSId,
     networkId: string,
+    signal?: AbortSignal,
   ): Promise<Buffer> {
     await this.initialize();
 
     const network = this.registry.find(networkId);
 
-    return network.getBytes(cid);
+    return network.getBytes(cid, signal);
   }
 
   public async getRecord(key: string): Promise<string | undefined> {

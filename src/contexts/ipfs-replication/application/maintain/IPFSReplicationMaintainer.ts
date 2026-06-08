@@ -16,6 +16,8 @@ import { IPFSContentNetworkReplicationStatus } from './types/IPFSContentNetworkR
 import { IPFSReplicationMaintenanceResult } from './types/IPFSReplicationMaintenanceResult';
 
 export default class IPFSReplicationMaintainer {
+  private static readonly DEFAULT_CLAIM_TIMEOUT_MS = 3000;
+
   constructor(
     private readonly finder: IPFSReplicationStatusFinder,
     private readonly claimRepository: IPFSContentReplicaClaimRepository,
@@ -64,6 +66,59 @@ export default class IPFSReplicationMaintainer {
     };
   }
 
+  private contentClaimTimeoutMs(): number {
+    return Number(
+      process.env.IPFS_REPLICATION_CLAIM_TIMEOUT_MS ??
+        process.env.IPFS_CONTENT_TIMEOUT_MS ??
+        IPFSReplicationMaintainer.DEFAULT_CLAIM_TIMEOUT_MS,
+    );
+  }
+
+  private createClaimAbortSignal(): {
+    signal: AbortSignal;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      this.contentClaimTimeoutMs(),
+    );
+
+    timeout.unref?.();
+
+    return {
+      signal: controller.signal,
+      timeout,
+    };
+  }
+
+  private async fetchResponsibleReplica(
+    content: IPFSContentReplicationStatus,
+    network: IPFSContentNetworkReplicationStatus,
+  ): Promise<void> {
+    const cid = new IPFSId(content.cid);
+    const context = new IPFSContentReplicationContext(content.context);
+    const abort = this.createClaimAbortSignal();
+
+    try {
+      if (context.isPublicUpload()) {
+        await this.ipfs.getBytesFromNetwork(
+          cid,
+          network.networkId,
+          abort.signal,
+        );
+      } else {
+        await this.ipfs.getJSONFromNetwork<unknown>(
+          cid,
+          network.networkId,
+          abort.signal,
+        );
+      }
+    } finally {
+      clearTimeout(abort.timeout);
+    }
+  }
+
   private combineResults(
     current: IPFSReplicationMaintenanceResult,
     next: IPFSReplicationMaintenanceResult,
@@ -81,14 +136,7 @@ export default class IPFSReplicationMaintainer {
     network: IPFSContentNetworkReplicationStatus,
     localNodeId: string,
   ): Promise<number> {
-    const cid = new IPFSId(content.cid);
-    const context = new IPFSContentReplicationContext(content.context);
-
-    if (context.isPublicUpload()) {
-      await this.ipfs.getBytesFromNetwork(cid, network.networkId);
-    } else {
-      await this.ipfs.getJSONFromNetwork<unknown>(cid, network.networkId);
-    }
+    await this.fetchResponsibleReplica(content, network);
 
     if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
       return 0;
