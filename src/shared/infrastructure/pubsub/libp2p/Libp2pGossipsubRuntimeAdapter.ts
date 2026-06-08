@@ -7,6 +7,13 @@ import { PublicRelayPeerAnnouncer } from './PublicRelayPeerAnnouncer';
 export class Libp2pGossipsubRuntimeAdapter {
   private static readonly globalNodeKey = '__pigeonSwarmPublicLibp2pNode';
 
+  private static readonly DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS = [
+    '/dnsaddr/am6.bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+    '/dnsaddr/sg1.bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',
+    '/dnsaddr/ny5.bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+    '/dnsaddr/sv15.bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+  ];
+
   private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
   private heliaModulePromise?: Promise<typeof import('helia')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
@@ -86,6 +93,22 @@ export class Libp2pGossipsubRuntimeAdapter {
     return this.bootstrapModulePromise;
   }
 
+  private publicBootstrapMultiaddrs(): string[] {
+    if (process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED === 'false') {
+      return [];
+    }
+
+    return (
+      process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS ||
+      Libp2pGossipsubRuntimeAdapter.DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS.join(
+        ',',
+      )
+    )
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
   private withoutWebRtcTransports<
     TConfig extends {
       addresses?: { listen?: string[] };
@@ -111,25 +134,43 @@ export class Libp2pGossipsubRuntimeAdapter {
   private async withBootstrapRelays<
     TConfig extends { peerDiscovery?: unknown[] },
   >(config: TConfig): Promise<TConfig> {
-    const relayMultiaddrs =
+    const publicBootstrapMultiaddrs = this.publicBootstrapMultiaddrs();
+    const relayBootstrapMultiaddrs =
       PublicRelayConfiguration.fromEnvironment().getBootstrapRelayMultiaddrs();
 
-    if (relayMultiaddrs.length === 0) {
+    if (
+      publicBootstrapMultiaddrs.length === 0 &&
+      relayBootstrapMultiaddrs.length === 0
+    ) {
       return config;
     }
 
     const bootstrapModule = await this.loadBootstrapModule();
+    const peerDiscovery = [...(config.peerDiscovery || [])];
 
-    return {
-      ...config,
-      peerDiscovery: [
-        ...(config.peerDiscovery || []),
+    if (publicBootstrapMultiaddrs.length > 0) {
+      peerDiscovery.push(
         bootstrapModule.bootstrap({
-          list: relayMultiaddrs,
+          list: publicBootstrapMultiaddrs,
+          tagName: 'pigeon-public-bootstrap',
+          tagTTL: Infinity,
+        }),
+      );
+    }
+
+    if (relayBootstrapMultiaddrs.length > 0) {
+      peerDiscovery.push(
+        bootstrapModule.bootstrap({
+          list: relayBootstrapMultiaddrs,
           tagName: 'pigeon-relay-bootstrap',
           tagTTL: Infinity,
         }),
-      ],
+      );
+    }
+
+    return {
+      ...config,
+      peerDiscovery,
     };
   }
 

@@ -24,7 +24,7 @@ import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly RAW_CODEC_CODE = 0x55;
-  private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
+  private static readonly ROUTING_RECORD_TIMEOUT_MS = 15000;
   private static readonly ROUTING_RECORD_WARNING_FLUSH_MS = 5000;
   private static readonly publicRelayRecordRegistry =
     new PublicRelayRecordRegistry();
@@ -266,6 +266,24 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return this.getPeers().length > 0;
   }
 
+  private async waitForPeers(signal?: AbortSignal): Promise<boolean> {
+    const deadline = Date.now() + HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      if (signal?.aborted) {
+        return false;
+      }
+
+      if (this.hasPeers()) {
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    return this.hasPeers();
+  }
+
   private getPubSubMessage(event: PubSubEvent): {
     data?: Uint8Array;
     topic?: string;
@@ -325,6 +343,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const routingAbort = this.createRoutingAbortSignal(signal);
 
     try {
+      if (!(await this.waitForPeers(routingAbort.signal))) {
+        throw new Error('No public IPFS peers available for DHT publication.');
+      }
+
       await this.heliaCore.routing.put(
         encoder.encode(key),
         encoder.encode(value),
@@ -332,7 +354,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
           signal: routingAbort.signal,
         },
       );
-    } catch {
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `DHT record publication skipped for key="${key}": ${String(error)}`,
+      );
       HeliaIPFS.registerSkippedRoutingRecordPublication(key);
     } finally {
       clearTimeout(routingAbort.timeout);
@@ -481,14 +506,20 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const routingAbort = this.createRoutingAbortSignal(signal);
 
     try {
+      if (!(await this.waitForPeers(routingAbort.signal))) {
+        throw new Error('No public IPFS peers available for DHT lookup.');
+      }
+
       const value = await this.heliaCore.routing.get(
         new TextEncoder().encode(key),
         { signal: routingAbort.signal },
       );
 
       return decoder.decode(value);
-    } catch {
-      // Fallback to local datastore.
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `DHT record lookup skipped for key="${key}": ${String(error)}`,
+      );
     } finally {
       clearTimeout(routingAbort.timeout);
     }
