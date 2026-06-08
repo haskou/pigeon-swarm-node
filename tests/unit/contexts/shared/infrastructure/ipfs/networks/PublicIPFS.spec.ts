@@ -282,6 +282,7 @@ describe('PublicIPFS', () => {
     });
 
     it('should keep local record when routing publication fails', async () => {
+      jest.useFakeTimers();
       const Kernel = (await import('@app/Kernel')).default;
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 
@@ -295,9 +296,11 @@ describe('PublicIPFS', () => {
 
       expect(mockHeliaNode.datastore.put).toHaveBeenCalled();
       expect(mockHeliaNode.routing.put).toHaveBeenCalled();
+      jest.advanceTimersByTime(5000);
       expect(Kernel.logger.warn).toHaveBeenCalledWith(
-        'DHT record publication skipped for key: identity-id',
+        'DHT record publications skipped: count=1 sampleKey="identity-id"',
       );
+      jest.useRealTimers();
     });
   });
 });

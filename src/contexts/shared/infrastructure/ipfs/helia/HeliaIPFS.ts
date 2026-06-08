@@ -23,6 +23,10 @@ import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly RAW_CODEC_CODE = 0x55;
   private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
+  private static readonly ROUTING_RECORD_WARNING_FLUSH_MS = 5000;
+  private static skippedRoutingRecordPublications = 0;
+  private static skippedRoutingRecordPublicationSampleKey?: string;
+  private static skippedRoutingRecordPublicationFlush?: NodeJS.Timeout;
   private readonly pinningStrategy: HeliaPinningStrategy;
 
   public static async createPublicHeliaCore(
@@ -204,10 +208,29 @@ export abstract class HeliaIPFS implements IPFSConnection {
         },
       );
     } catch {
-      Kernel.logger.warn(`DHT record publication skipped for key: ${key}`);
+      HeliaIPFS.registerSkippedRoutingRecordPublication(key);
     } finally {
       clearTimeout(routingAbort.timeout);
     }
+  }
+
+  private static registerSkippedRoutingRecordPublication(key: string): void {
+    HeliaIPFS.skippedRoutingRecordPublications += 1;
+    HeliaIPFS.skippedRoutingRecordPublicationSampleKey ??= key;
+
+    if (HeliaIPFS.skippedRoutingRecordPublicationFlush) {
+      return;
+    }
+
+    HeliaIPFS.skippedRoutingRecordPublicationFlush = setTimeout(() => {
+      Kernel.logger.warn(
+        `DHT record publications skipped: count=${HeliaIPFS.skippedRoutingRecordPublications} sampleKey="${HeliaIPFS.skippedRoutingRecordPublicationSampleKey}"`,
+      );
+      HeliaIPFS.skippedRoutingRecordPublications = 0;
+      HeliaIPFS.skippedRoutingRecordPublicationSampleKey = undefined;
+      HeliaIPFS.skippedRoutingRecordPublicationFlush = undefined;
+    }, HeliaIPFS.ROUTING_RECORD_WARNING_FLUSH_MS);
+    HeliaIPFS.skippedRoutingRecordPublicationFlush.unref?.();
   }
 
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
