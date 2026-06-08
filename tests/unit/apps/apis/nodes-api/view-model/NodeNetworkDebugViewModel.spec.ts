@@ -19,11 +19,11 @@ describe('NodeNetworkDebugViewModel', () => {
           lastDiscoveredAt: 3000,
           lastLookupHadValue: true,
           lastLookupValueKind: 'inline-envelope',
-          lastPublishedAt: 2500,
-          lastPublishedNetworkCount: 1,
           lastProviderLookupAt: 3500,
           lastProviderLookupHadValue: true,
           lastProviderLookupMultiaddrCount: 1,
+          lastPublishedAt: 2500,
+          lastPublishedNetworkCount: 1,
           lastRequestedNetworkCount: 1,
           privateNetworkCount: 1,
         },
@@ -35,6 +35,7 @@ describe('NodeNetworkDebugViewModel', () => {
     });
     expect(serializedResource).not.toContain('12D3SensitiveRelay');
     expect(serializedResource).not.toContain('/dns4/relay.example.com');
+    expect(serializedResource).not.toContain('/dns4/provider.example.com');
     expect(serializedResource).not.toContain('network-fingerprint');
   });
 
@@ -69,11 +70,14 @@ describe('NodeNetworkDebugViewModel', () => {
           lastDiscoveredAt: 3000,
           lastLookupHadValue: true,
           lastLookupValueKind: 'inline-envelope',
-          lastPublishedAt: 2500,
-          lastPublishedNetworkCount: 1,
           lastProviderLookupAt: 3500,
           lastProviderLookupHadValue: true,
+          lastProviderLookupMultiaddrs: [
+            '/dns4/provider.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+          ],
           lastProviderLookupMultiaddrCount: 1,
+          lastPublishedAt: 2500,
+          lastPublishedNetworkCount: 1,
           lastRequestedNetworkCount: 1,
           privateNetworkCount: 1,
           privateNetworkFingerprints: ['network-fingerprint'],
@@ -120,11 +124,14 @@ describe('NodeNetworkDebugViewModel', () => {
         lastDiscoveredAt: 3000,
         lastLookupHadValue: true,
         lastLookupValueKind: 'inline-envelope',
-        lastPublishedAt: 2500,
-        lastPublishedNetworkCount: 1,
         lastProviderLookupAt: 3500,
         lastProviderLookupHadValue: true,
+        lastProviderLookupMultiaddrs: [
+          '/dns4/provider.example.com/tcp/4011/p2p/12D3SensitiveRelay',
+        ],
         lastProviderLookupMultiaddrCount: 1,
+        lastPublishedAt: 2500,
+        lastPublishedNetworkCount: 1,
         lastRequestedNetworkCount: 1,
         privateNetworkCount: 1,
         privateNetworkFingerprints: ['network-fingerprint'],

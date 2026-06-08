@@ -63,6 +63,8 @@ export class NodeNetworkDebugViewModel {
           ...publicRelay.privateRelayDirectory,
           discoveredRelayPeerIds:
             this.publicRelay.privateRelayDirectory.discoveredRelayPeerIds,
+          lastProviderLookupMultiaddrs:
+            this.publicRelay.privateRelayDirectory.lastProviderLookupMultiaddrs,
           privateNetworkFingerprints:
             this.publicRelay.privateRelayDirectory.privateNetworkFingerprints,
         },

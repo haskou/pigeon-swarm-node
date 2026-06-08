@@ -284,6 +284,23 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return this.hasPeers();
   }
 
+  private providerMultiaddrWithPeerId(provider: {
+    id: { toString: () => string };
+    multiaddrs: { toString: () => string }[];
+  }): string[] {
+    const peerId = provider.id.toString();
+
+    return provider.multiaddrs.map((multiaddr) => {
+      const value = multiaddr.toString();
+
+      if (value.includes('/p2p/')) {
+        return value;
+      }
+
+      return `${value}/p2p/${peerId}`;
+    });
+  }
+
   private getPubSubMessage(event: PubSubEvent): {
     data?: Uint8Array;
     topic?: string;
@@ -564,9 +581,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       for await (const provider of this.heliaCore.routing.findProviders(cid, {
         signal: routingAbort.signal,
       })) {
-        multiaddrs.push(
-          ...provider.multiaddrs.map((multiaddr) => multiaddr.toString()),
-        );
+        multiaddrs.push(...this.providerMultiaddrWithPeerId(provider));
       }
     } catch (error: unknown) {
       Kernel.logger.debug(

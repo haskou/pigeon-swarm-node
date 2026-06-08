@@ -173,6 +173,26 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(discovered[0].multiaddrs).toEqual(relayRecord.multiaddrs);
   });
 
+  it('should discover relay provider multiaddrs with peer ids appended by the IPFS connection', async () => {
+    const publicConnection = new InMemoryPublicConnection();
+    const registry = new PublicRelayRecordRegistry();
+
+    registry.clear();
+    publicConnection.setProviderMultiaddrs([
+      '/dns4/relay.test/tcp/4011/p2p/12D3KooWDHwUoxY5MSJaTP66sbsMCFZEQwVVHS5EtemUrxtFqNGp',
+    ]);
+
+    const discovered = await new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      registry,
+      undefined,
+      async () => publicConnection,
+    ).discover();
+
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0].peerId).toBe(relayRecord.peerId);
+  });
+
   it('should refresh private relay discovery periodically', async () => {
     jest.useFakeTimers();
     const publicConnection = new InMemoryPublicConnection();
@@ -226,6 +246,7 @@ class InMemoryPublicConnection implements IPFSConnection {
 
   private readonly records = new Map<string, string>();
   private readonly providerMultiaddrs = new Map<string, string[]>();
+  private providerMultiaddrOverride?: string[];
 
   public stat(): Promise<void> {
     return Promise.resolve();
@@ -269,6 +290,10 @@ class InMemoryPublicConnection implements IPFSConnection {
     this.records.clear();
   }
 
+  public setProviderMultiaddrs(multiaddrs: string[]): void {
+    this.providerMultiaddrOverride = multiaddrs;
+  }
+
   public addedJSONCount(): number {
     return this.json.size;
   }
@@ -292,6 +317,10 @@ class InMemoryPublicConnection implements IPFSConnection {
   }
 
   public findRecordProviderMultiaddrs(key: string): Promise<string[]> {
+    if (this.providerMultiaddrOverride) {
+      return Promise.resolve(this.providerMultiaddrOverride);
+    }
+
     return Promise.resolve(this.providerMultiaddrs.get(key) || []);
   }
 

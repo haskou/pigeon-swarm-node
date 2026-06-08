@@ -57,6 +57,7 @@ export class PrivateNetworkRelayRecordDirectory {
     lastPublishedNetworkCount?: number;
     lastProviderLookupAt?: number;
     lastProviderLookupHadValue?: boolean;
+    lastProviderLookupMultiaddrs?: string[];
     lastProviderLookupMultiaddrCount?: number;
     lastRequestedNetworkCount?: number;
   } {
@@ -75,6 +76,7 @@ export class PrivateNetworkRelayRecordDirectory {
             lastPublishedNetworkCount?: number;
             lastProviderLookupAt?: number;
             lastProviderLookupHadValue?: boolean;
+            lastProviderLookupMultiaddrs?: string[];
             lastProviderLookupMultiaddrCount?: number;
             lastRequestedNetworkCount?: number;
           }
@@ -339,6 +341,8 @@ export class PrivateNetworkRelayRecordDirectory {
             }
             this.directoryDebugState.lastProviderLookupHadValue =
               providerMultiaddrs.length > 0;
+            this.directoryDebugState.lastProviderLookupMultiaddrs =
+              providerMultiaddrs;
             this.directoryDebugState.lastProviderLookupMultiaddrCount =
               providerMultiaddrs.length;
             const relayRecord =
@@ -418,6 +422,7 @@ export class PrivateNetworkRelayRecordDirectory {
     lastPublishedNetworkCount?: number;
     lastProviderLookupAt?: number;
     lastProviderLookupHadValue?: boolean;
+    lastProviderLookupMultiaddrs?: string[];
     lastProviderLookupMultiaddrCount?: number;
     lastRequestedNetworkCount?: number;
     privateNetworkCount: number;
@@ -433,14 +438,16 @@ export class PrivateNetworkRelayRecordDirectory {
       lastError: this.directoryDebugState.lastError,
       lastLookupHadValue: this.directoryDebugState.lastLookupHadValue,
       lastLookupValueKind: this.directoryDebugState.lastLookupValueKind,
-      lastPublishedAt: this.directoryDebugState.lastPublishedAt,
-      lastPublishedNetworkCount:
-        this.directoryDebugState.lastPublishedNetworkCount,
       lastProviderLookupAt: this.directoryDebugState.lastProviderLookupAt,
       lastProviderLookupHadValue:
         this.directoryDebugState.lastProviderLookupHadValue,
+      lastProviderLookupMultiaddrs:
+        this.directoryDebugState.lastProviderLookupMultiaddrs,
       lastProviderLookupMultiaddrCount:
         this.directoryDebugState.lastProviderLookupMultiaddrCount,
+      lastPublishedAt: this.directoryDebugState.lastPublishedAt,
+      lastPublishedNetworkCount:
+        this.directoryDebugState.lastPublishedNetworkCount,
       lastRequestedNetworkCount:
         this.directoryDebugState.lastRequestedNetworkCount,
       privateNetworkCount: privateNetworks.length,

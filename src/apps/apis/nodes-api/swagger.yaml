@@ -389,6 +389,11 @@ components:
                   type: number
                 lastProviderLookupHadValue:
                   type: boolean
+                lastProviderLookupMultiaddrs:
+                  type: array
+                  description: Present only when DEBUG_NETWORK=true.
+                  items:
+                    type: string
                 lastProviderLookupMultiaddrCount:
                   type: number
                 lastRequestedNetworkCount:
