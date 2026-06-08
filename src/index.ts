@@ -25,8 +25,10 @@ import RespondToIdentitySyncRequest from '@app/apps/consumers/pubsub/identities/
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import RegisterIPFSReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicaClaimWhenClaimed';
 import RegisterIPFSContentReplicationWhenRegistered from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicationWhenRegistered';
+import RespondToIPFSContentReplicationNetworkSyncRequest from '@app/apps/consumers/pubsub/ipfs/RespondToIPFSContentReplicationNetworkSyncRequest';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import RegisterKeychainWhenSyncAvailable from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenSyncAvailable';
+import RespondToKeychainNetworkSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainNetworkSyncRequest';
 import RespondToKeychainSyncRequest from '@app/apps/consumers/pubsub/keychains/RespondToKeychainSyncRequest';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
@@ -55,10 +57,13 @@ import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/applicat
 import IPFSReplicationStatusSummaryRefresher from '@app/contexts/ipfs-replication/application/refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/application/register-claim/IPFSContentReplicaClaimRegistrar';
 import IPFSContentReplicationMetadataRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationMetadataRegistrar';
+import IPFSContentReplicationNetworkSyncResponder from '@app/contexts/ipfs-replication/application/respond-network-sync/IPFSContentReplicationNetworkSyncResponder';
 import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
 import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
 import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
+import KeychainNetworkSyncResponder from '@app/contexts/keychains/application/respond-network-sync/KeychainNetworkSyncResponder';
+import KeychainSyncResponder from '@app/contexts/keychains/application/respond-sync/KeychainSyncResponder';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
@@ -192,6 +197,13 @@ async function init() {
       messageBus,
       new IdentityNetworkSyncResponder(identityMetadataRepository, messageBus),
     ),
+    new RespondToKeychainNetworkSyncRequest(
+      messageBus,
+      new KeychainNetworkSyncResponder(
+        identityMetadataRepository,
+        Kernel.di.getService<KeychainSyncResponder>(KeychainSyncResponder),
+      ),
+    ),
     new RegisterCommunityChannelMessageWhenAnnounced(
       messageBus,
       communityRepository,
@@ -245,6 +257,13 @@ async function init() {
       new IPFSContentReplicationMetadataRegistrar(
         ipfsContentReplicationRepository,
         ipfsReplicationSummaryRefresher,
+      ),
+    ),
+    new RespondToIPFSContentReplicationNetworkSyncRequest(
+      messageBus,
+      new IPFSContentReplicationNetworkSyncResponder(
+        ipfsContentReplicationRepository,
+        messageBus,
       ),
     ),
     new RegisterIdentityPresenceWhenUpdated(messageBus),

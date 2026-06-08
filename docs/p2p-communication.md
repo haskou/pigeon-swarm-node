@@ -212,8 +212,22 @@ Community network sync uses `communities.v1.network.sync_requested`. Peers that
 have communities in the requested network respond with the existing
 `communities.v1.community.sync_available` event per community. That response
 contains the community plus bounded message and reaction candidates, so an empty
-node can hydrate its local MongoDB before normal replication maintenance decides
-which IPFS contents should be kept locally.
+node can hydrate its local MongoDB.
+
+Keychain network sync uses `keychains.v1.network.sync_requested`. Keychains do
+not carry a network id directly, so responders derive scope from latest identity
+metadata in the requested network and answer with the existing
+`keychains.v1.keychain.sync_available` event for each owner that has a current
+keychain. This lets a node with no local keychain metadata hydrate login
+material after joining a network.
+
+IPFS replication metadata also has a network repair request:
+`ipfs.v1.content.replication.network.sync_requested`. Peers respond with the
+existing `ipfs.v1.content.replication.was_registered` event for bounded content
+candidates in that network. The response includes only the requested
+`networkId`, even if the CID is known in multiple networks. This repairs
+`/ipfs/replication/status`; block transfer still happens later through IPFS and
+replication maintenance policy.
 
 ## Domain Event Flow
 

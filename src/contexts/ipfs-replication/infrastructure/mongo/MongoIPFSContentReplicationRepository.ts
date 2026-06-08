@@ -1,4 +1,5 @@
 import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
@@ -70,6 +71,19 @@ export default class MongoIPFSContentReplicationRepository {
     });
 
     return document ? this.toDomain(document) : undefined;
+  }
+
+  public async findByNetworkId(
+    networkId: NetworkId,
+    limit = 500,
+  ): Promise<IPFSContentReplication[]> {
+    const documents = await (await this.collection())
+      .find({ networkIds: networkId.valueOf() })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
   }
 
   public async save(content: IPFSContentReplication): Promise<void> {

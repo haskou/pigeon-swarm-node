@@ -7,6 +7,8 @@ import MongoConversationRepository from '@app/contexts/conversations/infrastruct
 import { IdentityNetworkSyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentityNetworkSyncRequestedEvent';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import IdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import { IPFSContentReplicationNetworkSyncRequestedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationNetworkSyncRequestedEvent';
+import { KeychainNetworkSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainNetworkSyncRequestedEvent';
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
 import KeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
@@ -28,6 +30,8 @@ export interface NodeStartupSyncResult {
   conversationRequests: number;
   identityNetworkRequests: number;
   identityRequests: number;
+  ipfsReplicationNetworkRequests: number;
+  keychainNetworkRequests: number;
   keychainRequests: number;
   networkReadiness: NodeStartupNetworkReadiness[];
   networkIds: string[];
@@ -128,6 +132,21 @@ export default class NodeStartupSynchronizer {
     );
   }
 
+  private ipfsReplicationNetworkRequests(
+    requestId: string,
+    requesterNodeId: string,
+    networkIds: Set<string>,
+  ): DomainEvent[] {
+    return [...networkIds].map(
+      (networkId) =>
+        new IPFSContentReplicationNetworkSyncRequestedEvent(networkId, {
+          networkId,
+          requesterNodeId,
+          requestId,
+        }),
+    );
+  }
+
   private keychainRequests(
     requestId: string,
     requesterNodeId: string,
@@ -138,6 +157,21 @@ export default class NodeStartupSynchronizer {
         new KeychainSyncRequestedEvent(ownerIdentityId, {
           knownVersion,
           ownerIdentityId,
+          requesterNodeId,
+          requestId,
+        }),
+    );
+  }
+
+  private keychainNetworkRequests(
+    requestId: string,
+    requesterNodeId: string,
+    networkIds: Set<string>,
+  ): DomainEvent[] {
+    return [...networkIds].map(
+      (networkId) =>
+        new KeychainNetworkSyncRequestedEvent(networkId, {
+          networkId,
           requesterNodeId,
           requestId,
         }),
@@ -277,9 +311,21 @@ export default class NodeStartupSynchronizer {
       requesterNodeId,
       readyNetworkIds,
     );
+    const ipfsReplicationNetworkRequests = this.ipfsReplicationNetworkRequests(
+      requestId,
+      requesterNodeId,
+      readyNetworkIds,
+    );
+    const keychainNetworkRequests = this.keychainNetworkRequests(
+      requestId,
+      requesterNodeId,
+      readyNetworkIds,
+    );
     const rawPlannedRequests =
       readyNetworkIds.size +
       communityNetworkRequests.length +
+      keychainNetworkRequests.length +
+      ipfsReplicationNetworkRequests.length +
       identityVersions.size +
       keychainVersions.size +
       conversationScopes.filter((scope) => readyNetworkIds.has(scope.networkId))
@@ -292,6 +338,8 @@ export default class NodeStartupSynchronizer {
         readyNetworkIds,
       ),
       ...communityNetworkRequests,
+      ...keychainNetworkRequests,
+      ...ipfsReplicationNetworkRequests,
       ...this.identityRequests(
         requestId,
         requesterNodeId,
@@ -324,6 +372,8 @@ export default class NodeStartupSynchronizer {
       conversationRequests: limitedConversationScopes.length,
       identityNetworkRequests: readyNetworkIds.size,
       identityRequests: limitedIdentityVersions.size,
+      ipfsReplicationNetworkRequests: ipfsReplicationNetworkRequests.length,
+      keychainNetworkRequests: keychainNetworkRequests.length,
       keychainRequests: limitedKeychainVersions.size,
       networkIds,
       networkReadiness,
