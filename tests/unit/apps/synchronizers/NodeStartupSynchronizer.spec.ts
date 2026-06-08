@@ -48,6 +48,13 @@ describe('NodeStartupSynchronizer', () => {
         ready: true,
       },
     ]);
+    readiness.inspect.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 2,
+        ready: true,
+      },
+    ]);
     nodeLoader.loadNode.mockResolvedValue(
       new Node(
         new NodeId(nodeId),
@@ -466,5 +473,68 @@ describe('NodeStartupSynchronizer', () => {
     expect(secondAttemptEvents[2].attributes).toMatchObject({
       conversationId: 'one-to-one:second',
     });
+  });
+
+  it('should not synchronize again while networks remain unready', async () => {
+    readiness.prepare.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 0,
+        ready: false,
+      },
+    ]);
+    readiness.inspect.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 0,
+        ready: false,
+      },
+    ]);
+    identityMetadataRepository.findAll.mockResolvedValue([]);
+    keychainMetadataRepository.findAll.mockResolvedValue([]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([]);
+    communityRepository.findAll.mockResolvedValue([]);
+
+    await synchronizer.synchronize();
+    await synchronizer.synchronizeWhenNetworkBecomesReady();
+
+    expect(eventPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('should synchronize again when a network becomes ready', async () => {
+    readiness.prepare
+      .mockResolvedValueOnce([
+        {
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          peerCount: 0,
+          ready: false,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          peerCount: 1,
+          ready: true,
+        },
+      ]);
+    readiness.inspect.mockResolvedValue([
+      {
+        networkId: '123e4567-e89b-12d3-a456-426614174000',
+        peerCount: 1,
+        ready: true,
+      },
+    ]);
+    identityMetadataRepository.findAll.mockResolvedValue([]);
+    keychainMetadataRepository.findAll.mockResolvedValue([]);
+    conversationRepository.findConversationSyncScopes.mockResolvedValue([]);
+    communityRepository.findAll.mockResolvedValue([]);
+
+    await synchronizer.synchronize();
+    await synchronizer.synchronizeWhenNetworkBecomesReady();
+
+    expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(eventPublisher.publish.mock.calls[0][0]).toEqual([
+      expect.any(IdentityNetworkSyncRequestedEvent),
+    ]);
   });
 });

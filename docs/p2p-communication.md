@@ -172,7 +172,9 @@ Readiness is evaluated per network. A network is ready when its local IPFS
 runtime sees at least one peer before `STARTUP_SYNC_PEER_WAIT_MS` expires. Sync
 requests for conversations and communities are published only for ready
 networks. Networks without peers do not block healthy networks; they are retried
-by later startup-sync attempts. Global identity and keychain repair requests are
+by later startup-sync attempts. After startup, a readiness monitor runs every
+`STARTUP_SYNC_READY_MONITOR_MS` and triggers another sync when a previously
+unready network becomes ready. Global identity and keychain repair requests are
 published only when at least one network is ready.
 
 ## Domain Event Flow

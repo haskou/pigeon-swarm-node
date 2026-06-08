@@ -29,7 +29,7 @@ export default class NodeStartupSyncReadiness {
     });
   }
 
-  private async networkReadiness(
+  private async getNetworkReadiness(
     networkIds: string[],
   ): Promise<NodeStartupNetworkReadiness[]> {
     const networks = await this.ipfs.getNetworks();
@@ -53,17 +53,23 @@ export default class NodeStartupSyncReadiness {
   ): Promise<NodeStartupNetworkReadiness[]> {
     const timeoutMs = this.getPeerWaitTimeoutMs();
     const deadline = Date.now() + timeoutMs;
-    let networkReadiness = await this.networkReadiness(networkIds);
+    let networkReadiness = await this.getNetworkReadiness(networkIds);
 
     while (
       networkReadiness.some((network) => !network.ready) &&
       Date.now() < deadline
     ) {
       await this.sleep(500);
-      networkReadiness = await this.networkReadiness(networkIds);
+      networkReadiness = await this.getNetworkReadiness(networkIds);
     }
 
     return networkReadiness;
+  }
+
+  public async inspect(
+    networkIds: string[],
+  ): Promise<NodeStartupNetworkReadiness[]> {
+    return this.getNetworkReadiness(networkIds);
   }
 
   public async prepare(

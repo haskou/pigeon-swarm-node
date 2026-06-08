@@ -47,6 +47,9 @@ export default class NodeStartupSynchronizer {
   private readonly nodeLoader: NodeLoader;
   private readonly policy: NodeStartupSyncPolicy;
   private readonly readiness: NodeStartupSyncReadiness;
+  private readonly lastReadyNetworks = new Map<string, boolean>();
+  private readinessMonitor?: NodeJS.Timeout;
+  private runningSynchronization?: Promise<NodeStartupSyncResult>;
   private syncAttempt = 0;
 
   constructor(dependencies: NodeStartupSynchronizerDependencies) {
@@ -161,7 +164,24 @@ export default class NodeStartupSynchronizer {
       );
   }
 
-  public async synchronize(): Promise<NodeStartupSyncResult> {
+  private updateLastReadyNetworks(
+    networkReadiness: NodeStartupNetworkReadiness[],
+  ): void {
+    for (const network of networkReadiness) {
+      this.lastReadyNetworks.set(network.networkId, network.ready);
+    }
+  }
+
+  private hasReadyTransition(
+    networkReadiness: NodeStartupNetworkReadiness[],
+  ): boolean {
+    return networkReadiness.some(
+      (network) =>
+        network.ready && this.lastReadyNetworks.get(network.networkId) !== true,
+    );
+  }
+
+  private async synchronizeNow(): Promise<NodeStartupSyncResult> {
     const syncAttempt = this.syncAttempt;
 
     this.syncAttempt += 1;
@@ -173,6 +193,9 @@ export default class NodeStartupSynchronizer {
     const networkIds = Object.keys(nodePrimitives.networks);
 
     const networkReadiness = await this.readiness.prepare(networkIds);
+
+    this.updateLastReadyNetworks(networkReadiness);
+
     const readyNetworkIds = new Set(
       networkReadiness
         .filter((network) => network.ready)
@@ -289,6 +312,18 @@ export default class NodeStartupSynchronizer {
     };
   }
 
+  public async synchronize(): Promise<NodeStartupSyncResult> {
+    if (this.runningSynchronization) {
+      return this.runningSynchronization;
+    }
+
+    this.runningSynchronization = this.synchronizeNow().finally(() => {
+      this.runningSynchronization = undefined;
+    });
+
+    return this.runningSynchronization;
+  }
+
   public scheduleRetries(
     delaysMs: number[] = [5000, 15000, 30000, 60000],
   ): void {
@@ -299,5 +334,38 @@ export default class NodeStartupSynchronizer {
 
       timer.unref?.();
     }
+  }
+
+  public scheduleReadinessMonitor(
+    intervalMs: number = Number(
+      process.env.STARTUP_SYNC_READY_MONITOR_MS || 15000,
+    ),
+  ): void {
+    if (this.readinessMonitor || intervalMs <= 0) {
+      return;
+    }
+
+    this.readinessMonitor = setInterval(() => {
+      void this.synchronizeWhenNetworkBecomesReady();
+    }, intervalMs);
+    this.readinessMonitor.unref?.();
+  }
+
+  public async synchronizeWhenNetworkBecomesReady(): Promise<void> {
+    if (this.runningSynchronization) {
+      return;
+    }
+
+    const node = await this.nodeLoader.loadNode();
+    const networkIds = Object.keys(node.toPrimitives().networks);
+    const networkReadiness = await this.readiness.inspect(networkIds);
+
+    if (!this.hasReadyTransition(networkReadiness)) {
+      this.updateLastReadyNetworks(networkReadiness);
+
+      return;
+    }
+
+    await this.synchronize();
   }
 }

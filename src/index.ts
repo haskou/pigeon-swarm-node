@@ -332,6 +332,7 @@ async function init() {
 
   console.info('Node startup sync result', startupSyncResult);
   nodeStartupSynchronizer.scheduleRetries();
+  nodeStartupSynchronizer.scheduleReadinessMonitor();
   console.timeEnd('Node startup sync');
 
   console.info('Ready!');

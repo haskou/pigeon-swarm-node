@@ -75,6 +75,13 @@ logging URL.
 | `TRANSPORT_MAX_RETRIES` | Adapter default | No | Retry count for AMQP operations. |
 | `TRANSPORT_RETRY_DELAY` | Adapter default | No | Delay between retries (ms). |
 
+## Startup Sync Variables
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `STARTUP_SYNC_PEER_WAIT_MS` | `10000`, or `0` in tests | No | Maximum time to wait at startup for peers in each configured network before the first sync attempt. |
+| `STARTUP_SYNC_READY_MONITOR_MS` | `15000` | No | Interval used after startup to detect networks that move from unready to ready and trigger another startup sync attempt. Set to `0` to disable the monitor. |
+
 ## PWA Web Push Variables
 
 Web Push requires VAPID keys. Without them, `GET /push/vapid-public-key`
