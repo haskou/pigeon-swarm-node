@@ -692,6 +692,7 @@ Response:
       "lastPubSubPublishedAt": 1780579041000,
       "lastPubSubReceivedAt": 1780579042000,
       "lastRequestedNetworkCount": 1,
+      "publicConnectionPeerCount": 4,
       "privateNetworkCount": 1
     },
     "relayAutoEnabled": false,

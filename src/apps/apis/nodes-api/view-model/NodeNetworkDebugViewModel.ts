@@ -44,6 +44,8 @@ export class NodeNetworkDebugViewModel {
           this.publicRelay.privateRelayDirectory.lastRequestedNetworkCount,
         privateNetworkCount:
           this.publicRelay.privateRelayDirectory.privateNetworkCount,
+        publicConnectionPeerCount:
+          this.publicRelay.privateRelayDirectory.publicConnectionPeerCount,
       },
       relayAdvertised: this.publicRelay.relayAdvertised,
       relayAutoEnabled: this.publicRelay.relayAutoEnabled,
@@ -71,6 +73,8 @@ export class NodeNetworkDebugViewModel {
             this.publicRelay.privateRelayDirectory.lastProviderLookupMultiaddrs,
           privateNetworkFingerprints:
             this.publicRelay.privateRelayDirectory.privateNetworkFingerprints,
+          publicConnectionPeerId:
+            this.publicRelay.privateRelayDirectory.publicConnectionPeerId,
         },
         relayRecord: this.publicRelay.relayRecord,
       },

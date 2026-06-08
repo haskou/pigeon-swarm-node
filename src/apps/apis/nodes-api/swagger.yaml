@@ -402,6 +402,11 @@ components:
                   type: number
                 lastRequestedNetworkCount:
                   type: number
+                publicConnectionPeerCount:
+                  type: number
+                publicConnectionPeerId:
+                  type: string
+                  description: Present only when DEBUG_NETWORK=true.
                 privateNetworkCount:
                   type: number
                 privateNetworkFingerprints:

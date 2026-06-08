@@ -65,6 +65,8 @@ export class PrivateNetworkRelayRecordDirectory {
     lastPubSubPublishedAt?: number;
     lastPubSubReceivedAt?: number;
     lastRequestedNetworkCount?: number;
+    publicConnectionPeerCount?: number;
+    publicConnectionPeerId?: string;
   } {
     const globalState = globalThis as typeof globalThis & {
       [PrivateNetworkRelayRecordDirectory.globalDebugStateKey]?:
@@ -86,6 +88,8 @@ export class PrivateNetworkRelayRecordDirectory {
             lastPubSubPublishedAt?: number;
             lastPubSubReceivedAt?: number;
             lastRequestedNetworkCount?: number;
+            publicConnectionPeerCount?: number;
+            publicConnectionPeerId?: string;
           }
         | undefined;
     };
@@ -129,6 +133,13 @@ export class PrivateNetworkRelayRecordDirectory {
       });
 
     return this.publicConnection;
+  }
+
+  private updatePublicConnectionDebug(publicConnection: IPFSConnection): void {
+    this.directoryDebugState.publicConnectionPeerCount =
+      publicConnection.getPeers().length;
+    this.directoryDebugState.publicConnectionPeerId =
+      publicConnection.getPeerId();
   }
 
   private isEnvelope(
@@ -335,6 +346,7 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     const publicConnection = await this.getPublicConnection();
+    this.updatePublicConnectionDebug(publicConnection);
     this.directoryDebugState.lastPublishedAt = Date.now();
     this.directoryDebugState.lastPublishedNetworkCount = privateNetworks.length;
     Kernel.logger.debug(
@@ -390,6 +402,7 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     const publicConnection = await this.getPublicConnection();
+    this.updatePublicConnectionDebug(publicConnection);
     const discoveredRecords: PublicRelayRecordPrimitives[] = [];
     this.directoryDebugState.lastRequestedNetworkCount = privateNetworks.length;
     await this.subscribeRelayTopics(publicConnection, privateNetworks);
@@ -509,6 +522,8 @@ export class PrivateNetworkRelayRecordDirectory {
     lastPubSubPublishedAt?: number;
     lastPubSubReceivedAt?: number;
     lastRequestedNetworkCount?: number;
+    publicConnectionPeerCount?: number;
+    publicConnectionPeerId?: string;
     privateNetworkCount: number;
     privateNetworkFingerprints: string[];
   } {
@@ -536,6 +551,9 @@ export class PrivateNetworkRelayRecordDirectory {
       lastPubSubReceivedAt: this.directoryDebugState.lastPubSubReceivedAt,
       lastRequestedNetworkCount:
         this.directoryDebugState.lastRequestedNetworkCount,
+      publicConnectionPeerCount:
+        this.directoryDebugState.publicConnectionPeerCount,
+      publicConnectionPeerId: this.directoryDebugState.publicConnectionPeerId,
       privateNetworkCount: privateNetworks.length,
       privateNetworkFingerprints: privateNetworks.map((network) =>
         this.authenticator.fingerprint(network),

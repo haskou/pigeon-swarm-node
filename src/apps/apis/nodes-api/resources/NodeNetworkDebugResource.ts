@@ -27,6 +27,8 @@ export type NodeNetworkDebugResource = {
       lastPubSubPublishedAt?: number;
       lastPubSubReceivedAt?: number;
       lastRequestedNetworkCount?: number;
+      publicConnectionPeerCount?: number;
+      publicConnectionPeerId?: string;
       privateNetworkCount: number;
       privateNetworkFingerprints?: string[];
     };
