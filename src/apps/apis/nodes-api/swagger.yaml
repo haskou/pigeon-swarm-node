@@ -368,6 +368,24 @@ components:
                   description: Present only when DEBUG_NETWORK=true.
                   items:
                     type: string
+                lastDiscoveredAt:
+                  type: number
+                lastError:
+                  type: string
+                lastLookupHadValue:
+                  type: boolean
+                lastLookupValueKind:
+                  type: string
+                  enum:
+                    - cid
+                    - inline-envelope
+                    - unknown
+                lastPublishedAt:
+                  type: number
+                lastPublishedNetworkCount:
+                  type: number
+                lastRequestedNetworkCount:
+                  type: number
                 privateNetworkCount:
                   type: number
                 privateNetworkFingerprints:

@@ -9,6 +9,9 @@ import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 
 export class PrivateNetworkRelayRecordDirectory {
+  private static readonly globalDebugStateKey =
+    '__pigeonSwarmPrivateRelayRecordDirectoryDebug';
+
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
@@ -26,6 +29,34 @@ export class PrivateNetworkRelayRecordDirectory {
   ) {
     this.authenticator =
       authenticator ?? new PrivateNetworkRelayRecordAuthenticator();
+  }
+
+  private get directoryDebugState(): {
+    lastDiscoveredAt?: number;
+    lastError?: string;
+    lastLookupHadValue?: boolean;
+    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+    lastPublishedAt?: number;
+    lastPublishedNetworkCount?: number;
+    lastRequestedNetworkCount?: number;
+  } {
+    const globalState = globalThis as typeof globalThis & {
+      [PrivateNetworkRelayRecordDirectory.globalDebugStateKey]?:
+        | {
+            lastDiscoveredAt?: number;
+            lastError?: string;
+            lastLookupHadValue?: boolean;
+            lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+            lastPublishedAt?: number;
+            lastPublishedNetworkCount?: number;
+            lastRequestedNetworkCount?: number;
+          }
+        | undefined;
+    };
+
+    globalState[PrivateNetworkRelayRecordDirectory.globalDebugStateKey] ??= {};
+
+    return globalState[PrivateNetworkRelayRecordDirectory.globalDebugStateKey];
   }
 
   private publicStorageLocation(): string {
@@ -92,6 +123,20 @@ export class PrivateNetworkRelayRecordDirectory {
     return undefined;
   }
 
+  private relayRecordEnvelopeKind(
+    value: string,
+  ): 'cid' | 'inline-envelope' | 'unknown' {
+    if (this.decodeEnvelopeRecord(value)) {
+      return 'inline-envelope';
+    }
+
+    if (value.startsWith('baf') || value.startsWith('Qm')) {
+      return 'cid';
+    }
+
+    return 'unknown';
+  }
+
   private async loadEnvelopeRecord(
     publicConnection: IPFSConnection,
     value: string,
@@ -140,6 +185,8 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     const publicConnection = await this.getPublicConnection();
+    this.directoryDebugState.lastPublishedAt = Date.now();
+    this.directoryDebugState.lastPublishedNetworkCount = privateNetworks.length;
     Kernel.logger.debug(
       `Publishing private relay records: privateNetworks=${privateNetworks.length} relayPeerId="${relayRecord.peerId}" fingerprints="${privateNetworks
         .map((network) => this.authenticator.fingerprint(network))
@@ -175,6 +222,7 @@ export class PrivateNetworkRelayRecordDirectory {
 
     const publicConnection = await this.getPublicConnection();
     const discoveredRecords: PublicRelayRecordPrimitives[] = [];
+    this.directoryDebugState.lastRequestedNetworkCount = privateNetworks.length;
 
     Kernel.logger.debug(
       `Discovering private relay records: privateNetworks=${privateNetworks.length} fingerprints="${privateNetworks
@@ -188,11 +236,15 @@ export class PrivateNetworkRelayRecordDirectory {
           const lookupKey = this.authenticator.lookupKey(network);
           const relayRecordEnvelope =
             await publicConnection.getRecord(lookupKey);
+          this.directoryDebugState.lastLookupHadValue =
+            Boolean(relayRecordEnvelope);
 
           if (!relayRecordEnvelope) {
             return;
           }
 
+          this.directoryDebugState.lastLookupValueKind =
+            this.relayRecordEnvelopeKind(relayRecordEnvelope);
           const envelope = await this.loadEnvelopeRecord(
             publicConnection,
             relayRecordEnvelope,
@@ -210,12 +262,15 @@ export class PrivateNetworkRelayRecordDirectory {
 
           this.relayRecordRegistry.save(relayRecord);
           discoveredRecords.push(relayRecord);
+          this.directoryDebugState.lastDiscoveredAt = Date.now();
+          this.directoryDebugState.lastError = undefined;
           Kernel.logger.debug(
             `Discovered private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
               network,
             )}" peerId="${relayRecord.peerId}"`,
           );
         } catch (error: unknown) {
+          this.directoryDebugState.lastError = String(error);
           Kernel.logger.debug(
             `Private relay record lookup skipped for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
               network,
@@ -241,6 +296,13 @@ export class PrivateNetworkRelayRecordDirectory {
   public debugState(): {
     discoveredRecordCount: number;
     discoveredRelayPeerIds: string[];
+    lastDiscoveredAt?: number;
+    lastError?: string;
+    lastLookupHadValue?: boolean;
+    lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+    lastPublishedAt?: number;
+    lastPublishedNetworkCount?: number;
+    lastRequestedNetworkCount?: number;
     privateNetworkCount: number;
     privateNetworkFingerprints: string[];
   } {
@@ -250,6 +312,15 @@ export class PrivateNetworkRelayRecordDirectory {
     return {
       discoveredRecordCount: relayRecords.length,
       discoveredRelayPeerIds: relayRecords.map((record) => record.peerId),
+      lastDiscoveredAt: this.directoryDebugState.lastDiscoveredAt,
+      lastError: this.directoryDebugState.lastError,
+      lastLookupHadValue: this.directoryDebugState.lastLookupHadValue,
+      lastLookupValueKind: this.directoryDebugState.lastLookupValueKind,
+      lastPublishedAt: this.directoryDebugState.lastPublishedAt,
+      lastPublishedNetworkCount:
+        this.directoryDebugState.lastPublishedNetworkCount,
+      lastRequestedNetworkCount:
+        this.directoryDebugState.lastRequestedNetworkCount,
       privateNetworkCount: privateNetworks.length,
       privateNetworkFingerprints: privateNetworks.map((network) =>
         this.authenticator.fingerprint(network),

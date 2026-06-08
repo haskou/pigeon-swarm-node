@@ -19,6 +19,18 @@ export class NodeNetworkDebugViewModel {
       privateRelayDirectory: {
         discoveredRecordCount:
           this.publicRelay.privateRelayDirectory.discoveredRecordCount,
+        lastDiscoveredAt:
+          this.publicRelay.privateRelayDirectory.lastDiscoveredAt,
+        lastError: this.publicRelay.privateRelayDirectory.lastError,
+        lastLookupHadValue:
+          this.publicRelay.privateRelayDirectory.lastLookupHadValue,
+        lastLookupValueKind:
+          this.publicRelay.privateRelayDirectory.lastLookupValueKind,
+        lastPublishedAt: this.publicRelay.privateRelayDirectory.lastPublishedAt,
+        lastPublishedNetworkCount:
+          this.publicRelay.privateRelayDirectory.lastPublishedNetworkCount,
+        lastRequestedNetworkCount:
+          this.publicRelay.privateRelayDirectory.lastRequestedNetworkCount,
         privateNetworkCount:
           this.publicRelay.privateRelayDirectory.privateNetworkCount,
       },

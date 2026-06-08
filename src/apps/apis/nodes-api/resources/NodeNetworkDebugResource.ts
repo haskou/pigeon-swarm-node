@@ -14,6 +14,13 @@ export type NodeNetworkDebugResource = {
     privateRelayDirectory: {
       discoveredRecordCount: number;
       discoveredRelayPeerIds?: string[];
+      lastDiscoveredAt?: number;
+      lastError?: string;
+      lastLookupHadValue?: boolean;
+      lastLookupValueKind?: 'cid' | 'inline-envelope' | 'unknown';
+      lastPublishedAt?: number;
+      lastPublishedNetworkCount?: number;
+      lastRequestedNetworkCount?: number;
       privateNetworkCount: number;
       privateNetworkFingerprints?: string[];
     };

@@ -681,6 +681,12 @@ Response:
     "listenAddressCount": 1,
     "privateRelayDirectory": {
       "discoveredRecordCount": 1,
+      "lastDiscoveredAt": 1780579039944,
+      "lastLookupHadValue": true,
+      "lastLookupValueKind": "inline-envelope",
+      "lastPublishedAt": 1780579039000,
+      "lastPublishedNetworkCount": 1,
+      "lastRequestedNetworkCount": 1,
       "privateNetworkCount": 1
     },
     "relayAutoEnabled": false,
@@ -699,6 +705,9 @@ Implemented:
 - show whether the node relay is enabled, running and publicly advertised
 - show counts for configured bootstrap relays, listen addresses, discovered
   relays and private relay directory records
+- show safe private relay directory diagnostics such as last lookup/publish
+  timestamps, whether the last lookup returned a value, and whether that value
+  was an inline encrypted envelope or a legacy CID pointer
 - when `DEBUG_NETWORK=true`, the optional debug fields may include peer ids,
   relay multiaddrs, relay signatures, public keys and private network
   fingerprints for operational diagnostics
