@@ -218,11 +218,66 @@ components:
       type: object
       required:
         - id
+        - networkSummary
+        - nodeType
+        - relay
+        - runtime
       properties:
         id:
           type: string
         owner:
           type: string
+        nodeType:
+          type: string
+          enum:
+            - leaf
+            - reachable
+            - relay
+            - unknown
+        relay:
+          type: object
+          required:
+            - advertised
+            - autoEnabled
+            - enabled
+            - running
+          properties:
+            advertised:
+              type: boolean
+            autoEnabled:
+              type: boolean
+            enabled:
+              type: boolean
+            peerId:
+              type: string
+            running:
+              type: boolean
+        networkSummary:
+          type: object
+          required:
+            - privateCount
+            - publicCount
+            - total
+          properties:
+            privateCount:
+              type: number
+            publicCount:
+              type: number
+            total:
+              type: number
+        runtime:
+          type: object
+          required:
+            - transport
+          properties:
+            logLevel:
+              type: string
+            transport:
+              type: string
+              enum:
+                - in-memory
+                - libp2p-gossipsub
+                - unknown
     NetworkResource:
       type: object
       required:
@@ -300,16 +355,52 @@ components:
     PeerResource:
       type: object
       required:
+        - capabilities
+        - connectionSummary
         - id
         - lastSeenAt
         - networks
+        - nodeType
       properties:
+        capabilities:
+          type: object
+          required:
+            - gossipsub
+            - privateIpfs
+            - publicIpfs
+            - relay
+          properties:
+            gossipsub:
+              type: boolean
+            privateIpfs:
+              type: boolean
+            publicIpfs:
+              type: boolean
+            relay:
+              type: boolean
+        connectionSummary:
+          type: object
+          required:
+            - isSharedNetworkPeer
+            - sharedNetworkCount
+          properties:
+            isSharedNetworkPeer:
+              type: boolean
+            sharedNetworkCount:
+              type: number
         id:
           type: string
         owner:
           type: string
         lastSeenAt:
           type: number
+        nodeType:
+          type: string
+          enum:
+            - leaf
+            - reachable
+            - relay
+            - unknown
         networks:
           type: array
           items:

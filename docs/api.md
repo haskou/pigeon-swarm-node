@@ -517,7 +517,24 @@ Response:
 ```json
 {
   "id": "<nodeId>",
-  "owner": "<identityId>"
+  "networkSummary": {
+    "privateCount": 1,
+    "publicCount": 1,
+    "total": 2
+  },
+  "nodeType": "relay",
+  "owner": "<identityId>",
+  "relay": {
+    "advertised": true,
+    "autoEnabled": false,
+    "enabled": true,
+    "peerId": "12D3Koo...",
+    "running": true
+  },
+  "runtime": {
+    "logLevel": "info",
+    "transport": "libp2p-gossipsub"
+  }
 }
 ```
 
@@ -525,7 +542,12 @@ Implemented:
 
 - return the local node id
 - return the owner when the node has already been claimed
-- keep networks out of this response
+- return sanitized node runtime metadata for frontend/admin status displays
+- return `nodeType` as `leaf`, `reachable`, `relay` or `unknown`
+- return relay booleans without exposing relay multiaddrs or private directory
+  records
+- return network counts without exposing private network keys
+- return transport/log-level metadata
 
 ### Get local node networks
 
@@ -697,6 +719,16 @@ Response:
 {
   "peers": [
     {
+      "capabilities": {
+        "gossipsub": true,
+        "privateIpfs": false,
+        "publicIpfs": true,
+        "relay": false
+      },
+      "connectionSummary": {
+        "isSharedNetworkPeer": true,
+        "sharedNetworkCount": 1
+      },
       "id": "<nodeId>",
       "owner": "<identityId>",
       "lastSeenAt": 1773848829055,
@@ -705,7 +737,8 @@ Response:
           "id": "<networkId>",
           "name": "public"
         }
-      ]
+      ],
+      "nodeType": "unknown"
     }
   ]
 }
@@ -716,8 +749,13 @@ Implemented:
 - publish a local node heartbeat every 5 minutes through the consumer bus
 - store heartbeats received from remote nodes as active peers
 - return peers seen during the active peer window
-- include node id, owner and network id/name only
+- include node id, owner, network id/name, safe inferred capabilities and a
+  shared-network count
+- return `nodeType: "unknown"` until remote node capability metadata is
+  explicitly included in heartbeat payloads
 - never expose private network keys in peer heartbeat payloads
+- never expose peer multiaddrs or private relay directory records from this
+  endpoint
 
 ## IPFS HTTP API
 
