@@ -689,6 +689,8 @@ Response:
       "lastProviderLookupAt": 1780579040000,
       "lastProviderLookupHadValue": true,
       "lastProviderLookupMultiaddrCount": 1,
+      "lastPubSubPublishedAt": 1780579041000,
+      "lastPubSubReceivedAt": 1780579042000,
       "lastRequestedNetworkCount": 1,
       "privateNetworkCount": 1
     },

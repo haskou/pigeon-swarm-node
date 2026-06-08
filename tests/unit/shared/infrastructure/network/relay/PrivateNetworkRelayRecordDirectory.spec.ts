@@ -147,7 +147,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
-  it('should discover relay provider multiaddrs when custom DHT records are unavailable', async () => {
+  it('should ignore relay provider multiaddrs when custom DHT records are unavailable', async () => {
     const publicConnection = new InMemoryPublicConnection();
     const registry = new PublicRelayRecordRegistry();
     const publisher = new PrivateNetworkRelayRecordDirectory(
@@ -168,29 +168,31 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       async () => publicConnection,
     ).discover();
 
-    expect(discovered).toHaveLength(1);
-    expect(discovered[0].peerId).toBe(relayRecord.peerId);
-    expect(discovered[0].multiaddrs).toEqual(relayRecord.multiaddrs);
+    expect(discovered).toEqual([]);
+    expect(registry.all()).toEqual([]);
   });
 
-  it('should discover relay provider multiaddrs with peer ids appended by the IPFS connection', async () => {
+  it('should discover relay records from encrypted public pubsub envelopes', async () => {
     const publicConnection = new InMemoryPublicConnection();
     const registry = new PublicRelayRecordRegistry();
-
-    registry.clear();
-    publicConnection.setProviderMultiaddrs([
-      '/dns4/relay.test/tcp/4011/p2p/12D3KooWDHwUoxY5MSJaTP66sbsMCFZEQwVVHS5EtemUrxtFqNGp',
-    ]);
-
-    const discovered = await new PrivateNetworkRelayRecordDirectory(
+    const leafDirectory = new PrivateNetworkRelayRecordDirectory(
       networkRegistry(privateNetwork(networkKey)),
       registry,
       undefined,
       async () => publicConnection,
-    ).discover();
+    );
 
-    expect(discovered).toHaveLength(1);
-    expect(discovered[0].peerId).toBe(relayRecord.peerId);
+    registry.clear();
+    await leafDirectory.discover();
+
+    await new PrivateNetworkRelayRecordDirectory(
+      networkRegistry(privateNetwork(networkKey)),
+      new PublicRelayRecordRegistry(),
+      undefined,
+      async () => publicConnection,
+    ).publish(relayRecord);
+
+    expect(registry.all()).toEqual([relayRecord]);
   });
 
   it('should refresh private relay discovery periodically', async () => {
@@ -246,6 +248,10 @@ class InMemoryPublicConnection implements IPFSConnection {
 
   private readonly records = new Map<string, string>();
   private readonly providerMultiaddrs = new Map<string, string[]>();
+  private readonly pubsubHandlers = new Map<
+    string,
+    ((payload: string) => Promise<void>)[]
+  >();
   private providerMultiaddrOverride?: string[];
 
   public stat(): Promise<void> {
@@ -324,12 +330,24 @@ class InMemoryPublicConnection implements IPFSConnection {
     return Promise.resolve(this.providerMultiaddrs.get(key) || []);
   }
 
-  public publishPubSub(): Promise<void> {
-    throw new Error('Not implemented.');
+  public async publishPubSub(topic: string, payload: string): Promise<void> {
+    await Promise.all(
+      (this.pubsubHandlers.get(topic) || []).map((handler) =>
+        handler(payload),
+      ),
+    );
   }
 
-  public subscribePubSub(): Promise<void> {
-    throw new Error('Not implemented.');
+  public subscribePubSub(
+    topic: string,
+    handler: (payload: string) => Promise<void>,
+  ): Promise<void> {
+    this.pubsubHandlers.set(topic, [
+      ...(this.pubsubHandlers.get(topic) || []),
+      handler,
+    ]);
+
+    return Promise.resolve();
   }
 
   public blockPeer(): Promise<void> {

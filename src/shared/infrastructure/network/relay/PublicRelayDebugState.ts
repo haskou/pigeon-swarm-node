@@ -20,6 +20,8 @@ export type PublicRelayDebugState = {
     lastProviderLookupHadValue?: boolean;
     lastProviderLookupMultiaddrs?: string[];
     lastProviderLookupMultiaddrCount?: number;
+    lastPubSubPublishedAt?: number;
+    lastPubSubReceivedAt?: number;
     lastRequestedNetworkCount?: number;
     privateNetworkCount: number;
     privateNetworkFingerprints: string[];

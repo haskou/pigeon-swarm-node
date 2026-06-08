@@ -1,5 +1,6 @@
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 
@@ -22,6 +23,8 @@ export class PrivateNetworkRelayRecordDirectory {
   private discoveryInterval?: NodeJS.Timeout;
 
   private publicConnection?: Promise<IPFSConnection>;
+
+  private readonly subscribedRelayTopics = new Set<string>();
 
   private readonly authenticator: PrivateNetworkRelayRecordAuthenticator;
 
@@ -59,6 +62,8 @@ export class PrivateNetworkRelayRecordDirectory {
     lastProviderLookupHadValue?: boolean;
     lastProviderLookupMultiaddrs?: string[];
     lastProviderLookupMultiaddrCount?: number;
+    lastPubSubPublishedAt?: number;
+    lastPubSubReceivedAt?: number;
     lastRequestedNetworkCount?: number;
   } {
     const globalState = globalThis as typeof globalThis & {
@@ -78,6 +83,8 @@ export class PrivateNetworkRelayRecordDirectory {
             lastProviderLookupHadValue?: boolean;
             lastProviderLookupMultiaddrs?: string[];
             lastProviderLookupMultiaddrCount?: number;
+            lastPubSubPublishedAt?: number;
+            lastPubSubReceivedAt?: number;
             lastRequestedNetworkCount?: number;
           }
         | undefined;
@@ -90,6 +97,10 @@ export class PrivateNetworkRelayRecordDirectory {
 
   private publicStorageLocation(): string {
     return `${this.storagePath}/public-relay-record-directory`;
+  }
+
+  private relayTopic(network: IPFSNetwork): string {
+    return this.authenticator.lookupKey(network).replaceAll('/', '.');
   }
 
   private getPrivateNetworks() {
@@ -150,6 +161,89 @@ export class PrivateNetworkRelayRecordDirectory {
     }
 
     return undefined;
+  }
+
+  private saveDiscoveredRelayRecord(
+    relayRecord: PublicRelayRecordPrimitives,
+  ): void {
+    this.relayRecordRegistry.save(relayRecord);
+    this.directoryDebugState.lastDiscoveredAt = Date.now();
+    this.directoryDebugState.lastError = undefined;
+  }
+
+  private handlePubSubRelayRecord(network: IPFSNetwork, payload: string): void {
+    const envelope = this.decodeEnvelopeRecord(payload);
+
+    if (!envelope) {
+      return;
+    }
+
+    const relayRecord = this.authenticator.open(network, envelope);
+
+    if (!relayRecord) {
+      return;
+    }
+
+    this.directoryDebugState.lastLookupValueKind = 'inline-envelope';
+    this.directoryDebugState.lastPubSubReceivedAt = Date.now();
+    this.saveDiscoveredRelayRecord(relayRecord);
+    Kernel.logger.info(
+      `Discovered private relay record from public pubsub for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
+        network,
+      )}" peerId="${relayRecord.peerId}"`,
+    );
+  }
+
+  private async subscribeRelayTopic(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    const topic = this.relayTopic(network);
+
+    if (this.subscribedRelayTopics.has(topic)) {
+      return;
+    }
+
+    this.subscribedRelayTopics.add(topic);
+    await publicConnection.subscribePubSub(topic, (payload) =>
+      Promise.resolve(this.handlePubSubRelayRecord(network, payload)),
+    );
+    Kernel.logger.debug(
+      `Subscribed private relay pubsub topic for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
+        network,
+      )}"`,
+    );
+  }
+
+  private async subscribeRelayTopics(
+    publicConnection: IPFSConnection,
+    networks: IPFSNetwork[],
+  ): Promise<void> {
+    await Promise.all(
+      networks.map((network) =>
+        this.subscribeRelayTopic(publicConnection, network),
+      ),
+    );
+  }
+
+  private async publishRelayEnvelope(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+  ): Promise<void> {
+    try {
+      await publicConnection.publishPubSub(
+        this.relayTopic(network),
+        JSON.stringify(envelope),
+      );
+      this.directoryDebugState.lastPubSubPublishedAt = Date.now();
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `Private relay pubsub publication skipped for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
+          network,
+        )}": ${String(error)}`,
+      );
+    }
   }
 
   private relayRecordEnvelopeKind(
@@ -273,6 +367,7 @@ export class PrivateNetworkRelayRecordDirectory {
         } finally {
           clearTimeout(provideAbort.timeout);
         }
+        await this.publishRelayEnvelope(publicConnection, network, envelope);
         Kernel.logger.debug(
           `Published private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
             network,
@@ -297,6 +392,7 @@ export class PrivateNetworkRelayRecordDirectory {
     const publicConnection = await this.getPublicConnection();
     const discoveredRecords: PublicRelayRecordPrimitives[] = [];
     this.directoryDebugState.lastRequestedNetworkCount = privateNetworks.length;
+    await this.subscribeRelayTopics(publicConnection, privateNetworks);
 
     Kernel.logger.debug(
       `Discovering private relay records: privateNetworks=${privateNetworks.length} fingerprints="${privateNetworks
@@ -345,18 +441,6 @@ export class PrivateNetworkRelayRecordDirectory {
               providerMultiaddrs;
             this.directoryDebugState.lastProviderLookupMultiaddrCount =
               providerMultiaddrs.length;
-            const relayRecord =
-              this.relayRecordFromProviderMultiaddrs(providerMultiaddrs);
-
-            if (!relayRecord) {
-              return;
-            }
-
-            this.directoryDebugState.lastLookupValueKind = 'provider';
-            this.relayRecordRegistry.save(relayRecord);
-            discoveredRecords.push(relayRecord);
-            this.directoryDebugState.lastDiscoveredAt = Date.now();
-            this.directoryDebugState.lastError = undefined;
 
             return;
           }
@@ -378,10 +462,8 @@ export class PrivateNetworkRelayRecordDirectory {
             return;
           }
 
-          this.relayRecordRegistry.save(relayRecord);
+          this.saveDiscoveredRelayRecord(relayRecord);
           discoveredRecords.push(relayRecord);
-          this.directoryDebugState.lastDiscoveredAt = Date.now();
-          this.directoryDebugState.lastError = undefined;
           Kernel.logger.debug(
             `Discovered private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
               network,
@@ -424,6 +506,8 @@ export class PrivateNetworkRelayRecordDirectory {
     lastProviderLookupHadValue?: boolean;
     lastProviderLookupMultiaddrs?: string[];
     lastProviderLookupMultiaddrCount?: number;
+    lastPubSubPublishedAt?: number;
+    lastPubSubReceivedAt?: number;
     lastRequestedNetworkCount?: number;
     privateNetworkCount: number;
     privateNetworkFingerprints: string[];
@@ -441,13 +525,15 @@ export class PrivateNetworkRelayRecordDirectory {
       lastProviderLookupAt: this.directoryDebugState.lastProviderLookupAt,
       lastProviderLookupHadValue:
         this.directoryDebugState.lastProviderLookupHadValue,
-      lastProviderLookupMultiaddrs:
-        this.directoryDebugState.lastProviderLookupMultiaddrs,
       lastProviderLookupMultiaddrCount:
         this.directoryDebugState.lastProviderLookupMultiaddrCount,
+      lastProviderLookupMultiaddrs:
+        this.directoryDebugState.lastProviderLookupMultiaddrs,
       lastPublishedAt: this.directoryDebugState.lastPublishedAt,
       lastPublishedNetworkCount:
         this.directoryDebugState.lastPublishedNetworkCount,
+      lastPubSubPublishedAt: this.directoryDebugState.lastPubSubPublishedAt,
+      lastPubSubReceivedAt: this.directoryDebugState.lastPubSubReceivedAt,
       lastRequestedNetworkCount:
         this.directoryDebugState.lastRequestedNetworkCount,
       privateNetworkCount: privateNetworks.length,

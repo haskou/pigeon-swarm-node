@@ -36,6 +36,10 @@ export class NodeNetworkDebugViewModel {
         lastPublishedAt: this.publicRelay.privateRelayDirectory.lastPublishedAt,
         lastPublishedNetworkCount:
           this.publicRelay.privateRelayDirectory.lastPublishedNetworkCount,
+        lastPubSubPublishedAt:
+          this.publicRelay.privateRelayDirectory.lastPubSubPublishedAt,
+        lastPubSubReceivedAt:
+          this.publicRelay.privateRelayDirectory.lastPubSubReceivedAt,
         lastRequestedNetworkCount:
           this.publicRelay.privateRelayDirectory.lastRequestedNetworkCount,
         privateNetworkCount:

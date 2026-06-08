@@ -24,6 +24,8 @@ export type NodeNetworkDebugResource = {
       lastProviderLookupHadValue?: boolean;
       lastProviderLookupMultiaddrs?: string[];
       lastProviderLookupMultiaddrCount?: number;
+      lastPubSubPublishedAt?: number;
+      lastPubSubReceivedAt?: number;
       lastRequestedNetworkCount?: number;
       privateNetworkCount: number;
       privateNetworkFingerprints?: string[];

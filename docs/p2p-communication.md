@@ -112,6 +112,7 @@ IPFS routing layer can resolve the directory record.
 Relay records are advertised in two places:
 
 * public GossipSub topic `pigeon-swarm.public-relays.v1`;
+* opaque private-network GossipSub topics carrying encrypted relay envelopes;
 * private relay directory records published through the public IPFS routing
   layer, keyed and encrypted from the private network key.
 
@@ -122,15 +123,15 @@ directory envelope. The envelope is stored inline in the routing record so a
 leaf node does not need to fetch an additional public CID before it can decrypt
 and dial the relay. Older CID-backed directory values are still accepted while
 the network rolls forward. Because public DHT nodes do not necessarily accept
-custom mutable record namespaces, relay nodes also publish a standard provider
-record for a deterministic CID derived from the private lookup key. Leaf nodes
-use that provider record as a fallback rendezvous when the custom routing record
-is not available. The provider address announced for that fallback is the public
-relay multiaddr built from `PIGEON_PUBLIC_HOST` and `PIGEON_RELAY_PORT`, so a
-leaf node does not need a manual bootstrap relay address when the public routing
-layer can find the provider. Each private-directory routing operation uses
-`PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` when configured, or a short default
-timeout, to avoid blocking process schedulers while public DHT routing warms up.
+custom mutable record namespaces, relay nodes also publish the encrypted
+directory envelope on an opaque public GossipSub topic derived from the private
+network key. Leaf nodes that share the private network key subscribe to the same
+topic, decrypt the envelope locally, and dial the relay. Public DHT provider
+lookups remain diagnostic only; provider records can point at generic public
+gateways, so they are not trusted as relay records. Each private-directory
+routing operation uses `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` when
+configured, or a short default timeout, to avoid blocking process schedulers
+while public DHT routing warms up.
 
 ```mermaid
 sequenceDiagram
@@ -142,8 +143,8 @@ sequenceDiagram
 
   R->>R: Start public relay runtime
   R->>Pub: Publish signed public relay record
-  R->>Pub: Publish private relay directory record keyed by private network key
-  L->>Pub: Discover private relay directory record
+  R->>Pub: Publish encrypted private relay envelope on opaque topic
+  L->>Pub: Subscribe to opaque private relay topic
   Pub-->>L: Return relay record for shared private network
   L->>L: Verify record signature and private-network envelope
   L->>R: Dial relay/libp2p multiaddr
