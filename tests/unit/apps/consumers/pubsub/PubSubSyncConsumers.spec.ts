@@ -480,7 +480,11 @@ describe('PubSub sync consumers', () => {
 
     await consumer.handler(
       new ConversationSyncAvailableEvent(conversationId, {
-        messageCandidates: [{ messageId }, { messageId: 42 }, null],
+        messageCandidates: [
+          { externalIdentifier: 'message-cid', messageId },
+          { messageId: 42 },
+          null,
+        ],
         conversation: {
           id: conversationId,
           networkId: '550e8400-e29b-41d4-a716-446655440011',
@@ -505,6 +509,9 @@ describe('PubSub sync consumers', () => {
     expect(registrar.register.mock.calls[0][0].messageId.valueOf()).toBe(
       messageId,
     );
+    expect(
+      registrar.register.mock.calls[0][0].externalIdentifier?.valueOf(),
+    ).toBe('message-cid');
     expect(conversationRegistrar.register).toHaveBeenCalledWith(
       expect.any(ConversationMetadataRegisterMessage),
     );

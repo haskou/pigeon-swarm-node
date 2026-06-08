@@ -213,7 +213,10 @@ that have conversations in the requested network respond with the existing
 `conversations.v1.conversation.sync_available` event per conversation. That
 response contains conversation metadata plus bounded message and reaction
 candidates, so an empty node can hydrate conversation lists and recent message
-history.
+history. Message candidates announce the message CID as `externalIdentifier`;
+the receiving node downloads and validates the message from private IPFS before
+registering it. An embedded `message` payload is accepted only as a compatibility
+fallback for older peers and should not be the normal sync path.
 
 Community network sync uses `communities.v1.network.sync_requested`. Peers that
 have communities in the requested network respond with the existing

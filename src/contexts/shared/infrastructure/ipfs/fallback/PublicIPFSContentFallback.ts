@@ -20,10 +20,16 @@ export class PublicIPFSContentFallback {
     process.env.PIGEON_PUBLIC_IPFS_FALLBACK_MAX_BYTES || 10 * 1024 * 1024,
   );
 
+  private static handlerRegisteredNodeCount = 0;
+
   private static handlerRegisteredNodes = new WeakSet<object>();
   private static networks: IPFSNetwork[] = [];
 
   private readonly codec = new PubSubNetworkMessageCodec();
+
+  public static isServing(): boolean {
+    return PublicIPFSContentFallback.handlerRegisteredNodeCount > 0;
+  }
 
   public constructor(
     private readonly runtimeAdapter: Libp2pGossipsubRuntimeAdapter = runtime,
@@ -118,7 +124,7 @@ export class PublicIPFSContentFallback {
         break;
       }
 
-      const chunk = result.value;
+      const chunk = result.value as Uint8Array | { subarray(): Uint8Array };
       const bytes = this.chunkToBytes(chunk);
       size += bytes.byteLength;
 
@@ -238,6 +244,7 @@ export class PublicIPFSContentFallback {
       this.incomingStreamHandler(),
     );
     PublicIPFSContentFallback.handlerRegisteredNodes.add(nodeKey);
+    PublicIPFSContentFallback.handlerRegisteredNodeCount += 1;
   }
 
   private async ensureHandler(networks: IPFSNetwork[]): Promise<void> {

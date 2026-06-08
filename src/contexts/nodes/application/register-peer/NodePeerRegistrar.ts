@@ -22,6 +22,7 @@ export default class NodePeerRegistrar {
         message.owner,
         message.networks,
         message.lastSeenAt,
+        message.capabilities,
       ),
     );
   }

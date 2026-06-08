@@ -371,7 +371,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const routingAbort = this.createRoutingAbortSignal(signal);
 
     try {
-      if (!(await this.waitForPeers(routingAbort.signal))) {
+      if (!this.hasPeers()) {
         throw new Error('No public IPFS peers available for DHT publication.');
       }
 
@@ -516,7 +516,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     });
 
-    await this.publishRoutingRecord(key, value, signal);
+    void this.publishRoutingRecord(key, value, signal);
   }
 
   public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {

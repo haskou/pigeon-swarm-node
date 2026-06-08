@@ -1,7 +1,8 @@
+import { NodeHeartbeatCapabilitiesProvider } from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatCapabilitiesProvider';
 import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
-import { Node } from '@app/contexts/nodes/domain/Node';
-import { Network } from '@app/contexts/nodes/domain/Network';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
+import { Network } from '@app/contexts/nodes/domain/Network';
+import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
 import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
@@ -16,12 +17,27 @@ import { mock, MockProxy } from 'jest-mock-extended';
 describe('NodeHeartbeatSender', () => {
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let nodeRepository: MockProxy<NodeRepository>;
+  let capabilitiesProvider: MockProxy<NodeHeartbeatCapabilitiesProvider>;
   let sender: NodeHeartbeatSender;
 
   beforeEach(() => {
+    capabilitiesProvider = mock<NodeHeartbeatCapabilitiesProvider>();
+    capabilitiesProvider.find.mockResolvedValue({
+      contentFallback: true,
+      gossipsub: true,
+      privateIpfs: true,
+      privateIpfsPeerCount: 1,
+      publicIpfs: false,
+      publicIpfsPeerCount: 0,
+      relay: false,
+    });
     eventPublisher = mock<DomainEventPublisher>();
     nodeRepository = mock<NodeRepository>();
-    sender = new NodeHeartbeatSender(nodeRepository, eventPublisher);
+    sender = new NodeHeartbeatSender(
+      nodeRepository,
+      eventPublisher,
+      capabilitiesProvider,
+    );
   });
 
   it('publishes a heartbeat without private network keys', async () => {
@@ -58,6 +74,15 @@ describe('NodeHeartbeatSender', () => {
 
     expect(event.aggregateId).toBe(node.toPrimitives().id);
     expect(event.attributes).toEqual({
+      capabilities: {
+        contentFallback: true,
+        gossipsub: true,
+        privateIpfs: true,
+        privateIpfsPeerCount: 1,
+        publicIpfs: false,
+        publicIpfsPeerCount: 0,
+        relay: false,
+      },
       networks: [
         {
           id: networkId,

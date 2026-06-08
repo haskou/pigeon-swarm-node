@@ -29,7 +29,7 @@ export default class ConversationSyncResponder {
       return;
     }
 
-    const messages = await this.repository.findLatestMessages(
+    const messageCandidates = await this.repository.findMessageCandidates(
       message.conversationId,
       ConversationSyncResponder.MESSAGE_CANDIDATE_LIMIT,
     );
@@ -40,13 +40,6 @@ export default class ConversationSyncResponder {
       message.conversationId,
     );
     const conversationPrimitives = conversation?.toPrimitives();
-    const messageCandidates = messages.map((candidate) => ({
-      authorIdentityId: candidate.getAuthorId().valueOf(),
-      createdAt: candidate.toPrimitives().createdAt,
-      message: candidate.toPrimitives(),
-      messageId: candidate.getId().valueOf(),
-      messageType: candidate.getType().valueOf(),
-    }));
     const messageCandidateIds = new Set(
       messageCandidates.map((candidate) => candidate.messageId),
     );

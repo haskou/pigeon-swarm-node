@@ -742,14 +742,21 @@ Response:
   "peers": [
     {
       "capabilities": {
+        "contentFallback": true,
         "gossipsub": true,
-        "privateIpfs": false,
+        "privateIpfs": true,
         "publicIpfs": true,
         "relay": false
       },
       "connectionSummary": {
+        "contentFallbackAvailable": true,
+        "ipfsAvailable": true,
         "isSharedNetworkPeer": true,
-        "sharedNetworkCount": 1
+        "privateIpfsAvailable": true,
+        "privateIpfsPeerCount": 1,
+        "publicIpfsAvailable": true,
+        "publicIpfsPeerCount": 8,
+        "sharedNetworkCount": 2
       },
       "id": "<nodeId>",
       "owner": "<identityId>",
@@ -771,10 +778,15 @@ Implemented:
 - publish a local node heartbeat every 5 minutes through the consumer bus
 - store heartbeats received from remote nodes as active peers
 - return peers seen during the active peer window
-- include node id, owner, network id/name, safe inferred capabilities and a
+- include node id, owner, network id/name, heartbeat-announced runtime
+  capabilities, IPFS/fallback availability, IPFS peer counts and a
   shared-network count
-- return `nodeType: "unknown"` until remote node capability metadata is
-  explicitly included in heartbeat payloads
+- treat `capabilities.privateIpfs` and `capabilities.publicIpfs` as runtime
+  flags; `connectionSummary.privateIpfsAvailable`,
+  `connectionSummary.publicIpfsAvailable` and
+  `connectionSummary.ipfsAvailable` are true only when the peer also reports
+  connected IPFS peers for that layer
+- return `nodeType: "unknown"` until a dedicated node-type handshake exists
 - never expose private network keys in peer heartbeat payloads
 - never expose peer multiaddrs or private relay directory records from this
   endpoint

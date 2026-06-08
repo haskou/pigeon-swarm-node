@@ -20,6 +20,7 @@ export default class MongoNodePeerRepository implements NodePeerRepository {
 
     return {
       _id: primitives.id,
+      capabilities: primitives.capabilities,
       lastSeenAt: primitives.lastSeenAt,
       networks: primitives.networks,
       owner: primitives.owner,
@@ -28,6 +29,7 @@ export default class MongoNodePeerRepository implements NodePeerRepository {
 
   private toDomain(document: MongoNodePeerDocument): NodePeer {
     return NodePeer.fromPrimitives({
+      capabilities: document.capabilities,
       id: document._id,
       lastSeenAt: document.lastSeenAt,
       networks: document.networks,

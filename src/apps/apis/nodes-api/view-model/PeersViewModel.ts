@@ -6,30 +6,32 @@ import { PeersResource } from '../resources/PeersResource';
 export class PeersViewModel {
   constructor(private readonly peers: NodePeer[]) {}
 
-  private isPublicNetwork(network: { name: string }): boolean {
-    return network.name === 'public';
-  }
-
   private toPeerResource(peer: NodePeer): PeerResource {
     const primitives = peer.toPrimitives();
-    const hasPublicNetwork = primitives.networks.some((network) =>
-      this.isPublicNetwork(network),
-    );
-    const hasPrivateNetwork = primitives.networks.some(
-      (network) => !this.isPublicNetwork(network),
-    );
     const sharedNetworkCount = primitives.networks.length;
+    const capabilities = primitives.capabilities;
+    const privateIpfsAvailable =
+      capabilities.privateIpfs && capabilities.privateIpfsPeerCount > 0;
+    const publicIpfsAvailable =
+      capabilities.publicIpfs && capabilities.publicIpfsPeerCount > 0;
 
     return {
       ...primitives,
       capabilities: {
-        gossipsub: true,
-        privateIpfs: hasPrivateNetwork,
-        publicIpfs: hasPublicNetwork,
-        relay: false,
+        contentFallback: capabilities.contentFallback,
+        gossipsub: capabilities.gossipsub,
+        privateIpfs: capabilities.privateIpfs,
+        publicIpfs: capabilities.publicIpfs,
+        relay: capabilities.relay,
       },
       connectionSummary: {
+        contentFallbackAvailable: capabilities.contentFallback,
+        ipfsAvailable: privateIpfsAvailable || publicIpfsAvailable,
         isSharedNetworkPeer: sharedNetworkCount > 0,
+        privateIpfsAvailable,
+        privateIpfsPeerCount: capabilities.privateIpfsPeerCount,
+        publicIpfsAvailable,
+        publicIpfsPeerCount: capabilities.publicIpfsPeerCount,
         sharedNetworkCount,
       },
       nodeType: 'unknown',

@@ -1,6 +1,6 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
@@ -89,6 +89,31 @@ describe('Libp2pGossipsubAdapter', () => {
     expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(handler.mock.calls[0][0].toPrimitives).toBeUndefined();
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should publish generic pubsub payloads to websockets after consumers accept them', async () => {
+    const handler = jest.fn();
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      await callback(event.decode());
+    });
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+
+    expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(publishSpy).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
+
+    publishSpy.mockRestore();
   });
 
   it('should ignore other events published on the same context topic', async () => {

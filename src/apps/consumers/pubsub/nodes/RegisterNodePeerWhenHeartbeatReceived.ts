@@ -1,3 +1,5 @@
+import type { NodePeerCapabilitiesPayload } from '@app/contexts/nodes/application/register-peer/messages/types/NodePeerCapabilitiesPayload';
+
 import { NodePeerRegisterMessage } from '@app/contexts/nodes/application/register-peer/messages/NodePeerRegisterMessage';
 import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
@@ -56,6 +58,66 @@ export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
       }));
   }
 
+  private getCapabilities(
+    event: DomainEvent,
+  ): NodePeerCapabilitiesPayload | undefined {
+    const capabilities = this.capabilitiesRecord(event);
+
+    if (!capabilities) {
+      return undefined;
+    }
+
+    return {
+      contentFallback: this.booleanCapability(capabilities, 'contentFallback'),
+      gossipsub: this.booleanCapability(capabilities, 'gossipsub'),
+      privateIpfs: this.booleanCapability(capabilities, 'privateIpfs'),
+      privateIpfsPeerCount: this.numberCapability(
+        capabilities,
+        'privateIpfsPeerCount',
+      ),
+      publicIpfs: this.booleanCapability(capabilities, 'publicIpfs'),
+      publicIpfsPeerCount: this.numberCapability(
+        capabilities,
+        'publicIpfsPeerCount',
+      ),
+      relay: this.booleanCapability(capabilities, 'relay'),
+    };
+  }
+
+  private capabilitiesRecord(
+    event: DomainEvent,
+  ): Record<string, unknown> | undefined {
+    const capabilities = event.attributes.capabilities;
+
+    if (
+      typeof capabilities !== 'object' ||
+      capabilities === null ||
+      Array.isArray(capabilities)
+    ) {
+      return undefined;
+    }
+
+    return capabilities as Record<string, unknown>;
+  }
+
+  private booleanCapability(
+    capabilities: Record<string, unknown>,
+    key: string,
+  ): boolean | undefined {
+    return typeof capabilities[key] === 'boolean'
+      ? Boolean(capabilities[key])
+      : undefined;
+  }
+
+  private numberCapability(
+    capabilities: Record<string, unknown>,
+    key: string,
+  ): number | undefined {
+    return typeof capabilities[key] === 'number'
+      ? Number(capabilities[key])
+      : undefined;
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     await this.registrar.register(
       new NodePeerRegisterMessage(
@@ -63,6 +125,7 @@ export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
         event.attributes.owner ? String(event.attributes.owner) : undefined,
         this.getNetworks(event),
         event.occurredOn.getTime(),
+        this.getCapabilities(event),
       ),
     );
   }

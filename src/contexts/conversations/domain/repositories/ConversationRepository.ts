@@ -5,6 +5,7 @@ import { Conversation } from '../Conversation';
 import { Message } from '../Message';
 import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationId } from '../value-objects/ConversationId';
+import { MessageExternalIdentifier } from '../value-objects/MessageExternalIdentifier';
 import { MessageId } from '../value-objects/MessageId';
 import { ConversationMessageCandidate } from './types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from './types/ConversationMessagesAround';
@@ -18,6 +19,11 @@ export interface ConversationRepository {
   findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
+  ): Promise<Message | undefined>;
+  findCandidateMessageByExternalIdentifier(
+    conversationId: ConversationId,
+    messageId: MessageId,
+    externalIdentifier: MessageExternalIdentifier,
   ): Promise<Message | undefined>;
   findMessageCandidates(
     conversationId: ConversationId,

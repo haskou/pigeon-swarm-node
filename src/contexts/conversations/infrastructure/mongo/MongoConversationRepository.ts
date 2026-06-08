@@ -14,6 +14,7 @@ import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
+import { MessageExternalIdentifier } from '../../domain/value-objects/MessageExternalIdentifier';
 import { IpfsMessageDocument } from '../ipfs/documents/IpfsMessageDocument';
 import IpfsMessageMapper from '../ipfs/mappers/IpfsMessageMapper';
 import { MongoConversationDocument } from './documents/MongoConversationDocument';
@@ -475,6 +476,7 @@ export default class MongoConversationRepository implements Repository {
     return documents.reverse().map((document) => ({
       authorIdentityId: document.authorId,
       createdAt: document.createdAt,
+      externalIdentifier: document.cid,
       messageId: document.messageId,
       messageType: document.type,
     }));
@@ -536,6 +538,20 @@ export default class MongoConversationRepository implements Repository {
     }
 
     return undefined;
+  }
+
+  public async findCandidateMessageByExternalIdentifier(
+    conversationId: ConversationId,
+    messageId: MessageId,
+    externalIdentifier: MessageExternalIdentifier,
+  ): Promise<Message | undefined> {
+    const localMessage = await this.findMessageById(conversationId, messageId);
+
+    if (localMessage) {
+      return localMessage;
+    }
+
+    return this.findMessageFromCid(new IPFSId(externalIdentifier.valueOf()));
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {

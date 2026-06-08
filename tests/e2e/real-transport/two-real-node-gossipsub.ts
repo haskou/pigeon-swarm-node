@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 import 'module-alias/register';
-
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -21,9 +20,11 @@ type IdentityFixture = {
 };
 
 type NodeRuntime = {
+  bootstrapMultiaddrs: string[];
   baseUrl: string;
   databaseName: string;
   ipfsPath: string;
+  libp2pPort: number;
   name: string;
   port: number;
   process?: ChildProcessWithoutNullStreams;
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
   try {
     await startNode(nodeA, mongo.getUri());
     await addPrivateNetwork(nodeA, networkKey);
+    nodeB.bootstrapMultiaddrs = [await privateBootstrapMultiaddr(nodeA)];
     nodeAIdentity = await publishIdentity(nodeA, 'Node A', 'node-a');
     const nodeAKeychain = await publishKeychain(nodeA, nodeAIdentity);
 
@@ -83,6 +85,15 @@ async function main(): Promise<void> {
     await publishKeychain(nodeB, nodeBIdentity);
     await waitForIdentity(nodeA, nodeBIdentity.id);
     await waitForKeychain(nodeA, nodeBIdentity);
+
+    const privateContent = Buffer.from('private-media-from-node-a');
+    const privateContentCid = await uploadPrivateContent(
+      nodeA,
+      nodeAIdentity,
+      privateContent,
+    );
+
+    await waitForIPFSContent(nodeB, privateContentCid, privateContent.length);
 
     const conversation = await createOneToOneConversation(
       nodeA,
@@ -106,7 +117,12 @@ async function main(): Promise<void> {
       'node-a-message-payload',
     );
     await nodeBMessages;
-    await waitForMessage(nodeB, nodeBIdentity, conversation.id, messageFromA.id);
+    await waitForMessage(
+      nodeB,
+      nodeBIdentity,
+      conversation.id,
+      messageFromA.id,
+    );
 
     await stopNode(nodeB);
     const offlineMessageFromA = await sendConversationMessage(
@@ -124,12 +140,10 @@ async function main(): Promise<void> {
       conversation.id,
       offlineMessageFromA.id,
     );
-    await waitForConversationTimeline(
-      nodeB,
-      nodeBIdentity,
-      conversation.id,
-      [messageFromA.id, offlineMessageFromA.id],
-    );
+    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+    ]);
 
     const nodeAMessages = listenForDomainEvents(
       nodeA,
@@ -145,29 +159,33 @@ async function main(): Promise<void> {
       'node-b-reply-payload',
     );
     await nodeAMessages;
-    await waitForMessage(nodeA, nodeAIdentity, conversation.id, messageFromB.id);
-    await waitForConversationTimeline(
+    await waitForMessage(
       nodeA,
       nodeAIdentity,
       conversation.id,
-      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
+      messageFromB.id,
     );
-    await waitForConversationTimeline(
-      nodeB,
-      nodeBIdentity,
-      conversation.id,
-      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
-    );
+    await waitForConversationTimeline(nodeA, nodeAIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+      messageFromB.id,
+    ]);
+    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+      messageFromB.id,
+    ]);
 
     console.info(
       JSON.stringify(
         {
           conversationId: conversation.id,
           messageFromA: messageFromA.id,
-          offlineMessageFromA: offlineMessageFromA.id,
           messageFromB: messageFromB.id,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
+          offlineMessageFromA: offlineMessageFromA.id,
+          privateContentCid,
           result: 'PASS',
           transportDsn: 'libp2p-gossipsub://',
         },
@@ -182,11 +200,33 @@ async function main(): Promise<void> {
   }
 }
 
+async function uploadPrivateContent(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  body: Buffer,
+): Promise<string> {
+  const response = await request(
+    node,
+    'POST',
+    '/ipfs/private',
+    body,
+    identity,
+    {
+      'content-type': 'application/octet-stream',
+      'x-filename': 'private-media.bin',
+    },
+  );
+
+  return response.cid;
+}
+
 function buildNodeRuntime(name: string, port: number): NodeRuntime {
   return {
+    bootstrapMultiaddrs: [],
     baseUrl: `http://127.0.0.1:${port}`,
     databaseName: `pigeon_swarm_${name.replace('-', '_')}_e2e`,
     ipfsPath: path.join(TMP_ROOT, name, 'ipfs'),
+    libp2pPort: port + 1000,
     name,
     port,
     stderr: [],
@@ -215,6 +255,10 @@ async function startNode(node: NodeRuntime, mongoUrl: string): Promise<void> {
       MONGO_URL: mongoUrl,
       NODE_ENV: 'local',
       ROUTE_PREFIX: '',
+      PIGEON_BOOTSTRAP_RELAY_MULTIADDRS:
+        node.bootstrapMultiaddrs.join(','),
+      PIGEON_LIBP2P_PORT: String(node.libp2pPort),
+      PIGEON_PUBLIC_BOOTSTRAP_ENABLED: 'false',
       STARTUP_SYNC_PEER_WAIT_MS: '10000',
       TRANSPORT_DSN: 'libp2p-gossipsub://',
       TRANSPORT_MAX_RETRIES: '0',
@@ -246,6 +290,35 @@ async function startNode(node: NodeRuntime, mongoUrl: string): Promise<void> {
   if (node.stderr.some((line) => line.includes('Application error'))) {
     throw new Error(`${node.name} failed to start:\n${node.stderr.join('')}`);
   }
+}
+
+function findPrivatePeerId(node: NodeRuntime): string | undefined {
+  const output = node.stdout.join('\n');
+  const escapedNetworkName = NETWORK_NAME.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  );
+  const match = output.match(
+    new RegExp(
+      `Started private network "${escapedNetworkName}" with Peer ID: (\\S+)`,
+    ),
+  );
+
+  return match?.[1];
+}
+
+async function privateBootstrapMultiaddr(node: NodeRuntime): Promise<string> {
+  await waitFor(
+    () => findPrivatePeerId(node) !== undefined,
+    `${node.name} private IPFS peer id`,
+  );
+  const peerId = findPrivatePeerId(node);
+
+  if (!peerId) {
+    throw new Error(`${node.name} private IPFS peer id was not available`);
+  }
+
+  return `/ip4/127.0.0.1/tcp/${node.libp2pPort}/p2p/${peerId}`;
 }
 
 async function stopNode(node: NodeRuntime): Promise<void> {
@@ -339,7 +412,9 @@ async function publishKeychain(
   };
   const body = {
     ...bodyWithoutSignature,
-    signature: identity.keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    signature: identity.keyPair
+      .sign(JSON.stringify(signaturePayload))
+      .valueOf(),
   };
   const response = await request(node, 'POST', '/keychains/', body, identity);
 
@@ -402,7 +477,10 @@ async function waitForIdentity(
 ): Promise<void> {
   const path = `/identities/${encodeURIComponent(identityId)}`;
 
-  await waitFor(async () => (await requestMaybe(node, 'GET', path)) !== undefined, `${node.name} to sync identity`);
+  await waitFor(
+    async () => (await requestMaybe(node, 'GET', path)) !== undefined,
+    `${node.name} to sync identity`,
+  );
 }
 
 async function waitForKeychain(
@@ -412,7 +490,9 @@ async function waitForKeychain(
   const path = `/keychains/${encodeURIComponent(identity.id)}`;
 
   await waitFor(
-    async () => (await requestMaybe(node, 'GET', path, undefined, identity)) !== undefined,
+    async () =>
+      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
+      undefined,
     `${node.name} to sync keychain`,
   );
 }
@@ -435,7 +515,9 @@ async function waitForConversation(
       : response?.data;
 
     return Array.isArray(conversations)
-      ? conversations.some((conversation: { id: string }) => conversation.id === conversationId)
+      ? conversations.some(
+          (conversation: { id: string }) => conversation.id === conversationId,
+        )
       : false;
   }, `${node.name} to sync conversation`);
 }
@@ -451,9 +533,23 @@ async function waitForMessage(
   )}/messages/${encodeURIComponent(messageId)}`;
 
   await waitFor(
-    async () => (await requestMaybe(node, 'GET', path, undefined, identity)) !== undefined,
+    async () =>
+      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
+      undefined,
     `${node.name} to sync message ${messageId}`,
   );
+}
+
+async function waitForIPFSContent(
+  node: NodeRuntime,
+  cid: string,
+  expectedSize: number,
+): Promise<void> {
+  await waitFor(async () => {
+    const response = await requestMaybe(node, 'GET', `/ipfs/${cid}`);
+
+    return response?.encrypted === true && response?.size === expectedSize;
+  }, `${node.name} to fetch private IPFS content ${cid}`);
 }
 
 async function waitForConversationTimeline(
@@ -494,7 +590,14 @@ async function listenForDomainEvents(
 ): Promise<void> {
   const timestamp = String(Date.now());
   const nonce = randomUUID();
-  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, nonce, {});
+  const signature = signRequest(
+    identity.keyPair,
+    'GET',
+    '/ws',
+    timestamp,
+    nonce,
+    {},
+  );
   const query = new URLSearchParams({
     identityId: identity.id,
     nonce,
@@ -541,13 +644,17 @@ async function request(
   requestPath: string,
   body?: unknown,
   signer?: IdentityFixture,
+  headers?: Record<string, string>,
 ): Promise<any> {
   const canonicalPath = requestPath.split('?')[0];
   const response = await axios.request({
     data: body,
     headers: signer
-      ? signHeaders(signer, method, canonicalPath, body ?? {})
-      : {},
+      ? {
+          ...headers,
+          ...signHeaders(signer, method, canonicalPath, body ?? {}),
+        }
+      : headers || {},
     method,
     timeout: REQUEST_TIMEOUT_MS,
     url: `${node.baseUrl}${requestPath}`,
@@ -562,9 +669,10 @@ async function requestMaybe(
   requestPath: string,
   body?: unknown,
   signer?: IdentityFixture,
+  headers?: Record<string, string>,
 ): Promise<any | undefined> {
   try {
-    return await request(node, method, requestPath, body, signer);
+    return await request(node, method, requestPath, body, signer, headers);
   } catch (error) {
     if (error instanceof AxiosError && error.response?.status === 404) {
       return undefined;

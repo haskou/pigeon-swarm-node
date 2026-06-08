@@ -181,6 +181,7 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
       const message = new RegisterConversationMessage(
         event.aggregateId,
         candidate.messageId,
+        candidate.externalIdentifier,
       );
       const embeddedMessage = this.messageFromCandidate(candidate);
 

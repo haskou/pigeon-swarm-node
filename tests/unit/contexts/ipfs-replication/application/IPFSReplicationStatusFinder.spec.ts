@@ -33,6 +33,7 @@ describe('IPFSReplicationStatusFinder', () => {
     const contentRepository: IPFSContentReplicationRepository = {
       findAll: () => Promise.resolve([content]),
       findByCid: () => Promise.resolve(undefined),
+      findByNetworkId: () => Promise.resolve([content]),
       save: () => Promise.resolve(),
     };
     const claimRepository: IPFSContentReplicaClaimRepository = {

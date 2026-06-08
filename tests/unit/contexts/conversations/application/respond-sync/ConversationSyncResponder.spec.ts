@@ -34,24 +34,11 @@ describe('ConversationSyncResponder', () => {
     const conversationId = new ConversationId(
       'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de',
     );
-    const message = {
-      getAuthorId: () => ({ valueOf: () => 'author-id' }),
-      getId: () => ({ valueOf: () => 'message-id' }),
-      getType: () => ({ valueOf: () => 'sent' }),
-      toPrimitives: () => ({
-        authorId: 'author-id',
-        conversationId: conversationId.valueOf(),
-        createdAt: 1778513696020,
-        id: 'message-id',
-        signature: 'signature',
-        type: 'sent',
-      }),
-    };
     const messageCandidates = [
       {
         authorIdentityId: 'author-id',
         createdAt: 1778513696020,
-        message: message.toPrimitives(),
+        externalIdentifier: 'message-cid',
         messageId: 'message-id',
         messageType: 'sent',
       },
@@ -68,7 +55,7 @@ describe('ConversationSyncResponder', () => {
     };
 
     repository.findMetadataById.mockResolvedValue(conversation as never);
-    repository.findLatestMessages.mockResolvedValue([message] as never);
+    repository.findMessageCandidates.mockResolvedValue(messageCandidates);
     reactionRepository.findCandidates.mockResolvedValue([]);
 
     await responder.respond(
@@ -84,7 +71,7 @@ describe('ConversationSyncResponder', () => {
       conversationId.valueOf(),
       'request-3',
     );
-    expect(repository.findLatestMessages).toHaveBeenCalledWith(
+    expect(repository.findMessageCandidates).toHaveBeenCalledWith(
       conversationId,
       100,
     );
@@ -116,19 +103,15 @@ describe('ConversationSyncResponder', () => {
     const conversationId = new ConversationId(
       'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de',
     );
-    const message = {
-      getAuthorId: () => ({ valueOf: () => 'author-id' }),
-      getId: () => ({ valueOf: () => 'synced-message-id' }),
-      getType: () => ({ valueOf: () => 'sent' }),
-      toPrimitives: () => ({
-        authorId: 'author-id',
-        conversationId: conversationId.valueOf(),
+    const messageCandidates = [
+      {
+        authorIdentityId: 'author-id',
         createdAt: 1778513696020,
-        id: 'synced-message-id',
-        signature: 'signature',
-        type: 'sent',
-      }),
-    };
+        externalIdentifier: 'message-cid',
+        messageId: 'synced-message-id',
+        messageType: 'sent',
+      },
+    ];
     const syncedReaction = {
       toPrimitives: () => ({
         authorId: 'author-id',
@@ -157,7 +140,7 @@ describe('ConversationSyncResponder', () => {
         type: 'one-to-one',
       }),
     } as never);
-    repository.findLatestMessages.mockResolvedValue([message] as never);
+    repository.findMessageCandidates.mockResolvedValue(messageCandidates);
     reactionRepository.findCandidates.mockResolvedValue([
       syncedReaction,
       staleReaction,

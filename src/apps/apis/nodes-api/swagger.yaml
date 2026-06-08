@@ -493,27 +493,53 @@ components:
         capabilities:
           type: object
           required:
+            - contentFallback
             - gossipsub
             - privateIpfs
             - publicIpfs
             - relay
           properties:
+            contentFallback:
+              type: boolean
             gossipsub:
               type: boolean
             privateIpfs:
+              description: Peer reports a private IPFS runtime.
               type: boolean
             publicIpfs:
+              description: Peer reports a public IPFS runtime.
               type: boolean
             relay:
               type: boolean
         connectionSummary:
           type: object
           required:
+            - contentFallbackAvailable
+            - ipfsAvailable
             - isSharedNetworkPeer
+            - privateIpfsAvailable
+            - privateIpfsPeerCount
+            - publicIpfsAvailable
+            - publicIpfsPeerCount
             - sharedNetworkCount
           properties:
+            contentFallbackAvailable:
+              type: boolean
+            ipfsAvailable:
+              description: Peer reports at least one connected IPFS peer in a private or public IPFS runtime.
+              type: boolean
             isSharedNetworkPeer:
               type: boolean
+            privateIpfsAvailable:
+              description: Peer reports a private IPFS runtime with connected IPFS peers.
+              type: boolean
+            privateIpfsPeerCount:
+              type: number
+            publicIpfsAvailable:
+              description: Peer reports a public IPFS runtime with connected IPFS peers.
+              type: boolean
+            publicIpfsPeerCount:
+              type: number
             sharedNetworkCount:
               type: number
         id:
