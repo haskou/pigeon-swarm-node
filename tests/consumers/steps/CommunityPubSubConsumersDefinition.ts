@@ -2,6 +2,7 @@ import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/commu
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityMessagesWhenSync from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
+import CommunitySyncResponder from '@app/contexts/communities/application/respond-sync/CommunitySyncResponder';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
@@ -214,16 +215,18 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async syncRequestConsumerHandlesARequestWithoutLocalData(): Promise<void> {
     const consumer = new RespondToCommunitySyncRequest(
       this.eventConsumer(),
-      {
-        findById: async (): Promise<undefined> => undefined,
-      } as unknown as MongoCommunityRepository,
-      {
-        findSyncableByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityChannelMessageRepository,
-      {
-        findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
-      this.eventPublisher,
+      new CommunitySyncResponder(
+        {
+          findById: async (): Promise<undefined> => undefined,
+        } as unknown as MongoCommunityRepository,
+        {
+          findSyncableByCommunity: async (): Promise<[]> => [],
+        } as unknown as MongoCommunityChannelMessageRepository,
+        {
+          findByCommunity: async (): Promise<[]> => [],
+        } as unknown as MongoCommunityMessageReactionRepository,
+        this.eventPublisher,
+      ),
     );
 
     await consumer.handler(
@@ -241,18 +244,20 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async syncRequestConsumerHandlesARequestWithOrphanMessages(): Promise<void> {
     const consumer = new RespondToCommunitySyncRequest(
       this.eventConsumer(),
-      {
-        findById: async (): Promise<undefined> => undefined,
-      } as unknown as MongoCommunityRepository,
-      {
-        findSyncableByCommunity: async (): Promise<unknown[]> => [
-          { toPrimitives: (): object => ({ id: this.messageId }) },
-        ],
-      } as unknown as MongoCommunityChannelMessageRepository,
-      {
-        findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
-      this.eventPublisher,
+      new CommunitySyncResponder(
+        {
+          findById: async (): Promise<undefined> => undefined,
+        } as unknown as MongoCommunityRepository,
+        {
+          findSyncableByCommunity: async (): Promise<unknown[]> => [
+            { toPrimitives: (): object => ({ id: this.messageId }) },
+          ],
+        } as unknown as MongoCommunityChannelMessageRepository,
+        {
+          findByCommunity: async (): Promise<[]> => [],
+        } as unknown as MongoCommunityMessageReactionRepository,
+        this.eventPublisher,
+      ),
     );
 
     await consumer.handler(
@@ -270,49 +275,51 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async syncRequestConsumerHandlesARequestForAnotherNetwork(): Promise<void> {
     const consumer = new RespondToCommunitySyncRequest(
       this.eventConsumer(),
-      {
-        findById: async (): Promise<Community> =>
-          Community.fromPrimitives({
-            autoJoinEnabled: false,
-            avatar: undefined,
-            bannedMemberIds: [],
-            banner: undefined,
-            createdAt: 1778513696020,
-            description: 'Community description',
-            discoverable: true,
-            id: this.communityId,
-            memberIds: [this.ownerIdentityId()],
-            memberRoles: [],
-            name: 'Community',
-            networkId: this.otherNetworkId,
-            ownerIdentityId: this.ownerIdentityId(),
-            roles: [
-              {
-                builtIn: true,
-                id: 'everyone',
-                name: 'everyone',
-                permissions: [
-                  'attach_files',
-                  'connect_voice',
-                  'embed_links',
-                  'send_messages',
-                  'send_stickers',
-                  'view_channels',
-                ],
-              },
-            ],
-            textChannels: [],
-            visibility: 'private',
-            voiceChannels: [],
-          }),
-      } as unknown as MongoCommunityRepository,
-      {
-        findSyncableByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityChannelMessageRepository,
-      {
-        findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
-      this.eventPublisher,
+      new CommunitySyncResponder(
+        {
+          findById: async (): Promise<Community> =>
+            Community.fromPrimitives({
+              autoJoinEnabled: false,
+              avatar: undefined,
+              bannedMemberIds: [],
+              banner: undefined,
+              createdAt: 1778513696020,
+              description: 'Community description',
+              discoverable: true,
+              id: this.communityId,
+              memberIds: [this.ownerIdentityId()],
+              memberRoles: [],
+              name: 'Community',
+              networkId: this.otherNetworkId,
+              ownerIdentityId: this.ownerIdentityId(),
+              roles: [
+                {
+                  builtIn: true,
+                  id: 'everyone',
+                  name: 'everyone',
+                  permissions: [
+                    'attach_files',
+                    'connect_voice',
+                    'embed_links',
+                    'send_messages',
+                    'send_stickers',
+                    'view_channels',
+                  ],
+                },
+              ],
+              textChannels: [],
+              visibility: 'private',
+              voiceChannels: [],
+            }),
+        } as unknown as MongoCommunityRepository,
+        {
+          findSyncableByCommunity: async (): Promise<[]> => [],
+        } as unknown as MongoCommunityChannelMessageRepository,
+        {
+          findByCommunity: async (): Promise<[]> => [],
+        } as unknown as MongoCommunityMessageReactionRepository,
+        this.eventPublisher,
+      ),
     );
 
     await consumer.handler(

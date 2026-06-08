@@ -1,3 +1,4 @@
+import { CommunityNetworkSyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunityNetworkSyncRequestedEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
@@ -21,6 +22,7 @@ import { NodeStartupSynchronizerDependencies } from './NodeStartupSynchronizerDe
 import NodeStartupSyncPolicy from './NodeStartupSyncPolicy';
 
 export interface NodeStartupSyncResult {
+  communityNetworkRequests: number;
   communityRequests: number;
   connectedPeerCount: number;
   conversationRequests: number;
@@ -104,6 +106,21 @@ export default class NodeStartupSynchronizer {
     return [...networkIds].map(
       (networkId) =>
         new IdentityNetworkSyncRequestedEvent(networkId, {
+          networkId,
+          requesterNodeId,
+          requestId,
+        }),
+    );
+  }
+
+  private communityNetworkRequests(
+    requestId: string,
+    requesterNodeId: string,
+    networkIds: Set<string>,
+  ): DomainEvent[] {
+    return [...networkIds].map(
+      (networkId) =>
+        new CommunityNetworkSyncRequestedEvent(networkId, {
           networkId,
           requesterNodeId,
           requestId,
@@ -255,8 +272,14 @@ export default class NodeStartupSynchronizer {
       communityRequests,
       syncAttempt,
     );
+    const communityNetworkRequests = this.communityNetworkRequests(
+      requestId,
+      requesterNodeId,
+      readyNetworkIds,
+    );
     const rawPlannedRequests =
       readyNetworkIds.size +
+      communityNetworkRequests.length +
       identityVersions.size +
       keychainVersions.size +
       conversationScopes.filter((scope) => readyNetworkIds.has(scope.networkId))
@@ -268,6 +291,7 @@ export default class NodeStartupSynchronizer {
         requesterNodeId,
         readyNetworkIds,
       ),
+      ...communityNetworkRequests,
       ...this.identityRequests(
         requestId,
         requesterNodeId,
@@ -294,6 +318,7 @@ export default class NodeStartupSynchronizer {
     }
 
     return {
+      communityNetworkRequests: communityNetworkRequests.length,
       communityRequests: limitedCommunityRequests.length,
       connectedPeerCount,
       conversationRequests: limitedConversationScopes.length,

@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Community } from '../../domain/Community';
@@ -163,6 +164,19 @@ export class MongoCommunityRepository implements CommunityRepository {
     const documents = await (await this.collection())
       .find({ memberIds: identityId.valueOf() })
       .sort({ createdAt: -1 })
+      .toArray();
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findByNetworkId(
+    networkId: NetworkId,
+    limit = 100,
+  ): Promise<Community[]> {
+    const documents = await (await this.collection())
+      .find({ networkId: networkId.valueOf() })
+      .sort({ createdAt: -1 })
+      .limit(limit)
       .toArray();
 
     return documents.map((document) => this.toDomain(document));

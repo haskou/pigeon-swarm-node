@@ -2,6 +2,7 @@ import NodeStartupSynchronizer from '@app/apps/synchronizers/NodeStartupSynchron
 import NodeStartupSyncPolicy from '@app/apps/synchronizers/NodeStartupSyncPolicy';
 import NodeStartupSyncReadiness from '@app/apps/synchronizers/NodeStartupSyncReadiness';
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityNetworkSyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunityNetworkSyncRequestedEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
@@ -127,6 +128,7 @@ describe('NodeStartupSynchronizer', () => {
       '123e4567-e89b-12d3-a456-426614174000',
     ]);
     expect(result).toMatchObject({
+      communityNetworkRequests: 1,
       communityRequests: 0,
       connectedPeerCount: 2,
       conversationRequests: 1,
@@ -141,14 +143,15 @@ describe('NodeStartupSynchronizer', () => {
         },
       ],
       networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
-      publishedEvents: 4,
+      publishedEvents: 5,
       readyNetworkIds: ['123e4567-e89b-12d3-a456-426614174000'],
       requesterNodeId: nodeId,
-      totalRequests: 4,
+      totalRequests: 5,
       unreadyNetworkIds: [],
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunityNetworkSyncRequestedEvent),
       expect.any(IdentitySyncRequestedEvent),
       expect.any(KeychainSyncRequestedEvent),
       expect.any(ConversationSyncRequestedEvent),
@@ -159,18 +162,23 @@ describe('NodeStartupSynchronizer', () => {
       requestId: result.requestId,
     });
     expect(publishedEvents[1].attributes).toMatchObject({
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+      requesterNodeId: nodeId,
+      requestId: result.requestId,
+    });
+    expect(publishedEvents[2].attributes).toMatchObject({
       identityId: 'identity-1',
       knownVersion: 2,
       requesterNodeId: nodeId,
       requestId: result.requestId,
     });
-    expect(publishedEvents[2].attributes).toMatchObject({
+    expect(publishedEvents[3].attributes).toMatchObject({
       knownVersion: 3,
       ownerIdentityId: 'identity-1',
       requesterNodeId: nodeId,
       requestId: result.requestId,
     });
-    expect(publishedEvents[3].attributes).toMatchObject({
+    expect(publishedEvents[4].attributes).toMatchObject({
       conversationId: 'one-to-one:conversation',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
@@ -230,21 +238,26 @@ describe('NodeStartupSynchronizer', () => {
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
     expect(result).toMatchObject({
+      communityNetworkRequests: 1,
       connectedPeerCount: 1,
       conversationRequests: 1,
       identityNetworkRequests: 1,
       readyNetworkIds: ['123e4567-e89b-12d3-a456-426614174000'],
-      totalRequests: 2,
+      totalRequests: 3,
       unreadyNetworkIds: ['123e4567-e89b-12d3-a456-426614174001'],
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunityNetworkSyncRequestedEvent),
       expect.any(ConversationSyncRequestedEvent),
     ]);
     expect(publishedEvents[0].attributes).toMatchObject({
       networkId: '123e4567-e89b-12d3-a456-426614174000',
     });
     expect(publishedEvents[1].attributes).toMatchObject({
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+    });
+    expect(publishedEvents[2].attributes).toMatchObject({
       conversationId: 'one-to-one:ready',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
     });
@@ -298,6 +311,7 @@ describe('NodeStartupSynchronizer', () => {
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
     expect(result).toMatchObject({
+      communityNetworkRequests: 1,
       communityRequests: 1,
       connectedPeerCount: 2,
       conversationRequests: 0,
@@ -305,12 +319,13 @@ describe('NodeStartupSynchronizer', () => {
       identityRequests: 0,
       keychainRequests: 0,
       networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
-      publishedEvents: 2,
+      publishedEvents: 3,
       requesterNodeId: nodeId,
-      totalRequests: 2,
+      totalRequests: 3,
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunityNetworkSyncRequestedEvent),
       expect.any(CommunitySyncRequestedEvent),
     ]);
     expect(publishedEvents[0].attributes).toMatchObject({
@@ -319,6 +334,11 @@ describe('NodeStartupSynchronizer', () => {
       requestId: result.requestId,
     });
     expect(publishedEvents[1].attributes).toMatchObject({
+      networkId: '123e4567-e89b-12d3-a456-426614174000',
+      requesterNodeId: nodeId,
+      requestId: result.requestId,
+    });
+    expect(publishedEvents[2].attributes).toMatchObject({
       communityId: '550e8400-e29b-41d4-a716-446655440020',
       networkId: '123e4567-e89b-12d3-a456-426614174000',
       requesterNodeId: nodeId,
@@ -397,18 +417,19 @@ describe('NodeStartupSynchronizer', () => {
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
 
     expect(result).toMatchObject({
+      communityNetworkRequests: 1,
       conversationRequests: 1,
       identityNetworkRequests: 1,
       identityRequests: 1,
       keychainRequests: 1,
-      omittedRequests: 4,
+      omittedRequests: 5,
       publishedEvents: 3,
       totalRequests: 3,
     });
     expect(publishedEvents).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunityNetworkSyncRequestedEvent),
       expect.any(IdentitySyncRequestedEvent),
-      expect.any(KeychainSyncRequestedEvent),
     ]);
   });
 
@@ -467,10 +488,10 @@ describe('NodeStartupSynchronizer', () => {
 
     const secondAttemptEvents = eventPublisher.publish.mock.calls[1][0];
 
-    expect(secondAttemptEvents[1].attributes).toMatchObject({
+    expect(secondAttemptEvents[2].attributes).toMatchObject({
       identityId: 'identity-2',
     });
-    expect(secondAttemptEvents[2].attributes).toMatchObject({
+    expect(secondAttemptEvents[3].attributes).toMatchObject({
       conversationId: 'one-to-one:second',
     });
   });
@@ -535,6 +556,7 @@ describe('NodeStartupSynchronizer', () => {
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
     expect(eventPublisher.publish.mock.calls[0][0]).toEqual([
       expect.any(IdentityNetworkSyncRequestedEvent),
+      expect.any(CommunityNetworkSyncRequestedEvent),
     ]);
   });
 });

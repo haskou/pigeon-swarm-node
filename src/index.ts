@@ -7,6 +7,7 @@ import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/commu
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
 import RegisterCommunityMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
+import RespondToCommunityNetworkSyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunityNetworkSyncRequest';
 import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
@@ -38,6 +39,8 @@ import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRo
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { createNodeStartupSynchronizer } from '@app/apps/synchronizers/createNodeStartupSynchronizer';
 import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
+import CommunityNetworkSyncResponder from '@app/contexts/communities/application/respond-network-sync/CommunityNetworkSyncResponder';
+import CommunitySyncResponder from '@app/contexts/communities/application/respond-sync/CommunitySyncResponder';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
@@ -145,6 +148,12 @@ async function init() {
   );
   const communityMessageReactionRepository =
     new MongoCommunityMessageReactionRepository(mongo);
+  const communitySyncResponder = new CommunitySyncResponder(
+    communityRepository,
+    communityMessageRepository,
+    communityMessageReactionRepository,
+    messageBus,
+  );
   const ipfsReplicaClaimRepository = new MongoIPFSContentReplicaClaimRepository(
     mongo,
   );
@@ -198,12 +207,13 @@ async function init() {
       communityRepository,
       communityMessageRepository,
     ),
-    new RespondToCommunitySyncRequest(
+    new RespondToCommunitySyncRequest(messageBus, communitySyncResponder),
+    new RespondToCommunityNetworkSyncRequest(
       messageBus,
-      communityRepository,
-      communityMessageRepository,
-      communityMessageReactionRepository,
-      messageBus,
+      new CommunityNetworkSyncResponder(
+        communityRepository,
+        communitySyncResponder,
+      ),
     ),
     new RegisterCommunityMessagesWhenSyncAvailable(
       messageBus,

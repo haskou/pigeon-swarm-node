@@ -194,7 +194,10 @@ flowchart LR
 
 Startup sync is not a replacement for live gossip. It is a repair path: if a node
 was offline, it can ask connected peers for missing identity, keychain,
-conversation, and community data.
+conversation, and community data. Communities have two sync paths: a network
+request discovers communities that the local node does not know yet, and a
+community request repairs messages and reactions for communities already known
+locally.
 
 Readiness is evaluated per network. A network is ready when its local IPFS
 runtime sees at least one peer before `STARTUP_SYNC_PEER_WAIT_MS` expires. Sync
@@ -204,6 +207,13 @@ by later startup-sync attempts. After startup, a readiness monitor runs every
 `STARTUP_SYNC_READY_MONITOR_MS` and triggers another sync when a previously
 unready network becomes ready. Global identity and keychain repair requests are
 published only when at least one network is ready.
+
+Community network sync uses `communities.v1.network.sync_requested`. Peers that
+have communities in the requested network respond with the existing
+`communities.v1.community.sync_available` event per community. That response
+contains the community plus bounded message and reaction candidates, so an empty
+node can hydrate its local MongoDB before normal replication maintenance decides
+which IPFS contents should be kept locally.
 
 ## Domain Event Flow
 
