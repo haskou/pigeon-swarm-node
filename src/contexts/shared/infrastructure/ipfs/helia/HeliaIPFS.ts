@@ -86,8 +86,47 @@ export abstract class HeliaIPFS implements IPFSConnection {
       mode: 'private',
       name: networkName,
     });
+    await HeliaIPFS.dialConfiguredBootstrapRelays(heliaCore, networkName);
 
     return heliaCore;
+  }
+
+  private static configuredBootstrapRelayMultiaddrs(): string[] {
+    return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
+  private static async dialConfiguredBootstrapRelays(
+    heliaCore: HeliaInstance,
+    networkName: string,
+  ): Promise<void> {
+    const multiaddrs = HeliaIPFS.configuredBootstrapRelayMultiaddrs();
+    const dialer = heliaCore.libp2p as unknown as {
+      dial?: (address: unknown) => Promise<unknown>;
+    };
+
+    if (multiaddrs.length === 0 || !dialer.dial) {
+      return;
+    }
+
+    await Promise.all(
+      multiaddrs.map(async (address) => {
+        try {
+          await dialer.dial(await heliaRuntimeAdapter.createMultiaddr(address));
+          Kernel.logger.info(
+            `Private network "${networkName}" connected to bootstrap relay "${address}"`,
+          );
+        } catch (error: unknown) {
+          Kernel.logger.warn(
+            `Private network "${networkName}" failed to connect to bootstrap relay "${address}": ${String(
+              error,
+            )}`,
+          );
+        }
+      }),
+    );
   }
 
   constructor(
