@@ -1,5 +1,5 @@
 ---
-name: hasko-ddd-engineer
+name: ddd-engineer
 description: Implement, refactor, review, and document software using practical Domain-Driven Design, SOLID, explicit application boundaries, value objects, tests, and public-contract discipline.
 ---
 
@@ -74,13 +74,16 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 
 - Do not add getters or setters to domain/application objects just to make tests easier or to let callers inspect internals.
 - Public getters are allowed only when they expose a genuine boundary value or a stable domain concept that callers are meant to know. They are not a license to pull primitives out and make decisions elsewhere.
+- If a method is a getter, name it with a `get` prefix. Use `getAddress()` instead of `address()` when the method only returns the address.
+- If a method is a setter, name it with a `set` prefix. Use `setAddress(address)` instead of `address(address)` when the method only replaces the address.
+- Do not hide getters or setters behind noun-only method names to avoid an apparent code smell. The smell is unnecessary state exposure or mutation, not the `get` or `set` word itself.
 - Setters are almost always wrong in domain code. Prefer intent-revealing behavior:
   - `message.edit(payload, editedBy, editedAt)` instead of `message.setPayload(payload)`.
   - `community.renameChannel(channelId, name, actor)` instead of `channel.setName(name)`.
   - `identity.updateProfile(profile, timestamp)` instead of `identity.setProfile(profile)`.
 - If a test needs to inspect state after behavior, prefer testing observable domain behavior, recorded domain events, repository persistence, or serialized shape at a boundary.
 - If application code needs a getter to compare, filter, authorize, or branch, move that question into the aggregate, entity, value object, collection, or policy.
-- Avoid JavaBean-style `getX()` / `setX()` APIs in domain/application. Use ubiquitous-language methods:
+- Domain behavior is different from getters and setters. Keep ubiquitous-language methods for questions and commands that express behavior:
   - `belongsTo(identityId)`.
   - `wasCreatedBy(identityId)`.
   - `canBeEditedBy(identityId)`.
