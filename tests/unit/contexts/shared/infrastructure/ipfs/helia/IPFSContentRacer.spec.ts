@@ -1,3 +1,13 @@
+jest.mock('@app/Kernel', () => ({
+  __esModule: true,
+  default: {
+    logger: {
+      warn: jest.fn(),
+    },
+  },
+}));
+
+import Kernel from '@app/Kernel';
 import { mock } from 'jest-mock-extended';
 
 import { IPFSContentNotFoundError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
@@ -11,6 +21,7 @@ describe('IPFSContentRacer', () => {
   let fallback: jest.Mocked<PublicIPFSContentFallback>;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     fallback = mock<PublicIPFSContentFallback>();
     fallback.getJSON.mockRejectedValue(new IPFSContentNotFoundError('cid'));
     fallback.getBytes.mockRejectedValue(new IPFSContentNotFoundError('cid'));
@@ -61,6 +72,9 @@ describe('IPFSContentRacer', () => {
       const result = await racer.raceGetJSON([network], cid);
 
       expect(result).toEqual(expected);
+      expect(Kernel.logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('through content fallback'),
+      );
       expect(fallback.getJSON).toHaveBeenCalledWith(
         [network],
         cid,
@@ -118,6 +132,9 @@ describe('IPFSContentRacer', () => {
       const result = await racer.raceGetBytes([network], cid);
 
       expect(result).toEqual(expected);
+      expect(Kernel.logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('through content fallback'),
+      );
       expect(fallback.getBytes).toHaveBeenCalledWith(
         [network],
         cid,

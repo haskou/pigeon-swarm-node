@@ -172,6 +172,12 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
       acceptedMessageIds,
     );
 
+    if (acceptedMessageIds.size > 0) {
+      Kernel.logger?.warn?.(
+        `Community sync used non-IPFS gossip message payload path: communityId=${community.getId().valueOf()} messages=${acceptedMessageIds.size} requestId=${String(event.attributes.requestId || '')}`,
+      );
+    }
+
     await this.communityRepository.save(community);
 
     Kernel.logger?.info?.(

@@ -186,6 +186,9 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
       const embeddedMessage = this.messageFromCandidate(candidate);
 
       if (embeddedMessage) {
+        Kernel.logger?.warn?.(
+          `Conversation sync used embedded gossip payload fallback: conversationId=${event.aggregateId} messageId=${candidate.messageId} requestId=${String(event.attributes.requestId || '')}`,
+        );
         await this.registrar.registerCandidate(message, embeddedMessage);
       } else {
         await this.registrar.register(message);

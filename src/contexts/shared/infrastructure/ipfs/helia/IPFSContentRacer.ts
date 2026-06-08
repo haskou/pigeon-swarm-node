@@ -1,3 +1,5 @@
+import Kernel from '@app/Kernel';
+
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
 import { PublicIPFSContentFallback } from '../fallback/PublicIPFSContentFallback';
 import { IPFSNetwork } from '../networks/IPFSNetwork';
@@ -60,6 +62,20 @@ export default class IPFSContentRacer {
     }
   }
 
+  private networkIdsForLog(networks: IPFSNetwork[]): string {
+    return networks.map((network) => network.getId()).join(',');
+  }
+
+  private warnFallbackUsed(
+    kind: 'bytes' | 'json',
+    cid: IPFSId,
+    networks: IPFSNetwork[],
+  ): void {
+    Kernel.logger.warn(
+      `IPFS direct ${kind} lookup failed; fetched cid="${cid.valueOf()}" through content fallback networks="${this.networkIdsForLog(networks)}" timeoutMs=${this.timeoutMs}`,
+    );
+  }
+
   public async raceGetJSON<T>(
     networks: IPFSNetwork[],
     cid: IPFSId,
@@ -79,12 +95,16 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      return this.fallbackAfterDirectLookup(
+      const result = await this.fallbackAfterDirectLookup(
         timeout,
         (fallbackSignal) =>
           this.fallback.getJSON<T>(networks, cid, fallbackSignal),
         signal,
       );
+
+      this.warnFallbackUsed('json', cid, networks);
+
+      return result;
     } finally {
       clearTimeout(timeout);
     }
@@ -109,12 +129,16 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      return this.fallbackAfterDirectLookup(
+      const result = await this.fallbackAfterDirectLookup(
         timeout,
         (fallbackSignal) =>
           this.fallback.getBytes(networks, cid, fallbackSignal),
         signal,
       );
+
+      this.warnFallbackUsed('bytes', cid, networks);
+
+      return result;
     } finally {
       clearTimeout(timeout);
     }
