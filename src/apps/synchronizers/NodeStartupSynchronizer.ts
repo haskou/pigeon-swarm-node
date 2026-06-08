@@ -233,6 +233,25 @@ export default class NodeStartupSynchronizer {
       );
   }
 
+  private limitEventPhasesTotal(eventPhases: DomainEvent[][]): DomainEvent[][] {
+    const limitedEvents = this.policy.limitTotal(eventPhases.flat());
+    const limitedEventSet = new Set(limitedEvents);
+
+    return eventPhases.map((phase) =>
+      phase.filter((event) => limitedEventSet.has(event)),
+    );
+  }
+
+  private async publishEventPhases(
+    eventPhases: DomainEvent[][],
+  ): Promise<void> {
+    for (const phase of eventPhases) {
+      if (phase.length > 0) {
+        await this.eventPublisher.publish(phase);
+      }
+    }
+  }
+
   private updateLastNetworkState(
     networkReadiness: NodeStartupNetworkReadiness[],
   ): void {
@@ -366,39 +385,35 @@ export default class NodeStartupSynchronizer {
       conversationScopes.filter((scope) => readyNetworkIds.has(scope.networkId))
         .length +
       communityRequests.length;
-    const plannedEvents = [
-      ...this.identityNetworkRequests(
-        requestId,
-        requesterNodeId,
-        readyNetworkIds,
-      ),
-      ...communityNetworkRequests,
-      ...conversationNetworkRequests,
-      ...keychainNetworkRequests,
-      ...ipfsReplicationNetworkRequests,
-      ...this.identityRequests(
+    const eventPhases = this.limitEventPhasesTotal([
+      this.identityNetworkRequests(requestId, requesterNodeId, readyNetworkIds),
+      keychainNetworkRequests,
+      communityNetworkRequests,
+      this.identityRequests(
         requestId,
         requesterNodeId,
         limitedIdentityVersions,
       ),
-      ...this.keychainRequests(
+      this.keychainRequests(
         requestId,
         requesterNodeId,
         limitedKeychainVersions,
       ),
-      ...this.conversationRequests(
+      conversationNetworkRequests,
+      limitedCommunityRequests,
+      this.conversationRequests(
         requestId,
         requesterNodeId,
         limitedConversationScopes,
       ),
-      ...limitedCommunityRequests,
-    ];
-    const events = this.policy.limitTotal(plannedEvents);
+      ipfsReplicationNetworkRequests,
+    ]);
+    const events = eventPhases.flat();
 
     const totalRequests = events.length;
 
     if (totalRequests > 0) {
-      await this.eventPublisher.publish(events);
+      await this.publishEventPhases(eventPhases);
     }
 
     return {

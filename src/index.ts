@@ -254,10 +254,7 @@ async function init() {
     new RespondToCommunitySyncRequest(messageBus, communitySyncResponder),
     new RespondToCommunityNetworkSyncRequest(
       messageBus,
-      new CommunityNetworkSyncResponder(
-        communityRepository,
-        communitySyncResponder,
-      ),
+      new CommunityNetworkSyncResponder(communityRepository, messageBus),
     ),
     new RegisterCommunityMessagesWhenSyncAvailable(
       messageBus,

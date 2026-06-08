@@ -199,6 +199,24 @@ sync paths: a network request discovers aggregates that the local node does not
 know yet, and an aggregate request repairs messages and reactions for aggregates
 already known locally.
 
+Startup sync publishes requests in priority phases so a cold node can render the
+application shell quickly before downloading heavier history:
+
+1. identity network discovery;
+1. keychain network discovery;
+1. community network discovery, metadata only;
+1. known identity repair;
+1. known keychain repair;
+1. conversation network discovery;
+1. known community message/reaction repair;
+1. known conversation message/reaction repair;
+1. IPFS replication metadata repair.
+
+Each phase is published only after the previous phase has been handed to the
+event bus. This does not make remote peers synchronous, but it prevents local
+startup from flooding message and replication work before identities, keychains,
+and community metadata are announced.
+
 Readiness is evaluated per network. A network is ready when its local IPFS
 runtime sees at least one peer before `STARTUP_SYNC_PEER_WAIT_MS` expires. Sync
 requests for conversations and communities are published only for ready
@@ -221,8 +239,9 @@ fallback for older peers and should not be the normal sync path.
 Community network sync uses `communities.v1.network.sync_requested`. Peers that
 have communities in the requested network respond with the existing
 `communities.v1.community.sync_available` event per community. That response
-contains the community plus bounded message and reaction candidates, so an empty
-node can hydrate its local MongoDB.
+contains community metadata only, so an empty node can hydrate its local MongoDB
+and render servers/channels early. Message and reaction repair for known
+communities is requested later through `communities.v1.community.sync_requested`.
 
 Keychain network sync uses `keychains.v1.network.sync_requested`. Keychains do
 not carry a network id directly, so responders derive scope from latest identity

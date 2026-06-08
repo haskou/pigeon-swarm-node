@@ -1,8 +1,10 @@
 import CommunityNetworkSyncResponder from '@app/contexts/communities/application/respond-network-sync/CommunityNetworkSyncResponder';
 import { CommunityNetworkSyncResponseMessage } from '@app/contexts/communities/application/respond-network-sync/messages/CommunityNetworkSyncResponseMessage';
-import CommunitySyncResponder from '@app/contexts/communities/application/respond-sync/CommunitySyncResponder';
+import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -11,15 +13,19 @@ describe('CommunityNetworkSyncResponder', () => {
   const networkId = '550e8400-e29b-41d4-a716-446655440001';
 
   let communityRepository: MockProxy<MongoCommunityRepository>;
-  let communitySyncResponder: MockProxy<CommunitySyncResponder>;
+  let eventPublisher: MockProxy<DomainEventPublisher>;
+  let tracker: MockProxy<SyncResponseSuppressionTracker>;
   let responder: CommunityNetworkSyncResponder;
 
   beforeEach(() => {
     communityRepository = mock<MongoCommunityRepository>();
-    communitySyncResponder = mock<CommunitySyncResponder>();
+    eventPublisher = mock<DomainEventPublisher>();
+    tracker = mock<SyncResponseSuppressionTracker>();
+    tracker.shouldRespond.mockResolvedValue(true);
     responder = new CommunityNetworkSyncResponder(
       communityRepository,
-      communitySyncResponder,
+      eventPublisher,
+      tracker,
     );
   });
 
@@ -61,7 +67,7 @@ describe('CommunityNetworkSyncResponder', () => {
     });
   }
 
-  it('should request sync candidates for every community in the network', async () => {
+  it('should announce community metadata without message candidates', async () => {
     communityRepository.findByNetworkId.mockResolvedValue([
       community('community-1'),
       community('community-2'),
@@ -77,12 +83,19 @@ describe('CommunityNetworkSyncResponder', () => {
       }),
       100,
     );
-    expect(communitySyncResponder.respond).toHaveBeenCalledTimes(2);
-    expect(
-      communitySyncResponder.respond.mock.calls[0][0].communityId.valueOf(),
-    ).toBe('community-1');
-    expect(
-      communitySyncResponder.respond.mock.calls[1][0].communityId.valueOf(),
-    ).toBe('community-2');
+    expect(eventPublisher.publish).toHaveBeenCalledWith([
+      expect.any(CommunitySyncAvailableEvent),
+      expect.any(CommunitySyncAvailableEvent),
+    ]);
+    const attributes = eventPublisher.publish.mock.calls[0][0][0].attributes;
+
+    expect(attributes).toMatchObject({
+      community: expect.objectContaining({ id: 'community-1' }),
+      communityId: 'community-1',
+      networkId,
+      requestId: 'request-1',
+    });
+    expect(attributes).not.toHaveProperty('messageCandidates');
+    expect(attributes).not.toHaveProperty('reactionCandidates');
   });
 });
