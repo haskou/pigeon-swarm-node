@@ -100,6 +100,10 @@ package "conversations.domain" {
     +eventName(): string
   }
 
+  class ConversationNetworkSyncRequestedEvent {
+    +eventName(): string
+  }
+
   class ConversationSyncAvailableEvent {
     +eventName(): string
   }
@@ -115,6 +119,7 @@ package "conversations.domain" {
     +findMetadataById(id: ConversationId): Promise<Conversation>
     +findOneToOne(a: IdentityId, b: IdentityId, networkId: NetworkId): Promise<OneToOneConversation>
     +findGroup(id: ConversationId): Promise<GroupConversation>
+    +findByNetworkId(networkId: NetworkId, limit: number): Promise<Conversation[]>
     +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
     +hasMessage(conversationId: ConversationId, messageId: MessageId): Promise<boolean>
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
@@ -227,6 +232,10 @@ package "conversations.application" {
     +respond(message): Promise<void>
   }
 
+  class ConversationNetworkSyncResponder {
+    +respond(message): Promise<void>
+  }
+
   class DomainEventPublisher {
     +publish(domainEvents): Promise<void>
   }
@@ -262,6 +271,8 @@ package "conversations.application" {
   ConversationSyncResponder --> MessageReactionRepository
   ConversationSyncResponder --> DomainEventPublisher
   ConversationSyncResponder ..> ConversationSyncAvailableEvent
+  ConversationNetworkSyncResponder --> ConversationRepository
+  ConversationNetworkSyncResponder --> ConversationSyncResponder
 }
 
 package "conversations.infrastructure" {

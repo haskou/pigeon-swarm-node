@@ -17,6 +17,7 @@ import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/convers
 import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
+import RespondToConversationNetworkSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationNetworkSyncRequest';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
@@ -48,9 +49,13 @@ import { MongoCommunityMessageReactionRepository } from '@app/contexts/communiti
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import ConversationNetworkSyncResponder from '@app/contexts/conversations/application/respond-network-sync/ConversationNetworkSyncResponder';
+import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import MongoMessageReactionMapper from '@app/contexts/conversations/infrastructure/mongo/mappers/MongoMessageReactionMapper';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import MongoMessageReactionRepository from '@app/contexts/conversations/infrastructure/mongo/MongoMessageReactionRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
@@ -85,7 +90,22 @@ import { PublicRelayConfiguration } from '@app/shared/infrastructure/network/rel
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { PublicRelayRuntime } from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 
+import type { NodeStartupSyncResult } from './apps/synchronizers/NodeStartupSynchronizer';
+
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
+
+function logNodeSyncRequests(
+  source: string,
+  result: NodeStartupSyncResult,
+): void {
+  if (result.publishedEvents === 0) {
+    return;
+  }
+
+  Kernel.logger.info(
+    `Node sync requested: source=${source} published=${result.publishedEvents} peers=${result.connectedPeerCount} readyNetworks=${result.readyNetworkIds.length} identityNetworks=${result.identityNetworkRequests} communityNetworks=${result.communityNetworkRequests} conversationNetworks=${result.conversationNetworkRequests} keychainNetworks=${result.keychainNetworkRequests} ipfsReplicationNetworks=${result.ipfsReplicationNetworkRequests} identities=${result.identityRequests} communities=${result.communityRequests} conversations=${result.conversationRequests} keychains=${result.keychainRequests} omitted=${result.omittedRequests}`,
+  );
+}
 
 async function init() {
   console.time('Kernel');
@@ -159,6 +179,11 @@ async function init() {
     communityMessageReactionRepository,
     messageBus,
   );
+  const conversationSyncResponder = new ConversationSyncResponder(
+    conversationRepository,
+    new MongoMessageReactionRepository(mongo, new MongoMessageReactionMapper()),
+    messageBus,
+  );
   const ipfsReplicaClaimRepository = new MongoIPFSContentReplicaClaimRepository(
     mongo,
   );
@@ -192,6 +217,13 @@ async function init() {
     new MarkMessagesReadWhenAnnounced(
       messageBus,
       new MessagesReadRegistrar(conversationRepository),
+    ),
+    new RespondToConversationNetworkSyncRequest(
+      messageBus,
+      new ConversationNetworkSyncResponder(
+        conversationRepository,
+        conversationSyncResponder,
+      ),
     ),
     new RespondToIdentityNetworkSyncRequest(
       messageBus,
@@ -312,9 +344,9 @@ async function init() {
     new IdentityPresenceExpirationScheduler(),
   );
   kernel.addAcceptanceInstanceScheduler(new CallTimeoutScheduler());
-  kernel.addAcceptanceInstanceScheduler(
-    new IPFSReplicationMaintenanceScheduler(),
-  );
+  const ipfsReplicationMaintenanceScheduler =
+    new IPFSReplicationMaintenanceScheduler();
+  kernel.addAcceptanceInstanceScheduler(ipfsReplicationMaintenanceScheduler);
   await kernel.runSchedulers();
   console.timeEnd('Run Schedulers');
 
@@ -359,9 +391,14 @@ async function init() {
   const nodeStartupSynchronizer = createNodeStartupSynchronizer();
   const startupSyncResult = await nodeStartupSynchronizer.synchronize();
 
-  console.info('Node startup sync result', startupSyncResult);
-  nodeStartupSynchronizer.scheduleRetries();
-  nodeStartupSynchronizer.scheduleReadinessMonitor();
+  logNodeSyncRequests('startup', startupSyncResult);
+  nodeStartupSynchronizer.scheduleRetries(undefined, (result) =>
+    logNodeSyncRequests('retry', result),
+  );
+  nodeStartupSynchronizer.scheduleReadinessMonitor(undefined, (result) =>
+    logNodeSyncRequests('readiness-monitor', result),
+  );
+  ipfsReplicationMaintenanceScheduler.scheduleWarmupRuns();
   console.timeEnd('Node startup sync');
 
   console.info('Ready!');

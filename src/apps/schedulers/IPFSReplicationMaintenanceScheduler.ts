@@ -36,10 +36,41 @@ export default class IPFSReplicationMaintenanceScheduler extends Scheduler {
 
   public async execute(): Promise<void> {
     const result = await this.maintainer().maintain();
+    const hasFailures = result.failedClaims > 0 || result.failedReleases > 0;
+    const hasChanges =
+      result.claimedReplicas > 0 || result.releasedReplicas > 0;
+    const message = `IPFS replication: claimed=${result.claimedReplicas}, released=${result.releasedReplicas}, failedClaims=${result.failedClaims}, failedReleases=${result.failedReleases}`;
 
-    Kernel.logger.info(
-      `IPFS replication: claimed=${result.claimedReplicas}, released=${result.releasedReplicas}, failedClaims=${result.failedClaims}, failedReleases=${result.failedReleases}`,
-    );
+    if (hasFailures) {
+      Kernel.logger.warn(message);
+
+      return;
+    }
+
+    if (hasChanges) {
+      Kernel.logger.info(message);
+
+      return;
+    }
+
+    Kernel.logger.debug(message);
+  }
+
+  public scheduleWarmupRuns(delaysMs: number[] = [30000, 90000, 300000]): void {
+    for (const delayMs of delaysMs) {
+      const timer = setTimeout(() => {
+        void this.execute().catch((error: unknown) => {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
+          Kernel.logger.error(
+            `Error on ${this.getProcessName()} warmup: ${errorMessage}`,
+          );
+        });
+      }, delayMs);
+
+      timer.unref?.();
+    }
   }
 
   public getCronExpression(): CronExpression {

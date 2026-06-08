@@ -28,6 +28,7 @@ export interface ConversationRepository {
     limit: number,
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]>;
+  findByNetworkId(networkId: NetworkId, limit: number): Promise<Conversation[]>;
   findLatestMessages(
     conversationId: ConversationId,
     limit: number,

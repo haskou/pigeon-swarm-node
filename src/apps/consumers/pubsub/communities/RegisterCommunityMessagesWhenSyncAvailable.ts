@@ -8,6 +8,7 @@ import { MongoCommunityChannelMessageRepository } from '@app/contexts/communitie
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
@@ -122,12 +123,13 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
     community: Community,
     event: DomainEvent,
     acceptedMessageIds: ReadonlySet<string>,
-  ): Promise<void> {
+  ): Promise<number> {
     const reactionCandidates = Array.isArray(
       event.attributes.reactionCandidates,
     )
       ? event.attributes.reactionCandidates
       : [];
+    let registeredReactions = 0;
 
     for (const candidate of reactionCandidates) {
       if (!isCommunityChannelMessageReactionPrimitive(candidate)) {
@@ -148,8 +150,11 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
 
       if (await this.hasReactionTarget(reaction, acceptedMessageIds)) {
         await this.reactionRepository.save(reaction);
+        registeredReactions++;
       }
     }
+
+    return registeredReactions;
   }
 
   public async handler(event: DomainEvent): Promise<void> {
@@ -161,8 +166,16 @@ export default class RegisterCommunityMessagesWhenSync extends Consumer {
     }
 
     const acceptedMessageIds = await this.registerMessages(community, event);
+    const registeredReactions = await this.registerReactions(
+      community,
+      event,
+      acceptedMessageIds,
+    );
 
-    await this.registerReactions(community, event, acceptedMessageIds);
     await this.communityRepository.save(community);
+
+    Kernel.logger?.info?.(
+      `Community sync applied: communityId=${community.getId().valueOf()} messages=${acceptedMessageIds.size} reactions=${registeredReactions}`,
+    );
   }
 }

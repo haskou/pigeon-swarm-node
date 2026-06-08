@@ -8,6 +8,7 @@ import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/doma
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { MessageFactory } from '@app/contexts/conversations/domain/MessageFactory';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
+import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
@@ -154,24 +155,27 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     });
   }
 
-  public async handler(event: DomainEvent): Promise<void> {
-    this.tracker.markAvailable(
-      'conversation',
-      event.aggregateId,
-      event.attributes.requestId
-        ? String(event.attributes.requestId)
-        : undefined,
-    );
-    const candidates = Array.isArray(event.attributes.messageCandidates)
+  private messageCandidatesFrom(event: DomainEvent): MessageCandidate[] {
+    return Array.isArray(event.attributes.messageCandidates)
       ? event.attributes.messageCandidates.filter((candidate) =>
           this.isMessageCandidate(candidate),
         )
       : [];
-    const conversationMetadata = this.conversationMetadataFrom(event);
+  }
 
-    if (conversationMetadata) {
-      await this.conversationRegistrar.register(conversationMetadata);
-    }
+  private reactionCandidatesFrom(event: DomainEvent): ReactionCandidate[] {
+    return Array.isArray(event.attributes.reactionCandidates)
+      ? event.attributes.reactionCandidates.filter((candidate) =>
+          this.isReactionCandidate(candidate),
+        )
+      : [];
+  }
+
+  private async registerMessagesFrom(
+    event: DomainEvent,
+    candidates: MessageCandidate[],
+  ): Promise<number> {
+    let registeredMessages = 0;
 
     for (const candidate of candidates) {
       const message = new RegisterConversationMessage(
@@ -185,17 +189,20 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
       } else {
         await this.registrar.register(message);
       }
+
+      registeredMessages++;
     }
 
-    const reactionCandidates = Array.isArray(
-      event.attributes.reactionCandidates,
-    )
-      ? event.attributes.reactionCandidates.filter((candidate) =>
-          this.isReactionCandidate(candidate),
-        )
-      : [];
+    return registeredMessages;
+  }
 
-    for (const candidate of reactionCandidates) {
+  private async registerReactionsFrom(
+    event: DomainEvent,
+    candidates: ReactionCandidate[],
+  ): Promise<number> {
+    let registeredReactions = 0;
+
+    for (const candidate of candidates) {
       await this.reactionRegistrar.register(
         new RegisterMessageReaction(
           event.aggregateId,
@@ -205,6 +212,54 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
           candidate.createdAt,
         ),
       );
+      registeredReactions++;
     }
+
+    return registeredReactions;
+  }
+
+  private logAppliedSync(
+    event: DomainEvent,
+    hasMetadata: boolean,
+    registeredMessages: number,
+    registeredReactions: number,
+  ): void {
+    if (hasMetadata || registeredMessages > 0 || registeredReactions > 0) {
+      Kernel.logger?.info?.(
+        `Conversation sync applied: conversationId=${event.aggregateId} metadata=${hasMetadata ? 'true' : 'false'} messages=${registeredMessages} reactions=${registeredReactions}`,
+      );
+    }
+  }
+
+  public async handler(event: DomainEvent): Promise<void> {
+    this.tracker.markAvailable(
+      'conversation',
+      event.aggregateId,
+      event.attributes.requestId
+        ? String(event.attributes.requestId)
+        : undefined,
+    );
+
+    const conversationMetadata = this.conversationMetadataFrom(event);
+
+    if (conversationMetadata) {
+      await this.conversationRegistrar.register(conversationMetadata);
+    }
+
+    const registeredMessages = await this.registerMessagesFrom(
+      event,
+      this.messageCandidatesFrom(event),
+    );
+    const registeredReactions = await this.registerReactionsFrom(
+      event,
+      this.reactionCandidatesFrom(event),
+    );
+
+    this.logAppliedSync(
+      event,
+      conversationMetadata !== undefined,
+      registeredMessages,
+      registeredReactions,
+    );
   }
 }

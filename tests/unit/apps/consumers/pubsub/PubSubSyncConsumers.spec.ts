@@ -3,6 +3,7 @@ import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conv
 import RegisterMessagesWhenSyncAvailable from '@app/apps/consumers/pubsub/conversations/RegisterMessagesWhenSyncAvailable';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
+import RespondToConversationNetworkSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationNetworkSyncRequest';
 import RespondToConversationSyncRequest from '@app/apps/consumers/pubsub/conversations/RespondToConversationSyncRequest';
 import RegisterIdentityWhenSyncAvailable from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenSyncAvailable';
 import RespondToIdentityNetworkSyncRequest from '@app/apps/consumers/pubsub/identities/RespondToIdentityNetworkSyncRequest';
@@ -19,12 +20,15 @@ import ConversationMessageRegistrar from '@app/contexts/conversations/applicatio
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
+import ConversationNetworkSyncResponder from '@app/contexts/conversations/application/respond-network-sync/ConversationNetworkSyncResponder';
+import { ConversationNetworkSyncResponseMessage } from '@app/contexts/conversations/application/respond-network-sync/messages/ConversationNetworkSyncResponseMessage';
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
 import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
+import { ConversationNetworkSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationNetworkSyncRequestedEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
@@ -386,6 +390,32 @@ describe('PubSub sync consumers', () => {
     expect(responder.respond.mock.calls[0][0].requestId?.valueOf()).toBe(
       'request-3',
     );
+  });
+
+  it('responds to conversation network sync requests', async () => {
+    const responder = mock<ConversationNetworkSyncResponder>();
+    const consumer = new RespondToConversationNetworkSyncRequest(
+      eventConsumer,
+      responder,
+    );
+
+    await consumer.handler(
+      new ConversationNetworkSyncRequestedEvent(
+        '123e4567-e89b-12d3-a456-426614174000',
+        {
+          networkId: '123e4567-e89b-12d3-a456-426614174000',
+          requestId: 'request-4',
+        },
+      ),
+    );
+
+    expect(responder.respond).toHaveBeenCalledWith(
+      expect.any(ConversationNetworkSyncResponseMessage),
+    );
+    expect(responder.respond.mock.calls[0][0].networkId.valueOf()).toBe(
+      '123e4567-e89b-12d3-a456-426614174000',
+    );
+    expect(responder.respond.mock.calls[0][0].requestId).toBe('request-4');
   });
 
   it('registers valid conversation creation announcements before fan-out', async () => {

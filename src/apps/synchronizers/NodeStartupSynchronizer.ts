@@ -1,6 +1,7 @@
 import { CommunityNetworkSyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunityNetworkSyncRequestedEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import { ConversationNetworkSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationNetworkSyncRequestedEvent';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
 import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
@@ -27,6 +28,7 @@ export interface NodeStartupSyncResult {
   communityNetworkRequests: number;
   communityRequests: number;
   connectedPeerCount: number;
+  conversationNetworkRequests: number;
   conversationRequests: number;
   identityNetworkRequests: number;
   identityRequests: number;
@@ -195,6 +197,21 @@ export default class NodeStartupSynchronizer {
     );
   }
 
+  private conversationNetworkRequests(
+    requestId: string,
+    requesterNodeId: string,
+    networkIds: Set<string>,
+  ): DomainEvent[] {
+    return [...networkIds].map(
+      (networkId) =>
+        new ConversationNetworkSyncRequestedEvent(networkId, {
+          networkId,
+          requesterNodeId,
+          requestId,
+        }),
+    );
+  }
+
   private async communityRequests(
     requestId: string,
     requesterNodeId: string,
@@ -323,6 +340,11 @@ export default class NodeStartupSynchronizer {
       requesterNodeId,
       readyNetworkIds,
     );
+    const conversationNetworkRequests = this.conversationNetworkRequests(
+      requestId,
+      requesterNodeId,
+      readyNetworkIds,
+    );
     const ipfsReplicationNetworkRequests = this.ipfsReplicationNetworkRequests(
       requestId,
       requesterNodeId,
@@ -336,6 +358,7 @@ export default class NodeStartupSynchronizer {
     const rawPlannedRequests =
       readyNetworkIds.size +
       communityNetworkRequests.length +
+      conversationNetworkRequests.length +
       keychainNetworkRequests.length +
       ipfsReplicationNetworkRequests.length +
       identityVersions.size +
@@ -350,6 +373,7 @@ export default class NodeStartupSynchronizer {
         readyNetworkIds,
       ),
       ...communityNetworkRequests,
+      ...conversationNetworkRequests,
       ...keychainNetworkRequests,
       ...ipfsReplicationNetworkRequests,
       ...this.identityRequests(
@@ -381,6 +405,7 @@ export default class NodeStartupSynchronizer {
       communityNetworkRequests: communityNetworkRequests.length,
       communityRequests: limitedCommunityRequests.length,
       connectedPeerCount,
+      conversationNetworkRequests: conversationNetworkRequests.length,
       conversationRequests: limitedConversationScopes.length,
       identityNetworkRequests: readyNetworkIds.size,
       identityRequests: limitedIdentityVersions.size,
@@ -413,10 +438,13 @@ export default class NodeStartupSynchronizer {
 
   public scheduleRetries(
     delaysMs: number[] = [5000, 15000, 30000, 60000],
+    onResult?: (result: NodeStartupSyncResult) => void,
   ): void {
     for (const delayMs of delaysMs) {
       const timer = setTimeout(() => {
-        void this.synchronize().catch((): void => undefined);
+        void this.synchronize()
+          .then((result) => onResult?.(result))
+          .catch((): void => undefined);
       }, delayMs);
 
       timer.unref?.();
@@ -427,18 +455,27 @@ export default class NodeStartupSynchronizer {
     intervalMs: number = Number(
       process.env.STARTUP_SYNC_READY_MONITOR_MS || 15000,
     ),
+    onResult?: (result: NodeStartupSyncResult) => void,
   ): void {
     if (this.readinessMonitor || intervalMs <= 0) {
       return;
     }
 
     this.readinessMonitor = setInterval(() => {
-      void this.synchronizeWhenNetworkBecomesReady();
+      void this.synchronizeWhenNetworkBecomesReady()
+        .then((result) => {
+          if (result) {
+            onResult?.(result);
+          }
+        })
+        .catch((): void => undefined);
     }, intervalMs);
     this.readinessMonitor.unref?.();
   }
 
-  public async synchronizeWhenNetworkBecomesReady(): Promise<void> {
+  public async synchronizeWhenNetworkBecomesReady(): Promise<
+    NodeStartupSyncResult | undefined
+  > {
     if (this.runningSynchronization) {
       return;
     }
@@ -453,6 +490,6 @@ export default class NodeStartupSynchronizer {
       return;
     }
 
-    await this.synchronize();
+    return this.synchronize();
   }
 }

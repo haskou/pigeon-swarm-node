@@ -220,6 +220,19 @@ export default class MongoConversationRepository implements Repository {
     return conversations;
   }
 
+  public async findByNetworkId(
+    networkId: NetworkId,
+    limit: number,
+  ): Promise<Conversation[]> {
+    const documents = await (await this.collection())
+      .find({ networkId: networkId.valueOf() })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return documents.map((document) => this.mapper.toDomain(document));
+  }
+
   public async findLatestMessages(
     conversationId: ConversationId,
     limit: number,
