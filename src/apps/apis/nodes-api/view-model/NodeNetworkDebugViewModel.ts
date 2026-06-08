@@ -26,6 +26,13 @@ export class NodeNetworkDebugViewModel {
           this.publicRelay.privateRelayDirectory.lastLookupHadValue,
         lastLookupValueKind:
           this.publicRelay.privateRelayDirectory.lastLookupValueKind,
+        lastProviderLookupAt:
+          this.publicRelay.privateRelayDirectory.lastProviderLookupAt,
+        lastProviderLookupHadValue:
+          this.publicRelay.privateRelayDirectory.lastProviderLookupHadValue,
+        lastProviderLookupMultiaddrCount:
+          this.publicRelay.privateRelayDirectory
+            .lastProviderLookupMultiaddrCount,
         lastPublishedAt: this.publicRelay.privateRelayDirectory.lastPublishedAt,
         lastPublishedNetworkCount:
           this.publicRelay.privateRelayDirectory.lastPublishedNetworkCount,

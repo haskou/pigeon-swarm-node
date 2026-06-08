@@ -20,6 +20,9 @@ export type NodeNetworkDebugResource = {
       lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
       lastPublishedAt?: number;
       lastPublishedNetworkCount?: number;
+      lastProviderLookupAt?: number;
+      lastProviderLookupHadValue?: boolean;
+      lastProviderLookupMultiaddrCount?: number;
       lastRequestedNetworkCount?: number;
       privateNetworkCount: number;
       privateNetworkFingerprints?: string[];

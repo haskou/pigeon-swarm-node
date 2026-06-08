@@ -153,6 +153,44 @@ export class HeliaIPFSParser {
     }
   }
 
+  private static configurePublicRelayProviderAddresses(
+    libp2pConfig: Libp2pDefaults,
+  ): void {
+    const publicHost = process.env.PIGEON_PUBLIC_HOST;
+    const relayPort = process.env.PIGEON_RELAY_PORT;
+
+    if (
+      process.env.PIGEON_RELAY_ENABLED !== 'true' ||
+      !publicHost ||
+      !relayPort
+    ) {
+      return;
+    }
+
+    const publicConfig = libp2pConfig as unknown as {
+      addresses?: {
+        announce?: string[];
+        listen?: string[];
+      };
+      privateKey?: Parameters<typeof libp2pKeyAdapter.peerIdFromPrivateKey>[0];
+    };
+
+    if (!publicConfig.privateKey) {
+      return;
+    }
+
+    publicConfig.addresses = {
+      ...(publicConfig.addresses || {}),
+      announce: [
+        `/${HeliaIPFSParser.publicHostProtocol(
+          publicHost,
+        )}/${publicHost}/tcp/${relayPort}/p2p/${libp2pKeyAdapter.peerIdFromPrivateKey(
+          publicConfig.privateKey,
+        )}`,
+      ],
+    };
+  }
+
   public static isInMemoryStorageLocation(storageLocation: string): boolean {
     return (
       storageLocation === 'memory' || storageLocation.startsWith('memory/')
@@ -178,14 +216,21 @@ export class HeliaIPFSParser {
         options.storageLocation,
       ),
     })) as ParsedHeliaIPFSOptions['libp2p'];
+    const configuredLibp2pConfig = {
+      ...libp2pConfig,
+      connectionGater,
+      ...(options.privateKey ? { privateKey: options.privateKey } : {}),
+    };
+
+    if (options.privateKey) {
+      HeliaIPFSParser.configurePublicRelayProviderAddresses(
+        configuredLibp2pConfig,
+      );
+    }
 
     return {
       ...(await HeliaIPFSParser.parseStorageLocationOptions(options)),
-      libp2p: {
-        ...libp2pConfig,
-        connectionGater,
-        ...(options.privateKey ? { privateKey: options.privateKey } : {}),
-      },
+      libp2p: configuredLibp2pConfig,
     };
   }
 

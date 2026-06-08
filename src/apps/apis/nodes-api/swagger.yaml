@@ -385,6 +385,12 @@ components:
                   type: number
                 lastPublishedNetworkCount:
                   type: number
+                lastProviderLookupAt:
+                  type: number
+                lastProviderLookupHadValue:
+                  type: boolean
+                lastProviderLookupMultiaddrCount:
+                  type: number
                 lastRequestedNetworkCount:
                   type: number
                 privateNetworkCount:

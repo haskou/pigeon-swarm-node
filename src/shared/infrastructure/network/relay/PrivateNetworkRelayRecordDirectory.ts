@@ -12,6 +12,10 @@ export class PrivateNetworkRelayRecordDirectory {
   private static readonly globalDebugStateKey =
     '__pigeonSwarmPrivateRelayRecordDirectoryDebug';
 
+  private static readonly routingTimeoutMs = Number(
+    process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS || 5000,
+  );
+
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
@@ -20,6 +24,19 @@ export class PrivateNetworkRelayRecordDirectory {
   private publicConnection?: Promise<IPFSConnection>;
 
   private readonly authenticator: PrivateNetworkRelayRecordAuthenticator;
+
+  private static createRoutingAbortSignal(): {
+    signal: AbortSignal;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      PrivateNetworkRelayRecordDirectory.routingTimeoutMs,
+    );
+
+    return { signal: controller.signal, timeout };
+  }
 
   public constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
@@ -38,6 +55,9 @@ export class PrivateNetworkRelayRecordDirectory {
     lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
     lastPublishedAt?: number;
     lastPublishedNetworkCount?: number;
+    lastProviderLookupAt?: number;
+    lastProviderLookupHadValue?: boolean;
+    lastProviderLookupMultiaddrCount?: number;
     lastRequestedNetworkCount?: number;
   } {
     const globalState = globalThis as typeof globalThis & {
@@ -53,6 +73,9 @@ export class PrivateNetworkRelayRecordDirectory {
               | 'unknown';
             lastPublishedAt?: number;
             lastPublishedNetworkCount?: number;
+            lastProviderLookupAt?: number;
+            lastProviderLookupHadValue?: boolean;
+            lastProviderLookupMultiaddrCount?: number;
             lastRequestedNetworkCount?: number;
           }
         | undefined;
@@ -228,9 +251,26 @@ export class PrivateNetworkRelayRecordDirectory {
       privateNetworks.map(async (network) => {
         const envelope = this.authenticator.seal(network, relayRecord);
         const lookupKey = this.authenticator.lookupKey(network);
+        const putAbort =
+          PrivateNetworkRelayRecordDirectory.createRoutingAbortSignal();
+        const provideAbort =
+          PrivateNetworkRelayRecordDirectory.createRoutingAbortSignal();
 
-        await publicConnection.putRecord(lookupKey, JSON.stringify(envelope));
-        await publicConnection.provideRecord(lookupKey);
+        try {
+          await publicConnection.putRecord(
+            lookupKey,
+            JSON.stringify(envelope),
+            putAbort.signal,
+          );
+        } finally {
+          clearTimeout(putAbort.timeout);
+        }
+
+        try {
+          await publicConnection.provideRecord(lookupKey, provideAbort.signal);
+        } finally {
+          clearTimeout(provideAbort.timeout);
+        }
         Kernel.logger.debug(
           `Published private relay record for network="${network.getId()}" fingerprint="${this.authenticator.fingerprint(
             network,
@@ -266,14 +306,41 @@ export class PrivateNetworkRelayRecordDirectory {
       privateNetworks.map(async (network) => {
         try {
           const lookupKey = this.authenticator.lookupKey(network);
-          const relayRecordEnvelope =
-            await publicConnection.getRecord(lookupKey);
+          const getAbort =
+            PrivateNetworkRelayRecordDirectory.createRoutingAbortSignal();
+          let relayRecordEnvelope: string | undefined;
+
+          try {
+            relayRecordEnvelope = await publicConnection.getRecord(
+              lookupKey,
+              getAbort.signal,
+            );
+          } finally {
+            clearTimeout(getAbort.timeout);
+          }
+
           this.directoryDebugState.lastLookupHadValue =
             Boolean(relayRecordEnvelope);
 
           if (!relayRecordEnvelope) {
-            const providerMultiaddrs =
-              await publicConnection.findRecordProviderMultiaddrs(lookupKey);
+            const providerAbort =
+              PrivateNetworkRelayRecordDirectory.createRoutingAbortSignal();
+            let providerMultiaddrs: string[] = [];
+
+            this.directoryDebugState.lastProviderLookupAt = Date.now();
+            try {
+              providerMultiaddrs =
+                await publicConnection.findRecordProviderMultiaddrs(
+                  lookupKey,
+                  providerAbort.signal,
+                );
+            } finally {
+              clearTimeout(providerAbort.timeout);
+            }
+            this.directoryDebugState.lastProviderLookupHadValue =
+              providerMultiaddrs.length > 0;
+            this.directoryDebugState.lastProviderLookupMultiaddrCount =
+              providerMultiaddrs.length;
             const relayRecord =
               this.relayRecordFromProviderMultiaddrs(providerMultiaddrs);
 
@@ -349,6 +416,9 @@ export class PrivateNetworkRelayRecordDirectory {
     lastLookupValueKind?: 'cid' | 'inline-envelope' | 'provider' | 'unknown';
     lastPublishedAt?: number;
     lastPublishedNetworkCount?: number;
+    lastProviderLookupAt?: number;
+    lastProviderLookupHadValue?: boolean;
+    lastProviderLookupMultiaddrCount?: number;
     lastRequestedNetworkCount?: number;
     privateNetworkCount: number;
     privateNetworkFingerprints: string[];
@@ -366,6 +436,11 @@ export class PrivateNetworkRelayRecordDirectory {
       lastPublishedAt: this.directoryDebugState.lastPublishedAt,
       lastPublishedNetworkCount:
         this.directoryDebugState.lastPublishedNetworkCount,
+      lastProviderLookupAt: this.directoryDebugState.lastProviderLookupAt,
+      lastProviderLookupHadValue:
+        this.directoryDebugState.lastProviderLookupHadValue,
+      lastProviderLookupMultiaddrCount:
+        this.directoryDebugState.lastProviderLookupMultiaddrCount,
       lastRequestedNetworkCount:
         this.directoryDebugState.lastRequestedNetworkCount,
       privateNetworkCount: privateNetworks.length,

@@ -120,11 +120,17 @@ private network through public IPFS routing. Those private relay directory
 records store the encrypted relay envelope directly in the routing record, using
 lookup keys and encrypted payloads derived from the private network key, so
 unrelated public peers cannot enumerate private network ids or read relay peer
-metadata. Relay nodes and leaf nodes retry private relay directory
-publish/discovery periodically, so discovery does not depend on the first public
-IPFS routing tick at startup. The public Helia/IPFS runtime bootstraps to the
-public routing layer with `/dnsaddr/bootstrap.libp2p.io` by default so private
-relay records can be published and resolved before any private peers are known.
+metadata. Relay nodes also advertise the public relay multiaddr as the provider
+address for a deterministic private-directory CID, so leaf nodes still have a
+standard DHT rendezvous fallback when custom routing records are unavailable.
+Relay nodes and leaf nodes retry private relay directory publish/discovery
+periodically, so discovery does not depend on the first public IPFS routing tick
+at startup. `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` can be used to tune each
+private-directory routing operation; it defaults to a short timeout so relay
+discovery does not block schedulers during startup. The public Helia/IPFS
+runtime bootstraps to the public routing layer with
+`/dnsaddr/bootstrap.libp2p.io` by default so private relay records can be
+published and resolved before any private peers are known.
 The public relay path is used only for fallback connectivity: private
 network events and IPFS content requests remain encrypted with the private
 network key.

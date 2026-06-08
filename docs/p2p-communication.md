@@ -125,7 +125,12 @@ the network rolls forward. Because public DHT nodes do not necessarily accept
 custom mutable record namespaces, relay nodes also publish a standard provider
 record for a deterministic CID derived from the private lookup key. Leaf nodes
 use that provider record as a fallback rendezvous when the custom routing record
-is not available.
+is not available. The provider address announced for that fallback is the public
+relay multiaddr built from `PIGEON_PUBLIC_HOST` and `PIGEON_RELAY_PORT`, so a
+leaf node does not need a manual bootstrap relay address when the public routing
+layer can find the provider. Each private-directory routing operation uses
+`PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` when configured, or a short default
+timeout, to avoid blocking process schedulers while public DHT routing warms up.
 
 ```mermaid
 sequenceDiagram

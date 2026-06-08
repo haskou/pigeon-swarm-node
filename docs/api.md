@@ -686,6 +686,9 @@ Response:
       "lastLookupValueKind": "inline-envelope",
       "lastPublishedAt": 1780579039000,
       "lastPublishedNetworkCount": 1,
+      "lastProviderLookupAt": 1780579040000,
+      "lastProviderLookupHadValue": true,
+      "lastProviderLookupMultiaddrCount": 1,
       "lastRequestedNetworkCount": 1,
       "privateNetworkCount": 1
     },
