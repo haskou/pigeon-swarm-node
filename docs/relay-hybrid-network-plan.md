@@ -35,10 +35,10 @@ Implemented in this branch:
 - Relay-capable nodes publish signed relay records on
   `pigeon-swarm.public-relays.v1`.
 - Relay-capable nodes publish encrypted private-network relay directory
-  documents to public IPFS and publish deterministic IPNS records pointing to
-  those documents. The IPNS key and encryption key are derived from the private
-  network key with separated HMAC contexts, so only nodes that know that
-  private network key can derive the IPNS name and decrypt the document.
+  documents to public IPFS and publish deterministic time-windowed IPNS records
+  pointing to those documents. The IPNS keys and encryption key are derived from
+  the private network key with separated HMAC contexts, so only nodes that know
+  that private network key can derive the IPNS names and decrypt the documents.
 - Peers validate relay records with the advertised libp2p public key, verify
   that the public key maps to the advertised `peerId`, reject expired records,
   persist active records in MongoDB and dial the advertised relay multiaddrs.
@@ -353,7 +353,8 @@ required for relay discovery and can leak private membership or identity
 information.
 
 For private-network discovery, publish an encrypted directory document per
-private network through public IPFS and point to it with deterministic IPNS:
+private network through public IPFS and point to it with deterministic
+time-windowed IPNS:
 
 ```json
 {
@@ -373,11 +374,13 @@ private network through public IPFS and point to it with deterministic IPNS:
 }
 ```
 
-The IPNS name is derived from the private network key with HMAC and a dedicated
-context. The document does not include `networkId`, PSK, private key, owner id,
-identity metadata, relay peer id, or relay multiaddrs in plaintext. A node that
-does not know the private network key cannot derive the IPNS name and cannot
-decrypt the relay records if it finds the document by other means.
+The IPNS names are derived from the private network key, a short time window,
+and a dedicated HMAC context. The document does not include `networkId`, PSK,
+private key, owner id, identity metadata, relay peer id, or relay multiaddrs in
+plaintext. A node that does not know the private network key cannot derive the
+IPNS names and cannot decrypt the relay records if it finds a document by other
+means. The rolling window prevents stale public routing caches from pinning
+discovery to one obsolete static IPNS record.
 
 ## Relay Record Signature
 
@@ -424,8 +427,8 @@ Relay nodes should publish signed relay records to a public discovery layer.
 
 Possible storage mechanisms:
 
-- deterministic IPNS records pointing to encrypted public IPFS directory
-  documents;
+- deterministic time-windowed IPNS records pointing to encrypted public IPFS
+  directory documents;
 - public IPFS routing records;
 - public DHT records;
 - a public Gossipsub topic for relay announcements;
@@ -434,8 +437,8 @@ Possible storage mechanisms:
 The system should not rely on one single mechanism. A practical first version can use:
 
 1. configured bootstrap relay multiaddrs;
-2. private-network relay directory records resolved through deterministic IPNS
-   with the private network key;
+2. private-network relay directory records resolved through deterministic
+   time-windowed IPNS with the private network key;
 3. public relay records learned through pubsub after at least one public peer is
    connected;
 4. healthchecked local cache.

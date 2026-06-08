@@ -109,11 +109,13 @@ export class PrivateNetworkRelayRecordAuthenticator {
     return `${PrivateNetworkRelayRecordAuthenticator.recordPrefix}/${digest}`;
   }
 
-  public ipnsSeed(network: IPFSNetwork): Uint8Array {
+  public ipnsSeed(network: IPFSNetwork, windowId: number): Uint8Array {
     const networkKey = this.requireNetworkKey(network);
 
     return createHmac('sha256', networkKey.valueOf())
       .update(PrivateNetworkRelayRecordAuthenticator.ipnsContext)
+      .update('\n')
+      .update(String(windowId))
       .digest();
   }
 

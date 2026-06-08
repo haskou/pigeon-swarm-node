@@ -119,18 +119,20 @@ Relay records are advertised through complementary paths:
 * legacy custom routing records for compatibility and diagnostics.
 
 The deterministic private directory is the primary cold-start path. For every
-private network, backend derives an IPNS key from the private network key using
-an HMAC context. A relay node stores an encrypted directory document in public
-IPFS, then publishes an IPNS record whose value points to that document CID.
-Leaf nodes that share the same private network key derive the same IPNS name,
-resolve it through public IPFS routing, fetch the encrypted document, decrypt it
-locally, validate the signed relay record, and dial the relay.
+private network, backend derives IPNS keys from the private network key and a
+short time window using an HMAC context. A relay node stores an encrypted
+directory document in public IPFS, then publishes an IPNS record for the current
+window whose value points to that document CID. Leaf nodes that share the same
+private network key derive the same current and previous window IPNS names,
+resolve them through public IPFS routing, fetch encrypted documents, decrypt
+them locally, validate the signed relay record, and dial the relay.
 
 This does not publish the private network id, PSK, relay peer id, or relay
 multiaddrs in the clear. Nodes outside the private network can at most observe
-an opaque IPNS name and encrypted document. They cannot derive the name from a
-network they do not know and cannot decrypt the document if they discover it by
-other means.
+opaque IPNS names and encrypted documents. They cannot derive the names from a
+network they do not know and cannot decrypt the documents if they discover them
+by other means. The time-windowed names also prevent a single stale IPNS routing
+record from pinning discovery to an obsolete document forever.
 
 Public DHT provider lookups remain diagnostic only; provider records can point
 at generic public gateways, so they are not trusted as relay records. Each
@@ -149,9 +151,9 @@ sequenceDiagram
   R->>R: Start public relay runtime
   R->>Pub: Publish signed public relay record
   R->>Pub: Add encrypted private relay directory JSON
-  R->>Pub: Publish deterministic private-network IPNS record
-  L->>L: Derive same IPNS name from private network key
-  L->>Pub: Resolve IPNS and fetch encrypted directory JSON
+  R->>Pub: Publish deterministic private-network IPNS window record
+  L->>L: Derive current and previous IPNS names from private network key
+  L->>Pub: Resolve IPNS window records and fetch encrypted directory JSON
   Pub-->>L: Return encrypted relay directory
   L->>L: Decrypt envelope and verify signed relay record
   L->>R: Dial relay/libp2p multiaddr
