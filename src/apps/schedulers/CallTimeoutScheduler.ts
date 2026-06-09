@@ -1,8 +1,8 @@
 import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
 import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCallPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
-import MongoNotificationMapper from '@app/contexts/notifications/infrastructure/mongo/mappers/MongoNotificationMapper';
-import MongoNotificationRepository from '@app/contexts/notifications/infrastructure/mongo/MongoNotificationRepository';
+import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import OrbitDBNotificationRepository from '@app/contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -19,7 +19,7 @@ type CallTimeoutSchedulerDependencies = {
     'findTimedOutJoinedCalls' | 'findTimedOutRingingCalls' | 'save'
   >;
   eventPublisher?: DomainEventPublisher;
-  notificationRepository?: Pick<MongoNotificationRepository, 'save'>;
+  notificationRepository?: Pick<NotificationRepository, 'save'>;
 };
 
 export default class CallTimeoutScheduler extends Scheduler {
@@ -30,10 +30,7 @@ export default class CallTimeoutScheduler extends Scheduler {
     'findTimedOutJoinedCalls' | 'findTimedOutRingingCalls' | 'save'
   >;
 
-  private readonly notificationRepository: Pick<
-    MongoNotificationRepository,
-    'save'
-  >;
+  private readonly notificationRepository: Pick<NotificationRepository, 'save'>;
 
   constructor(dependencies: CallTimeoutSchedulerDependencies = {}) {
     super();
@@ -49,10 +46,7 @@ export default class CallTimeoutScheduler extends Scheduler {
       dependencies.callRepository || new MongoCallRepository(mongo as MongoDB);
     this.notificationRepository =
       dependencies.notificationRepository ||
-      new MongoNotificationRepository(
-        mongo as MongoDB,
-        new MongoNotificationMapper(),
-      );
+      new OrbitDBNotificationRepository();
   }
 
   private async markTimedOutJoinedParticipants(): Promise<void> {

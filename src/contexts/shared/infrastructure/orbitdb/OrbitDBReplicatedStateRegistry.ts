@@ -66,4 +66,13 @@ export class OrbitDBReplicatedStateRegistry {
 
     return documents;
   }
+
+  public async putDocument(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    document: Record<string, unknown>,
+  ): Promise<void> {
+    for (const stores of this.storesByNetworkId.values()) {
+      await this.getStore(stores, storeName).put?.(document);
+    }
+  }
 }
