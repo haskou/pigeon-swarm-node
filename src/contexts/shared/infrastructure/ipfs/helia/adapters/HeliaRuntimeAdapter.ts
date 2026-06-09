@@ -245,6 +245,7 @@ export class HeliaRuntimeAdapter {
       ...(config.services || {}),
       pubsub: gossipsubModule.gossipsub({
         allowPublishToZeroTopicPeers: true,
+        runOnLimitedConnection: true,
       }) as unknown,
     };
 

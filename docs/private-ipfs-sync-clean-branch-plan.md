@@ -6,6 +6,8 @@ Related documents:
 
 - PSK relay spike findings:
   [private-ipfs-relay-spike.md](./private-ipfs-relay-spike.md)
+- OrbitDB private sync spike findings:
+  [orbitdb-private-sync-spike.md](./orbitdb-private-sync-spike.md)
 
 ## Objective
 
@@ -30,6 +32,10 @@ The target result is:
   IPFS/Bitswap.
 - The private IPFS relay spike was reduced to final evidence and negative
   findings, not implementation noise.
+- OrbitDB was validated as the replicated application storage candidate for
+  private-network `events`, `documents` and `keyvalue` stores.
+- Private IPFS pubsub and OrbitDB sync require relay-limited connection support
+  when stores replicate over `/p2p-circuit`.
 
 The remaining plan starts after block transport. IPFS moves bytes once a CID is
 known; it does not provide the replicated application index/head layer.
@@ -61,10 +67,16 @@ known; it does not provide the replicated application index/head layer.
 4. Keep `.env.local`, generated IPFS folders, logs, and `tmp/` out of git.
 5. Open one PR with a squash-friendly title.
 
-## Phase 1: OrbitDB Spike
+## Completed Phase 1: OrbitDB Spike
+
+Decision: proceed with OrbitDB as the replicated application storage candidate.
+
+The detailed evidence is in
+[orbitdb-private-sync-spike.md](./orbitdb-private-sync-spike.md).
 
 Goal: decide whether OrbitDB can replace MongoDB as replicated application
-storage before implementing any manual sync layer.
+storage before implementing any manual sync layer. This has been validated for
+the spike scope.
 
 The completed private IPFS relay phase already proves the content path: if a
 node knows a CID, it can fetch the bytes through private IPFS over a PSK relay.
@@ -92,7 +104,7 @@ private-network/<networkId>/keyvalue/heads
 private-network/<networkId>/keyvalue/sync-state
 ```
 
-The spike must verify:
+The spike verified:
 
 - two isolated nodes with separate local folders;
 - one private PSK network;
@@ -110,6 +122,11 @@ The spike must verify:
   - unread/read marker lookup;
   - notifications by identity;
   - invites/membership requests by community and identity.
+- deterministic store names generate the same OrbitDB addresses on both nodes;
+- private IPFS pubsub works on relay-limited connections when gossipsub is
+  configured for limited connections;
+- OrbitDB heads sync works on relay-limited connections with the compatibility
+  patch documented in the spike findings.
 
 Suggested commit:
 
@@ -117,19 +134,17 @@ Suggested commit:
 spike(db): 🧪 Validate OrbitDB replicated stores
 ```
 
-Acceptance:
+Acceptance evidence:
 
 - OrbitDB spike proves replicated `events`, `documents` and `keyvalue` stores
   across two isolated nodes on the same private relay path;
 - OrbitDB-originated domain events create/update document/keyvalue projections
   and emit the equivalent WebSocket projections;
-- there is a written decision:
-  - proceed with OrbitDB storage; or
-  - reject OrbitDB for specific measured reasons.
+- written decision: proceed with OrbitDB storage.
 
 ## Phase 2A: OrbitDB Path
 
-Run this phase only if Phase 1 succeeds.
+Selected next phase.
 
 Goal: move replicated application state to OrbitDB stores and avoid building a
 manual Mongo/gossip/pull sync layer.
@@ -189,7 +204,9 @@ Acceptance:
 
 ## Phase 2B: Manual Sync Fallback
 
-Run this phase only if Phase 1 fails.
+Do not run this phase while the OrbitDB path remains viable. Keep it only as a
+fallback if Phase 2A uncovers a blocking OrbitDB limitation with measured
+evidence.
 
 Goal: use MongoDB event logs plus pull-based repair sync as fallback. Do not
 build this before OrbitDB has been rejected with measured reasons.
