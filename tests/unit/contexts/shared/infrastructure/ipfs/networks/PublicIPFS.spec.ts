@@ -1,5 +1,6 @@
 const mockHeliaNode = {
   blockstore: {
+    createSession: jest.fn(),
     delete: jest.fn(),
     get: jest.fn(),
     has: jest.fn(),
@@ -26,9 +27,18 @@ async function* pinResults(cid: { toString(): string }) {
   yield cid;
 }
 
+async function* bytesResults() {
+  yield new Uint8Array([1, 2, 3]);
+}
+
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
 const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
+const mockUnixfsCat = jest.fn();
+const mockUnixfs = jest.fn().mockReturnValue({
+  addBytes: jest.fn().mockResolvedValue({ toString: () => 'bafybytescid' }),
+  cat: mockUnixfsCat,
+});
 const mockMultiaddr = jest
   .fn()
   .mockImplementation((address: string) => `mock-multiaddr:${address}`);
@@ -48,6 +58,14 @@ jest.mock(
       add: jest.fn().mockResolvedValue({ toString: () => 'bafymockcid' }),
       get: jest.fn().mockResolvedValue({ test: true }),
     }),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/unixfs',
+  () => ({
+    unixfs: mockUnixfs,
   }),
   { virtual: true },
 );
@@ -152,6 +170,13 @@ describe('PublicIPFS', () => {
     mockHeliaNode.pins.rm.mockReturnValue(
       pinResults({ toString: () => 'bafymockcid' }),
     );
+    mockHeliaNode.blockstore.createSession.mockReturnValue({
+      close: jest.fn(),
+      get: jest.fn(),
+      has: jest.fn(),
+      put: jest.fn(),
+    });
+    mockUnixfsCat.mockReturnValue(bytesResults());
   });
 
   describe('create', () => {
@@ -180,13 +205,14 @@ describe('PublicIPFS', () => {
     });
 
     it('should log the peer id on creation', async () => {
-      const Kernel = (await import('@app/Kernel')).default;
+      const infoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       await PublicIPFS.create({ storageLocation: 'memory' });
 
-      expect(Kernel.logger.info).toHaveBeenCalledWith(
+      expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('mock-peer-id'),
       );
+      infoSpy.mockRestore();
     });
   });
 
@@ -256,6 +282,62 @@ describe('PublicIPFS', () => {
     });
   });
 
+  describe('getBytes', () => {
+    it('should pin uploaded byte content in background', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      const cid = await connection.addBytes(Buffer.from([1, 2, 3]));
+
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(cid.valueOf()).toBe('bafybytescid');
+      expect(mockHeliaNode.pins.add).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        {
+          metadata: {
+            strategy: 'read-through-cache',
+          },
+          signal: undefined,
+        },
+      );
+    });
+
+    it('should use connected peers as initial providers when fetching bytes', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+      const connectedPeer = { toString: () => 'connected-peer-id' };
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue([connectedPeer]);
+
+      const result = await connection.getBytes(cid);
+
+      expect(result).toEqual(Buffer.from([1, 2, 3]));
+      expect(mockHeliaNode.blockstore.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        {
+          maxProviders: 1,
+          minProviders: 1,
+          providers: [connectedPeer],
+          signal: undefined,
+        },
+      );
+      expect(mockUnixfs).toHaveBeenCalledWith({
+        blockstore: expect.objectContaining({
+          close: expect.any(Function),
+        }),
+      });
+      expect(mockUnixfsCat).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        {
+          maxProviders: 1,
+          minProviders: 1,
+          providers: [connectedPeer],
+          signal: undefined,
+        },
+      );
+    });
+  });
+
   describe('removeJSON', () => {
     it('should unpin pinned content before deleting the block', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
@@ -288,9 +370,11 @@ describe('PublicIPFS', () => {
 
     it('should keep local record when routing publication fails', async () => {
       jest.useFakeTimers();
-      const Kernel = (await import('@app/Kernel')).default;
+      const previousLogLevel = process.env.LOG_LEVEL;
+      const debugSpy = jest.spyOn(console, 'debug').mockImplementation();
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 
+      process.env.LOG_LEVEL = 'debug';
       mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
       mockHeliaNode.datastore.put.mockResolvedValue(undefined);
       mockHeliaNode.routing.put.mockRejectedValue(new Error('dht timeout'));
@@ -302,9 +386,11 @@ describe('PublicIPFS', () => {
       expect(mockHeliaNode.datastore.put).toHaveBeenCalled();
       expect(mockHeliaNode.routing.put).toHaveBeenCalled();
       jest.advanceTimersByTime(5000);
-      expect(Kernel.logger.debug).toHaveBeenCalledWith(
+      expect(debugSpy).toHaveBeenCalledWith(
         'DHT record publications skipped: count=1 sampleKey="identity-id"',
       );
+      debugSpy.mockRestore();
+      process.env.LOG_LEVEL = previousLogLevel;
       jest.useRealTimers();
     });
   });

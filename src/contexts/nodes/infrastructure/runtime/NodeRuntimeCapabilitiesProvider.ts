@@ -1,4 +1,3 @@
-import { PublicIPFSContentFallback } from '@app/contexts/shared/infrastructure/ipfs/fallback/PublicIPFSContentFallback';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { PublicRelayRuntime } from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 
@@ -25,7 +24,7 @@ export class NodeRuntimeCapabilitiesProvider implements CapabilitiesProvider {
     ).debugState();
 
     return {
-      contentFallback: PublicIPFSContentFallback.isServing(),
+      contentFallback: false,
       gossipsub: true,
       privateIpfs: privateNetworks.length > 0,
       privateIpfsPeerCount: this.uniquePeerCount(

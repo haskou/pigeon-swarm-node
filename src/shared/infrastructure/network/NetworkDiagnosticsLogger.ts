@@ -1,5 +1,4 @@
-import Kernel from '@app/Kernel';
-
+import InfrastructureLogger from '../logs/InfrastructureLogger';
 import { NetworkDiagnosticsMode } from './types/NetworkDiagnosticsMode';
 import { RuntimeConfig } from './types/RuntimeConfig';
 import { RuntimeNode } from './types/RuntimeNode';
@@ -58,7 +57,7 @@ export default class NetworkDiagnosticsLogger {
       return;
     }
 
-    Kernel.logger.debug(
+    InfrastructureLogger.debug(
       JSON.stringify({
         addresses: {
           announced: params.config?.addresses?.announce || [],
@@ -102,7 +101,7 @@ export default class NetworkDiagnosticsLogger {
 
     for (const eventName of ['peer:connect', 'peer:disconnect']) {
       node.addEventListener(eventName, (event) => {
-        Kernel.logger.debug(
+        InfrastructureLogger.debug(
           JSON.stringify({
             activeConnections: node.getConnections?.().length,
             connectedPeers: NetworkDiagnosticsLogger.stringifyList(
@@ -137,7 +136,7 @@ export default class NetworkDiagnosticsLogger {
       return;
     }
 
-    Kernel.logger.debug(
+    InfrastructureLogger.debug(
       JSON.stringify({
         action,
         activeConnections: node.getConnections?.().length,

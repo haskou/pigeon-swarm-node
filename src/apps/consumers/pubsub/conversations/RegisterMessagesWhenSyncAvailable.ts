@@ -5,14 +5,11 @@ import { RegisterConversationMessage } from '@app/contexts/conversations/applica
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
-import { Message } from '@app/contexts/conversations/domain/Message';
-import { MessageFactory } from '@app/contexts/conversations/domain/MessageFactory';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
-import { PrimitiveOf } from '@haskou/value-objects';
 
 import { MessageCandidate } from './types/MessageCandidate';
 import { ReactionCandidate } from './types/ReactionCandidate';
@@ -80,23 +77,6 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
       typeof candidateRecord.createdAt === 'number' &&
       typeof candidateRecord.emoji === 'string' &&
       typeof candidateRecord.messageId === 'string'
-    );
-  }
-
-  private messageFromCandidate(
-    candidate: MessageCandidate,
-  ): Message | undefined {
-    if (
-      candidate.message === undefined ||
-      candidate.message === null ||
-      typeof candidate.message !== 'object' ||
-      Array.isArray(candidate.message)
-    ) {
-      return undefined;
-    }
-
-    return MessageFactory.fromPrimitives(
-      candidate.message as PrimitiveOf<Message>,
     );
   }
 
@@ -178,22 +158,27 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     let registeredMessages = 0;
 
     for (const candidate of candidates) {
+      if (!candidate.externalIdentifier) {
+        Kernel.logger?.warn?.(
+          `Conversation sync ignored message candidate without IPFS CID: conversationId=${event.aggregateId} messageId=${candidate.messageId} requestId=${String(event.attributes.requestId || '')}`,
+        );
+
+        continue;
+      }
+
       const message = new RegisterConversationMessage(
         event.aggregateId,
         candidate.messageId,
         candidate.externalIdentifier,
       );
-      const embeddedMessage = this.messageFromCandidate(candidate);
 
-      if (embeddedMessage) {
+      if (candidate.message) {
         Kernel.logger?.warn?.(
-          `Conversation sync used embedded gossip payload fallback: conversationId=${event.aggregateId} messageId=${candidate.messageId} requestId=${String(event.attributes.requestId || '')}`,
+          `Conversation sync ignored embedded IPFS message payload: conversationId=${event.aggregateId} messageId=${candidate.messageId} requestId=${String(event.attributes.requestId || '')}`,
         );
-        await this.registrar.registerCandidate(message, embeddedMessage);
-      } else {
-        await this.registrar.register(message);
       }
 
+      await this.registrar.register(message);
       registeredMessages++;
     }
 

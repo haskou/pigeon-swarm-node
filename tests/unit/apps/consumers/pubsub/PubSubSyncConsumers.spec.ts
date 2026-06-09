@@ -518,7 +518,7 @@ describe('PubSub sync consumers', () => {
     expect(reactionRegistrar.register).not.toHaveBeenCalled();
   });
 
-  it('registers embedded message candidates announced by conversation sync responses', async () => {
+  it('ignores embedded IPFS message candidates without CID in conversation sync responses', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
     const reactionRegistrar = mock<MessageReactionRegistrar>();
     const conversationRegistrar = mock<ConversationRegistrar>();
@@ -564,11 +564,7 @@ describe('PubSub sync consumers', () => {
       expect.any(ConversationMetadataRegisterMessage),
     );
     expect(registrar.register).not.toHaveBeenCalled();
-    expect(registrar.registerCandidate).toHaveBeenCalledTimes(1);
-    expect(registrar.registerCandidate).toHaveBeenCalledWith(
-      expect.any(RegisterConversationMessage),
-      expect.any(MessageSent),
-    );
+    expect(registrar.registerCandidate).not.toHaveBeenCalled();
   });
 
   it('rejects conversation sync metadata for another aggregate', async () => {

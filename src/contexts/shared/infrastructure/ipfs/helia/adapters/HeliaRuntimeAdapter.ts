@@ -1,3 +1,4 @@
+import type { unixfs as createHeliaUnixfsClient } from '@helia/unixfs';
 import type * as GossipsubModule from '@libp2p/gossipsub';
 import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 import type { preSharedKey } from '@libp2p/pnet';
@@ -20,6 +21,7 @@ import type { HeliaJSONClient } from './types/HeliaJSONClient';
 import type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
 import type { HeliaUnixfsClient } from './types/HeliaUnixfsClient';
 import type { Libp2pDefaults } from './types/Libp2pDefaults';
+import type { PrivateHeliaCreateOptions } from './types/PrivateHeliaCreateOptions';
 
 export type { DatastoreKeyLike } from './types/DatastoreKeyLike';
 export type { HeliaInstance } from './types/HeliaInstance';
@@ -44,6 +46,11 @@ export class HeliaRuntimeAdapter {
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
+  private heliaBlockBrokersModulePromise?: Promise<
+    typeof import('@helia/block-brokers')
+  >;
+
+  private heliaRoutersModulePromise?: Promise<typeof import('@helia/routers')>;
   private gossipsubModulePromise?: Promise<typeof GossipsubModule>;
   private ipnsModulePromise?: Promise<typeof IPNSModule>;
   private ipnsValidatorModulePromise?: Promise<typeof IPNSValidatorModule>;
@@ -105,6 +112,23 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof import('@helia/unixfs')>('@helia/unixfs');
 
     return this.heliaUnixfsModulePromise;
+  }
+
+  private loadHeliaBlockBrokersModule(): Promise<
+    typeof import('@helia/block-brokers')
+  > {
+    this.heliaBlockBrokersModulePromise ??= this.nativeImport<
+      typeof import('@helia/block-brokers')
+    >('@helia/block-brokers');
+
+    return this.heliaBlockBrokersModulePromise;
+  }
+
+  private loadHeliaRoutersModule(): Promise<typeof import('@helia/routers')> {
+    this.heliaRoutersModulePromise ??=
+      this.nativeImport<typeof import('@helia/routers')>('@helia/routers');
+
+    return this.heliaRoutersModulePromise;
   }
 
   private loadGossipsubModule(): Promise<typeof GossipsubModule> {
@@ -363,7 +387,7 @@ export class HeliaRuntimeAdapter {
   }
 
   public async createUnixfsClient(
-    core: HeliaInstance,
+    core: Parameters<typeof createHeliaUnixfsClient>[0],
   ): Promise<HeliaUnixfsClient> {
     const heliaUnixfsModule = await this.loadHeliaUnixfsModule();
 
@@ -376,6 +400,26 @@ export class HeliaRuntimeAdapter {
     const heliaModule = await this.loadHeliaModule();
 
     return heliaModule.createHelia(options);
+  }
+
+  public async createPrivateHelia(
+    options: PrivateHeliaCreateOptions,
+  ): Promise<HeliaInstance> {
+    const [heliaModule, blockBrokersModule, routersModule] = await Promise.all([
+      this.loadHeliaModule(),
+      this.loadHeliaBlockBrokersModule(),
+      this.loadHeliaRoutersModule(),
+    ]);
+
+    return heliaModule.createHelia({
+      ...options,
+      blockBrokers: [
+        blockBrokersModule.bitswap({
+          runOnLimitedConnections: true,
+        }),
+      ],
+      routers: [routersModule.libp2pRouting(options.libp2p)],
+    });
   }
 
   public async createLibp2p(

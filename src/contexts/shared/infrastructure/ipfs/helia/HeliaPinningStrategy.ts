@@ -1,10 +1,10 @@
-import Kernel from '@app/Kernel';
+import InfrastructureLogger from '@app/shared/infrastructure/logs/InfrastructureLogger';
 
 import { HeliaInstance, ParsedCidLike } from './adapters/HeliaRuntimeAdapter';
 
 export default class HeliaPinningStrategy {
   private debug(message: string): void {
-    Kernel.logger.debug?.(message);
+    InfrastructureLogger.debug(message);
   }
 
   private async consumePinOperation(

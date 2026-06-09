@@ -258,5 +258,8 @@ export class PublicRelayRecordRegistry {
   public onRecordSaved(listener: RelayRecordHandler): void {
     this.loadPersistedRecords();
     this.listeners.push(listener);
+    this.all().forEach((record) => {
+      listener(record).catch((): undefined => undefined);
+    });
   }
 }

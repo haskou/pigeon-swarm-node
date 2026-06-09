@@ -1,31 +1,15 @@
-jest.mock('@app/Kernel', () => ({
-  __esModule: true,
-  default: {
-    logger: {
-      warn: jest.fn(),
-    },
-  },
-}));
-
-import Kernel from '@app/Kernel';
 import { mock } from 'jest-mock-extended';
 
 import { IPFSContentNotFoundError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
-import { PublicIPFSContentFallback } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/fallback/PublicIPFSContentFallback';
 import IPFSContentRacer from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
 import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 
 describe('IPFSContentRacer', () => {
   let racer: IPFSContentRacer;
-  let fallback: jest.Mocked<PublicIPFSContentFallback>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    fallback = mock<PublicIPFSContentFallback>();
-    fallback.getJSON.mockRejectedValue(new IPFSContentNotFoundError('cid'));
-    fallback.getBytes.mockRejectedValue(new IPFSContentNotFoundError('cid'));
-    racer = new IPFSContentRacer(undefined, fallback);
+    racer = new IPFSContentRacer();
   });
 
   describe('raceGetJSON', () => {
@@ -54,122 +38,57 @@ describe('IPFSContentRacer', () => {
       );
     });
 
-    it('should use public fallback when direct JSON lookup fails', async () => {
+    it('should not use fallback when direct JSON lookup fails', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
-      const expected = { name: 'fallback' };
-      let fallbackSignalWasAborted = true;
 
       network.getJSON.mockRejectedValue(new Error('not found'));
-      fallback.getJSON.mockImplementation(
-        async (_networks, _cid, signal?: AbortSignal) => {
-          fallbackSignalWasAborted = Boolean(signal?.aborted);
 
-          return expected;
-        },
+      await expect(racer.raceGetJSON([network], cid)).rejects.toThrow(
+        IPFSContentNotFoundError,
       );
-
-      const result = await racer.raceGetJSON([network], cid);
-
-      expect(result).toEqual(expected);
-      expect(Kernel.logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('through content fallback'),
-      );
-      expect(fallback.getJSON).toHaveBeenCalledWith(
-        [network],
-        cid,
-        expect.any(AbortSignal),
-      );
-      expect(fallbackSignalWasAborted).toBe(false);
-    });
-
-    it('should use a fresh signal when direct JSON lookup was aborted', async () => {
-      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
-      const network = mock<IPFSNetwork>();
-      const expected = { name: 'fallback' };
-      let fallbackSignalWasAborted = true;
-
-      racer = new IPFSContentRacer(1, fallback);
-      network.getJSON.mockImplementation(
-        (_ipfsId: IPFSId, signal?: AbortSignal) =>
-          new Promise((_resolve, reject) => {
-            signal?.addEventListener('abort', () => {
-              reject(new Error('aborted'));
-            });
-          }),
-      );
-      fallback.getJSON.mockImplementation(
-        async (_networks, _cid, signal?: AbortSignal) => {
-          fallbackSignalWasAborted = Boolean(signal?.aborted);
-
-          return expected;
-        },
-      );
-
-      const result = await racer.raceGetJSON([network], cid);
-
-      expect(result).toEqual(expected);
-      expect(fallbackSignalWasAborted).toBe(false);
     });
   });
 
   describe('raceGetBytes', () => {
-    it('should use public fallback when direct bytes lookup fails', async () => {
+    it('should not use fallback when direct bytes lookup fails', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
-      const expected = Buffer.from('fallback-bytes');
-      let fallbackSignalWasAborted = true;
 
       network.getBytes.mockRejectedValue(new Error('not found'));
-      fallback.getBytes.mockImplementation(
-        async (_networks, _cid, signal?: AbortSignal) => {
-          fallbackSignalWasAborted = Boolean(signal?.aborted);
 
-          return expected;
-        },
+      await expect(racer.raceGetBytes([network], cid)).rejects.toThrow(
+        IPFSContentNotFoundError,
       );
-
-      const result = await racer.raceGetBytes([network], cid);
-
-      expect(result).toEqual(expected);
-      expect(Kernel.logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('through content fallback'),
-      );
-      expect(fallback.getBytes).toHaveBeenCalledWith(
-        [network],
-        cid,
-        expect.any(AbortSignal),
-      );
-      expect(fallbackSignalWasAborted).toBe(false);
     });
 
-    it('should use a fresh signal when direct bytes lookup was aborted', async () => {
+    it('should use the bytes timeout instead of the generic timeout', async () => {
+      const previousBytesTimeout = process.env.IPFS_CONTENT_BYTES_TIMEOUT_MS;
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network = mock<IPFSNetwork>();
-      const expected = Buffer.from('fallback-bytes');
-      let fallbackSignalWasAborted = true;
 
-      racer = new IPFSContentRacer(1, fallback);
-      network.getBytes.mockImplementation(
-        (_ipfsId: IPFSId, signal?: AbortSignal) =>
-          new Promise((_resolve, reject) => {
-            signal?.addEventListener('abort', () => {
-              reject(new Error('aborted'));
-            });
-          }),
-      );
-      fallback.getBytes.mockImplementation(
-        async (_networks, _cid, signal?: AbortSignal) => {
-          fallbackSignalWasAborted = Boolean(signal?.aborted);
+      try {
+        process.env.IPFS_CONTENT_BYTES_TIMEOUT_MS = '1';
+        racer = new IPFSContentRacer(1000);
+        network.getBytes.mockImplementation(
+          (_cid, signal) =>
+            new Promise<Buffer>((_, reject) => {
+              signal?.addEventListener('abort', () =>
+                reject(new Error('aborted')),
+              );
+            }),
+        );
 
-          return expected;
-        },
-      );
-
-      const result = await racer.raceGetBytes([network], cid);
-
-      expect(result).toEqual(expected);
-      expect(fallbackSignalWasAborted).toBe(false);
+        await expect(racer.raceGetBytes([network], cid)).rejects.toThrow(
+          IPFSContentNotFoundError,
+        );
+      } finally {
+        if (previousBytesTimeout === undefined) {
+          delete process.env.IPFS_CONTENT_BYTES_TIMEOUT_MS;
+        } else {
+          process.env.IPFS_CONTENT_BYTES_TIMEOUT_MS = previousBytesTimeout;
+        }
+      }
     });
   });
 

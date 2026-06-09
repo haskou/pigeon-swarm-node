@@ -47,6 +47,28 @@ describe('PublicRelayRecordRegistry', () => {
     expect(listener).toHaveBeenCalledWith(record);
   });
 
+  it('should replay active relay records when a listener is registered', async () => {
+    const registry = new PublicRelayRecordRegistry();
+    const listener = jest.fn(async (): Promise<void> => undefined);
+    const record = {
+      expiresAt: Date.now() + 1000,
+      issuedAt: Date.now(),
+      multiaddrs: ['/dns4/relay.test/tcp/4011/p2p/12D3Relay'],
+      peerId: '12D3Relay',
+      publicKey: 'public-key',
+      role: 'relay' as const,
+      signature: 'signature',
+      version: 1 as const,
+    };
+
+    registry.clear();
+    registry.save(record);
+    registry.onRecordSaved(listener);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(listener).toHaveBeenCalledWith(record);
+  });
+
   it('should not notify listeners when only the relay record expiry is refreshed', async () => {
     const registry = new PublicRelayRecordRegistry();
     const listener = jest.fn(async (): Promise<void> => undefined);

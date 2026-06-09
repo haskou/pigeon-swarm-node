@@ -15,6 +15,8 @@ const mockHeliaNode = {
 };
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
+const mockBitswap = jest.fn().mockReturnValue('mock-bitswap');
+const mockLibp2pRouting = jest.fn().mockReturnValue('mock-libp2p-routing');
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockLibp2pDefaults = jest.fn().mockReturnValue({
   connectionEncrypters: [],
@@ -48,6 +50,22 @@ jest.mock(
       add: jest.fn().mockResolvedValue({ toString: () => 'bafymockcid' }),
       get: jest.fn().mockResolvedValue({ test: true }),
     }),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/block-brokers',
+  () => ({
+    bitswap: mockBitswap,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/routers',
+  () => ({
+    libp2pRouting: mockLibp2pRouting,
   }),
   { virtual: true },
 );
@@ -180,9 +198,12 @@ describe('PrivateIPFS', () => {
 
       expect(mockCreateHelia).toHaveBeenCalledWith(
         expect.objectContaining({
+          blockBrokers: ['mock-bitswap'],
           libp2p: mockHeliaNode.libp2p,
+          routers: ['mock-libp2p-routing'],
         }),
       );
+      expect(mockLibp2pRouting).toHaveBeenCalledWith(mockHeliaNode.libp2p);
     });
 
     it('should not register connection event listeners', async () => {
@@ -206,16 +227,17 @@ describe('PrivateIPFS', () => {
     });
 
     it('should log the network name and peer id', async () => {
-      const Kernel = (await import('@app/Kernel')).default;
+      const infoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       await PrivateIPFS.create(defaultOptions);
 
-      expect(Kernel.logger.info).toHaveBeenCalledWith(
+      expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('test-network'),
       );
-      expect(Kernel.logger.info).toHaveBeenCalledWith(
+      expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('mock-peer-id'),
       );
+      infoSpy.mockRestore();
     });
   });
 });

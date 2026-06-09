@@ -1,4 +1,3 @@
-import { PublicIPFSContentFallback } from '@app/contexts/shared/infrastructure/ipfs/fallback/PublicIPFSContentFallback';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 
@@ -264,10 +263,6 @@ export class PublicRelayRuntime {
 
     this.state.node = await this.adapter.createNode(
       await this.networkRegistry.getSharedPeerPrivateKey(),
-    );
-    await new PublicIPFSContentFallback().serveRegistryOnNode(
-      this.state.node,
-      this.networkRegistry,
     );
     const peerId = this.state.node.peerId?.toString();
 

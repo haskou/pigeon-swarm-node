@@ -1,29 +1,33 @@
-import Kernel from '@app/Kernel';
+import InfrastructureLogger from '@app/shared/infrastructure/logs/InfrastructureLogger';
 
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
-import { PublicIPFSContentFallback } from '../fallback/PublicIPFSContentFallback';
 import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
 
 export default class IPFSContentRacer {
+  private readonly bytesTimeoutMs: number;
+
   private readonly timeoutMs: number;
 
-  constructor(
-    timeoutMs?: number,
-    private readonly fallback = new PublicIPFSContentFallback(),
-  ) {
+  constructor(timeoutMs?: number) {
     this.timeoutMs =
       timeoutMs ??
       Number(
         process.env.IPFS_CONTENT_TIMEOUT_MS ??
           (process.env.NODE_ENV === 'test' ? 500 : 3000),
       );
+    this.bytesTimeoutMs = Number(
+      process.env.IPFS_CONTENT_BYTES_TIMEOUT_MS ??
+        process.env.IPFS_CONTENT_TIMEOUT_MS ??
+        (process.env.NODE_ENV === 'test' ? 500 : 15000),
+    );
   }
 
   private startTimeout(
     controller: AbortController,
+    timeoutMs: number = this.timeoutMs,
   ): ReturnType<typeof setTimeout> {
-    return setTimeout(() => controller.abort(), this.timeoutMs);
+    return setTimeout(() => controller.abort(), timeoutMs);
   }
 
   private forwardAbortSignal(
@@ -43,36 +47,19 @@ export default class IPFSContentRacer {
     source.addEventListener('abort', () => target.abort(), { once: true });
   }
 
-  private async fallbackAfterDirectLookup<T>(
-    timeout: ReturnType<typeof setTimeout>,
-    lookup: (signal: AbortSignal) => Promise<T>,
-    signal?: AbortSignal,
-  ): Promise<T> {
-    clearTimeout(timeout);
-    const fallbackController = new AbortController();
-    const fallbackTimeout = this.startTimeout(fallbackController);
-
-    this.forwardAbortSignal(signal, fallbackController);
-
-    try {
-      return await lookup(fallbackController.signal);
-    } finally {
-      fallbackController.abort();
-      clearTimeout(fallbackTimeout);
-    }
-  }
-
-  private networkIdsForLog(networks: IPFSNetwork[]): string {
-    return networks.map((network) => network.getId()).join(',');
-  }
-
-  private warnFallbackUsed(
-    kind: 'bytes' | 'json',
+  private logBytesFailure(
+    network: IPFSNetwork,
     cid: IPFSId,
-    networks: IPFSNetwork[],
+    error: unknown,
   ): void {
-    Kernel.logger.warn(
-      `IPFS direct ${kind} lookup failed; fetched cid="${cid.valueOf()}" through content fallback networks="${this.networkIdsForLog(networks)}" timeoutMs=${this.timeoutMs}`,
+    if (process.env.DEBUG_NETWORK !== 'true') {
+      return;
+    }
+
+    InfrastructureLogger.debug(
+      `IPFS bytes fetch failed: cid="${cid.valueOf()}" networkId="${network.getId()}" networkName="${network.getName()}" networkType="${network.isPrivate() ? 'private' : 'public'}" error="${String(
+        error,
+      )}"`,
     );
   }
 
@@ -95,16 +82,7 @@ export default class IPFSContentRacer {
 
       return result;
     } catch {
-      const result = await this.fallbackAfterDirectLookup(
-        timeout,
-        (fallbackSignal) =>
-          this.fallback.getJSON<T>(networks, cid, fallbackSignal),
-        signal,
-      );
-
-      this.warnFallbackUsed('json', cid, networks);
-
-      return result;
+      throw new IPFSContentNotFoundError(cid.valueOf());
     } finally {
       clearTimeout(timeout);
     }
@@ -116,29 +94,26 @@ export default class IPFSContentRacer {
     signal?: AbortSignal,
   ): Promise<Buffer> {
     const controller = new AbortController();
-    const timeout = this.startTimeout(controller);
+    const timeout = this.startTimeout(controller, this.bytesTimeoutMs);
 
     this.forwardAbortSignal(signal, controller);
 
     try {
       const result = await Promise.any(
-        networks.map((network) => network.getBytes(cid, controller.signal)),
+        networks.map((network) =>
+          network.getBytes(cid, controller.signal).catch((error) => {
+            this.logBytesFailure(network, cid, error);
+
+            throw error;
+          }),
+        ),
       );
 
       controller.abort();
 
       return result;
     } catch {
-      const result = await this.fallbackAfterDirectLookup(
-        timeout,
-        (fallbackSignal) =>
-          this.fallback.getBytes(networks, cid, fallbackSignal),
-        signal,
-      );
-
-      this.warnFallbackUsed('bytes', cid, networks);
-
-      return result;
+      throw new IPFSContentNotFoundError(cid.valueOf());
     } finally {
       clearTimeout(timeout);
     }
