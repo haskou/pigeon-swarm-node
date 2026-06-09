@@ -410,14 +410,16 @@ export class HeliaRuntimeAdapter {
       this.loadHeliaBlockBrokersModule(),
       this.loadHeliaRoutersModule(),
     ]);
+    const bitswapOptions: Parameters<typeof blockBrokersModule.bitswap>[0] & {
+      messageReceiveTimeout: number;
+    } = {
+      messageReceiveTimeout: 30000,
+      runOnLimitedConnections: true,
+    };
 
     return heliaModule.createHelia({
       ...options,
-      blockBrokers: [
-        blockBrokersModule.bitswap({
-          runOnLimitedConnections: true,
-        }),
-      ],
+      blockBrokers: [blockBrokersModule.bitswap(bitswapOptions)],
       routers: [routersModule.libp2pRouting(options.libp2p)],
     });
   }
