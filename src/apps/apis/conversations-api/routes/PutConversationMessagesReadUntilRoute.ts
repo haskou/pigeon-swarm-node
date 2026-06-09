@@ -1,6 +1,6 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import MessagesReadMarker from '@app/contexts/conversations/application/mark-messages-read/MessagesReadMarker';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -21,7 +21,7 @@ import { PutConversationMessagesReadUntilRequest } from '../requests/PutConversa
 @JsonController('/conversations')
 export class PutConversationMessagesReadUntilRoute extends Route {
   private readonly marker = new MessagesReadMarker(
-    this.get<MongoConversationRepository>(MongoConversationRepository),
+    new OrbitDBConversationRepository(),
     this.get<DomainEventPublisher>(MessageBus),
   );
 

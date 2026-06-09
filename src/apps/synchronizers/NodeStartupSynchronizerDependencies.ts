@@ -1,5 +1,5 @@
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import IdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import KeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
@@ -10,7 +10,7 @@ import NodeStartupSyncReadiness from './NodeStartupSyncReadiness';
 
 export interface NodeStartupSynchronizerDependencies {
   communityRepository: MongoCommunityRepository;
-  conversationRepository: MongoConversationRepository;
+  conversationRepository: ConversationRepository;
   eventPublisher: DomainEventPublisher;
   identityMetadataRepository: IdentityMetadataRepository;
   keychainMetadataRepository: KeychainMetadataRepository;

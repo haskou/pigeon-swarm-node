@@ -3,7 +3,7 @@ import { ConversationNotFoundError } from '@app/contexts/conversations/domain/er
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MongoConversationDraftRepository } from '@app/contexts/conversations/infrastructure/mongo/MongoConversationDraftRepository';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -29,8 +29,8 @@ export class ConversationDraftsRoute extends Route {
     SignedHttpRequestAuthenticator,
   );
 
-  private conversationRepository(): MongoConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
+  private conversationRepository(): OrbitDBConversationRepository {
+    return new OrbitDBConversationRepository();
   }
 
   private draftRepository(): MongoConversationDraftRepository {

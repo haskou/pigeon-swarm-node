@@ -5,7 +5,7 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityNetworkSyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentityNetworkSyncRequestedEvent';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
@@ -24,7 +24,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 describe('NodeStartupSynchronizer', () => {
   const nodeId = '550e8400-e29b-41d4-a716-446655440010';
 
-  let conversationRepository: MockProxy<MongoConversationRepository>;
+  let conversationRepository: MockProxy<ConversationRepository>;
   let communityRepository: MockProxy<MongoCommunityRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let identityMetadataRepository: MockProxy<MongoIdentityMetadataRepository>;
@@ -34,7 +34,7 @@ describe('NodeStartupSynchronizer', () => {
   let synchronizer: NodeStartupSynchronizer;
 
   beforeEach(() => {
-    conversationRepository = mock<MongoConversationRepository>();
+    conversationRepository = mock<ConversationRepository>();
     communityRepository = mock<MongoCommunityRepository>();
     eventPublisher = mock<DomainEventPublisher>();
     identityMetadataRepository = mock<MongoIdentityMetadataRepository>();

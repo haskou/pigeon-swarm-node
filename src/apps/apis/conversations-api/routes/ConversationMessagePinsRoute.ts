@@ -7,7 +7,7 @@ import { ConversationMessageWasUnpinnedEvent } from '@app/contexts/conversations
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MongoConversationMessagePinRepository } from '@app/contexts/conversations/infrastructure/mongo/MongoConversationMessagePinRepository';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -35,8 +35,8 @@ export class ConversationMessagePinsRoute extends Route {
 
   private readonly eventPublisher = this.get<MessageBus>(MessageBus);
 
-  private conversationRepository(): MongoConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
+  private conversationRepository(): OrbitDBConversationRepository {
+    return new OrbitDBConversationRepository();
   }
 
   private pinRepository(): MongoConversationMessagePinRepository {

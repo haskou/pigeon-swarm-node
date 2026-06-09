@@ -1,8 +1,9 @@
 import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import MessageSender from '@app/contexts/conversations/application/send-message/MessageSender';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { MongoPollRepository } from '@app/contexts/polls/infrastructure/mongo/MongoPollRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -35,12 +36,12 @@ export class PostConversationMessageRoute extends Route {
     return new MongoPollRepository(this.get<MongoDB>(MongoDB));
   }
 
-  private conversationRepository(): MongoConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
+  private conversationRepository(): ConversationRepository {
+    return new OrbitDBConversationRepository();
   }
 
   private async registerPreviousPollMessage(
-    conversation: Awaited<ReturnType<MongoConversationRepository['findById']>>,
+    conversation: Awaited<ReturnType<ConversationRepository['findById']>>,
     conversationId: ConversationId,
     previousMessageId: string,
     request: Request,

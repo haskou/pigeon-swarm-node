@@ -5,8 +5,9 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { InvalidPollScopeError } from '@app/contexts/polls/domain/errors/InvalidPollScopeError';
 import { PollNotFoundError } from '@app/contexts/polls/domain/errors/PollNotFoundError';
 import { Poll } from '@app/contexts/polls/domain/Poll';
@@ -48,8 +49,8 @@ export abstract class PollRouteSupport extends Route {
     );
   }
 
-  protected conversationRepository(): MongoConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
+  protected conversationRepository(): ConversationRepository {
+    return new OrbitDBConversationRepository();
   }
 
   protected async findPoll(id: string): Promise<Poll> {

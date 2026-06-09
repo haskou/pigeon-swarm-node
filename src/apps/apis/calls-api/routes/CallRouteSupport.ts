@@ -4,7 +4,7 @@ import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/Mo
 import { CommunityRepository } from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
@@ -28,7 +28,7 @@ export abstract class CallRouteSupport extends Route {
   }
 
   protected conversationRepository(): ConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
+    return new OrbitDBConversationRepository();
   }
 
   protected communityRepository(): CommunityRepository {

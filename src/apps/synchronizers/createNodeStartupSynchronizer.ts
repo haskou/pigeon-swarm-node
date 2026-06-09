@@ -1,5 +1,5 @@
 import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import MongoKeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
@@ -17,9 +17,7 @@ export function createNodeStartupSynchronizer(): NodeStartupSynchronizer {
 
   return new NodeStartupSynchronizer({
     communityRepository: new MongoCommunityRepository(mongo),
-    conversationRepository: Kernel.di.getService<MongoConversationRepository>(
-      MongoConversationRepository,
-    ),
+    conversationRepository: new OrbitDBConversationRepository(),
     eventPublisher: Kernel.di.getService<MessageBus>(MessageBus),
     identityMetadataRepository:
       Kernel.di.getService<MongoIdentityMetadataRepository>(

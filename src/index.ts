@@ -45,7 +45,7 @@ import { MongoCommunityRepository } from '@app/contexts/communities/infrastructu
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
@@ -113,10 +113,7 @@ async function init() {
     RegisterNodePeerWhenHeartbeatReceived,
   );
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
-  const conversationRepository =
-    Kernel.di.getService<MongoConversationRepository>(
-      MongoConversationRepository,
-    );
+  const conversationRepository = new OrbitDBConversationRepository();
   const mongo = Kernel.di.getService<MongoDB>(MongoDB);
   await new MongoIndexInitializer(mongo).ensure();
   const identityMetadataRepository =

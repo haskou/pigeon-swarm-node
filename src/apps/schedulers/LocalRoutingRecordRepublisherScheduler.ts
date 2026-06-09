@@ -1,4 +1,4 @@
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import IpfsIdentityRepository from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsKeychainRepository from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRepository';
 import Kernel from '@app/Kernel';
@@ -6,8 +6,7 @@ import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
 
 export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
-  private readonly conversationRepository: MongoConversationRepository =
-    this.get<MongoConversationRepository>(MongoConversationRepository);
+  private readonly conversationRepository = new OrbitDBConversationRepository();
 
   private readonly identityRepository: IpfsIdentityRepository =
     this.get<IpfsIdentityRepository>(IpfsIdentityRepository);

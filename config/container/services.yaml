@@ -652,19 +652,9 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tb25nb2RiX19Nb25nb0RCX19Nb25nb0RC
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX01vbmdvQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==:
-    class: /contexts/conversations/infrastructure/mongo/MongoConversationRepository
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tb25nb2RiX19Nb25nb0RCX19Nb25nb0RC
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb0NvbnZlcnNhdGlvbk1hcHBlcl9fTW9uZ29Db252ZXJzYXRpb25NYXBwZXI=
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSVBGU19fSVBGUw==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX2lwZnNfX21hcHBlcnNfX0lwZnNNZXNzYWdlTWFwcGVyX19JcGZzTWVzc2FnZU1hcHBlcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb01lc3NhZ2VNZXRhZGF0YU1hcHBlcl9fTW9uZ29NZXNzYWdlTWV0YWRhdGFNYXBwZXI=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDb252ZXJzYXRpb25SZXBvc2l0b3J5X19PcmJpdERCQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==:
+    class: /contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository
+    arguments: []
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb01lc3NhZ2VSZWFjdGlvbk1hcHBlcl9fTW9uZ29NZXNzYWdlUmVhY3Rpb25NYXBwZXI=:
@@ -870,7 +860,7 @@ services:
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvblJlcG9zaXRvcnk=: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0NvbnZlcnNhdGlvblJlcG9zaXRvcnlfX01vbmdvQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fY29udmVyc2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDb252ZXJzYXRpb25SZXBvc2l0b3J5X19PcmJpdERCQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybV9fc3JjX19jb250ZXh0c19fbm90aWZpY2F0aW9uc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb05vdGlmaWNhdGlvbk1hcHBlcl9fTW9uZ29Ob3RpZmljYXRpb25NYXBwZXI=:
     class: >-
       /contexts/notifications/infrastructure/mongo/mappers/MongoNotificationMapper
