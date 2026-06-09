@@ -12,6 +12,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { IpfsMessageDocument } from '../ipfs/documents/IpfsMessageDocument';
@@ -54,6 +55,97 @@ export default class MongoConversationRepository implements Repository {
     return this.mongo.getCollection<MongoUnreadConversationMessageDocument>(
       MongoConversationRepository.UNREAD_COLLECTION,
     );
+  }
+
+  private arrayValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): unknown[] | undefined {
+    const value = document[attribute];
+
+    return Array.isArray(value) ? value : undefined;
+  }
+
+  private numberValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private stringValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private documentFromReplicatedDocument(
+    document: Record<string, unknown>,
+  ): MongoConversationDocument | undefined {
+    const id = this.stringValue(document, 'id');
+    const createdAt =
+      this.numberValue(document, 'createdAt') ||
+      this.numberValue(document, 'receivedAt');
+    const networkId = this.stringValue(document, 'networkId');
+    const participantIds = this.arrayValue(document, 'participantIds');
+    const type = this.stringValue(document, 'type');
+
+    if (
+      !id ||
+      !createdAt ||
+      !networkId ||
+      !participantIds ||
+      (type !== 'group' && type !== 'one-to-one')
+    ) {
+      return undefined;
+    }
+
+    return {
+      _id: id,
+      createdAt,
+      name: this.stringValue(document, 'name'),
+      networkId,
+      participantIds: participantIds as string[],
+      type,
+    };
+  }
+
+  private async findReplicatedDocuments(
+    matcher: (document: Record<string, unknown>) => boolean,
+  ): Promise<MongoConversationDocument[]> {
+    try {
+      const documents =
+        await OrbitDBReplicatedStateRegistry.shared().queryDocuments(
+          'conversations',
+          matcher,
+        );
+
+      return documents
+        .map((document) => this.documentFromReplicatedDocument(document))
+        .filter(
+          (document): document is MongoConversationDocument =>
+            document !== undefined,
+        );
+    } catch {
+      return [];
+    }
+  }
+
+  private deduplicateDocuments(
+    documents: MongoConversationDocument[],
+  ): MongoConversationDocument[] {
+    const deduplicated = new Map<string, MongoConversationDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(document._id, document);
+    }
+
+    return [...deduplicated.values()];
   }
 
   private async findMessagesByConversationId(
@@ -171,7 +263,14 @@ export default class MongoConversationRepository implements Repository {
     });
 
     if (!document) {
-      return undefined;
+      const [replicatedDocument] = await this.findReplicatedDocuments(
+        (candidate) =>
+          this.stringValue(candidate, 'id') === conversationId.valueOf(),
+      );
+
+      return replicatedDocument
+        ? this.mapper.toDomain(replicatedDocument)
+        : undefined;
     }
 
     return this.mapper.toDomain(
@@ -189,7 +288,18 @@ export default class MongoConversationRepository implements Repository {
       _id: conversationId.valueOf(),
     });
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    if (document) {
+      return this.mapper.toDomain(document);
+    }
+
+    const [replicatedDocument] = await this.findReplicatedDocuments(
+      (candidate) =>
+        this.stringValue(candidate, 'id') === conversationId.valueOf(),
+    );
+
+    return replicatedDocument
+      ? this.mapper.toDomain(replicatedDocument)
+      : undefined;
   }
 
   public async findByParticipant(
@@ -211,13 +321,29 @@ export default class MongoConversationRepository implements Repository {
       .limit(limit)
       .sort({ createdAt: -1 })
       .toArray();
-    const conversations: Conversation[] = [];
+    const replicatedDocuments = await this.findReplicatedDocuments(
+      (candidate) =>
+        this.arrayValue(candidate, 'participantIds')?.includes(
+          participantId.valueOf(),
+        ) ?? false,
+    );
+    const replicatedBeforeDocument = beforeConversationId
+      ? replicatedDocuments.find(
+          (document) => document._id === beforeConversationId.valueOf(),
+        )
+      : undefined;
+    const beforeCreatedAt =
+      beforeDocument?.createdAt ?? replicatedBeforeDocument?.createdAt;
 
-    for (const document of documents) {
-      conversations.push(this.mapper.toDomain(document));
-    }
-
-    return conversations;
+    return this.deduplicateDocuments([
+      ...documents,
+      ...replicatedDocuments.filter((document) =>
+        beforeCreatedAt ? document.createdAt < beforeCreatedAt : true,
+      ),
+    ])
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, limit)
+      .map((document) => this.mapper.toDomain(document));
   }
 
   public async findLatestMessages(
