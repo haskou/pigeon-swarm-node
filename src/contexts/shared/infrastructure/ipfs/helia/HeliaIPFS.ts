@@ -12,6 +12,7 @@ import heliaRuntimeAdapter, {
   HeliaLibp2pConfig,
   ParsedCidLike,
 } from './adapters/HeliaRuntimeAdapter';
+import { HeliaUnixfsCatOptions } from './adapters/types/HeliaUnixfsCatOptions';
 import { HeliaIPFSParser } from './HeliaIPFSParser';
 import HeliaPinningStrategy from './HeliaPinningStrategy';
 import { IPFSConnection } from './IPFSConnection';
@@ -53,6 +54,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
       libp2pConfig as unknown as HeliaLibp2pConfig,
     );
     const heliaCore = await heliaRuntimeAdapter.createHelia({
+      ...(baseOptions.blockBrokers
+        ? { blockBrokers: baseOptions.blockBrokers }
+        : {}),
       blockstore: baseOptions.blockstore,
       datastore: baseOptions.datastore,
       libp2p,
@@ -135,6 +139,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return services.pubsub;
   }
 
+  private getConnectedPeerIds(): ReturnType<
+    HeliaInstance['libp2p']['getPeers']
+  > {
+    return this.heliaCore.libp2p.getPeers?.() || [];
+  }
+
   private isAsyncIterableBytes(
     value: unknown,
   ): value is AsyncIterable<Uint8Array> {
@@ -147,11 +157,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   private async collectRawBlockBytes(
     parsedCid: ParsedCidLike,
-    signal?: AbortSignal,
+    options: NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]>,
+    blockstore: Pick<HeliaInstance['blockstore'], 'get'> = this.heliaCore
+      .blockstore,
   ): Promise<Uint8Array[]> {
-    const rawBlocks = this.heliaCore.blockstore.get(parsedCid, {
-      signal,
-    }) as unknown;
+    const rawBlocks = blockstore.get(parsedCid, options) as unknown;
 
     if (this.isAsyncIterableBytes(rawBlocks)) {
       const chunks: Uint8Array[] = [];
@@ -164,6 +174,57 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
+  }
+
+  private createBlockRetrievalOptions(
+    signal?: AbortSignal,
+  ): NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]> {
+    const providers = this.getConnectedPeerIds();
+
+    return {
+      ...(providers.length > 0 ? { providers } : {}),
+      signal,
+    };
+  }
+
+  private createUnixfsCatOptions(signal?: AbortSignal): HeliaUnixfsCatOptions {
+    const options: HeliaUnixfsCatOptions = {
+      ...this.createBlockRetrievalOptions(signal),
+    };
+
+    if (this.usesLimitedConnections()) {
+      options.blockReadConcurrency = 1;
+    }
+
+    return options;
+  }
+
+  private usesLimitedConnections(): boolean {
+    return Boolean(
+      this.options.enableRelayServer ||
+      this.options.listenAddresses?.some((address) =>
+        address.includes('/p2p-circuit'),
+      ),
+    );
+  }
+
+  private createSessionBlockstore(
+    parsedCid: ParsedCidLike,
+    signal?: AbortSignal,
+  ): {
+    blockstore: Pick<HeliaInstance['blockstore'], 'get' | 'has' | 'put'>;
+    close(): void;
+  } {
+    const retrievalOptions = this.createBlockRetrievalOptions(signal);
+    const session = this.heliaCore.blockstore.createSession(
+      parsedCid,
+      retrievalOptions,
+    );
+
+    return {
+      blockstore: session,
+      close: () => session.close(),
+    };
   }
 
   private async publishRoutingRecord(
@@ -210,17 +271,47 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return new IPFSId(cid.toString());
   }
 
-  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
-    const unixfsClient = await heliaRuntimeAdapter.createUnixfsClient(
-      this.heliaCore,
+  public async dial(multiaddr: string): Promise<void> {
+    await this.heliaCore.libp2p.dial(
+      await heliaRuntimeAdapter.createMultiaddr(multiaddr),
     );
+  }
+
+  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
     const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
       cid.valueOf(),
     );
+    const retrievalOptions = this.createBlockRetrievalOptions(signal);
+    const catOptions = this.createUnixfsCatOptions(signal);
+    const session = this.createSessionBlockstore(parsedCid, signal);
+    const unixfsClient =
+      await heliaRuntimeAdapter.createUnixfsClientFromBlockstore(
+        session.blockstore,
+      );
     const chunks: Uint8Array[] = [];
 
-    if (parsedCid.code === HeliaIPFS.RAW_CODEC_CODE) {
-      chunks.push(...(await this.collectRawBlockBytes(parsedCid, signal)));
+    try {
+      if (parsedCid.code === HeliaIPFS.RAW_CODEC_CODE) {
+        chunks.push(
+          ...(await this.collectRawBlockBytes(
+            parsedCid,
+            retrievalOptions,
+            session.blockstore,
+          )),
+        );
+        await this.pinningStrategy.ensurePinned(
+          this.heliaCore,
+          parsedCid,
+          signal,
+        );
+
+        return Buffer.concat(chunks);
+      }
+
+      for await (const chunk of unixfsClient.cat(parsedCid, catOptions)) {
+        chunks.push(chunk);
+      }
+
       await this.pinningStrategy.ensurePinned(
         this.heliaCore,
         parsedCid,
@@ -228,15 +319,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
       );
 
       return Buffer.concat(chunks);
+    } finally {
+      session.close();
     }
-
-    for await (const chunk of unixfsClient.cat(parsedCid, { signal })) {
-      chunks.push(chunk);
-    }
-
-    await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
-
-    return Buffer.concat(chunks);
   }
 
   public async removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void> {
@@ -393,6 +478,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   public getPeers(): string[] {
     return this.heliaCore.libp2p.getPeers().map((peer) => peer.toString());
+  }
+
+  public getMultiaddrs(): string[] {
+    return this.heliaCore.libp2p
+      .getMultiaddrs()
+      .map((multiaddr) => multiaddr.toString());
   }
 
   public getPeerId(): string {

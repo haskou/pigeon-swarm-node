@@ -3,6 +3,7 @@ const mockHeliaNode = {
   libp2p: {
     addEventListener: jest.fn(),
     dial: jest.fn().mockResolvedValue(undefined),
+    getMultiaddrs: jest.fn().mockReturnValue([]),
     getPeers: jest.fn().mockReturnValue([]),
     peerId: { toString: () => 'mock-peer-id' },
   },

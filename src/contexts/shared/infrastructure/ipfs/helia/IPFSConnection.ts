@@ -3,6 +3,7 @@ import { IPFSId } from './IPFSId';
 export interface IPFSConnection {
   stat(cid: IPFSId, offlineOnly: boolean, signal?: AbortSignal): Promise<void>;
   addBytes(bytes: Uint8Array, signal?: AbortSignal): Promise<IPFSId>;
+  dial(multiaddr: string): Promise<void>;
   getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer>;
   addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId>;
   removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void>;
@@ -15,6 +16,7 @@ export interface IPFSConnection {
     handler: (payload: string) => Promise<void>,
   ): Promise<void>;
   blockPeer(peerId: string): Promise<void>;
+  getMultiaddrs(): string[];
   getPeers(): string[];
   getPeerId(): string;
   stop(): Promise<void>;

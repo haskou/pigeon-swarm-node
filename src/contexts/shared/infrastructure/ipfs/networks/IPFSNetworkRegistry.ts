@@ -1,4 +1,4 @@
-import { createPrivateKey } from 'crypto';
+import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
@@ -14,6 +14,7 @@ type IPFSNetworkRegistryState = {
   initialized: boolean;
   listeners: Array<(network: IPFSNetwork) => void>;
   networks: IPFSNetwork[];
+  privateRelayPorts: Record<string, number>;
   sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
   sharedPeerPrivateKeyPem?: string;
 };
@@ -33,6 +34,7 @@ export default class IPFSNetworkRegistry {
       initialized: false,
       listeners: [],
       networks: [],
+      privateRelayPorts: {},
     };
 
     return globalState[globalRegistryStateKey];
@@ -52,6 +54,91 @@ export default class IPFSNetworkRegistry {
 
   private getNetworkStorageLocation(id: string): string {
     return `${this.storagePath}/${id}`;
+  }
+
+  private getPrivateRelayPortRange():
+    | {
+        end: number;
+        start: number;
+      }
+    | undefined {
+    const start = Number(
+      process.env.PIGEON_PRIVATE_RELAY_PORT_START ||
+        process.env.PIGEON_RELAY_PORT_START,
+    );
+    const end = Number(
+      process.env.PIGEON_PRIVATE_RELAY_PORT_END ||
+        process.env.PIGEON_RELAY_PORT_END,
+    );
+
+    if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) {
+      return undefined;
+    }
+
+    return { end, start };
+  }
+
+  private getRelayDataLimitBytes(): number {
+    return Number(
+      process.env.PIGEON_RELAY_DATA_LIMIT_BYTES || 64 * 1024 * 1024,
+    );
+  }
+
+  private getPrivateRelayPort(networkId: string): number | undefined {
+    const existingPort = this.state.privateRelayPorts[networkId];
+
+    if (existingPort) {
+      return existingPort;
+    }
+
+    const range = this.getPrivateRelayPortRange();
+
+    if (!range) {
+      return undefined;
+    }
+
+    const portCount = range.end - range.start + 1;
+    const usedPorts = new Set(Object.values(this.state.privateRelayPorts));
+    const hash = createHash('sha256')
+      .update(networkId)
+      .digest()
+      .readUInt32BE(0);
+
+    for (let offset = 0; offset < portCount; offset += 1) {
+      const port = range.start + ((hash + offset) % portCount);
+
+      if (!usedPorts.has(port)) {
+        this.state.privateRelayPorts[networkId] = port;
+
+        return port;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getPrivateRelayListenAddresses(networkId: string):
+    | {
+        announceAddresses?: string[];
+        listenAddresses: string[];
+        relayDataLimitBytes: number;
+      }
+    | undefined {
+    const port = this.getPrivateRelayPort(networkId);
+
+    if (!port) {
+      return undefined;
+    }
+
+    const publicHost = process.env.PIGEON_PUBLIC_HOST;
+
+    return {
+      ...(publicHost
+        ? { announceAddresses: [`/dns4/${publicHost}/tcp/${port}`] }
+        : {}),
+      listenAddresses: [`/ip4/0.0.0.0/tcp/${port}`],
+      relayDataLimitBytes: this.getRelayDataLimitBytes(),
+    };
   }
 
   // eslint-disable-next-line max-len
@@ -125,10 +212,19 @@ export default class IPFSNetworkRegistry {
     const storageLocation = this.getNetworkStorageLocation(config.getId());
 
     if (key) {
+      const relayOptions = this.getPrivateRelayListenAddresses(config.getId());
       const connection = await PrivateIPFS.create({
         key,
         name: config.getName(),
         privateKey: sharedPrivateKey,
+        ...(relayOptions
+          ? {
+              announceAddresses: relayOptions.announceAddresses,
+              enableRelayServer: true,
+              listenAddresses: relayOptions.listenAddresses,
+              relayDataLimitBytes: relayOptions.relayDataLimitBytes,
+            }
+          : {}),
         storageLocation,
       });
 

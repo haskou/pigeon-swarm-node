@@ -38,6 +38,51 @@ export class HeliaIPFSParser {
     };
   }
 
+  private static applyAddressOptions(
+    libp2pConfig: Libp2pDefaults,
+    options: IPFSOptions,
+  ): Libp2pDefaults {
+    const config = libp2pConfig as unknown as {
+      addresses?: {
+        announce?: string[];
+        listen?: string[];
+      };
+    };
+
+    config.addresses = {
+      ...(config.addresses || {}),
+      ...(options.announceAddresses
+        ? { announce: options.announceAddresses }
+        : {}),
+      ...(options.listenAddresses ? { listen: options.listenAddresses } : {}),
+    };
+
+    return libp2pConfig;
+  }
+
+  private static usesLimitedConnections(options: IPFSOptions): boolean {
+    return Boolean(
+      options.enableRelayServer ||
+      options.listenAddresses?.some((address) =>
+        address.includes('/p2p-circuit'),
+      ),
+    );
+  }
+
+  private static async applyRelayOptions(
+    libp2pConfig: Libp2pDefaults,
+    options: IPFSOptions,
+  ): Promise<Libp2pDefaults> {
+    if (!options.enableRelayServer) {
+      return libp2pConfig;
+    }
+
+    return heliaRuntimeAdapter.withRelayServer(
+      libp2pConfig,
+      options.relayDataLimitBytes,
+    );
+  }
+
   private static parseBlockedPeers(options: IPFSOptions): {
     connectionGater: ConnectionGater;
   } {
@@ -131,14 +176,27 @@ export class HeliaIPFSParser {
     options: IPFSOptions,
   ): Promise<ParsedHeliaIPFSOptions> {
     const { connectionGater } = HeliaIPFSParser.parseBlockedPeers(options);
-    const libp2pConfig = (await heliaRuntimeAdapter.getLibp2pDefaults({
+    let libp2pConfig = (await heliaRuntimeAdapter.getLibp2pDefaults({
       offline: HeliaIPFSParser.isInMemoryStorageLocation(
         options.storageLocation,
       ),
     })) as ParsedHeliaIPFSOptions['libp2p'];
+    libp2pConfig = HeliaIPFSParser.applyAddressOptions(
+      libp2pConfig,
+      options,
+    ) as ParsedHeliaIPFSOptions['libp2p'];
+    libp2pConfig = (await HeliaIPFSParser.applyRelayOptions(
+      libp2pConfig,
+      options,
+    )) as ParsedHeliaIPFSOptions['libp2p'];
 
     return {
       ...(await HeliaIPFSParser.parseStorageLocationOptions(options)),
+      ...(HeliaIPFSParser.usesLimitedConnections(options)
+        ? {
+            blockBrokers: await heliaRuntimeAdapter.createRelayBlockBrokers(),
+          }
+        : {}),
       libp2p: {
         ...libp2pConfig,
         connectionGater,

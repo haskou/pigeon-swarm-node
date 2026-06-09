@@ -3,15 +3,19 @@ import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
 
 export default class IPFSContentRacer {
+  private static readonly MAX_TIMEOUT_MS = 10000;
+
   private readonly timeoutMs: number;
 
   constructor(timeoutMs?: number) {
-    this.timeoutMs =
+    this.timeoutMs = Math.min(
       timeoutMs ??
-      Number(
-        process.env.IPFS_CONTENT_TIMEOUT_MS ??
-          (process.env.NODE_ENV === 'test' ? 500 : 3000),
-      );
+        Number(
+          process.env.IPFS_CONTENT_TIMEOUT_MS ??
+            (process.env.NODE_ENV === 'test' ? 500 : 3000),
+        ),
+      IPFSContentRacer.MAX_TIMEOUT_MS,
+    );
   }
 
   private startTimeout(

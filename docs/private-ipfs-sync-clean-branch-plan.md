@@ -6,8 +6,6 @@ Related documents:
 
 - PSK relay spike findings:
   [private-ipfs-relay-spike.md](./private-ipfs-relay-spike.md)
-- Obsolete relay plan redirect:
-  [relay-hybrid-network-plan.md](./relay-hybrid-network-plan.md)
 
 ## Objective
 
@@ -23,11 +21,26 @@ The target result is:
 - manual database sync is implemented only if the OrbitDB spike fails;
 - the implementation is small enough to review and operate.
 
+## Completed Baseline In This Branch
+
+- CI jobs have a `30` minute timeout so failing real-transport checks cannot run
+  indefinitely.
+- Private IPFS block transport is validated through a PSK circuit relay. A node
+  that knows a CID can fetch its bytes from another private-network node through
+  IPFS/Bitswap.
+- The private IPFS relay spike was reduced to final evidence and negative
+  findings, not implementation noise.
+
+The remaining plan starts after block transport. IPFS moves bytes once a CID is
+known; it does not provide the replicated application index/head layer.
+
 ## Explicit Non-Goals
 
 - Do not ship `tmp/` spikes or exploratory scripts.
 - Do not ship tests that only prove discarded hypotheses.
 - Do not use gossip as the primary large IPFS block transport.
+- Do not use gossip to replicate IPFS bytes. Gossip may announce that a head or
+  CID changed, but the content behind that CID must move through private IPFS.
 - Do not make public, non-PSK relays carry private PSK traffic.
 - Do not keep debug logs at `info` when they are only useful during diagnosis.
 - Do not add strange debug-only endpoints or feature-flagged public contracts for
@@ -48,140 +61,15 @@ The target result is:
 4. Keep `.env.local`, generated IPFS folders, logs, and `tmp/` out of git.
 5. Open one PR with a squash-friendly title.
 
-## Phase 1: Private IPFS Relay Foundation
-
-Goal: restore and clean up only the production behavior required for private IPFS
-fetches across nodes.
-
-Before implementing, preserve the existing PSK/relay spike findings in
-[private-ipfs-relay-spike.md](./private-ipfs-relay-spike.md). The temporary
-scripts and generated data stay out of git, but the verified conclusions must
-remain available so the same hypotheses are not tested again later.
-
-Document at least:
-
-- a relay without the private network PSK cannot serve private PSK peers;
-- a PSK relay can establish `/p2p-circuit` paths for peers with the same PSK;
-- both provider and requester need relay reservations for Bitswap traffic;
-- generic `/p2p-circuit` listen addresses were unreliable compared with
-  explicit `<relayMultiaddr>/p2p-circuit` reservations;
-- Helia/Bitswap limited connections require `runOnLimitedConnection` to survive
-  the internal send queue path;
-- the default circuit relay data limit is too small for real media and must be
-  raised/configured;
-- session/provider-aware fetch succeeded for small payloads and `1 MiB`
-  payloads through the PSK relay.
-
-### Private Relay Model
-
-The previous assumption that one public relay can serve every private network is
-wrong for private IPFS traffic. A private IPFS network uses a PSK. A relay that
-does not have that PSK cannot carry those protected connections.
-
-The clean implementation must run one private relay runtime per private network.
-Each private relay:
-
-- uses the PSK for exactly one private network;
-- listens on one port from a configured range;
-- publishes a private relay record encrypted/discoverable only by peers that
-  know that private network key;
-- signs the record with the private libp2p peer key;
-- allows peers to reserve `/p2p-circuit` addresses through that network relay.
-
-### Port Range
-
-Use a range instead of a single relay port:
-
-```env
-PIGEON_PRIVATE_RELAY_PORT_START=4100
-PIGEON_PRIVATE_RELAY_PORT_END=4199
-```
-
-Rules:
-
-- a reachable node assigns one port from the range per private network;
-- if the range has fewer available ports than private networks, startup must log
-  a clear warning and mark the affected network relay as unavailable;
-- the same network should receive a stable port when possible, so restarts do
-  not churn records unnecessarily;
-- Docker/deployments must expose the whole range when the node is expected to
-  relay multiple private networks;
-- leaf nodes do not need inbound ports.
-
-`PIGEON_LIBP2P_PORT` remains the direct private IPFS/libp2p port for the node.
-The private relay range is for per-network circuit relay servers.
-
-### Relay Records
-
-Private relay records must advertise the PSK-protected private IPFS relay, not a
-clear public relay.
-
-Records must include:
-
-- relay/private IPFS peer id;
-- dialable relay multiaddrs;
-- private IPFS multiaddrs when useful;
-- issued/expiry timestamps;
-- signature;
-- version.
-
-Records must not expose:
-
-- private network key;
-- application identity private keys;
-- application owner identity;
-- private network membership lists;
-- frontend user metadata.
-
-Records should be cached locally as fallback data, but cache data is advisory.
-Fresh signed records win over stale ones.
-
-### IPFS Fetch Behavior
-
-CID fetch must prefer private IPFS/Bitswap over the private network. Gossip or
-custom encrypted content transfer may exist only as fallback and must emit a
-warning when used.
-
-Constraints:
-
-- IPFS CID lookup/fetch timeout must not exceed `10s`;
-- fetch must use provider-aware sessions when a known peer/provider is available;
-- circuit-relay limited connections must be supported;
-- relay transfer limits must be large enough for real media, configurable, and
-  documented;
-- a same-CID request must return from the first successful network/provider
-  instead of waiting for all networks.
-
-The current validated Bitswap issue is that the installed Helia/Bitswap version
-does not propagate `runOnLimitedConnection` correctly inside one internal queue
-path. The clean branch should either:
-
-- patch it reproducibly during install; or
-- upgrade to a version that contains the fix, after verifying behavior with the
-  private relay E2E.
-
-Suggested commits:
-
-```txt
-docs(network): 📝 Record private relay spike findings
-fix(ipfs): 🐛 Fetch private content through PSK relays
-feat(network): ✨ Run one private relay per network
-```
-
-Acceptance:
-
-- private relay E2E passes with two isolated IPFS folders;
-- a CID hosted by a remote private-network peer works without waiting for
-  database sync;
-- the E2E covers a small CID and a CID larger than the default circuit-relay
-  `128 KiB` limit;
-- IPFS lookup/fetch timeout is capped at `10s`;
-- fallback/gossip content transfer logs a warning if used.
-
-## Phase 2: OrbitDB Spike
+## Phase 1: OrbitDB Spike
 
 Goal: decide whether OrbitDB can replace MongoDB as replicated application
 storage before implementing any manual sync layer.
+
+The completed private IPFS relay phase already proves the content path: if a
+node knows a CID, it can fetch the bytes through private IPFS over a PSK relay.
+The remaining problem is not block transport; it is the replicated
+index/event/head layer that tells nodes which CIDs and projections exist.
 
 OrbitDB is the preferred candidate because it already provides the store types
 this project needs:
@@ -239,9 +127,9 @@ Acceptance:
   - proceed with OrbitDB storage; or
   - reject OrbitDB for specific measured reasons.
 
-## Phase 3A: OrbitDB Path
+## Phase 2A: OrbitDB Path
 
-Run this phase only if Phase 2 succeeds.
+Run this phase only if Phase 1 succeeds.
 
 Goal: move replicated application state to OrbitDB stores and avoid building a
 manual Mongo/gossip/pull sync layer.
@@ -299,9 +187,9 @@ Acceptance:
   documented temporary compatibility adapters;
 - MongoDB is not a parallel source of truth for replicated data.
 
-## Phase 3B: Manual Sync Fallback
+## Phase 2B: Manual Sync Fallback
 
-Run this phase only if Phase 2 fails.
+Run this phase only if Phase 1 fails.
 
 Goal: use MongoDB event logs plus pull-based repair sync as fallback. Do not
 build this before OrbitDB has been rejected with measured reasons.
@@ -351,7 +239,7 @@ Acceptance:
 - pull/catch-up is cursor-based and idempotent;
 - read markers, notifications and invites are synchronized across nodes.
 
-## Phase 4: Runtime And Bootstrap Refactor
+## Phase 3: Runtime And Bootstrap Refactor
 
 Goal: clean up application composition after the chosen data path is clear.
 
@@ -377,7 +265,7 @@ Suggested commit:
 refactor(runtime): ♻️ Move network runtimes out of bootstrap
 ```
 
-## Phase 5: Infrastructure Naming Cleanup
+## Phase 4: Infrastructure Naming Cleanup
 
 In infrastructure code, if a method is a getter, name it as a getter.
 
@@ -391,7 +279,7 @@ This is allowed even if excessive getters are a design smell in domain code. The
 domain model should still expose behavior, but infrastructure adapters often
 need explicit read methods for external systems, configuration and diagnostics.
 
-## Phase 6: Observability
+## Phase 5: Observability
 
 Do not add extra public debug endpoints behind flags unless there is a concrete
 product/admin use case. Prefer enriching existing node/peer/status resources with
@@ -428,7 +316,7 @@ Logs:
 - `debug`: DHT misses, discovery polling, per-record skips, per-peer attempts,
   scheduler ticks. These logs must stay out of `info`.
 
-## Phase 7: Tests
+## Phase 6: Tests
 
 Keep small tests that protect production behavior:
 
@@ -473,14 +361,13 @@ Suggested commits:
 test(network): ✅ Cover private relay and storage replication
 ```
 
-## Phase 8: Documentation
+## Phase 7: Documentation
 
 Update:
 
 - `docs/INSTALLATION.md`
 - `docs/p2p-communication.md`
-- `docs/relay-hybrid-network-plan.md` or replace it with the final topology
-  document if it conflicts with this plan.
+- the final topology document if this plan becomes implementation guidance.
 
 Documentation must explain:
 

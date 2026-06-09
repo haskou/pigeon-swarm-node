@@ -115,10 +115,42 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `PIGEON_PRIVATE_RELAY_PORT_START` | unset | No | First TCP port in the private PSK circuit-relay range. When unset, private networks do not start relay servers. |
+| `PIGEON_PRIVATE_RELAY_PORT_END` | unset | No | Last TCP port in the private PSK circuit-relay range. Must be greater than or equal to `PIGEON_PRIVATE_RELAY_PORT_START`. |
+| `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
+| `PIGEON_PUBLIC_HOST` | unset | Required for public relay advertising | Public DNS name used in announced private relay multiaddrs when the node is reachable from other hosts. |
 
 Private networks are no longer configured through environment variables.
 
 They must be added through application methods/use cases (for example, node network management flows) and are persisted in storage metadata.
+
+### Private IPFS relay range
+
+Private IPFS networks use a PSK. A relay that does not know that PSK cannot
+carry private IPFS traffic, so the backend starts one circuit-relay server per
+private network when a relay port range is configured.
+
+Example:
+
+```dotenv
+PIGEON_PRIVATE_RELAY_PORT_START=4100
+PIGEON_PRIVATE_RELAY_PORT_END=4199
+PIGEON_RELAY_DATA_LIMIT_BYTES=67108864
+PIGEON_PUBLIC_HOST=relay.example.com
+```
+
+Operational rules:
+
+- expose the whole configured port range in Docker/firewall when the node should
+  relay more than one private network;
+- each private network gets a stable port from the range;
+- nodes without the range still work as leaf nodes and can use other private
+  relay nodes;
+- CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
+- Helia/Bitswap is patched during install so private relay limited connections
+  can transfer blocks through `/p2p-circuit`.
+- UnixFS child blocks are read sequentially on limited relay connections to avoid
+  parallel stream-open failures over `/p2p-circuit`.
 
 ### Important note about `IPFS_STORAGE_PATH=memory`
 

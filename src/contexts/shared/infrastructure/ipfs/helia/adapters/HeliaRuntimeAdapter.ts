@@ -1,3 +1,5 @@
+import type * as HeliaBlockBrokersModule from '@helia/block-brokers';
+import type * as CircuitRelayModule from '@libp2p/circuit-relay-v2';
 import type * as GossipsubModule from '@libp2p/gossipsub';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
@@ -10,6 +12,7 @@ import type { Key as DatastoreKey } from 'interface-datastore/key';
 import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
 
+import type { HeliaBlockBrokers } from './types/HeliaBlockBrokers';
 import type { HeliaInstance } from './types/HeliaInstance';
 import type { HeliaJSONClient } from './types/HeliaJSONClient';
 import type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
@@ -21,12 +24,17 @@ export type { HeliaInstance } from './types/HeliaInstance';
 export type { HeliaJSONClient } from './types/HeliaJSONClient';
 export type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
 export type { HeliaUnixfsClient } from './types/HeliaUnixfsClient';
+export type { HeliaBlockBrokers } from './types/HeliaBlockBrokers';
 export type { Libp2pDefaults } from './types/Libp2pDefaults';
 export type { ParsedCidLike } from './types/ParsedCidLike';
 export type { RuntimeBlockstore } from './types/RuntimeBlockstore';
 export type { RuntimeDatastore } from './types/RuntimeDatastore';
 
 export class HeliaRuntimeAdapter {
+  private static readonly DEFAULT_RELAY_DATA_LIMIT_BYTES = 64 * 1024 * 1024;
+
+  private blockBrokersModulePromise?: Promise<typeof HeliaBlockBrokersModule>;
+  private circuitRelayModulePromise?: Promise<typeof CircuitRelayModule>;
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
@@ -87,11 +95,27 @@ export class HeliaRuntimeAdapter {
     return this.heliaUnixfsModulePromise;
   }
 
+  private loadBlockBrokersModule(): Promise<typeof HeliaBlockBrokersModule> {
+    this.blockBrokersModulePromise ??= this.nativeImport<
+      typeof HeliaBlockBrokersModule
+    >('@helia/block-brokers');
+
+    return this.blockBrokersModulePromise;
+  }
+
   private loadGossipsubModule(): Promise<typeof GossipsubModule> {
     this.gossipsubModulePromise ??=
       this.nativeImport<typeof GossipsubModule>('@libp2p/gossipsub');
 
     return this.gossipsubModulePromise;
+  }
+
+  private loadCircuitRelayModule(): Promise<typeof CircuitRelayModule> {
+    this.circuitRelayModulePromise ??= this.nativeImport<
+      typeof CircuitRelayModule
+    >('@libp2p/circuit-relay-v2');
+
+    return this.circuitRelayModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
@@ -227,6 +251,39 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  public async withRelayServer(
+    defaults: Libp2pDefaults,
+    dataLimitBytes: number = HeliaRuntimeAdapter.DEFAULT_RELAY_DATA_LIMIT_BYTES,
+  ): Promise<Libp2pDefaults> {
+    const circuitRelayModule = await this.loadCircuitRelayModule();
+    const config = defaults as unknown as {
+      services?: Record<string, unknown>;
+    };
+
+    config.services = {
+      ...(config.services || {}),
+      relay: circuitRelayModule.circuitRelayServer({
+        reservations: {
+          defaultDataLimit: BigInt(dataLimitBytes),
+        },
+      }) as unknown,
+    };
+
+    return defaults;
+  }
+
+  public async createRelayBlockBrokers(): Promise<HeliaBlockBrokers> {
+    const blockBrokersModule = await this.loadBlockBrokersModule();
+
+    const blockBrokers: HeliaBlockBrokers = [
+      blockBrokersModule.bitswap({
+        runOnLimitedConnections: true,
+      }),
+    ];
+
+    return blockBrokers;
+  }
+
   public async createJSONClient(core: HeliaInstance): Promise<HeliaJSONClient> {
     const heliaJsonModule = await this.loadHeliaJsonModule();
 
@@ -239,6 +296,14 @@ export class HeliaRuntimeAdapter {
     const heliaUnixfsModule = await this.loadHeliaUnixfsModule();
 
     return heliaUnixfsModule.unixfs(core);
+  }
+
+  public async createUnixfsClientFromBlockstore(
+    blockstore: Pick<HeliaInstance['blockstore'], 'get' | 'has' | 'put'>,
+  ): Promise<HeliaUnixfsClient> {
+    const heliaUnixfsModule = await this.loadHeliaUnixfsModule();
+
+    return heliaUnixfsModule.unixfs({ blockstore });
   }
 
   public async createHelia(
