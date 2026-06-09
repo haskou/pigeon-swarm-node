@@ -124,8 +124,8 @@ export class IPFSNetwork {
     return this.connection.getPeerId();
   }
 
-  public getContentFallbackNode(): Libp2pPubSubNode | undefined {
-    return this.connection.getContentFallbackNode?.();
+  public getLibp2pNode(): Libp2pPubSubNode | undefined {
+    return this.connection.getLibp2pNode?.();
   }
 
   public async stop(): Promise<void> {

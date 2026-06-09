@@ -617,7 +617,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return Buffer.concat(chunks);
   }
 
-  public getContentFallbackNode(): Libp2pPubSubNode | undefined {
+  public getLibp2pNode(): Libp2pPubSubNode | undefined {
     return this.heliaCore.libp2p as unknown as Libp2pPubSubNode;
   }
 

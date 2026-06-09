@@ -222,7 +222,7 @@ function getLibp2pNode(
   connection: IPFSConnection,
   label: string,
 ): Libp2pPubSubNode {
-  const node = connection.getContentFallbackNode?.();
+  const node = connection.getLibp2pNode?.();
 
   if (!node) {
     throw new Error(`${label} does not expose a libp2p node`);

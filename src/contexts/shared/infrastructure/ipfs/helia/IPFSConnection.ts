@@ -35,7 +35,7 @@ export interface IPFSConnection {
     handler: (payload: string) => Promise<void>,
   ): Promise<void>;
   blockPeer(peerId: string): Promise<void>;
-  getContentFallbackNode?(): Libp2pPubSubNode | undefined;
+  getLibp2pNode?(): Libp2pPubSubNode | undefined;
   getPeers(): string[];
   getPeerId(): string;
   stop(): Promise<void>;
