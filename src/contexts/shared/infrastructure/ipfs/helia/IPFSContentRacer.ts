@@ -19,7 +19,7 @@ export default class IPFSContentRacer {
     this.bytesTimeoutMs = Number(
       process.env.IPFS_CONTENT_BYTES_TIMEOUT_MS ??
         process.env.IPFS_CONTENT_TIMEOUT_MS ??
-        (process.env.NODE_ENV === 'test' ? 500 : 15000),
+        (process.env.NODE_ENV === 'test' ? 500 : 120000),
     );
   }
 
