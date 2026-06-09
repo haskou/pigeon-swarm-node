@@ -10,6 +10,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { MongoKeychainMetadataDocument } from '../mongo/documents/MongoKeychainMetadataDocument';
 import MongoKeychainMetadataRepository from '../mongo/MongoKeychainMetadataRepository';
@@ -117,6 +118,87 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     return candidates;
   }
 
+  private deduplicateMetadata(
+    documents: MongoKeychainMetadataDocument[],
+  ): MongoKeychainMetadataDocument[] {
+    const deduplicated = new Map<string, MongoKeychainMetadataDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(document._id, document);
+    }
+
+    return [...deduplicated.values()].sort(
+      (left, right) =>
+        right.version - left.version || right.receivedAt - left.receivedAt,
+    );
+  }
+
+  private replicatedStringValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private replicatedNumberValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private metadataFromReplicatedDocument(
+    document: Record<string, unknown>,
+    ownerIdentityId: IdentityId,
+  ): MongoKeychainMetadataDocument | undefined {
+    const cid = this.replicatedStringValue(document, 'cid');
+
+    if (!cid) {
+      return undefined;
+    }
+
+    return {
+      _id: `${ownerIdentityId.valueOf()}:${cid}`,
+      cid,
+      ownerIdentityId: ownerIdentityId.valueOf(),
+      previousCid: undefined,
+      receivedAt:
+        this.replicatedNumberValue(document, 'receivedAt') || Date.now(),
+      version: this.replicatedNumberValue(document, 'version') || 0,
+    };
+  }
+
+  private async findReplicatedMetadata(
+    ownerIdentityId: IdentityId,
+  ): Promise<MongoKeychainMetadataDocument[]> {
+    try {
+      const documents =
+        await OrbitDBReplicatedStateRegistry.shared().queryDocuments(
+          'keychains',
+          (document) =>
+            this.replicatedStringValue(document, 'id') ===
+              ownerIdentityId.valueOf() ||
+            this.replicatedStringValue(document, 'ownerIdentityId') ===
+              ownerIdentityId.valueOf(),
+        );
+
+      return documents
+        .map((document) =>
+          this.metadataFromReplicatedDocument(document, ownerIdentityId),
+        )
+        .filter(
+          (document): document is MongoKeychainMetadataDocument =>
+            document !== undefined,
+        );
+    } catch {
+      return [];
+    }
+  }
+
   private async findRemoteCandidateReferences(
     ownerIdentityId: IdentityId,
     knownCids: Set<string>,
@@ -163,8 +245,10 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   public async findCandidateReferencesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]> {
-    const metadata =
-      await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId);
+    const metadata = this.deduplicateMetadata([
+      ...(await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId)),
+      ...(await this.findReplicatedMetadata(ownerIdentityId)),
+    ]);
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
     if (localCandidates.length > 0) {

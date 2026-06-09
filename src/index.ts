@@ -65,12 +65,15 @@ import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructu
 import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
 import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { MongoIndexInitializer } from '@app/shared/infrastructure/mongodb/MongoIndexInitializer';
 
 import { IPFSRuntime } from './apps/runtimes/ipfs-runtime/IPFSRuntime';
+import { OrbitDBReplicatedStateRuntime } from './apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
+import { OrbitDBReplicatedDomainEventPublisher } from './contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
 
 async function init() {
   console.time('Kernel');
@@ -282,6 +285,15 @@ async function init() {
   const ipfsRuntime = new IPFSRuntime();
   await ipfsRuntime.run();
   console.timeEnd('IPFS Runtime');
+
+  console.time('OrbitDB Replicated State Runtime');
+  const orbitDBReplicatedStateRuntime = new OrbitDBReplicatedStateRuntime(
+    Kernel.di.getService(IPFSNetworkRegistry),
+    messageBus,
+    new OrbitDBReplicatedDomainEventPublisher(),
+  );
+  await orbitDBReplicatedStateRuntime.run();
+  console.timeEnd('OrbitDB Replicated State Runtime');
 
   console.time('Republish local routing records');
   const localRoutingRecordRepublisher =

@@ -13,6 +13,7 @@ import { NetworkId } from '../../../../../../src/contexts/shared/domain/value-ob
 import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
+import { OrbitDBReplicatedStateRegistry } from '../../../../../../src/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
@@ -33,6 +34,11 @@ describe('IpfsIdentityRepository', () => {
     );
     mother = new IdentityMother();
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
+    OrbitDBReplicatedStateRegistry.shared().clear();
+  });
+
+  afterEach(() => {
+    OrbitDBReplicatedStateRegistry.shared().clear();
   });
 
   describe('save', () => {
@@ -140,6 +146,48 @@ describe('IpfsIdentityRepository', () => {
         new IPFSId(dhtCidString),
       );
       expect(result).toHaveLength(1);
+    });
+
+    it('should find identity using replicated OrbitDB metadata before DHT fallback', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const cidString = 'bafyorbitidentity';
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+      OrbitDBReplicatedStateRegistry.shared().register('network-1', {
+        identities: {
+          query: jest.fn().mockResolvedValue([
+            {
+              cid: cidString,
+              id: primitives.id,
+              networkId: primitives.networks[0],
+              receivedAt: Date.now(),
+              version: primitives.version,
+            },
+          ]),
+        },
+      } as never);
+      ipfsManager.getJSON.mockResolvedValue({
+        _id: primitives.id,
+        encryptedKeyPair: primitives.encryptedKeyPair,
+        networks: primitives.networks,
+        previousCid: primitives.previousIdentityExternalIdentifier,
+        profile: primitives.profile,
+        signature: primitives.signature,
+        timestamp: primitives.timestamp,
+        version: primitives.version,
+      });
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(cidString),
+      );
+      expect(result.toPrimitives()).toEqual(primitives);
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {

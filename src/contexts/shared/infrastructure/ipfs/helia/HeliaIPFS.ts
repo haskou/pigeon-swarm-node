@@ -486,6 +486,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
       .map((multiaddr) => multiaddr.toString());
   }
 
+  public getHeliaCore(): HeliaInstance {
+    return this.heliaCore;
+  }
+
   public getPeerId(): string {
     return this.heliaCore.libp2p.peerId.toString();
   }

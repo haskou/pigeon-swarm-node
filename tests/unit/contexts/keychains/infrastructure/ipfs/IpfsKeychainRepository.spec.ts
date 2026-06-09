@@ -7,6 +7,7 @@ import { KeychainExternalIdentifier } from '../../../../../../src/contexts/keych
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
+import { OrbitDBReplicatedStateRegistry } from '../../../../../../src/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { KeychainMother } from '../../../../mothers/KeychainMother';
 
 describe('IpfsKeychainRepository', () => {
@@ -25,6 +26,11 @@ describe('IpfsKeychainRepository', () => {
       metadataRepository,
     );
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
+    OrbitDBReplicatedStateRegistry.shared().clear();
+  });
+
+  afterEach(() => {
+    OrbitDBReplicatedStateRegistry.shared().clear();
   });
 
   it('should use cached keychain metadata without reading IPFS', async () => {
@@ -82,5 +88,40 @@ describe('IpfsKeychainRepository', () => {
 
     expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
     expect(metadataRepository.save).toHaveBeenCalledWith(keychain, cid);
+  });
+
+  it('should find keychain using replicated OrbitDB metadata before DHT fallback', async () => {
+    const keychain = (await KeychainMother.create()).build();
+    const primitives = keychain.toPrimitives();
+    const cid = new IPFSId('bafyorbitkeychain');
+
+    metadataRepository.findByOwnerIdentityId.mockResolvedValue([]);
+    OrbitDBReplicatedStateRegistry.shared().register('network-1', {
+      keychains: {
+        query: jest.fn().mockResolvedValue([
+          {
+            cid: cid.valueOf(),
+            id: primitives.ownerIdentityId,
+            receivedAt: Date.now(),
+            version: primitives.version,
+          },
+        ]),
+      },
+    } as never);
+    ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(keychain));
+
+    const result = await repository.findCandidateReferencesByOwnerId(
+      new IdentityId(primitives.ownerIdentityId),
+    );
+
+    expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+    expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
+    expect(result).toEqual([
+      {
+        externalIdentifier: new KeychainExternalIdentifier(cid.valueOf()),
+        keychain,
+        source: 'local',
+      },
+    ]);
   });
 });

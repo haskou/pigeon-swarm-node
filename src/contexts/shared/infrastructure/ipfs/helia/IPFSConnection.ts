@@ -1,3 +1,4 @@
+import { HeliaInstance } from './adapters/HeliaRuntimeAdapter';
 import { IPFSId } from './IPFSId';
 
 export interface IPFSConnection {
@@ -17,6 +18,7 @@ export interface IPFSConnection {
   ): Promise<void>;
   blockPeer(peerId: string): Promise<void>;
   getMultiaddrs(): string[];
+  getHeliaCore(): HeliaInstance;
   getPeers(): string[];
   getPeerId(): string;
   stop(): Promise<void>;

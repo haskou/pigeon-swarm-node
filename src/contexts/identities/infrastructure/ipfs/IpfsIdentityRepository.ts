@@ -1,6 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
@@ -29,8 +30,94 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   private async findValidMetadata(
     id: IdentityId,
   ): Promise<MongoIdentityMetadataDocument[]> {
+    const documents: MongoIdentityMetadataDocument[] = [];
+
     try {
-      return await this.metadataRepository.findByIdentityId(id);
+      documents.push(...(await this.metadataRepository.findByIdentityId(id)));
+    } catch {
+      return this.findReplicatedMetadata(id);
+    }
+
+    documents.push(...(await this.findReplicatedMetadata(id)));
+
+    return this.deduplicateMetadata(documents);
+  }
+
+  private deduplicateMetadata(
+    documents: MongoIdentityMetadataDocument[],
+  ): MongoIdentityMetadataDocument[] {
+    const deduplicated = new Map<string, MongoIdentityMetadataDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(document._id, document);
+    }
+
+    return [...deduplicated.values()].sort(
+      (left, right) =>
+        right.version - left.version || right.receivedAt - left.receivedAt,
+    );
+  }
+
+  private replicatedStringValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private replicatedNumberValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private metadataFromReplicatedDocument(
+    document: Record<string, unknown>,
+    identityId: IdentityId,
+  ): MongoIdentityMetadataDocument | undefined {
+    const cid = this.replicatedStringValue(document, 'cid');
+
+    if (!cid) {
+      return undefined;
+    }
+
+    const networkId = this.replicatedStringValue(document, 'networkId');
+
+    return {
+      _id: `${identityId.valueOf()}:${cid}`,
+      cid,
+      identityId: identityId.valueOf(),
+      networkIds: networkId ? [networkId] : undefined,
+      previousCid: undefined,
+      receivedAt:
+        this.replicatedNumberValue(document, 'receivedAt') || Date.now(),
+      version: this.replicatedNumberValue(document, 'version') || 0,
+    };
+  }
+
+  private async findReplicatedMetadata(
+    id: IdentityId,
+  ): Promise<MongoIdentityMetadataDocument[]> {
+    try {
+      const documents =
+        await OrbitDBReplicatedStateRegistry.shared().queryDocuments(
+          'identities',
+          (document) =>
+            this.replicatedStringValue(document, 'id') === id.valueOf() ||
+            this.replicatedStringValue(document, 'identityId') === id.valueOf(),
+        );
+
+      return documents
+        .map((document) => this.metadataFromReplicatedDocument(document, id))
+        .filter(
+          (document): document is MongoIdentityMetadataDocument =>
+            document !== undefined,
+        );
     } catch {
       return [];
     }
