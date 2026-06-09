@@ -3,6 +3,7 @@ import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communi
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
+import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import { OrbitDBDomainEventProjector } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
@@ -213,8 +214,48 @@ describe('OrbitDBDomainEventProjector', () => {
       replicatedMessage(
         NotificationWasCreatedEvent.EVENT_NAME,
         {
+          notification: {
+            createdAt: 1780000000000,
+            id: 'notification-1',
+            payload: {
+              conversationId: 'conversation-1',
+              encryptedConversationKey: 'encrypted-key',
+              inviterIdentityId: 'identity-2',
+              inviterSignature: 'signature',
+              recipientIdentityId: 'identity-1',
+            },
+            recipientIdentityId: 'identity-1',
+            state: 'pending',
+            status: 'unread',
+            type: 'conversation_invitation',
+          },
           recipientIdentityId: 'identity-1',
-          type: 'message',
+          type: 'conversation_invitation',
+        },
+        'notification-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        NotificationWasAcceptedEvent.EVENT_NAME,
+        {
+          notification: {
+            createdAt: 1780000000000,
+            id: 'notification-1',
+            payload: {
+              conversationId: 'conversation-1',
+              encryptedConversationKey: 'encrypted-key',
+              inviterIdentityId: 'identity-2',
+              inviterSignature: 'signature',
+              recipientIdentityId: 'identity-1',
+            },
+            recipientIdentityId: 'identity-1',
+            state: 'accepted',
+            status: 'read',
+            type: 'conversation_invitation',
+          },
+          recipientIdentityId: 'identity-1',
         },
         'notification-1',
       ),
@@ -255,8 +296,20 @@ describe('OrbitDBDomainEventProjector', () => {
     );
     expect(stores.notifications.put).toHaveBeenCalledWith(
       expect.objectContaining({
+        createdAt: 1780000000000,
         id: 'notification-1',
+        payload: expect.objectContaining({
+          conversationId: 'conversation-1',
+        }),
         recipientIdentityId: 'identity-1',
+        status: 'unread',
+      }),
+    );
+    expect(stores.notifications.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'notification-1',
+        state: 'accepted',
+        status: 'read',
       }),
     );
     expect(stores.requests.put).toHaveBeenCalledWith(

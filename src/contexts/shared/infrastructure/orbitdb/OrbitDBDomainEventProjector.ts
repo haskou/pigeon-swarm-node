@@ -20,7 +20,9 @@ import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/
 import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
+import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
+import { NotificationWasDeclinedEvent } from '@app/contexts/notifications/domain/events/NotificationWasDeclinedEvent';
 
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
@@ -388,8 +390,10 @@ export class OrbitDBDomainEventProjector {
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
+    const notification = this.getRecordAttribute(message, 'notification');
+
     await stores.notifications.put?.({
-      ...message.attributes,
+      ...(notification || message.attributes),
       id: message.aggregate_id,
       lastEventId: message.event_id,
       receivedAt: this.receivedAt(message),
@@ -560,7 +564,11 @@ export class OrbitDBDomainEventProjector {
         project: () => this.projectReadMarker(stores, message),
       },
       {
-        eventNames: [NotificationWasCreatedEvent.EVENT_NAME],
+        eventNames: [
+          NotificationWasAcceptedEvent.EVENT_NAME,
+          NotificationWasCreatedEvent.EVENT_NAME,
+          NotificationWasDeclinedEvent.EVENT_NAME,
+        ],
         project: () => this.projectNotification(stores, message),
       },
       {

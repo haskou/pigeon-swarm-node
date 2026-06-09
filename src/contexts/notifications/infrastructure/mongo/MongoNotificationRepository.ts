@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Notification } from '../../domain/Notification';
@@ -23,6 +24,98 @@ export default class MongoNotificationRepository implements Repository {
     );
   }
 
+  private stringValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private numberValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private documentFromReplicatedDocument(
+    document: Record<string, unknown>,
+  ): MongoNotificationDocument | undefined {
+    const id = this.stringValue(document, 'id');
+    const createdAt = this.numberValue(document, 'createdAt');
+    const payload = document.payload;
+    const recipientIdentityId = this.stringValue(
+      document,
+      'recipientIdentityId',
+    );
+    const state = this.stringValue(document, 'state');
+    const status = this.stringValue(document, 'status');
+    const type = this.stringValue(document, 'type');
+
+    if (
+      !id ||
+      !createdAt ||
+      !this.isRecord(payload) ||
+      !recipientIdentityId ||
+      !state ||
+      !status ||
+      !type
+    ) {
+      return undefined;
+    }
+
+    return {
+      _id: id,
+      createdAt,
+      payload: payload as MongoNotificationDocument['payload'],
+      recipientIdentityId,
+      state: state as MongoNotificationDocument['state'],
+      status: status as MongoNotificationDocument['status'],
+      type: type as MongoNotificationDocument['type'],
+    };
+  }
+
+  private async findReplicatedDocuments(
+    matcher: (document: Record<string, unknown>) => boolean,
+  ): Promise<MongoNotificationDocument[]> {
+    try {
+      const documents =
+        await OrbitDBReplicatedStateRegistry.shared().queryDocuments(
+          'notifications',
+          matcher,
+        );
+
+      return documents
+        .map((document) => this.documentFromReplicatedDocument(document))
+        .filter(
+          (document): document is MongoNotificationDocument =>
+            document !== undefined,
+        );
+    } catch {
+      return [];
+    }
+  }
+
+  private deduplicateDocuments(
+    documents: MongoNotificationDocument[],
+  ): MongoNotificationDocument[] {
+    const deduplicated = new Map<string, MongoNotificationDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(document._id, document);
+    }
+
+    return [...deduplicated.values()];
+  }
+
   public async findById(
     notificationId: NotificationId,
   ): Promise<Notification | undefined> {
@@ -32,7 +125,18 @@ export default class MongoNotificationRepository implements Repository {
       _id: notificationId.valueOf(),
     });
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    if (document) {
+      return this.mapper.toDomain(document);
+    }
+
+    const [replicatedDocument] = await this.findReplicatedDocuments(
+      (candidate) =>
+        this.stringValue(candidate, 'id') === notificationId.valueOf(),
+    );
+
+    return replicatedDocument
+      ? this.mapper.toDomain(replicatedDocument)
+      : undefined;
   }
 
   public async findByRecipient(
@@ -54,8 +158,28 @@ export default class MongoNotificationRepository implements Repository {
       .limit(limit)
       .sort({ createdAt: -1 })
       .toArray();
+    const replicatedDocuments = await this.findReplicatedDocuments(
+      (candidate) =>
+        this.stringValue(candidate, 'recipientIdentityId') ===
+        recipientIdentityId.valueOf(),
+    );
+    const replicatedBeforeDocument = beforeNotificationId
+      ? replicatedDocuments.find(
+          (document) => document._id === beforeNotificationId.valueOf(),
+        )
+      : undefined;
+    const beforeCreatedAt =
+      beforeDocument?.createdAt ?? replicatedBeforeDocument?.createdAt;
+    const mergedDocuments = this.deduplicateDocuments([
+      ...documents,
+      ...replicatedDocuments.filter((document) =>
+        beforeCreatedAt ? document.createdAt < beforeCreatedAt : true,
+      ),
+    ])
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, limit);
 
-    return documents.map((document) => this.mapper.toDomain(document));
+    return mergedDocuments.map((document) => this.mapper.toDomain(document));
   }
 
   public async save(notification: Notification): Promise<void> {

@@ -14,17 +14,6 @@ import { NotificationStatus } from './value-objects/NotificationStatus';
 import { NotificationType } from './value-objects/NotificationType';
 
 export class Notification extends AggregateRoot {
-  private static recordCreated(notification: Notification): Notification {
-    notification.record(
-      new NotificationWasCreatedEvent(notification.toPrimitives().id, {
-        recipientIdentityId: notification.toPrimitives().recipientIdentityId,
-        type: notification.toPrimitives().type,
-      }),
-    );
-
-    return notification;
-  }
-
   private static payloadFromPrimitives(
     primitives: PrimitiveOf<Notification>['payload'],
   ):
@@ -40,6 +29,20 @@ export class Notification extends AggregateRoot {
     }
 
     return ConversationInvitationPayload.fromPrimitives(primitives);
+  }
+
+  private static recordCreated(notification: Notification): Notification {
+    const primitives = notification.toPrimitives();
+
+    notification.record(
+      new NotificationWasCreatedEvent(primitives.id, {
+        notification: primitives,
+        recipientIdentityId: primitives.recipientIdentityId,
+        type: primitives.type,
+      }),
+    );
+
+    return notification;
   }
 
   public static communityInvitation(
@@ -143,24 +146,31 @@ export class Notification extends AggregateRoot {
     super();
   }
 
+  private recordUpdated(
+    EventClass:
+      | typeof NotificationWasAcceptedEvent
+      | typeof NotificationWasDeclinedEvent,
+  ): void {
+    const primitives = this.toPrimitives();
+
+    this.record(
+      new EventClass(primitives.id, {
+        notification: primitives,
+        recipientIdentityId: primitives.recipientIdentityId,
+      }),
+    );
+  }
+
   public accept(): void {
     this.state = NotificationState.ACCEPTED;
     this.status = NotificationStatus.READ;
-    this.record(
-      new NotificationWasAcceptedEvent(this.id.valueOf(), {
-        recipientIdentityId: this.recipientIdentityId.valueOf(),
-      }),
-    );
+    this.recordUpdated(NotificationWasAcceptedEvent);
   }
 
   public decline(): void {
     this.state = NotificationState.DECLINED;
     this.status = NotificationStatus.READ;
-    this.record(
-      new NotificationWasDeclinedEvent(this.id.valueOf(), {
-        recipientIdentityId: this.recipientIdentityId.valueOf(),
-      }),
-    );
+    this.recordUpdated(NotificationWasDeclinedEvent);
   }
 
   public getRecipientIdentityId(): IdentityId {
