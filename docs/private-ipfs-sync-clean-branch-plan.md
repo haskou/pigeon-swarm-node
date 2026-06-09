@@ -154,8 +154,11 @@ Rules:
 - OrbitDB `events` is the replicated domain event log;
 - OrbitDB `documents` stores replicated JSON read models;
 - OrbitDB `keyvalue` stores heads, cursors, settings and small lookup tables;
-- MongoDB is removed from replicated application state or kept only for
-  documented temporary compatibility gaps;
+- MongoDB must be removed from replicated application state. Do not add new
+  Mongo fallback paths to keep the old storage model alive;
+- any already existing Mongo-backed API path must be treated as code to replace
+  with an OrbitDB-backed repository/query service, not as a compatibility layer
+  to maintain;
 - local runtime state remains local and does not need replication.
 
 The clean branch must verify that these are represented in OrbitDB events and
@@ -198,8 +201,8 @@ Acceptance:
   OrbitDB replication;
 - OrbitDB-replicated domain events create/update document/keyvalue projections
   and emit equivalent WebSocket projections;
-- current API reads can be served from OrbitDB-backed read models or explicitly
-  documented temporary compatibility adapters;
+- current API reads for replicated state are served from OrbitDB-backed read
+  models;
 - MongoDB is not a parallel source of truth for replicated data.
 
 ## Phase 2B: Manual Sync Fallback

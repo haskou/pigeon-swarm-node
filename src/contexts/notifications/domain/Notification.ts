@@ -14,6 +14,20 @@ import { NotificationStatus } from './value-objects/NotificationStatus';
 import { NotificationType } from './value-objects/NotificationType';
 
 export class Notification extends AggregateRoot {
+  private static recordCreated(notification: Notification): Notification {
+    const primitives = notification.toPrimitives();
+
+    notification.record(
+      new NotificationWasCreatedEvent(primitives.id, {
+        notification: primitives,
+        recipientIdentityId: primitives.recipientIdentityId,
+        type: primitives.type,
+      }),
+    );
+
+    return notification;
+  }
+
   private static payloadFromPrimitives(
     primitives: PrimitiveOf<Notification>['payload'],
   ):
@@ -29,20 +43,6 @@ export class Notification extends AggregateRoot {
     }
 
     return ConversationInvitationPayload.fromPrimitives(primitives);
-  }
-
-  private static recordCreated(notification: Notification): Notification {
-    const primitives = notification.toPrimitives();
-
-    notification.record(
-      new NotificationWasCreatedEvent(primitives.id, {
-        notification: primitives,
-        recipientIdentityId: primitives.recipientIdentityId,
-        type: primitives.type,
-      }),
-    );
-
-    return notification;
   }
 
   public static communityInvitation(
