@@ -1,6 +1,7 @@
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
+import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
@@ -323,6 +324,47 @@ describe('OrbitDBDomainEventProjector', () => {
         cid: 'bafy',
         id: 'bafy',
         sizeBytes: 128,
+      }),
+    );
+  });
+
+  it('projects conversation message deletions with target tombstones', async () => {
+    const stores = fakeStores();
+
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        ConversationMessageWasDeletedEvent.EVENT_NAME,
+        {
+          message: {
+            authorId: 'identity-1',
+            conversationId: 'conversation-1',
+            createdAt: 1780000000001,
+            id: 'delete-message-1',
+            previousMessageIds: ['message-1'],
+            signature: 'signature',
+            targetMessageId: 'message-1',
+            type: 'deleted',
+          },
+          messageId: 'delete-message-1',
+          targetMessageId: 'message-1',
+        },
+        'conversation-1',
+      ),
+    );
+
+    expect(stores.messages.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'delete-message-1',
+        scopeType: 'conversation',
+        targetMessageId: 'message-1',
+      }),
+    );
+    expect(stores.messages.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'message-1',
+        scopeType: 'conversation',
+        valid: false,
       }),
     );
   });

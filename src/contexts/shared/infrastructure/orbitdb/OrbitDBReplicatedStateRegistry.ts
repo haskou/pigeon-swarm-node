@@ -38,6 +38,46 @@ export class OrbitDBReplicatedStateRegistry {
       );
   }
 
+  private async allRecords(store: OrbitDBDatabase): Promise<
+    Array<{
+      key?: string;
+      value: Record<string, unknown>;
+    }>
+  > {
+    const entries = await store.all?.();
+
+    return (entries || [])
+      .filter(
+        (
+          entry,
+        ): entry is {
+          key?: string;
+          value: Record<string, unknown>;
+        } =>
+          typeof entry.value === 'object' &&
+          entry.value !== null &&
+          !Array.isArray(entry.value),
+      )
+      .map((entry) => ({
+        key: entry.key,
+        value: entry.value,
+      }));
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private recordValue(
+    entry: { value?: unknown } | unknown,
+  ): Record<string, unknown> | undefined {
+    if (this.isRecord(entry) && 'value' in entry) {
+      return this.isRecord(entry.value) ? entry.value : undefined;
+    }
+
+    return this.isRecord(entry) ? entry : undefined;
+  }
+
   public register(
     networkId: string,
     stores: OrbitDBReplicatedStateStores,
@@ -73,6 +113,37 @@ export class OrbitDBReplicatedStateRegistry {
   ): Promise<void> {
     for (const stores of this.storesByNetworkId.values()) {
       await this.getStore(stores, storeName).put?.(document);
+    }
+  }
+
+  public async findHead(
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    for (const stores of this.storesByNetworkId.values()) {
+      const directRecord = this.recordValue(await stores.heads.get?.(key));
+
+      if (directRecord) {
+        return directRecord;
+      }
+
+      const fallbackRecord = (await this.allRecords(stores.heads)).find(
+        (record) => record.key === key,
+      );
+
+      if (fallbackRecord) {
+        return fallbackRecord.value;
+      }
+    }
+
+    return undefined;
+  }
+
+  public async putHead(
+    key: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
+    for (const stores of this.storesByNetworkId.values()) {
+      await stores.heads.put?.(key, value);
     }
   }
 }

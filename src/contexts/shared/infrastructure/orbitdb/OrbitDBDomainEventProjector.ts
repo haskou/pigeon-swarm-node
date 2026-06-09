@@ -220,15 +220,30 @@ export class OrbitDBDomainEventProjector {
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
     const document = this.getRecordAttribute(message, 'message') || {};
+    const targetMessageId = this.getStringAttribute(message, 'targetMessageId');
+    const conversationId =
+      this.stringValue(document, 'conversationId') || message.aggregate_id;
 
     await this.putMessageDocument(stores, message, {
       ...document,
-      conversationId:
-        this.stringValue(document, 'conversationId') || message.aggregate_id,
+      conversationId,
       messageId: this.getStringAttribute(message, 'messageId'),
       scopeType: 'conversation',
-      targetMessageId: this.getStringAttribute(message, 'targetMessageId'),
+      targetMessageId,
     });
+
+    if (
+      message.type === ConversationMessageWasDeletedEvent.EVENT_NAME &&
+      targetMessageId
+    ) {
+      await stores.messages.put?.({
+        conversationId,
+        id: targetMessageId,
+        messageId: targetMessageId,
+        scopeType: 'conversation',
+        valid: false,
+      });
+    }
   }
 
   private async projectCommunityMessage(
