@@ -10,7 +10,6 @@ import { MongoMessageReactionDocument } from '@app/contexts/conversations/infras
 import { MongoUnreadConversationMessageDocument } from '@app/contexts/conversations/infrastructure/mongo/documents/MongoUnreadConversationMessageDocument';
 import { MongoIdentityMetadataDocument } from '@app/contexts/identities/infrastructure/mongo/documents/MongoIdentityMetadataDocument';
 import { MongoIPFSContentReplicaClaimDocument } from '@app/contexts/ipfs-replication/infrastructure/mongo/documents/MongoIPFSContentReplicaClaimDocument';
-import { MongoIPFSContentReplicationDocument } from '@app/contexts/ipfs-replication/infrastructure/mongo/documents/MongoIPFSContentReplicationDocument';
 import { MongoIPFSReplicationStatusSummaryDocument } from '@app/contexts/ipfs-replication/infrastructure/mongo/documents/MongoIPFSReplicationStatusSummaryDocument';
 import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodePeerDocument';
 import { MongoNotificationDocument } from '@app/contexts/notifications/infrastructure/mongo/documents/MongoNotificationDocument';
@@ -45,8 +44,6 @@ export class MongoNodeNetworkDataCleaner implements NodeNetworkDataCleaner {
 
   private static readonly CONVERSATIONS = 'conversations';
   private static readonly IDENTITIES = 'identity_metadata';
-  private static readonly IPFS_CONTENT_REPLICATION = 'ipfs_content_replication';
-
   private static readonly IPFS_REPLICA_CLAIMS = 'ipfs_content_replica_claims';
   private static readonly IPFS_REPLICATION_SUMMARIES =
     'ipfs_replication_status_summaries';
@@ -285,26 +282,6 @@ export class MongoNodeNetworkDataCleaner implements NodeNetworkDataCleaner {
         MongoNodeNetworkDataCleaner.IPFS_REPLICA_CLAIMS,
       )
     ).deleteMany({ networkId });
-
-    const contentReplication =
-      await this.mongo.getCollection<MongoIPFSContentReplicationDocument>(
-        MongoNodeNetworkDataCleaner.IPFS_CONTENT_REPLICATION,
-      );
-
-    await contentReplication.deleteMany({
-      networkIds: {
-        $all: [networkId],
-        $size: 1,
-      },
-    });
-    await contentReplication.updateMany(
-      { networkIds: networkId },
-      {
-        $pull: {
-          networkIds: networkId,
-        },
-      },
-    );
 
     await (
       await this.mongo.getCollection<MongoIPFSReplicationStatusSummaryDocument>(

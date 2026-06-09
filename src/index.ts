@@ -54,8 +54,8 @@ import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/app
 import IPFSContentReplicationMetadataRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationMetadataRegistrar';
 import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
-import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
 import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
+import OrbitDBIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/orbitdb/OrbitDBIPFSContentReplicationRepository';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
@@ -133,7 +133,7 @@ async function init() {
     mongo,
   );
   const ipfsContentReplicationRepository =
-    new MongoIPFSContentReplicationRepository(mongo);
+    new OrbitDBIPFSContentReplicationRepository();
   const ipfsReplicationSummaryRepository =
     new MongoIPFSReplicationStatusSummaryRepository(mongo);
   const ipfsReplicationSummaryRefresher =

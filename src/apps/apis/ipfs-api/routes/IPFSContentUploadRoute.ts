@@ -4,8 +4,8 @@ import IPFSReplicationStatusSummaryRefresher from '@app/contexts/ipfs-replicatio
 import IPFSContentReplicationRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationRegistrar';
 import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import MongoIPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicaClaimRepository';
-import MongoIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
 import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
+import OrbitDBIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/orbitdb/OrbitDBIPFSContentReplicationRepository';
 import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
 import MongoNodePeerRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodePeerRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -24,7 +24,7 @@ export abstract class IPFSContentUploadRoute extends Route {
 
   private replicationRegistrar(): IPFSContentReplicationRegistrar {
     const mongo = this.get<MongoDB>(MongoDB);
-    const contentRepository = new MongoIPFSContentReplicationRepository(mongo);
+    const contentRepository = new OrbitDBIPFSContentReplicationRepository();
     const claimRepository = new MongoIPFSContentReplicaClaimRepository(mongo);
 
     return new IPFSContentReplicationRegistrar(

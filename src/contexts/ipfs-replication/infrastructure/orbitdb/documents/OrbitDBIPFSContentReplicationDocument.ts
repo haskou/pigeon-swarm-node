@@ -1,11 +1,12 @@
 import { PriorityValue } from '../../../domain/value-objects/types/PriorityValue';
 
-export interface MongoIPFSContentReplicationDocument {
-  _id: string;
+export interface OrbitDBIPFSContentReplicationDocument {
+  cid: string;
   contentType?: string;
   context: string;
   createdAt: number;
   filename?: string;
+  id: string;
   networkIds: string[];
   ownerIdentityId?: string;
   priority: PriorityValue;

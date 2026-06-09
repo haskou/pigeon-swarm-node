@@ -29,7 +29,7 @@ package "ipfs-replication/application" {
 }
 
 package "ipfs-replication/infrastructure" {
-  class MongoIPFSContentReplicationRepository
+  class OrbitDBIPFSContentReplicationRepository
   class MongoIPFSReplicationStatusSummaryRepository
   class MongoIPFSReplicationStatusSummaryDocument
 }
@@ -50,7 +50,7 @@ IPFSReplicationStatusSummaryFinder ..> IPFSReplicationStatusSummaryRepository
 IPFSReplicationStatusSummaryRefresher ..> IPFSReplicationStatusSummaryRepository
 IPFSReplicationStatusSummaryUpdater ..> IPFSReplicationStatusSummaryRepository
 
-MongoIPFSContentReplicationRepository ..|> IPFSContentReplicationRepository
+OrbitDBIPFSContentReplicationRepository ..|> IPFSContentReplicationRepository
 MongoIPFSReplicationStatusSummaryRepository ..|> IPFSReplicationStatusSummaryRepository
 MongoIPFSReplicationStatusSummaryRepository ..> MongoIPFSReplicationStatusSummaryDocument
 

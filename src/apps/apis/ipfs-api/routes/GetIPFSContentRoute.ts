@@ -1,8 +1,8 @@
-import ContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSContentReplicationRepository';
+import { IPFSContentReplicationRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
+import OrbitDBIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/orbitdb/OrbitDBIPFSContentReplicationRepository';
 import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Response } from 'express';
@@ -20,8 +20,8 @@ export class GetIPFSContentRoute extends Route {
     return `inline; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
   }
 
-  private contentReplicationRepository(): ContentReplicationRepository {
-    return new ContentReplicationRepository(this.get<MongoDB>(MongoDB));
+  private contentReplicationRepository(): IPFSContentReplicationRepository {
+    return new OrbitDBIPFSContentReplicationRepository();
   }
 
   private async contentResponseMetadata(cid: IPFSId): Promise<{

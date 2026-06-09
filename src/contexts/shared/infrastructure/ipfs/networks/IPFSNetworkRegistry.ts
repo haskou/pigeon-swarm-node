@@ -56,6 +56,10 @@ export default class IPFSNetworkRegistry {
     return `${this.storagePath}/${id}`;
   }
 
+  private getOrbitDBStorageLocation(id: string): string {
+    return `${this.storagePath}/orbitdb/${id}`;
+  }
+
   private getPrivateRelayPortRange():
     | {
         end: number;
@@ -293,6 +297,10 @@ export default class IPFSNetworkRegistry {
   public async deleteNetwork(id: string): Promise<void> {
     await this.removeNetwork(id);
     await fs.rm(this.getNetworkStorageLocation(id), {
+      force: true,
+      recursive: true,
+    });
+    await fs.rm(this.getOrbitDBStorageLocation(id), {
       force: true,
       recursive: true,
     });

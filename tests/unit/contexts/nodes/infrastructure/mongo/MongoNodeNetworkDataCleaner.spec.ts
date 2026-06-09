@@ -110,13 +110,5 @@ describe('MongoNodeNetworkDataCleaner', () => {
     expect(collection('ipfs_content_replica_claims').deleteMany).toHaveBeenCalledWith(
       { networkId: networkId.valueOf() },
     );
-    expect(collection('ipfs_content_replication').updateMany).toHaveBeenCalledWith(
-      { networkIds: networkId.valueOf() },
-      {
-        $pull: {
-          networkIds: networkId.valueOf(),
-        },
-      },
-    );
   });
 });

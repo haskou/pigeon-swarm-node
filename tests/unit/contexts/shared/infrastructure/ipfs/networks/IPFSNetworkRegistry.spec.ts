@@ -1,6 +1,14 @@
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
+import * as fs from 'fs/promises';
 import { mock } from 'jest-mock-extended';
+
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn(),
+  readFile: jest.fn(),
+  rm: jest.fn(),
+  writeFile: jest.fn(),
+}));
 
 jest.mock(
   '@libp2p/crypto/keys',
@@ -271,6 +279,52 @@ describe('IPFSNetworkRegistry', () => {
       );
 
       expect(listener).toHaveBeenCalledWith(network);
+    });
+  });
+
+  describe('deleteNetwork', () => {
+    const previousStoragePath = process.env.IPFS_STORAGE_PATH;
+
+    afterEach(() => {
+      if (previousStoragePath === undefined) {
+        delete process.env.IPFS_STORAGE_PATH;
+      } else {
+        process.env.IPFS_STORAGE_PATH = previousStoragePath;
+      }
+      jest.restoreAllMocks();
+    });
+
+    it('should delete IPFS and OrbitDB storage for the network', async () => {
+      process.env.IPFS_STORAGE_PATH = '/tmp/pigeon-swarm-ipfs';
+      const registry = new IPFSNetworkRegistry();
+      const network = mock<IPFSNetwork>();
+      const removeStorage = fs.rm as jest.MockedFunction<typeof fs.rm>;
+      removeStorage.mockResolvedValue(undefined);
+
+      network.getId.mockReturnValue('network-1');
+      (
+        registry as unknown as {
+          networks: IPFSNetwork[];
+        }
+      ).networks = [network];
+
+      await registry.deleteNetwork('network-1');
+
+      expect(network.stop).toHaveBeenCalled();
+      expect(removeStorage).toHaveBeenCalledWith(
+        '/tmp/pigeon-swarm-ipfs/network-1',
+        {
+          force: true,
+          recursive: true,
+        },
+      );
+      expect(removeStorage).toHaveBeenCalledWith(
+        '/tmp/pigeon-swarm-ipfs/orbitdb/network-1',
+        {
+          force: true,
+          recursive: true,
+        },
+      );
     });
   });
 });
