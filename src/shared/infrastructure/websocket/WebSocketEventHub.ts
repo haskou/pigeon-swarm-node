@@ -110,6 +110,10 @@ export class WebSocketEventHub {
     return event.eventName().startsWith('identities.');
   }
 
+  private isIdentityUpdateEvent(event: DomainEvent): boolean {
+    return event.eventName() === 'identities.v1.identity.was_updated';
+  }
+
   private isKeychainEvent(event: DomainEvent): boolean {
     return event.eventName().startsWith('keychains.');
   }
@@ -275,6 +279,38 @@ export class WebSocketEventHub {
     );
   }
 
+  private async relayIdentityUpdateToRelatedRecipients(
+    event: DomainEvent,
+    message: WebSocketRealtimeMessage,
+  ): Promise<void> {
+    if (!this.isIdentityUpdateEvent(event)) {
+      return;
+    }
+
+    const baseRecipients = this.getEventRecipients(event);
+    const relatedRecipients = await this.findIdentityUpdateRecipients(
+      event.aggregateId,
+    );
+    const recipients = relatedRecipients.filter(
+      (recipient) => !baseRecipients.has(recipient),
+    );
+
+    this.debug(
+      `WebSocket identity update fanout "${event.aggregateId}" relatedRecipients="${recipients.join(',')}"`,
+    );
+    this.sendToRecipients(recipients, message);
+  }
+
+  private async findIdentityUpdateRecipients(
+    identityId: string,
+  ): Promise<string[]> {
+    return (
+      (await this.clientMessageHandler?.findIdentityUpdateRecipients(
+        identityId,
+      )) || []
+    );
+  }
+
   private sendToRecipients(
     recipients: string[],
     message: WebSocketRealtimeMessage,
@@ -370,9 +406,19 @@ export class WebSocketEventHub {
 
   public publish(events: DomainEvent[]): void {
     for (const event of events) {
-      this.broadcast(event, {
+      const domainEventMessage: WebSocketRealtimeMessage = {
         event: JSON.parse(event.decode()),
         type: 'domain_event',
+      };
+
+      this.broadcast(event, domainEventMessage);
+      this.relayIdentityUpdateToRelatedRecipients(
+        event,
+        domainEventMessage,
+      ).catch((error: unknown) => {
+        Kernel.logger?.error(
+          `WebSocket identity update fanout failed for "${event.aggregateId}": ${String(error)}`,
+        );
       });
       const conversationCallEvents =
         this.conversationCallEventMapper.toEvents(event);

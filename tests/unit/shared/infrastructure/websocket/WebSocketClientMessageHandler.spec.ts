@@ -86,6 +86,39 @@ describe('WebSocketClientMessageHandler', () => {
     ).resolves.toEqual([recipient.valueOf()]);
   });
 
+  it('should return identity update recipients from conversations and communities', async () => {
+    const updatedIdentity = new IdentityId(
+      'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+    );
+    const conversationRecipient = new IdentityId(
+      'MCowBQYDK2VwAyEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+    );
+    const communityRecipient = new IdentityId(
+      'MCowBQYDK2VwAyECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=',
+    );
+    const conversation = mock<Conversation>();
+    const community = mock<Community>();
+
+    conversation.getParticipantIds.mockReturnValue([
+      updatedIdentity,
+      conversationRecipient,
+    ]);
+    community.getMemberIds.mockReturnValue([
+      updatedIdentity,
+      conversationRecipient,
+      communityRecipient,
+    ]);
+    conversationRepository.findByParticipant.mockResolvedValue([conversation]);
+    communityRepository.findByMember.mockResolvedValue([community]);
+
+    await expect(
+      handler.findIdentityUpdateRecipients(updatedIdentity.valueOf()),
+    ).resolves.toEqual([
+      conversationRecipient.valueOf(),
+      communityRecipient.valueOf(),
+    ]);
+  });
+
   it('should record identity heartbeat', async () => {
     const identityId =
       'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';

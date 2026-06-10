@@ -8,6 +8,8 @@ import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/applica
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 export default class WebSocketClientMessageHandler {
+  private static readonly IDENTITY_UPDATE_CONVERSATION_LIMIT = 500;
+
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly communityRepository: CommunityRepository,
@@ -63,6 +65,40 @@ export default class WebSocketClientMessageHandler {
     } catch {
       return [];
     }
+  }
+
+  public async findIdentityUpdateRecipients(
+    identityId: string,
+  ): Promise<string[]> {
+    const actorId = new IdentityId(identityId);
+    const [conversations, communities] = await Promise.all([
+      this.conversationRepository.findByParticipant(
+        actorId,
+        WebSocketClientMessageHandler.IDENTITY_UPDATE_CONVERSATION_LIMIT,
+      ),
+      this.communityRepository.findByMember(actorId),
+    ]);
+    const recipients = new Set<string>();
+
+    for (const conversation of conversations) {
+      for (const recipient of this.excludeIdentity(
+        conversation.getParticipantIds(),
+        actorId,
+      )) {
+        recipients.add(recipient);
+      }
+    }
+
+    for (const community of communities) {
+      for (const recipient of this.excludeIdentity(
+        community.getMemberIds(),
+        actorId,
+      )) {
+        recipients.add(recipient);
+      }
+    }
+
+    return [...recipients];
   }
 
   public async recordIdentityHeartbeat(

@@ -561,19 +561,28 @@ describe('WebSocketEventHub', () => {
     ).toBe(false);
   });
 
-  it('sends identity aggregate events only to that identity', async () => {
+  it('sends identity aggregate updates to that identity and related identities', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
-    const otherIdentityId = await generateIdentityId();
+    const relatedIdentityId = await generateIdentityId();
+    const unrelatedIdentityId = await generateIdentityId();
     const identityClient = buildClient();
-    const otherClient = buildClient();
+    const relatedClient = buildClient();
+    const unrelatedClient = buildClient();
     const event = new TestIdentityDomainEvent(identityId.valueOf());
+    const clientMessageHandler = buildClientMessageHandler();
 
+    clientMessageHandler.findIdentityUpdateRecipients.mockResolvedValue([
+      relatedIdentityId.valueOf(),
+    ]);
+    hub.setClientMessageHandler(clientMessageHandler);
     hub.register(identityId, identityClient);
-    hub.register(otherIdentityId, otherClient);
+    hub.register(relatedIdentityId, relatedClient);
+    hub.register(unrelatedIdentityId, unrelatedClient);
     jest.clearAllMocks();
 
     hub.publish([event]);
+    await flushPromises();
 
     expect(identityClient.send).toHaveBeenCalledWith(
       JSON.stringify({
@@ -581,7 +590,16 @@ describe('WebSocketEventHub', () => {
         type: 'domain_event',
       }),
     );
-    expect(otherClient.send).not.toHaveBeenCalled();
+    expect(relatedClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(unrelatedClient.send).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findIdentityUpdateRecipients,
+    ).toHaveBeenCalledWith(identityId.valueOf());
   });
 
   it('does not broadcast events without a related identity', async () => {
@@ -640,6 +658,7 @@ function buildClientMessageHandler(): jest.Mocked<WebSocketClientMessageHandler>
   return {
     findCommunityChannelTypingRecipients: jest.fn().mockResolvedValue([]),
     findConversationTypingRecipients: jest.fn().mockResolvedValue([]),
+    findIdentityUpdateRecipients: jest.fn().mockResolvedValue([]),
     recordIdentityHeartbeat: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<WebSocketClientMessageHandler>;
 }
