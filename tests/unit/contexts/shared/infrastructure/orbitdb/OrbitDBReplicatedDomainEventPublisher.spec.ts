@@ -1,4 +1,4 @@
-import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
+import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
@@ -108,7 +108,7 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
     );
 
     await publisher.publish([
-      new KeychainSyncAvailableEvent('identity-1', {
+      new KeychainWasPublishedEvent('identity-1', {
         externalIdentifier: 'bafk-keychain',
         ownerIdentityId: 'identity-1',
       }),

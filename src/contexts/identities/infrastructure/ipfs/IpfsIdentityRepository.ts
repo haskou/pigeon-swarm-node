@@ -344,7 +344,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return candidates.map((candidate) => candidate.identity);
   }
 
-  public async save(identity: Identity): Promise<void> {
+  public async save(identity: Identity): Promise<IdentityExternalIdentifier> {
     const document = this.mapper.toDocument(identity);
     const networks: string[] = document.networks;
     const cid = await this.ipfsManager.addJSONToNetworks(document, networks);
@@ -356,6 +356,8 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       cid.valueOf(),
       networks,
     );
+
+    return new IdentityExternalIdentifier(cid.valueOf());
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {

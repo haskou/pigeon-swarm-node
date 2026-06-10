@@ -56,9 +56,13 @@ export default class KeychainPublisher {
     const events = keychain.pullDomainEvents();
 
     for (const event of events) {
+      event.attributes.externalIdentifier = externalIdentifier.valueOf();
       event.attributes.networkIds = networkIds.map((networkId) =>
         networkId.valueOf(),
       );
+      event.attributes.previousExternalIdentifier =
+        keychain.toPrimitives().previousKeychainExternalIdentifier;
+      event.attributes.version = keychain.toPrimitives().version;
     }
 
     await this.eventPublisher.publish(events);

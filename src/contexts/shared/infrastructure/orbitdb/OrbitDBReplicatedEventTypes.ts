@@ -8,7 +8,6 @@ import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain
 import { CommunityMembershipRequestWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasAcceptedEvent';
 import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
 import { CommunityMembershipRequestWasDeclinedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasDeclinedEvent';
-import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
 import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
@@ -17,12 +16,12 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
-import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
+import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
-import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
+import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import { NotificationWasDeclinedEvent } from '@app/contexts/notifications/domain/events/NotificationWasDeclinedEvent';
@@ -75,10 +74,6 @@ export const orbitDBReplicatedEventTypes: OrbitDBReplicatedEventType[] = [
     domainEvent: CommunityMembershipRequestWasDeclinedEvent,
   },
   {
-    bindingKey: CommunitySyncAvailableEvent.EVENT_NAME,
-    domainEvent: CommunitySyncAvailableEvent,
-  },
-  {
     bindingKey: CommunityWasCreatedEvent.EVENT_NAME,
     domainEvent: CommunityWasCreatedEvent,
   },
@@ -111,16 +106,16 @@ export const orbitDBReplicatedEventTypes: OrbitDBReplicatedEventType[] = [
     domainEvent: ConversationMessageWasSentEvent,
   },
   {
-    bindingKey: ConversationSyncAvailableEvent.EVENT_NAME,
-    domainEvent: ConversationSyncAvailableEvent,
-  },
-  {
     bindingKey: ConversationWasCreatedEvent.EVENT_NAME,
     domainEvent: ConversationWasCreatedEvent,
   },
   {
-    bindingKey: IdentitySyncAvailableEvent.EVENT_NAME,
-    domainEvent: IdentitySyncAvailableEvent,
+    bindingKey: IdentityWasCreatedEvent.EVENT_NAME,
+    domainEvent: IdentityWasCreatedEvent,
+  },
+  {
+    bindingKey: IdentityWasUpdatedEvent.EVENT_NAME,
+    domainEvent: IdentityWasUpdatedEvent,
   },
   {
     bindingKey: IPFSContentReplicationWasClaimedEvent.EVENT_NAME,
@@ -131,8 +126,8 @@ export const orbitDBReplicatedEventTypes: OrbitDBReplicatedEventType[] = [
     domainEvent: IPFSContentReplicationWasRegisteredEvent,
   },
   {
-    bindingKey: KeychainSyncAvailableEvent.EVENT_NAME,
-    domainEvent: KeychainSyncAvailableEvent,
+    bindingKey: KeychainWasPublishedEvent.EVENT_NAME,
+    domainEvent: KeychainWasPublishedEvent,
   },
   {
     bindingKey: NotificationWasAcceptedEvent.EVENT_NAME,

@@ -4,7 +4,6 @@ import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOn
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
-import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -553,29 +552,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       : undefined;
   }
 
-  public async findConversationSyncScopes(): Promise<ConversationSyncScope[]> {
-    const documents = this.deduplicateMessages(
-      await this.findMessageDocuments(
-        (candidate) =>
-          this.stringValue(candidate, 'scopeType') === 'conversation',
-      ),
-    );
-    const scopesById = new Map<string, ConversationSyncScope>();
-
-    for (const document of documents) {
-      if (!document.networkId) {
-        continue;
-      }
-
-      scopesById.set(`${document.networkId}:${document.conversationId}`, {
-        conversationId: document.conversationId,
-        networkId: document.networkId,
-      });
-    }
-
-    return [...scopesById.values()];
-  }
-
   public async markReadUntil(
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
@@ -652,12 +628,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         });
       }
     }
-  }
-
-  public async findConversationIdsWithMessages(): Promise<string[]> {
-    const scopes = await this.findConversationSyncScopes();
-
-    return [...new Set(scopes.map((scope) => scope.conversationId))];
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {

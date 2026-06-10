@@ -30,8 +30,19 @@ export default class IdentityPublisher {
       throw new InvalidIdentityCandidateError();
     }
 
-    await this.saver.save(identity);
-    await this.eventPublisher.publish(identity.pullDomainEvents());
+    const externalIdentifier = await this.saver.save(identity);
+    const events = identity.pullDomainEvents();
+
+    for (const event of events) {
+      event.attributes.externalIdentifier = externalIdentifier.valueOf();
+      event.attributes.handle = primitives.profile.handle;
+      event.attributes.networkIds = primitives.networks;
+      event.attributes.previousExternalIdentifier =
+        primitives.previousIdentityExternalIdentifier;
+      event.attributes.version = primitives.version;
+    }
+
+    await this.eventPublisher.publish(events);
 
     return identity;
   }

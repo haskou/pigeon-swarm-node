@@ -8,7 +8,6 @@ import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 import { ConversationMessageCandidate } from './types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from './types/ConversationMessagesAround';
-import { ConversationSyncScope } from './types/ConversationSyncScope';
 
 export default abstract class ConversationRepository {
   public abstract findById(
@@ -80,10 +79,6 @@ export default abstract class ConversationRepository {
     secondIdentityId: IdentityId,
     networkId: NetworkId,
   ): Promise<OneToOneConversation | undefined>;
-
-  public abstract findConversationSyncScopes(): Promise<
-    ConversationSyncScope[]
-  >;
 
   public abstract markReadUntil(
     conversationId: ConversationId,

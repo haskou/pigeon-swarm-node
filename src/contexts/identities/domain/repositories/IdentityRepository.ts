@@ -6,13 +6,16 @@ import { ProfileHandle } from '../value-objects/ProfileHandle';
 import { IdentityCandidate } from './types/IdentityCandidate';
 
 export default abstract class IdentityRepository {
-  public abstract save(identity: Identity): Promise<void>;
+  public abstract save(identity: Identity): Promise<IdentityExternalIdentifier>;
+
   public abstract findById(id: IdentityId): Promise<Identity>;
+
   public abstract findCandidateReferencesById(
     id: IdentityId,
   ): Promise<IdentityCandidate[]>;
 
   public abstract findByHandle(handle: ProfileHandle): Promise<Identity>;
+
   public abstract findByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity | undefined>;

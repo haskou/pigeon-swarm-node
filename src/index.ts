@@ -3,10 +3,7 @@ import 'module-alias/register';
 import 'reflect-metadata';
 import { applicationConsumers } from '@app/apps/ApplicationConsumers';
 import { applicationInitializers } from '@app/apps/ApplicationInitializers';
-import {
-  applicationRuntimes,
-  startupSyncRuntimes,
-} from '@app/apps/ApplicationRuntimes';
+import { applicationRuntimes } from '@app/apps/ApplicationRuntimes';
 import {
   recurringSchedulers,
   startupSchedulers,
@@ -68,10 +65,6 @@ async function init() {
     await kernel.runSchedulerNowAndSchedule(scheduler);
   }
   console.timeEnd('Republish local routing records');
-
-  console.time('Node startup sync');
-  await kernel.runRuntimes(...startupSyncRuntimes);
-  console.timeEnd('Node startup sync');
 
   console.info('Ready!');
 }

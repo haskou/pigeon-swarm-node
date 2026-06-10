@@ -8,7 +8,6 @@ import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain
 import { CommunityMembershipRequestWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasAcceptedEvent';
 import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
 import { CommunityMembershipRequestWasDeclinedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasDeclinedEvent';
-import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
 import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
@@ -17,12 +16,12 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
-import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
+import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
-import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
+import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import { NotificationWasDeclinedEvent } from '@app/contexts/notifications/domain/events/NotificationWasDeclinedEvent';
@@ -161,9 +160,17 @@ export default class OrbitDBDomainEventProjector {
 
     await this.put(stores.identities, {
       cid: externalIdentifier,
+      handle: this.getStringAttribute(message, 'handle'),
       id: identityId,
       lastEventId: message.event_id,
       networkId: this.getStringAttribute(message, 'networkId'),
+      networkIds: this.getArrayAttribute(message, 'networkIds').filter(
+        (networkId): networkId is string => typeof networkId === 'string',
+      ),
+      previousCid: this.getStringAttribute(
+        message,
+        'previousExternalIdentifier',
+      ),
       receivedAt: this.receivedAt(message),
       version: this.getNumberAttribute(message, 'version'),
     });
@@ -181,6 +188,10 @@ export default class OrbitDBDomainEventProjector {
       cid: this.getStringAttribute(message, 'externalIdentifier'),
       id: ownerIdentityId,
       lastEventId: message.event_id,
+      previousCid: this.getStringAttribute(
+        message,
+        'previousExternalIdentifier',
+      ),
       receivedAt: this.receivedAt(message),
       version: this.getNumberAttribute(message, 'version'),
     });
@@ -380,37 +391,6 @@ export default class OrbitDBDomainEventProjector {
     });
   }
 
-  private async projectConversationSyncMessageCandidate(
-    stores: OrbitDBReplicatedStateStores,
-    message: ReplicatedDomainEventMessage,
-    candidate: Record<string, unknown>,
-  ): Promise<void> {
-    const messageDocument = this.isRecord(candidate.message)
-      ? candidate.message
-      : candidate;
-    const messageId =
-      this.stringValue(candidate, 'messageId') ||
-      this.stringValue(messageDocument, 'id');
-
-    await this.putMessageDocument(stores, message, {
-      ...messageDocument,
-      conversationId:
-        this.stringValue(messageDocument, 'conversationId') ||
-        message.aggregate_id,
-      id: messageId,
-      messageId,
-      scopeType: 'conversation',
-    });
-  }
-
-  private async projectConversationSyncReactionCandidate(
-    stores: OrbitDBReplicatedStateStores,
-    message: ReplicatedDomainEventMessage,
-    reaction: Record<string, unknown>,
-  ): Promise<void> {
-    await this.putReactionDocument(stores, message, reaction, false);
-  }
-
   private async projectReaction(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
@@ -540,83 +520,6 @@ export default class OrbitDBDomainEventProjector {
     });
   }
 
-  private async projectConversationSync(
-    stores: OrbitDBReplicatedStateStores,
-    message: ReplicatedDomainEventMessage,
-  ): Promise<void> {
-    const conversation = this.getRecordAttribute(message, 'conversation');
-
-    if (conversation) {
-      await this.projectConversation(stores, message);
-    }
-
-    for (const candidate of this.getArrayAttribute(
-      message,
-      'messageCandidates',
-    )) {
-      if (!this.isRecord(candidate)) {
-        continue;
-      }
-
-      await this.projectConversationSyncMessageCandidate(
-        stores,
-        message,
-        candidate,
-      );
-    }
-
-    for (const reaction of this.getArrayAttribute(
-      message,
-      'reactionCandidates',
-    )) {
-      if (this.isRecord(reaction)) {
-        await this.projectConversationSyncReactionCandidate(
-          stores,
-          message,
-          reaction,
-        );
-      }
-    }
-  }
-
-  private async projectCommunitySync(
-    stores: OrbitDBReplicatedStateStores,
-    message: ReplicatedDomainEventMessage,
-  ): Promise<void> {
-    const community = this.getRecordAttribute(message, 'community');
-
-    if (community) {
-      await this.putCommunity(stores, message, community);
-    }
-
-    for (const candidate of this.getArrayAttribute(
-      message,
-      'messageCandidates',
-    )) {
-      if (!this.isRecord(candidate)) {
-        continue;
-      }
-
-      await this.putMessageDocument(stores, message, {
-        ...candidate,
-        communityId:
-          this.stringValue(candidate, 'communityId') ||
-          this.getStringAttribute(message, 'communityId') ||
-          message.aggregate_id,
-        scopeType: 'community_channel',
-      });
-    }
-
-    for (const reaction of this.getArrayAttribute(
-      message,
-      'reactionCandidates',
-    )) {
-      if (this.isRecord(reaction)) {
-        await this.putReactionDocument(stores, message, reaction, false);
-      }
-    }
-  }
-
   public async project(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
@@ -625,11 +528,14 @@ export default class OrbitDBDomainEventProjector {
 
     const projection = [
       {
-        eventNames: [IdentitySyncAvailableEvent.EVENT_NAME],
+        eventNames: [
+          IdentityWasCreatedEvent.EVENT_NAME,
+          IdentityWasUpdatedEvent.EVENT_NAME,
+        ],
         project: () => this.projectIdentity(stores, message),
       },
       {
-        eventNames: [KeychainSyncAvailableEvent.EVENT_NAME],
+        eventNames: [KeychainWasPublishedEvent.EVENT_NAME],
         project: () => this.projectKeychain(stores, message),
       },
       {
@@ -642,14 +548,6 @@ export default class OrbitDBDomainEventProjector {
       {
         eventNames: [ConversationWasCreatedEvent.EVENT_NAME],
         project: () => this.projectConversation(stores, message),
-      },
-      {
-        eventNames: [ConversationSyncAvailableEvent.EVENT_NAME],
-        project: () => this.projectConversationSync(stores, message),
-      },
-      {
-        eventNames: [CommunitySyncAvailableEvent.EVENT_NAME],
-        project: () => this.projectCommunitySync(stores, message),
       },
       {
         eventNames: [

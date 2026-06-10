@@ -1,10 +1,14 @@
 import { CommunityInviteWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasAcceptedEvent';
 import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
+import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
+import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
-import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
+import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
+import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
-import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
+import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
@@ -70,13 +74,13 @@ function replicatedMessage(
 describe('OrbitDBDomainEventProjector', () => {
   const projector = new OrbitDBDomainEventProjector();
 
-  it('projects conversation sync batches into replicated read model stores', async () => {
+  it('projects conversation events into replicated read model stores', async () => {
     const stores = fakeStores();
 
     await projector.project(
       storesFrom(stores),
       replicatedMessage(
-        ConversationSyncAvailableEvent.EVENT_NAME,
+        ConversationWasCreatedEvent.EVENT_NAME,
         {
           conversation: {
             id: 'conversation-1',
@@ -85,26 +89,36 @@ describe('OrbitDBDomainEventProjector', () => {
             participantIds: ['identity-1', 'identity-2'],
             type: 'group',
           },
-          messageCandidates: [
-            {
-              message: {
-                conversationId: 'conversation-1',
-                encryptedPayload: 'payload',
-                id: 'message-1',
-                type: 'sent',
-              },
-              messageId: 'message-1',
-            },
-          ],
-          reactionCandidates: [
-            {
-              authorId: 'identity-1',
-              conversationId: 'conversation-1',
-              createdAt: 1780000000000,
-              emoji: ':thumbsup:',
-              messageId: 'message-1',
-            },
-          ],
+        },
+        'conversation-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        ConversationMessageWasSentEvent.EVENT_NAME,
+        {
+          message: {
+            conversationId: 'conversation-1',
+            encryptedPayload: 'payload',
+            id: 'message-1',
+            type: 'sent',
+          },
+          messageId: 'message-1',
+        },
+        'conversation-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        ConversationMessageReactionWasAddedEvent.EVENT_NAME,
+        {
+          authorId: 'identity-1',
+          conversationId: 'conversation-1',
+          createdAt: 1780000000000,
+          emoji: ':thumbsup:',
+          messageId: 'message-1',
         },
         'conversation-1',
       ),
@@ -113,7 +127,7 @@ describe('OrbitDBDomainEventProjector', () => {
     expect(stores.conversations.put).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'conversation-1',
-        lastEventType: ConversationSyncAvailableEvent.EVENT_NAME,
+        lastEventType: ConversationWasCreatedEvent.EVENT_NAME,
       }),
     );
     expect(stores.messages.put).toHaveBeenCalledWith(
@@ -131,20 +145,20 @@ describe('OrbitDBDomainEventProjector', () => {
       }),
     );
     expect(stores.heads.put).toHaveBeenCalledWith(
-      `event:${ConversationSyncAvailableEvent.EVENT_NAME}:conversation-1`,
+      `event:${ConversationWasCreatedEvent.EVENT_NAME}:conversation-1`,
       expect.objectContaining({
-        eventId: `${ConversationSyncAvailableEvent.EVENT_NAME}:event-id`,
+        eventId: `${ConversationWasCreatedEvent.EVENT_NAME}:event-id`,
       }),
     );
   });
 
-  it('projects community sync batches into replicated read model stores', async () => {
+  it('projects community events into replicated read model stores', async () => {
     const stores = fakeStores();
 
     await projector.project(
       storesFrom(stores),
       replicatedMessage(
-        CommunitySyncAvailableEvent.EVENT_NAME,
+        CommunityWasCreatedEvent.EVENT_NAME,
         {
           community: {
             id: 'community-1',
@@ -153,24 +167,39 @@ describe('OrbitDBDomainEventProjector', () => {
             networkId: 'network-1',
           },
           communityId: 'community-1',
-          messageCandidates: [
-            {
-              channelId: 'channel-1',
-              communityId: 'community-1',
-              encryptedPayload: 'payload',
-              id: 'community-message-1',
-              type: 'sent',
-            },
-          ],
-          reactionCandidates: [
-            {
-              authorIdentityId: 'identity-1',
-              channelId: 'channel-1',
-              communityId: 'community-1',
-              emoji: ':fire:',
-              messageId: 'community-message-1',
-            },
-          ],
+        },
+        'community-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        CommunityChannelMessageWasSentEvent.EVENT_NAME,
+        {
+          channelId: 'channel-1',
+          communityId: 'community-1',
+          message: {
+            channelId: 'channel-1',
+            communityId: 'community-1',
+            encryptedPayload: 'payload',
+            id: 'community-message-1',
+            type: 'sent',
+          },
+          messageId: 'community-message-1',
+        },
+        'community-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        CommunityChannelMessageReactionWasAddedEvent.EVENT_NAME,
+        {
+          authorIdentityId: 'identity-1',
+          channelId: 'channel-1',
+          communityId: 'community-1',
+          emoji: ':fire:',
+          messageId: 'community-message-1',
         },
         'community-1',
       ),
@@ -179,7 +208,7 @@ describe('OrbitDBDomainEventProjector', () => {
     expect(stores.communities.put).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'community-1',
-        lastEventType: CommunitySyncAvailableEvent.EVENT_NAME,
+        lastEventType: CommunityWasCreatedEvent.EVENT_NAME,
       }),
     );
     expect(stores.messages.put).toHaveBeenCalledWith(

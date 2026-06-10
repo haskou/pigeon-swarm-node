@@ -3,6 +3,7 @@ import { IdentityCreateMessage } from '@app/contexts/identities/application/crea
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentitySaverService from '@app/contexts/identities/domain/services/IdentitySaverService';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { faker } from '@faker-js/faker';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -34,7 +35,9 @@ describe('IdentityCreator', () => {
 
       jest.spyOn(Identity, 'create').mockResolvedValue(identity);
       jest.spyOn(identity, 'pullDomainEvents').mockReturnValue(events);
-      saver.save.mockResolvedValue(undefined);
+      saver.save.mockResolvedValue(
+        new IdentityExternalIdentifier('bafkreicreatedidentity'),
+      );
       eventPublisher.publish.mockResolvedValue(undefined);
 
       const result = await creator.create(message);
@@ -43,6 +46,9 @@ describe('IdentityCreator', () => {
       expect(saver.save).toHaveBeenCalledWith(identity);
       expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
       expect(eventPublisher.publish).toHaveBeenCalledWith(events);
+      expect(events[0].attributes.externalIdentifier).toBe(
+        'bafkreicreatedidentity',
+      );
       expect(result).toBe(identity);
     });
 

@@ -17,9 +17,18 @@ export default class IdentityCreator {
       message.networks,
       message.handle,
     );
+    const externalIdentifier = await this.saver.save(identity);
+    const primitives = identity.toPrimitives();
+    const events = identity.pullDomainEvents();
 
-    await this.saver.save(identity);
-    await this.eventPublisher.publish(identity.pullDomainEvents());
+    for (const event of events) {
+      event.attributes.externalIdentifier = externalIdentifier.valueOf();
+      event.attributes.handle = primitives.profile.handle;
+      event.attributes.networkIds = primitives.networks;
+      event.attributes.version = primitives.version;
+    }
+
+    await this.eventPublisher.publish(events);
 
     return identity;
   }
