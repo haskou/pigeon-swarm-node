@@ -721,10 +721,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/value-objects@2.7.4":
-  version "2.7.4"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.7.4.tgz#157b9f2fba1ecb3fcd18cbd260d8c1c6640d7657"
-  integrity sha512-JMTehjiUqnoY1zYg7iguyKq9g88WNDv+7j5AxBhINwAuhI8/0/KnpaYqlOKxC753mC63hU1UyZy6/3fCU7JHXA==
+"@haskou/value-objects@2.10.0":
+  version "2.10.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.10.0.tgz#52dc1e39b3a5d44b4784e637e96e061166426165"
+  integrity sha512-Nf9E26hUCs7sJ0gnqdL3x6QG52EFPYn1bMHxOhEbUkpHV5HYA62g+4J2IXaUHtRGFdn5XLUeL9MS5NQ/2JfbQQ==
   dependencies:
     "@noble/ciphers" "^2.2.0"
     "@noble/curves" "^2.0.1"
