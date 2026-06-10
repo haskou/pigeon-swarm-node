@@ -28,16 +28,6 @@ Feature: Post one-to-one conversation route
       | name | api-group |
     And response body should contain "group:"
 
-  Scenario: Reject a replayed signed request nonce
-    Given I am an anonymous user
-    And I register an in-memory IPFS network "conversation-api-replayed-nonce-network"
-    And I have created a one-to-one conversation
-    And I sign the current conversations request
-    When I GET current conversations
-    Then response code is equal to 200
-    When I GET current conversations
-    Then response code is equal to 401
-
   Scenario: Reject an expired signed request timestamp
     Given I am an anonymous user
     And I register an in-memory IPFS network "conversation-api-expired-timestamp-network"

@@ -20,7 +20,7 @@ export abstract class PollRouteSupport extends Route {
     PollScopeAccessResolver,
   );
 
-  protected async authenticate(request: Request): Promise<IdentityId> {
+  protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 

@@ -29,7 +29,7 @@ export abstract class CommunityRouteSupport extends Route {
 
   private readonly communityFinder = this.get<CommunityFinder>(CommunityFinder);
 
-  protected async authenticate(request: Request): Promise<IdentityId> {
+  protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 

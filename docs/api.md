@@ -28,16 +28,14 @@ Authenticated endpoints use a canonical request signature:
 ```http
 X-Identity-Id: <identityId>
 X-Timestamp: <timestamp>
-X-Nonce: <nonce>
 X-Signature: <signature>
 ```
 
 Implemented:
 
-- canonical request payload: method, path, timestamp, nonce and body hash
-- recent nonces in the local embedded database to prevent replay
-- timestamp freshness validation
-- Cucumber scenarios for invalid, replayed and stale signed requests
+- canonical request payload: method, path, timestamp and body hash
+- timestamp freshness validation with a 30 second maximum clock skew
+- Cucumber scenarios for invalid and stale signed requests
 
 ## Path Parameters
 
@@ -80,12 +78,10 @@ so they must authenticate with signed query parameters:
 ```ts
 const path = '/ws';
 const timestamp = String(Date.now());
-const nonce = crypto.randomUUID();
 const body = {};
 const canonicalPayload = {
   bodyHash: sha256(JSON.stringify(body)),
   method: 'GET',
-  nonce,
   path,
   timestamp,
 };
@@ -94,7 +90,6 @@ const url =
   `ws://localhost:8080${path}` +
   `?identityId=${encodeURIComponent(identityId)}` +
   `&timestamp=${encodeURIComponent(timestamp)}` +
-  `&nonce=${encodeURIComponent(nonce)}` +
   `&signature=${encodeURIComponent(signature)}`;
 const socket = new WebSocket(url);
 ```
@@ -104,7 +99,6 @@ Non-browser clients may send the same signature through headers:
 ```http
 X-Identity-Id: <identityId>
 X-Timestamp: <timestamp>
-X-Nonce: <nonce>
 X-Signature: <signature>
 ```
 
@@ -231,7 +225,7 @@ Implemented:
 - require a valid signed WebSocket handshake
 - accept browser-compatible query parameter authentication
 - accept header authentication for non-browser clients
-- reject stale timestamps and reused WebSocket nonces
+- reject stale timestamps outside the 30 second freshness window
 - push domain events after they have been published by the local node
 - deliver identity events only to the matching identity connection
 - deliver keychain events only to the matching keychain owner
@@ -533,7 +527,6 @@ Implemented:
 GET /node/networks
 X-Identity-Id: <ownerIdentityId>
 X-Timestamp: <millisecondsSinceEpoch>
-X-Nonce: <uniqueNonce>
 X-Signature: <signature>
 ```
 
@@ -1276,7 +1269,7 @@ Implemented:
 ## Conversation HTTP API
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
-`X-Timestamp`, `X-Nonce` and `X-Signature`.
+`X-Timestamp` and `X-Signature`.
 
 ### List conversations
 
@@ -1859,8 +1852,7 @@ Implemented:
 
 Signed HTTP request validation:
 
-- reject reused `X-Nonce` values per identity
-- reject stale `X-Timestamp` values outside the freshness window
+- reject stale `X-Timestamp` values outside the 30 second freshness window
 
 ## Community HTTP API
 
@@ -1870,7 +1862,7 @@ text channel messages. Community channels are not backed by `Conversation`;
 they live inside the `communities` context.
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
-`X-Timestamp`, `X-Nonce` and `X-Signature`.
+`X-Timestamp` and `X-Signature`.
 
 ### List communities
 

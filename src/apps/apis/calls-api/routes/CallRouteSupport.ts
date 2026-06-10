@@ -7,7 +7,7 @@ export abstract class CallRouteSupport extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  protected async authenticate(request: Request): Promise<IdentityId> {
+  protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 }

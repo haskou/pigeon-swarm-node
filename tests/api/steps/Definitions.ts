@@ -306,19 +306,16 @@ export default class Definitions {
   ): Promise<void> {
     const signerKeyPair = keyPair ?? (await this.ensureIdentityKeyPair());
     const signerIdentityId = identityId ?? this.ownerIdentityId;
-    const nonce = `api-nonce-${timestamp}-${Math.random()}`;
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
       path,
       timestamp,
-      nonce,
       this.binaryBody ?? (this.body ? JSON.parse(this.body) : {}),
     );
 
     this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
     this.headers['x-timestamp'] = timestamp;
-    this.headers['x-nonce'] = nonce;
     this.headers['x-signature'] = signerKeyPair
       .sign(JSON.stringify(signedRequestPayload))
       .valueOf();
@@ -2069,10 +2066,10 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequestWithAnExpiredTimestamp(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest(
-      'GET',
-      '/conversations/',
-      String(Date.now() - 10 * 60 * 1000),
-    );
+	      'GET',
+	      '/conversations/',
+	      String(Date.now() - 31_000),
+	    );
   }
 
   @given('I sign the current node owner request')

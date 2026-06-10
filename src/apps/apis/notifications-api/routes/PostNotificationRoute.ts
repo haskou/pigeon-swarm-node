@@ -22,12 +22,12 @@ export class PostNotificationRoute extends Route {
   private assertRequesterIsInviter(
     message: NotificationCreateMessage,
     request: Request,
-  ): Promise<void> {
-    return this.signedRequestAuthenticator.authenticate(request).then((id) => {
-      if (message.inviterIdentityId.isNotEqual(id)) {
-        throw new AuthenticatedIdentityIsNotInviterError();
-      }
-    });
+  ): void {
+    const id = this.signedRequestAuthenticator.authenticate(request);
+
+    if (message.inviterIdentityId.isNotEqual(id)) {
+      throw new AuthenticatedIdentityIsNotInviterError();
+    }
   }
 
   @Post('/')
@@ -38,7 +38,7 @@ export class PostNotificationRoute extends Route {
   ): Promise<Response> {
     const message = new PostNotificationRequest(body).getMessage();
 
-    await this.assertRequesterIsInviter(message, request);
+    this.assertRequesterIsInviter(message, request);
 
     const notification = await this.creator.create(message);
 

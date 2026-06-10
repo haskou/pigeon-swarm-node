@@ -32,13 +32,11 @@ export class SignedHttpRequestVerifier {
     method: string,
     path: string,
     timestamp: string,
-    nonce: string,
     body: unknown,
   ): SignedRequestPayload {
     return {
       bodyHash: this.hashBody(body),
       method: method.toUpperCase(),
-      nonce,
       path,
       timestamp,
     };
@@ -46,14 +44,12 @@ export class SignedHttpRequestVerifier {
 
   public verifySignature(request: Request): {
     identityId: IdentityId;
-    nonce: string;
     timestamp: string;
   } {
     const identityId = new IdentityId(
       this.getRequiredHeader(request, 'x-identity-id'),
     );
     const timestamp = this.getRequiredHeader(request, 'x-timestamp');
-    const nonce = this.getRequiredHeader(request, 'x-nonce');
     const signature = new Signature(
       this.getRequiredHeader(request, 'x-signature'),
     );
@@ -61,7 +57,6 @@ export class SignedHttpRequestVerifier {
       request.method,
       request.path,
       timestamp,
-      nonce,
       request.body,
     );
     const isValid = PublicKey.fromPEM(identityId.toString()).isValidSignature(
@@ -73,7 +68,7 @@ export class SignedHttpRequestVerifier {
       throw new InvalidSignedRequestError();
     }
 
-    return { identityId, nonce, timestamp };
+    return { identityId, timestamp };
   }
 
   public verify(request: Request): IdentityId {

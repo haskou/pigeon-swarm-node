@@ -32,7 +32,6 @@ type NodeRuntime = {
 
 type SignedHeaders = {
   'x-identity-id': string;
-  'x-nonce': string;
   'x-signature': string;
   'x-timestamp': string;
 };
@@ -495,11 +494,9 @@ async function listenForDomainEvents(
   aggregateId: string,
 ): Promise<void> {
   const timestamp = String(Date.now());
-  const nonce = randomUUID();
-  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, nonce, {});
+  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, {});
   const query = new URLSearchParams({
     identityId: identity.id,
-    nonce,
     signature,
     timestamp,
   });
@@ -592,17 +589,14 @@ function signHeaders(
   body: unknown,
 ): SignedHeaders {
   const timestamp = String(Date.now());
-  const nonce = randomUUID();
 
   return {
     'x-identity-id': identity.id,
-    'x-nonce': nonce,
     'x-signature': signRequest(
       identity.keyPair,
       method,
       requestPath,
       timestamp,
-      nonce,
       body,
     ),
     'x-timestamp': timestamp,
@@ -614,14 +608,12 @@ function signRequest(
   method: string,
   requestPath: string,
   timestamp: string,
-  nonce: string,
   body: unknown,
 ): string {
   const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
     method,
     requestPath,
     timestamp,
-    nonce,
     body,
   );
 

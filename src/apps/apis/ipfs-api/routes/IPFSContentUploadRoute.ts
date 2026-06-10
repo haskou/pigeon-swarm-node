@@ -11,7 +11,7 @@ export abstract class IPFSContentUploadRoute extends Route {
   private readonly contentPublisher =
     this.get<ContentPublisher>(ContentPublisher);
 
-  protected async authenticate(request: Request): Promise<IdentityId> {
+  protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 

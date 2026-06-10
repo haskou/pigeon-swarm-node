@@ -271,7 +271,7 @@ Rules:
   written to OrbitDB;
 - every other durable local exception must be documented in this phase before
   implementation;
-- technical caches, nonces and rate limits may be persistent local state when
+- technical caches and rate limits may be persistent local state when
   that improves behavior across restarts. They remain unsynchronized unless a
   concrete distributed abuse-control/product requirement is added;
 - bootstrap configuration required to discover/open networks may come from
@@ -295,7 +295,6 @@ Remaining Mongo-backed areas to replace:
 - content replication status summary;
 - processed-domain-event/idempotency guard;
 - link preview cache and rate limiter;
-- HTTP auth nonce storage;
 - node network data cleanup paths that currently delete Mongo collections.
 
 Durability and replication classification:
@@ -346,16 +345,14 @@ Durability and replication classification:
 - link preview cache and rate limiter state are persistent local technical
   state. Cache entries and rate-limit windows should use an embedded node-local
   repository unless a concrete distributed abuse-control requirement is added;
-- HTTP auth nonce storage is persistent local technical TTL state and should use
-  an embedded node-local repository;
 - node network data cleanup must delete network-scoped OrbitDB/IPFS state. It
   must not depend on Mongo collection cleanup once this phase is complete.
 
 Implementation order:
 
-1. Replace technical local repositories first: auth nonce, processed events,
-   link preview cache/rate limiter, peer cache and replication status summary,
-   using an embedded node-local repository.
+1. Replace technical local repositories first: processed events, link preview
+   cache/rate limiter, peer cache and replication status summary, using an
+   embedded node-local repository.
 2. Replace node metadata: keep node owner and application-managed local network
    definitions as local durable bootstrap/configuration; keep
    environment/configuration-provider values out of every database; then move
