@@ -25,7 +25,7 @@ package "keychains.domain" {
   class KeychainWasPublishedEvent <<DomainEvent>>
 
   interface KeychainRepository {
-    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
     +republishLocalRoutingRecords(): Promise<number>
   }
@@ -65,12 +65,8 @@ package "keychains.application" {
     +register(message): Promise<void>
   }
 
-  class KeychainSyncResponder {
-    +respond(message): Promise<void>
-  }
-
   class KeychainSaverService {
-    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
   }
 
   class IdentityRepository <<external>>
@@ -80,8 +76,6 @@ package "keychains.application" {
   KeychainSaverService --> KeychainRepository
   CurrentKeychainFinder --> KeychainRepository
   KeychainCandidateRegistrar --> KeychainRepository
-  KeychainSyncResponder --> CurrentKeychainFinder
-  KeychainSyncResponder ..> KeychainWasPublishedEvent
 
   note right of KeychainPublisher
     Resolves the owner identity and publishes
@@ -109,7 +103,7 @@ package "keychains.infrastructure" {
   }
 
   class IpfsKeychainRepository {
-    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
     +republishLocalRoutingRecords(): Promise<number>
   }

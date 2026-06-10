@@ -96,14 +96,6 @@ package "conversations.domain" {
     +eventName(): string
   }
 
-  class ConversationSyncRequestedEvent {
-    +eventName(): string
-  }
-
-  class ConversationSyncAvailableEvent {
-    +eventName(): string
-  }
-
   class MessageSignatureDomainService {
     +sign(message): Signature
     +verify(message): boolean
@@ -118,8 +110,9 @@ package "conversations.domain" {
     +findMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
     +hasMessage(conversationId: ConversationId, messageId: MessageId): Promise<boolean>
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
+    +findMessagesAround(conversationId: ConversationId, messageId: MessageId, before: number, after: number): Promise<ConversationMessagesAround>
+    +findThreadMessages(conversationId: ConversationId, rootMessageId: MessageId, limit: number): Promise<Message[]>
     +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
-    +findSyncScopes(): Promise<object[]>
     +countUnreadByRecipient(recipientIdentityId: IdentityId, conversationIds: ConversationId[]): Promise<Map<string, number>>
     +hasUnreadMessageForRecipient(recipientIdentityId: IdentityId, conversationId: ConversationId, messageId: MessageId): Promise<boolean>
     +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId): Promise<void>
@@ -202,10 +195,6 @@ package "conversations.application" {
     +remove(command): Promise<MessageReaction>
   }
 
-  class ConversationSynchronizer {
-    +sync(conversationId: ConversationId): Promise<void>
-  }
-
   class ConversationMessageRegistrar {
     +register(message): Promise<void>
   }
@@ -221,10 +210,6 @@ package "conversations.application" {
   class MessageReactionRegistrar {
     +register(message): Promise<void>
     +unregister(message): Promise<void>
-  }
-
-  class ConversationSyncResponder {
-    +respond(message): Promise<void>
   }
 
   class DomainEventPublisher {
@@ -250,18 +235,12 @@ package "conversations.application" {
   MessageReactionRemover --> ConversationRepository
   MessageReactionRemover --> MessageReactionRepository
   MessageReactionRemover --> DomainEventPublisher
-  ConversationSynchronizer --> ConversationRepository
-  ConversationSynchronizer --> DomainEventPublisher
   ConversationMessageRegistrar --> ConversationRepository
   MessagesReadMarker --> ConversationRepository
   MessagesReadMarker --> DomainEventPublisher
   MessagesReadRegistrar --> ConversationRepository
   MessageReactionRegistrar --> ConversationRepository
   MessageReactionRegistrar --> MessageReactionRepository
-  ConversationSyncResponder --> ConversationRepository
-  ConversationSyncResponder --> MessageReactionRepository
-  ConversationSyncResponder --> DomainEventPublisher
-  ConversationSyncResponder ..> ConversationSyncAvailableEvent
 }
 
 package "conversations.infrastructure" {
@@ -279,16 +258,16 @@ package "conversations.infrastructure" {
     -signature: string
   }
 
-  class MongoMessageDocumentIndex {
+  class OrbitDBConversationMessageDocument {
+    -id: string
     -messageId: string
-    -externalIdentifier: string
     -conversationId: string
     -authorId: string
-    -recipientIds: string[]
-    -networkId: string
+    -scopeType: string
     -type: string
     -createdAt: number
     -receivedAt: number
+    -externalIdentifier?: string
     -targetMessageId?: string
   }
 
@@ -321,8 +300,8 @@ package "conversations.infrastructure" {
 
   OrbitDBConversationRepository ..|> ConversationRepository
   OrbitDBConversationRepository --> OrbitDBConversationDocument
+  OrbitDBConversationRepository --> OrbitDBConversationMessageDocument
   OrbitDBConversationRepository ..> IpfsMessageDocument
-  OrbitDBConversationRepository --> MongoMessageDocumentIndex
   OrbitDBMessageReactionRepository ..|> MessageReactionRepository
   OrbitDBMessageReactionRepository --> OrbitDBMessageReactionDocument
   Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
