@@ -34,6 +34,28 @@ export default abstract class Scheduler {
   public abstract getProcessName(): string;
   public abstract getCronExpression(): CronExpression;
 
+  public async runOnce(): Promise<void> {
+    try {
+      Kernel.logger?.debug?.(`Scheduler: Executing ${this.getProcessName()}`);
+      await this.execute();
+    } catch (err: unknown) {
+      if (this.isReplicatedStateNotReady(err)) {
+        Kernel.logger?.debug?.(
+          `Scheduler: Skipping ${this.getProcessName()}; replicated state is not ready.`,
+        );
+
+        return;
+      }
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const error = new ScheduledExecutionError(
+        `Error on ${this.getProcessName()}: ${errorMessage}`,
+      );
+
+      Kernel.logger?.error?.(error.message);
+    }
+  }
+
   public get<T>(service: unknown): T {
     return Kernel.di.getService<T>(service);
   }
@@ -45,27 +67,7 @@ export default abstract class Scheduler {
     } catch (err) {
       throw new InvalidParseCronExpressionError(this.getProcessName());
     }
-    cron.schedule(parsedCronExpression, async () => {
-      try {
-        Kernel.logger?.debug?.(`Scheduler: Executing ${this.getProcessName()}`);
-        await this.execute();
-      } catch (err: unknown) {
-        if (this.isReplicatedStateNotReady(err)) {
-          Kernel.logger?.debug?.(
-            `Scheduler: Skipping ${this.getProcessName()}; replicated state is not ready.`,
-          );
-
-          return;
-        }
-
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        const error = new ScheduledExecutionError(
-          `Error on ${this.getProcessName()}: ${errorMessage}`,
-        );
-
-        Kernel.logger?.error?.(error.message);
-      }
-    });
+    cron.schedule(parsedCronExpression, () => this.runOnce());
 
     return Promise.resolve();
   }

@@ -138,7 +138,7 @@ export default class Kernel {
   ): Promise<void> {
     const scheduler = this.getSchedulerFromClass(ClassDefinition);
 
-    await scheduler.execute();
+    await scheduler.runOnce();
     await scheduler.init();
   }
 
