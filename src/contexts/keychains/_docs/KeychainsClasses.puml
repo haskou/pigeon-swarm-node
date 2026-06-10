@@ -99,8 +99,8 @@ package "keychains.infrastructure" {
     -version: number
   }
 
-  class MongoKeychainMetadataDocument {
-    -_id: string
+  class OrbitDBKeychainMetadataDocument {
+    -id: string
     -cid: string
     -ownerIdentityId: string
     -previousCid?: string
@@ -119,17 +119,13 @@ package "keychains.infrastructure" {
     +toDomain(document: IpfsKeychainDocument): Keychain
   }
 
-  class MongoKeychainMetadataRepository {
+  class OrbitDBKeychainMetadataRepository {
     +save(keychain: Keychain, cid: IPFSId): Promise<void>
-    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<MongoKeychainMetadataDocument[]>
-  }
-
-  class MongoKeychainMetadataMapper {
-    +toDocument(keychain: Keychain, cid: IPFSId): MongoKeychainMetadataDocument
+    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<OrbitDBKeychainMetadataDocument[]>
   }
 
   note right of IpfsKeychainRepository
-    Encapsulates IPFS documents, MongoDB metadata,
+    Encapsulates IPFS documents, OrbitDB metadata,
     DHT record candidates and content addressing.
     New keychain versions are published only in
     the owner's identity networks.
@@ -139,10 +135,9 @@ package "keychains.infrastructure" {
 
   IpfsKeychainRepository ..|> KeychainRepository
   IpfsKeychainRepository --> IpfsKeychainMapper
-  IpfsKeychainRepository --> MongoKeychainMetadataRepository
+  IpfsKeychainRepository --> OrbitDBKeychainMetadataRepository
   IpfsKeychainRepository --> IpfsKeychainDocument
-  MongoKeychainMetadataRepository --> MongoKeychainMetadataMapper
-  MongoKeychainMetadataRepository --> MongoKeychainMetadataDocument
+  OrbitDBKeychainMetadataRepository --> OrbitDBKeychainMetadataDocument
 }
 
 @enduml

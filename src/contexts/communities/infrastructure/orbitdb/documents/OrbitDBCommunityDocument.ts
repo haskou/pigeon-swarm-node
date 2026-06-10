@@ -1,9 +1,9 @@
 import { CommunityVisibilityValue } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
 
-import { MongoCommunityMemberRoleDocument } from '../../mongo/documents/MongoCommunityMemberRoleDocument';
-import { MongoCommunityRoleDocument } from '../../mongo/documents/MongoCommunityRoleDocument';
-import { MongoCommunityTextChannelDocument } from '../../mongo/documents/MongoCommunityTextChannelDocument';
-import { MongoCommunityVoiceChannelDocument } from '../../mongo/documents/MongoCommunityVoiceChannelDocument';
+import { OrbitDBCommunityMemberRoleDocument } from './OrbitDBCommunityMemberRoleDocument';
+import { OrbitDBCommunityRoleDocument } from './OrbitDBCommunityRoleDocument';
+import { OrbitDBCommunityTextChannelDocument } from './OrbitDBCommunityTextChannelDocument';
+import { OrbitDBCommunityVoiceChannelDocument } from './OrbitDBCommunityVoiceChannelDocument';
 
 export interface OrbitDBCommunityDocument extends Record<string, unknown> {
   autoJoinEnabled?: boolean;
@@ -17,12 +17,12 @@ export interface OrbitDBCommunityDocument extends Record<string, unknown> {
   discoverable?: boolean;
   id: string;
   memberIds: string[];
-  memberRoles?: MongoCommunityMemberRoleDocument[];
+  memberRoles?: OrbitDBCommunityMemberRoleDocument[];
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  roles?: MongoCommunityRoleDocument[];
-  textChannels: MongoCommunityTextChannelDocument[];
+  roles?: OrbitDBCommunityRoleDocument[];
+  textChannels: OrbitDBCommunityTextChannelDocument[];
   visibility: CommunityVisibilityValue;
-  voiceChannels?: MongoCommunityVoiceChannelDocument[];
+  voiceChannels?: OrbitDBCommunityVoiceChannelDocument[];
 }

@@ -4,9 +4,9 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
-import MongoCommunityMessageReactionRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import MongoCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import MongoCommunityRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -20,22 +20,22 @@ describe('RespondToCommunitySyncRequest', () => {
   const encryptedMessageId = 'encrypted-message';
   const plaintextMessageId = 'plaintext-message';
 
-  let communityRepository: MockProxy<MongoCommunityRepository>;
+  let communityRepository: MockProxy<CommunityRepository>;
   let eventConsumer: MockProxy<DomainEventConsumer>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
-  let messageRepository: MockProxy<MongoCommunityChannelMessageRepository>;
-  let reactionRepository: MockProxy<MongoCommunityMessageReactionRepository>;
+  let messageRepository: MockProxy<CommunityChannelMessageRepository>;
+  let reactionRepository: MockProxy<CommunityMessageReactionRepository>;
   let tracker: MockProxy<SyncResponseSuppressionTracker>;
   let consumer: RespondToCommunitySyncRequest;
   let ownerIdentityId: string;
   let signature: string;
 
   beforeEach(() => {
-    communityRepository = mock<MongoCommunityRepository>();
+    communityRepository = mock<CommunityRepository>();
     eventConsumer = mock<DomainEventConsumer>();
     eventPublisher = mock<DomainEventPublisher>();
-    messageRepository = mock<MongoCommunityChannelMessageRepository>();
-    reactionRepository = mock<MongoCommunityMessageReactionRepository>();
+    messageRepository = mock<CommunityChannelMessageRepository>();
+    reactionRepository = mock<CommunityMessageReactionRepository>();
     tracker = mock<SyncResponseSuppressionTracker>();
     const identityMother = new IdentityMother();
 

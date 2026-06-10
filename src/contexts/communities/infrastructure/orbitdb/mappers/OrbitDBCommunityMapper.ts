@@ -2,19 +2,21 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityRole } from '@app/contexts/communities/domain/entities/membership/CommunityRole';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 
-import { MongoCommunityRoleDocument } from '../../mongo/documents/MongoCommunityRoleDocument';
-import { MongoCommunityTextChannelDocument } from '../../mongo/documents/MongoCommunityTextChannelDocument';
-import { MongoCommunityVoiceChannelDocument } from '../../mongo/documents/MongoCommunityVoiceChannelDocument';
 import { OrbitDBCommunityDocument } from '../documents/OrbitDBCommunityDocument';
+import { OrbitDBCommunityRoleDocument } from '../documents/OrbitDBCommunityRoleDocument';
+import { OrbitDBCommunityTextChannelDocument } from '../documents/OrbitDBCommunityTextChannelDocument';
+import { OrbitDBCommunityVoiceChannelDocument } from '../documents/OrbitDBCommunityVoiceChannelDocument';
 
 export default class OrbitDBCommunityMapper {
   private rolesFromDocument(
-    roles: MongoCommunityRoleDocument[] | undefined,
+    roles: OrbitDBCommunityRoleDocument[] | undefined,
   ): ReturnType<CommunityRole['toPrimitives']>[] {
     return roles?.length ? roles : [CommunityRole.everyone().toPrimitives()];
   }
 
-  private textChannelFromDocument(channel: MongoCommunityTextChannelDocument) {
+  private textChannelFromDocument(
+    channel: OrbitDBCommunityTextChannelDocument,
+  ) {
     return {
       ...channel,
       permissions: channel.permissions || {
@@ -24,7 +26,7 @@ export default class OrbitDBCommunityMapper {
   }
 
   private voiceChannelFromDocument(
-    channel: MongoCommunityVoiceChannelDocument,
+    channel: OrbitDBCommunityVoiceChannelDocument,
   ) {
     return {
       ...channel,

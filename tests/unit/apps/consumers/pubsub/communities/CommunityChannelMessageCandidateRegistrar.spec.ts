@@ -4,7 +4,7 @@ import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/comm
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/services/types/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
-import MongoCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -18,12 +18,12 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
   const signatureService = new CommunityChannelMessageSignatureDomainService();
 
   let identityMother: IdentityMother;
-  let messageRepository: MockProxy<MongoCommunityChannelMessageRepository>;
+  let messageRepository: MockProxy<CommunityChannelMessageRepository>;
   let registrar: CommunityChannelMessageCandidateRegistrar;
 
   beforeEach(() => {
     identityMother = new IdentityMother();
-    messageRepository = mock<MongoCommunityChannelMessageRepository>();
+    messageRepository = mock<CommunityChannelMessageRepository>();
     registrar = new CommunityChannelMessageCandidateRegistrar(
       messageRepository,
       signatureService,

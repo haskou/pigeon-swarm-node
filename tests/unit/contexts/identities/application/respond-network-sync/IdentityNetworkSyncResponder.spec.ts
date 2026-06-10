@@ -1,20 +1,20 @@
 import IdentityNetworkSyncResponder from '@app/contexts/identities/application/respond-network-sync/IdentityNetworkSyncResponder';
 import { IdentityNetworkSyncResponseMessage } from '@app/contexts/identities/application/respond-network-sync/messages/IdentityNetworkSyncResponseMessage';
 import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
-import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('IdentityNetworkSyncResponder', () => {
   let eventPublisher: MockProxy<DomainEventPublisher>;
-  let metadataRepository: MockProxy<MongoIdentityMetadataRepository>;
+  let metadataRepository: MockProxy<IdentityMetadataRepository>;
   let responder: IdentityNetworkSyncResponder;
   let suppressionTracker: MockProxy<SyncResponseSuppressionTracker>;
 
   beforeEach(() => {
     eventPublisher = mock<DomainEventPublisher>();
-    metadataRepository = mock<MongoIdentityMetadataRepository>();
+    metadataRepository = mock<IdentityMetadataRepository>();
     suppressionTracker = mock<SyncResponseSuppressionTracker>();
     suppressionTracker.shouldRespond.mockResolvedValue(true);
     responder = new IdentityNetworkSyncResponder(
@@ -27,7 +27,6 @@ describe('IdentityNetworkSyncResponder', () => {
   it('should publish latest identity candidates for the requested network', async () => {
     metadataRepository.findLatestByNetworkId.mockResolvedValue([
       {
-        _id: 'identity-1:bafyidentity1',
         cid: 'bafyidentity1',
         handle: 'alice',
         identityId: 'identity-1',
@@ -73,7 +72,6 @@ describe('IdentityNetworkSyncResponder', () => {
     suppressionTracker.shouldRespond.mockResolvedValue(false);
     metadataRepository.findLatestByNetworkId.mockResolvedValue([
       {
-        _id: 'identity-1:bafyidentity1',
         cid: 'bafyidentity1',
         identityId: 'identity-1',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],

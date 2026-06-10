@@ -292,27 +292,18 @@ package "conversations.infrastructure" {
     -targetMessageId?: string
   }
 
-  class MongoUnreadConversationMessageDocument {
-    -_id: string
-    -conversationId: string
-    -messageId: string
-    -recipientIdentityId: string
-    -networkId?: string
-    -createdAt: number
-  }
-
-  class MongoConversationRepository
-  class MongoMessageReactionRepository
-  class MongoMessageReactionDocument {
-    -_id: string
+  class OrbitDBConversationRepository
+  class OrbitDBMessageReactionRepository
+  class OrbitDBMessageReactionDocument {
+    -id: string
     -conversationId: string
     -messageId: string
     -authorId: string
     -emoji: string
     -createdAt: number
   }
-  class MongoConversationDocument {
-    -_id: string
+  class OrbitDBConversationDocument {
+    -id: string
     -type: string
     -networkId: string
     -participantIds: string[]
@@ -321,21 +312,19 @@ package "conversations.infrastructure" {
 
   class Libp2pGossipsubMessageBusAdapter
 
-  note right of MongoConversationRepository
+  note right of OrbitDBConversationRepository
     Reconstitutes and persists the Conversation
-    aggregate. Message storage is an
-    infrastructure detail inside this repository.
-    Unread flags are Mongo-only projections,
-    never IPFS documents.
+    aggregate from OrbitDB replicated documents.
+    Message storage and read markers are
+    replicated projections, not Mongo documents.
   end note
 
-  MongoConversationRepository ..|> ConversationRepository
-  MongoConversationRepository --> MongoConversationDocument
-  MongoConversationRepository ..> IpfsMessageDocument
-  MongoConversationRepository --> MongoMessageDocumentIndex
-  MongoConversationRepository --> MongoUnreadConversationMessageDocument
-  MongoMessageReactionRepository ..|> MessageReactionRepository
-  MongoMessageReactionRepository --> MongoMessageReactionDocument
+  OrbitDBConversationRepository ..|> ConversationRepository
+  OrbitDBConversationRepository --> OrbitDBConversationDocument
+  OrbitDBConversationRepository ..> IpfsMessageDocument
+  OrbitDBConversationRepository --> MongoMessageDocumentIndex
+  OrbitDBMessageReactionRepository ..|> MessageReactionRepository
+  OrbitDBMessageReactionRepository --> OrbitDBMessageReactionDocument
   Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
 }
 

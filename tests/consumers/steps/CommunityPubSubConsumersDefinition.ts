@@ -9,10 +9,10 @@ import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/comm
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import MongoCommunityMessageReactionRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import MongoCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import MongoCommunityRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -148,19 +148,16 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async addedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenAdded(
       this.eventConsumer(),
-      this.communityRepository as unknown as MongoCommunityRepository,
-      this.messageRepository as unknown as MongoCommunityChannelMessageRepository,
-      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+      this.communityRepository as unknown as CommunityRepository,
+      this.messageRepository as unknown as CommunityChannelMessageRepository,
+      this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
 
     await consumer.handler(
-      new CommunityChannelMessageReactionWasAddedEvent(
-        this.communityId,
-        {
-          ...this.reactionAttributes(),
-          community: this.communityPrimitives(),
-        },
-      ),
+      new CommunityChannelMessageReactionWasAddedEvent(this.communityId, {
+        ...this.reactionAttributes(),
+        community: this.communityPrimitives(),
+      }),
     );
   }
 
@@ -170,19 +167,16 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async removedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenRemoved(
       this.eventConsumer(),
-      this.communityRepository as unknown as MongoCommunityRepository,
-      this.messageRepository as unknown as MongoCommunityChannelMessageRepository,
-      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+      this.communityRepository as unknown as CommunityRepository,
+      this.messageRepository as unknown as CommunityChannelMessageRepository,
+      this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
 
     await consumer.handler(
-      new CommunityChannelMessageReactionRemovedEvent(
-        this.communityId,
-        {
-          ...this.reactionAttributes(),
-          community: this.communityPrimitives(),
-        },
-      ),
+      new CommunityChannelMessageReactionRemovedEvent(this.communityId, {
+        ...this.reactionAttributes(),
+        community: this.communityPrimitives(),
+      }),
     );
   }
 
@@ -194,18 +188,18 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
       this.eventConsumer(),
       {
         save: async (): Promise<void> => undefined,
-      } as unknown as MongoCommunityRepository,
+      } as unknown as CommunityRepository,
       {
         findById: async (): Promise<object> => ({}),
         save: async (): Promise<void> => undefined,
-      } as unknown as MongoCommunityChannelMessageRepository,
-      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+      } as unknown as CommunityChannelMessageRepository,
+      this.reactionRepository as unknown as CommunityMessageReactionRepository,
       SyncResponseSuppressionTracker.shared(),
       new CommunityChannelMessageCandidateRegistrar(
         {
           findById: async (): Promise<object> => ({}),
           save: async (): Promise<void> => undefined,
-        } as unknown as MongoCommunityChannelMessageRepository,
+        } as unknown as CommunityChannelMessageRepository,
         new CommunityChannelMessageSignatureDomainService(),
       ),
     );
@@ -227,13 +221,13 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
       this.eventConsumer(),
       {
         findById: async (): Promise<undefined> => undefined,
-      } as unknown as MongoCommunityRepository,
+      } as unknown as CommunityRepository,
       {
         findSyncableByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityChannelMessageRepository,
+      } as unknown as CommunityChannelMessageRepository,
       {
         findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
+      } as unknown as CommunityMessageReactionRepository,
       this.eventPublisher,
       SyncResponseSuppressionTracker.shared(),
     );
@@ -255,15 +249,15 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
       this.eventConsumer(),
       {
         findById: async (): Promise<undefined> => undefined,
-      } as unknown as MongoCommunityRepository,
+      } as unknown as CommunityRepository,
       {
         findSyncableByCommunity: async (): Promise<unknown[]> => [
           { toPrimitives: (): object => ({ id: this.messageId }) },
         ],
-      } as unknown as MongoCommunityChannelMessageRepository,
+      } as unknown as CommunityChannelMessageRepository,
       {
         findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
+      } as unknown as CommunityMessageReactionRepository,
       this.eventPublisher,
       SyncResponseSuppressionTracker.shared(),
     );
@@ -318,13 +312,13 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
             visibility: 'private',
             voiceChannels: [],
           }),
-      } as unknown as MongoCommunityRepository,
+      } as unknown as CommunityRepository,
       {
         findSyncableByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityChannelMessageRepository,
+      } as unknown as CommunityChannelMessageRepository,
       {
         findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
+      } as unknown as CommunityMessageReactionRepository,
       this.eventPublisher,
       SyncResponseSuppressionTracker.shared(),
     );

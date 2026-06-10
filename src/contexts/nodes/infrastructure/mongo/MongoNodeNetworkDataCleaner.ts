@@ -1,27 +1,18 @@
 import { MongoCallDocument } from '@app/contexts/calls/infrastructure/mongo/documents/MongoCallDocument';
-import { MongoCommunityChannelMessageDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityChannelMessageDocument';
-import { MongoCommunityDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityDocument';
-import { MongoCommunityInviteDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityInviteDocument';
 import { MongoCommunityModerationLogDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityModerationLogDocument';
-import { MongoCommunityRequestDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityRequestDocument';
-import { MongoConversationDocument } from '@app/contexts/conversations/infrastructure/mongo/documents/MongoConversationDocument';
-import { MongoMessageMetadataDocument } from '@app/contexts/conversations/infrastructure/mongo/documents/MongoMessageMetadataDocument';
-import { MongoMessageReactionDocument } from '@app/contexts/conversations/infrastructure/mongo/documents/MongoMessageReactionDocument';
-import { MongoUnreadConversationMessageDocument } from '@app/contexts/conversations/infrastructure/mongo/documents/MongoUnreadConversationMessageDocument';
-import { MongoIdentityMetadataDocument } from '@app/contexts/identities/infrastructure/mongo/documents/MongoIdentityMetadataDocument';
-import { MongoIPFSContentReplicaClaimDocument } from '@app/contexts/ipfs-replication/infrastructure/mongo/documents/MongoIPFSContentReplicaClaimDocument';
 import { MongoIPFSReplicationStatusSummaryDocument } from '@app/contexts/ipfs-replication/infrastructure/mongo/documents/MongoIPFSReplicationStatusSummaryDocument';
 import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodePeerDocument';
-import { MongoNotificationDocument } from '@app/contexts/notifications/infrastructure/mongo/documents/MongoNotificationDocument';
 import { MongoPollDocument } from '@app/contexts/polls/infrastructure/mongo/documents/MongoPollDocument';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import { Document } from 'mongodb';
 
 import NodeNetworkDataCleaner from '../../domain/services/NodeNetworkDataCleaner';
 import { CommunityIdentifier } from './types/CommunityIdentifier';
 import { CommunityReactionDocument } from './types/CommunityReactionDocument';
 import { ConversationIdentifier } from './types/ConversationIdentifier';
+import { NetworkScopedIdentityDocument } from './types/NetworkScopedIdentityDocument';
 
 // eslint-disable-next-line max-len
 export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner {
@@ -85,7 +76,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
 
   private async cleanIdentities(networkId: string): Promise<void> {
     const identities =
-      await this.mongo.getCollection<MongoIdentityMetadataDocument>(
+      await this.mongo.getCollection<NetworkScopedIdentityDocument>(
         MongoNodeNetworkDataCleaner.IDENTITIES,
       );
 
@@ -95,14 +86,11 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
         $size: 1,
       },
     });
-    await identities.updateMany(
-      { networkIds: networkId },
-      {
-        $pull: {
-          networkIds: networkId,
-        },
+    await identities.updateMany({ networkIds: networkId }, {
+      $pull: {
+        networkIds: networkId,
       },
-    );
+    } as Document);
   }
 
   private async cleanPeers(networkId: string): Promise<void> {
@@ -128,13 +116,13 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     conversationIds: string[],
   ): Promise<void> {
     await (
-      await this.mongo.getCollection<MongoConversationDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.CONVERSATIONS,
       )
     ).deleteMany({ networkId });
 
     await (
-      await this.mongo.getCollection<MongoMessageMetadataDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.CONVERSATION_MESSAGES,
       )
     ).deleteMany({
@@ -149,7 +137,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     });
 
     await (
-      await this.mongo.getCollection<MongoMessageReactionDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.CONVERSATION_REACTIONS,
       )
     ).deleteMany({
@@ -159,7 +147,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     });
 
     await (
-      await this.mongo.getCollection<MongoUnreadConversationMessageDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.CONVERSATION_UNREAD_MESSAGES,
       )
     ).deleteMany({
@@ -179,13 +167,13 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     communityIds: string[],
   ): Promise<void> {
     await (
-      await this.mongo.getCollection<MongoCommunityDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.COMMUNITIES,
       )
     ).deleteMany({ networkId });
 
     await (
-      await this.mongo.getCollection<MongoCommunityChannelMessageDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.COMMUNITY_MESSAGES,
       )
     ).deleteMany({
@@ -205,7 +193,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     });
 
     await (
-      await this.mongo.getCollection<MongoCommunityInviteDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.COMMUNITY_INVITES,
       )
     ).deleteMany({
@@ -215,7 +203,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     });
 
     await (
-      await this.mongo.getCollection<MongoCommunityRequestDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.COMMUNITY_REQUESTS,
       )
     ).deleteMany({
@@ -259,7 +247,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     conversationIds: string[],
   ): Promise<void> {
     await (
-      await this.mongo.getCollection<MongoNotificationDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.NOTIFICATIONS,
       )
     ).deleteMany({
@@ -281,7 +269,7 @@ export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
 
   private async cleanIPFSReplication(networkId: string): Promise<void> {
     await (
-      await this.mongo.getCollection<MongoIPFSContentReplicaClaimDocument>(
+      await this.mongo.getCollection<Document>(
         MongoNodeNetworkDataCleaner.IPFS_REPLICA_CLAIMS,
       )
     ).deleteMany({ networkId });

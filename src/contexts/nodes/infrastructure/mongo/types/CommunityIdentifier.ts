@@ -1,3 +1,3 @@
-import { MongoCommunityDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityDocument';
-
-export type CommunityIdentifier = Pick<MongoCommunityDocument, '_id'>;
+export interface CommunityIdentifier {
+  _id: string;
+}

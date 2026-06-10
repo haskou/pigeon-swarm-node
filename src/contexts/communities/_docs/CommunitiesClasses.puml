@@ -336,29 +336,29 @@ Community --> Timestamp
 CommunityTextChannel --> Timestamp
 
 package "communities/infrastructure" {
-  class MongoCommunityRepository
-  class MongoCommunityDocument
-  class MongoCommunityChannelMessageRepository
-  class MongoCommunityChannelMessageDocument
-  class MongoCommunityChannelMessageReactionRepository
-  class MongoCommunityChannelMessageReactionDocument
-  class MongoCommunityInviteRepository
-  class MongoCommunityInviteDocument
-  class MongoCommunityMembershipRequestRepository
-  class MongoCommunityRequestDocument
+  class OrbitDBCommunityRepository
+  class OrbitDBCommunityDocument
+  class OrbitDBCommunityChannelMessageRepository
+  class OrbitDBCommunityChannelMessageDocument
+  class OrbitDBCommunityMessageReactionRepository
+  class OrbitDBCommunityChannelMessageReactionDocument
+  class OrbitDBCommunityInviteRepository
+  class OrbitDBCommunityInviteDocument
+  class OrbitDBCommunityMembershipRequestRepository
+  class OrbitDBCommunityMembershipRequestDocument
   class MongoCommunityModerationLogRepository
   class MongoCommunityModerationLogDocument
 
-  MongoCommunityRepository ..|> CommunityRepository
-  MongoCommunityRepository --> MongoCommunityDocument
-  MongoCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
-  MongoCommunityChannelMessageRepository --> MongoCommunityChannelMessageDocument
-  MongoCommunityChannelMessageReactionRepository ..|> CommunityChannelMessageReactionRepository
-  MongoCommunityChannelMessageReactionRepository --> MongoCommunityChannelMessageReactionDocument
-  MongoCommunityInviteRepository ..|> CommunityInviteRepository
-  MongoCommunityInviteRepository --> MongoCommunityInviteDocument
-  MongoCommunityMembershipRequestRepository ..|> CommunityMembershipRequestRepository
-  MongoCommunityMembershipRequestRepository --> MongoCommunityRequestDocument
+  OrbitDBCommunityRepository ..|> CommunityRepository
+  OrbitDBCommunityRepository --> OrbitDBCommunityDocument
+  OrbitDBCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
+  OrbitDBCommunityChannelMessageRepository --> OrbitDBCommunityChannelMessageDocument
+  OrbitDBCommunityMessageReactionRepository ..|> CommunityMessageReactionRepository
+  OrbitDBCommunityMessageReactionRepository --> OrbitDBCommunityChannelMessageReactionDocument
+  OrbitDBCommunityInviteRepository ..|> CommunityInviteRepository
+  OrbitDBCommunityInviteRepository --> OrbitDBCommunityInviteDocument
+  OrbitDBCommunityMembershipRequestRepository ..|> CommunityMembershipRequestRepository
+  OrbitDBCommunityMembershipRequestRepository --> OrbitDBCommunityMembershipRequestDocument
   MongoCommunityModerationLogRepository ..|> CommunityModerationLogRepository
   MongoCommunityModerationLogRepository --> MongoCommunityModerationLogDocument
 }

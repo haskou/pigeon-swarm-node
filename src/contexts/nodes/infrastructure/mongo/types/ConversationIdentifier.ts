@@ -1,3 +1,3 @@
-import { MongoConversationDocument } from '@app/contexts/conversations/infrastructure/mongo/documents/MongoConversationDocument';
-
-export type ConversationIdentifier = Pick<MongoConversationDocument, '_id'>;
+export interface ConversationIdentifier {
+  _id: string;
+}
