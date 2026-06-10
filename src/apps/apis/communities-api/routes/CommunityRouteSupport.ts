@@ -7,10 +7,10 @@ import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/en
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
+import CommunityMembershipRequestRepository from '@app/contexts/communities/domain/repositories/CommunityMembershipRequestRepository';
 import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
 import CommunityModerationLogRepository from '@app/contexts/communities/domain/repositories/CommunityModerationLogRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import CommunityRequestStore from '@app/contexts/communities/domain/repositories/CommunityRequestStore';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -53,8 +53,10 @@ export abstract class CommunityRouteSupport extends Route {
     return this.get<CommunityInviteRepository>(CommunityInviteRepository);
   }
 
-  protected membershipRequests(): CommunityRequestStore {
-    return this.get<CommunityRequestStore>(CommunityRequestStore);
+  protected membershipRequests(): CommunityMembershipRequestRepository {
+    return this.get<CommunityMembershipRequestRepository>(
+      CommunityMembershipRequestRepository,
+    );
   }
 
   protected moderationLogs(): CommunityModerationLogRepository {

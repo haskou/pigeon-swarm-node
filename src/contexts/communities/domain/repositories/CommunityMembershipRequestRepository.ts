@@ -4,7 +4,7 @@ import { CommunityMembershipRequest } from '../entities/membership/CommunityMemb
 import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityRequestId } from '../value-objects/CommunityRequestId';
 
-export default abstract class CommunityRequestStore {
+export default abstract class CommunityMembershipRequestRepository {
   public abstract deleteByCommunity(communityId: CommunityId): Promise<void>;
   public abstract findByCommunityAndIdentity(
     communityId: CommunityId,

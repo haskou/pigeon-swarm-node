@@ -10,7 +10,6 @@ import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import { dependencyAliases, explicitServices } from '@app/index';
 import Kernel from '@app/Kernel';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
@@ -101,7 +100,7 @@ export default class Definitions {
       kernel.environmentVariables('test');
       this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
-      await kernel.dependencyInjection(dependencyAliases, explicitServices);
+      await kernel.dependencyInjection();
       await kernel.runServer();
       kernel.logs();
       await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);

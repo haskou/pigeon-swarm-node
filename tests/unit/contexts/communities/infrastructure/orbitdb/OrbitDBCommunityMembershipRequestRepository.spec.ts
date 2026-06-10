@@ -1,11 +1,11 @@
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityMembershipRequestMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper';
-import OrbitDBCommunityRequestStore from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRequestStore';
+import OrbitDBCommunityMembershipRequestRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
-describe('OrbitDBCommunityRequestStore', () => {
+describe('OrbitDBCommunityMembershipRequestRepository', () => {
   const communityId = new CommunityId('community-1');
   const ownerIdentityId = new IdentityId(
     'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=',
@@ -16,7 +16,7 @@ describe('OrbitDBCommunityRequestStore', () => {
   const communities: Record<string, unknown>[] = [];
   const requests: Record<string, unknown>[] = [];
   let registry: OrbitDBReplicatedStateRegistry;
-  let store: OrbitDBCommunityRequestStore;
+  let store: OrbitDBCommunityMembershipRequestRepository;
 
   beforeEach(() => {
     communities.splice(0);
@@ -49,7 +49,7 @@ describe('OrbitDBCommunityRequestStore', () => {
         query: jest.fn(async (matcher) => requests.filter(matcher)),
       },
     } as never);
-    store = new OrbitDBCommunityRequestStore(
+    store = new OrbitDBCommunityMembershipRequestRepository(
       registry,
       new OrbitDBCommunityMembershipRequestMapper(),
     );

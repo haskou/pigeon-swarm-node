@@ -2,13 +2,14 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
-import CommunityRequestStore from '../../domain/repositories/CommunityRequestStore';
+import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityRequestId } from '../../domain/value-objects/CommunityRequestId';
 import { MongoCommunityDocument } from './documents/MongoCommunityDocument';
 import { MongoCommunityRequestDocument } from './documents/MongoCommunityRequestDocument';
 
-export default class MongoCommunityRequestStore extends CommunityRequestStore {
+// eslint-disable-next-line max-len
+export default class MongoCommunityMembershipRequestRepository extends CommunityMembershipRequestRepository {
   private static readonly COLLECTION = 'community_membership_requests';
   private static readonly COMMUNITIES_COLLECTION = 'communities';
 
@@ -18,13 +19,13 @@ export default class MongoCommunityRequestStore extends CommunityRequestStore {
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityRequestDocument>(
-      MongoCommunityRequestStore.COLLECTION,
+      MongoCommunityMembershipRequestRepository.COLLECTION,
     );
   }
 
   private async communitiesCollection() {
     return this.mongo.getCollection<MongoCommunityDocument>(
-      MongoCommunityRequestStore.COMMUNITIES_COLLECTION,
+      MongoCommunityMembershipRequestRepository.COMMUNITIES_COLLECTION,
     );
   }
 

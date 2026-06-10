@@ -1,6 +1,4 @@
-import { DependencyAlias } from '@app/shared/infrastructure/dependencyInjection/DependencyAlias';
 import DependencyInjection from '@app/shared/infrastructure/dependencyInjection/DependencyInjection';
-import ExplicitServiceDefinition from '@app/shared/infrastructure/dependencyInjection/ExplicitServiceDefinition';
 import Server from '@app/shared/infrastructure/express/Server';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import dotenv from 'dotenv';
@@ -74,11 +72,8 @@ export default class Kernel {
     });
   }
 
-  public async dependencyInjection(
-    aliases: readonly DependencyAlias[] = [],
-    explicitServices: readonly ExplicitServiceDefinition[] = [],
-  ): Promise<void> {
-    Kernel._di = new DependencyInjection(aliases, explicitServices);
+  public async dependencyInjection(): Promise<void> {
+    Kernel._di = new DependencyInjection();
     await Kernel._di.compile();
   }
 
@@ -99,6 +94,10 @@ export default class Kernel {
       const consumer = this.getConsumerFromClass(ClassDefinition);
       Kernel._consumers.push(consumer);
     }
+  }
+
+  public addConsumerInstances(...consumers: Consumer[]): void {
+    Kernel._consumers.push(...consumers);
   }
 
   public async runConsumers(): Promise<void> {
@@ -141,6 +140,10 @@ export default class Kernel {
 
     await scheduler.execute();
     await scheduler.init();
+  }
+
+  public addAcceptanceInstanceScheduler(instance: Scheduler): void {
+    Kernel.schedulers.push(instance);
   }
 
   public removeSchedulers(): void {

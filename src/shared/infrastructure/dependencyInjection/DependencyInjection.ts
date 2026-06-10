@@ -1,17 +1,12 @@
 import Kernel from '@app/Kernel';
 import fs from 'fs-extra';
 import {
-  Autowire,
   ContainerBuilder,
-  Reference,
-  ServiceFile,
+  Autowire,
   YamlFileLoader,
+  ServiceFile,
 } from 'node-dependency-injection';
 import path from 'path';
-
-import { ContainerDefinition } from './ContainerDefinition';
-import { DependencyAlias } from './DependencyAlias';
-import ExplicitServiceDefinition from './ExplicitServiceDefinition';
 
 export default class DependencyInjection {
   private static _instance: DependencyInjection;
@@ -24,14 +19,7 @@ export default class DependencyInjection {
     'services.yaml',
   );
 
-  private readonly aliases: Map<unknown, unknown>;
-
-  constructor(
-    aliases: readonly DependencyAlias[] = [],
-    // eslint-disable-next-line max-len
-    private readonly explicitServices: readonly ExplicitServiceDefinition[] = [],
-  ) {
-    this.aliases = new Map<unknown, unknown>(aliases);
+  constructor() {
     this.container = new ContainerBuilder(false, Kernel.sourceDirectory);
   }
 
@@ -48,85 +36,59 @@ export default class DependencyInjection {
     }
   }
 
-  private serviceIdFromSource(sourcePath: string, serviceName: string): string {
-    const readableId = sourcePath
-      .replace(/\//g, '__')
-      .replace('.ts', '')
-      .replace('@', '__')
-      .concat(`__${serviceName}`);
+  private get definitions(): Map<
+    string,
+    { _abstract?: boolean; _parent?: string | null }
+  > {
+    const container = this.container as unknown as {
+      _definitions?: Map<
+        string,
+        { _abstract?: boolean; _parent?: string | null }
+      >;
+    };
 
-    return Buffer.from(readableId, 'utf-8').toString('base64');
+    return container._definitions || new Map();
   }
 
-  private serviceReferenceFor(serviceClass: unknown): Reference {
-    const serviceId = this.serviceIdFor(
-      this.aliases.get(serviceClass) ?? serviceClass,
+  private getServiceClassName(serviceName: unknown): string | undefined {
+    return typeof serviceName === 'function' ? serviceName.name : undefined;
+  }
+
+  private parentMatchesService(
+    parentId: string | null | undefined,
+    serviceClassName: string,
+  ): boolean {
+    if (!parentId) {
+      return false;
+    }
+
+    const parentName = Buffer.from(parentId, 'base64').toString('utf8');
+
+    return parentName.endsWith(`__${serviceClassName}__${serviceClassName}`);
+  }
+
+  private findConcreteChildServiceId(serviceName: unknown): string | undefined {
+    const serviceClassName = this.getServiceClassName(serviceName);
+
+    if (!serviceClassName) {
+      return undefined;
+    }
+
+    const matches = [...this.definitions.entries()]
+      .filter(([, definition]) => definition._abstract !== true)
+      .filter(([, definition]) =>
+        this.parentMatchesService(definition._parent, serviceClassName),
+      )
+      .map(([id]) => id);
+
+    return matches[matches.length - 1];
+  }
+
+  public static get instance(): DependencyInjection {
+    return (
+      DependencyInjection._instance ||
+      (DependencyInjection._instance = new this())
     );
-
-    if (typeof serviceId !== 'string') {
-      throw new Error(`Service ${String(serviceClass)} is not registered.`);
-    }
-
-    return new Reference(serviceId);
-  }
-
-  private registerExplicitServices(): void {
-    for (const { dependencyClasses = [], serviceClass, sourcePath } of this
-      .explicitServices) {
-      const serviceId = this.serviceIdFromSource(sourcePath, serviceClass.name);
-      const definition = this.container.register(serviceId, serviceClass);
-
-      for (const dependencyClass of dependencyClasses) {
-        definition.addArgument(this.serviceReferenceFor(dependencyClass));
-      }
-    }
-  }
-
-  private containerDefinitions(): Array<[string, ContainerDefinition]> {
-    const definitions = (
-      this.container as unknown as {
-        readonly definitions:
-          | Map<string, ContainerDefinition>
-          | Record<string, ContainerDefinition>;
-      }
-    ).definitions;
-
-    if (definitions instanceof Map) {
-      return Array.from(definitions.entries());
-    }
-
-    return Object.entries(definitions);
-  }
-
-  private serviceIdFor(serviceClass: unknown): unknown {
-    if (typeof serviceClass !== 'function') {
-      return serviceClass;
-    }
-
-    const exactDefinition = this.containerDefinitions().find(
-      ([, definition]) => definition.Object === serviceClass,
-    );
-
-    if (exactDefinition) {
-      return exactDefinition[0];
-    }
-
-    const namedDefinition = this.containerDefinitions().find(
-      ([, definition]) => definition.Object?.name === serviceClass.name,
-    );
-
-    return namedDefinition ? namedDefinition[0] : serviceClass;
-  }
-
-  private registerAliases(): void {
-    for (const [alias, implementation] of this.aliases) {
-      const aliasId = this.serviceIdFor(alias);
-      const implementationId = this.serviceIdFor(implementation);
-
-      if (typeof aliasId === 'string' && typeof implementationId === 'string') {
-        this.container.setAlias(aliasId, implementationId);
-      }
-    }
   }
 
   public async compile(): Promise<void> {
@@ -142,21 +104,16 @@ export default class DependencyInjection {
       this.loader = new YamlFileLoader(this.container);
       await this.loader.load(this._servicesYamlPath);
     }
-    this.registerExplicitServices();
-    this.registerAliases();
     await this.container.compile();
   }
 
-  public static get instance(): DependencyInjection {
-    return (
-      DependencyInjection._instance ||
-      (DependencyInjection._instance = new this())
-    );
-  }
-
   public getService<T>(serviceName: unknown): T {
-    return this.container.get<T>(
-      this.serviceIdFor(this.aliases.get(serviceName) ?? serviceName),
-    );
+    const childServiceId = this.findConcreteChildServiceId(serviceName);
+
+    if (childServiceId) {
+      return this.container.get<T>(childServiceId);
+    }
+
+    return this.container.get<T>(serviceName);
   }
 }

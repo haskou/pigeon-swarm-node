@@ -9,7 +9,6 @@ import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/valu
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
-import { dependencyAliases, explicitServices } from '@app/index';
 import Kernel from '@app/Kernel';
 import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
@@ -134,7 +133,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
       kernel.environmentVariables('test');
       this.cleanupStorageFolder();
 
-      await kernel.dependencyInjection(dependencyAliases, explicitServices);
+      await kernel.dependencyInjection();
       this.installTestLogger();
       await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
     }

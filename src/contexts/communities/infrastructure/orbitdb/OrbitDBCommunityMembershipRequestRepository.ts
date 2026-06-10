@@ -1,5 +1,5 @@
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
-import CommunityRequestStore from '@app/contexts/communities/domain/repositories/CommunityRequestStore';
+import CommunityMembershipRequestRepository from '@app/contexts/communities/domain/repositories/CommunityMembershipRequestRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -9,7 +9,7 @@ import { OrbitDBCommunityMembershipRequestDocument } from './documents/OrbitDBCo
 import OrbitDBCommunityMembershipRequestMapper from './mappers/OrbitDBCommunityMembershipRequestMapper';
 
 // eslint-disable-next-line max-len
-export default class OrbitDBCommunityRequestStore extends CommunityRequestStore {
+export default class OrbitDBCommunityMembershipRequestRepository extends CommunityMembershipRequestRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityMembershipRequestMapper,
