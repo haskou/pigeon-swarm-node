@@ -1986,15 +1986,17 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/ipfs/secure');
   }
 
+  @given('I sign the current content replication status request')
   @given('I sign the current IPFS replication status request')
-  public async iSignTheCurrentIPFSReplicationStatusRequest(): Promise<void> {
+  public async iSignTheCurrentContentReplicationStatusRequest(): Promise<void> {
     this.binaryBody = undefined;
     this.body = undefined;
     await this.signCurrentRequest('GET', '/ipfs/replication/status');
   }
 
+  @given('another identity signs the current content replication status request')
   @given('another identity signs the current IPFS replication status request')
-  public async anotherIdentitySignsTheCurrentIPFSReplicationStatusRequest(): Promise<void> {
+  public async anotherIdentitySignsTheCurrentContentReplicationStatusRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
     this.binaryBody = undefined;
@@ -3279,7 +3281,7 @@ export default class Definitions {
   }
 
   @when('I GET the published IPFS content as binary')
-  public async iGETThePublishedIPFSContentAsBinary(): Promise<void> {
+  public async iGETThePublishedContentAsBinary(): Promise<void> {
     this.response = await this.restClient.getBinary(
       `/ipfs/${this.response.data.cid}`,
       this.headers,

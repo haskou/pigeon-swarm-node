@@ -615,7 +615,7 @@ Implemented:
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
 - delete local and replicated data scoped to that network:
-  conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and IPFS replication records
+  conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
 
@@ -798,7 +798,7 @@ Implemented:
 - read JSON content by CID from any configured IPFS network
 - return `404` when the CID is not found
 
-### Get IPFS replication status
+### Get content replication status
 
 ```http
 GET /ipfs/replication/status

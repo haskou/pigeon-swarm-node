@@ -10,6 +10,8 @@ import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communi
 import { CommunityMembershipRequestWasDeclinedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasDeclinedEvent';
 import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
+import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
+import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
 import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
 import { ConversationMessageReactionWasRemovedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasRemovedEvent';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
@@ -19,8 +21,6 @@ import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/dom
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
-import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
-import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
@@ -118,12 +118,12 @@ export const orbitDBReplicatedEventTypes: OrbitDBReplicatedEventType[] = [
     domainEvent: IdentityWasUpdatedEvent,
   },
   {
-    bindingKey: IPFSContentReplicationWasClaimedEvent.EVENT_NAME,
-    domainEvent: IPFSContentReplicationWasClaimedEvent,
+    bindingKey: ContentReplicationWasClaimedEvent.EVENT_NAME,
+    domainEvent: ContentReplicationWasClaimedEvent,
   },
   {
-    bindingKey: IPFSContentReplicationWasRegisteredEvent.EVENT_NAME,
-    domainEvent: IPFSContentReplicationWasRegisteredEvent,
+    bindingKey: ContentReplicationWasRegisteredEvent.EVENT_NAME,
+    domainEvent: ContentReplicationWasRegisteredEvent,
   },
   {
     bindingKey: KeychainWasPublishedEvent.EVENT_NAME,

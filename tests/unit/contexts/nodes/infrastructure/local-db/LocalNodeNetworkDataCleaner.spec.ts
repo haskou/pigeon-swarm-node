@@ -53,7 +53,7 @@ describe('LocalNodeNetworkDataCleaner', () => {
       'peer-to-delete',
     );
     expect(database.deleteMany).toHaveBeenCalledWith(
-      'ipfs_replication_status_summaries',
+      'content_replication_status_summaries',
       expect.any(Function),
     );
   });

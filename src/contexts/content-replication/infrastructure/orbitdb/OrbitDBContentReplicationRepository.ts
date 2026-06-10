@@ -1,0 +1,155 @@
+import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
+import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+
+import { OrbitDBContentReplicationDocument } from './documents/OrbitDBContentReplicationDocument';
+import OrbitDBContentReplicationMapper from './mappers/OrbitDBContentReplicationMapper';
+
+// eslint-disable-next-line max-len
+export default class OrbitDBContentReplicationRepository extends ContentReplicationRepository {
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly mapper: OrbitDBContentReplicationMapper,
+  ) {
+    super();
+  }
+
+  private numberValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private stringArrayValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string[] | undefined {
+    const value = document[attribute];
+
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    return value.every((item) => typeof item === 'string') ? value : undefined;
+  }
+
+  private stringValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private isCompleteDocument(
+    document: Partial<OrbitDBContentReplicationDocument>,
+  ): document is OrbitDBContentReplicationDocument {
+    return [
+      document.cid,
+      document.context,
+      document.createdAt,
+      document.id,
+      document.networkIds,
+      document.priority,
+      document.sizeBytes,
+      document.updatedAt,
+    ].every((value) => value !== undefined);
+  }
+
+  private documentFromRecord(
+    record: Record<string, unknown>,
+  ): OrbitDBContentReplicationDocument | undefined {
+    const cid = this.stringValue(record, 'cid');
+    const contentType = this.stringValue(record, 'contentType');
+    const context = this.stringValue(record, 'context');
+    const createdAt = this.numberValue(record, 'createdAt');
+    const filename = this.stringValue(record, 'filename');
+    const id = this.stringValue(record, 'id') || cid;
+    const networkIds = this.stringArrayValue(record, 'networkIds');
+    const ownerIdentityId = this.stringValue(record, 'ownerIdentityId');
+    const priority = this.stringValue(record, 'priority');
+    const sizeBytes = this.numberValue(record, 'sizeBytes');
+    const updatedAt = this.numberValue(record, 'updatedAt');
+
+    const document: Partial<OrbitDBContentReplicationDocument> = {
+      cid,
+      contentType,
+      context,
+      createdAt,
+      filename,
+      id,
+      networkIds,
+      ownerIdentityId,
+      priority: priority as OrbitDBContentReplicationDocument['priority'],
+      sizeBytes,
+      updatedAt,
+    };
+
+    return this.isCompleteDocument(document) ? document : undefined;
+  }
+
+  private deduplicateDocuments(
+    documents: OrbitDBContentReplicationDocument[],
+  ): OrbitDBContentReplicationDocument[] {
+    const deduplicated = new Map<string, OrbitDBContentReplicationDocument>();
+
+    for (const document of documents) {
+      const current = deduplicated.get(document.cid);
+
+      if (!current || current.updatedAt < document.updatedAt) {
+        deduplicated.set(document.cid, document);
+      }
+    }
+
+    return [...deduplicated.values()];
+  }
+
+  private async findDocuments(
+    matcher: (document: Record<string, unknown>) => boolean,
+  ): Promise<OrbitDBContentReplicationDocument[]> {
+    const documents = await this.registry.queryDocuments(
+      'contentReplication',
+      matcher,
+    );
+
+    return documents
+      .map((document) => this.documentFromRecord(document))
+      .filter(
+        (document): document is OrbitDBContentReplicationDocument =>
+          document !== undefined,
+      );
+  }
+
+  public async findAll(): Promise<ContentReplication[]> {
+    const documents = await this.findDocuments(() => true);
+
+    return this.deduplicateDocuments(documents)
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .map((document) => this.mapper.toDomain(document));
+  }
+
+  public async findByCid(cid: IPFSId): Promise<ContentReplication | undefined> {
+    const cidValue = cid.valueOf();
+    const documents = await this.findDocuments(
+      (candidate) =>
+        this.stringValue(candidate, 'cid') === cidValue ||
+        this.stringValue(candidate, 'id') === cidValue,
+    );
+    const [document] = this.deduplicateDocuments(documents).sort(
+      (left, right) => right.updatedAt - left.updatedAt,
+    );
+
+    return document ? this.mapper.toDomain(document) : undefined;
+  }
+
+  public async save(content: ContentReplication): Promise<void> {
+    await this.registry.putDocument('contentReplication', {
+      ...this.mapper.toDocument(content),
+    });
+  }
+}

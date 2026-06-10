@@ -18,7 +18,7 @@ export class OrbitDBReplicatedStateStores {
   public readonly events: OrbitDBDatabase;
   public readonly heads: OrbitDBDatabase;
   public readonly identities: OrbitDBDatabase;
-  public readonly ipfsReplication: OrbitDBDatabase;
+  public readonly contentReplication: OrbitDBDatabase;
   public readonly keychains: OrbitDBDatabase;
   public readonly messages: OrbitDBDatabase;
   public readonly moderationLogs: OrbitDBDatabase;
@@ -92,7 +92,7 @@ export class OrbitDBReplicatedStateStores {
     );
 
     Kernel.logger.info(
-      `OrbitDB replicated stores opened: networkId=${networkId} peerId=${network.getPeerId()}`,
+      `OrbitDB replicated state opened: networkId=${networkId} peerId=${network.getPeerId()}`,
     );
 
     return new OrbitDBReplicatedStateStores({
@@ -108,6 +108,12 @@ export class OrbitDBReplicatedStateStores {
         'documents/communities',
         AccessController,
       ),
+      contentReplication: await this.openDocumentsStore(
+        orbitdb,
+        networkId,
+        'documents/content-replication',
+        AccessController,
+      ),
       conversations: await this.openDocumentsStore(
         orbitdb,
         networkId,
@@ -120,12 +126,6 @@ export class OrbitDBReplicatedStateStores {
         orbitdb,
         networkId,
         'documents/identities',
-        AccessController,
-      ),
-      ipfsReplication: await this.openDocumentsStore(
-        orbitdb,
-        networkId,
-        'documents/ipfs-replication',
         AccessController,
       ),
       keychains: await this.openDocumentsStore(
@@ -223,7 +223,7 @@ export class OrbitDBReplicatedStateStores {
     this.events = stores.events;
     this.heads = stores.heads;
     this.identities = stores.identities;
-    this.ipfsReplication = stores.ipfsReplication;
+    this.contentReplication = stores.contentReplication;
     this.keychains = stores.keychains;
     this.messages = stores.messages;
     this.moderationLogs = stores.moderationLogs;
@@ -243,11 +243,11 @@ export class OrbitDBReplicatedStateStores {
     return {
       calls: this.calls.address,
       communities: this.communities.address,
+      contentReplication: this.contentReplication.address,
       conversations: this.conversations.address,
       events: this.events.address,
       heads: this.heads.address,
       identities: this.identities.address,
-      ipfsReplication: this.ipfsReplication.address,
       keychains: this.keychains.address,
       messages: this.messages.address,
       moderationLogs: this.moderationLogs.address,

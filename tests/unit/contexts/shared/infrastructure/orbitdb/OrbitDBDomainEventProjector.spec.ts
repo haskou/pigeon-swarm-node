@@ -9,8 +9,8 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
-import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
-import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
+import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
+import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
@@ -33,7 +33,7 @@ function fakeStores(): Record<string, FakeStore> {
     conversations: fakeStore(),
     heads: fakeStore(),
     identities: fakeStore(),
-    ipfsReplication: fakeStore(),
+    contentReplication: fakeStore(),
     keychains: fakeStore(),
     messages: fakeStore(),
     notifications: fakeStore(),
@@ -346,7 +346,7 @@ describe('OrbitDBDomainEventProjector', () => {
     await projector.project(
       storesFrom(stores),
       replicatedMessage(
-        IPFSContentReplicationWasRegisteredEvent.EVENT_NAME,
+        ContentReplicationWasRegisteredEvent.EVENT_NAME,
         {
           cid: 'bafy',
           networkIds: ['network-1'],
@@ -358,7 +358,7 @@ describe('OrbitDBDomainEventProjector', () => {
     await projector.project(
       storesFrom(stores),
       replicatedMessage(
-        IPFSContentReplicationWasClaimedEvent.EVENT_NAME,
+        ContentReplicationWasClaimedEvent.EVENT_NAME,
         {
           cid: 'bafy',
           claimedAt: 1780000000001,
@@ -417,18 +417,18 @@ describe('OrbitDBDomainEventProjector', () => {
         uses: 1,
       }),
     );
-    expect(stores.ipfsReplication.put).toHaveBeenCalledWith(
+    expect(stores.contentReplication.put).toHaveBeenCalledWith(
       expect.objectContaining({
         cid: 'bafy',
         id: 'bafy',
         sizeBytes: 128,
       }),
     );
-    expect(stores.ipfsReplication.put).toHaveBeenCalledWith(
+    expect(stores.contentReplication.put).toHaveBeenCalledWith(
       expect.objectContaining({
         cid: 'bafy',
         id: 'bafy:network-1:node-1',
-        kind: 'ipfs_content_replica_claim',
+        kind: 'content_replica_claim',
         nodeId: 'node-1',
       }),
     );

@@ -1,6 +1,6 @@
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
+import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/ContentReplicationMaintenanceScheduler';
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
-import IPFSReplicationMaintenanceScheduler from '@app/apps/schedulers/IPFSReplicationMaintenanceScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import { ServiceClass } from '@app/shared/infrastructure/dependencyInjection/ServiceClass';
@@ -10,7 +10,7 @@ export const recurringSchedulers: ServiceClass<Scheduler>[] = [
   NodeHeartbeatScheduler,
   IdentityPresenceExpirationScheduler,
   CallTimeoutScheduler,
-  IPFSReplicationMaintenanceScheduler,
+  ContentReplicationMaintenanceScheduler,
 ];
 
 export const startupSchedulers: ServiceClass<Scheduler>[] = [

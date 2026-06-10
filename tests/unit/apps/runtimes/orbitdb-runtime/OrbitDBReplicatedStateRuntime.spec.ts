@@ -30,7 +30,7 @@ function fakeStores(): OrbitDBReplicatedStateStores {
     events: fakeStore(),
     heads: fakeStore(),
     identities: fakeStore(),
-    ipfsReplication: fakeStore(),
+    contentReplication: fakeStore(),
     keychains: fakeStore(),
     messages: fakeStore(),
     notifications: fakeStore(),

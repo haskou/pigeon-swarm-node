@@ -73,7 +73,7 @@ function createStores(): {
     events: createStore(),
     heads: createStore(),
     identities,
-    ipfsReplication: createStore(),
+    contentReplication: createStore(),
     keychains,
     messages,
     notifications,
@@ -101,7 +101,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       code: 503020,
       httpCode: 503,
       message:
-        'Replicated state is not ready yet. Retry after the node finishes opening and synchronizing its stores.',
+        'Replicated state is not ready yet. Retry after the node finishes opening and synchronizing replicated state.',
     });
     await expect(
       registry.putDocument('communities', { id: 'community-1' }),

@@ -177,7 +177,7 @@ projected into the relevant document/keyvalue stores:
 - notifications;
 - community invites;
 - membership requests;
-- IPFS replication metadata.
+- content replication metadata.
 
 Community invite link state is represented by replicated domain events:
 
@@ -292,7 +292,7 @@ Remaining Mongo-backed areas to replace:
 - conversation pins and drafts;
 - community channel pins and drafts;
 - community moderation logs;
-- IPFS replication status summary;
+- content replication status summary;
 - processed-domain-event/idempotency guard;
 - link preview cache and rate limiter;
 - HTTP auth nonce storage;
@@ -336,7 +336,7 @@ Durability and replication classification:
   through an embedded node-local repository;
 - community moderation logs are product state and should use synchronized
   OrbitDB repositories;
-- IPFS replication metadata is synchronized product/runtime policy state.
+- content replication metadata is synchronized product/runtime policy state.
   Replication status summaries are persistent local derived views and should be
   stored in an embedded node-local repository or recomputed from OrbitDB/runtime
   state;

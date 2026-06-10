@@ -1,3 +1,4 @@
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Kernel from '@app/Kernel';
 import cron from 'node-cron';
 
@@ -6,6 +7,15 @@ import ScheduledExecutionError from '../errors/scheduler/ScheduledExecutionError
 import { CronExpression } from './SchedulerCronExpression';
 
 export default abstract class Scheduler {
+  private isReplicatedStateNotReady(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === ReplicatedStateNotReadyError.CODE
+    );
+  }
+
   private parseCronExpression(): string {
     const expression = this.getCronExpression();
 
@@ -40,6 +50,14 @@ export default abstract class Scheduler {
         Kernel.logger?.debug?.(`Scheduler: Executing ${this.getProcessName()}`);
         await this.execute();
       } catch (err: unknown) {
+        if (this.isReplicatedStateNotReady(err)) {
+          Kernel.logger?.debug?.(
+            `Scheduler: Skipping ${this.getProcessName()}; replicated state is not ready.`,
+          );
+
+          return;
+        }
+
         const errorMessage = err instanceof Error ? err.message : String(err);
         const error = new ScheduledExecutionError(
           `Error on ${this.getProcessName()}: ${errorMessage}`,

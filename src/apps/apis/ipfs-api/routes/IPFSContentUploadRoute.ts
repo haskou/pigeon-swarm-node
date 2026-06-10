@@ -1,5 +1,5 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import IPFSContentPublisher from '@app/contexts/ipfs-replication/application/publish-content/IPFSContentPublisher';
+import ContentPublisher from '@app/contexts/content-replication/application/publish-content/ContentPublisher';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request } from 'express';
@@ -9,7 +9,7 @@ export abstract class IPFSContentUploadRoute extends Route {
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   private readonly contentPublisher =
-    this.get<IPFSContentPublisher>(IPFSContentPublisher);
+    this.get<ContentPublisher>(ContentPublisher);
 
   protected async authenticate(request: Request): Promise<IdentityId> {
     return this.signedRequestAuthenticator.authenticate(request);
@@ -19,7 +19,7 @@ export abstract class IPFSContentUploadRoute extends Route {
     return Buffer.isBuffer(request.body) ? request.body : Buffer.from([]);
   }
 
-  protected publisher(): IPFSContentPublisher {
+  protected publisher(): ContentPublisher {
     return this.contentPublisher;
   }
 }

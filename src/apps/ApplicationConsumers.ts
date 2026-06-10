@@ -12,8 +12,8 @@ import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conve
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
-import RegisterIPFSReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicaClaimWhenClaimed';
-import RegisterIPFSContentReplicationWhenRegistered from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicationWhenRegistered';
+import RegisterContentReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed';
+import RegisterContentReplicationWhenRegistered from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicationWhenRegistered';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
@@ -44,8 +44,8 @@ export const applicationConsumers: ServiceClass<Consumer>[] = [
   RegisterCommunityChannelMessageEditionWhenAnnounced,
   RegisterCommunityReactionWhenAdded,
   RegisterCommunityReactionWhenRemoved,
-  RegisterIPFSReplicaClaimWhenClaimed,
-  RegisterIPFSContentReplicationWhenRegistered,
+  RegisterContentReplicaClaimWhenClaimed,
+  RegisterContentReplicationWhenRegistered,
   RegisterIdentityPresenceWhenUpdated,
   SendPushNotificationWhenConversationMessageSent,
   SendPushNotificationWhenCommunityMessageSent,

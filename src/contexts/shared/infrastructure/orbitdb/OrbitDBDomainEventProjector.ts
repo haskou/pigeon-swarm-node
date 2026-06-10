@@ -10,6 +10,8 @@ import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communi
 import { CommunityMembershipRequestWasDeclinedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasDeclinedEvent';
 import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
+import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
+import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
 import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
 import { ConversationMessageReactionWasRemovedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasRemovedEvent';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
@@ -19,8 +21,6 @@ import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/dom
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
-import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
-import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
@@ -486,11 +486,11 @@ export default class OrbitDBDomainEventProjector {
     });
   }
 
-  private async projectIPFSReplication(
+  private async projectContentReplication(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
-    await this.put(stores.ipfsReplication, {
+    await this.put(stores.contentReplication, {
       ...message.attributes,
       id: message.aggregate_id,
       lastEventId: message.event_id,
@@ -498,7 +498,7 @@ export default class OrbitDBDomainEventProjector {
     });
   }
 
-  private async projectIPFSReplicaClaim(
+  private async projectContentReplicaClaim(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
@@ -510,11 +510,11 @@ export default class OrbitDBDomainEventProjector {
       return;
     }
 
-    await this.put(stores.ipfsReplication, {
+    await this.put(stores.contentReplication, {
       ...message.attributes,
       cid,
       id: `${cid}:${networkId}:${nodeId}`,
-      kind: 'ipfs_content_replica_claim',
+      kind: 'content_replica_claim',
       lastEventId: message.event_id,
       receivedAt: this.receivedAt(message),
     });
@@ -607,12 +607,12 @@ export default class OrbitDBDomainEventProjector {
         project: () => this.projectInvite(stores, message),
       },
       {
-        eventNames: [IPFSContentReplicationWasRegisteredEvent.EVENT_NAME],
-        project: () => this.projectIPFSReplication(stores, message),
+        eventNames: [ContentReplicationWasRegisteredEvent.EVENT_NAME],
+        project: () => this.projectContentReplication(stores, message),
       },
       {
-        eventNames: [IPFSContentReplicationWasClaimedEvent.EVENT_NAME],
-        project: () => this.projectIPFSReplicaClaim(stores, message),
+        eventNames: [ContentReplicationWasClaimedEvent.EVENT_NAME],
+        project: () => this.projectContentReplicaClaim(stores, message),
       },
     ].find(({ eventNames }) => eventNames.includes(message.type));
 

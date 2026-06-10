@@ -1,5 +1,5 @@
-import IPFSContentGetter from '@app/contexts/ipfs-replication/application/get-content/IPFSContentGetter';
-import { IPFSContentGetMessage } from '@app/contexts/ipfs-replication/application/get-content/messages/IPFSContentGetMessage';
+import ContentGetter from '@app/contexts/content-replication/application/get-content/ContentGetter';
+import { ContentGetMessage } from '@app/contexts/content-replication/application/get-content/messages/ContentGetMessage';
 import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -8,7 +8,7 @@ import { Get, JsonController, Param, Res } from 'routing-controllers';
 
 @JsonController('/ipfs')
 export class GetIPFSContentRoute extends Route {
-  private readonly getter = this.get<IPFSContentGetter>(IPFSContentGetter);
+  private readonly getter = this.get<ContentGetter>(ContentGetter);
 
   private contentDisposition(filename: string): string {
     const asciiFilename = filename
@@ -24,7 +24,7 @@ export class GetIPFSContentRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     try {
-      const content = await this.getter.get(new IPFSContentGetMessage(cid));
+      const content = await this.getter.get(new ContentGetMessage(cid));
 
       if (content.kind === 'binary') {
         response.status(HttpRouteStatusEnum.OK).type(content.contentType);

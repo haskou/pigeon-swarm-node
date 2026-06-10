@@ -5,7 +5,7 @@ export type OrbitDBReplicatedStoreAddresses = {
   events: string;
   heads: string;
   identities: string;
-  ipfsReplication: string;
+  contentReplication: string;
   keychains: string;
   messages: string;
   moderationLogs: string;

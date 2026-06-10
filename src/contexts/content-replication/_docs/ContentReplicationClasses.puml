@@ -1,0 +1,57 @@
+@startuml ContentReplicationClasses
+title content replication context
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "content-replication/domain" {
+  class ContentReplication <<AggregateRoot>>
+  class ContentReplicaClaim <<Entity>>
+  class ContentReplicationPolicy <<DomainService>>
+  class ContentReplicationStatusSummary <<ReadModel>>
+
+  interface ContentReplicationRepository
+  interface ContentReplicationStatusSummaryRepository
+
+  class ContentReplicationWasRegisteredEvent <<DomainEvent>>
+  class ContentReplicationWasClaimedEvent <<DomainEvent>>
+}
+
+package "content-replication/application" {
+  class ContentReplicationRegistrar
+  class ContentReplicationMetadataRegistrar
+  class ContentReplicaClaimRegistrar
+  class ContentReplicationMaintainer
+  class ContentReplicationStatusFinder
+  class ContentReplicationStatusSummaryFinder
+  class ContentReplicationSummaryRefresher
+  class ContentReplicationStatusSummaryUpdater
+}
+
+package "content-replication/infrastructure" {
+  class OrbitDBContentReplicationRepository
+  class LocalContentReplicationStatusSummaryRepository
+  class LocalContentReplicationStatusSummaryDocument
+}
+
+ContentReplication *-- ContentReplicaClaim
+ContentReplicationPolicy ..> ContentReplication
+
+ContentReplication ..> ContentReplicationWasRegisteredEvent
+ContentReplication ..> ContentReplicationWasClaimedEvent
+
+ContentReplicationRegistrar ..> ContentReplicationRepository
+ContentReplicationMetadataRegistrar ..> ContentReplicationRepository
+ContentReplicaClaimRegistrar ..> ContentReplicationRepository
+ContentReplicationMaintainer ..> ContentReplicationPolicy
+ContentReplicationMaintainer ..> ContentReplicationRepository
+ContentReplicationStatusFinder ..> ContentReplicationRepository
+ContentReplicationStatusSummaryFinder ..> ContentReplicationStatusSummaryRepository
+ContentReplicationSummaryRefresher ..> ContentReplicationStatusSummaryRepository
+ContentReplicationStatusSummaryUpdater ..> ContentReplicationStatusSummaryRepository
+
+OrbitDBContentReplicationRepository ..|> ContentReplicationRepository
+LocalContentReplicationStatusSummaryRepository ..|> ContentReplicationStatusSummaryRepository
+LocalContentReplicationStatusSummaryRepository ..> LocalContentReplicationStatusSummaryDocument
+
+@enduml

@@ -8,7 +8,7 @@ export type OrbitDBReplicatedStoreSet = {
   events: OrbitDBDatabase;
   heads: OrbitDBDatabase;
   identities: OrbitDBDatabase;
-  ipfsReplication: OrbitDBDatabase;
+  contentReplication: OrbitDBDatabase;
   keychains: OrbitDBDatabase;
   messages: OrbitDBDatabase;
   moderationLogs: OrbitDBDatabase;

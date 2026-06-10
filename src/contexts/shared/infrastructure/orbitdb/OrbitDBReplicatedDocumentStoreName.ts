@@ -3,7 +3,7 @@ export type OrbitDBReplicatedDocumentStoreName =
   | 'communities'
   | 'conversations'
   | 'identities'
-  | 'ipfsReplication'
+  | 'contentReplication'
   | 'keychains'
   | 'messages'
   | 'moderationLogs'

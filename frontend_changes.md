@@ -4,8 +4,8 @@
 
 Backend no usa MongoDB como almacenamiento de producto. El estado compartido entre
 nodos se sirve desde OrbitDB replicado. Durante el arranque, o justo después de
-añadir una red, puede haber una ventana en la que las stores replicadas todavía
-no estén abiertas.
+añadir una red, puede haber una ventana en la que el estado replicado todavía
+no esté disponible.
 
 Cuando una ruta necesita estado replicado y ese estado no está listo, backend
 responde:
@@ -13,7 +13,7 @@ responde:
 ```json
 {
   "code": "ReplicatedStateNotReadyError",
-  "message": "Replicated state is not ready yet. Retry after the node finishes opening and synchronizing its stores."
+  "message": "Replicated state is not ready yet. Retry after the node finishes opening and synchronizing replicated state."
 }
 ```
 
@@ -35,7 +35,7 @@ Puede afectar a vistas que lean estado sincronizado:
 - mensajes, reacciones, pins y polls;
 - presencia y notification settings;
 - packs de stickers y librería de stickers;
-- estado de replicación IPFS sincronizado.
+- estado de replicación de contenido sincronizado.
 
 ## Local-Only State
 

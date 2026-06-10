@@ -53,7 +53,7 @@ export default class LocalNodeNetworkDataCleaner extends NodeNetworkDataCleaner 
     await this.networkRegistry.deleteNetwork(networkIdValue);
     await this.cleanPeers(networkIdValue);
     await this.database.deleteMany(
-      'ipfs_replication_status_summaries',
+      'content_replication_status_summaries',
       () => true,
     );
   }
