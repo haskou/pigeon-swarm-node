@@ -9,6 +9,7 @@ import {
   KeyPair,
   PrimitiveOf,
   Signature,
+  SymmetricKey,
   Timestamp,
   UniqueObjectArray,
 } from '@haskou/value-objects';
@@ -21,18 +22,45 @@ import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
 import { Profile } from './Profile';
 import { PreviousIdentityReference as PreviousReference } from './types/PreviousIdentityReference';
+import { EncryptedMasterKey } from './value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from './value-objects/IdentityVersion';
+import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 import { ProfileName } from './value-objects/ProfileName';
 
 export class Identity extends AggregateRoot {
   private readonly previousIdentityExternalIdentifier?: PreviousReference;
 
+  private static async createEncryptedMasterKey(password: Password): Promise<{
+    encryptedMasterKey: EncryptedMasterKey;
+    masterKeyDerivation: MasterKeyDerivation;
+  }> {
+    const masterKey = SymmetricKey.generate();
+    const salt = SymmetricKey.generate().valueOf();
+    const wrappingKey = await SymmetricKey.fromPasswordUsingOwasp(password, {
+      salt,
+    });
+
+    return {
+      encryptedMasterKey: new EncryptedMasterKey(
+        wrappingKey.encrypt(masterKey.valueOf()).valueOf(),
+      ),
+      masterKeyDerivation: new MasterKeyDerivation({
+        algorithm: 'scrypt-owasp',
+        encryptedPayloadScheme: 'symmetric',
+        salt,
+        version: 1,
+      }),
+    };
+  }
+
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
       new IdentityId(primitives.id),
       EncryptedKeyPair.fromPrimitives(primitives.encryptedKeyPair),
+      new EncryptedMasterKey(primitives.encryptedMasterKey),
+      MasterKeyDerivation.fromPrimitives(primitives.masterKeyDerivation),
       UniqueObjectArray.fromArray(
         primitives.networks.map((networkId) => new NetworkId(networkId)),
       ),
@@ -56,11 +84,16 @@ export class Identity extends AggregateRoot {
   ): Promise<Identity> {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const encryptedMasterKey =
+      await Identity.createEncryptedMasterKey(password);
     const primitiveEncryptedKeyPair = encryptedKeyPair.toPrimitives();
     const identityId = new IdentityId(primitiveEncryptedKeyPair.publicKey);
     const primitives: PrimitiveOf<Identity> = {
       encryptedKeyPair: primitiveEncryptedKeyPair,
+      encryptedMasterKey: encryptedMasterKey.encryptedMasterKey.valueOf(),
       id: identityId.valueOf(),
+      masterKeyDerivation:
+        encryptedMasterKey.masterKeyDerivation.toPrimitives(),
       networks: networks.map((networkId) => networkId.valueOf()),
       previousIdentityExternalIdentifier: undefined,
       profile: new Profile(
@@ -112,6 +145,8 @@ export class Identity extends AggregateRoot {
   constructor(
     private readonly id: IdentityId,
     private readonly encryptedKeyPair: EncryptedKeyPair,
+    private readonly encryptedMasterKey: EncryptedMasterKey,
+    private readonly masterKeyDerivation: MasterKeyDerivation,
     private readonly networks: UniqueObjectArray<NetworkId>,
     private profile: Profile,
     private timestamp: Timestamp,
@@ -229,7 +264,9 @@ export class Identity extends AggregateRoot {
   public toPrimitives() {
     return {
       encryptedKeyPair: this.encryptedKeyPair.toPrimitives(),
+      encryptedMasterKey: this.encryptedMasterKey.valueOf(),
       id: this.id.valueOf(),
+      masterKeyDerivation: this.masterKeyDerivation.toPrimitives(),
       networks: this.networks.toArray().map((networkId) => networkId.valueOf()),
       previousIdentityExternalIdentifier:
         this.previousIdentityExternalIdentifier?.valueOf(),

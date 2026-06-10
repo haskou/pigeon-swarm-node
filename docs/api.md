@@ -1040,11 +1040,16 @@ Response:
 {
   "id": "<identityId>",
   "identityExternalIdentifier": "<currentIdentityCid>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<encryptedPrivateKey>"
-  },
-  "networks": ["<networkId>"],
+	  "encryptedKeyPair": {
+	    "publicKey": "<publicKeyPem>",
+	    "encryptedPrivateKey": "<encryptedPrivateKey>"
+	  },
+	  "encryptedMasterKey": "<encryptedMasterKey>",
+	  "masterKeyDerivation": {
+	    "algorithm": "<clientDerivationAlgorithm>",
+	    "version": 1
+	  },
+	  "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
     "handle": "alice",
@@ -1083,11 +1088,16 @@ Client-signed request:
 ```json
 {
   "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<encryptedPrivateKey>"
-  },
-  "networks": ["<networkId>"],
+	  "encryptedKeyPair": {
+	    "publicKey": "<publicKeyPem>",
+	    "encryptedPrivateKey": "<encryptedPrivateKey>"
+	  },
+	  "encryptedMasterKey": "<encryptedMasterKey>",
+	  "masterKeyDerivation": {
+	    "algorithm": "<clientDerivationAlgorithm>",
+	    "version": 1
+	  },
+	  "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
     "handle": "alice"
@@ -1102,6 +1112,8 @@ Implemented:
 
 - keep the legacy password-based creation flow for local clients
 - accept client-generated encrypted keypairs and signed identity candidates
+- accept client-generated encrypted master keys and client-controlled master key
+  derivation metadata as signed opaque identity fields
 - keep client passwords out of the backend in the client-signed flow
 - store `profile.handle` as part of the signed identity profile
 - normalize handles to lowercase
@@ -1120,7 +1132,12 @@ Client-signed identity signatures must cover the canonical identity payload:
 ```json
 {
   "encryptedKeyPair": "<encryptedKeyPair>",
+  "encryptedMasterKey": "<encryptedMasterKey>",
   "id": "<identityId>",
+  "masterKeyDerivation": {
+    "algorithm": "<clientDerivationAlgorithm>",
+    "version": 1
+  },
   "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": null,
   "profile": {
@@ -1149,11 +1166,16 @@ Request:
 ```json
 {
   "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<encryptedPrivateKey>"
-  },
-  "networks": ["<networkId>"],
+	  "encryptedKeyPair": {
+	    "publicKey": "<publicKeyPem>",
+	    "encryptedPrivateKey": "<encryptedPrivateKey>"
+	  },
+	  "encryptedMasterKey": "<encryptedMasterKey>",
+	  "masterKeyDerivation": {
+	    "algorithm": "<clientDerivationAlgorithm>",
+	    "version": 1
+	  },
+	  "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": "<previousIdentityCid>",
   "profile": {
     "name": "Alice Updated",

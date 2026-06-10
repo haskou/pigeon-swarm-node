@@ -38,6 +38,14 @@ export class PostIdentityBody {
   };
 
   @IsOptional()
+  @IsString()
+  public readonly encryptedMasterKey?: string;
+
+  @IsOptional()
+  @IsObject()
+  public readonly masterKeyDerivation?: Record<string, unknown>;
+
+  @IsOptional()
   @IsObject()
   public readonly profile?: {
     banner?: string;

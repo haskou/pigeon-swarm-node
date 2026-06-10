@@ -19,11 +19,13 @@ Feature: Post identity route
       """
     When I POST to "/identities/"
     Then response code is equal to 200
-    And response contains a valid resource with the following fields
-      | profile.name | alice                                |
-      | profile.handle | alice                              |
-      | networks[0]  | 123e4567-e89b-12d3-a456-426614174000 |
-    And response body should contain "identityExternalIdentifier"
+	    And response contains a valid resource with the following fields
+	      | profile.name | alice                                |
+	      | profile.handle | alice                              |
+	      | networks[0]  | 123e4567-e89b-12d3-a456-426614174000 |
+	    And response body should contain "encryptedMasterKey"
+	    And response body should contain "masterKeyDerivation"
+	    And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
     When I GET the created identity
     Then response code is equal to 200
@@ -44,11 +46,13 @@ Feature: Post identity route
     And I set a client-signed identity body with name "bob" and handle "bob"
     When I POST to "/identities/"
     Then response code is equal to 200
-    And response contains a valid resource with the following fields
-      | profile.name   | bob                                  |
-      | profile.handle | bob                                  |
-      | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
-    And response body should contain "identityExternalIdentifier"
+	    And response contains a valid resource with the following fields
+	      | profile.name   | bob                                  |
+	      | profile.handle | bob                                  |
+	      | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
+	    And response body should contain "encryptedMasterKey"
+	    And response body should contain "masterKeyDerivation"
+	    And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
     When I GET "/identities/bob"
     Then response code is equal to 200

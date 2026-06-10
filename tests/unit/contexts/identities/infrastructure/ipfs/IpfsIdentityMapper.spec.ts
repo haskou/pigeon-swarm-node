@@ -36,6 +36,8 @@ describe('IpfsIdentityMapper', () => {
       const document: IpfsIdentityDocument = {
         _id: primitives.id,
         encryptedKeyPair: primitives.encryptedKeyPair,
+        encryptedMasterKey: primitives.encryptedMasterKey,
+        masterKeyDerivation: primitives.masterKeyDerivation,
         networks: primitives.networks,
         previousCid: primitives.previousIdentityExternalIdentifier,
         profile: primitives.profile,

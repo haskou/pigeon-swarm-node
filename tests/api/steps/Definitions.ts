@@ -225,10 +225,15 @@ export default class Definitions {
       name,
       picture: undefined,
     };
-    const signaturePayload = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      id: ownerIdentityId.valueOf(),
-      networks,
+	    const signaturePayload = {
+	      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+	      encryptedMasterKey: 'v1.test.encrypted-master-key',
+	      id: ownerIdentityId.valueOf(),
+	      masterKeyDerivation: {
+	        algorithm: 'test',
+	        version: 1,
+	      },
+	      networks,
       previousIdentityExternalIdentifier,
       profile,
       timestamp: 1773848829055 + version,

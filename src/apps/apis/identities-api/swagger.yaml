@@ -124,6 +124,8 @@ components:
       required:
         - id
         - encryptedKeyPair
+        - encryptedMasterKey
+        - masterKeyDerivation
         - networks
         - profile
         - timestamp
@@ -142,6 +144,13 @@ components:
               type: string
             publicKey:
               type: string
+        encryptedMasterKey:
+          type: string
+          description: Opaque encrypted identity master key. Backend stores and signs it but does not decrypt it.
+        masterKeyDerivation:
+          type: object
+          additionalProperties: true
+          description: Opaque client-controlled derivation metadata required to decrypt encryptedMasterKey.
         networks:
           type: array
           description: Identity networks. Signed updates may add networks but cannot remove existing ones.
@@ -190,6 +199,8 @@ components:
       required:
         - id
         - encryptedKeyPair
+        - encryptedMasterKey
+        - masterKeyDerivation
         - profile
         - networks
         - timestamp
@@ -211,6 +222,18 @@ components:
             publicKey:
               type: string
               example: -----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=\n-----END PUBLIC KEY-----\n
+        encryptedMasterKey:
+          type: string
+          description: Opaque encrypted identity master key. The backend never decrypts it.
+          example: v1.aes-gcm.exampleEncryptedMasterKey
+        masterKeyDerivation:
+          type: object
+          additionalProperties: true
+          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey.
+          example:
+            algorithm: argon2id
+            version: 1
+            salt: base64urlSalt
         networks:
           type: array
           items:

@@ -44,6 +44,12 @@ describe('Identity', () => {
       expect(primitives.encryptedKeyPair).toEqual(
         mother.encryptedKeyPair.toPrimitives(),
       );
+      expect(primitives.encryptedMasterKey).toBe(
+        mother.encryptedMasterKey.valueOf(),
+      );
+      expect(primitives.masterKeyDerivation).toEqual(
+        mother.masterKeyDerivation.toPrimitives(),
+      );
     });
 
     it('should create an identity from valid primitives', () => {
@@ -74,6 +80,35 @@ describe('Identity', () => {
       const tampered: PrimitiveOf<Identity> = {
         ...primitives,
         version: primitives.version + 1,
+      };
+
+      expect(() => Identity.fromPrimitives(tampered)).toThrow(
+        InvalidIdentitySignatureError,
+      );
+    });
+
+    it('should throw InvalidIdentitySignatureError when encrypted master key is tampered', () => {
+      const identity = mother.build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        encryptedMasterKey: 'tampered-encrypted-master-key',
+      };
+
+      expect(() => Identity.fromPrimitives(tampered)).toThrow(
+        InvalidIdentitySignatureError,
+      );
+    });
+
+    it('should throw InvalidIdentitySignatureError when master key derivation is tampered', () => {
+      const identity = mother.build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        masterKeyDerivation: {
+          ...primitives.masterKeyDerivation,
+          version: 2,
+        },
       };
 
       expect(() => Identity.fromPrimitives(tampered)).toThrow(
@@ -134,7 +169,9 @@ describe('Identity', () => {
 
       expect(identity.toPrimitives()).toEqual({
         encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),
+        encryptedMasterKey: mother.encryptedMasterKey.valueOf(),
         id: mother.id.valueOf(),
+        masterKeyDerivation: mother.masterKeyDerivation.toPrimitives(),
         networks: mother.networks.map((network) => network.valueOf()),
         previousIdentityExternalIdentifier:
           mother.previousIdentityExternalIdentifier?.valueOf(),
