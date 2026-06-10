@@ -1,4 +1,4 @@
-import { CallEnder } from '@app/contexts/calls/application/end-call/CallEnder';
+import CallEnder from '@app/contexts/calls/application/end-call/CallEnder';
 import { CallEndMessage } from '@app/contexts/calls/application/end-call/messages/CallEndMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';

@@ -190,6 +190,8 @@ services:
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb05vZGVQZWVyUmVwb3NpdG9yeV9fTW9uZ29Ob2RlUGVlclJlcG9zaXRvcnk=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb05vZGVNZXRhZGF0YVJlcG9zaXRvcnlfX01vbmdvTm9kZU1ldGFkYXRhUmVwb3NpdG9yeQ==
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19zZXJ2aWNlc19fTm9kZU5ldHdvcmtEYXRhQ2xlYW5lcl9fTm9kZU5ldHdvcmtEYXRhQ2xlYW5lcg==: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb05vZGVOZXR3b3JrRGF0YUNsZWFuZXJfX01vbmdvTm9kZU5ldHdvcmtEYXRhQ2xlYW5lcg==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19tYXBwZXJzX19Nb25nb05vZGVNZXRhZGF0YU1hcHBlcl9fTW9uZ29Ob2RlTWV0YWRhdGFNYXBwZXI=:
     class: /contexts/nodes/infrastructure/mongo/mappers/MongoNodeMetadataMapper
     arguments: []
@@ -215,12 +217,8 @@ services:
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1BvbGxSZXBvc2l0b3J5X19Nb25nb1BvbGxSZXBvc2l0b3J5
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19Nb25nb0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19maW5kLXZhcGlkLXB1YmxpYy1rZXlfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXJfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXI=:
-    class: >-
-      /contexts/push-notifications/application/find-vapid-public-key/PushVapidConfigurationReader
-    arguments: []
-    abstract: true
-    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19maW5kLXZhcGlkLXB1YmxpYy1rZXlfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXJfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXI=: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2luZnJhc3RydWN0dXJlX193ZWItcHVzaF9fUHVzaFZhcGlkQ29uZmlndXJhdGlvbl9fUHVzaFZhcGlkQ29uZmlndXJhdGlvbg==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19zZW5kX19QdXNoTm90aWZpY2F0aW9uRGVsaXZlcnlfX1B1c2hOb3RpZmljYXRpb25EZWxpdmVyeQ==: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2luZnJhc3RydWN0dXJlX193ZWItcHVzaF9fV2ViUHVzaE5vdGlmaWNhdGlvbkRlbGl2ZXJ5X19XZWJQdXNoTm90aWZpY2F0aW9uRGVsaXZlcnk=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19QdXNoU3Vic2NyaXB0aW9uUmVwb3NpdG9yeV9fUHVzaFN1YnNjcmlwdGlvblJlcG9zaXRvcnk=: >-
@@ -250,16 +248,10 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5:
-    class: /contexts/stickers/domain/repositories/StickerPackRepository
-    arguments: []
-    abstract: true
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnk=:
-    class: /contexts/stickers/domain/repositories/StickerUserLibraryRepository
-    arguments: []
-    abstract: true
-    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnk=: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19BZ2dyZWdhdGVSb290X19BZ2dyZWdhdGVSb290:
     class: /shared/domain/AggregateRoot
     arguments: []
@@ -269,11 +261,6 @@ services:
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2RlcGVuZGVuY3lJbmplY3Rpb25fX0RlcGVuZGVuY3lJbmplY3Rpb25fX0RlcGVuZGVuY3lJbmplY3Rpb24=:
-    class: /shared/infrastructure/dependencyInjection/DependencyInjection
-    arguments: []
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2V4cHJlc3NfX1NlcnZlcl9fU2VydmVy:
     class: /shared/infrastructure/express/Server
     arguments: []
@@ -351,6 +338,35 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3N5bmNocm9uaXplcnNfX05vZGVTdGFydHVwU3luY2hyb25pemVyX19Ob2RlU3RhcnR1cFN5bmNocm9uaXplcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2ZpbmQtYWN0aXZlLWNhbGxzX19BY3RpdmVDYWxsc0ZpbmRlcl9fQWN0aXZlQ2FsbHNGaW5kZXI=:
+    class: /contexts/calls/application/find-active-calls/ActiveCallsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2ZpbmQtY2FsbF9fQ2FsbEZpbmRlcl9fQ2FsbEZpbmRlcg==:
+    class: /contexts/calls/application/find-call/CallFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2ZpbmQtY2FsbC1oaXN0b3J5X19DYWxsSGlzdG9yeUZpbmRlcl9fQ2FsbEhpc3RvcnlGaW5kZXI=:
+    class: /contexts/calls/application/find-call-history/CallHistoryFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3JlY29yZC1wYXJ0aWNpcGFudC1oZWFydGJlYXRfX0NhbGxQYXJ0aWNpcGFudEhlYXJ0YmVhdFJlY29yZGVyX19DYWxsUGFydGljaXBhbnRIZWFydGJlYXRSZWNvcmRlcg==:
+    class: >-
+      /contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==:
@@ -486,6 +502,14 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2FwcGxpY2F0aW9uX19maW5kX19Ob3RpZmljYXRpb25TZXR0aW5nc0ZpbmRlcl9fTm90aWZpY2F0aW9uU2V0dGluZ3NGaW5kZXI=:
+    class: >-
+      /contexts/notification-settings/application/find/NotificationSettingsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uU2NvcGVTZXR0aW5nc1JlcG9zaXRvcnk=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2FwcGxpY2F0aW9uX19zaG91bGQtZGVsaXZlcl9fTm90aWZpY2F0aW9uRGVsaXZlcnlQcmVmZXJlbmNlQ2hlY2tlcl9fTm90aWZpY2F0aW9uRGVsaXZlcnlQcmVmZXJlbmNlQ2hlY2tlcg==:
     class: >-
       /contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker
@@ -530,6 +554,21 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19maW5kLXZhcGlkLXB1YmxpYy1rZXlfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXJfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXI=
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19yZWdpc3Rlcl9fUHVzaFN1YnNjcmlwdGlvblJlZ2lzdHJhcl9fUHVzaFN1YnNjcmlwdGlvblJlZ2lzdHJhcg==:
+    class: >-
+      /contexts/push-notifications/application/register/PushSubscriptionRegistrar
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19QdXNoU3Vic2NyaXB0aW9uUmVwb3NpdG9yeV9fUHVzaFN1YnNjcmlwdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19yZW1vdmVfX1B1c2hTdWJzY3JpcHRpb25SZW1vdmVyX19QdXNoU3Vic2NyaXB0aW9uUmVtb3Zlcg==:
+    class: /contexts/push-notifications/application/remove/PushSubscriptionRemover
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19QdXNoU3Vic2NyaXB0aW9uUmVwb3NpdG9yeV9fUHVzaFN1YnNjcmlwdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2luZnJhc3RydWN0dXJlX193ZWItcHVzaF9fV2ViUHVzaE5vdGlmaWNhdGlvbkRlbGl2ZXJ5X19XZWJQdXNoTm90aWZpY2F0aW9uRGVsaXZlcnk=:
     class: >-
       /contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery
@@ -543,6 +582,41 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCRG9tYWluRXZlbnRQcm9qZWN0b3JfX09yYml0REJEb21haW5FdmVudFByb2plY3Rvcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2FkZC1zdGlja2VyX19TdGlja2VyQWRkZXJfX1N0aWNrZXJBZGRlcg==:
+    class: /contexts/stickers/application/add-sticker/StickerAdder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2ZpbmQtbGlicmFyeV9fU3RpY2tlclVzZXJMaWJyYXJ5RmluZGVyX19TdGlja2VyVXNlckxpYnJhcnlGaW5kZXI=:
+    class: /contexts/stickers/application/find-library/StickerUserLibraryFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2ZpbmQtcGFja3NfX1N0aWNrZXJQYWNrc0ZpbmRlcl9fU3RpY2tlclBhY2tzRmluZGVy:
+    class: /contexts/stickers/application/find-packs/StickerPacksFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2ZvcmdldC1wYWNrX19TdGlja2VyUGFja0ZvcmdldHRlcl9fU3RpY2tlclBhY2tGb3JnZXR0ZXI=:
+    class: /contexts/stickers/application/forget-pack/StickerPackForgetter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX3VuZmF2b3JpdGUtc3RpY2tlcl9fU3RpY2tlclVuZmF2b3JpdGVyX19TdGlja2VyVW5mYXZvcml0ZXI=:
+    class: /contexts/stickers/application/unfavorite-sticker/StickerUnfavoriter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2Vycm9yc19fc2VjdXJpdHlfX0RvbWFpbkRvZXNOb3RFeGlzdEVycm9yX19Eb21haW5Eb2VzTm90RXhpc3RFcnJvcg==:
@@ -653,7 +727,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19NZXNzYWdlU2lnbmF0dXJlU2VydmljZQ==
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0lQRlNSZXBsaWNhdGlvbk1haW50ZW5hbmNlU2NoZWR1bGVyX19JUEZTUmVwbGljYXRpb25NYWludGVuYW5jZVNjaGVkdWxlcg==:
@@ -689,6 +763,51 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19JUEZTX19JUEZT
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2VuZC1jYWxsX19DYWxsRW5kZXJfX0NhbGxFbmRlcg==:
+    class: /contexts/calls/application/end-call/CallEnder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2pvaW4tY2FsbF9fQ2FsbEpvaW5lcl9fQ2FsbEpvaW5lcg==:
+    class: /contexts/calls/application/join-call/CallJoiner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2xlYXZlLWNhbGxfX0NhbGxMZWF2ZXJfX0NhbGxMZWF2ZXI=:
+    class: /contexts/calls/application/leave-call/CallLeaver
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3NlbmQtc2lnbmFsX19DYWxsU2lnbmFsU2VuZGVyX19DYWxsU2lnbmFsU2VuZGVy:
+    class: /contexts/calls/application/send-signal/CallSignalSender
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3N0YXJ0LWNhbGxfX0NhbGxTY29wZVJlc29sdmVyX19DYWxsU2NvcGVSZXNvbHZlcg==:
+    class: /contexts/calls/application/start-call/CallScopeResolver
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb0NhbGxSZXBvc2l0b3J5X19Nb25nb0NhbGxSZXBvc2l0b3J5:
     class: /contexts/calls/infrastructure/mongo/MongoCallRepository
     arguments:
@@ -699,6 +818,15 @@ services:
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZS1jb21tdW5pdHlfX0NvbW11bml0eUNyZWF0b3JfX0NvbW11bml0eUNyZWF0b3I=:
     class: /contexts/communities/application/create-community/CommunityCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3VwZGF0ZS1wcm9maWxlX19Db21tdW5pdHlQcm9maWxlVXBkYXRlcl9fQ29tbXVuaXR5UHJvZmlsZVVwZGF0ZXI=:
+    class: /contexts/communities/application/update-profile/CommunityProfileUpdater
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
@@ -1007,6 +1135,26 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVQZWVyUmVwb3NpdG9yeV9fTm9kZVBlZXJSZXBvc2l0b3J5
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2FwcGxpY2F0aW9uX19yZXNldF9fTm90aWZpY2F0aW9uU2NvcGVTZXR0aW5nc1Jlc2V0dGVyX19Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzUmVzZXR0ZXI=:
+    class: >-
+      /contexts/notification-settings/application/reset/NotificationScopeSettingsResetter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uU2NvcGVTZXR0aW5nc1JlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2FwcGxpY2F0aW9uX191cGRhdGVfX05vdGlmaWNhdGlvblNjb3BlU2V0dGluZ3NVcGRhdGVyX19Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzVXBkYXRlcg==:
+    class: >-
+      /contexts/notification-settings/application/update/NotificationScopeSettingsUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uU2NvcGVTZXR0aW5nc1JlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2luZnJhc3RydWN0dXJlX19tb25nb19fTW9uZ29Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzUmVwb3NpdG9yeV9fTW9uZ29Ob3RpZmljYXRpb25TY29wZVNldHRpbmdzUmVwb3NpdG9yeQ==:
     class: >-
       /contexts/notification-settings/infrastructure/mongo/MongoNotificationScopeSettingsRepository
@@ -1041,7 +1189,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVzc2FnZVJlcG9zaXRvcnk=
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fYXBwbGljYXRpb25fX3Jlc29sdmUtc2NvcGVfX1BvbGxTY29wZUFjY2Vzc1Jlc29sdmVyX19Qb2xsU2NvcGVBY2Nlc3NSZXNvbHZlcg==:
@@ -1094,6 +1242,24 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19oZWxpYV9fSVBGU0NvbnRlbnRSYWNlcl9fSVBGU0NvbnRlbnRSYWNlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2Zhdm9yaXRlLXN0aWNrZXJfX1N0aWNrZXJGYXZvcml0ZXJfX1N0aWNrZXJGYXZvcml0ZXI=:
+    class: /contexts/stickers/application/favorite-sticker/StickerFavoriter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX3JlY29yZC1zdGlja2VyLXVzZV9fU3RpY2tlclVzZVJlY29yZGVyX19TdGlja2VyVXNlUmVjb3JkZXI=:
+    class: /contexts/stickers/application/record-sticker-use/StickerUseRecorder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=:
@@ -1383,6 +1549,17 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3N0YXJ0LWNhbGxfX0NhbGxTdGFydGVyX19DYWxsU3RhcnRlcg==:
+    class: /contexts/calls/application/start-call/CallStarter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3N0YXJ0LWNhbGxfX0NhbGxTY29wZVJlc29sdmVyX19DYWxsU2NvcGVSZXNvbHZlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDb21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnlfX09yYml0REJDb21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnk=:
     class: >-
       /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository
@@ -1658,6 +1835,16 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb05vZGVOZXR3b3JrRGF0YUNsZWFuZXJfX01vbmdvTm9kZU5ldHdvcmtEYXRhQ2xlYW5lcg==:
+    class: /contexts/nodes/infrastructure/mongo/MongoNodeNetworkDataCleaner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21vbmdvZGJfX01vbmdvREJfX01vbmdvREI=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
+    abstract: false
+    parent: >-
+      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19zZXJ2aWNlc19fTm9kZU5ldHdvcmtEYXRhQ2xlYW5lcl9fTm9kZU5ldHdvcmtEYXRhQ2xlYW5lcg==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb25zX19pbmZyYXN0cnVjdHVyZV9fbW9uZ29fX01vbmdvTm90aWZpY2F0aW9uUmVwb3NpdG9yeV9fTW9uZ29Ob3RpZmljYXRpb25SZXBvc2l0b3J5:
     class: /contexts/notifications/infrastructure/mongo/MongoNotificationRepository
     arguments:
@@ -1713,6 +1900,28 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2NyZWF0ZS1wYWNrX19TdGlja2VyUGFja0NyZWF0b3JfX1N0aWNrZXJQYWNrQ3JlYXRvcg==:
+    class: /contexts/stickers/application/create-pack/StickerPackCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX3NhdmUtcGFja19fU3RpY2tlclBhY2tTYXZlcl9fU3RpY2tlclBhY2tTYXZlcg==:
+    class: /contexts/stickers/application/save-pack/StickerPackSaver
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fTW9uZ29TdGlja2VyUGFja1JlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX21vbmdvX19Nb25nb1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX01vbmdvU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=:
     class: /shared/infrastructure/messageBus/MessageBus
     arguments:
@@ -1735,6 +1944,19 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3JlY29yZC1oZWFydGJlYXRfX0lkZW50aXR5UHJlc2VuY2VIZWFydGJlYXRSZWNvcmRlcl9fSWRlbnRpdHlQcmVzZW5jZUhlYXJ0YmVhdFJlY29yZGVy
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdGZXRjaGVyX19MaW5rUHJldmlld0ZldGNoZXI=:
+    class: /apps/apis/link-previews-api/services/LinkPreviewFetcher
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdDYWNoZVJlcG9zaXRvcnlfX0xpbmtQcmV2aWV3Q2FjaGVSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdVcmxHdWFyZF9fTGlua1ByZXZpZXdVcmxHdWFyZA==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdIdHRwRmV0Y2hlcl9fTGlua1ByZXZpZXdIdHRwRmV0Y2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdIdG1sUGFyc2VyX19MaW5rUHJldmlld0h0bWxQYXJzZXI=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fUmVnaXN0ZXJDb21tdW5pdHlDaGFubmVsTWVzc2FnZUVkaXRpb25XaGVuQW5ub3VuY2VkX19SZWdpc3RlckNvbW11bml0eU1lc3NhZ2VFZGl0aW9u:
     class: >-
       /apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced
@@ -1744,7 +1966,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eU1lc3NhZ2VSZWdpc3RyYXI=
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlQ2FuZGlkYXRlUmVnaXN0cmFy
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
@@ -1757,7 +1979,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eU1lc3NhZ2VSZWdpc3RyYXI=
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlQ2FuZGlkYXRlUmVnaXN0cmFy
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
@@ -1914,7 +2136,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19NZXNzYWdlU2lnbmF0dXJlU2VydmljZQ==
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
@@ -2130,7 +2352,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2FwcGxpY2F0aW9uX19zeW5jX19TeW5jUmVzcG9uc2VTdXBwcmVzc2lvblRyYWNrZXJfX1N5bmNSZXNwb25zZVN1cHByZXNzaW9uVHJhY2tlcg==
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eU1lc3NhZ2VSZWdpc3RyYXI=
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlQ2FuZGlkYXRlUmVnaXN0cmFy
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
@@ -2160,6 +2382,50 @@ services:
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19oZWxpYV9fSVBGU0NvbnRlbnRSYWNlcl9fSVBGU0NvbnRlbnRSYWNlcg==:
     class: /contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer
     arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdDYWNoZVJlcG9zaXRvcnlfX0xpbmtQcmV2aWV3Q2FjaGVSZXBvc2l0b3J5:
+    class: /apps/apis/link-previews-api/services/LinkPreviewCacheRepository
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21vbmdvZGJfX01vbmdvREJfX01vbmdvREI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdVcmxHdWFyZF9fTGlua1ByZXZpZXdVcmxHdWFyZA==:
+    class: /apps/apis/link-previews-api/services/LinkPreviewUrlGuard
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdIdHRwRmV0Y2hlcl9fTGlua1ByZXZpZXdIdHRwRmV0Y2hlcg==:
+    class: /apps/apis/link-previews-api/services/LinkPreviewHttpFetcher
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdVcmxHdWFyZF9fTGlua1ByZXZpZXdVcmxHdWFyZA==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdIdG1sUGFyc2VyX19MaW5rUHJldmlld0h0bWxQYXJzZXI=:
+    class: /apps/apis/link-previews-api/services/LinkPreviewHtmlParser
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdSYXRlTGltaXRlcl9fTGlua1ByZXZpZXdSYXRlTGltaXRlcg==:
+    class: /apps/apis/link-previews-api/services/LinkPreviewRateLimiter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21vbmdvZGJfX01vbmdvREJfX01vbmdvREI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2luZnJhc3RydWN0dXJlX193ZWItcHVzaF9fUHVzaFZhcGlkQ29uZmlndXJhdGlvbl9fUHVzaFZhcGlkQ29uZmlndXJhdGlvbg==:
+    class: >-
+      /contexts/push-notifications/infrastructure/web-push/PushVapidConfiguration
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2NhbGxzLWFwaV9fQ2FsbFNpZ25hbFJhdGVMaW1pdGVyX19DYWxsU2lnbmFsUmF0ZUxpbWl0ZXI=:
+    class: /apps/apis/calls-api/CallSignalRateLimiter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21vbmdvZGJfX01vbmdvREJfX01vbmdvREI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNBZGFwdGVyX19NZXNzYWdlQnVzQWRhcHRlcg==: >-

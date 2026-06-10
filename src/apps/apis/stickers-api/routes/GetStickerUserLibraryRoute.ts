@@ -1,5 +1,5 @@
 import { StickerUserLibraryFindMessage } from '@app/contexts/stickers/application/find-library/messages/StickerUserLibraryFindMessage';
-import { StickerUserLibraryFinder } from '@app/contexts/stickers/application/find-library/StickerUserLibraryFinder';
+import StickerUserLibraryFinder from '@app/contexts/stickers/application/find-library/StickerUserLibraryFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';

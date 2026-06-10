@@ -3,7 +3,7 @@ import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import MessageSignatureService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -23,7 +23,8 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     private readonly eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
-    private readonly signatureService: MessageSignatureService,
+    // eslint-disable-next-line max-len
+    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
   ) {
     super(eventConsumer);
   }

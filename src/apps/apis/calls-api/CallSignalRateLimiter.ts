@@ -6,7 +6,7 @@ import { CallSignalRateLimitDocument } from './CallSignalRateLimitDocument';
 import { CallSignalRatePolicy } from './CallSignalRatePolicy';
 import { CallSignalRateLimitExceededError } from './errors/CallSignalRateLimitExceededError';
 
-export class CallSignalRateLimiter {
+export default class CallSignalRateLimiter {
   private static readonly COLLECTION = 'call_signal_rate_limits';
 
   private readonly policy: CallSignalRatePolicy;

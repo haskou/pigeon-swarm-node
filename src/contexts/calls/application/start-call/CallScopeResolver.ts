@@ -6,7 +6,7 @@ import { InvalidCallScopeError } from '../../domain/errors/InvalidCallScopeError
 import { CallStartMessage } from './messages/CallStartMessage';
 import { ResolvedCallScope } from './ResolvedCallScope';
 
-export class CallScopeResolver {
+export default class CallScopeResolver {
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly communityRepository: CommunityRepository,

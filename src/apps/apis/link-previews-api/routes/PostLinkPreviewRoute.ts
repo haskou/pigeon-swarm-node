@@ -5,7 +5,7 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostLinkPreviewBody } from '../bodies/PostLinkPreviewBody';
-import { LinkPreviewFetcher } from '../services/LinkPreviewFetcher';
+import LinkPreviewFetcher from '../services/LinkPreviewFetcher';
 import { LinkPreviewRateLimiter } from '../services/LinkPreviewRateLimiter';
 
 @JsonController('/link-previews')

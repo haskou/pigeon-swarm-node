@@ -1,12 +1,12 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { StickerAddMessage } from '@app/contexts/stickers/application/add-sticker/messages/StickerAddMessage';
-import { StickerAdder } from '@app/contexts/stickers/application/add-sticker/StickerAdder';
+import StickerAdder from '@app/contexts/stickers/application/add-sticker/StickerAdder';
 import { StickerPackCreateMessage } from '@app/contexts/stickers/application/create-pack/messages/StickerPackCreateMessage';
-import { StickerPackCreator } from '@app/contexts/stickers/application/create-pack/StickerPackCreator';
+import StickerPackCreator from '@app/contexts/stickers/application/create-pack/StickerPackCreator';
 import { StickerFavoriteMessage } from '@app/contexts/stickers/application/favorite-sticker/messages/StickerFavoriteMessage';
-import { StickerFavoriter } from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
+import StickerFavoriter from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
 import { StickerUseRecordMessage } from '@app/contexts/stickers/application/record-sticker-use/messages/StickerUseRecordMessage';
-import { StickerUseRecorder } from '@app/contexts/stickers/application/record-sticker-use/StickerUseRecorder';
+import StickerUseRecorder from '@app/contexts/stickers/application/record-sticker-use/StickerUseRecorder';
 import StickerPackRepository from '@app/contexts/stickers/domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '@app/contexts/stickers/domain/repositories/StickerUserLibraryRepository';
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';

@@ -7,7 +7,7 @@ import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerPackCreateMessage } from './messages/StickerPackCreateMessage';
 import { StickerUserLibraryLookup } from './types/StickerUserLibraryLookup';
 
-export class StickerPackCreator {
+export default class StickerPackCreator {
   constructor(
     private readonly packRepository: StickerPackRepository,
     private readonly libraryRepository: StickerUserLibraryRepository,

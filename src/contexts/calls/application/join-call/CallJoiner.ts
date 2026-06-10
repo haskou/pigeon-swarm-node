@@ -5,7 +5,7 @@ import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import { CallJoinMessage } from './messages/CallJoinMessage';
 
-export class CallJoiner {
+export default class CallJoiner {
   constructor(
     private readonly repository: CallRepository,
     private readonly eventPublisher: DomainEventPublisher,

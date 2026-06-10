@@ -5,7 +5,7 @@ import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain
 import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
-import MessageSignatureService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
@@ -19,7 +19,8 @@ import { assert, Signature, Timestamp } from '@haskou/value-objects';
 export default class CommunityChannelMessageCandidateRegistrar {
   constructor(
     private readonly messageRepository: CommunityChannelMessageRepository,
-    private readonly signatureService: MessageSignatureService,
+    // eslint-disable-next-line max-len
+    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
   ) {}
 
   private sameCommunity(

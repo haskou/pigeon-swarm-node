@@ -1,5 +1,5 @@
 import { StickerPackSaveMessage } from '@app/contexts/stickers/application/save-pack/messages/StickerPackSaveMessage';
-import { StickerPackSaver } from '@app/contexts/stickers/application/save-pack/StickerPackSaver';
+import StickerPackSaver from '@app/contexts/stickers/application/save-pack/StickerPackSaver';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';

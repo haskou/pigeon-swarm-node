@@ -1,6 +1,6 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMetadata';
-import CommunityMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 
@@ -9,7 +9,8 @@ import { PollTimelineMessageRegisterMessage } from './messages/PollTimelineMessa
 export default class PollTimelineMessageRegistrar {
   constructor(
     private readonly conversationRepository: ConversationRepository,
-    private readonly communityMessageRepository: CommunityMessageRepository,
+    // eslint-disable-next-line max-len
+    private readonly communityMessageRepository: CommunityChannelMessageRepository,
   ) {}
 
   private async registerConversationTimelineMessage(

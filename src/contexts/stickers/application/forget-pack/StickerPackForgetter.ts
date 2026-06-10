@@ -2,7 +2,7 @@ import StickerUserLibraryRepository from '../../domain/repositories/StickerUserL
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerPackForgetMessage } from './messages/StickerPackForgetMessage';
 
-export class StickerPackForgetter {
+export default class StickerPackForgetter {
   constructor(private readonly repository: StickerUserLibraryRepository) {}
 
   private async findLibrary(

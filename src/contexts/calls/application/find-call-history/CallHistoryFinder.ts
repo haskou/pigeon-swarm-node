@@ -2,7 +2,7 @@ import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
 import { CallHistoryFindMessage } from './messages/CallHistoryFindMessage';
 
-export class CallHistoryFinder {
+export default class CallHistoryFinder {
   constructor(private readonly repository: CallRepository) {}
 
   public async find(message: CallHistoryFindMessage): Promise<Call[]> {

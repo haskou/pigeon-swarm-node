@@ -3,7 +3,7 @@ import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import { CallParticipantHeartbeatRecordMessage } from './messages/CallParticipantHeartbeatRecordMessage';
 
-export class CallParticipantHeartbeatRecorder {
+export default class CallParticipantHeartbeatRecorder {
   constructor(private readonly repository: CallRepository) {}
 
   public async record(

@@ -4,16 +4,12 @@ import { LinkPreviewHtmlParser } from './LinkPreviewHtmlParser';
 import { LinkPreviewHttpFetcher } from './LinkPreviewHttpFetcher';
 import { LinkPreviewUrlGuard } from './LinkPreviewUrlGuard';
 
-export class LinkPreviewFetcher {
-  private readonly urlGuard: LinkPreviewUrlGuard;
-  private readonly httpFetcher: LinkPreviewHttpFetcher;
-  private readonly htmlParser: LinkPreviewHtmlParser;
-
+export default class LinkPreviewFetcher {
   constructor(
     private readonly cacheRepository: LinkPreviewCacheRepository,
-    urlGuard?: LinkPreviewUrlGuard,
-    httpFetcher?: LinkPreviewHttpFetcher,
-    htmlParser?: LinkPreviewHtmlParser,
+    private readonly urlGuard?: LinkPreviewUrlGuard,
+    private readonly httpFetcher?: LinkPreviewHttpFetcher,
+    private readonly htmlParser?: LinkPreviewHtmlParser,
   ) {
     this.urlGuard = urlGuard ?? new LinkPreviewUrlGuard();
     this.httpFetcher = httpFetcher ?? new LinkPreviewHttpFetcher(this.urlGuard);

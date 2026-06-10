@@ -5,7 +5,7 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
-import CommunityMessageRegistrar from './CommunityChannelMessageCandidateRegistrar';
+import CommunityChannelMessageCandidateRegistrar from './CommunityChannelMessageCandidateRegistrar';
 import { isCommunityChannelMessagePrimitive } from './isCommunityChannelMessagePrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
@@ -16,7 +16,8 @@ export default class RegisterCommunityMessageWhenAnnounced extends Consumer {
   constructor(
     private readonly eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
-    private readonly messageRegistrar: CommunityMessageRegistrar,
+    // eslint-disable-next-line max-len
+    private readonly messageRegistrar: CommunityChannelMessageCandidateRegistrar,
   ) {
     super(eventConsumer);
   }

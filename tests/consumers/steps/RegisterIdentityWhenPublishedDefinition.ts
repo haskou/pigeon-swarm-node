@@ -7,9 +7,9 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import { dependencyAliases, explicitServices } from '@app/index';
 import Kernel from '@app/Kernel';
 import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
@@ -97,10 +97,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
 
     const deadline = Date.now() + 5000;
-    const metadataRepository =
-      Kernel.di.getService<IdentityMetadataRepository>(
-        IdentityMetadataRepository,
-      );
+    const metadataRepository = Kernel.di.getService<IdentityMetadataRepository>(
+      IdentityMetadataRepository,
+    );
     const identityId = new IdentityId(this.identity.toPrimitives().id);
 
     while (Date.now() < deadline) {
@@ -135,7 +134,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
       kernel.environmentVariables('test');
       this.cleanupStorageFolder();
 
-      await kernel.dependencyInjection();
+      await kernel.dependencyInjection(dependencyAliases, explicitServices);
       this.installTestLogger();
       await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
     }
@@ -193,10 +192,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
 
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
-    const metadataRepository =
-      Kernel.di.getService<IdentityMetadataRepository>(
-        IdentityMetadataRepository,
-      );
+    const metadataRepository = Kernel.di.getService<IdentityMetadataRepository>(
+      IdentityMetadataRepository,
+    );
     const [externalIdentifier] = await ipfs.getRecordCandidates(
       `pigeon-swarm_identity-${this.identity.toPrimitives().id}`,
     );

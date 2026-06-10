@@ -10,8 +10,9 @@ import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import { dependencyAliases, explicitServices } from '@app/index';
 import Kernel from '@app/Kernel';
+import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
@@ -100,7 +101,7 @@ export default class Definitions {
       kernel.environmentVariables('test');
       this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
-      await kernel.dependencyInjection();
+      await kernel.dependencyInjection(dependencyAliases, explicitServices);
       await kernel.runServer();
       kernel.logs();
       await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
@@ -249,9 +250,11 @@ export default class Definitions {
   }
 
   private async ensureAuthenticatedIdentityIsPublished(): Promise<void> {
-    const ownerIdentityId = this.ownerIdentityId ?? new IdentityId(
-      (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
-    );
+    const ownerIdentityId =
+      this.ownerIdentityId ??
+      new IdentityId(
+        (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
+      );
 
     if (this.createdIdentityId === ownerIdentityId.valueOf()) {
       return;
@@ -576,8 +579,8 @@ export default class Definitions {
   @given('I set a community profile body with empty channel lists')
   public iSetACommunityProfileBodyWithEmptyChannelLists(): void {
     this.body = JSON.stringify({
-      avatar: 'bafybeigcommunityavatarupdated',
       autoJoinEnabled: false,
+      avatar: 'bafybeigcommunityavatarupdated',
       banner: 'bafybeigcommunitybannerupdated',
       description: 'Updated private API community',
       discoverable: true,
@@ -590,8 +593,8 @@ export default class Definitions {
   @given('I set a community profile body enabling auto join')
   public iSetACommunityProfileBodyEnablingAutoJoin(): void {
     this.body = JSON.stringify({
-      avatar: 'bafybeigcommunityavatarupdated',
       autoJoinEnabled: true,
+      avatar: 'bafybeigcommunityavatarupdated',
       banner: 'bafybeigcommunitybannerupdated',
       description: 'Updated private API community',
       discoverable: true,
@@ -889,7 +892,9 @@ export default class Definitions {
     );
   }
 
-  @given('the community member signs the current community invite accept request')
+  @given(
+    'the community member signs the current community invite accept request',
+  )
   public async theCommunityMemberSignsTheCurrentCommunityInviteAcceptRequest(): Promise<void> {
     if (!this.communityInviteToken) {
       throw new Error('Community invite must be created first.');
@@ -1110,7 +1115,9 @@ export default class Definitions {
     );
   }
 
-  @given('another identity signs the current community channel deletion request')
+  @given(
+    'another identity signs the current community channel deletion request',
+  )
   public async anotherIdentitySignsTheCurrentCommunityChannelDeletionRequest(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
       throw new Error('Community and channel must be created first.');
@@ -1217,7 +1224,9 @@ export default class Definitions {
   @given('I restore the remembered community channel thread root message')
   public iRestoreTheRememberedCommunityChannelThreadRootMessage(): void {
     if (!this.communityThreadRootMessageId) {
-      throw new Error('Community channel thread root must be remembered first.');
+      throw new Error(
+        'Community channel thread root must be remembered first.',
+      );
     }
 
     this.communityChannelMessageId = this.communityThreadRootMessageId;
@@ -1252,7 +1261,9 @@ export default class Definitions {
     });
   }
 
-  @given('I set an encrypted community channel message body mentioning everyone')
+  @given(
+    'I set an encrypted community channel message body mentioning everyone',
+  )
   public async iSetAnEncryptedCommunityChannelMessageBodyMentioningEveryone(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
       throw new Error('Community and channel must be created first.');
@@ -1960,9 +1971,7 @@ export default class Definitions {
     );
   }
 
-  @given(
-    'I set raw IPFS content with content type {string} and text {string}',
-  )
+  @given('I set raw IPFS content with content type {string} and text {string}')
   public iSetPublicIPFSContent(contentType: string, text: string): void {
     this.binaryBody = Buffer.from(text);
     this.headers['content-type'] = contentType;
@@ -2037,7 +2046,9 @@ export default class Definitions {
     });
   }
 
-  @given('the other identity signs the current read conversation messages request')
+  @given(
+    'the other identity signs the current read conversation messages request',
+  )
   public async theOtherIdentitySignsTheCurrentReadConversationMessagesRequest(): Promise<void> {
     if (!this.conversationId) {
       throw new Error('Conversation must be created first.');
@@ -2128,7 +2139,9 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/node/networks/public/');
   }
 
-  @given('I sign the current node network deletion request for network {string}')
+  @given(
+    'I sign the current node network deletion request for network {string}',
+  )
   public async iSignTheCurrentNodeNetworkDeletionRequestForNetwork(
     networkId: string,
   ): Promise<void> {
@@ -2163,7 +2176,9 @@ export default class Definitions {
       conversationId: 'one-to-one:notification-api-conversation',
       encryptedConversationKey: 'encrypted-conversation-key',
       inviterIdentityId: this.ownerIdentityId?.valueOf(),
-      inviterSignature: inviterKeyPair.sign('conversation-invitation').valueOf(),
+      inviterSignature: inviterKeyPair
+        .sign('conversation-invitation')
+        .valueOf(),
       recipientIdentityId: this.otherIdentityId?.valueOf(),
       type: 'conversation_invitation',
     });
@@ -2456,7 +2471,9 @@ export default class Definitions {
     );
   }
 
-  @given('the notification recipient signs the current notification patch request')
+  @given(
+    'the notification recipient signs the current notification patch request',
+  )
   public async notificationRecipientSignsTheCurrentNotificationPatchRequest(): Promise<void> {
     if (!this.notificationId) {
       throw new Error('Notification must be created first.');
@@ -2527,9 +2544,7 @@ export default class Definitions {
     });
   }
 
-  @given(
-    'I set a private node network body with id {string} and name {string}',
-  )
+  @given('I set a private node network body with id {string} and name {string}')
   public iSetAPrivateNodeNetworkBodyWithIdAndName(
     id: string,
     name: string,
@@ -2674,9 +2689,9 @@ export default class Definitions {
   ): Promise<void> {
     this.currentNetworkId =
       await this.ipfsDefinition.registerInMemoryNetworkWithId(
-      networkId,
-      networkName,
-    );
+        networkId,
+        networkName,
+      );
   }
 
   @given('I store the following json in IPFS network {string}')
@@ -2716,10 +2731,12 @@ export default class Definitions {
       path,
       isFormData
         ? this.formData
-        : this.binaryBody ?? (this.body && JSON.parse(this.body)),
-      isFormData ? { headers: this.formData?.getHeaders() } : {
-        headers: this.headers,
-      },
+        : (this.binaryBody ?? (this.body && JSON.parse(this.body))),
+      isFormData
+        ? { headers: this.formData?.getHeaders() }
+        : {
+            headers: this.headers,
+          },
     );
 
     if (this.response?.data?.id) {
@@ -2916,10 +2933,7 @@ export default class Definitions {
 
   @when('I GET current communities')
   public async iGETCurrentCommunities(): Promise<void> {
-    this.response = await this.restClient.get(
-      '/communities/',
-      this.headers,
-    );
+    this.response = await this.restClient.get('/communities/', this.headers);
   }
 
   @when('I PATCH the current community')
@@ -3489,9 +3503,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    expect(JSON.stringify(this.response.data)).to.not.contain(
-      this.communityId,
-    );
+    expect(JSON.stringify(this.response.data)).to.not.contain(this.communityId);
   }
 
   @then('response body should contain the other identity id')

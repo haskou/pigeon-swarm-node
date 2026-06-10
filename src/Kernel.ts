@@ -1,4 +1,6 @@
+import { DependencyAlias } from '@app/shared/infrastructure/dependencyInjection/DependencyAlias';
 import DependencyInjection from '@app/shared/infrastructure/dependencyInjection/DependencyInjection';
+import ExplicitServiceDefinition from '@app/shared/infrastructure/dependencyInjection/ExplicitServiceDefinition';
 import Server from '@app/shared/infrastructure/express/Server';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import dotenv from 'dotenv';
@@ -72,8 +74,11 @@ export default class Kernel {
     });
   }
 
-  public async dependencyInjection(): Promise<void> {
-    Kernel._di = new DependencyInjection();
+  public async dependencyInjection(
+    aliases: readonly DependencyAlias[] = [],
+    explicitServices: readonly ExplicitServiceDefinition[] = [],
+  ): Promise<void> {
+    Kernel._di = new DependencyInjection(aliases, explicitServices);
     await Kernel._di.compile();
   }
 

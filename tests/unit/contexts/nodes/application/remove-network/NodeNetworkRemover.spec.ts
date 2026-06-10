@@ -4,7 +4,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { NodeNetworkRemoverMessage } from '../../../../../../src/contexts/nodes/application/remove-network/messages/NodeNetworkRemoverMessage';
 import NodeNetworkRemover from '../../../../../../src/contexts/nodes/application/remove-network/NodeNetworkRemover';
 import { Node } from '../../../../../../src/contexts/nodes/domain/Node';
-import { NodeNetworkDataCleaner } from '../../../../../../src/contexts/nodes/domain/services/NodeNetworkDataCleaner';
+import NodeNetworkDataCleaner from '../../../../../../src/contexts/nodes/domain/services/NodeNetworkDataCleaner';
 import NodeLoaderService from '../../../../../../src/contexts/nodes/domain/services/NodeLoaderService';
 import NodeSaverService from '../../../../../../src/contexts/nodes/domain/services/NodeSaverService';
 import DomainEvent from '../../../../../../src/shared/domain/events/DomainEvent';

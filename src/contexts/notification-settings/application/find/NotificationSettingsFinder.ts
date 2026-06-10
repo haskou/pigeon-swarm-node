@@ -2,7 +2,7 @@ import { NotificationScopeSettings } from '../../domain/NotificationScopeSetting
 import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingsFindMessage } from './messages/NotificationSettingsFindMessage';
 
-export class NotificationSettingsFinder {
+export default class NotificationSettingsFinder {
   constructor(
     private readonly repository: NotificationScopeSettingsRepository,
   ) {}

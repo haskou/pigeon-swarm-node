@@ -1,5 +1,5 @@
 import { StickerUnfavoriteMessage } from '@app/contexts/stickers/application/unfavorite-sticker/messages/StickerUnfavoriteMessage';
-import { StickerUnfavoriter } from '@app/contexts/stickers/application/unfavorite-sticker/StickerUnfavoriter';
+import StickerUnfavoriter from '@app/contexts/stickers/application/unfavorite-sticker/StickerUnfavoriter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';

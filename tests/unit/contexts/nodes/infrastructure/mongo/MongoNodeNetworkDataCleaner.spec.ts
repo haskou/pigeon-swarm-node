@@ -3,7 +3,7 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import { MongoNodeNetworkDataCleaner } from '../../../../../../src/contexts/nodes/infrastructure/mongo/MongoNodeNetworkDataCleaner';
+import MongoNodeNetworkDataCleaner from '../../../../../../src/contexts/nodes/infrastructure/mongo/MongoNodeNetworkDataCleaner';
 
 type CollectionMock = {
   deleteMany: jest.Mock;

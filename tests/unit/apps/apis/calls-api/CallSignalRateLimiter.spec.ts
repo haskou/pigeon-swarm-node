@@ -1,4 +1,4 @@
-import { CallSignalRateLimiter } from '@app/apps/apis/calls-api/CallSignalRateLimiter';
+import CallSignalRateLimiter from '@app/apps/apis/calls-api/CallSignalRateLimiter';
 import { CallSignalRatePolicy } from '@app/apps/apis/calls-api/CallSignalRatePolicy';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';

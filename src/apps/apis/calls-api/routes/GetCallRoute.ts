@@ -1,4 +1,4 @@
-import { CallFinder } from '@app/contexts/calls/application/find-call/CallFinder';
+import CallFinder from '@app/contexts/calls/application/find-call/CallFinder';
 import { CallFindMessage } from '@app/contexts/calls/application/find-call/messages/CallFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';

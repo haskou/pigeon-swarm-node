@@ -1,4 +1,4 @@
-import { CallSignalSender } from '@app/contexts/calls/application/send-signal/CallSignalSender';
+import CallSignalSender from '@app/contexts/calls/application/send-signal/CallSignalSender';
 import { CallSignalSendMessage } from '@app/contexts/calls/application/send-signal/messages/CallSignalSendMessage';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -13,7 +13,7 @@ import {
 } from 'routing-controllers';
 
 import { PostCallSignalBody } from '../bodies/PostCallSignalBody';
-import { CallSignalRateLimiter } from '../CallSignalRateLimiter';
+import CallSignalRateLimiter from '../CallSignalRateLimiter';
 import { CallViewModel } from '../view-model/CallViewModel';
 import { CallRouteSupport } from './CallRouteSupport';
 

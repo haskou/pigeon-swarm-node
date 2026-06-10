@@ -1,4 +1,4 @@
-import { CallStarter } from '@app/contexts/calls/application/start-call/CallStarter';
+import CallStarter from '@app/contexts/calls/application/start-call/CallStarter';
 import { CallStartMessage } from '@app/contexts/calls/application/start-call/messages/CallStartMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';

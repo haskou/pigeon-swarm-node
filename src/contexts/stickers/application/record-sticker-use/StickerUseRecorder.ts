@@ -4,7 +4,7 @@ import StickerUserLibraryRepository from '../../domain/repositories/StickerUserL
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerUseRecordMessage } from './messages/StickerUseRecordMessage';
 
-export class StickerUseRecorder {
+export default class StickerUseRecorder {
   constructor(
     private readonly packRepository: StickerPackRepository,
     private readonly libraryRepository: StickerUserLibraryRepository,

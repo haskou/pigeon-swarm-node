@@ -18,12 +18,13 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { NodeNetworkDataCleaner } from '../../domain/services/NodeNetworkDataCleaner';
+import NodeNetworkDataCleaner from '../../domain/services/NodeNetworkDataCleaner';
 import { CommunityIdentifier } from './types/CommunityIdentifier';
 import { CommunityReactionDocument } from './types/CommunityReactionDocument';
 import { ConversationIdentifier } from './types/ConversationIdentifier';
 
-export class MongoNodeNetworkDataCleaner implements NodeNetworkDataCleaner {
+// eslint-disable-next-line max-len
+export default class MongoNodeNetworkDataCleaner extends NodeNetworkDataCleaner {
   private static readonly CALLS = 'calls';
   private static readonly COMMUNITIES = 'communities';
   private static readonly COMMUNITY_INVITES = 'community_invites';
@@ -55,7 +56,9 @@ export class MongoNodeNetworkDataCleaner implements NodeNetworkDataCleaner {
   constructor(
     private readonly mongo: MongoDB,
     private readonly networkRegistry: IPFSNetworkRegistry,
-  ) {}
+  ) {
+    super();
+  }
 
   private async findCommunityIds(networkId: string): Promise<string[]> {
     const communities = await this.mongo.getCollection<CommunityIdentifier>(

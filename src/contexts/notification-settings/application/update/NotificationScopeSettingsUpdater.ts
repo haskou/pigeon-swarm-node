@@ -4,7 +4,7 @@ import { NotificationScopeSettings } from '../../domain/NotificationScopeSetting
 import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationScopeSettingsUpdateMessage } from './messages/NotificationScopeSettingsUpdateMessage';
 
-export class NotificationScopeSettingsUpdater {
+export default class NotificationScopeSettingsUpdater {
   constructor(
     private readonly repository: NotificationScopeSettingsRepository,
     private readonly messageBus: MessageBus,

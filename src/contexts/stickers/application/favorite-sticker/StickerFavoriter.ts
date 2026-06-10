@@ -4,7 +4,7 @@ import StickerUserLibraryRepository from '../../domain/repositories/StickerUserL
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerFavoriteMessage } from './messages/StickerFavoriteMessage';
 
-export class StickerFavoriter {
+export default class StickerFavoriter {
   constructor(
     private readonly packRepository: StickerPackRepository,
     private readonly libraryRepository: StickerUserLibraryRepository,

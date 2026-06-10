@@ -1,4 +1,4 @@
-import { CallJoiner } from '@app/contexts/calls/application/join-call/CallJoiner';
+import CallJoiner from '@app/contexts/calls/application/join-call/CallJoiner';
 import { CallJoinMessage } from '@app/contexts/calls/application/join-call/messages/CallJoinMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';

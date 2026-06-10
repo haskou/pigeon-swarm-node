@@ -1,6 +1,6 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { PushSubscriptionRegisterMessage } from '@app/contexts/push-notifications/application/register/messages/PushSubscriptionRegisterMessage';
-import { PushSubscriptionRegistrar } from '@app/contexts/push-notifications/application/register/PushSubscriptionRegistrar';
+import PushSubscriptionRegistrar from '@app/contexts/push-notifications/application/register/PushSubscriptionRegistrar';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';

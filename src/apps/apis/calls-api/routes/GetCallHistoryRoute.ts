@@ -1,4 +1,4 @@
-import { CallHistoryFinder } from '@app/contexts/calls/application/find-call-history/CallHistoryFinder';
+import CallHistoryFinder from '@app/contexts/calls/application/find-call-history/CallHistoryFinder';
 import { CallHistoryFindMessage } from '@app/contexts/calls/application/find-call-history/messages/CallHistoryFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';

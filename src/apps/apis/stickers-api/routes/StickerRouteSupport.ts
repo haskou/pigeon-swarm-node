@@ -1,7 +1,7 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
-import { StickerPacksFinder } from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
+import StickerPacksFinder from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request } from 'express';

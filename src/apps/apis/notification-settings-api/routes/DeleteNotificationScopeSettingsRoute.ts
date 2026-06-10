@@ -1,5 +1,5 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { NotificationScopeSettingsResetter } from '@app/contexts/notification-settings/application/reset/NotificationScopeSettingsResetter';
+import NotificationScopeSettingsResetter from '@app/contexts/notification-settings/application/reset/NotificationScopeSettingsResetter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';

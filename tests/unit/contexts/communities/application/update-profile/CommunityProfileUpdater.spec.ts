@@ -1,4 +1,4 @@
-import { CommunityProfileUpdater } from '@app/contexts/communities/application/update-profile/CommunityProfileUpdater';
+import CommunityProfileUpdater from '@app/contexts/communities/application/update-profile/CommunityProfileUpdater';
 import { CommunityProfileUpdateMessage } from '@app/contexts/communities/application/update-profile/messages/CommunityProfileUpdateMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';

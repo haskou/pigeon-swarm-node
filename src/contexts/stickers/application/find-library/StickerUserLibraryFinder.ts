@@ -2,7 +2,7 @@ import StickerUserLibraryRepository from '../../domain/repositories/StickerUserL
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerUserLibraryFindMessage } from './messages/StickerUserLibraryFindMessage';
 
-export class StickerUserLibraryFinder {
+export default class StickerUserLibraryFinder {
   constructor(private readonly repository: StickerUserLibraryRepository) {}
 
   public async find(

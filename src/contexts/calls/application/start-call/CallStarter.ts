@@ -2,10 +2,10 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
-import { CallScopeResolver } from './CallScopeResolver';
+import CallScopeResolver from './CallScopeResolver';
 import { CallStartMessage } from './messages/CallStartMessage';
 
-export class CallStarter {
+export default class CallStarter {
   constructor(
     private readonly repository: CallRepository,
     private readonly scopeResolver: CallScopeResolver,

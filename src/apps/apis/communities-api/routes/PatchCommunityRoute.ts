@@ -1,4 +1,4 @@
-import { CommunityProfileUpdater } from '@app/contexts/communities/application/update-profile/CommunityProfileUpdater';
+import CommunityProfileUpdater from '@app/contexts/communities/application/update-profile/CommunityProfileUpdater';
 import { CommunityProfileUpdateMessage } from '@app/contexts/communities/application/update-profile/messages/CommunityProfileUpdateMessage';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';

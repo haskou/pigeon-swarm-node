@@ -5,7 +5,7 @@ import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import { CallEndMessage } from './messages/CallEndMessage';
 
-export class CallEnder {
+export default class CallEnder {
   constructor(
     private readonly repository: CallRepository,
     private readonly eventPublisher: DomainEventPublisher,

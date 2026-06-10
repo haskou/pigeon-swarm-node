@@ -4,7 +4,7 @@ import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityProfileUpdateMessage } from './messages/CommunityProfileUpdateMessage';
 
-export class CommunityProfileUpdater {
+export default class CommunityProfileUpdater {
   constructor(
     private readonly repository: CommunityRepository,
     private readonly eventPublisher: DomainEventPublisher,
