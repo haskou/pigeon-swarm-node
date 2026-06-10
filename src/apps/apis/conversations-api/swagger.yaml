@@ -284,7 +284,7 @@ paths:
       tags:
         - conversations
       summary: React to a conversation message
-      description: Stores a message reaction in MongoDB only and publishes a realtime/sync event to the other conversation participants.
+      description: Stores a message reaction in OrbitDB replicated metadata and publishes a realtime/sync event to the other conversation participants.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - in: path
@@ -313,7 +313,7 @@ paths:
       tags:
         - conversations
       summary: Remove a conversation message reaction
-      description: Removes the authenticated participant reaction from MongoDB and publishes a realtime/sync event to the other conversation participants.
+      description: Removes the authenticated participant reaction from OrbitDB replicated metadata and publishes a realtime/sync event to the other conversation participants.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - in: path
@@ -723,7 +723,7 @@ components:
             type: string
         reactions:
           type: array
-          description: MongoDB-only reactions synchronized by conversation events.
+          description: OrbitDB replicated reactions synchronized by conversation events.
           items:
             $ref: '#/components/schemas/MessageReactionResource'
         replyToMessageId:

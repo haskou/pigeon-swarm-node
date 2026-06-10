@@ -708,7 +708,7 @@ Response:
 Implemented:
 
 - publish public content to every configured IPFS network
-- register the returned CID in local MongoDB replication metadata
+- register the returned CID in OrbitDB replication metadata
 - accept raw request bytes instead of wrapping the content in JSON/base64
 - store the binary bytes directly in IPFS
 - preserve response metadata from `Content-Type` and `X-Filename` in local
@@ -775,7 +775,7 @@ Response:
 Implemented:
 
 - publish client-encrypted private content to every configured IPFS network
-- register the returned CID in local MongoDB replication metadata
+- register the returned CID in OrbitDB replication metadata
 - accept raw encrypted request bytes instead of wrapping the content in
   JSON/base64
 - store content as a JSON IPFS document with `encrypted: true`,
@@ -1219,7 +1219,7 @@ Implemented:
 - validate owner identity from the signed request
 - validate keychain signature and version chain
 - persist immutable encrypted document in IPFS
-- persist metadata in MongoDB
+- persist metadata in OrbitDB replicated metadata
 - publish keychain announcement through the domain event publisher
 
 ### Get current keychain
@@ -1248,7 +1248,7 @@ Response:
 Implemented:
 
 - only return the authenticated identity keychain
-- resolve latest valid candidate from local MongoDB and DHT candidates
+- resolve latest valid candidate from OrbitDB metadata and DHT candidates
 - return encrypted payload as-is for client-side unlock/decryption
 
 ## Conversation HTTP API
@@ -1323,7 +1323,7 @@ Implemented:
 - require the conversation network id; messages and sync for this conversation
   are published only through that network
 - validate that the keychain candidate belongs to the authenticated identity
-- persist conversation metadata in MongoDB
+- persist conversation metadata in OrbitDB replicated metadata
 - publish `ConversationWasCreatedEvent`
 
 Standalone group conversations are different from future community channels:
@@ -1622,10 +1622,10 @@ Implemented:
   non-deleted `sent` message in the same conversation
 - validate the signature against the canonical message payload
 - persist immutable message document in IPFS
-- persist message metadata in MongoDB
+- persist message metadata in OrbitDB replicated metadata
 - publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
   `networkId` and `participantIds`
-- create Mongo-only unread flags for every participant except the author
+- derive unread state from OrbitDB replicated read markers and message metadata
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
 
@@ -1705,11 +1705,11 @@ Implemented:
 
 - require signed request auth
 - require the authenticated identity to be a conversation participant
-- delete Mongo-only unread flags for the authenticated identity up to and
-  including `messageId`
+- update the OrbitDB replicated read marker for the authenticated identity up to
+  and including `messageId`
 - publish `ConversationMessagesWereReadEvent` with `messageId`,
   `readerIdentityId`, `networkId` and `participantIds`
-- consuming nodes apply the same unread-flag deletion locally
+- consuming nodes apply the same replicated read marker update locally
 - send a Web Push control payload of type `notifications_cleared` to the
   reader identity subscriptions so service workers can close displayed
   notifications tagged as `conversation:<conversationId>`
@@ -1743,7 +1743,8 @@ Implemented:
 - require signed request auth
 - require the authenticated identity to be a conversation participant
 - require the target message to exist and be visible locally
-- store reactions in MongoDB only; message IPFS documents are not rewritten
+- store reactions in OrbitDB replicated metadata; message IPFS documents are not
+  rewritten
 - keep reactions unique by conversation id, message id, author id and emoji
 - include reactions in `GET /conversations/{conversationId}/messages`,
   `GET /conversations/{conversationId}/messages/{messageId}` and
@@ -3096,7 +3097,7 @@ Implemented:
 - require the authenticated member to have channel visibility through their
   roles
 - return messages ordered from oldest to newest in the page
-- include MongoDB-only reactions for each message
+- include OrbitDB replicated reactions for each message
 - include `poll` timeline items scoped to the same community text channel. The
   poll `id` is also registered as a channel message id, so it is valid as
   `beforeMessageId` for pagination.
@@ -3135,7 +3136,8 @@ Implemented:
 - require the channel and target message to exist
 - require the authenticated member to have channel visibility through their
   roles and `send_stickers`
-- store reactions in MongoDB only; encrypted message documents are not rewritten
+- store reactions in OrbitDB replicated metadata; encrypted message documents are
+  not rewritten
 - keep reactions unique by community id, channel id, message id, author id and
   emoji
 - publish `communities.v1.channel.message.reaction.was_added` to community
@@ -3313,7 +3315,7 @@ Community invitation request:
 Implemented:
 
 - require signed request auth from the inviter
-- persist the notification in MongoDB
+- persist the notification in OrbitDB replicated metadata
 - store encrypted key material as opaque payload only
 - keep private keys and decrypted conversation keys out of the backend
 - group conversation invitations use the same encrypted conversation key payload
@@ -4038,13 +4040,13 @@ Client realtime does not replace PubSub. The intended flow is:
 ```text
 Client A -> Node A: POST /conversations/{id}/messages
 Node A -> IPFS: store immutable encrypted message document
-Node A -> MongoDB: index metadata
+Node A -> OrbitDB: index replicated metadata
 Node A -> DomainEventPublisher: publish accepted domain event
 Node A -> PubSub: announce conversation message
 Node B <- PubSub: receive announcement
 Node B -> IPFS: fetch message document
 Node B -> Domain: validate candidate
-Node B -> MongoDB: cache valid metadata
+Node B -> OrbitDB: project valid replicated metadata
 Node B -> Client B: WebSocket message event
 ```
 
