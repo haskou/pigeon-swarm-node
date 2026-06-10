@@ -34,6 +34,8 @@ X-Signature: <signature>
 Implemented:
 
 - canonical request payload: method, path, timestamp and body hash
+- canonical payload `timestamp` is a JSON number; HTTP headers and WebSocket
+  query parameters still carry it as text
 - timestamp freshness validation with a 30 second maximum clock skew
 - Cucumber scenarios for invalid and stale signed requests
 
@@ -77,7 +79,7 @@ so they must authenticate with signed query parameters:
 
 ```ts
 const path = '/ws';
-const timestamp = String(Date.now());
+const timestamp = Date.now();
 const body = {};
 const canonicalPayload = {
   bodyHash: sha256(JSON.stringify(body)),
@@ -89,7 +91,7 @@ const signature = sign(JSON.stringify(canonicalPayload));
 const url =
   `ws://localhost:8080${path}` +
   `?identityId=${encodeURIComponent(identityId)}` +
-  `&timestamp=${encodeURIComponent(timestamp)}` +
+  `&timestamp=${encodeURIComponent(String(timestamp))}` +
   `&signature=${encodeURIComponent(signature)}`;
 const socket = new WebSocket(url);
 ```

@@ -1,11 +1,17 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PublicKey, Signature } from '@haskou/value-objects';
 import { createHash } from 'crypto';
-import { Request } from 'express';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
 import { SignedRequestPayload } from './SignedRequestPayload';
+
+export type SignedHttpRequest = {
+  body?: unknown;
+  header(header: string): string | string[] | undefined;
+  method: string;
+  path: string;
+};
 
 export class SignedHttpRequestVerifier {
   private hashBody(body: unknown): string {
@@ -18,31 +24,42 @@ export class SignedHttpRequestVerifier {
       .digest('hex');
   }
 
-  public getRequiredHeader(request: Request, header: string): string {
-    const value = request.header(header);
+  private getCanonicalTimestamp(timestamp: number | string): number {
+    const canonicalTimestamp = Number(timestamp);
 
-    if (!value) {
+    if (!Number.isInteger(canonicalTimestamp)) {
+      throw new InvalidSignedRequestError();
+    }
+
+    return canonicalTimestamp;
+  }
+
+  public getRequiredHeader(request: SignedHttpRequest, header: string): string {
+    const value = request.header(header);
+    const normalizedValue = Array.isArray(value) ? value[0] : value;
+
+    if (!normalizedValue) {
       throw new MissingSignedRequestHeaderError(header);
     }
 
-    return value;
+    return normalizedValue;
   }
 
   public getCanonicalPayload(
     method: string,
     path: string,
-    timestamp: string,
+    timestamp: number | string,
     body: unknown,
   ): SignedRequestPayload {
     return {
       bodyHash: this.hashBody(body),
       method: method.toUpperCase(),
       path,
-      timestamp,
+      timestamp: this.getCanonicalTimestamp(timestamp),
     };
   }
 
-  public verifySignature(request: Request): {
+  public verifySignature(request: SignedHttpRequest): {
     identityId: IdentityId;
     timestamp: string;
   } {
@@ -71,7 +88,7 @@ export class SignedHttpRequestVerifier {
     return { identityId, timestamp };
   }
 
-  public verify(request: Request): IdentityId {
+  public verify(request: SignedHttpRequest): IdentityId {
     return this.verifySignature(request).identityId;
   }
 }

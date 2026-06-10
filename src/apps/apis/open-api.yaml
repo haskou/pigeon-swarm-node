@@ -34,6 +34,8 @@ paths:
         The signed canonical request is `GET /ws` with an empty body `{}`. When
         `ROUTE_PREFIX` is configured, sign the prefixed path, for example
         `GET /api/ws`.
+        The canonical payload timestamp is a JSON number, even though the
+        browser query parameter and HTTP header carry it as text.
 
         On success the server sends:
 
