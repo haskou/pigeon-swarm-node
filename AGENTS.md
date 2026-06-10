@@ -45,6 +45,7 @@ docs(calls): 📝 Fix calls OpenAPI refs
 - Every use case must receive an explicit application message object/class, placed in a `messages/` folder under the action folder when the input comes from primitives. The message owns primitive-to-Value-Object conversion and validation. Do not pass anonymous primitive input bags directly to a use case.
 - Use cases must expose a ubiquitous-language method (`find`, `create`, `send`, `reconcile`, `accept`, `update`, etc.). Do not use generic `execute`.
 - A class named `Factory`, `Mapper`, `Projector`, `Catalog`, `Resolver`, or `Cipher` is not a use case by default. Put it in the layer that matches its responsibility: domain when it creates or enforces domain concepts, infrastructure when it adapts external contracts/serialization/crypto/transport, and presentation when it builds view models. Do not keep these classes in `application/<action>` just to satisfy folder shape.
+- Routes and controllers must stay thin. They parse requests, build application messages, call one use case/application service, and return a view model/response. Any persistence decision, infrastructure selection, domain branching, or repeated orchestration belongs outside the route.
 - Application messages may receive primitives; domain objects, entities, aggregates, policies, and domain services must receive Value Objects or domain objects.
 - Application messages are mandatory for every application entrypoint that receives external primitives or DTOs. The folder must be exactly `application/<action-name>/messages/<MessageClassName>.ts`; do not create empty `messages/` folders, shared generic `application/messages`, or message classes whose filename differs from the exported class.
 - Primitive-to-Value-Object transformations belong in application messages or infrastructure mappers. Do not hide this conversion inside arbitrary private methods on use cases.
@@ -60,6 +61,8 @@ docs(calls): 📝 Fix calls OpenAPI refs
 - Repository methods must return aggregate roots, entities, Value Objects, or explicit Null Objects. They must not return infrastructure documents, DTOs, generic interfaces, primitive type bags, or persistence-shaped `types`.
 - Finder methods that model domain lookups should return a domain object. When absence is an expected result, return a `NullObject` for that entity/aggregate and let the application service or route map it to a 404, no-op, or explicit response. Avoid `Entity | undefined` as the normal repository contract.
 - Infrastructure document shapes and storage DTOs belong under infrastructure. Do not put document `types` in `domain`, and do not leak them into application services.
+- Do not create `Store` contracts or `stores` folders in domain or application. If the concept is domain persistence, it is a repository. If it is a third-party storage primitive, keep that adapter in infrastructure.
+- Generic repository abstractions are not a replacement for domain repositories. A concrete adapter must implement the real repository contract of the aggregate/context it persists.
 - Domain services are only for behavior that genuinely spans multiple domain objects. Do not use them as dumping grounds for logic that belongs in an entity or Value Object.
 - Domain services may use domain repositories when the domain behavior requires persisted aggregate state. Application services should orchestrate domain services and repositories instead of inventing procedural shortcuts or infrastructure-facing stores.
 - Application services orchestrate use cases. They should not contain domain rules that belong inside aggregates, entities, or Value Objects.
@@ -77,9 +80,12 @@ docs(calls): 📝 Fix calls OpenAPI refs
 
 - `src/shared/infrastructure/dependencyInjection/DependencyInjection.ts` is shared infrastructure. It must contain only generic container mechanics.
 - Application-specific bindings belong in the composition root (`src/index.ts`) or app-level composition modules, not in shared infrastructure.
+- `src/index.ts` is the composition root. It may choose implementations and register runtimes, schedulers, consumers, and routes, but it must stay declarative. If composition becomes noisy, extract app-level composition modules instead of constructing collaborators inline.
 - Routes and app entrypoints must request use cases or domain/application contracts from DI with `this.get<Contract>(Contract)` or `Kernel.di.getService<Contract>(Contract)` at the composition boundary.
 - Routes must call use cases. They must not instantiate repositories, infrastructure adapters, domain services, application services, or private factories for those collaborators.
 - Use DI instead of manual `new` when the class is an application service, repository, adapter, consumer, scheduler, runtime, projector, publisher, or other app component.
+- Consumers, schedulers, runtimes, and projectors should be resolved through one consistent DI path. Avoid parallel registration APIs that instantiate the same kind of component differently unless a real framework boundary forces it.
+- App runtimes belong under `src/apps/**/runtimes` or an equivalent app composition folder. Do not hide runtime startup inside arbitrary use cases or route constructors.
 - Do not call `new` inside constructors to build dependencies. Dependencies must be injected by the container.
 - Classes that must be resolved automatically by the container should be exported as `default` so the generated `services.yaml` can wire them.
 - `services.yaml` is generated by the container build flow. Do not hand-maintain it to hide missing exports or bad constructors.
