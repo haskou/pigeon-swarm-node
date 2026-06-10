@@ -295,7 +295,7 @@ describe('PublicIPFS', () => {
 
       expect(mockHeliaNode.datastore.put).toHaveBeenCalled();
       expect(mockHeliaNode.routing.put).toHaveBeenCalled();
-      expect(Kernel.logger.warn).toHaveBeenCalledWith(
+      expect(Kernel.logger.debug).toHaveBeenCalledWith(
         'DHT record publication skipped for key: identity-id',
       );
     });

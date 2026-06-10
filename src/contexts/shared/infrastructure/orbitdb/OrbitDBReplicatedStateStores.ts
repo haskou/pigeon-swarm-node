@@ -91,7 +91,7 @@ export class OrbitDBReplicatedStateStores {
       },
     );
 
-    Kernel.logger.info(
+    Kernel.logger.debug?.(
       `OrbitDB replicated state opened: networkId=${networkId} peerId=${network.getPeerId()}`,
     );
 

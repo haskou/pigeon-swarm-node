@@ -18,7 +18,7 @@ export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
       this.keychainRepository.republishLocalRoutingRecords(),
     ]);
 
-    Kernel.logger.info(
+    Kernel.logger.debug?.(
       `Republished local routing records: identities=${identities}, keychains=${keychains}, messages=0`,
     );
   }

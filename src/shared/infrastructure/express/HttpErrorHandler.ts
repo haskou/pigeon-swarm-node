@@ -53,7 +53,7 @@ export class HttpErrorHandler implements ExpressErrorMiddlewareInterface {
 
     if (Kernel.logger) {
       Kernel.logger.error(message);
-      Kernel.logger.info(stackTrace);
+      Kernel.logger.debug(stackTrace);
 
       return;
     }

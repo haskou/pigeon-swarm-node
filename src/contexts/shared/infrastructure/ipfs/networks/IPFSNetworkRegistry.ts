@@ -24,7 +24,7 @@ export default class IPFSNetworkRegistry {
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
-  private get state(): IPFSNetworkRegistryState {
+  private getState(): IPFSNetworkRegistryState {
     const globalState = globalThis as typeof globalThis & {
       [globalRegistryStateKey]?: IPFSNetworkRegistryState;
     };
@@ -39,15 +39,11 @@ export default class IPFSNetworkRegistry {
     return globalState[globalRegistryStateKey];
   }
 
-  private get networks(): IPFSNetwork[] {
-    return this.state.networks;
+  private getNetworks(): IPFSNetwork[] {
+    return this.getState().networks;
   }
 
-  private set networks(networks: IPFSNetwork[]) {
-    this.state.networks = networks;
-  }
-
-  private get sharedPeerKeyFilePath(): string {
+  private getSharedPeerKeyFilePath(): string {
     return `${this.storagePath}/shared-peer-private-key.pb`;
   }
 
@@ -88,7 +84,8 @@ export default class IPFSNetworkRegistry {
   }
 
   private getPrivateRelayPort(networkId: string): number | undefined {
-    const existingPort = this.state.privateRelayPorts[networkId];
+    const state = this.getState();
+    const existingPort = state.privateRelayPorts[networkId];
 
     if (existingPort) {
       return existingPort;
@@ -101,7 +98,7 @@ export default class IPFSNetworkRegistry {
     }
 
     const portCount = range.end - range.start + 1;
-    const usedPorts = new Set(Object.values(this.state.privateRelayPorts));
+    const usedPorts = new Set(Object.values(state.privateRelayPorts));
     const hash = createHash('sha256')
       .update(networkId)
       .digest()
@@ -111,7 +108,7 @@ export default class IPFSNetworkRegistry {
       const port = range.start + ((hash + offset) % portCount);
 
       if (!usedPorts.has(port)) {
-        this.state.privateRelayPorts[networkId] = port;
+        state.privateRelayPorts[networkId] = port;
 
         return port;
       }
@@ -146,27 +143,31 @@ export default class IPFSNetworkRegistry {
 
   // eslint-disable-next-line max-len
   private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
-    if (this.state.sharedPeerPrivateKey) {
-      return this.state.sharedPeerPrivateKey;
+    const state = this.getState();
+
+    if (state.sharedPeerPrivateKey) {
+      return state.sharedPeerPrivateKey;
     }
 
     try {
-      const persistedPrivateKey = await fs.readFile(this.sharedPeerKeyFilePath);
-      this.state.sharedPeerPrivateKey =
+      const persistedPrivateKey = await fs.readFile(
+        this.getSharedPeerKeyFilePath(),
+      );
+      state.sharedPeerPrivateKey =
         await libp2pKeyAdapter.privateKeyFromProtobuf(persistedPrivateKey);
 
-      return this.state.sharedPeerPrivateKey;
+      return state.sharedPeerPrivateKey;
     } catch {
       const generatedPrivateKey =
         await libp2pKeyAdapter.generateEd25519KeyPair();
 
       await fs.mkdir(this.storagePath, { recursive: true });
       await fs.writeFile(
-        this.sharedPeerKeyFilePath,
+        this.getSharedPeerKeyFilePath(),
         await libp2pKeyAdapter.privateKeyToProtobuf(generatedPrivateKey),
       );
 
-      this.state.sharedPeerPrivateKey = generatedPrivateKey;
+      state.sharedPeerPrivateKey = generatedPrivateKey;
 
       return generatedPrivateKey;
     }
@@ -175,8 +176,10 @@ export default class IPFSNetworkRegistry {
   private exportSharedPeerPrivateKeyPem(
     privateKey: Libp2pPrivateKeyLike,
   ): string {
-    if (this.state.sharedPeerPrivateKeyPem) {
-      return this.state.sharedPeerPrivateKeyPem;
+    const state = this.getState();
+
+    if (state.sharedPeerPrivateKeyPem) {
+      return state.sharedPeerPrivateKeyPem;
     }
 
     if (privateKey.type !== 'Ed25519') {
@@ -199,12 +202,12 @@ export default class IPFSNetworkRegistry {
       },
     });
 
-    this.state.sharedPeerPrivateKeyPem = keyObject.export({
+    state.sharedPeerPrivateKeyPem = keyObject.export({
       format: 'pem',
       type: 'pkcs8',
     }) as string;
 
-    return this.state.sharedPeerPrivateKeyPem;
+    return state.sharedPeerPrivateKeyPem;
   }
 
   private async createNetworkFromConfig(
@@ -249,16 +252,18 @@ export default class IPFSNetworkRegistry {
   }
 
   public async initialize(): Promise<void> {
-    if (this.state.initialized) {
+    const state = this.getState();
+
+    if (state.initialized) {
       return;
     }
 
     await this.loadOrCreateSharedPeerPrivateKey();
-    this.state.initialized = true;
+    state.initialized = true;
   }
 
   public async register(config: IPFSNetworkConfig): Promise<IPFSNetwork> {
-    const existing = this.networks.find(
+    const existing = this.getNetworks().find(
       (network) => network.getId() === config.getId(),
     );
 
@@ -271,9 +276,9 @@ export default class IPFSNetworkRegistry {
       config,
       sharedPrivateKey,
     );
-    this.networks.push(network);
+    this.getNetworks().push(network);
     await Promise.all(
-      this.state.listeners.map((listener) => listener(network)),
+      this.getState().listeners.map((listener) => listener(network)),
     );
 
     return network;
@@ -282,17 +287,18 @@ export default class IPFSNetworkRegistry {
   public onNetworkRegistered(
     listener: (network: IPFSNetwork) => Promise<void> | void,
   ): void {
-    this.state.listeners.push(listener);
+    this.getState().listeners.push(listener);
   }
 
   public async removeNetwork(id: string): Promise<void> {
-    const index = this.networks.findIndex((network) => network.getId() === id);
+    const networks = this.getNetworks();
+    const index = networks.findIndex((network) => network.getId() === id);
 
     if (index === -1) {
       return;
     }
 
-    const [network] = this.networks.splice(index, 1);
+    const [network] = networks.splice(index, 1);
 
     await network.stop();
   }
@@ -310,7 +316,7 @@ export default class IPFSNetworkRegistry {
   }
 
   public find(id: string): IPFSNetwork {
-    const network = this.networks.find((n) => n.getId() === id);
+    const network = this.getNetworks().find((n) => n.getId() === id);
 
     if (!network) {
       throw new IPFSNetworkNotFoundError(id);
@@ -320,6 +326,6 @@ export default class IPFSNetworkRegistry {
   }
 
   public getAll(): IPFSNetwork[] {
-    return [...this.networks];
+    return [...this.getNetworks()];
   }
 }
