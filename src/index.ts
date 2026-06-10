@@ -79,6 +79,7 @@ import MongoPushSubscriptionRepository from '@app/contexts/push-notifications/in
 import PushVapidConfiguration from '@app/contexts/push-notifications/infrastructure/web-push/PushVapidConfiguration';
 import WebPushNotificationDelivery from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
 import IPFSContentRacer from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer';
+import { orbitDBReplicatedEventTypes } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedEventTypes';
 import StickerAdder from '@app/contexts/stickers/application/add-sticker/StickerAdder';
 import StickerPackCreator from '@app/contexts/stickers/application/create-pack/StickerPackCreator';
 import StickerFavoriter from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
@@ -318,6 +319,11 @@ async function init() {
   await kernel.dependencyInjection(dependencyAliases, explicitServices);
   console.timeEnd('Dependency Injection');
   kernel.configureWebSocketEventHub();
+  const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
+
+  for (const eventType of orbitDBReplicatedEventTypes) {
+    messageBus.registerEventType(eventType.bindingKey, eventType.domainEvent);
+  }
 
   console.time('Run server');
   await kernel.runServer();

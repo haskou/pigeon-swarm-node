@@ -53,7 +53,7 @@ describe('OrbitDBIPFSContentReplicaClaimRepository', () => {
       );
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', {
+    registry.register(networkId, {
       ipfsReplication: {
         put,
         query,

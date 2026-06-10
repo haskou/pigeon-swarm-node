@@ -23,7 +23,7 @@ describe('OrbitDBConversationRepository', () => {
     mother = await ConversationMother.create();
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', {
+    registry.register(mother.networkId.valueOf(), {
       conversations: {
         put: jest.fn(async (document) => {
           upsertDocument(conversationDocuments, document);

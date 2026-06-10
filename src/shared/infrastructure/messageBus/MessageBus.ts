@@ -23,6 +23,7 @@ export default class MessageBus
   private static activeContextIds: string[] = [];
   private static replicatedEventPublisher?: DomainEventPublisher;
   private adapter: MessageBusAdapter;
+  private readonly domainEventTypes = new Map<string, typeof DomainEvent>();
   private readonly localSubscriptionHandlers = new Map<
     string,
     LocalSubscriptionHandler[]
@@ -156,8 +157,16 @@ export default class MessageBus
   ): void {
     const handlers = this.localSubscriptionHandlers.get(bindingKey) || [];
 
+    this.registerEventType(bindingKey, DomainEventInstance);
     handlers.push({ DomainEventInstance, handler });
     this.localSubscriptionHandlers.set(bindingKey, handlers);
+  }
+
+  public registerEventType(
+    bindingKey: string,
+    DomainEventInstance: typeof DomainEvent,
+  ): void {
+    this.domainEventTypes.set(bindingKey, DomainEventInstance);
   }
 
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
@@ -169,9 +178,15 @@ export default class MessageBus
 
   public async dispatchReplicated(message: Message): Promise<void> {
     const handlers = this.localSubscriptionHandlers.get(message.type) || [];
-    const events = handlers.map(({ DomainEventInstance }) =>
-      this.instanceDomainEvent(DomainEventInstance, message),
-    );
+    const eventType = this.domainEventTypes.get(message.type);
+    const events =
+      handlers.length > 0
+        ? handlers.map(({ DomainEventInstance }) =>
+            this.instanceDomainEvent(DomainEventInstance, message),
+          )
+        : eventType
+          ? [this.instanceDomainEvent(eventType, message)]
+          : [];
 
     await Promise.all(
       handlers.map(async ({ DomainEventInstance, handler }) => {

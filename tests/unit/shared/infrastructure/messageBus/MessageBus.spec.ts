@@ -109,4 +109,37 @@ describe('MessageBus', () => {
     expect(handler.mock.calls[0][0].attributes).toEqual({ value: 'payload' });
     expect(websocketPublish).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
   });
+
+  it('should dispatch registered replicated events to websocket without a consumer', async () => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+    const websocketPublish = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation();
+    const messageBus = new MessageBus(
+      amqpAdapter,
+      memoryAdapter,
+      libp2pGossipsubAdapter,
+    );
+
+    messageBus.registerEventType(TestDomainEvent.EVENT_NAME, TestDomainEvent);
+    await messageBus.dispatchReplicated({
+      aggregate_id: 'aggregate-id',
+      attributes: {
+        value: 'payload',
+      },
+      event: TestDomainEvent.EVENT_NAME,
+      event_id: 'event-id',
+      exchange: 'domain_events',
+      occurred_on: 1780000000000,
+      retries: 0,
+      routingKey: TestDomainEvent.EVENT_NAME,
+      type: TestDomainEvent.EVENT_NAME,
+      user_id: '',
+    });
+
+    expect(websocketPublish).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
+    expect(
+      (websocketPublish.mock.calls[0][0][0] as TestDomainEvent).attributes,
+    ).toEqual({ value: 'payload' });
+  });
 });

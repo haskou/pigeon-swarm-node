@@ -112,6 +112,7 @@ export default class OrbitDBReplicatedStateRuntime {
       stores,
     });
     this.registry.register(networkId, stores);
+    await this.registry.backfillLocalStateToNetwork(networkId);
     this.publisher.registerNetworkStores(networkId, localPeerId, stores);
     this.subscribeToEvents(networkId, stores);
     await this.projectExistingEvents(networkId, stores);
