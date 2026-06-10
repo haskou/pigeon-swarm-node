@@ -1,7 +1,7 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { ConversationRepository as Repository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
@@ -13,6 +13,7 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import { NullObject } from '@haskou/value-objects';
 
 import { IpfsMessageDocument } from '../ipfs/documents/IpfsMessageDocument';
 import IpfsMessageMapper from '../ipfs/mappers/IpfsMessageMapper';
@@ -23,7 +24,8 @@ import MongoConversationMapper from './mappers/MongoConversationMapper';
 import MongoMessageMetadataMapper from './mappers/MongoMessageMetadataMapper';
 import { UnreadCount } from './types/UnreadCount';
 
-export default class MongoConversationRepository implements Repository {
+// eslint-disable-next-line max-len
+export default class MongoConversationRepository extends ConversationRepository {
   private static readonly COLLECTION = 'conversations';
   private static readonly MESSAGES_COLLECTION = 'conversation_messages';
   private static readonly UNREAD_COLLECTION = 'conversation_unread_messages';
@@ -36,7 +38,9 @@ export default class MongoConversationRepository implements Repository {
     private readonly ipfsManager: IPFS,
     private readonly messageMapper: IpfsMessageMapper,
     private readonly metadataMapper: MongoMessageMetadataMapper,
-  ) {}
+  ) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoConversationDocument>(
@@ -189,7 +193,9 @@ export default class MongoConversationRepository implements Repository {
       _id: conversationId.valueOf(),
     });
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    return document
+      ? this.mapper.toDomain(document)
+      : NullObject.new(Conversation);
   }
 
   public async findByParticipant(

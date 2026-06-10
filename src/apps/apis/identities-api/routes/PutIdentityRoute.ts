@@ -1,4 +1,4 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
 import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';

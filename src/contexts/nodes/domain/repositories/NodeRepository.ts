@@ -1,6 +1,8 @@
+import { NodeId } from '../../../shared/domain/value-objects/NodeId';
 import { Node } from '../Node';
 
-export interface NodeRepository {
-  loadLocalNode(): Promise<Node>;
-  saveLocalNode(node: Node): Promise<void>;
+export default abstract class NodeRepository {
+  public abstract loadLocalNodeId(): Promise<NodeId>;
+  public abstract loadLocalNode(): Promise<Node>;
+  public abstract saveLocalNode(node: Node): Promise<void>;
 }

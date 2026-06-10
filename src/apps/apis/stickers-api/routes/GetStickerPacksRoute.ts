@@ -10,12 +10,14 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class GetStickerPacksRoute extends StickerRouteSupport {
+  private readonly finder = this.get<StickerPacksFinder>(StickerPacksFinder);
+
   @Get('/')
   public async getStickerPacks(
     @QueryParam('ownerIdentityId') ownerIdentityId: string | undefined,
     @Res() response: Response,
   ): Promise<Response> {
-    const packs = await new StickerPacksFinder(this.packRepository()).find(
+    const packs = await this.finder.find(
       new StickerPacksFindMessage(ownerIdentityId),
     );
     const resource: StickerPacksResource = {

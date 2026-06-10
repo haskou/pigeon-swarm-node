@@ -1,7 +1,7 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { Call } from '../../domain/Call';
-import { CallRepository } from '../../domain/repositories/CallRepository';
+import CallRepository from '../../domain/repositories/CallRepository';
 import { CallScopeResolver } from './CallScopeResolver';
 import { CallStartMessage } from './messages/CallStartMessage';
 

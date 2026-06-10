@@ -1,8 +1,8 @@
 import ConversationSyncResponder from '@app/contexts/conversations/application/respond-sync/ConversationSyncResponder';
 import { ConversationSyncResponseMessage } from '@app/contexts/conversations/application/respond-sync/messages/ConversationSyncResponseMessage';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { MessageReactionRepository } from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';

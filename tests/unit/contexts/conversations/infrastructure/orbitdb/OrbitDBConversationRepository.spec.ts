@@ -1,7 +1,9 @@
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
+import OrbitDBConversationMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMapper';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
 import { ConversationMother } from '../../../../mothers/ConversationMother';
@@ -10,6 +12,7 @@ describe('OrbitDBConversationRepository', () => {
   const heads = new Map<string, Record<string, unknown>>();
   const conversationDocuments: Record<string, unknown>[] = [];
   const messageDocuments: Record<string, unknown>[] = [];
+  let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBConversationRepository;
   let mother: ConversationMother;
 
@@ -18,8 +21,9 @@ describe('OrbitDBConversationRepository', () => {
     conversationDocuments.splice(0);
     messageDocuments.splice(0);
     mother = await ConversationMother.create();
-    OrbitDBReplicatedStateRegistry.shared().clear();
-    OrbitDBReplicatedStateRegistry.shared().register('network-1', {
+    registry = new OrbitDBReplicatedStateRegistry();
+    registry.clear();
+    registry.register('network-1', {
       conversations: {
         put: jest.fn(async (document) => {
           upsertDocument(conversationDocuments, document);
@@ -50,11 +54,15 @@ describe('OrbitDBConversationRepository', () => {
         query: jest.fn(async (matcher) => messageDocuments.filter(matcher)),
       },
     } as never);
-    repository = new OrbitDBConversationRepository();
+    repository = new OrbitDBConversationRepository(
+      registry,
+      new OrbitDBConversationMapper(),
+      new OrbitDBConversationMessageMapper(),
+    );
   });
 
   afterEach(() => {
-    OrbitDBReplicatedStateRegistry.shared().clear();
+    registry.clear();
   });
 
   it('should save and read conversations with messages from OrbitDB', async () => {

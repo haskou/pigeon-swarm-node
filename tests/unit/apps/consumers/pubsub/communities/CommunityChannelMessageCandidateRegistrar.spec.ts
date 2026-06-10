@@ -1,10 +1,10 @@
-import { CommunityChannelMessageCandidateRegistrar } from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
+import CommunityChannelMessageCandidateRegistrar from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/services/types/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import MongoCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -26,6 +26,7 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
     messageRepository = mock<MongoCommunityChannelMessageRepository>();
     registrar = new CommunityChannelMessageCandidateRegistrar(
       messageRepository,
+      signatureService,
     );
   });
 

@@ -1,14 +1,14 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 
-import MongoIdentityPresenceRepository from '../../infrastructure/mongo/MongoIdentityPresenceRepository';
+import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
 import IdentityPresenceNetworkResolver from '../IdentityPresenceNetworkResolver';
 
 export default class IdentityPresenceExpirationRegistrar {
   private static readonly HEARTBEAT_TIMEOUT_MS = 20_000;
 
   constructor(
-    private readonly repository: MongoIdentityPresenceRepository,
+    private readonly repository: IdentityPresenceRepository,
     private readonly networkResolver: IdentityPresenceNetworkResolver,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}

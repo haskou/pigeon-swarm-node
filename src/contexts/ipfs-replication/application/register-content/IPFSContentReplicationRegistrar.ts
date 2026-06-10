@@ -9,8 +9,8 @@ import { IPFSContentReplicationWasClaimedEvent } from '../../domain/events/IPFSC
 import { IPFSContentReplicationWasRegisteredEvent } from '../../domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
-import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
-import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
+import IPFSContentReplicaClaimRepository from '../../domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicationRepository from '../../domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentFilename } from '../../domain/value-objects/IPFSContentFilename';
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationMetadata } from '../../domain/value-objects/IPFSContentReplicationMetadata';

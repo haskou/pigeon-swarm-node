@@ -1,13 +1,13 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
-import MongoIdentityPresenceRepository from '../../infrastructure/mongo/MongoIdentityPresenceRepository';
+import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
 import IdentityPresenceNetworkResolver from '../IdentityPresenceNetworkResolver';
 import { IdentityPresenceHeartbeatMessage } from './messages/IdentityPresenceHeartbeatMessage';
 
 export default class IdentityPresenceHeartbeatRecorder {
   constructor(
-    private readonly repository: MongoIdentityPresenceRepository,
+    private readonly repository: IdentityPresenceRepository,
     private readonly networkResolver: IdentityPresenceNetworkResolver,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}

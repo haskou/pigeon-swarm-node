@@ -501,8 +501,6 @@ async function createNode(
   },
 ): Promise<PrivateOrbitNode> {
   const ipfsOptions: IPFSOptions = {
-    key: networkKey,
-    name: NETWORK_NAME,
     storageLocation: path.join(TMP_ROOT, name, 'ipfs'),
     ...options,
   };

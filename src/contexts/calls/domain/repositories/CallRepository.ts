@@ -7,21 +7,39 @@ import { Timestamp } from '@haskou/value-objects';
 import { Call } from '../Call';
 import { CallId } from '../value-objects/CallId';
 
-export interface CallRepository {
-  findActiveByCommunity(communityId: CommunityId): Promise<Call[]>;
-  findActiveByCommunityChannel(
+export default abstract class CallRepository {
+  public abstract findActiveByCommunity(
+    communityId: CommunityId,
+  ): Promise<Call[]>;
+
+  public abstract findActiveByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call | undefined>;
-  findActiveByParticipant(participantId: IdentityId): Promise<Call[]>;
-  findByCommunityChannel(
+
+  public abstract findActiveByParticipant(
+    participantId: IdentityId,
+  ): Promise<Call[]>;
+
+  public abstract findByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call[]>;
-  findByConversationId(conversationId: ConversationId): Promise<Call[]>;
-  findById(id: CallId): Promise<Call | undefined>;
-  findByParticipant(participantId: IdentityId): Promise<Call[]>;
-  findTimedOutJoinedCalls(timeoutThreshold: Timestamp): Promise<Call[]>;
-  findTimedOutRingingCalls(timeoutThreshold: Timestamp): Promise<Call[]>;
-  save(call: Call): Promise<void>;
+
+  public abstract findByConversationId(
+    conversationId: ConversationId,
+  ): Promise<Call[]>;
+
+  public abstract findById(id: CallId): Promise<Call | undefined>;
+  public abstract findByParticipant(participantId: IdentityId): Promise<Call[]>;
+
+  public abstract findTimedOutJoinedCalls(
+    timeoutThreshold: Timestamp,
+  ): Promise<Call[]>;
+
+  public abstract findTimedOutRingingCalls(
+    timeoutThreshold: Timestamp,
+  ): Promise<Call[]>;
+
+  public abstract save(call: Call): Promise<void>;
 }

@@ -2,14 +2,14 @@ import { CallScopeResolver } from '@app/contexts/calls/application/start-call/Ca
 import { CallStarter } from '@app/contexts/calls/application/start-call/CallStarter';
 import { CallStartMessage } from '@app/contexts/calls/application/start-call/messages/CallStartMessage';
 import { Call } from '@app/contexts/calls/domain/Call';
-import { CallRepository } from '@app/contexts/calls/domain/repositories/CallRepository';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityRepository } from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
@@ -153,6 +153,10 @@ class EmptyCommunityRepository implements CommunityRepository {
   }
 
   public async findDiscoverable(): Promise<Community[]> {
+    return [];
+  }
+
+  public async findSyncable(): Promise<Community[]> {
     return [];
   }
 

@@ -1,9 +1,6 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IPFSReplicationStatusSummaryFinder from '@app/contexts/ipfs-replication/application/find-summary/IPFSReplicationStatusSummaryFinder';
-import MongoIPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/infrastructure/mongo/MongoIPFSReplicationStatusSummaryRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
-import MongoNodeMetadataRepository from '@app/contexts/nodes/infrastructure/mongo/MongoNodeMetadataRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -19,14 +16,9 @@ export class GetIPFSReplicationStatusRoute extends Route {
 
   private readonly loader: NodeLoader = this.get<NodeLoader>(NodeLoader);
 
-  private finder(): IPFSReplicationStatusSummaryFinder {
-    const mongo = this.get<MongoDB>(MongoDB);
-
-    return new IPFSReplicationStatusSummaryFinder(
-      new MongoIPFSReplicationStatusSummaryRepository(mongo),
-      this.get<MongoNodeMetadataRepository>(MongoNodeMetadataRepository),
-    );
-  }
+  private readonly finder = this.get<IPFSReplicationStatusSummaryFinder>(
+    IPFSReplicationStatusSummaryFinder,
+  );
 
   private async assertCanReadReplicationStatus(
     request: Request,
@@ -46,7 +38,7 @@ export class GetIPFSReplicationStatusRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     await this.assertCanReadReplicationStatus(request);
-    const status = await this.finder().find();
+    const status = await this.finder.find();
 
     return response
       .status(HttpRouteStatusEnum.OK)

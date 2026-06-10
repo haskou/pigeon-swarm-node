@@ -4,9 +4,9 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import MongoCommunityMessageReactionRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
+import MongoCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import MongoCommunityRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';

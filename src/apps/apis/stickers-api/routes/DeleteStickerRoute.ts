@@ -9,6 +9,8 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class DeleteStickerRoute extends StickerRouteSupport {
+  private readonly deleter = this.get<StickerDeleter>(StickerDeleter);
+
   @Delete('/:packId/stickers/:stickerId')
   public async deleteSticker(
     @Param('packId') packId: string,
@@ -17,7 +19,7 @@ export class DeleteStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const pack = await new StickerDeleter(this.packRepository()).delete(
+    const pack = await this.deleter.delete(
       new StickerDeleteMessage(packId, stickerId, actor.valueOf()),
     );
 

@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { KeyPair } from '@haskou/value-objects';
 import { WebSocket } from 'ws';
@@ -88,18 +87,13 @@ describe('WebSocketEventHub', () => {
     const recipientClient = buildClient();
     const otherClient = buildClient();
     const now = 1770000000000;
+    const clientMessageHandler = buildClientMessageHandler();
 
     jest.spyOn(Date, 'now').mockReturnValue(now);
-    mockWebSocketMongo({
-      conversations: {
-        findOne: jest.fn().mockResolvedValue({
-          participantIds: [
-            senderIdentityId.valueOf(),
-            recipientIdentityId.valueOf(),
-          ],
-        }),
-      },
-    });
+    clientMessageHandler.findConversationTypingRecipients.mockResolvedValue([
+      recipientIdentityId.valueOf(),
+    ]);
+    hub.setClientMessageHandler(clientMessageHandler);
     hub.register(senderIdentityId, senderClient);
     hub.register(recipientIdentityId, recipientClient);
     hub.register(otherIdentityId, otherClient);
@@ -130,6 +124,9 @@ describe('WebSocketEventHub', () => {
     );
     expect(senderClient.send).not.toHaveBeenCalled();
     expect(otherClient.send).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findConversationTypingRecipients,
+    ).toHaveBeenCalledWith(senderIdentityId.valueOf(), 'conversation-id');
   });
 
   it('relays community text channel typing indicators to other members', async () => {
@@ -139,15 +136,13 @@ describe('WebSocketEventHub', () => {
     const senderClient = buildClient();
     const recipientClient = buildClient();
     const now = 1770000000000;
+    const clientMessageHandler = buildClientMessageHandler();
 
     jest.spyOn(Date, 'now').mockReturnValue(now);
-    mockWebSocketMongo({
-      communities: {
-        findOne: jest.fn().mockResolvedValue({
-          memberIds: [senderIdentityId.valueOf(), recipientIdentityId.valueOf()],
-        }),
-      },
-    });
+    clientMessageHandler.findCommunityChannelTypingRecipients.mockResolvedValue(
+      [recipientIdentityId.valueOf()],
+    );
+    hub.setClientMessageHandler(clientMessageHandler);
     hub.register(senderIdentityId, senderClient);
     hub.register(recipientIdentityId, recipientClient);
     const messageHandler = getClientMessageHandler(senderClient);
@@ -178,6 +173,13 @@ describe('WebSocketEventHub', () => {
       }),
     );
     expect(senderClient.send).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findCommunityChannelTypingRecipients,
+    ).toHaveBeenCalledWith(
+      senderIdentityId.valueOf(),
+      'community-id',
+      'channel-id',
+    );
   });
 
   it('ignores typing indicators when the websocket identity cannot access the scope', async () => {
@@ -186,12 +188,10 @@ describe('WebSocketEventHub', () => {
     const recipientIdentityId = await generateIdentityId();
     const senderClient = buildClient();
     const recipientClient = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
 
-    mockWebSocketMongo({
-      conversations: {
-        findOne: jest.fn().mockResolvedValue(undefined),
-      },
-    });
+    clientMessageHandler.findConversationTypingRecipients.mockResolvedValue([]);
+    hub.setClientMessageHandler(clientMessageHandler);
     hub.register(senderIdentityId, senderClient);
     hub.register(recipientIdentityId, recipientClient);
     const messageHandler = getClientMessageHandler(senderClient);
@@ -217,11 +217,9 @@ describe('WebSocketEventHub', () => {
     const hub = new WebSocketEventHub();
     const senderIdentityId = await generateIdentityId();
     const senderClient = buildClient();
-    const conversations = {
-      findOne: jest.fn(),
-    };
+    const clientMessageHandler = buildClientMessageHandler();
 
-    mockWebSocketMongo({ conversations });
+    hub.setClientMessageHandler(clientMessageHandler);
     hub.register(senderIdentityId, senderClient);
     const messageHandler = getClientMessageHandler(senderClient);
 
@@ -238,7 +236,9 @@ describe('WebSocketEventHub', () => {
     );
     await flushPromises();
 
-    expect(conversations.findOne).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findConversationTypingRecipients,
+    ).not.toHaveBeenCalled();
     expect(senderClient.send).not.toHaveBeenCalled();
   });
 
@@ -246,11 +246,9 @@ describe('WebSocketEventHub', () => {
     const hub = new WebSocketEventHub();
     const senderIdentityId = await generateIdentityId();
     const senderClient = buildClient();
-    const communities = {
-      findOne: jest.fn(),
-    };
+    const clientMessageHandler = buildClientMessageHandler();
 
-    mockWebSocketMongo({ communities });
+    hub.setClientMessageHandler(clientMessageHandler);
     hub.register(senderIdentityId, senderClient);
     const messageHandler = getClientMessageHandler(senderClient);
 
@@ -268,7 +266,9 @@ describe('WebSocketEventHub', () => {
     );
     await flushPromises();
 
-    expect(communities.findOne).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findCommunityChannelTypingRecipients,
+    ).not.toHaveBeenCalled();
     expect(senderClient.send).not.toHaveBeenCalled();
   });
 
@@ -636,24 +636,12 @@ function getClientMessageHandler(client: WebSocket): (message: Buffer) => void {
   return messageHandler;
 }
 
-function mockWebSocketMongo(
-  collections: Record<string, { findOne: jest.Mock }>,
-): void {
-  const mongo = {
-    getCollection: jest.fn(async (collectionName: string) => {
-      const collection = collections[collectionName];
-
-      if (!collection) {
-        throw new Error(`Unexpected collection ${collectionName}.`);
-      }
-
-      return collection;
-    }),
-  };
-
-  (Kernel as unknown as { _di: { getService: jest.Mock } })._di = {
-    getService: jest.fn().mockReturnValue(mongo as unknown as MongoDB),
-  };
+function buildClientMessageHandler(): jest.Mocked<WebSocketClientMessageHandler> {
+  return {
+    findCommunityChannelTypingRecipients: jest.fn().mockResolvedValue([]),
+    findConversationTypingRecipients: jest.fn().mockResolvedValue([]),
+    recordIdentityHeartbeat: jest.fn().mockResolvedValue(undefined),
+  } as unknown as jest.Mocked<WebSocketClientMessageHandler>;
 }
 
 async function flushPromises(): Promise<void> {

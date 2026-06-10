@@ -6,8 +6,8 @@ import { ConversationParticipantNotFoundError } from '../../domain/errors/Conver
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import { ConversationMessageReactionWasAddedEvent } from '../../domain/events/ConversationMessageReactionWasAddedEvent';
 import { MessageReaction } from '../../domain/MessageReaction';
-import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
-import { MessageReactionRepository } from '../../domain/repositories/MessageReactionRepository';
+import ConversationRepository from '../../domain/repositories/ConversationRepository';
+import MessageReactionRepository from '../../domain/repositories/MessageReactionRepository';
 import { MessageReactionAddMessage } from './messages/MessageReactionAddMessage';
 
 export default class MessageReactionAdder {

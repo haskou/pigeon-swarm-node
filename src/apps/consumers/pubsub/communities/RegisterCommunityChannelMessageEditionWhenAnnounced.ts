@@ -1,12 +1,11 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
-import { CommunityChannelMessageCandidateRegistrar } from './CommunityChannelMessageCandidateRegistrar';
+import CommunityMessageRegistrar from './CommunityChannelMessageCandidateRegistrar';
 import { isCommunityChannelMessagePrimitive } from './isCommunityChannelMessagePrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
@@ -15,17 +14,11 @@ export default class RegisterCommunityMessageEdition extends Consumer {
     'pigeon-swarm.register-community-channel-message-edition-when-announced';
 
   constructor(
-    consumer: DomainEventConsumer,
-    private readonly communityRepository: MongoCommunityRepository,
-    private readonly messageRepository: MongoCommunityChannelMessageRepository,
+    private readonly eventConsumer: DomainEventConsumer,
+    private readonly communityRepository: CommunityRepository,
+    private readonly messageRegistrar: CommunityMessageRegistrar,
   ) {
-    super(consumer);
-  }
-
-  private get messageRegistrar(): CommunityChannelMessageCandidateRegistrar {
-    return new CommunityChannelMessageCandidateRegistrar(
-      this.messageRepository,
-    );
+    super(eventConsumer);
   }
 
   public get queueName(): string {

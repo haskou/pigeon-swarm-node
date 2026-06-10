@@ -3,6 +3,8 @@ import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/commu
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
+import { CommunityInviteWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasAcceptedEvent';
+import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
 import { CommunityMembershipRequestWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasAcceptedEvent';
 import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
 import { CommunityMembershipRequestWasDeclinedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasDeclinedEvent';
@@ -18,16 +20,18 @@ import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/dom
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
+import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { KeychainSyncAvailableEvent } from '@app/contexts/keychains/domain/events/KeychainSyncAvailableEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import { NotificationWasDeclinedEvent } from '@app/contexts/notifications/domain/events/NotificationWasDeclinedEvent';
 
+import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
 
-export class OrbitDBDomainEventProjector {
+export default class OrbitDBDomainEventProjector {
   private getStringAttribute(
     message: ReplicatedDomainEventMessage,
     attribute: string,
@@ -68,6 +72,46 @@ export class OrbitDBDomainEventProjector {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
+  private withoutUndefined(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.withoutUndefined(item));
+    }
+
+    if (!this.isRecord(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .map(([entryKey, entryValue]) => [
+          entryKey,
+          this.withoutUndefined(entryValue),
+        ]),
+    );
+  }
+
+  private cleanRecord(
+    record: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return this.withoutUndefined(record) as Record<string, unknown>;
+  }
+
+  private async put(
+    store: OrbitDBDatabase,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    await store.put?.(this.cleanRecord(record));
+  }
+
+  private async putHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    await stores.heads.put?.(key, this.cleanRecord(record));
+  }
+
   private stringValue(
     record: Record<string, unknown>,
     attribute: string,
@@ -94,10 +138,14 @@ export class OrbitDBDomainEventProjector {
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
-    await stores.heads.put?.(`event:${message.type}:${message.aggregate_id}`, {
-      eventId: message.event_id,
-      occurredOn: message.occurred_on,
-    });
+    await this.putHead(
+      stores,
+      `event:${message.type}:${message.aggregate_id}`,
+      {
+        eventId: message.event_id,
+        occurredOn: message.occurred_on,
+      },
+    );
   }
 
   private async projectIdentity(
@@ -111,7 +159,7 @@ export class OrbitDBDomainEventProjector {
       'externalIdentifier',
     );
 
-    await stores.identities.put?.({
+    await this.put(stores.identities, {
       cid: externalIdentifier,
       id: identityId,
       lastEventId: message.event_id,
@@ -129,7 +177,7 @@ export class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'ownerIdentityId') ||
       message.aggregate_id;
 
-    await stores.keychains.put?.({
+    await this.put(stores.keychains, {
       cid: this.getStringAttribute(message, 'externalIdentifier'),
       id: ownerIdentityId,
       lastEventId: message.event_id,
@@ -148,7 +196,7 @@ export class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'communityId') ||
       message.aggregate_id;
 
-    await stores.communities.put?.({
+    await this.put(stores.communities, {
       ...community,
       id: communityId,
       lastEventId: message.event_id,
@@ -169,7 +217,7 @@ export class OrbitDBDomainEventProjector {
       return;
     }
 
-    await stores.communities.put?.({
+    await this.put(stores.communities, {
       ...message.attributes,
       id: message.aggregate_id,
       lastEventId: message.event_id,
@@ -186,7 +234,7 @@ export class OrbitDBDomainEventProjector {
     const conversationId =
       this.stringValue(conversation || {}, 'id') || message.aggregate_id;
 
-    await stores.conversations.put?.({
+    await this.put(stores.conversations, {
       ...(conversation || message.attributes),
       id: conversationId,
       lastEventId: message.event_id,
@@ -206,7 +254,7 @@ export class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'messageId') ||
       message.aggregate_id;
 
-    await stores.messages.put?.({
+    await this.put(stores.messages, {
       ...document,
       id: messageId,
       lastEventId: message.event_id,
@@ -236,7 +284,7 @@ export class OrbitDBDomainEventProjector {
       message.type === ConversationMessageWasDeletedEvent.EVENT_NAME &&
       targetMessageId
     ) {
-      await stores.messages.put?.({
+      await this.put(stores.messages, {
         conversationId,
         id: targetMessageId,
         messageId: targetMessageId,
@@ -321,7 +369,7 @@ export class OrbitDBDomainEventProjector {
     const scopeType = this.reactionScopeType(message, reaction);
     const id = this.reactionDocumentId(message, reaction, scopeType);
 
-    await stores.reactions.put?.({
+    await this.put(stores.reactions, {
       ...reaction,
       id,
       lastEventId: message.event_id,
@@ -390,7 +438,8 @@ export class OrbitDBDomainEventProjector {
       return;
     }
 
-    await stores.heads.put?.(
+    await this.putHead(
+      stores,
       `read-marker:${message.aggregate_id}:${readerIdentityId}`,
       {
         eventId: message.event_id,
@@ -407,7 +456,7 @@ export class OrbitDBDomainEventProjector {
   ): Promise<void> {
     const notification = this.getRecordAttribute(message, 'notification');
 
-    await stores.notifications.put?.({
+    await this.put(stores.notifications, {
       ...(notification || message.attributes),
       id: message.aggregate_id,
       lastEventId: message.event_id,
@@ -426,12 +475,34 @@ export class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'inviteId') ||
       message.aggregate_id;
 
-    await stores.requests.put?.({
+    await this.put(stores.requests, {
       ...(request || message.attributes),
       id: requestId,
+      kind: 'community_membership_request',
       lastEventId: message.event_id,
       lastEventType: message.type,
       receivedAt: this.receivedAt(message),
+    });
+  }
+
+  private async projectInvite(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const invite = this.getRecordAttribute(message, 'invite') || {};
+    const token =
+      this.stringValue(invite, 'token') ||
+      this.getStringAttribute(message, 'inviteToken') ||
+      message.aggregate_id;
+
+    await this.put(stores.requests, {
+      ...invite,
+      id: token,
+      kind: 'community_invite',
+      lastEventId: message.event_id,
+      lastEventType: message.type,
+      receivedAt: this.receivedAt(message),
+      token,
     });
   }
 
@@ -439,9 +510,31 @@ export class OrbitDBDomainEventProjector {
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
-    await stores.ipfsReplication.put?.({
+    await this.put(stores.ipfsReplication, {
       ...message.attributes,
       id: message.aggregate_id,
+      lastEventId: message.event_id,
+      receivedAt: this.receivedAt(message),
+    });
+  }
+
+  private async projectIPFSReplicaClaim(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const cid = this.getStringAttribute(message, 'cid') || message.aggregate_id;
+    const networkId = this.getStringAttribute(message, 'networkId');
+    const nodeId = this.getStringAttribute(message, 'nodeId');
+
+    if (!networkId || !nodeId) {
+      return;
+    }
+
+    await this.put(stores.ipfsReplication, {
+      ...message.attributes,
+      cid,
+      id: `${cid}:${networkId}:${nodeId}`,
+      kind: 'ipfs_content_replica_claim',
       lastEventId: message.event_id,
       receivedAt: this.receivedAt(message),
     });
@@ -609,8 +702,19 @@ export class OrbitDBDomainEventProjector {
         project: () => this.projectRequest(stores, message),
       },
       {
+        eventNames: [
+          CommunityInviteWasCreatedEvent.EVENT_NAME,
+          CommunityInviteWasAcceptedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectInvite(stores, message),
+      },
+      {
         eventNames: [IPFSContentReplicationWasRegisteredEvent.EVENT_NAME],
         project: () => this.projectIPFSReplication(stores, message),
+      },
+      {
+        eventNames: [IPFSContentReplicationWasClaimedEvent.EVENT_NAME],
+        project: () => this.projectIPFSReplicaClaim(stores, message),
       },
     ].find(({ eventNames }) => eventNames.includes(message.type));
 

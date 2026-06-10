@@ -10,7 +10,7 @@ import { InvalidMessageSignatureError } from '../errors/InvalidMessageSignatureE
 import { Message } from '../Message';
 import { MessageSignaturePayload } from '../types/MessageSignaturePayload';
 
-export class MessageSignatureDomainService {
+export default class MessageSignatureDomainService {
   private getCanonicalPayload(
     payload: MessageSignaturePayload,
   ): MessageSignaturePayload {

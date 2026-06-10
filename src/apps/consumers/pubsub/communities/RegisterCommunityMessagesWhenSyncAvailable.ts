@@ -1,46 +1,40 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
-import { CommunityChannelMessageCandidateRegistrar } from './CommunityChannelMessageCandidateRegistrar';
+import CommunityMessageRegistrar from './CommunityChannelMessageCandidateRegistrar';
 import { isCommunityChannelMessagePrimitive } from './isCommunityChannelMessagePrimitive';
 import { isCommunityChannelMessageReactionPrimitive } from './isCommunityChannelMessageReactionPrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
-type ReactionRepository = MongoCommunityMessageReactionRepository;
-
-export default class RegisterCommunityMessagesWhenSync extends Consumer {
+// eslint-disable-next-line max-len
+export default class RegisterCommunityMessagesWhenSyncAvailable extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.register-community-messages-when-sync-available';
 
   constructor(
-    consumer: DomainEventConsumer,
-    private readonly communityRepository: MongoCommunityRepository,
-    private readonly messageRepository: MongoCommunityChannelMessageRepository,
-    private readonly reactionRepository: ReactionRepository,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly eventConsumer: DomainEventConsumer,
+    private readonly communityRepository: CommunityRepository,
+    private readonly messageRepository: CommunityChannelMessageRepository,
+    private readonly reactionRepository: CommunityMessageReactionRepository,
+    private readonly tracker: SyncResponseSuppressionTracker,
+    private readonly messageRegistrar: CommunityMessageRegistrar,
   ) {
-    super(consumer);
-  }
-
-  private get messageRegistrar(): CommunityChannelMessageCandidateRegistrar {
-    return new CommunityChannelMessageCandidateRegistrar(
-      this.messageRepository,
-    );
+    super(eventConsumer);
   }
 
   public get queueName(): string {
-    return RegisterCommunityMessagesWhenSync.QUEUE_NAME;
+    return RegisterCommunityMessagesWhenSyncAvailable.QUEUE_NAME;
   }
 
   public get eventName(): string {

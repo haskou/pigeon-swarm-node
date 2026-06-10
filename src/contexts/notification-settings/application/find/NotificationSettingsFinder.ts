@@ -1,5 +1,5 @@
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
-import { NotificationScopeSettingsRepository } from '../../domain/repositories/NotificationScopeSettingsRepository';
+import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingsFindMessage } from './messages/NotificationSettingsFindMessage';
 
 export class NotificationSettingsFinder {

@@ -1,4 +1,4 @@
-import { IdentityRepository } from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import IdentitySaverService from '@app/contexts/identities/domain/services/IdentitySaverService';
 import { mock, MockProxy } from 'jest-mock-extended';
 

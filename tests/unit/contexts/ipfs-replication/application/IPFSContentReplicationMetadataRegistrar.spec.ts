@@ -1,6 +1,6 @@
 import IPFSContentReplicationMetadataRegistrar from '@app/contexts/ipfs-replication/application/register-content/IPFSContentReplicationMetadataRegistrar';
 import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
-import { IPFSContentReplicationRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
+import IPFSContentReplicationRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationMetadata } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';

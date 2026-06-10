@@ -1,5 +1,5 @@
 import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
-import { MessageReactionRepository } from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
+import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
@@ -7,15 +7,16 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { MongoMessageReactionDocument } from './documents/MongoMessageReactionDocument';
 import MongoMessageReactionMapper from './mappers/MongoMessageReactionMapper';
 
-type Repository = MessageReactionRepository;
-
-export default class MongoMessageReactionRepository implements Repository {
+// eslint-disable-next-line max-len
+export default class MongoMessageReactionRepository extends MessageReactionRepository {
   private static readonly COLLECTION = 'conversation_message_reactions';
 
   constructor(
     private readonly mongo: MongoDB,
     private readonly mapper: MongoMessageReactionMapper,
-  ) {}
+  ) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoMessageReactionDocument>(

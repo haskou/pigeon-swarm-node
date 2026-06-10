@@ -3,12 +3,16 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Notification } from '../Notification';
 import { NotificationId } from '../value-objects/NotificationId';
 
-export interface NotificationRepository {
-  findById(notificationId: NotificationId): Promise<Notification | undefined>;
-  findByRecipient(
+export default abstract class NotificationRepository {
+  public abstract findById(
+    notificationId: NotificationId,
+  ): Promise<Notification | undefined>;
+
+  public abstract findByRecipient(
     recipientIdentityId: IdentityId,
     limit: number,
     beforeNotificationId?: NotificationId,
   ): Promise<Notification[]>;
-  save(notification: Notification): Promise<void>;
+
+  public abstract save(notification: Notification): Promise<void>;
 }

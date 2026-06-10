@@ -1,21 +1,24 @@
 import Kernel from '@app/Kernel';
 import { createRequire } from 'module';
 
-import { PushNotificationDelivery } from '../../application/send/PushNotificationDelivery';
+import PushNotificationDelivery from '../../application/send/PushNotificationDelivery';
 import { PushNotificationPayload } from '../../application/send/PushNotificationPayload';
 import { PushNotificationDeliveryResult } from '../../application/send/types/PushNotificationDeliveryResult';
 import { PushSubscription } from '../../domain/PushSubscription';
-import { PushVapidConfiguration } from './PushVapidConfiguration';
+import PushVapidConfiguration from './PushVapidConfiguration';
 import { WebPushError } from './types/WebPushError';
 import { WebPushModule } from './types/WebPushModule';
 import { WebPushSendResult } from './types/WebPushSendResult';
 
-export class WebPushNotificationDelivery implements PushNotificationDelivery {
+// eslint-disable-next-line max-len
+export default class WebPushNotificationDelivery extends PushNotificationDelivery {
   private readonly configuration = new PushVapidConfiguration();
   private readonly webPush = this.loadWebPush();
   private hasLoggedDisabledDelivery = false;
 
   constructor() {
+    super();
+
     if (this.isConfigured() && this.webPush) {
       this.configuration.setVapidDetailsWith((subject, publicKey, privateKey) =>
         this.webPush?.setVapidDetails(subject, publicKey, privateKey),

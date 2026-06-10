@@ -2,17 +2,19 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
-import { CommunityRequestStore } from '../../domain/repositories/CommunityRequestStore';
+import CommunityRequestStore from '../../domain/repositories/CommunityRequestStore';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityRequestId } from '../../domain/value-objects/CommunityRequestId';
 import { MongoCommunityDocument } from './documents/MongoCommunityDocument';
 import { MongoCommunityRequestDocument } from './documents/MongoCommunityRequestDocument';
 
-export class MongoCommunityRequestStore implements CommunityRequestStore {
+export default class MongoCommunityRequestStore extends CommunityRequestStore {
   private static readonly COLLECTION = 'community_membership_requests';
   private static readonly COMMUNITIES_COLLECTION = 'communities';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityRequestDocument>(

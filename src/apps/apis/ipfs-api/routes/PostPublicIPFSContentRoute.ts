@@ -1,3 +1,5 @@
+import { maxIPFSContentSizeBytes } from '@app/contexts/ipfs-replication/application/publish-content/IPFSContentUploadLimits';
+import { IPFSContentPublishMessage } from '@app/contexts/ipfs-replication/application/publish-content/messages/IPFSContentPublishMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import * as express from 'express';
 import { Request, Response } from 'express';
@@ -10,7 +12,6 @@ import {
   UseBefore,
 } from 'routing-controllers';
 
-import { maxIPFSContentSizeBytes } from '../IPFSContentLimits';
 import { IPFSContentUploadRoute } from './IPFSContentUploadRoute';
 
 @JsonController('/ipfs')
@@ -28,12 +29,15 @@ export class PostPublicIPFSContentRoute extends IPFSContentUploadRoute {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const published = await this.publisher().publishPublic({
-      body: this.bodyFrom(request),
-      contentType,
-      filename,
-      ownerIdentityId: await this.authenticate(request),
-    });
+    const ownerIdentityId = await this.authenticate(request);
+    const published = await this.publisher().publishPublic(
+      new IPFSContentPublishMessage({
+        body: this.bodyFrom(request),
+        contentType,
+        filename,
+        ownerIdentityId: ownerIdentityId.valueOf(),
+      }),
+    );
 
     return response.status(HttpRouteStatusEnum.CREATED).json(published);
   }

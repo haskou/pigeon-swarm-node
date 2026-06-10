@@ -5,15 +5,17 @@ import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIde
 import { ProfileHandle } from '../value-objects/ProfileHandle';
 import { IdentityCandidate } from './types/IdentityCandidate';
 
-export { IdentityCandidate } from './types/IdentityCandidate';
+export default abstract class IdentityRepository {
+  public abstract save(identity: Identity): Promise<void>;
+  public abstract findById(id: IdentityId): Promise<Identity>;
+  public abstract findCandidateReferencesById(
+    id: IdentityId,
+  ): Promise<IdentityCandidate[]>;
 
-export interface IdentityRepository {
-  save(identity: Identity): Promise<void>;
-  findById(id: IdentityId): Promise<Identity>;
-  findCandidateReferencesById(id: IdentityId): Promise<IdentityCandidate[]>;
-  findByHandle(handle: ProfileHandle): Promise<Identity>;
-  findByExternalIdentifier(
+  public abstract findByHandle(handle: ProfileHandle): Promise<Identity>;
+  public abstract findByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity | undefined>;
-  findCandidatesById(id: IdentityId): Promise<Identity[]>;
+
+  public abstract findCandidatesById(id: IdentityId): Promise<Identity[]>;
 }

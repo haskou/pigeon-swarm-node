@@ -1,11 +1,10 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { ThreadMessagesFindMessage } from '@app/contexts/conversations/application/find-latest-messages/messages/ThreadMessagesFindMessage';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MongoPollRepository } from '@app/contexts/polls/infrastructure/mongo/MongoPollRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -37,13 +36,9 @@ export class GetConversationMessagesRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private callRepository(): MongoCallRepository {
-    return new MongoCallRepository(this.get<MongoDB>(MongoDB));
-  }
+  private readonly calls = this.get<CallRepository>(CallRepository);
 
-  private pollRepository(): MongoPollRepository {
-    return new MongoPollRepository(this.get<MongoDB>(MongoDB));
-  }
+  private readonly polls = this.get<PollRepository>(PollRepository);
 
   @Get('/:conversationId/messages')
   public async getMessages(
@@ -67,7 +62,7 @@ export class GetConversationMessagesRoute extends Route {
       Math.max(Number(limit) || GetConversationMessagesRoute.DEFAULT_LIMIT, 1),
       GetConversationMessagesRoute.MAX_LIMIT,
     );
-    const calls = await this.callRepository().findByConversationId(
+    const calls = await this.calls.findByConversationId(
       new ConversationId(conversationId),
     );
     const callEvents =
@@ -80,7 +75,7 @@ export class GetConversationMessagesRoute extends Route {
     const polls =
       beforeMessageId && messages.length === 0
         ? []
-        : await this.pollRepository().findByGroupConversation(
+        : await this.polls.findByGroupConversation(
             new ConversationId(conversationId),
             safeLimit,
             beforeMessageId ? upperBound : undefined,

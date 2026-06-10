@@ -9,13 +9,15 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class GetCallsRoute extends CallRouteSupport {
+  private readonly finder = this.get<ActiveCallsFinder>(ActiveCallsFinder);
+
   @Get('/')
   public async getCalls(
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const requesterIdentityId = await this.authenticate(request);
-    const calls = await new ActiveCallsFinder(this.callRepository()).find(
+    const calls = await this.finder.find(
       new ActiveCallsFindMessage(requesterIdentityId.valueOf()),
     );
 

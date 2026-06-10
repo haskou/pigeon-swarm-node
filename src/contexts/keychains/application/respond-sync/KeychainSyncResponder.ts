@@ -10,7 +10,7 @@ export default class KeychainSyncResponder {
   constructor(
     private readonly finder: CurrentKeychainFinder,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {}
 
   public async respond(message: KeychainSyncResponseMessage): Promise<void> {

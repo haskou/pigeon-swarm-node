@@ -2,15 +2,17 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { CommunityInvite } from '../../domain/entities/invites/CommunityInvite';
 import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
-import { CommunityInviteRepository as InviteRepository } from '../../domain/repositories/CommunityInviteRepository';
+import InviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '../../domain/value-objects/CommunityInviteToken';
 import { MongoCommunityInviteDocument } from './documents/MongoCommunityInviteDocument';
 
-export class MongoCommunityInviteRepository implements InviteRepository {
+export default class MongoCommunityInviteRepository extends InviteRepository {
   private static readonly COLLECTION = 'community_invites';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityInviteDocument>(

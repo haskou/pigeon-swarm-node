@@ -1,15 +1,17 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
+import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerPackId } from '../../domain/value-objects/StickerPackId';
 import { MongoStickerPackDocument } from './documents/MongoStickerPackDocument';
 
-export class MongoStickerPackRepository implements StickerPackRepository {
+export default class MongoStickerPackRepository extends StickerPackRepository {
   private static readonly COLLECTION = 'sticker_packs';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoStickerPackDocument>(

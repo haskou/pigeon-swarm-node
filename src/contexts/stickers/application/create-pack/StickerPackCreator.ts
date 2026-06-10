@@ -1,7 +1,7 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
-import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
-import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
+import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
+import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerPackCreateMessage } from './messages/StickerPackCreateMessage';

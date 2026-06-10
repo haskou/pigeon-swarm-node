@@ -1,4 +1,6 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import Kernel from '@app/Kernel';
 import path from 'path';
 
@@ -32,6 +34,13 @@ export class OrbitDBReplicatedStateStores {
 
   private static getStoreName(networkId: string, store: string): string {
     return `private-network/${networkId}/${store}`;
+  }
+
+  private static getLocalStoragePath(): string {
+    return path.join(
+      process.env.IPFS_STORAGE_PATH || './ipfs_storage',
+      'orbitdb-local-ipfs',
+    );
   }
 
   private static async openDocumentsStore(
@@ -137,6 +146,18 @@ export class OrbitDBReplicatedStateStores {
         AccessController,
       ),
     });
+  }
+
+  public static async openLocal(): Promise<OrbitDBReplicatedStateStores> {
+    const connection = await PublicIPFS.create({
+      storageLocation: this.getLocalStoragePath(),
+    });
+    const network = new IPFSNetwork(
+      new IPFSNetworkConfig('local', 'local-orbitdb-state'),
+      connection,
+    );
+
+    return this.open(network);
   }
 
   private constructor(stores: OrbitDBReplicatedStoreSet) {

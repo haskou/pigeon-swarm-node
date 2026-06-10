@@ -1,7 +1,5 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { NotificationSettingsServicesFactory } from '@app/contexts/notification-settings/application/NotificationSettingsServicesFactory';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import { NotificationScopeSettingsResetter } from '@app/contexts/notification-settings/application/reset/NotificationScopeSettingsResetter';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -15,12 +13,9 @@ export class DeleteNotificationScopeSettingsRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private settingsServices(): NotificationSettingsServicesFactory {
-    return new NotificationSettingsServicesFactory(
-      this.get<MongoDB>(MongoDB),
-      this.get<MessageBus>(MessageBus),
-    );
-  }
+  private readonly resetter = this.get<NotificationScopeSettingsResetter>(
+    NotificationScopeSettingsResetter,
+  );
 
   @Delete('/scopes')
   public async deleteScopeSettings(
@@ -30,14 +25,12 @@ export class DeleteNotificationScopeSettingsRoute extends Route {
   ): Promise<Response> {
     const identityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    await this.settingsServices()
-      .resetter()
-      .reset(
-        new DeleteNotificationScopeSettingsRequest(
-          identityId.valueOf(),
-          body,
-        ).getMessage(),
-      );
+    await this.resetter.reset(
+      new DeleteNotificationScopeSettingsRequest(
+        identityId.valueOf(),
+        body,
+      ).getMessage(),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send();
   }

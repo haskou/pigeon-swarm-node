@@ -1,6 +1,6 @@
-import { IdentityRepository } from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import IdentityFinderService from '@app/contexts/identities/domain/services/IdentityFinderService';
-import { IdentityResolutionDomainService } from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
+import IdentityResolutionDomainService from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';

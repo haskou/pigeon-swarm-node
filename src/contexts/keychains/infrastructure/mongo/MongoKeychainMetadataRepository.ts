@@ -4,16 +4,21 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Sort } from 'mongodb';
 
 import { Keychain } from '../../domain/Keychain';
+import KeychainMetadataRepository from '../../domain/repositories/KeychainMetadataRepository';
+import { KeychainExternalIdentifier } from '../../domain/value-objects/KeychainExternalIdentifier';
 import { MongoKeychainMetadataDocument } from './documents/MongoKeychainMetadataDocument';
 import MongoKeychainMetadataMapper from './mappers/MongoKeychainMetadataMapper';
 
-export default class MongoKeychainMetadataRepository {
+// eslint-disable-next-line max-len
+export default class MongoKeychainMetadataRepository extends KeychainMetadataRepository {
   private static readonly COLLECTION = 'keychain_metadata';
 
   constructor(
     private readonly mongo: MongoDB,
     private readonly mapper: MongoKeychainMetadataMapper,
-  ) {}
+  ) {
+    super();
+  }
 
   public async findByOwnerIdentityId(
     ownerIdentityId: IdentityId,
@@ -39,12 +44,18 @@ export default class MongoKeychainMetadataRepository {
     return collection.find().toArray();
   }
 
-  public async save(keychain: Keychain, cid: IPFSId): Promise<void> {
+  public async save(
+    keychain: Keychain,
+    externalIdentifier: KeychainExternalIdentifier,
+  ): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoKeychainMetadataDocument>(
         MongoKeychainMetadataRepository.COLLECTION,
       );
-    const document = this.mapper.toDocument(keychain, cid);
+    const document = this.mapper.toDocument(
+      keychain,
+      new IPFSId(externalIdentifier.valueOf()),
+    );
 
     await collection.updateOne(
       { _id: document._id },

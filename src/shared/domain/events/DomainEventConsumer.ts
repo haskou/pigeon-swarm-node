@@ -1,7 +1,7 @@
 import DomainEvent from './DomainEvent';
 
-interface DomainEventConsumer {
-  consume(
+export default abstract class DomainEventConsumer {
+  public abstract consume(
     queueName: string,
     bindingKey: string,
     domainEvent: typeof DomainEvent,
@@ -9,5 +9,3 @@ interface DomainEventConsumer {
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void>;
 }
-
-export default DomainEventConsumer;

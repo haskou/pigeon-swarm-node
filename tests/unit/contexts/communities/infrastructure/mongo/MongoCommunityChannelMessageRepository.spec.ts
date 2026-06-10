@@ -1,5 +1,5 @@
 import { MongoCommunityChannelMessageDocument } from '@app/contexts/communities/infrastructure/mongo/documents/MongoCommunityChannelMessageDocument';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import MongoCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Collection } from 'mongodb';

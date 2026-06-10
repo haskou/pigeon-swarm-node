@@ -2,8 +2,8 @@ import SyncResponseSuppressionTracker from '@app/contexts/shared/application/syn
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { ConversationSyncAvailableEvent } from '../../domain/events/ConversationSyncAvailableEvent';
-import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
-import { MessageReactionRepository } from '../../domain/repositories/MessageReactionRepository';
+import ConversationRepository from '../../domain/repositories/ConversationRepository';
+import MessageReactionRepository from '../../domain/repositories/MessageReactionRepository';
 import { ConversationSyncResponseMessage } from './messages/ConversationSyncResponseMessage';
 
 export default class ConversationSyncResponder {
@@ -13,7 +13,7 @@ export default class ConversationSyncResponder {
     private readonly repository: ConversationRepository,
     private readonly reactionRepository: MessageReactionRepository,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {}
 
   public async respond(

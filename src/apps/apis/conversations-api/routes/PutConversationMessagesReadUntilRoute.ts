@@ -1,8 +1,5 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import MessagesReadMarker from '@app/contexts/conversations/application/mark-messages-read/MessagesReadMarker';
-import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -20,10 +17,7 @@ import { PutConversationMessagesReadUntilRequest } from '../requests/PutConversa
 
 @JsonController('/conversations')
 export class PutConversationMessagesReadUntilRoute extends Route {
-  private readonly marker = new MessagesReadMarker(
-    new OrbitDBConversationRepository(),
-    this.get<DomainEventPublisher>(MessageBus),
-  );
+  private readonly marker = this.get<MessagesReadMarker>(MessagesReadMarker);
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);

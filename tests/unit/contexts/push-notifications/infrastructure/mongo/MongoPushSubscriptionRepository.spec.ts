@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { MongoPushSubscriptionDocument } from '@app/contexts/push-notifications/infrastructure/mongo/documents/MongoPushSubscriptionDocument';
-import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
+import MongoPushSubscriptionRepository from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Collection } from 'mongodb';
 import { mock, MockProxy } from 'jest-mock-extended';

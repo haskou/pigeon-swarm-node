@@ -1,6 +1,7 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { CommunityChannelMessage } from '../../domain/entities/messages/CommunityChannelMessage';
+import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
@@ -8,14 +9,15 @@ import { MongoCommunityChannelMessageDocument } from './documents/MongoCommunity
 import { CommunityChannelThreadSummary } from './types/CommunityChannelThreadSummary';
 import { CommunityChannelThreadSummaryDocument } from './types/CommunityChannelThreadSummaryDocument';
 
-export { CommunityChannelThreadSummary } from './types/CommunityChannelThreadSummary';
-
-export class MongoCommunityChannelMessageRepository {
+// eslint-disable-next-line max-len
+export default class MongoCommunityChannelMessageRepository extends CommunityChannelMessageRepository {
   private static readonly COLLECTION = 'community_channel_messages';
   private static readonly THREAD_SUMMARY_CANDIDATE_MULTIPLIER = 25;
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityChannelMessageDocument>(

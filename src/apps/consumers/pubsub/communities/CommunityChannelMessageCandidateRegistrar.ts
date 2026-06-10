@@ -4,7 +4,8 @@ import { CommunityChannelMessageMention } from '@app/contexts/communities/domain
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
 import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import MessageSignatureService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
@@ -12,16 +13,13 @@ import { CommunityChannelMessageId } from '@app/contexts/communities/domain/valu
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
 import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { assert, Signature, Timestamp } from '@haskou/value-objects';
 
-export class CommunityChannelMessageCandidateRegistrar {
-  private readonly signatureService =
-    new CommunityChannelMessageSignatureDomainService();
-
+export default class CommunityChannelMessageCandidateRegistrar {
   constructor(
-    private readonly messageRepository: MongoCommunityChannelMessageRepository,
+    private readonly messageRepository: CommunityChannelMessageRepository,
+    private readonly signatureService: MessageSignatureService,
   ) {}
 
   private sameCommunity(

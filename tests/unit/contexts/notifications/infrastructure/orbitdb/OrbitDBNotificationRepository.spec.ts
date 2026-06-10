@@ -1,7 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
 import { OrbitDBNotificationDocument } from '@app/contexts/notifications/infrastructure/orbitdb/documents/OrbitDBNotificationDocument';
+import OrbitDBNotificationMapper from '@app/contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper';
 import OrbitDBNotificationRepository from '@app/contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -9,6 +10,7 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 describe('OrbitDBNotificationRepository', () => {
   let put: jest.Mock;
   let query: jest.Mock;
+  let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBNotificationRepository;
 
   const identityMother = new IdentityMother();
@@ -43,18 +45,22 @@ describe('OrbitDBNotificationRepository', () => {
         ].filter(matcher),
       ),
     );
-    OrbitDBReplicatedStateRegistry.shared().clear();
-    OrbitDBReplicatedStateRegistry.shared().register('network-1', {
+    registry = new OrbitDBReplicatedStateRegistry();
+    registry.clear();
+    registry.register('network-1', {
       notifications: {
         put,
         query,
       },
     } as never);
-    repository = new OrbitDBNotificationRepository();
+    repository = new OrbitDBNotificationRepository(
+      registry,
+      new OrbitDBNotificationMapper(),
+    );
   });
 
   afterEach(() => {
-    OrbitDBReplicatedStateRegistry.shared().clear();
+    registry.clear();
   });
 
   it('should find a notification by id from OrbitDB', async () => {

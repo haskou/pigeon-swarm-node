@@ -2,18 +2,23 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { createHash } from 'node:crypto';
 
 import { CommunityChannelMessageReaction } from '../../domain/entities/messages/CommunityChannelMessageReaction';
+import CommunityMessageReactionRepository from '../../domain/repositories/CommunityMessageReactionRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
-import { MongoCommunityChannelMessageReactionDocument as ReactionDocument } from './documents/MongoCommunityChannelMessageReactionDocument';
+import { MongoCommunityChannelMessageReactionDocument } from './documents/MongoCommunityChannelMessageReactionDocument';
 
-export class MongoCommunityMessageReactionRepository {
+// eslint-disable-next-line max-len
+export default class MongoCommunityMessageReactionRepository extends CommunityMessageReactionRepository {
   private static readonly COLLECTION = 'community_channel_message_reactions';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
-    return this.mongo.getCollection<ReactionDocument>(
+    // eslint-disable-next-line max-len
+    return this.mongo.getCollection<MongoCommunityChannelMessageReactionDocument>(
       MongoCommunityMessageReactionRepository.COLLECTION,
     );
   }
@@ -36,7 +41,7 @@ export class MongoCommunityMessageReactionRepository {
 
   private toDocument(
     reaction: CommunityChannelMessageReaction,
-  ): ReactionDocument {
+  ): MongoCommunityChannelMessageReactionDocument {
     const primitives = reaction.toPrimitives();
 
     return {
@@ -51,7 +56,7 @@ export class MongoCommunityMessageReactionRepository {
   }
 
   private toDomain(
-    document: ReactionDocument,
+    document: MongoCommunityChannelMessageReactionDocument,
   ): CommunityChannelMessageReaction {
     return CommunityChannelMessageReaction.fromPrimitives({
       authorIdentityId: document.authorIdentityId,

@@ -2,14 +2,17 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
-import { NotificationScopeSettingsRepository as Repository } from '../../domain/repositories/NotificationScopeSettingsRepository';
+import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingScope } from '../../domain/value-objects/NotificationSettingScope';
 import { MongoNotificationScopeSettingsDocument } from './documents/MongoNotificationScopeSettingsDocument';
 
-export class MongoNotificationScopeSettingsRepository implements Repository {
+// eslint-disable-next-line max-len
+export default class MongoNotificationScopeSettingsRepository extends NotificationScopeSettingsRepository {
   private static readonly COLLECTION = 'notification_scope_settings';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private documentId(identityId: IdentityId, scope: NotificationSettingScope) {
     return `${identityId.valueOf()}:${scope.key()}`;

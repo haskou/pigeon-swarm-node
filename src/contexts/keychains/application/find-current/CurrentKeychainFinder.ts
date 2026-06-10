@@ -1,9 +1,7 @@
-import {
-  KeychainCandidate,
-  KeychainRepository,
-} from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
-import { KeychainSignatureDomainService } from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/types/KeychainCandidate';
+import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 
 import { KeychainNotFoundError } from '../../domain/errors/KeychainNotFoundError';
 import { CurrentKeychainFindMessage } from './messages/CurrentKeychainFindMessage';
@@ -12,7 +10,7 @@ export default class CurrentKeychainFinder {
   constructor(
     private readonly repository: KeychainRepository,
     private readonly validator: KeychainCandidateValidationDomainService,
-    private readonly signatureService = new KeychainSignatureDomainService(),
+    private readonly signatureService: KeychainSignatureDomainService,
   ) {}
 
   private async isValidCandidate(

@@ -9,6 +9,8 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class GetCallRoute extends CallRouteSupport {
+  private readonly finder = this.get<CallFinder>(CallFinder);
+
   @Get('/:callId')
   public async getCall(
     @Param('callId') callId: string,
@@ -16,7 +18,7 @@ export class GetCallRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const requesterIdentityId = await this.authenticate(request);
-    const call = await new CallFinder(this.callRepository()).find(
+    const call = await this.finder.find(
       new CallFindMessage(callId, requesterIdentityId.valueOf()),
     );
 

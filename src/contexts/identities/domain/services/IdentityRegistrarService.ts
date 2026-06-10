@@ -1,8 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Identity } from '../Identity';
-import { IdentityRepository } from '../repositories/IdentityRepository';
-import { IdentityResolutionDomainService } from './IdentityResolutionDomainService';
+import IdentityRepository from '../repositories/IdentityRepository';
+import IdentityResolutionDomainService from './IdentityResolutionDomainService';
 
 export default class IdentityRegistrarService {
   constructor(

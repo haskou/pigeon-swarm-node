@@ -1,15 +1,17 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
-import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
+import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { MongoStickerUserLibraryDocument } from './documents/MongoStickerUserLibraryDocument';
 
 // eslint-disable-next-line max-len
-export class MongoStickerUserLibraryRepository implements StickerUserLibraryRepository {
+export default class MongoStickerUserLibraryRepository extends StickerUserLibraryRepository {
   private static readonly COLLECTION = 'sticker_user_libraries';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoStickerUserLibraryDocument>(

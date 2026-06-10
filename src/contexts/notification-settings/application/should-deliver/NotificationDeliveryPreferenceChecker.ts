@@ -1,8 +1,8 @@
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
-import { NotificationScopeSettingsRepository } from '../../domain/repositories/NotificationScopeSettingsRepository';
+import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationDeliveryShouldSendPushMessage } from './messages/NotificationDeliveryShouldSendPushMessage';
 
-export class NotificationDeliveryPreferenceChecker {
+export default class NotificationDeliveryPreferenceChecker {
   constructor(
     private readonly repository: NotificationScopeSettingsRepository,
   ) {}

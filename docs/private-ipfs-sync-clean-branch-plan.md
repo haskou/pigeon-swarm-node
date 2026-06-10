@@ -160,6 +160,10 @@ Rules:
   with an OrbitDB-backed repository/query service, not as a compatibility layer
   to maintain;
 - local runtime state remains local and does not need replication.
+- OrbitDB also opens a local, non-network store for application state before any
+  private/public network exists. This keeps local-only API flows working without
+  falling back to MongoDB, while replicated network stores are still opened per
+  IPFS network when those networks are registered.
 
 The clean branch must verify that these are represented in OrbitDB events and
 projected into the relevant document/keyvalue stores:
@@ -174,6 +178,15 @@ projected into the relevant document/keyvalue stores:
 - community invites;
 - membership requests;
 - IPFS replication metadata.
+
+Community invite link state is represented by replicated domain events:
+
+- `communities.v1.invite.was_created`
+- `communities.v1.invite.was_accepted`
+
+Those events project into the shared `requests` document store with
+`kind: community_invite`, so invite creation and usage counts are not only
+local document writes.
 
 Whether an event originates from local HTTP, OrbitDB replication, or repair
 logic, the backend must process it through the same application path:

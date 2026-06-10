@@ -2,14 +2,14 @@ import SyncResponseSuppressionTracker from '@app/contexts/shared/application/syn
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { IdentitySyncAvailableEvent } from '../../domain/events/IdentitySyncAvailableEvent';
-import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
+import IdentityRepository from '../../domain/repositories/IdentityRepository';
 import { IdentitySyncResponseMessage } from './messages/IdentitySyncResponseMessage';
 
 export default class IdentitySyncResponder {
   constructor(
     private readonly repository: IdentityRepository,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {}
 
   public async respond(message: IdentitySyncResponseMessage): Promise<void> {

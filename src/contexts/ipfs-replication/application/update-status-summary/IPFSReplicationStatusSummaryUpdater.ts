@@ -2,7 +2,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Integer, Timestamp } from '@haskou/value-objects';
 
 import { IPFSReplicationStatusSummary } from '../../domain/IPFSReplicationStatusSummary';
-import { IPFSReplicationStatusSummaryRepository } from '../../domain/repositories/IPFSReplicationStatusSummaryRepository';
+import IPFSReplicationStatusSummaryRepository from '../../domain/repositories/IPFSReplicationStatusSummaryRepository';
 import { IPFSContentSize } from '../../domain/value-objects/IPFSContentSize';
 import { IPFSReplicationStatus } from '../find-status/types/IPFSReplicationStatus';
 

@@ -1,5 +1,5 @@
 import { Conversation } from '../../domain/Conversation';
-import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
+import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import { RegisterConversationMessage } from './messages/RegisterConversationMessage';
 
 export default class ConversationRegistrar {

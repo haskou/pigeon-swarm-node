@@ -1,4 +1,4 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import MessageReactionAdder from '@app/contexts/conversations/application/add-reaction/MessageReactionAdder';
 import MessageReactionRemover from '@app/contexts/conversations/application/remove-reaction/MessageReactionRemover';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';

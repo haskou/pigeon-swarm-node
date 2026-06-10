@@ -3,7 +3,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { PollVoteWasCastEvent } from '../../domain/events/PollVoteWasCastEvent';
 import { Poll } from '../../domain/Poll';
-import { PollRepository } from '../../domain/repositories/PollRepository';
+import PollRepository from '../../domain/repositories/PollRepository';
 import { PollVoteCastMessage } from './messages/PollVoteCastMessage';
 
 export class PollVoteCaster {

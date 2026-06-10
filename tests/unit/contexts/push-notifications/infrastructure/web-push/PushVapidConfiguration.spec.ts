@@ -1,4 +1,4 @@
-import { PushVapidConfiguration } from '@app/contexts/push-notifications/infrastructure/web-push/PushVapidConfiguration';
+import PushVapidConfiguration from '@app/contexts/push-notifications/infrastructure/web-push/PushVapidConfiguration';
 
 describe('PushVapidConfiguration', () => {
   it('requires both public and private keys to enable push', () => {

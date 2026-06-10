@@ -2,14 +2,18 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Timestamp } from '@haskou/value-objects';
 
+import CommunityChannelDraftRepository from '../../domain/repositories/CommunityChannelDraftRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { MongoCommunityChannelDraftDocument } from './documents/MongoCommunityChannelDraftDocument';
 
-export class MongoCommunityChannelDraftRepository {
+// eslint-disable-next-line max-len
+export default class MongoCommunityChannelDraftRepository extends CommunityChannelDraftRepository {
   private static readonly COLLECTION = 'community_channel_drafts';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityChannelDraftDocument>(

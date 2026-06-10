@@ -251,11 +251,9 @@ describe('PubSub sync consumers', () => {
 
   it('registers announced conversation message mutations', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
-    const conversationRegistrar = mock<ConversationRegistrar>();
     const sentConsumer = new RegisterMessageWhenAnnounced(
       eventConsumer,
       registrar,
-      conversationRegistrar,
     );
     const editedConsumer = new RegisterMessageEditionWhenAnnounced(
       eventConsumer,
@@ -291,11 +289,9 @@ describe('PubSub sync consumers', () => {
 
   it('does not synthesize missing conversation metadata from message announcements', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
-    const conversationRegistrar = mock<ConversationRegistrar>();
     const consumer = new RegisterMessageWhenAnnounced(
       eventConsumer,
       registrar,
-      conversationRegistrar,
     );
     const expectedError = new ConversationNotFoundError(
       new ConversationId(conversationId),
@@ -317,17 +313,14 @@ describe('PubSub sync consumers', () => {
       ),
     ).rejects.toBe(expectedError);
 
-    expect(conversationRegistrar.register).not.toHaveBeenCalled();
     expect(registrar.register).toHaveBeenCalledTimes(1);
   });
 
   it('registers announced messages from the embedded encrypted candidate', async () => {
     const registrar = mock<ConversationMessageRegistrar>();
-    const conversationRegistrar = mock<ConversationRegistrar>();
     const consumer = new RegisterMessageWhenAnnounced(
       eventConsumer,
       registrar,
-      conversationRegistrar,
     );
     const authorId = new IdentityMother().id;
     const candidate = MessageSent.create({

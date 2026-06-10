@@ -1,6 +1,6 @@
 import IPFSReplicationStatusSummaryUpdater from '@app/contexts/ipfs-replication/application/update-status-summary/IPFSReplicationStatusSummaryUpdater';
 import { IPFSReplicationStatusSummary } from '@app/contexts/ipfs-replication/domain/IPFSReplicationStatusSummary';
-import { IPFSReplicationStatusSummaryRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSReplicationStatusSummaryRepository';
+import IPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSReplicationStatusSummaryRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 
 describe('IPFSReplicationStatusSummaryUpdater', () => {

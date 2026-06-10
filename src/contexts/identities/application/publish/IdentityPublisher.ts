@@ -3,8 +3,8 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
 import { Identity } from '../../domain/Identity';
-import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
-import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
+import IdentityRepository from '../../domain/repositories/IdentityRepository';
+import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import IdentitySaverService from '../../domain/services/IdentitySaverService';
 import { IdentityPublishMessage } from './messages/IdentityPublishMessage';
 

@@ -3,17 +3,20 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NotificationScopeSettings } from '../NotificationScopeSettings';
 import { NotificationSettingScope } from '../value-objects/NotificationSettingScope';
 
-export interface NotificationScopeSettingsRepository {
-  delete(
+export default abstract class NotificationScopeSettingsRepository {
+  public abstract delete(
     identityId: IdentityId,
     scope: NotificationSettingScope,
   ): Promise<void>;
-  findByIdentityId(
+
+  public abstract findByIdentityId(
     identityId: IdentityId,
   ): Promise<NotificationScopeSettings[]>;
-  findByScope(
+
+  public abstract findByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
   ): Promise<NotificationScopeSettings | undefined>;
-  save(settings: NotificationScopeSettings): Promise<void>;
+
+  public abstract save(settings: NotificationScopeSettings): Promise<void>;
 }

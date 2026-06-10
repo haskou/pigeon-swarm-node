@@ -1,12 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Identity } from '../Identity';
-import {
-  IdentityCandidate,
-  IdentityRepository,
-} from '../repositories/IdentityRepository';
+import IdentityRepository from '../repositories/IdentityRepository';
+import { IdentityCandidate } from '../repositories/types/IdentityCandidate';
 import { ProfileHandle } from '../value-objects/ProfileHandle';
-import { IdentityResolutionDomainService } from './IdentityResolutionDomainService';
+import IdentityResolutionDomainService from './IdentityResolutionDomainService';
 
 export default class IdentityFinderService {
   constructor(

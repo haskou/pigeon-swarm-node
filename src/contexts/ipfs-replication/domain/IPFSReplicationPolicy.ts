@@ -1,4 +1,4 @@
-export class IPFSReplicationPolicy {
+export default class IPFSReplicationPolicy {
   private static readonly FULL_REPLICATION_NODE_LIMIT = 5;
   private static readonly MIN_REPLICAS_WHEN_DISTRIBUTED = 5;
   private static readonly REPLICATION_RATIO = 0.4;

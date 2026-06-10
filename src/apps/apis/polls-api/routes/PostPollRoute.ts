@@ -1,13 +1,8 @@
-import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
-import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMetadata';
-import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { PollCreateMessage } from '@app/contexts/polls/application/create/messages/PollCreateMessage';
 import { PollCreator } from '@app/contexts/polls/application/create/PollCreator';
-import { Poll } from '@app/contexts/polls/domain/Poll';
-import { PollScope } from '@app/contexts/polls/domain/PollScope';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { PollTimelineMessageRegisterMessage } from '@app/contexts/polls/application/register-timeline-message/messages/PollTimelineMessageRegisterMessage';
+import PollTimelineMessageRegistrar from '@app/contexts/polls/application/register-timeline-message/PollTimelineMessageRegistrar';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
@@ -17,58 +12,11 @@ import { PollRouteSupport } from './PollRouteSupport';
 
 @JsonController('/polls')
 export class PostPollRoute extends PollRouteSupport {
-  private async registerConversationTimelineMessage(
-    actor: IdentityId,
-    poll: Poll,
-    scope: PollScope,
-    request: Request,
-  ): Promise<void> {
-    const conversationId = scope.getConversationId();
+  private readonly creator = this.get<PollCreator>(PollCreator);
 
-    if (!conversationId) {
-      return;
-    }
-    const conversation =
-      await this.conversationRepository().findById(conversationId);
-
-    if (!conversation) {
-      return;
-    }
-    conversation.addPollMessage(
-      actor,
-      poll.getId(),
-      new Signature(request.header('X-Signature') || ''),
-      {
-        createdAt: new Timestamp(poll.toPrimitives().createdAt),
-      },
-    );
-    await this.conversationRepository().save(conversation);
-  }
-
-  private async registerCommunityChannelTimelineMessage(
-    actor: IdentityId,
-    poll: Poll,
-    scope: PollScope,
-  ): Promise<void> {
-    const communityId = scope.getCommunityId();
-    const channelId = scope.getChannelId();
-
-    if (!communityId || !channelId) {
-      return;
-    }
-    await this.communityMessageRepository().save(
-      CommunityChannelMessage.poll(
-        new CommunityChannelMessageMetadata(
-          new CommunityChannelMessageId(poll.getId().valueOf()),
-          communityId,
-          channelId,
-          actor,
-          new Timestamp(poll.toPrimitives().createdAt),
-        ),
-        poll.getId(),
-      ),
-    );
-  }
+  private readonly timelineRegistrar = this.get<PollTimelineMessageRegistrar>(
+    PollTimelineMessageRegistrar,
+  );
 
   @Post('/')
   public async createPoll(
@@ -85,10 +33,7 @@ export class PostPollRoute extends PollRouteSupport {
             body.channelId || '',
           )
         : await this.groupConversationScope(actor, body.conversationId || '');
-    const poll = await new PollCreator(
-      this.repository(),
-      this.eventPublisher,
-    ).create(
+    const poll = await this.creator.create(
       new PollCreateMessage(
         actor.valueOf(),
         scopeAccess.scope,
@@ -99,16 +44,12 @@ export class PostPollRoute extends PollRouteSupport {
         body.expiresAt,
       ),
     );
-    await this.registerConversationTimelineMessage(
-      actor,
-      poll,
-      scopeAccess.scope,
-      request,
-    );
-    await this.registerCommunityChannelTimelineMessage(
-      actor,
-      poll,
-      scopeAccess.scope,
+    await this.timelineRegistrar.register(
+      new PollTimelineMessageRegisterMessage(
+        actor.valueOf(),
+        poll,
+        request.header('X-Signature') || '',
+      ),
     );
 
     return response

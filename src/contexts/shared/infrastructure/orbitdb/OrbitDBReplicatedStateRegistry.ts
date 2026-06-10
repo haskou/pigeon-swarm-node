@@ -2,21 +2,11 @@ import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 
-export class OrbitDBReplicatedStateRegistry {
-  private static instance?: OrbitDBReplicatedStateRegistry;
-
+export default class OrbitDBReplicatedStateRegistry {
   private readonly storesByNetworkId = new Map<
     string,
     OrbitDBReplicatedStateStores
   >();
-
-  public static shared(): OrbitDBReplicatedStateRegistry {
-    if (!this.instance) {
-      this.instance = new OrbitDBReplicatedStateRegistry();
-    }
-
-    return this.instance;
-  }
 
   private getStore(
     stores: OrbitDBReplicatedStateStores,
@@ -78,6 +68,31 @@ export class OrbitDBReplicatedStateRegistry {
     return this.isRecord(entry) ? entry : undefined;
   }
 
+  private withoutUndefined(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.withoutUndefined(item));
+    }
+
+    if (!this.isRecord(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .map(([entryKey, entryValue]) => [
+          entryKey,
+          this.withoutUndefined(entryValue),
+        ]),
+    );
+  }
+
+  private cleanDocument(
+    document: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return this.withoutUndefined(document) as Record<string, unknown>;
+  }
+
   public register(
     networkId: string,
     stores: OrbitDBReplicatedStateStores,
@@ -111,8 +126,10 @@ export class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
     document: Record<string, unknown>,
   ): Promise<void> {
+    const cleanDocument = this.cleanDocument(document);
+
     for (const stores of this.storesByNetworkId.values()) {
-      await this.getStore(stores, storeName).put?.(document);
+      await this.getStore(stores, storeName).put?.(cleanDocument);
     }
   }
 
@@ -142,8 +159,10 @@ export class OrbitDBReplicatedStateRegistry {
     key: string,
     value: Record<string, unknown>,
   ): Promise<void> {
+    const cleanValue = this.cleanDocument(value);
+
     for (const stores of this.storesByNetworkId.values()) {
-      await stores.heads.put?.(key, value);
+      await stores.heads.put?.(key, cleanValue);
     }
   }
 }

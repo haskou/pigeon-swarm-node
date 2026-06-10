@@ -1,12 +1,12 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import MessageSignatureService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
@@ -19,15 +19,13 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.delete-community-channel-message-when-announced';
 
-  private readonly signatureService =
-    new CommunityChannelMessageSignatureDomainService();
-
   constructor(
-    consumer: DomainEventConsumer,
-    private readonly communityRepository: MongoCommunityRepository,
-    private readonly messageRepository: MongoCommunityChannelMessageRepository,
+    private readonly eventConsumer: DomainEventConsumer,
+    private readonly communityRepository: CommunityRepository,
+    private readonly messageRepository: CommunityChannelMessageRepository,
+    private readonly signatureService: MessageSignatureService,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

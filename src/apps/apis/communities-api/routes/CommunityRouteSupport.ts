@@ -1,22 +1,21 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { CommunityFinder } from '@app/contexts/communities/application/find-community/CommunityFinder';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import CommunityFinder from '@app/contexts/communities/application/find-community/CommunityFinder';
 import { CommunityFindMessage } from '@app/contexts/communities/application/find-community/messages/CommunityFindMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
 import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityModerationLogRepository from '@app/contexts/communities/domain/repositories/CommunityModerationLogRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import CommunityRequestStore from '@app/contexts/communities/domain/repositories/CommunityRequestStore';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityInviteRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityInviteRepository';
-import { MongoCommunityModerationLogRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityModerationLogRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
-import { MongoCommunityRequestStore } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRequestStore';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { ValueObject } from '@haskou/value-objects';
 import { Request } from 'express';
@@ -28,37 +27,39 @@ export abstract class CommunityRouteSupport extends Route {
   protected readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
+  private readonly communityFinder = this.get<CommunityFinder>(CommunityFinder);
+
   protected async authenticate(request: Request): Promise<IdentityId> {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 
-  protected repository(): MongoCommunityRepository {
-    return new MongoCommunityRepository(this.get<MongoDB>(MongoDB));
+  protected repository(): CommunityRepository {
+    return this.get<CommunityRepository>(CommunityRepository);
   }
 
-  protected messageRepository(): MongoCommunityChannelMessageRepository {
-    return new MongoCommunityChannelMessageRepository(
-      this.get<MongoDB>(MongoDB),
+  protected messageRepository(): CommunityChannelMessageRepository {
+    return this.get<CommunityChannelMessageRepository>(
+      CommunityChannelMessageRepository,
     );
   }
 
-  protected reactions(): MongoCommunityMessageReactionRepository {
-    return new MongoCommunityMessageReactionRepository(
-      this.get<MongoDB>(MongoDB),
+  protected reactions(): CommunityMessageReactionRepository {
+    return this.get<CommunityMessageReactionRepository>(
+      CommunityMessageReactionRepository,
     );
   }
 
-  protected inviteRepository(): MongoCommunityInviteRepository {
-    return new MongoCommunityInviteRepository(this.get<MongoDB>(MongoDB));
+  protected inviteRepository(): CommunityInviteRepository {
+    return this.get<CommunityInviteRepository>(CommunityInviteRepository);
   }
 
-  protected membershipRequests(): MongoCommunityRequestStore {
-    return new MongoCommunityRequestStore(this.get<MongoDB>(MongoDB));
+  protected membershipRequests(): CommunityRequestStore {
+    return this.get<CommunityRequestStore>(CommunityRequestStore);
   }
 
-  protected moderationLogs(): MongoCommunityModerationLogRepository {
-    return new MongoCommunityModerationLogRepository(
-      this.get<MongoDB>(MongoDB),
+  protected moderationLogs(): CommunityModerationLogRepository {
+    return this.get<CommunityModerationLogRepository>(
+      CommunityModerationLogRepository,
     );
   }
 
@@ -95,8 +96,6 @@ export abstract class CommunityRouteSupport extends Route {
   }
 
   protected async findCommunity(id: string): Promise<Community> {
-    return new CommunityFinder(this.repository()).find(
-      new CommunityFindMessage(id),
-    );
+    return this.communityFinder.find(new CommunityFindMessage(id));
   }
 }

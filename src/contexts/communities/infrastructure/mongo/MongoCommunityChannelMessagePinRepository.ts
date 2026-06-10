@@ -2,15 +2,19 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Timestamp } from '@haskou/value-objects';
 
+import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { MongoCommunityChannelMessagePinDocument } from './documents/MongoCommunityChannelMessagePinDocument';
 
-export class MongoCommunityChannelMessagePinRepository {
+// eslint-disable-next-line max-len
+export default class MongoCommunityChannelMessagePinRepository extends CommunityChannelMessagePinRepository {
   private static readonly COLLECTION = 'community_channel_message_pins';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityChannelMessagePinDocument>(

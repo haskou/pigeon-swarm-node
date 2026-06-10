@@ -1,7 +1,6 @@
 import { CallSignalSender } from '@app/contexts/calls/application/send-signal/CallSignalSender';
 import { CallSignalSendMessage } from '@app/contexts/calls/application/send-signal/messages/CallSignalSendMessage';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -20,6 +19,12 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class PostCallSignalRoute extends CallRouteSupport {
+  private readonly sender = this.get<CallSignalSender>(CallSignalSender);
+
+  private readonly rateLimiter = this.get<CallSignalRateLimiter>(
+    CallSignalRateLimiter,
+  );
+
   @Post('/:callId/signals')
   public async sendSignal(
     @Param('callId') callId: string,
@@ -28,11 +33,7 @@ export class PostCallSignalRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const senderIdentityId = await this.authenticate(request);
-    const rateLimiter = new CallSignalRateLimiter(this.get<MongoDB>(MongoDB));
-    const call = await new CallSignalSender(
-      this.callRepository(),
-      this.eventPublisher,
-    ).send(
+    const call = await this.sender.send(
       new CallSignalSendMessage(
         callId,
         senderIdentityId.valueOf(),
@@ -41,7 +42,7 @@ export class PostCallSignalRoute extends CallRouteSupport {
         body.payload,
       ),
       async () => {
-        await rateLimiter.consume(new CallId(callId), senderIdentityId);
+        await this.rateLimiter.consume(new CallId(callId), senderIdentityId);
       },
     );
 

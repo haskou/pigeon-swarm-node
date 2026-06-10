@@ -2,20 +2,21 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Notification } from '../../domain/Notification';
-import { NotificationRepository } from '../../domain/repositories/NotificationRepository';
+import NotificationRepository from '../../domain/repositories/NotificationRepository';
 import { NotificationId } from '../../domain/value-objects/NotificationId';
 import { MongoNotificationDocument } from './documents/MongoNotificationDocument';
 import MongoNotificationMapper from './mappers/MongoNotificationMapper';
 
-type Repository = NotificationRepository;
-
-export default class MongoNotificationRepository implements Repository {
+// eslint-disable-next-line max-len
+export default class MongoNotificationRepository extends NotificationRepository {
   private static readonly COLLECTION = 'notifications';
 
   constructor(
     private readonly mongo: MongoDB,
     private readonly mapper: MongoNotificationMapper,
-  ) {}
+  ) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoNotificationDocument>(

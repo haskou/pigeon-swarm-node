@@ -2,10 +2,8 @@ import { PushSubscription } from '../../domain/PushSubscription';
 import { PushNotificationPayload } from './PushNotificationPayload';
 import { PushNotificationDeliveryResult } from './types/PushNotificationDeliveryResult';
 
-export { PushNotificationDeliveryResult } from './types/PushNotificationDeliveryResult';
-
-export interface PushNotificationDelivery {
-  send(
+export default abstract class PushNotificationDelivery {
+  public abstract send(
     subscription: PushSubscription,
     payload: PushNotificationPayload,
   ): Promise<PushNotificationDeliveryResult>;

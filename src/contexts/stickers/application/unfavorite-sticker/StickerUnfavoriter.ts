@@ -1,4 +1,4 @@
-import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
+import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerUnfavoriteMessage } from './messages/StickerUnfavoriteMessage';
 

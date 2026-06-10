@@ -1,12 +1,15 @@
-import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
+import { CommunityInviteWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasAcceptedEvent';
+import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
 import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
+import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationSyncAvailableEvent } from '@app/contexts/conversations/domain/events/ConversationSyncAvailableEvent';
+import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicationWasRegisteredEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasRegisteredEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
-import { OrbitDBDomainEventProjector } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
+import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedDomainEventMessage';
 
@@ -278,11 +281,60 @@ describe('OrbitDBDomainEventProjector', () => {
     await projector.project(
       storesFrom(stores),
       replicatedMessage(
+        CommunityInviteWasCreatedEvent.EVENT_NAME,
+        {
+          invite: {
+            communityId: 'community-1',
+            createdAt: 1780000000000,
+            creatorIdentityId: 'identity-1',
+            maxUses: 3,
+            token: 'invite-token',
+            uses: 0,
+          },
+          networkId: 'network-1',
+        },
+        'invite-token',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        CommunityInviteWasAcceptedEvent.EVENT_NAME,
+        {
+          invite: {
+            communityId: 'community-1',
+            createdAt: 1780000000000,
+            creatorIdentityId: 'identity-1',
+            maxUses: 3,
+            token: 'invite-token',
+            uses: 1,
+          },
+          networkId: 'network-1',
+        },
+        'invite-token',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
         IPFSContentReplicationWasRegisteredEvent.EVENT_NAME,
         {
           cid: 'bafy',
           networkIds: ['network-1'],
           sizeBytes: 128,
+        },
+        'bafy',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        IPFSContentReplicationWasClaimedEvent.EVENT_NAME,
+        {
+          cid: 'bafy',
+          claimedAt: 1780000000001,
+          networkId: 'network-1',
+          nodeId: 'node-1',
         },
         'bafy',
       ),
@@ -316,7 +368,24 @@ describe('OrbitDBDomainEventProjector', () => {
     expect(stores.requests.put).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'request-1',
+        kind: 'community_membership_request',
         status: 'pending',
+      }),
+    );
+    expect(stores.requests.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'invite-token',
+        kind: 'community_invite',
+        token: 'invite-token',
+        uses: 0,
+      }),
+    );
+    expect(stores.requests.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'invite-token',
+        kind: 'community_invite',
+        token: 'invite-token',
+        uses: 1,
       }),
     );
     expect(stores.ipfsReplication.put).toHaveBeenCalledWith(
@@ -324,6 +393,14 @@ describe('OrbitDBDomainEventProjector', () => {
         cid: 'bafy',
         id: 'bafy',
         sizeBytes: 128,
+      }),
+    );
+    expect(stores.ipfsReplication.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cid: 'bafy',
+        id: 'bafy:network-1:node-1',
+        kind: 'ipfs_content_replica_claim',
+        nodeId: 'node-1',
       }),
     );
   });

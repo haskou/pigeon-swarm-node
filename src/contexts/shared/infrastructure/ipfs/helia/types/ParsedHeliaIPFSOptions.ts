@@ -1,4 +1,4 @@
-import { Libp2pPrivateKeyLike } from '../../networks/adapters/Libp2pKeyAdapter';
+import { Libp2pPrivateKeyLike } from '../../networks/adapters/types/Libp2pPrivateKeyLike';
 import { HeliaBlockBrokers } from '../adapters/types/HeliaBlockBrokers';
 import { Libp2pDefaults } from '../adapters/types/Libp2pDefaults';
 import { RuntimeBlockstore } from '../adapters/types/RuntimeBlockstore';

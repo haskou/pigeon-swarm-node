@@ -1,9 +1,6 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { PushNotificationTestMessage } from '@app/contexts/push-notifications/application/test/messages/PushNotificationTestMessage';
-import { PushNotificationTester } from '@app/contexts/push-notifications/application/test/PushNotificationTester';
-import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
-import { WebPushNotificationDelivery } from '@app/contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import PushTestNotificationSender from '@app/contexts/push-notifications/application/test/PushTestNotificationSender';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -17,12 +14,8 @@ export class PostPushTestRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private tester(): PushNotificationTester {
-    return new PushNotificationTester(
-      new MongoPushSubscriptionRepository(this.get<MongoDB>(MongoDB)),
-      new WebPushNotificationDelivery(),
-    );
-  }
+  private readonly testNotificationSender =
+    this.get<PushTestNotificationSender>(PushTestNotificationSender);
 
   @Post('/test')
   public async testPush(
@@ -32,7 +25,7 @@ export class PostPushTestRoute extends Route {
   ): Promise<Response> {
     const identityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const results = await this.tester().test(
+    const results = await this.testNotificationSender.send(
       new PushNotificationTestMessage(identityId.valueOf(), body?.endpoint),
     );
 

@@ -1,5 +1,5 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
-import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -8,7 +8,7 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { MongoNodeMetadataDocument } from './documents/MongoNodeMetadataDocument';
 import MongoNodeMetadataMapper from './mappers/MongoNodeMetadataMapper';
 
-export default class MongoNodeMetadataRepository implements NodeRepository {
+export default class MongoNodeMetadataRepository extends NodeRepository {
   private static COLLECTION_NAME = 'node_metadata';
   private static LOCAL_NODE_ID: MongoNodeMetadataDocument['_id'] = 'local';
 
@@ -16,7 +16,9 @@ export default class MongoNodeMetadataRepository implements NodeRepository {
     private readonly mongo: MongoDB,
     private readonly networkRegistry: IPFSNetworkRegistry,
     private readonly metadataMapper: MongoNodeMetadataMapper,
-  ) {}
+  ) {
+    super();
+  }
 
   private async loadOrCreateMetadata(): Promise<MongoNodeMetadataDocument> {
     const collection =

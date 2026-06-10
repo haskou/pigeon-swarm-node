@@ -1,9 +1,9 @@
-import { IdentityRepository } from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
 import { KeychainOwnerNetworksNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainOwnerNetworksNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 import KeychainSaverService from '@app/contexts/keychains/domain/services/KeychainSaverService';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';

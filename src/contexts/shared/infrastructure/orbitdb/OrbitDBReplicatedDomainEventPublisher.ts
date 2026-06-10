@@ -1,11 +1,12 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import EventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
-import { OrbitDBDomainEventProjector } from './OrbitDBDomainEventProjector';
+import OrbitDBDomainEventProjector from './OrbitDBDomainEventProjector';
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
 
-export class OrbitDBReplicatedDomainEventPublisher implements EventPublisher {
+// eslint-disable-next-line max-len
+export default class OrbitDBReplicatedDomainEventPublisher implements EventPublisher {
   private readonly storesByNetworkId = new Map<
     string,
     {
@@ -14,7 +15,7 @@ export class OrbitDBReplicatedDomainEventPublisher implements EventPublisher {
     }
   >();
 
-  constructor(private readonly projector = new OrbitDBDomainEventProjector()) {}
+  constructor(private readonly projector: OrbitDBDomainEventProjector) {}
 
   private eventNetworkIds(event: DomainEvent): string[] {
     const networkId = event.attributes.networkId;

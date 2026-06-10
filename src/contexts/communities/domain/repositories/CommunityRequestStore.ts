@@ -4,17 +4,24 @@ import { CommunityMembershipRequest } from '../entities/membership/CommunityMemb
 import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityRequestId } from '../value-objects/CommunityRequestId';
 
-export interface CommunityRequestStore {
-  findByCommunityAndIdentity(
+export default abstract class CommunityRequestStore {
+  public abstract deleteByCommunity(communityId: CommunityId): Promise<void>;
+  public abstract findByCommunityAndIdentity(
     communityId: CommunityId,
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]>;
-  findById(
+
+  public abstract findById(
     id: CommunityRequestId,
   ): Promise<CommunityMembershipRequest | undefined>;
-  findByIdentity(identityId: IdentityId): Promise<CommunityMembershipRequest[]>;
-  findByOwnedCommunities(
+
+  public abstract findByIdentity(
+    identityId: IdentityId,
+  ): Promise<CommunityMembershipRequest[]>;
+
+  public abstract findByOwnedCommunities(
     ownerIdentityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]>;
-  save(request: CommunityMembershipRequest): Promise<void>;
+
+  public abstract save(request: CommunityMembershipRequest): Promise<void>;
 }

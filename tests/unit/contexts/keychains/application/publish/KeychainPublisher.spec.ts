@@ -1,11 +1,11 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
-import { IdentityRepository } from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import KeychainPublisher from '@app/contexts/keychains/application/publish/KeychainPublisher';
 import { KeychainPublishMessage } from '@app/contexts/keychains/application/publish/messages/KeychainPublishMessage';
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 import KeychainSaverService from '@app/contexts/keychains/domain/services/KeychainSaverService';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';

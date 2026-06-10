@@ -1,9 +1,11 @@
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
+import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
 import { IdentityCreateMessage } from '@app/contexts/identities/application/create/messages/IdentityCreateMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
-import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
@@ -96,8 +98,8 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
     const deadline = Date.now() + 5000;
     const metadataRepository =
-      Kernel.di.getService<MongoIdentityMetadataRepository>(
-        MongoIdentityMetadataRepository,
+      Kernel.di.getService<IdentityMetadataRepository>(
+        IdentityMetadataRepository,
       );
     const identityId = new IdentityId(this.identity.toPrimitives().id);
 
@@ -135,6 +137,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
       await kernel.dependencyInjection();
       this.installTestLogger();
+      await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
     }
   }
 
@@ -191,8 +194,8 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const metadataRepository =
-      Kernel.di.getService<MongoIdentityMetadataRepository>(
-        MongoIdentityMetadataRepository,
+      Kernel.di.getService<IdentityMetadataRepository>(
+        IdentityMetadataRepository,
       );
     const [externalIdentifier] = await ipfs.getRecordCandidates(
       `pigeon-swarm_identity-${this.identity.toPrimitives().id}`,
@@ -203,7 +206,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
 
     await metadataRepository.deleteByExternalIdentifier(
-      new IPFSId(externalIdentifier),
+      new IdentityExternalIdentifier(externalIdentifier),
     );
   }
 

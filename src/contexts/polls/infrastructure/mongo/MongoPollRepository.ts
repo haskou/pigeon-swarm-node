@@ -4,14 +4,16 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Poll } from '../../domain/Poll';
-import { PollRepository } from '../../domain/repositories/PollRepository';
+import PollRepository from '../../domain/repositories/PollRepository';
 import { PollId } from '../../domain/value-objects/PollId';
 import { MongoPollDocument } from './documents/MongoPollDocument';
 
-export class MongoPollRepository implements PollRepository {
+export default class MongoPollRepository extends PollRepository {
   private static readonly COLLECTION = 'polls';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoPollDocument>(

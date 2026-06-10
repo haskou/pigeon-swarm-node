@@ -1,15 +1,17 @@
 import { IPFSReplicationStatusSummary } from '@app/contexts/ipfs-replication/domain/IPFSReplicationStatusSummary';
-import { IPFSReplicationStatusSummaryRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSReplicationStatusSummaryRepository';
+import IPFSReplicationStatusSummaryRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSReplicationStatusSummaryRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { MongoIPFSReplicationStatusSummaryDocument } from './documents/MongoIPFSReplicationStatusSummaryDocument';
 
 // eslint-disable-next-line max-len
-export default class MongoIPFSReplicationStatusSummaryRepository implements IPFSReplicationStatusSummaryRepository {
+export default class MongoIPFSReplicationStatusSummaryRepository extends IPFSReplicationStatusSummaryRepository {
   private static readonly COLLECTION = 'ipfs_replication_status_summaries';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoIPFSReplicationStatusSummaryDocument>(

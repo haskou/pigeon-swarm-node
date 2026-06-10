@@ -1,16 +1,17 @@
 import NodeStartupSynchronizer from '@app/apps/synchronizers/NodeStartupSynchronizer';
+import NodeStartupSyncPlanner from '@app/apps/synchronizers/NodeStartupSyncPlanner';
 import NodeStartupSyncPolicy from '@app/apps/synchronizers/NodeStartupSyncPolicy';
 import NodeStartupSyncReadiness from '@app/apps/synchronizers/NodeStartupSyncReadiness';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { ConversationSyncRequestedEvent } from '@app/contexts/conversations/domain/events/ConversationSyncRequestedEvent';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityNetworkSyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentityNetworkSyncRequestedEvent';
 import { IdentitySyncRequestedEvent } from '@app/contexts/identities/domain/events/IdentitySyncRequestedEvent';
-import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { KeychainSyncRequestedEvent } from '@app/contexts/keychains/domain/events/KeychainSyncRequestedEvent';
-import MongoKeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
+import KeychainMetadataRepository from '@app/contexts/keychains/domain/repositories/KeychainMetadataRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { Network } from '@app/contexts/nodes/domain/Network';
 import { Node } from '@app/contexts/nodes/domain/Node';
@@ -25,20 +26,20 @@ describe('NodeStartupSynchronizer', () => {
   const nodeId = '550e8400-e29b-41d4-a716-446655440010';
 
   let conversationRepository: MockProxy<ConversationRepository>;
-  let communityRepository: MockProxy<MongoCommunityRepository>;
+  let communityRepository: MockProxy<CommunityRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
-  let identityMetadataRepository: MockProxy<MongoIdentityMetadataRepository>;
-  let keychainMetadataRepository: MockProxy<MongoKeychainMetadataRepository>;
+  let identityMetadataRepository: MockProxy<IdentityMetadataRepository>;
+  let keychainMetadataRepository: MockProxy<KeychainMetadataRepository>;
   let nodeLoader: MockProxy<NodeLoader>;
   let readiness: MockProxy<NodeStartupSyncReadiness>;
   let synchronizer: NodeStartupSynchronizer;
 
   beforeEach(() => {
     conversationRepository = mock<ConversationRepository>();
-    communityRepository = mock<MongoCommunityRepository>();
+    communityRepository = mock<CommunityRepository>();
     eventPublisher = mock<DomainEventPublisher>();
-    identityMetadataRepository = mock<MongoIdentityMetadataRepository>();
-    keychainMetadataRepository = mock<MongoKeychainMetadataRepository>();
+    identityMetadataRepository = mock<IdentityMetadataRepository>();
+    keychainMetadataRepository = mock<KeychainMetadataRepository>();
     nodeLoader = mock<NodeLoader>();
     readiness = mock<NodeStartupSyncReadiness>();
     readiness.prepare.mockResolvedValue(2);
@@ -56,21 +57,23 @@ describe('NodeStartupSynchronizer', () => {
         ]),
       ),
     );
-    synchronizer = new NodeStartupSynchronizer({
-      communityRepository,
-      conversationRepository,
-      eventPublisher,
-      identityMetadataRepository,
-      keychainMetadataRepository,
-      nodeLoader,
+    synchronizer = new NodeStartupSynchronizer(
       readiness,
-    });
+      new NodeStartupSyncPlanner(
+        communityRepository,
+        conversationRepository,
+        identityMetadataRepository,
+        keychainMetadataRepository,
+        nodeLoader,
+        new NodeStartupSyncPolicy(),
+      ),
+      eventPublisher,
+    );
   });
 
   it('should prepare and publish scoped startup sync requests', async () => {
     identityMetadataRepository.findAll.mockResolvedValue([
       {
-        _id: 'identity-1-v1',
         cid: 'bafyidentity1v1',
         identityId: 'identity-1',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
@@ -79,7 +82,6 @@ describe('NodeStartupSynchronizer', () => {
         version: 1,
       },
       {
-        _id: 'identity-1-v2',
         cid: 'bafyidentity1v2',
         identityId: 'identity-1',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
@@ -90,7 +92,6 @@ describe('NodeStartupSynchronizer', () => {
     ]);
     keychainMetadataRepository.findAll.mockResolvedValue([
       {
-        _id: 'keychain-1',
         cid: 'bafykeychain1',
         ownerIdentityId: 'identity-1',
         previousCid: undefined,
@@ -104,7 +105,7 @@ describe('NodeStartupSynchronizer', () => {
         networkId: '123e4567-e89b-12d3-a456-426614174000',
       },
     ]);
-    communityRepository.findAll.mockResolvedValue([]);
+    communityRepository.findSyncable.mockResolvedValue([]);
 
     const result = await synchronizer.synchronize();
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
@@ -191,7 +192,7 @@ describe('NodeStartupSynchronizer', () => {
     identityMetadataRepository.findAll.mockResolvedValue([]);
     keychainMetadataRepository.findAll.mockResolvedValue([]);
     conversationRepository.findConversationSyncScopes.mockResolvedValue([]);
-    communityRepository.findAll.mockResolvedValue([
+    communityRepository.findSyncable.mockResolvedValue([
       {
         toPrimitives: () => communityPrimitives,
       },
@@ -232,7 +233,6 @@ describe('NodeStartupSynchronizer', () => {
   it('should cap startup sync fanout deterministically', async () => {
     identityMetadataRepository.findAll.mockResolvedValue([
       {
-        _id: 'identity-1-v1',
         cid: 'bafyidentity1v1',
         identityId: 'identity-1',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
@@ -241,7 +241,6 @@ describe('NodeStartupSynchronizer', () => {
         version: 1,
       },
       {
-        _id: 'identity-2-v1',
         cid: 'bafyidentity2v1',
         identityId: 'identity-2',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
@@ -252,7 +251,6 @@ describe('NodeStartupSynchronizer', () => {
     ]);
     keychainMetadataRepository.findAll.mockResolvedValue([
       {
-        _id: 'keychain-1',
         cid: 'bafykeychain1',
         ownerIdentityId: 'identity-1',
         previousCid: undefined,
@@ -260,7 +258,6 @@ describe('NodeStartupSynchronizer', () => {
         version: 1,
       },
       {
-        _id: 'keychain-2',
         cid: 'bafykeychain2',
         ownerIdentityId: 'identity-2',
         previousCid: undefined,
@@ -278,23 +275,25 @@ describe('NodeStartupSynchronizer', () => {
         networkId: '123e4567-e89b-12d3-a456-426614174000',
       },
     ]);
-    communityRepository.findAll.mockResolvedValue([]);
-    synchronizer = new NodeStartupSynchronizer({
-      communityRepository,
-      conversationRepository,
-      eventPublisher,
-      identityMetadataRepository,
-      keychainMetadataRepository,
-      nodeLoader,
-      policy: new NodeStartupSyncPolicy({
-        maxCommunityRequests: 1,
-        maxConversationRequests: 1,
-        maxIdentityRequests: 1,
-        maxKeychainRequests: 1,
-        maxTotalRequests: 3,
-      }),
+    communityRepository.findSyncable.mockResolvedValue([]);
+    synchronizer = new NodeStartupSynchronizer(
       readiness,
-    });
+      new NodeStartupSyncPlanner(
+        communityRepository,
+        conversationRepository,
+        identityMetadataRepository,
+        keychainMetadataRepository,
+        nodeLoader,
+        NodeStartupSyncPolicy.fromOptions({
+          maxCommunityRequests: 1,
+          maxConversationRequests: 1,
+          maxIdentityRequests: 1,
+          maxKeychainRequests: 1,
+          maxTotalRequests: 3,
+        }),
+      ),
+      eventPublisher,
+    );
 
     const result = await synchronizer.synchronize();
     const publishedEvents = eventPublisher.publish.mock.calls[0][0];
@@ -318,7 +317,6 @@ describe('NodeStartupSynchronizer', () => {
   it('should rotate capped startup sync batches across retries', async () => {
     identityMetadataRepository.findAll.mockResolvedValue([
       {
-        _id: 'identity-1-v1',
         cid: 'bafyidentity1v1',
         identityId: 'identity-1',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
@@ -327,7 +325,6 @@ describe('NodeStartupSynchronizer', () => {
         version: 1,
       },
       {
-        _id: 'identity-2-v1',
         cid: 'bafyidentity2v1',
         identityId: 'identity-2',
         networkIds: ['123e4567-e89b-12d3-a456-426614174000'],
@@ -347,23 +344,25 @@ describe('NodeStartupSynchronizer', () => {
         networkId: '123e4567-e89b-12d3-a456-426614174000',
       },
     ]);
-    communityRepository.findAll.mockResolvedValue([]);
-    synchronizer = new NodeStartupSynchronizer({
-      communityRepository,
-      conversationRepository,
-      eventPublisher,
-      identityMetadataRepository,
-      keychainMetadataRepository,
-      nodeLoader,
-      policy: new NodeStartupSyncPolicy({
-        maxCommunityRequests: 1,
-        maxConversationRequests: 1,
-        maxIdentityRequests: 1,
-        maxKeychainRequests: 1,
-        maxTotalRequests: 10,
-      }),
+    communityRepository.findSyncable.mockResolvedValue([]);
+    synchronizer = new NodeStartupSynchronizer(
       readiness,
-    });
+      new NodeStartupSyncPlanner(
+        communityRepository,
+        conversationRepository,
+        identityMetadataRepository,
+        keychainMetadataRepository,
+        nodeLoader,
+        NodeStartupSyncPolicy.fromOptions({
+          maxCommunityRequests: 1,
+          maxConversationRequests: 1,
+          maxIdentityRequests: 1,
+          maxKeychainRequests: 1,
+          maxTotalRequests: 10,
+        }),
+      ),
+      eventPublisher,
+    );
 
     await synchronizer.synchronize();
     await synchronizer.synchronize();

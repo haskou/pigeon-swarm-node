@@ -3,7 +3,7 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { Community } from '../../domain/Community';
 import { CommunityRole } from '../../domain/entities/membership/CommunityRole';
-import { CommunityRepository } from '../../domain/repositories/CommunityRepository';
+import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 import { MongoCommunityDocument } from './documents/MongoCommunityDocument';
@@ -11,11 +11,13 @@ import { MongoCommunityRoleDocument } from './documents/MongoCommunityRoleDocume
 import { MongoCommunityTextChannelDocument } from './documents/MongoCommunityTextChannelDocument';
 import { MongoCommunityVoiceChannelDocument } from './documents/MongoCommunityVoiceChannelDocument';
 
-export class MongoCommunityRepository implements CommunityRepository {
+export default class MongoCommunityRepository extends CommunityRepository {
   private static readonly COLLECTION = 'communities';
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityDocument>(
@@ -172,6 +174,10 @@ export class MongoCommunityRepository implements CommunityRepository {
     const documents = await (await this.collection()).find({}).toArray();
 
     return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findSyncable(): Promise<Community[]> {
+    return this.findAll();
   }
 
   public async save(community: Community): Promise<void> {

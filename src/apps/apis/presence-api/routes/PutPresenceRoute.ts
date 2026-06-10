@@ -1,8 +1,5 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { MongoIdentityMetadataRepository } from '@app/contexts/identities/infrastructure/mongo';
-import { IdentityPresenceServicesFactory } from '@app/contexts/presence/application/IdentityPresenceServicesFactory';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import IdentityPresenceUpdater from '@app/contexts/presence/application/update/IdentityPresenceUpdater';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -17,15 +14,9 @@ export class PutPresenceRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private presenceServices(): IdentityPresenceServicesFactory {
-    return new IdentityPresenceServicesFactory(
-      this.get<MongoDB>(MongoDB),
-      this.get<MongoIdentityMetadataRepository>(
-        MongoIdentityMetadataRepository,
-      ),
-      this.get<MessageBus>(MessageBus),
-    );
-  }
+  private readonly updater = this.get<IdentityPresenceUpdater>(
+    IdentityPresenceUpdater,
+  );
 
   @Put('/me')
   public async putPresence(
@@ -35,9 +26,9 @@ export class PutPresenceRoute extends Route {
   ): Promise<Response> {
     const identityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const presence = await this.presenceServices()
-      .updater()
-      .update(new PutPresenceRequest(identityId.valueOf(), body).getMessage());
+    const presence = await this.updater.update(
+      new PutPresenceRequest(identityId.valueOf(), body).getMessage(),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

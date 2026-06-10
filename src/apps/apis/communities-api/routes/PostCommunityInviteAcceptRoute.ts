@@ -1,4 +1,5 @@
 import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/errors/CommunityInviteNotFoundError';
+import { CommunityInviteWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasAcceptedEvent';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -28,10 +29,18 @@ export class PostCommunityInviteAcceptRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
 
     community.assertIsNotBanned(actorIdentityId);
-    await this.inviteRepository().consume(invite);
+    const acceptedInvite = await this.inviteRepository().consume(invite);
     community.joinWithInvite(actorIdentityId);
     await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.eventPublisher.publish([
+      new CommunityInviteWasAcceptedEvent(acceptedInvite.getToken().valueOf(), {
+        communityId: community.getId().valueOf(),
+        identityId: actorIdentityId.valueOf(),
+        invite: acceptedInvite.toPrimitives(),
+        networkId: community.getNetworkId().valueOf(),
+      }),
+      ...community.pullDomainEvents(),
+    ]);
 
     return response
       .status(HttpRouteStatusEnum.OK)

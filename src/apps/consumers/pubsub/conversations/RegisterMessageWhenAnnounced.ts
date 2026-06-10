@@ -1,4 +1,3 @@
-import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
@@ -13,12 +12,10 @@ export default class RegisterMessageWhenAnnounced extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-message-when-announced';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
-    _conversationRegistrar: ConversationRegistrar,
   ) {
-    super(consumer);
-    void _conversationRegistrar;
+    super(eventConsumer);
   }
 
   public get queueName(): string {

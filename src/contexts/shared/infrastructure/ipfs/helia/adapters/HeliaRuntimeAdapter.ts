@@ -218,7 +218,6 @@ export class HeliaRuntimeAdapter {
         listen?: string[];
       };
       peerDiscovery?: unknown[];
-      services?: Record<string, unknown>;
       transports?: unknown[];
     };
 
@@ -227,7 +226,6 @@ export class HeliaRuntimeAdapter {
       listen: [],
     };
     config.peerDiscovery = [];
-    config.services = {};
     config.transports = [];
 
     return defaults;
@@ -351,7 +349,7 @@ export class HeliaRuntimeAdapter {
     const defaults = this.withoutWebRtcTransports(heliaModule.libp2pDefaults());
 
     if (options?.offline) {
-      return this.withoutNetwork(defaults);
+      return this.withGossipsub(this.withoutNetwork(defaults));
     }
 
     return this.withGossipsub(defaults);

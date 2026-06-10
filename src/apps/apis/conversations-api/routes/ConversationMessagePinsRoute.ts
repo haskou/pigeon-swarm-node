@@ -1,16 +1,10 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
-import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
-import { ConversationMessageWasPinnedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasPinnedEvent';
-import { ConversationMessageWasUnpinnedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasUnpinnedEvent';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { MongoConversationMessagePinRepository } from '@app/contexts/conversations/infrastructure/mongo/MongoConversationMessagePinRepository';
-import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import ConversationMessagePinner from '@app/contexts/conversations/application/manage-pin/ConversationMessagePinner';
+import ConversationMessagePinsFinder from '@app/contexts/conversations/application/manage-pin/ConversationMessagePinsFinder';
+import ConversationMessageUnpinner from '@app/contexts/conversations/application/manage-pin/ConversationMessageUnpinner';
+import { ConversationMessagePinCreateMessage } from '@app/contexts/conversations/application/manage-pin/messages/ConversationMessagePinCreateMessage';
+import { ConversationMessagePinDeleteMessage } from '@app/contexts/conversations/application/manage-pin/messages/ConversationMessagePinDeleteMessage';
+import { ConversationMessagePinsFindMessage } from '@app/contexts/conversations/application/manage-pin/messages/ConversationMessagePinsFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -33,35 +27,17 @@ export class ConversationMessagePinsRoute extends Route {
     SignedHttpRequestAuthenticator,
   );
 
-  private readonly eventPublisher = this.get<MessageBus>(MessageBus);
+  private readonly finder = this.get<ConversationMessagePinsFinder>(
+    ConversationMessagePinsFinder,
+  );
 
-  private conversationRepository(): OrbitDBConversationRepository {
-    return new OrbitDBConversationRepository();
-  }
+  private readonly pinner = this.get<ConversationMessagePinner>(
+    ConversationMessagePinner,
+  );
 
-  private pinRepository(): MongoConversationMessagePinRepository {
-    return new MongoConversationMessagePinRepository(
-      this.get<MongoDB>(MongoDB),
-    );
-  }
-
-  private async findReadableConversation(
-    conversationId: ConversationId,
-    identityId: IdentityId,
-  ) {
-    const conversation =
-      await this.conversationRepository().findMetadataById(conversationId);
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(conversationId);
-    }
-
-    if (!conversation.hasParticipant(identityId)) {
-      throw new ConversationParticipantNotFoundError();
-    }
-
-    return conversation;
-  }
+  private readonly unpinner = this.get<ConversationMessageUnpinner>(
+    ConversationMessageUnpinner,
+  );
 
   @Get('/:conversationId/pins')
   public async listPins(
@@ -70,29 +46,20 @@ export class ConversationMessagePinsRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-    const domainConversationId = new ConversationId(conversationId);
-
-    await this.findReadableConversation(domainConversationId, identityId);
-
-    const pins =
-      await this.pinRepository().findByConversation(domainConversationId);
-    const resources: ConversationMessagePinsResource['pins'] = [];
-
-    for (const pin of pins) {
-      const message = await this.conversationRepository().findMessageById(
-        domainConversationId,
-        new MessageId(pin.messageId),
-      );
-
-      if (message) {
-        resources.push({
-          createdAt: pin.createdAt,
-          message: new MessageViewModel(message).toResource(),
-          messageId: pin.messageId,
-          pinnedByIdentityId: pin.pinnedByIdentityId,
-        });
-      }
-    }
+    const pins = await this.finder.find(
+      new ConversationMessagePinsFindMessage(
+        identityId.valueOf(),
+        conversationId,
+      ),
+    );
+    const resources: ConversationMessagePinsResource['pins'] = pins.map(
+      (pin) => ({
+        createdAt: pin.createdAt,
+        message: new MessageViewModel(pin.message).toResource(),
+        messageId: pin.messageId,
+        pinnedByIdentityId: pin.pinnedByIdentityId,
+      }),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({
       conversationId,
@@ -108,38 +75,14 @@ export class ConversationMessagePinsRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-    const domainConversationId = new ConversationId(conversationId);
-    const domainMessageId = new MessageId(messageId);
 
-    const conversation = await this.findReadableConversation(
-      domainConversationId,
-      identityId,
-    );
-
-    const message = await this.conversationRepository().findMessageById(
-      domainConversationId,
-      domainMessageId,
-    );
-
-    if (!message) {
-      throw new MessageTargetNotFoundError();
-    }
-
-    await this.pinRepository().pin(
-      domainConversationId,
-      domainMessageId,
-      identityId,
-    );
-    const conversationPrimitives = conversation.toPrimitives();
-
-    await this.eventPublisher.publish([
-      new ConversationMessageWasPinnedEvent(conversationId, {
+    await this.pinner.pin(
+      new ConversationMessagePinCreateMessage(
+        identityId.valueOf(),
+        conversationId,
         messageId,
-        networkId: conversationPrimitives.networkId,
-        participantIds: conversationPrimitives.participantIds,
-        pinnedByIdentityId: identityId.valueOf(),
-      }),
-    ]);
+      ),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({
       conversationId,
@@ -156,24 +99,14 @@ export class ConversationMessagePinsRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-    const domainConversationId = new ConversationId(conversationId);
-    const domainMessageId = new MessageId(messageId);
 
-    const conversation = await this.findReadableConversation(
-      domainConversationId,
-      identityId,
-    );
-    await this.pinRepository().unpin(domainConversationId, domainMessageId);
-    const conversationPrimitives = conversation.toPrimitives();
-
-    await this.eventPublisher.publish([
-      new ConversationMessageWasUnpinnedEvent(conversationId, {
+    await this.unpinner.unpin(
+      new ConversationMessagePinDeleteMessage(
+        identityId.valueOf(),
+        conversationId,
         messageId,
-        networkId: conversationPrimitives.networkId,
-        participantIds: conversationPrimitives.participantIds,
-        unpinnedByIdentityId: identityId.valueOf(),
-      }),
-    ]);
+      ),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({
       conversationId,

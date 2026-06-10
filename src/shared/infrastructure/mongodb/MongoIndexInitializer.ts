@@ -4,7 +4,7 @@ import { ExistingIndex } from './ExistingIndex';
 import { IndexDefinition } from './IndexDefinition';
 import MongoDB from './MongoDB';
 
-export class MongoIndexInitializer {
+export default class MongoIndexInitializer {
   private readonly indexes: IndexDefinition[] = [
     {
       collection: 'communities',

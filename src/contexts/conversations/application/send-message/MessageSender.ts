@@ -1,7 +1,7 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { MessageSignatureDomainService } from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessageSendMessage } from './messages/MessageSendMessage';

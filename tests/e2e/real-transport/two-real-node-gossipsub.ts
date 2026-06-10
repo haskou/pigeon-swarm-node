@@ -324,7 +324,12 @@ async function publishKeychain(
   node: NodeRuntime,
   identity: IdentityFixture,
 ): Promise<string> {
-  const bodyWithoutSignature = {
+  const bodyWithoutSignature: {
+    encryptedPayload: string;
+    previousKeychainExternalIdentifier: string | null;
+    timestamp: number;
+    version: number;
+  } = {
     encryptedPayload: `encrypted-keychain-payload-${node.name}`,
     previousKeychainExternalIdentifier: null,
     timestamp: Date.now(),
@@ -384,7 +389,7 @@ async function sendConversationMessage(
     type: MessageType.SENT.valueOf(),
   };
   const body = {
-    attachmentExternalIdentifiers: [],
+    attachmentExternalIdentifiers: [] as string[],
     createdAt,
     encryptedPayload,
     id,

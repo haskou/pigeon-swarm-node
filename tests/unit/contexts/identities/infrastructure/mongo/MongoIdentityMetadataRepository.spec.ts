@@ -1,3 +1,4 @@
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { MongoIdentityMetadataDocument } from '@app/contexts/identities/infrastructure/mongo/documents/MongoIdentityMetadataDocument';
 import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
 import MongoIdentityMetadataMapper from '@app/contexts/identities/infrastructure/mongo/mappers/MongoIdentityMetadataMapper';
@@ -30,9 +31,10 @@ describe('MongoIdentityMetadataRepository', () => {
   it('should save identity metadata by CID', async () => {
     const identity = mother.build();
     const cid = new IPFSId('bafyidentitycid');
+    const externalIdentifier = new IdentityExternalIdentifier(cid.valueOf());
     const expectedDocument = mapper.toDocument(identity, cid);
 
-    await repository.save(identity, cid);
+    await repository.save(identity, externalIdentifier);
 
     expect(mongo.getCollection).toHaveBeenCalledWith('identity_metadata');
     expect(collection.updateOne).toHaveBeenCalledWith(
@@ -78,8 +80,9 @@ describe('MongoIdentityMetadataRepository', () => {
 
   it('should delete identity metadata by external identifier', async () => {
     const cid = new IPFSId('bafyidentitycid');
+    const externalIdentifier = new IdentityExternalIdentifier(cid.valueOf());
 
-    await repository.deleteByExternalIdentifier(cid);
+    await repository.deleteByExternalIdentifier(externalIdentifier);
 
     expect(collection.deleteMany).toHaveBeenCalledWith({ cid: cid.valueOf() });
   });

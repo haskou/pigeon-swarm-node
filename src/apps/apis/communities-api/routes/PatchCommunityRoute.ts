@@ -18,6 +18,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PatchCommunityRoute extends CommunityRouteSupport {
+  private readonly updater = this.get<CommunityProfileUpdater>(
+    CommunityProfileUpdater,
+  );
+
   @Patch('/:communityId')
   public async patchCommunity(
     @Param('communityId') communityId: string,
@@ -28,7 +32,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
-    await new CommunityProfileUpdater(this.repository()).update(
+    await this.updater.update(
       community,
       new CommunityProfileUpdateMessage(
         actorIdentityId.valueOf(),
@@ -40,7 +44,6 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
         body.autoJoinEnabled,
       ),
     );
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.recordModerationLog(
       community,
       actorIdentityId,

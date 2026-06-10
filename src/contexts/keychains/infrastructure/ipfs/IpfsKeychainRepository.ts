@@ -1,31 +1,32 @@
 import { IpfsIdentityDocument } from '@app/contexts/identities/infrastructure/ipfs/documents/IpfsIdentityDocument';
 import { KeychainOwnerNetworksNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainOwnerNetworksNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import {
-  KeychainCandidate,
-  KeychainRepository,
-} from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import KeychainMetadataRepository from '@app/contexts/keychains/domain/repositories/KeychainMetadataRepository';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/types/KeychainCandidate';
+import { KeychainMetadataRecord } from '@app/contexts/keychains/domain/repositories/types/KeychainMetadataRecord';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
-import { MongoKeychainMetadataDocument } from '../mongo/documents/MongoKeychainMetadataDocument';
-import MongoKeychainMetadataRepository from '../mongo/MongoKeychainMetadataRepository';
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 
-export default class IpfsKeychainRepository implements KeychainRepository {
+export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly IDENTITY_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
 
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsKeychainMapper,
-    private readonly metadataRepository: MongoKeychainMetadataRepository,
-  ) {}
+    private readonly metadataRepository: KeychainMetadataRepository,
+    private readonly replicatedStateRegistry: OrbitDBReplicatedStateRegistry,
+  ) {
+    super();
+  }
 
   private async findCandidateFromCid(
     cid: IPFSId,
@@ -35,7 +36,10 @@ export default class IpfsKeychainRepository implements KeychainRepository {
         await this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
       const keychain = this.mapper.toDomain(document);
 
-      await this.metadataRepository.save(keychain, cid);
+      await this.metadataRepository.save(
+        keychain,
+        new KeychainExternalIdentifier(cid.valueOf()),
+      );
 
       return keychain;
     } catch {
@@ -97,14 +101,14 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   }
 
   private async findLocalCandidateReferences(
-    metadata: MongoKeychainMetadataDocument[],
+    metadata: KeychainMetadataRecord[],
   ): Promise<KeychainCandidate[]> {
     const candidates: KeychainCandidate[] = [];
 
     for (const document of metadata) {
-      const candidate = document.keychain
-        ? this.mapper.toDomain(document.keychain)
-        : await this.findCandidateFromCid(new IPFSId(document.cid));
+      const candidate = await this.findCandidateFromCid(
+        new IPFSId(document.cid),
+      );
 
       if (candidate) {
         candidates.push({
@@ -119,12 +123,12 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   }
 
   private deduplicateMetadata(
-    documents: MongoKeychainMetadataDocument[],
-  ): MongoKeychainMetadataDocument[] {
-    const deduplicated = new Map<string, MongoKeychainMetadataDocument>();
+    documents: KeychainMetadataRecord[],
+  ): KeychainMetadataRecord[] {
+    const deduplicated = new Map<string, KeychainMetadataRecord>();
 
     for (const document of documents) {
-      deduplicated.set(document._id, document);
+      deduplicated.set(`${document.ownerIdentityId}:${document.cid}`, document);
     }
 
     return [...deduplicated.values()].sort(
@@ -154,7 +158,7 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   private metadataFromReplicatedDocument(
     document: Record<string, unknown>,
     ownerIdentityId: IdentityId,
-  ): MongoKeychainMetadataDocument | undefined {
+  ): KeychainMetadataRecord | undefined {
     const cid = this.replicatedStringValue(document, 'cid');
 
     if (!cid) {
@@ -162,7 +166,6 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     }
 
     return {
-      _id: `${ownerIdentityId.valueOf()}:${cid}`,
       cid,
       ownerIdentityId: ownerIdentityId.valueOf(),
       previousCid: undefined,
@@ -174,24 +177,23 @@ export default class IpfsKeychainRepository implements KeychainRepository {
 
   private async findReplicatedMetadata(
     ownerIdentityId: IdentityId,
-  ): Promise<MongoKeychainMetadataDocument[]> {
+  ): Promise<KeychainMetadataRecord[]> {
     try {
-      const documents =
-        await OrbitDBReplicatedStateRegistry.shared().queryDocuments(
-          'keychains',
-          (document) =>
-            this.replicatedStringValue(document, 'id') ===
-              ownerIdentityId.valueOf() ||
-            this.replicatedStringValue(document, 'ownerIdentityId') ===
-              ownerIdentityId.valueOf(),
-        );
+      const documents = await this.replicatedStateRegistry.queryDocuments(
+        'keychains',
+        (document) =>
+          this.replicatedStringValue(document, 'id') ===
+            ownerIdentityId.valueOf() ||
+          this.replicatedStringValue(document, 'ownerIdentityId') ===
+            ownerIdentityId.valueOf(),
+      );
 
       return documents
         .map((document) =>
           this.metadataFromReplicatedDocument(document, ownerIdentityId),
         )
         .filter(
-          (document): document is MongoKeychainMetadataDocument =>
+          (document): document is KeychainMetadataRecord =>
             document !== undefined,
         );
     } catch {
@@ -274,7 +276,10 @@ export default class IpfsKeychainRepository implements KeychainRepository {
       primitiveNetworkIds,
     );
 
-    await this.metadataRepository.save(keychain, cid);
+    await this.metadataRepository.save(
+      keychain,
+      new KeychainExternalIdentifier(cid.valueOf()),
+    );
     await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
@@ -286,7 +291,7 @@ export default class IpfsKeychainRepository implements KeychainRepository {
 
   public async republishLocalRoutingRecords(): Promise<number> {
     const metadata = await this.metadataRepository.findAll();
-    const uniqueDocuments = new Map<string, MongoKeychainMetadataDocument>();
+    const uniqueDocuments = new Map<string, KeychainMetadataRecord>();
 
     for (const document of metadata) {
       uniqueDocuments.set(

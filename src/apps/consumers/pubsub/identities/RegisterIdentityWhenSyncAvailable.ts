@@ -13,12 +13,12 @@ export default class RegisterIdentityWhenSyncAvailable extends Consumer {
     'pigeon-swarm.register-identity-when-sync-available';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: IdentityCandidateRegistrar,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

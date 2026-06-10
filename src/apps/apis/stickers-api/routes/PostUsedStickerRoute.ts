@@ -8,6 +8,8 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class PostUsedStickerRoute extends StickerRouteSupport {
+  private readonly recorder = this.get<StickerUseRecorder>(StickerUseRecorder);
+
   @Post('/:packId/stickers/:stickerId/used')
   public async recordStickerUse(
     @Param('packId') packId: string,
@@ -16,10 +18,7 @@ export class PostUsedStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const library = await new StickerUseRecorder(
-      this.packRepository(),
-      this.libraryRepository(),
-    ).record(
+    const library = await this.recorder.record(
       new StickerUseRecordMessage(identityId.valueOf(), packId, stickerId),
     );
 

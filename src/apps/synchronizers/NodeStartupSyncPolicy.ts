@@ -1,14 +1,10 @@
-type NodeStartupSyncPolicyOptions = {
-  maxCommunityRequests: number;
-  maxConversationRequests: number;
-  maxIdentityRequests: number;
-  maxKeychainRequests: number;
-  maxTotalRequests: number;
-};
+import { NodeStartupSyncPolicyOptions } from './NodeStartupSyncPolicyOptions';
 
 export default class NodeStartupSyncPolicy {
   private static readonly DEFAULT_MAX_CONTEXT_REQUESTS = 250;
   private static readonly DEFAULT_MAX_TOTAL_REQUESTS = 1000;
+  private options: NodeStartupSyncPolicyOptions =
+    NodeStartupSyncPolicy.optionsFromEnvironment();
 
   private static positiveIntegerFromEnv(
     variableName: string,
@@ -29,13 +25,13 @@ export default class NodeStartupSyncPolicy {
     return parsed;
   }
 
-  public static fromEnvironment(): NodeStartupSyncPolicy {
+  private static optionsFromEnvironment(): NodeStartupSyncPolicyOptions {
     const defaultContextLimit = NodeStartupSyncPolicy.positiveIntegerFromEnv(
       'STARTUP_SYNC_MAX_CONTEXT_REQUESTS',
       NodeStartupSyncPolicy.DEFAULT_MAX_CONTEXT_REQUESTS,
     );
 
-    return new NodeStartupSyncPolicy({
+    return {
       maxCommunityRequests: NodeStartupSyncPolicy.positiveIntegerFromEnv(
         'STARTUP_SYNC_MAX_COMMUNITY_REQUESTS',
         defaultContextLimit,
@@ -56,10 +52,18 @@ export default class NodeStartupSyncPolicy {
         'STARTUP_SYNC_MAX_TOTAL_REQUESTS',
         NodeStartupSyncPolicy.DEFAULT_MAX_TOTAL_REQUESTS,
       ),
-    });
+    };
   }
 
-  constructor(private readonly options: NodeStartupSyncPolicyOptions) {}
+  public static fromOptions(
+    options: NodeStartupSyncPolicyOptions,
+  ): NodeStartupSyncPolicy {
+    const policy = new NodeStartupSyncPolicy();
+
+    policy.options = options;
+
+    return policy;
+  }
 
   private rotatingSlice<T>(items: T[], limit: number, attempt: number): T[] {
     if (items.length <= limit) {

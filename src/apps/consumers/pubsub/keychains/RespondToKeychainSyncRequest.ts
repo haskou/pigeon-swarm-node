@@ -9,10 +9,10 @@ export default class RespondToKeychainSyncRequest extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.respond-to-keychain-sync-request';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly responder: KeychainSyncResponder,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

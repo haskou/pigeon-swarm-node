@@ -1,4 +1,4 @@
-import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
+import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerPacksFindMessage } from './messages/StickerPacksFindMessage';
 

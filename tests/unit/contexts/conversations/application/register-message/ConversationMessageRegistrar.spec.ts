@@ -4,8 +4,8 @@ import { ConversationParticipantNotFoundError } from '@app/contexts/conversation
 import { InvalidMessageSignatureError } from '@app/contexts/conversations/domain/errors/InvalidMessageSignatureError';
 import { RemoteMessageCandidateMismatchError } from '@app/contexts/conversations/domain/errors/RemoteMessageCandidateMismatchError';
 import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { MessageSignatureDomainService } from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';

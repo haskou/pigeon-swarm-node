@@ -3,12 +3,16 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Timestamp } from '@haskou/value-objects';
 
+import ConversationDraftRepository from '../../domain/repositories/ConversationDraftRepository';
 import { MongoConversationDraftDocument } from './documents/MongoConversationDraftDocument';
 
-export class MongoConversationDraftRepository {
+// eslint-disable-next-line max-len
+export default class MongoConversationDraftRepository extends ConversationDraftRepository {
   private static readonly COLLECTION = 'conversation_drafts';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoConversationDraftDocument>(

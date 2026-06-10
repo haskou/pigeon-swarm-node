@@ -1,27 +1,17 @@
-import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 
 import { IPFSReplicationStatusSummary } from '../../domain/IPFSReplicationStatusSummary';
-import { IPFSReplicationStatusSummaryRepository } from '../../domain/repositories/IPFSReplicationStatusSummaryRepository';
-
-type NodeRepositoryWithLocalNodeId = NodeRepository & {
-  loadLocalNodeId?(): Promise<NodeId>;
-};
+import IPFSReplicationStatusSummaryRepository from '../../domain/repositories/IPFSReplicationStatusSummaryRepository';
 
 export default class IPFSReplicationStatusSummaryFinder {
   constructor(
     private readonly repository: IPFSReplicationStatusSummaryRepository,
-    private readonly nodeRepository: NodeRepositoryWithLocalNodeId,
+    private readonly nodeRepository: NodeRepository,
   ) {}
 
   private async localNodeId(): Promise<NodeId> {
-    if (this.nodeRepository.loadLocalNodeId) {
-      return this.nodeRepository.loadLocalNodeId();
-    }
-
-    const localNode = await this.nodeRepository.loadLocalNode();
-
-    return new NodeId(localNode.toPrimitives().id);
+    return this.nodeRepository.loadLocalNodeId();
   }
 
   public async find(): Promise<IPFSReplicationStatusSummary> {

@@ -5,18 +5,20 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { Poll } from '../Poll';
 import { PollId } from '../value-objects/PollId';
 
-export interface PollRepository {
-  findByCommunityChannel(
+export default abstract class PollRepository {
+  public abstract findByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]>;
-  findByGroupConversation(
+
+  public abstract findByGroupConversation(
     conversationId: ConversationId,
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]>;
-  findById(id: PollId): Promise<Poll | undefined>;
-  save(poll: Poll): Promise<void>;
+
+  public abstract findById(id: PollId): Promise<Poll | undefined>;
+  public abstract save(poll: Poll): Promise<void>;
 }

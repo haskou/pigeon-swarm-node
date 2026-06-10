@@ -18,7 +18,7 @@ package "push-notifications/application" {
   class PushNotificationDispatcher
   class PushNotificationDelivery <<Port>>
   class PushNotificationPayload
-  class PushNotificationTester
+  class PushTestNotificationSender
 }
 
 package "push-notifications/infrastructure" {
@@ -36,7 +36,7 @@ PushSubscriptionRemover ..> PushSubscriptionRepository
 PushNotificationDispatcher ..> PushSubscriptionRepository
 PushNotificationDispatcher ..> PushNotificationDelivery
 PushNotificationDispatcher ..> PushNotificationPayload
-PushNotificationTester ..> PushNotificationDelivery
+PushTestNotificationSender ..> PushNotificationDelivery
 
 MongoPushSubscriptionRepository ..|> PushSubscriptionRepository
 MongoPushSubscriptionRepository ..> MongoPushSubscriptionDocument

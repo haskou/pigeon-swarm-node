@@ -2,14 +2,17 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { PushSubscription } from '../../domain/PushSubscription';
-import { PushSubscriptionRepository as Repository } from '../../domain/repositories/PushSubscriptionRepository';
+import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import { PushSubscriptionEndpoint } from '../../domain/value-objects/PushSubscriptionEndpoint';
 import { MongoPushSubscriptionDocument } from './documents/MongoPushSubscriptionDocument';
 
-export class MongoPushSubscriptionRepository implements Repository {
+// eslint-disable-next-line max-len
+export default class MongoPushSubscriptionRepository extends PushSubscriptionRepository {
   private static readonly COLLECTION = 'push_subscriptions';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoPushSubscriptionDocument>(

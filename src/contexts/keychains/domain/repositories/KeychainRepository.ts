@@ -5,17 +5,20 @@ import { Keychain } from '../Keychain';
 import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
 import { KeychainCandidate } from './types/KeychainCandidate';
 
-export { KeychainCandidate } from './types/KeychainCandidate';
-
-export interface KeychainRepository {
-  findByExternalIdentifier(
+export default abstract class KeychainRepository {
+  public abstract findByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined>;
-  findCandidateReferencesByOwnerId(
+
+  public abstract findCandidateReferencesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]>;
-  findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>;
-  save(
+
+  public abstract findCandidatesByOwnerId(
+    ownerIdentityId: IdentityId,
+  ): Promise<Keychain[]>;
+
+  public abstract save(
     keychain: Keychain,
     networkIds: NetworkId[],
   ): Promise<KeychainExternalIdentifier>;

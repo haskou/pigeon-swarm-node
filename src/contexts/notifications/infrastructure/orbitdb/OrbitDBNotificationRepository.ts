@@ -1,25 +1,19 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { Notification } from '../../domain/Notification';
-import { NotificationRepository } from '../../domain/repositories/NotificationRepository';
+import NotificationRepository from '../../domain/repositories/NotificationRepository';
 import { NotificationId } from '../../domain/value-objects/NotificationId';
 import { OrbitDBNotificationDocument } from './documents/OrbitDBNotificationDocument';
 import OrbitDBNotificationMapper from './mappers/OrbitDBNotificationMapper';
 
-type Repository = NotificationRepository;
-
-export default class OrbitDBNotificationRepository implements Repository {
-  private readonly mapper: OrbitDBNotificationMapper;
-
-  private readonly registry: OrbitDBReplicatedStateRegistry;
-
+// eslint-disable-next-line max-len
+export default class OrbitDBNotificationRepository extends NotificationRepository {
   constructor(
-    registry?: OrbitDBReplicatedStateRegistry,
-    mapper?: OrbitDBNotificationMapper,
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly mapper: OrbitDBNotificationMapper,
   ) {
-    this.registry = registry || OrbitDBReplicatedStateRegistry.shared();
-    this.mapper = mapper || new OrbitDBNotificationMapper();
+    super();
   }
 
   private numberValue(

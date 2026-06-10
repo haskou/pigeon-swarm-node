@@ -1,5 +1,5 @@
 import { Call } from '../../domain/Call';
-import { CallRepository } from '../../domain/repositories/CallRepository';
+import CallRepository from '../../domain/repositories/CallRepository';
 import { CallHistoryFindMessage } from './messages/CallHistoryFindMessage';
 
 export class CallHistoryFinder {

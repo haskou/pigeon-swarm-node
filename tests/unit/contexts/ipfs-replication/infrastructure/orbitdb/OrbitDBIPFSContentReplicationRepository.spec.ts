@@ -1,13 +1,14 @@
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
 import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationMetadata } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
 import { OrbitDBIPFSContentReplicationDocument } from '@app/contexts/ipfs-replication/infrastructure/orbitdb/documents/OrbitDBIPFSContentReplicationDocument';
+import OrbitDBIPFSContentReplicationMapper from '@app/contexts/ipfs-replication/infrastructure/orbitdb/mappers/OrbitDBIPFSContentReplicationMapper';
 import OrbitDBIPFSContentReplicationRepository from '@app/contexts/ipfs-replication/infrastructure/orbitdb/OrbitDBIPFSContentReplicationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -15,6 +16,7 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 describe('OrbitDBIPFSContentReplicationRepository', () => {
   let put: jest.Mock;
   let query: jest.Mock;
+  let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBIPFSContentReplicationRepository;
 
   const identityMother = new IdentityMother();
@@ -37,36 +39,45 @@ describe('OrbitDBIPFSContentReplicationRepository', () => {
 
   beforeEach(() => {
     put = jest.fn().mockResolvedValue('ok');
-    query = jest.fn().mockImplementation((matcher) =>
-      Promise.resolve(
-        [
-          baseDocument,
-          {
-            ...baseDocument,
-            filename: 'old-image.png',
-            updatedAt: baseDocument.updatedAt - 1,
-          },
-          {
-            ...baseDocument,
-            cid: 'bafybeibfb7fpre6rvg5ujuk7g34kegdd7indjrilpkaogxavta77f4c6iy',
-            id: 'bafybeibfb7fpre6rvg5ujuk7g34kegdd7indjrilpkaogxavta77f4c6iy',
-            updatedAt: baseDocument.updatedAt + 1,
-          },
-        ].filter(matcher),
-      ),
-    );
-    OrbitDBReplicatedStateRegistry.shared().clear();
-    OrbitDBReplicatedStateRegistry.shared().register('network-1', {
+    query = jest
+      .fn()
+      .mockImplementation(
+        (
+          matcher: (document: OrbitDBIPFSContentReplicationDocument) => boolean,
+        ) =>
+          Promise.resolve(
+            [
+              baseDocument,
+              {
+                ...baseDocument,
+                filename: 'old-image.png',
+                updatedAt: baseDocument.updatedAt - 1,
+              },
+              {
+                ...baseDocument,
+                cid: 'bafybeibfb7fpre6rvg5ujuk7g34kegdd7indjrilpkaogxavta77f4c6iy',
+                id: 'bafybeibfb7fpre6rvg5ujuk7g34kegdd7indjrilpkaogxavta77f4c6iy',
+                updatedAt: baseDocument.updatedAt + 1,
+              },
+            ].filter(matcher),
+          ),
+      );
+    registry = new OrbitDBReplicatedStateRegistry();
+    registry.clear();
+    registry.register('network-1', {
       ipfsReplication: {
         put,
         query,
       },
     } as never);
-    repository = new OrbitDBIPFSContentReplicationRepository();
+    repository = new OrbitDBIPFSContentReplicationRepository(
+      registry,
+      new OrbitDBIPFSContentReplicationMapper(),
+    );
   });
 
   afterEach(() => {
-    OrbitDBReplicatedStateRegistry.shared().clear();
+    registry.clear();
   });
 
   it('should find IPFS content replication metadata by CID from OrbitDB', async () => {

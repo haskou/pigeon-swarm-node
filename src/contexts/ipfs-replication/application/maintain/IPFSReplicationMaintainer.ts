@@ -7,7 +7,7 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { IPFSContentReplicationWasClaimedEvent } from '../../domain/events/IPFSContentReplicationWasClaimedEvent';
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
-import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicaClaimRepository from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
 import IPFSReplicationStatusFinder from '../find-status/IPFSReplicationStatusFinder';
 import { IPFSContentReplicationStatus } from '../find-status/types/IPFSContentReplicationStatus';

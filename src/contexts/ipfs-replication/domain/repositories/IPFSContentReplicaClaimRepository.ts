@@ -1,7 +1,10 @@
 import { IPFSId } from '../../../shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSContentReplicaClaim } from '../IPFSContentReplicaClaim';
 
-export interface IPFSContentReplicaClaimRepository {
-  findByCids(cids: IPFSId[]): Promise<IPFSContentReplicaClaim[]>;
-  save(claim: IPFSContentReplicaClaim): Promise<void>;
+export default abstract class IPFSContentReplicaClaimRepository {
+  public abstract findByCids(
+    cids: IPFSId[],
+  ): Promise<IPFSContentReplicaClaim[]>;
+
+  public abstract save(claim: IPFSContentReplicaClaim): Promise<void>;
 }

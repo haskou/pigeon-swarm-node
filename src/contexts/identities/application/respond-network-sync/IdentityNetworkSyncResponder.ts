@@ -1,5 +1,5 @@
 import { IdentitySyncAvailableEvent } from '@app/contexts/identities/domain/events/IdentitySyncAvailableEvent';
-import MongoIdentityMetadataRepository from '@app/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
@@ -7,9 +7,9 @@ import { IdentityNetworkSyncResponseMessage } from './messages/IdentityNetworkSy
 
 export default class IdentityNetworkSyncResponder {
   constructor(
-    private readonly metadataRepository: MongoIdentityMetadataRepository,
+    private readonly metadataRepository: IdentityMetadataRepository,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {}
 
   public async respond(

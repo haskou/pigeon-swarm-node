@@ -1,10 +1,9 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import { IPFSNetworkType } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkType';
-import { OrbitDBDomainEventProjector } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
+import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
-import { OrbitDBReplicatedDomainEventPublisher } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedDomainEventMessage';
 import Kernel from '@app/Kernel';
@@ -12,7 +11,7 @@ import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 
 import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
 
-export class OrbitDBReplicatedStateRuntime {
+export default class OrbitDBReplicatedStateRuntime {
   private readonly registeredNetworks = new Map<
     string,
     RegisteredOrbitDBNetwork
@@ -22,7 +21,8 @@ export class OrbitDBReplicatedStateRuntime {
     private readonly networkRegistry: IPFSNetworkRegistry,
     private readonly messageBus: MessageBus,
     private readonly publisher: OrbitDBReplicatedDomainEventPublisher,
-    private readonly projector = new OrbitDBDomainEventProjector(),
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly projector: OrbitDBDomainEventProjector,
   ) {}
 
   private isReplicatedMessage(
@@ -38,10 +38,6 @@ export class OrbitDBReplicatedStateRuntime {
       'replication' in value &&
       'type' in value
     );
-  }
-
-  private shouldRunFor(network: IPFSNetwork): boolean {
-    return network.getType() === IPFSNetworkType.PRIVATE;
   }
 
   private async projectAndDispatch(
@@ -101,10 +97,6 @@ export class OrbitDBReplicatedStateRuntime {
   }
 
   private async registerNetwork(network: IPFSNetwork): Promise<void> {
-    if (!this.shouldRunFor(network)) {
-      return;
-    }
-
     const networkId = network.getId();
 
     if (this.registeredNetworks.has(networkId)) {
@@ -119,7 +111,7 @@ export class OrbitDBReplicatedStateRuntime {
       processedEventIds: new Set(),
       stores,
     });
-    OrbitDBReplicatedStateRegistry.shared().register(networkId, stores);
+    this.registry.register(networkId, stores);
     this.publisher.registerNetworkStores(networkId, localPeerId, stores);
     this.subscribeToEvents(networkId, stores);
     await this.projectExistingEvents(networkId, stores);
@@ -129,19 +121,45 @@ export class OrbitDBReplicatedStateRuntime {
     );
   }
 
+  private async registerLocalState(): Promise<void> {
+    const networkId = 'local';
+
+    if (this.registeredNetworks.has(networkId)) {
+      return;
+    }
+
+    const stores = await OrbitDBReplicatedStateStores.openLocal();
+    const localPeerId = 'local';
+
+    this.registeredNetworks.set(networkId, {
+      localPeerId,
+      processedEventIds: new Set(),
+      stores,
+    });
+    this.registry.register(networkId, stores);
+    this.publisher.registerNetworkStores(networkId, localPeerId, stores);
+    this.subscribeToEvents(networkId, stores);
+    await this.projectExistingEvents(networkId, stores);
+
+    Kernel.logger.info('OrbitDB local state ready');
+  }
+
   public async run(): Promise<void> {
+    await this.registerLocalState();
     await Promise.all(
       this.networkRegistry
         .getAll()
         .map((network) => this.registerNetwork(network)),
     );
 
-    this.networkRegistry.onNetworkRegistered((network) => {
-      this.registerNetwork(network).catch((error: unknown) => {
+    this.networkRegistry.onNetworkRegistered(async (network) => {
+      try {
+        await this.registerNetwork(network);
+      } catch (error: unknown) {
         Kernel.logger.error(
           `OrbitDB replicated state network registration failed: networkId=${network.getId()} error=${String(error)}`,
         );
-      });
+      }
     });
 
     MessageBus.setReplicatedEventPublisher(this.publisher);

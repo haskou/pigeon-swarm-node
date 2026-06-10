@@ -54,7 +54,6 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     const consumer = new RegisterMessageWhenAnnounced(
       this.eventConsumer(),
       this.fakeUseCase<ConversationMessageRegistrar>('register'),
-      this.fakeUseCase<ConversationRegistrar>('register'),
     );
 
     await consumer.handler(

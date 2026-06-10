@@ -1,5 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelThreadSummary } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/types/CommunityChannelThreadSummary';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { CommunityChannelsResource } from '../resources/CommunityChannelsResource';

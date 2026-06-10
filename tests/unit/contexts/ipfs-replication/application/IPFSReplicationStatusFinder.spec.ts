@@ -1,15 +1,16 @@
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
 import { IPFSContentReplicaClaim } from '@app/contexts/ipfs-replication/domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
-import { IPFSContentReplicaClaimRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
-import { IPFSContentReplicationRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
+import IPFSReplicationPolicy from '@app/contexts/ipfs-replication/domain/IPFSReplicationPolicy';
+import IPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicationRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationContext } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationMetadata } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '@app/contexts/ipfs-replication/domain/value-objects/IPFSContentReplicationPriority';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
-import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
-import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -48,6 +49,7 @@ describe('IPFSReplicationStatusFinder', () => {
       save: () => Promise.resolve(),
     };
     const nodeRepository: NodeRepository = {
+      loadLocalNodeId: () => Promise.resolve(new NodeId(localNodeId)),
       loadLocalNode: () =>
         Promise.resolve(
           Node.fromPrimitives({
@@ -76,6 +78,7 @@ describe('IPFSReplicationStatusFinder', () => {
       claimRepository,
       nodeRepository,
       nodePeerRepository,
+      new IPFSReplicationPolicy(),
     ).find();
 
     expect(status.contents[0].networks[0]).toMatchObject({

@@ -3,13 +3,17 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
+import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '../../domain/value-objects/PresenceStatus';
 import { MongoIdentityPresenceDocument } from './documents/MongoIdentityPresenceDocument';
 
-export default class MongoIdentityPresenceRepository {
+// eslint-disable-next-line max-len
+export default class MongoIdentityPresenceRepository extends IdentityPresenceRepository {
   private static readonly COLLECTION = 'identity_presence';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoIdentityPresenceDocument>(

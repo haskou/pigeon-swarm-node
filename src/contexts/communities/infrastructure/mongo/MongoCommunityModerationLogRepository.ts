@@ -1,15 +1,18 @@
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { CommunityModerationLogEntry } from '../../domain/entities/moderation/CommunityModerationLogEntry';
-import { CommunityModerationLogRepository as LogRepository } from '../../domain/repositories/CommunityModerationLogRepository';
+import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityModerationLogId } from '../../domain/value-objects/CommunityModerationLogId';
 import { MongoCommunityModerationLogDocument } from './documents/MongoCommunityModerationLogDocument';
 
-export class MongoCommunityModerationLogRepository implements LogRepository {
+// eslint-disable-next-line max-len
+export default class MongoCommunityModerationLogRepository extends CommunityModerationLogRepository {
   private static readonly COLLECTION = 'community_moderation_logs';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCommunityModerationLogDocument>(

@@ -8,6 +8,9 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class DeleteSavedStickerPackRoute extends StickerRouteSupport {
+  private readonly forgetter =
+    this.get<StickerPackForgetter>(StickerPackForgetter);
+
   @Delete('/:packId/saved')
   public async forgetPack(
     @Param('packId') packId: string,
@@ -15,9 +18,9 @@ export class DeleteSavedStickerPackRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const library = await new StickerPackForgetter(
-      this.libraryRepository(),
-    ).forget(new StickerPackForgetMessage(identityId.valueOf(), packId));
+    const library = await this.forgetter.forget(
+      new StickerPackForgetMessage(identityId.valueOf(), packId),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

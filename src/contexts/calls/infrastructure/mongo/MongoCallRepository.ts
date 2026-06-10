@@ -1,5 +1,5 @@
 import { Call } from '@app/contexts/calls/domain/Call';
-import { CallRepository } from '@app/contexts/calls/domain/repositories/CallRepository';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -10,10 +10,12 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { MongoCallDocument } from './documents/MongoCallDocument';
 
-export class MongoCallRepository implements CallRepository {
+export default class MongoCallRepository extends CallRepository {
   private static readonly COLLECTION = 'calls';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoCallDocument>(

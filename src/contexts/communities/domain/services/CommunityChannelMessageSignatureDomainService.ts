@@ -6,7 +6,7 @@ import { CommunityChannelMessageEditionSignaturePayload } from './types/Communit
 import { CommunityChannelMessageSignaturePayload } from './types/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelSignaturePayload } from './types/CommunityChannelSignaturePayload';
 
-export class CommunityChannelMessageSignatureDomainService {
+export default class CommunityChannelMessageSignatureDomainService {
   private isMessagePayload(
     payload: CommunityChannelSignaturePayload,
   ): payload is

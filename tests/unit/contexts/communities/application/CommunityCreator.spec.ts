@@ -1,9 +1,11 @@
-import { CommunityCreator } from '@app/contexts/communities/application/create-community/CommunityCreator';
+import CommunityCreator from '@app/contexts/communities/application/create-community/CommunityCreator';
 import { CommunityCreateMessage } from '@app/contexts/communities/application/create-community/messages/CommunityCreateMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityRepository } from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { mock } from 'jest-mock-extended';
 
 class InMemoryCommunityRepository implements CommunityRepository {
   public readonly savedCommunities: Community[] = [];
@@ -26,6 +28,10 @@ class InMemoryCommunityRepository implements CommunityRepository {
     return this.savedCommunities;
   }
 
+  public async findSyncable(): Promise<Community[]> {
+    return this.savedCommunities;
+  }
+
   public async save(community: Community): Promise<void> {
     this.savedCommunities.push(community);
   }
@@ -36,7 +42,8 @@ describe('CommunityCreator', () => {
     const ownerIdentityId =
       'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
     const repository = new InMemoryCommunityRepository();
-    const community = await new CommunityCreator(repository).create(
+    const eventPublisher = mock<DomainEventPublisher>();
+    const community = await new CommunityCreator(repository, eventPublisher).create(
       new CommunityCreateMessage(
         ownerIdentityId,
         '550e8400-e29b-41d4-a716-446655440000',

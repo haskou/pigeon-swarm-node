@@ -1,6 +1,6 @@
 import IPFSReplicationStatusFinder from '@app/contexts/ipfs-replication/application/find-status/IPFSReplicationStatusFinder';
 import IPFSReplicationMaintainer from '@app/contexts/ipfs-replication/application/maintain/IPFSReplicationMaintainer';
-import { IPFSContentReplicaClaimRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';

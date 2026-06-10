@@ -1,7 +1,7 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { Poll } from '../../domain/Poll';
-import { PollRepository } from '../../domain/repositories/PollRepository';
+import PollRepository from '../../domain/repositories/PollRepository';
 import { PollCreateMessage } from './messages/PollCreateMessage';
 
 export class PollCreator {

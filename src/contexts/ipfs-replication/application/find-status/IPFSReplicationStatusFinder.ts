@@ -1,37 +1,29 @@
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
-import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
+import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { createHash } from 'crypto';
 
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
-import { IPFSReplicationPolicy } from '../../domain/IPFSReplicationPolicy';
-import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
-import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
+import IPFSReplicationPolicy from '../../domain/IPFSReplicationPolicy';
+import IPFSContentReplicaClaimRepository from '../../domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicationRepository from '../../domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationStatus } from './types/IPFSContentReplicationStatus';
 import { IPFSReplicationStatus } from './types/IPFSReplicationStatus';
-import { NodeRepositoryWithLocalNodeId } from './types/NodeRepositoryWithLocalNodeId';
 
 export default class IPFSReplicationStatusFinder {
   private static readonly ACTIVE_PEER_WINDOW_MS = 15 * 60 * 1000;
 
-  private readonly policy: IPFSReplicationPolicy;
-
   constructor(
     private readonly contentRepository: IPFSContentReplicationRepository,
     private readonly claimRepository: IPFSContentReplicaClaimRepository,
-    private readonly nodeRepository: NodeRepositoryWithLocalNodeId,
+    private readonly nodeRepository: NodeRepository,
     private readonly nodePeerRepository: NodePeerRepository,
-    policy?: IPFSReplicationPolicy,
-  ) {
-    this.policy = policy ?? new IPFSReplicationPolicy();
-  }
+    private readonly policy: IPFSReplicationPolicy,
+  ) {}
 
   private async localNodeId(): Promise<string> {
-    if (this.nodeRepository.loadLocalNodeId) {
-      return (await this.nodeRepository.loadLocalNodeId()).valueOf();
-    }
-
-    return (await this.nodeRepository.loadLocalNode()).toPrimitives().id;
+    return (await this.nodeRepository.loadLocalNodeId()).valueOf();
   }
 
   private score(cid: string, nodeId: string, networkId: string): string {

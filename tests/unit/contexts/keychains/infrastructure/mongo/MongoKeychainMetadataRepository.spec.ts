@@ -1,3 +1,4 @@
+import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { MongoKeychainMetadataDocument } from '@app/contexts/keychains/infrastructure/mongo/documents/MongoKeychainMetadataDocument';
 import MongoKeychainMetadataMapper from '@app/contexts/keychains/infrastructure/mongo/mappers/MongoKeychainMetadataMapper';
 import MongoKeychainMetadataRepository from '@app/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
@@ -28,9 +29,10 @@ describe('MongoKeychainMetadataRepository', () => {
   it('should save keychain metadata by external identifier', async () => {
     const keychain = (await KeychainMother.create()).build();
     const cid = new IPFSId('bafy-keychain');
+    const externalIdentifier = new KeychainExternalIdentifier(cid.valueOf());
     const document = mapper.toDocument(keychain, cid);
 
-    await repository.save(keychain, cid);
+    await repository.save(keychain, externalIdentifier);
 
     expect(mongo.getCollection).toHaveBeenCalledWith('keychain_metadata');
     expect(collection.updateOne).toHaveBeenCalledWith(

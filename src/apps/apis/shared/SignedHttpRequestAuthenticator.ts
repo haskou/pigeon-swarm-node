@@ -6,7 +6,7 @@ import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from './SignedHttpRequestVerifier';
 import { SignedRequestNonceDocument } from './SignedRequestNonceDocument';
 
-export class SignedHttpRequestAuthenticator {
+export default class SignedHttpRequestAuthenticator {
   private static readonly COLLECTION = 'signed_request_nonces';
   private static readonly MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
   private readonly verifier = new SignedHttpRequestVerifier();

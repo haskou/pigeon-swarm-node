@@ -1,4 +1,4 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import Route from '@app/shared/infrastructure/ui/routes/Route';

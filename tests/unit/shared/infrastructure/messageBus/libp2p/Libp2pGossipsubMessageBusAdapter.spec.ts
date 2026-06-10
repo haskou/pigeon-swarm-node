@@ -2,7 +2,9 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
-import { PubSubTransport } from '@app/shared/infrastructure/pubsub/PubSubTransport';
+import PubSubNetworkMessageCodec from '@app/shared/infrastructure/messageBus/libp2p/PubSubNetworkMessageCodec';
+import PubSubTopicResolver from '@app/shared/infrastructure/messageBus/libp2p/PubSubTopicResolver';
+import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { PrivateKey } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -48,11 +50,19 @@ describe('Libp2pGossipsubAdapter', () => {
     return network;
   };
 
+  const createAdapter = (): Libp2pGossipsubAdapter =>
+    new Libp2pGossipsubAdapter(
+      transport,
+      networkRegistry,
+      new PubSubTopicResolver(),
+      new PubSubNetworkMessageCodec(),
+    );
+
   beforeEach(() => {
     transport = mock<PubSubTransport>();
     networkRegistry = mock<IPFSNetworkRegistry>();
     networkRegistry.getAll.mockReturnValue([]);
-    adapter = new Libp2pGossipsubAdapter(transport);
+    adapter = createAdapter();
   });
 
   it('should publish domain events to pubsub topics', async () => {
@@ -122,7 +132,7 @@ describe('Libp2pGossipsubAdapter', () => {
     const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
 
     networkRegistry.getAll.mockReturnValue([publicNetwork, privateNetwork]);
-    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+    adapter = createAdapter();
 
     await adapter.publish([event]);
 
@@ -151,7 +161,7 @@ describe('Libp2pGossipsubAdapter', () => {
         subscribedHandler = callback;
       },
     );
-    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+    adapter = createAdapter();
 
     await adapter.consume(
       'queue',
@@ -187,7 +197,7 @@ describe('Libp2pGossipsubAdapter', () => {
     network.subscribePubSub.mockImplementation(async (_topic, callback) => {
       subscribedHandler = callback;
     });
-    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+    adapter = createAdapter();
 
     await adapter.consume(
       'queue',
@@ -219,7 +229,7 @@ describe('Libp2pGossipsubAdapter', () => {
     network.subscribePubSub.mockImplementation(async (_topic, callback) => {
       subscribedHandler = callback;
     });
-    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+    adapter = createAdapter();
 
     await adapter.consume(
       'queue',
@@ -250,7 +260,7 @@ describe('Libp2pGossipsubAdapter', () => {
     network.subscribePubSub.mockImplementation(async (_topic, callback) => {
       subscribedHandler = callback;
     });
-    adapter = new Libp2pGossipsubAdapter(transport, networkRegistry);
+    adapter = createAdapter();
 
     await adapter.consume(
       'queue-a',

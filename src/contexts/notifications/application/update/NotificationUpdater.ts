@@ -1,7 +1,7 @@
 import { NotificationNotFoundError } from '@app/contexts/notifications/domain/errors/NotificationNotFoundError';
 import { NotificationRecipientMismatchError } from '@app/contexts/notifications/domain/errors/NotificationRecipientMismatchError';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
-import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { NotificationState } from '@app/contexts/notifications/domain/value-objects/NotificationState';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 

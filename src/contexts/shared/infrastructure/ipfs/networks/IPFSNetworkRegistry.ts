@@ -2,9 +2,8 @@ import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
-import libp2pKeyAdapter, {
-  Libp2pPrivateKeyLike,
-} from './adapters/Libp2pKeyAdapter';
+import libp2pKeyAdapter from './adapters/Libp2pKeyAdapter';
+import { Libp2pPrivateKeyLike } from './adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from './IPFSNetwork';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { PrivateIPFS } from './PrivateIPFS';
@@ -12,7 +11,7 @@ import { PublicIPFS } from './PublicIPFS';
 
 type IPFSNetworkRegistryState = {
   initialized: boolean;
-  listeners: Array<(network: IPFSNetwork) => void>;
+  listeners: Array<(network: IPFSNetwork) => Promise<void> | void>;
   networks: IPFSNetwork[];
   privateRelayPorts: Record<string, number>;
   sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
@@ -273,12 +272,16 @@ export default class IPFSNetworkRegistry {
       sharedPrivateKey,
     );
     this.networks.push(network);
-    this.state.listeners.forEach((listener) => listener(network));
+    await Promise.all(
+      this.state.listeners.map((listener) => listener(network)),
+    );
 
     return network;
   }
 
-  public onNetworkRegistered(listener: (network: IPFSNetwork) => void): void {
+  public onNetworkRegistered(
+    listener: (network: IPFSNetwork) => Promise<void> | void,
+  ): void {
     this.state.listeners.push(listener);
   }
 

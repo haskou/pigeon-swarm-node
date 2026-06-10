@@ -9,6 +9,8 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class DeleteCallRoute extends CallRouteSupport {
+  private readonly ender = this.get<CallEnder>(CallEnder);
+
   @Delete('/:callId')
   public async endCall(
     @Param('callId') callId: string,
@@ -16,10 +18,9 @@ export class DeleteCallRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await new CallEnder(
-      this.callRepository(),
-      this.eventPublisher,
-    ).end(new CallEndMessage(callId, participantIdentityId.valueOf()));
+    const call = await this.ender.end(
+      new CallEndMessage(callId, participantIdentityId.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

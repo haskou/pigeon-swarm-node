@@ -1,36 +1,37 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
-import {
-  IdentityCandidate,
-  IdentityRepository,
-} from '../../domain/repositories/IdentityRepository';
-import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
+import IdentityMetadataRepository from '../../domain/repositories/IdentityMetadataRepository';
+import IdentityRepository from '../../domain/repositories/IdentityRepository';
+import { IdentityCandidate } from '../../domain/repositories/types/IdentityCandidate';
+import { IdentityMetadataRecord } from '../../domain/repositories/types/IdentityMetadataRecord';
+import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
-import { MongoIdentityMetadataDocument } from '../mongo/documents/MongoIdentityMetadataDocument';
-import MongoIdentityMetadataRepository from '../mongo/MongoIdentityMetadataRepository';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
-export default class IpfsIdentityRepository implements IdentityRepository {
+export default class IpfsIdentityRepository extends IdentityRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
 
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsIdentityMapper,
-    private readonly metadataRepository: MongoIdentityMetadataRepository,
-  ) {}
+    private readonly metadataRepository: IdentityMetadataRepository,
+    private readonly replicatedStateRegistry: OrbitDBReplicatedStateRegistry,
+  ) {
+    super();
+  }
 
   private async findValidMetadata(
     id: IdentityId,
-  ): Promise<MongoIdentityMetadataDocument[]> {
-    const documents: MongoIdentityMetadataDocument[] = [];
+  ): Promise<IdentityMetadataRecord[]> {
+    const documents: IdentityMetadataRecord[] = [];
 
     try {
       documents.push(...(await this.metadataRepository.findByIdentityId(id)));
@@ -44,12 +45,12 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   }
 
   private deduplicateMetadata(
-    documents: MongoIdentityMetadataDocument[],
-  ): MongoIdentityMetadataDocument[] {
-    const deduplicated = new Map<string, MongoIdentityMetadataDocument>();
+    documents: IdentityMetadataRecord[],
+  ): IdentityMetadataRecord[] {
+    const deduplicated = new Map<string, IdentityMetadataRecord>();
 
     for (const document of documents) {
-      deduplicated.set(document._id, document);
+      deduplicated.set(`${document.identityId}:${document.cid}`, document);
     }
 
     return [...deduplicated.values()].sort(
@@ -79,7 +80,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   private metadataFromReplicatedDocument(
     document: Record<string, unknown>,
     identityId: IdentityId,
-  ): MongoIdentityMetadataDocument | undefined {
+  ): IdentityMetadataRecord | undefined {
     const cid = this.replicatedStringValue(document, 'cid');
 
     if (!cid) {
@@ -89,7 +90,6 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     const networkId = this.replicatedStringValue(document, 'networkId');
 
     return {
-      _id: `${identityId.valueOf()}:${cid}`,
       cid,
       identityId: identityId.valueOf(),
       networkIds: networkId ? [networkId] : undefined,
@@ -102,20 +102,19 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   private async findReplicatedMetadata(
     id: IdentityId,
-  ): Promise<MongoIdentityMetadataDocument[]> {
+  ): Promise<IdentityMetadataRecord[]> {
     try {
-      const documents =
-        await OrbitDBReplicatedStateRegistry.shared().queryDocuments(
-          'identities',
-          (document) =>
-            this.replicatedStringValue(document, 'id') === id.valueOf() ||
-            this.replicatedStringValue(document, 'identityId') === id.valueOf(),
-        );
+      const documents = await this.replicatedStateRegistry.queryDocuments(
+        'identities',
+        (document) =>
+          this.replicatedStringValue(document, 'id') === id.valueOf() ||
+          this.replicatedStringValue(document, 'identityId') === id.valueOf(),
+      );
 
       return documents
         .map((document) => this.metadataFromReplicatedDocument(document, id))
         .filter(
-          (document): document is MongoIdentityMetadataDocument =>
+          (document): document is IdentityMetadataRecord =>
             document !== undefined,
         );
     } catch {
@@ -125,7 +124,9 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   private async deleteMetadata(cid: IPFSId): Promise<void> {
     try {
-      await this.metadataRepository.deleteByExternalIdentifier(cid);
+      await this.metadataRepository.deleteByExternalIdentifier(
+        new IdentityExternalIdentifier(cid.valueOf()),
+      );
     } catch {
       return;
     }
@@ -133,7 +134,10 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
     try {
-      await this.metadataRepository.save(identity, cid);
+      await this.metadataRepository.save(
+        identity,
+        new IdentityExternalIdentifier(cid.valueOf()),
+      );
     } catch {
       return;
     }
@@ -155,7 +159,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   private async findCandidatesFromMetadata(
     id: IdentityId,
-    metadata: MongoIdentityMetadataDocument[],
+    metadata: IdentityMetadataRecord[],
   ): Promise<Identity[]> {
     const cids = [...new Set(metadata.map((document) => document.cid))];
     const candidates: Identity[] = [];
@@ -223,14 +227,13 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   }
 
   private async findCandidateFromMetadata(
-    metadata: MongoIdentityMetadataDocument,
+    metadata: IdentityMetadataRecord,
   ): Promise<Identity | undefined> {
     try {
       const id = new IdentityId(metadata.identityId);
       const cid = new IPFSId(metadata.cid);
       const document =
-        metadata.identity ??
-        (await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid));
+        await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
       const candidate = this.mapper.toDomain(document);
 
       if (!this.validator.isValidFor(id, candidate)) {
@@ -239,9 +242,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
         return undefined;
       }
 
-      if (!metadata.identity) {
-        await this.saveMetadata(candidate, cid);
-      }
+      await this.saveMetadata(candidate, cid);
 
       return candidate;
     } catch {
@@ -359,7 +360,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   public async republishLocalRoutingRecords(): Promise<number> {
     const metadata = await this.metadataRepository.findAll();
-    const uniqueDocuments = new Map<string, MongoIdentityMetadataDocument>();
+    const uniqueDocuments = new Map<string, IdentityMetadataRecord>();
 
     for (const document of metadata) {
       uniqueDocuments.set(`${document.identityId}:${document.cid}`, document);
@@ -371,7 +372,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       try {
         const identityDocument =
           await this.ipfsManager.getJSON<IpfsIdentityDocument>(
-            new IPFSId(document.cid),
+            new IPFSId(String(document.cid)),
           );
         const cid = await this.ipfsManager.addJSONToNetworks(
           identityDocument,

@@ -11,11 +11,11 @@ export default class RegisterKeychainWhenSyncAvailable extends Consumer {
     'pigeon-swarm.register-keychain-when-sync-available';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: KeychainCandidateRegistrar,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

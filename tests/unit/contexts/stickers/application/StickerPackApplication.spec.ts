@@ -7,8 +7,8 @@ import { StickerFavoriteMessage } from '@app/contexts/stickers/application/favor
 import { StickerFavoriter } from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
 import { StickerUseRecordMessage } from '@app/contexts/stickers/application/record-sticker-use/messages/StickerUseRecordMessage';
 import { StickerUseRecorder } from '@app/contexts/stickers/application/record-sticker-use/StickerUseRecorder';
-import { StickerPackRepository } from '@app/contexts/stickers/domain/repositories/StickerPackRepository';
-import { StickerUserLibraryRepository } from '@app/contexts/stickers/domain/repositories/StickerUserLibraryRepository';
+import StickerPackRepository from '@app/contexts/stickers/domain/repositories/StickerPackRepository';
+import StickerUserLibraryRepository from '@app/contexts/stickers/domain/repositories/StickerUserLibraryRepository';
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';

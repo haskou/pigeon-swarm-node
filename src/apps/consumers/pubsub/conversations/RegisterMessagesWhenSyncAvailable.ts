@@ -29,13 +29,13 @@ export default class RegisterMessagesWhenSyncAvailable extends Consumer {
     'pigeon-swarm.register-messages-when-sync-available';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
     private readonly reactionRegistrar: MessageReactionRegistrar,
     private readonly conversationRegistrar: ConversationRegistrar,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

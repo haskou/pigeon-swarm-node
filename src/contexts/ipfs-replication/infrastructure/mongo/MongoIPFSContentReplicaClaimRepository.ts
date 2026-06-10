@@ -1,16 +1,17 @@
 import { IPFSContentReplicaClaim } from '@app/contexts/ipfs-replication/domain/IPFSContentReplicaClaim';
-import { IPFSContentReplicaClaimRepository } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicaClaimRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicaClaimRepository';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { MongoIPFSContentReplicaClaimDocument } from './documents/MongoIPFSContentReplicaClaimDocument';
 
-type Repository = IPFSContentReplicaClaimRepository;
-
-export default class MongoIPFSReplicaClaimRepository implements Repository {
+// eslint-disable-next-line max-len
+export default class MongoIPFSReplicaClaimRepository extends IPFSContentReplicaClaimRepository {
   private static readonly COLLECTION = 'ipfs_content_replica_claims';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoIPFSContentReplicaClaimDocument>(

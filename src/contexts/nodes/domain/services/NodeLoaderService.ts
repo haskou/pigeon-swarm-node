@@ -1,5 +1,5 @@
 import { Node } from '../Node';
-import { NodeRepository } from '../repositories/NodeRepository';
+import NodeRepository from '../repositories/NodeRepository';
 
 export default class NodeLoaderService {
   constructor(private readonly repository: NodeRepository) {}

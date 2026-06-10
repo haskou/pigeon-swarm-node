@@ -1,13 +1,15 @@
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
-import { NodePeerRepository } from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
+import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 
 import { MongoNodePeerDocument } from './documents/MongoNodePeerDocument';
 
-export default class MongoNodePeerRepository implements NodePeerRepository {
+export default class MongoNodePeerRepository extends NodePeerRepository {
   private static readonly COLLECTION_NAME = 'node_peers';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoNodePeerDocument>(

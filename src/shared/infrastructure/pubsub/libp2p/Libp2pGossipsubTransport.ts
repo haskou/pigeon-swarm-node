@@ -1,18 +1,16 @@
 import Kernel from '@app/Kernel';
 
-import { PubSubTransport } from '../PubSubTransport';
-import runtime, {
-  Libp2pGossipsubRuntimeAdapter,
-} from './Libp2pGossipsubRuntimeAdapter';
+import PubSubTransport from '../PubSubTransport';
+import Libp2pGossipsubRuntimeAdapter from './Libp2pGossipsubRuntimeAdapter';
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 import { PubSubEvent } from './PubSubEvent';
 
-export default class Libp2pGossipsubTransport implements PubSubTransport {
+export default class Libp2pGossipsubTransport extends PubSubTransport {
   private nodePromise?: Promise<Libp2pPubSubNode>;
 
-  constructor(
-    private readonly runtimeAdapter: Libp2pGossipsubRuntimeAdapter = runtime,
-  ) {}
+  constructor(private readonly runtimeAdapter: Libp2pGossipsubRuntimeAdapter) {
+    super();
+  }
 
   private async getNode(): Promise<Libp2pPubSubNode> {
     this.nodePromise ??= this.runtimeAdapter.createNode();

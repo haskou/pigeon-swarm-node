@@ -1,5 +1,5 @@
 import { PushSubscription } from '../../domain/PushSubscription';
-import { PushSubscriptionRepository } from '../../domain/repositories/PushSubscriptionRepository';
+import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import { PushSubscriptionRegisterMessage } from './messages/PushSubscriptionRegisterMessage';
 
 export class PushSubscriptionRegistrar {

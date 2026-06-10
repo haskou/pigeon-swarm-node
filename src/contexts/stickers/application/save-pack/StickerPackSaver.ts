@@ -1,8 +1,8 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
-import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
-import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
+import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
+import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerPackSaveMessage } from './messages/StickerPackSaveMessage';
 import { StickerUserLibraryLookup } from './types/StickerUserLibraryLookup';

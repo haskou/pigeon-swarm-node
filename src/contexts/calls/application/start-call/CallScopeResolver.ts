@@ -1,5 +1,5 @@
-import { CommunityRepository } from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 
 import { CallScope } from '../../domain/CallScope';
 import { InvalidCallScopeError } from '../../domain/errors/InvalidCallScopeError';

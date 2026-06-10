@@ -8,6 +8,9 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class DeleteFavoriteStickerRoute extends StickerRouteSupport {
+  private readonly unfavoriter =
+    this.get<StickerUnfavoriter>(StickerUnfavoriter);
+
   @Delete('/:packId/stickers/:stickerId/favorite')
   public async unfavoriteSticker(
     @Param('packId') packId: string,
@@ -16,9 +19,7 @@ export class DeleteFavoriteStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const library = await new StickerUnfavoriter(
-      this.libraryRepository(),
-    ).unfavorite(
+    const library = await this.unfavoriter.unfavorite(
       new StickerUnfavoriteMessage(identityId.valueOf(), packId, stickerId),
     );
 

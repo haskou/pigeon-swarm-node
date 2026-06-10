@@ -1,22 +1,18 @@
 import { IPFSContentReplication } from '@app/contexts/ipfs-replication/domain/IPFSContentReplication';
-import { IPFSContentReplicationRepository as Repo } from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
+import IPFSContentReplicationRepository from '@app/contexts/ipfs-replication/domain/repositories/IPFSContentReplicationRepository';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBIPFSContentReplicationDocument } from './documents/OrbitDBIPFSContentReplicationDocument';
 import OrbitDBIPFSContentReplicationMapper from './mappers/OrbitDBIPFSContentReplicationMapper';
 
-export default class OrbitDBIPFSContentReplicationRepository implements Repo {
-  private readonly mapper: OrbitDBIPFSContentReplicationMapper;
-
-  private readonly registry: OrbitDBReplicatedStateRegistry;
-
+// eslint-disable-next-line max-len
+export default class OrbitDBIPFSContentReplicationRepository extends IPFSContentReplicationRepository {
   constructor(
-    registry?: OrbitDBReplicatedStateRegistry,
-    mapper?: OrbitDBIPFSContentReplicationMapper,
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly mapper: OrbitDBIPFSContentReplicationMapper,
   ) {
-    this.registry = registry || OrbitDBReplicatedStateRegistry.shared();
-    this.mapper = mapper || new OrbitDBIPFSContentReplicationMapper();
+    super();
   }
 
   private numberValue(

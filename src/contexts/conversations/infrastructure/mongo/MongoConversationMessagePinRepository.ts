@@ -4,12 +4,16 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Timestamp } from '@haskou/value-objects';
 
+import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
 import { MongoConversationMessagePinDocument } from './documents/MongoConversationMessagePinDocument';
 
-export class MongoConversationMessagePinRepository {
+// eslint-disable-next-line max-len
+export default class MongoConversationMessagePinRepository extends ConversationMessagePinRepository {
   private static readonly COLLECTION = 'conversation_message_pins';
 
-  constructor(private readonly mongo: MongoDB) {}
+  constructor(private readonly mongo: MongoDB) {
+    super();
+  }
 
   private async collection() {
     return this.mongo.getCollection<MongoConversationMessagePinDocument>(

@@ -2,10 +2,10 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
 import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityMessageReactionRepository as ReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import SyncResponseSuppressionTracker from '@app/contexts/shared/application/sync/SyncResponseSuppressionTracker';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
@@ -20,14 +20,14 @@ export default class RespondToCommunitySyncRequest extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.respond-to-community-sync-request';
 
   constructor(
-    consumer: DomainEventConsumer,
-    private readonly communityRepository: MongoCommunityRepository,
-    private readonly messageRepository: MongoCommunityChannelMessageRepository,
-    private readonly reactionRepository: ReactionRepository,
+    private readonly eventConsumer: DomainEventConsumer,
+    private readonly communityRepository: CommunityRepository,
+    private readonly messageRepository: CommunityChannelMessageRepository,
+    private readonly reactionRepository: CommunityMessageReactionRepository,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly tracker = SyncResponseSuppressionTracker.shared(),
+    private readonly tracker: SyncResponseSuppressionTracker,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

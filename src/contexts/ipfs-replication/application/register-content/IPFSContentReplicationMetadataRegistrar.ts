@@ -4,7 +4,7 @@ import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Timestamp } from '@haskou/value-objects';
 
 import { IPFSContentReplication } from '../../domain/IPFSContentReplication';
-import { IPFSContentReplicationRepository } from '../../domain/repositories/IPFSContentReplicationRepository';
+import IPFSContentReplicationRepository from '../../domain/repositories/IPFSContentReplicationRepository';
 import { IPFSContentReplicationContext } from '../../domain/value-objects/IPFSContentReplicationContext';
 import { IPFSContentReplicationMetadata } from '../../domain/value-objects/IPFSContentReplicationMetadata';
 import { IPFSContentReplicationPriority } from '../../domain/value-objects/IPFSContentReplicationPriority';

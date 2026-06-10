@@ -1,6 +1,6 @@
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
-import { CallRepository } from '../../domain/repositories/CallRepository';
+import CallRepository from '../../domain/repositories/CallRepository';
 import { CallParticipantHeartbeatRecordMessage } from './messages/CallParticipantHeartbeatRecordMessage';
 
 export class CallParticipantHeartbeatRecorder {

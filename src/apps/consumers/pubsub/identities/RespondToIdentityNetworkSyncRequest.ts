@@ -10,10 +10,10 @@ export default class RespondToIdentityNetworkSyncRequest extends Consumer {
     'pigeon-swarm.respond-to-identity-network-sync-request';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly responder: IdentityNetworkSyncResponder,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

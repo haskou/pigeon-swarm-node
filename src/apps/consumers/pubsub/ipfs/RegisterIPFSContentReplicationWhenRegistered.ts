@@ -9,10 +9,10 @@ export default class RegisterIPFSContentWhenRegistered extends Consumer {
     'pigeon-swarm.register-ipfs-content-replication-when-registered';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: IPFSContentReplicationMetadataRegistrar,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

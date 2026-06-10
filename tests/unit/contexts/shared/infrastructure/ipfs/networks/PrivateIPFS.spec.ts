@@ -106,6 +106,14 @@ jest.mock(
   { virtual: true },
 );
 
+jest.mock(
+  '@libp2p/gossipsub',
+  () => ({
+    gossipsub: jest.fn().mockReturnValue('mock-gossipsub'),
+  }),
+  { virtual: true },
+);
+
 jest.mock('@app/Kernel', () => ({
   __esModule: true,
   default: {

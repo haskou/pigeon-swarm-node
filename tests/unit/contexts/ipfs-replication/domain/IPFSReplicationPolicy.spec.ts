@@ -1,4 +1,4 @@
-import { IPFSReplicationPolicy } from '@app/contexts/ipfs-replication/domain/IPFSReplicationPolicy';
+import IPFSReplicationPolicy from '@app/contexts/ipfs-replication/domain/IPFSReplicationPolicy';
 
 describe('IPFSReplicationPolicy', () => {
   const policy = new IPFSReplicationPolicy();

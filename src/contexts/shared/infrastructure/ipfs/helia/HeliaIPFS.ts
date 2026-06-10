@@ -208,25 +208,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     );
   }
 
-  private createSessionBlockstore(
-    parsedCid: ParsedCidLike,
-    signal?: AbortSignal,
-  ): {
-    blockstore: Pick<HeliaInstance['blockstore'], 'get' | 'has' | 'put'>;
-    close(): void;
-  } {
-    const retrievalOptions = this.createBlockRetrievalOptions(signal);
-    const session = this.heliaCore.blockstore.createSession(
-      parsedCid,
-      retrievalOptions,
-    );
-
-    return {
-      blockstore: session,
-      close: () => session.close(),
-    };
-  }
-
   private async publishRoutingRecord(
     key: string,
     value: string,
@@ -283,35 +264,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
     );
     const retrievalOptions = this.createBlockRetrievalOptions(signal);
     const catOptions = this.createUnixfsCatOptions(signal);
-    const session = this.createSessionBlockstore(parsedCid, signal);
-    const unixfsClient =
-      await heliaRuntimeAdapter.createUnixfsClientFromBlockstore(
-        session.blockstore,
-      );
+    const unixfsClient = await heliaRuntimeAdapter.createUnixfsClient(
+      this.heliaCore,
+    );
     const chunks: Uint8Array[] = [];
 
-    try {
-      if (parsedCid.code === HeliaIPFS.RAW_CODEC_CODE) {
-        chunks.push(
-          ...(await this.collectRawBlockBytes(
-            parsedCid,
-            retrievalOptions,
-            session.blockstore,
-          )),
-        );
-        await this.pinningStrategy.ensurePinned(
-          this.heliaCore,
-          parsedCid,
-          signal,
-        );
-
-        return Buffer.concat(chunks);
-      }
-
-      for await (const chunk of unixfsClient.cat(parsedCid, catOptions)) {
-        chunks.push(chunk);
-      }
-
+    if (parsedCid.code === HeliaIPFS.RAW_CODEC_CODE) {
+      chunks.push(
+        ...(await this.collectRawBlockBytes(parsedCid, retrievalOptions)),
+      );
       await this.pinningStrategy.ensurePinned(
         this.heliaCore,
         parsedCid,
@@ -319,9 +280,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
       );
 
       return Buffer.concat(chunks);
-    } finally {
-      session.close();
     }
+
+    for await (const chunk of unixfsClient.cat(parsedCid, catOptions)) {
+      chunks.push(chunk);
+    }
+
+    await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
+
+    return Buffer.concat(chunks);
   }
 
   public async removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void> {

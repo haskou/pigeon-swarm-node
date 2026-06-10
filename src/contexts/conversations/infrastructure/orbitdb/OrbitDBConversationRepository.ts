@@ -1,7 +1,7 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { ConversationRepository as Repo } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 import { ConversationSyncScope } from '@app/contexts/conversations/domain/repositories/types/ConversationSyncScope';
@@ -10,7 +10,7 @@ import { MessageId } from '@app/contexts/conversations/domain/value-objects/Mess
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { OrbitDBReplicatedStateRegistry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBConversationDocument } from './documents/OrbitDBConversationDocument';
@@ -18,24 +18,13 @@ import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversat
 import OrbitDBConversationMapper from './mappers/OrbitDBConversationMapper';
 import OrbitDBConversationMessageMapper from './mappers/OrbitDBConversationMessageMapper';
 
-export default class OrbitDBConversationRepository implements Repo {
-  private readonly conversationMapper: OrbitDBConversationMapper;
-
-  private readonly messageMapper: OrbitDBConversationMessageMapper;
-
-  private readonly registry: OrbitDBReplicatedStateRegistry;
-
+// eslint-disable-next-line max-len
+export default class OrbitDBConversationRepository implements ConversationRepository {
   constructor(
-    registry?: OrbitDBReplicatedStateRegistry,
-    conversationMapper?: OrbitDBConversationMapper,
-    messageMapper?: OrbitDBConversationMessageMapper,
-  ) {
-    this.registry = registry || OrbitDBReplicatedStateRegistry.shared();
-    this.conversationMapper =
-      conversationMapper || new OrbitDBConversationMapper();
-    this.messageMapper =
-      messageMapper || new OrbitDBConversationMessageMapper();
-  }
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly conversationMapper: OrbitDBConversationMapper,
+    private readonly messageMapper: OrbitDBConversationMessageMapper,
+  ) {}
 
   private numberValue(
     document: Record<string, unknown>,

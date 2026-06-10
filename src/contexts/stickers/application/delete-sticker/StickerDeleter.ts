@@ -1,5 +1,5 @@
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
-import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
+import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerDeleteMessage } from './messages/StickerDeleteMessage';
 

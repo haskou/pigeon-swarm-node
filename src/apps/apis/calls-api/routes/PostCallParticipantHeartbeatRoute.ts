@@ -9,6 +9,10 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class PostCallParticipantHeartbeatRoute extends CallRouteSupport {
+  private readonly recorder = this.get<CallParticipantHeartbeatRecorder>(
+    CallParticipantHeartbeatRecorder,
+  );
+
   @Post('/:callId/participants/me/heartbeat')
   public async heartbeat(
     @Param('callId') callId: string,
@@ -16,9 +20,7 @@ export class PostCallParticipantHeartbeatRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await new CallParticipantHeartbeatRecorder(
-      this.callRepository(),
-    ).record(
+    const call = await this.recorder.record(
       new CallParticipantHeartbeatRecordMessage(
         callId,
         participantIdentityId.valueOf(),

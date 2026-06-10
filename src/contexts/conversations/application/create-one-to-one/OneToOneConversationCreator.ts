@@ -1,19 +1,18 @@
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
-import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { OneToOneConversationCreateMessage } from './messages/OneToOneConversationCreateMessage';
-
-type KeychainValidator = KeychainCandidateValidationDomainService;
 
 export default class OneToOneConversationCreator {
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly keychainRepository: KeychainRepository,
-    private readonly keychainValidator: KeychainValidator,
+    // eslint-disable-next-line max-len
+    private readonly keychainValidator: KeychainCandidateValidationDomainService,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 

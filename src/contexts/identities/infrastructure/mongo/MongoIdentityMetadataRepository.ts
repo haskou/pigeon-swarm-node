@@ -5,17 +5,22 @@ import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { Sort } from 'mongodb';
 
 import { Identity } from '../../domain/Identity';
+import IdentityMetadataRepository from '../../domain/repositories/IdentityMetadataRepository';
+import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import { MongoIdentityMetadataDocument } from './documents/MongoIdentityMetadataDocument';
 import MongoIdentityMetadataMapper from './mappers/MongoIdentityMetadataMapper';
 
-export default class MongoIdentityMetadataRepository {
+// eslint-disable-next-line max-len
+export default class MongoIdentityMetadataRepository extends IdentityMetadataRepository {
   private static COLLECTION_NAME = 'identity_metadata';
 
   constructor(
     private readonly mongo: MongoDB,
     private readonly mapper: MongoIdentityMetadataMapper,
-  ) {}
+  ) {
+    super();
+  }
 
   public async findByIdentityId(
     identityId: IdentityId,
@@ -92,12 +97,18 @@ export default class MongoIdentityMetadataRepository {
     return [...latestDocuments.values()];
   }
 
-  public async save(identity: Identity, cid: IPFSId): Promise<void> {
+  public async save(
+    identity: Identity,
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
         MongoIdentityMetadataRepository.COLLECTION_NAME,
       );
-    const document = this.mapper.toDocument(identity, cid);
+    const document = this.mapper.toDocument(
+      identity,
+      new IPFSId(externalIdentifier.valueOf()),
+    );
 
     await collection.updateOne(
       { _id: document._id },
@@ -117,12 +128,14 @@ export default class MongoIdentityMetadataRepository {
     );
   }
 
-  public async deleteByExternalIdentifier(cid: IPFSId): Promise<void> {
+  public async deleteByExternalIdentifier(
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<void> {
     const collection =
       await this.mongo.getCollection<MongoIdentityMetadataDocument>(
         MongoIdentityMetadataRepository.COLLECTION_NAME,
       );
 
-    await collection.deleteMany({ cid: cid.valueOf() });
+    await collection.deleteMany({ cid: externalIdentifier.valueOf() });
   }
 }

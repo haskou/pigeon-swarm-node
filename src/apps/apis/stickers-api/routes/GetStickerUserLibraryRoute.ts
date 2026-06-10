@@ -8,15 +8,19 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers')
 export class GetStickerUserLibraryRoute extends StickerRouteSupport {
+  private readonly finder = this.get<StickerUserLibraryFinder>(
+    StickerUserLibraryFinder,
+  );
+
   @Get('/me')
   public async getLibrary(
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const library = await new StickerUserLibraryFinder(
-      this.libraryRepository(),
-    ).find(new StickerUserLibraryFindMessage(identityId.valueOf()));
+    const library = await this.finder.find(
+      new StickerUserLibraryFindMessage(identityId.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

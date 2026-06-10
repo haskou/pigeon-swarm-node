@@ -10,6 +10,8 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class PostStickerPackRoute extends StickerRouteSupport {
+  private readonly creator = this.get<StickerPackCreator>(StickerPackCreator);
+
   @Post('/')
   public async createStickerPack(
     @Body() body: PostStickerPackBody,
@@ -17,11 +19,7 @@ export class PostStickerPackRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const ownerIdentityId = await this.authenticate(request);
-    const pack = await new StickerPackCreator(
-      this.packRepository(),
-      this.libraryRepository(),
-      this.eventPublisher,
-    ).create(
+    const pack = await this.creator.create(
       new StickerPackCreateMessage(ownerIdentityId.valueOf(), body.name),
     );
 

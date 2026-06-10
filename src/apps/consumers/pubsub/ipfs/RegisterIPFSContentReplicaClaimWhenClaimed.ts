@@ -9,10 +9,10 @@ export default class RegisterIPFSReplicaClaimWhenClaimed extends Consumer {
     'pigeon-swarm.register-ipfs-content-replica-claim-when-claimed';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: IPFSContentReplicaClaimRegistrar,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

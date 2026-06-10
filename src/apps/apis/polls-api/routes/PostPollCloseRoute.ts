@@ -9,6 +9,8 @@ import { PollRouteSupport } from './PollRouteSupport';
 
 @JsonController('/polls')
 export class PostPollCloseRoute extends PollRouteSupport {
+  private readonly closer = this.get<PollCloser>(PollCloser);
+
   @Post('/:pollId/close')
   public async closePoll(
     @Param('pollId') pollId: string,
@@ -18,10 +20,7 @@ export class PostPollCloseRoute extends PollRouteSupport {
     const actor = await this.authenticate(request);
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.managePollScope(actor, poll);
-    const updatedPoll = await new PollCloser(
-      this.repository(),
-      this.eventPublisher,
-    ).close(
+    const updatedPoll = await this.closer.close(
       new PollCloseMessage(pollId, actor.valueOf(), scopeAccess.recipients),
     );
 

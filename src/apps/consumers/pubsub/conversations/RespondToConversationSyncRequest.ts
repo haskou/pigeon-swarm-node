@@ -10,10 +10,10 @@ export default class RespondToConversationSyncRequest extends Consumer {
     'pigeon-swarm.respond-to-conversation-sync-request';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly responder: ConversationSyncResponder,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

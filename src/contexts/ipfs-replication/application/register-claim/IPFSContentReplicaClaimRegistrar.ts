@@ -4,7 +4,7 @@ import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Timestamp } from '@haskou/value-objects';
 
 import { IPFSContentReplicaClaim } from '../../domain/IPFSContentReplicaClaim';
-import { IPFSContentReplicaClaimRepository } from '../../domain/repositories/IPFSContentReplicaClaimRepository';
+import IPFSContentReplicaClaimRepository from '../../domain/repositories/IPFSContentReplicaClaimRepository';
 import IPFSReplicationStatusSummaryRefresher from '../refresh-status-summary/IPFSReplicationStatusSummaryRefresher';
 
 export default class IPFSContentReplicaClaimRegistrar {

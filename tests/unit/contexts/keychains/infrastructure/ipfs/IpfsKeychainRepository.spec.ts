@@ -2,59 +2,61 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 import IpfsKeychainRepository from '../../../../../../src/contexts/keychains/infrastructure/ipfs/IpfsKeychainRepository';
 import IpfsKeychainMapper from '../../../../../../src/contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper';
-import MongoKeychainMetadataRepository from '../../../../../../src/contexts/keychains/infrastructure/mongo/MongoKeychainMetadataRepository';
+import KeychainMetadataRepository from '../../../../../../src/contexts/keychains/domain/repositories/KeychainMetadataRepository';
 import { KeychainExternalIdentifier } from '../../../../../../src/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
-import { OrbitDBReplicatedStateRegistry } from '../../../../../../src/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import OrbitDBReplicatedStateRegistry from '../../../../../../src/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { KeychainMother } from '../../../../mothers/KeychainMother';
 
 describe('IpfsKeychainRepository', () => {
   let ipfsManager: MockProxy<IPFS>;
   let mapper: IpfsKeychainMapper;
-  let metadataRepository: MockProxy<MongoKeychainMetadataRepository>;
+  let metadataRepository: MockProxy<KeychainMetadataRepository>;
+  let replicatedStateRegistry: OrbitDBReplicatedStateRegistry;
   let repository: IpfsKeychainRepository;
 
   beforeEach(() => {
     ipfsManager = mock<IPFS>();
     mapper = new IpfsKeychainMapper();
-    metadataRepository = mock<MongoKeychainMetadataRepository>();
+    metadataRepository = mock<KeychainMetadataRepository>();
+    replicatedStateRegistry = new OrbitDBReplicatedStateRegistry();
     repository = new IpfsKeychainRepository(
       ipfsManager,
       mapper,
       metadataRepository,
+      replicatedStateRegistry,
     );
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
-    OrbitDBReplicatedStateRegistry.shared().clear();
+    replicatedStateRegistry.clear();
   });
 
   afterEach(() => {
-    OrbitDBReplicatedStateRegistry.shared().clear();
+    replicatedStateRegistry.clear();
   });
 
-  it('should use cached keychain metadata without reading IPFS', async () => {
+  it('should use local keychain metadata before DHT fallback', async () => {
     const keychain = (await KeychainMother.create()).build();
     const primitives = keychain.toPrimitives();
     const cidString = 'bafycachedkeychain';
 
     metadataRepository.findByOwnerIdentityId.mockResolvedValue([
       {
-        _id: primitives.ownerIdentityId + ':' + cidString,
         cid: cidString,
-        keychain: mapper.toDocument(keychain),
         ownerIdentityId: primitives.ownerIdentityId,
         previousCid: primitives.previousKeychainExternalIdentifier,
         receivedAt: Date.now(),
         version: primitives.version,
       },
     ]);
+    ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(keychain));
 
     const result = await repository.findCandidateReferencesByOwnerId(
       new IdentityId(primitives.ownerIdentityId),
     );
 
-    expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+    expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
     expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
     expect(result).toEqual([
       {
@@ -72,7 +74,6 @@ describe('IpfsKeychainRepository', () => {
 
     metadataRepository.findByOwnerIdentityId.mockResolvedValue([
       {
-        _id: primitives.ownerIdentityId + ':' + cid.valueOf(),
         cid: cid.valueOf(),
         ownerIdentityId: primitives.ownerIdentityId,
         previousCid: primitives.previousKeychainExternalIdentifier,
@@ -96,7 +97,7 @@ describe('IpfsKeychainRepository', () => {
     const cid = new IPFSId('bafyorbitkeychain');
 
     metadataRepository.findByOwnerIdentityId.mockResolvedValue([]);
-    OrbitDBReplicatedStateRegistry.shared().register('network-1', {
+    replicatedStateRegistry.register('network-1', {
       keychains: {
         query: jest.fn().mockResolvedValue([
           {

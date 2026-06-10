@@ -1,4 +1,4 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import GroupConversationCreator from '@app/contexts/conversations/application/create-group/GroupConversationCreator';
 import OneToOneConversationCreator from '@app/contexts/conversations/application/create-one-to-one/OneToOneConversationCreator';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
