@@ -164,7 +164,7 @@ Because of this, setting `IPFS_STORAGE_PATH=memory` does not activate Helia in-m
 
 `IPFSNetworkRegistry` persists only Helia/libp2p runtime data such as
 `shared-peer-private-key.pb` under the storage path. Node metadata and
-configured network metadata are stored in MongoDB.
+configured network metadata are stored in the local embedded database.
 
 Practical recommendation:
 

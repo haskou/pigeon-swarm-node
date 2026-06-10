@@ -28,7 +28,7 @@ package "notification-settings/application" {
 }
 
 package "notification-settings/infrastructure" {
-  class MongoNotificationScopeSettingsRepository
+  class OrbitDBNotificationScopeSettingsRepository
 }
 
 NotificationScopeSettings *-- NotificationScopeSettingsPreferences
@@ -46,7 +46,7 @@ NotificationSettingsUpdater ..> NotificationSettingsUpdateMessage
 NotificationSettingsUpdater ..> NotificationScopeSettingsRepository
 NotificationSettingsResetter ..> NotificationSettingsResetMessage
 NotificationSettingsResetter ..> NotificationScopeSettingsRepository
-MongoNotificationScopeSettingsRepository ..|> NotificationScopeSettingsRepository
-MongoNotificationScopeSettingsRepository ..> NotificationScopeSettings
+OrbitDBNotificationScopeSettingsRepository ..|> NotificationScopeSettingsRepository
+OrbitDBNotificationScopeSettingsRepository ..> NotificationScopeSettings
 
 @enduml

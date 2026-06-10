@@ -159,11 +159,11 @@ Rules:
 - any already existing Mongo-backed API path must be treated as code to replace
   with an OrbitDB-backed repository/query service, not as a compatibility layer
   to maintain;
-- local runtime state remains local and does not need replication.
-- OrbitDB also opens a local, non-network store for application state before any
-  private/public network exists. This keeps local-only API flows working without
-  falling back to MongoDB, while replicated network stores are still opened per
-  IPFS network when those networks are registered.
+- durable product state that must be shared across nodes belongs in synchronized
+  OrbitDB stores;
+- state that is genuinely node-local may remain local and unsynchronized when
+  this plan classifies it that way. Environment/configuration-provider values
+  are runtime configuration and must not be copied into a database.
 
 The clean branch must verify that these are represented in OrbitDB events and
 projected into the relevant document/keyvalue stores:
@@ -218,85 +218,200 @@ Acceptance:
   models;
 - MongoDB is not a parallel source of truth for replicated data.
 
-## Phase 2B: Manual Sync Fallback
+## Phase 2A.1: Full MongoDB Replacement
 
-Do not run this phase while the OrbitDB path remains viable. Keep it only as a
-fallback if Phase 2A uncovers a blocking OrbitDB limitation with measured
-evidence.
+Goal: remove MongoDB from the product entirely. Phase 2A moves the first
+replicated state slice to OrbitDB. Phase 2A.1 finishes the storage migration by
+replacing every remaining Mongo-backed repository with either synchronized
+OrbitDB-backed state or an embedded node-local repository, depending on the
+classification below. Then MongoDB can be removed from dependencies, docker and
+installation docs.
 
-Goal: use MongoDB event logs plus pull-based repair sync as fallback. Do not
-build this before OrbitDB has been rejected with measured reasons.
+This phase exists because replacing MongoDB must not keep an external database
+service around. Shared product state synchronizes through OrbitDB. Explicitly
+local state is stored through one embedded node-local database adapter shared by
+all local repositories. Prefer a NoSQL/key-value embedded database; SQLite is
+acceptable only if it is chosen as the single local database for the whole
+phase. Do not mix several local databases, and do not use raw-file JSON
+persistence.
+Environment/configuration-provider values are read directly at runtime and are
+not persisted to OrbitDB or any other database.
 
-Fallback model:
+Rules:
 
-- MongoDB stores a durable `domain_events` collection;
-- gossip is only a lightweight wake-up/head-announcement channel;
-- bulk synchronization happens through pull/catch-up by cursor;
-- MongoDB projections are rebuilt locally from events;
-- repair sync runs when a private network becomes usable, not just at process
-  startup.
+- no production API path may depend on MongoDB;
+- no domain/application repository may have a MongoDB implementation;
+- no route, consumer, scheduler, runtime or application service may instantiate
+  storage directly;
+- keep using domain repositories and DI contracts; do not introduce generic
+  OrbitDB stores into application/domain code;
+- durable product state that must be shared across nodes uses synchronized
+  OrbitDB repositories and domain events;
+- durable local state is allowed when the state is explicitly node-local,
+  device-local, private draft/cache state, or technical TTL/idempotency state;
+- durable local state must use an embedded node-local repository that does not
+  require dockerizing another service. Choose exactly one local database adapter
+  for the phase, for example LMDB, LevelDB, SQLite, or local non-network
+  OrbitDB. Prefer NoSQL/key-value over SQL, but do not mix multiple local
+  databases. Every option must stay behind the proper domain/application
+  repository contract;
+- durable node-local bootstrap/configuration state is allowed to remain local
+  and unsynchronized when managed by the application: node owner and local
+  network definitions;
+- node-local capabilities may remain local and unsynchronized. Push
+  subscriptions are node capabilities: each node may or may not support push
+  notifications, and subscriptions registered on one node are not synchronized
+  to other nodes;
+- durable local exceptions use a node-local configuration/capability repository,
+  backed by the single selected embedded local database adapter. They must not
+  use MongoDB, raw-file persistence, or any external database service;
+- environment/configuration-provider values are not database state. Bind/public
+  addresses, relay port ranges, debug flags, bootstrap hints and similar
+  operator-provided values stay in env/configuration providers and must not be
+  written to OrbitDB;
+- every other durable local exception must be documented in this phase before
+  implementation;
+- technical caches, nonces and rate limits may be persistent local state when
+  that improves behavior across restarts. They remain unsynchronized unless a
+  concrete distributed abuse-control/product requirement is added;
+- bootstrap configuration required to discover/open networks may come from
+  environment variables, configuration providers, or APIs, but it must not
+  become an unsynchronized application database;
+- delete MongoDB only after all usages are gone from source, tests,
+  dependencies, docker and docs.
 
-Repair sync triggers:
+Remaining Mongo-backed areas to replace:
 
-- a private IPFS network connects to a relay;
-- a private IPFS network gets its first connected peer after being empty;
-- a new private relay record is discovered and successfully dialed;
-- a network transitions from not-ready to ready;
-- a new network is added locally.
+- node metadata, local networks and peer cache;
+- call state and call history;
+- identity presence;
+- notification settings;
+- push subscriptions and push delivery diagnostics;
+- polls and poll votes;
+- sticker packs, user sticker library, favorites and recent stickers;
+- conversation pins and drafts;
+- community channel pins and drafts;
+- community moderation logs;
+- IPFS replication status summary;
+- processed-domain-event/idempotency guard;
+- link preview cache and rate limiter;
+- HTTP auth nonce storage;
+- node network data cleanup paths that currently delete Mongo collections.
 
-Repair sync priority:
+Durability and replication classification:
 
-1. identities;
-2. keychains;
-3. communities and channels metadata;
-4. invites and membership requests;
-5. read markers and notifications;
-6. conversations metadata;
-7. community messages/reactions;
-8. conversation messages/reactions;
-9. IPFS replication metadata.
+- node owner and application-managed local network definitions are local durable
+  bootstrap/configuration. They are node-owned, unsynchronized and not product
+  state shared with peers. Store them through a node-local configuration
+  repository;
+- environment/configuration-provider values are not database state. Bind/public
+  addresses, relay port ranges, debug flags, bootstrap hints and
+  operator-controlled settings stay in env/configuration providers and are not
+  persisted;
+- peer cache is persistent local runtime observation. It should be updated from
+  libp2p/relay discovery/current connections and stored in an embedded
+  node-local repository. If a future peer record is required for other nodes to
+  discover/connect, model that as an explicit synchronized relay/peer record,
+  not as a local peer cache;
+- call state and call history are product state and should use synchronized
+  OrbitDB repositories. Realtime call signaling remains ephemeral transport
+  state and should not be persisted as history;
+- identity presence is synchronized current state with expiration/TTL semantics.
+  It should not become durable history. Offline is derived when heartbeat/current
+  presence expires;
+- notification settings are user-visible product state and should use
+  synchronized OrbitDB repositories;
+- push subscriptions and push delivery diagnostics are local durable node
+  capability state. They are not synchronized because each node may or may not
+  provide push notifications. Store them through an embedded node-local
+  capability repository;
+- polls and poll votes are product state and should use synchronized OrbitDB
+  repositories;
+- sticker packs, sticker metadata, user sticker libraries, favorites and recent
+  stickers are product/user-visible state and should use synchronized OrbitDB
+  repositories. Sticker binary assets continue to live in IPFS;
+- conversation pins and community channel pins are product state and should use
+  synchronized OrbitDB repositories;
+- drafts are persistent private user state and are not synchronized. Store them
+  through an embedded node-local repository;
+- community moderation logs are product state and should use synchronized
+  OrbitDB repositories;
+- IPFS replication metadata is synchronized product/runtime policy state.
+  Replication status summaries are persistent local derived views and should be
+  stored in an embedded node-local repository or recomputed from OrbitDB/runtime
+  state;
+- processed-domain-event/idempotency state is persistent local technical state.
+  It should be stored in an embedded node-local repository unless the projector
+  can derive idempotency safely from replicated event ids alone;
+- link preview cache and rate limiter state are persistent local technical
+  state. Cache entries and rate-limit windows should use an embedded node-local
+  repository unless a concrete distributed abuse-control requirement is added;
+- HTTP auth nonce storage is persistent local technical TTL state and should use
+  an embedded node-local repository;
+- node network data cleanup must delete network-scoped OrbitDB/IPFS state. It
+  must not depend on Mongo collection cleanup once this phase is complete.
 
-Repeated repair sync must be debounced per network. It should run after useful
-connectivity changes, not spam every scheduler tick.
+Implementation order:
 
-Suggested commit:
-
-```txt
-fix(sync): 🐛 Repair replicated state by event cursor
-```
+1. Replace technical local repositories first: auth nonce, processed events,
+   link preview cache/rate limiter, peer cache and replication status summary,
+   using an embedded node-local repository.
+2. Replace node metadata: keep node owner and application-managed local network
+   definitions as local durable bootstrap/configuration; keep
+   environment/configuration-provider values out of every database; then move
+   peer/product-visible network state to synchronized OrbitDB or keep it in the
+   local peer cache if it is only runtime observation.
+3. Replace user/session state: keep push subscriptions as local durable node
+   capability state; keep drafts as persistent local private state; move
+   presence to synchronized current-state repositories with TTL/expiration
+   semantics; move notification settings to synchronized OrbitDB repositories.
+4. Replace feature state: calls, polls, stickers, pins, drafts and moderation
+   logs.
+5. Remove MongoDB infrastructure, package dependency, environment variables,
+   docker service and installation references.
+6. Regenerate/update diagrams and docs so MongoDB is not presented as a runtime
+   dependency.
 
 Acceptance:
 
-- fallback decision references the failed OrbitDB criteria;
-- gossip does not carry bulk database synchronization;
-- pull/catch-up is cursor-based and idempotent;
-- read markers, notifications and invites are synchronized across nodes.
+- `rg "Mongo|mongodb|MONGO_URL" src tests config docker-compose.yml Dockerfile
+  package.json docs` has no production MongoDB dependency left, except explicit
+  historical notes if intentionally kept;
+- `package.json` and lockfile no longer include the `mongodb` dependency;
+- Docker and installation docs no longer require a MongoDB service;
+- no replacement local persistence requires Docker or an external database
+  service;
+- the storage stack has only two persistence technologies: synchronized OrbitDB
+  for shared product state and one selected embedded local database for
+  unsynchronized local state;
+- all previous Mongo-backed API behavior is preserved or deliberately
+  reclassified with a documented product decision;
+- every durable unsynchronized local repository is explicitly classified as
+  node configuration, node capability, private user draft/cache state, runtime
+  cache, TTL state, idempotency guard, or derived summary;
+- product state that must be shared across nodes is synchronized through
+  OrbitDB;
+- environment/configuration-provider values are read at runtime and are not
+  persisted to OrbitDB or any replacement database;
+- APIs that need durable application state either operate against synchronized
+  OrbitDB stores or return a clear not-ready/error state until the relevant
+  network/store exists;
+- replicated data still syncs through OrbitDB and emits equivalent websocket
+  projections;
+- deleting a network cleans the relevant network-scoped OrbitDB/IPFS state
+  without touching identities or data that belong to other networks;
+- `yarn lint`, `yarn build`, `yarn test:unit`, `yarn test:api`,
+  `yarn test:consumer`, focused OrbitDB tests and real-transport OrbitDB/IPFS
+  tests pass.
 
-## Phase 3: Runtime And Bootstrap Refactor
-
-Goal: clean up application composition after the chosen data path is clear.
-
-`index.ts` must stop constructing application behavior directly with many
-manual `new` calls.
-
-Target shape:
-
-- app runtimes live under app-level `runtimes/` folders;
-- consumers are discovered/composed from app-level consumer modules;
-- schedulers are discovered/composed from app-level scheduler modules;
-- bootstrap wires runtimes, consumers, schedulers, logs, HTTP and DI only;
-- use cases are invoked by routes, consumers, schedulers or runtimes, not by
-  `index.ts` directly.
-
-`PublicRelayRuntime` should not live as a shared infrastructure god object. Move
-runtime orchestration to the app layer. Keep only genuinely reusable adapters in
-shared infrastructure.
-
-Suggested commit:
+Suggested commits:
 
 ```txt
-refactor(runtime): ♻️ Move network runtimes out of bootstrap
+refactor(db): ♻️ Replace Mongo stores with embedded repositories
+refactor(db): ♻️ Remove MongoDB runtime dependency
+docs(db): 📝 Document MongoDB-free storage
 ```
+
 
 ## Phase 4: Infrastructure Naming Cleanup
 

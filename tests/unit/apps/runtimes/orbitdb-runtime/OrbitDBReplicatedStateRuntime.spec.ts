@@ -60,8 +60,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     jest.restoreAllMocks();
   });
 
-  it('registers a local OrbitDB state store even when no IPFS network exists', async () => {
-    const stores = fakeStores();
+  it('waits for IPFS networks without registering a local OrbitDB state store', async () => {
     const networkRegistry = {
       getAll: jest.fn().mockReturnValue([]),
       onNetworkRegistered: jest.fn(),
@@ -81,20 +80,13 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     );
     const openLocal = jest
       .spyOn(OrbitDBReplicatedStateStores, 'openLocal')
-      .mockResolvedValue(stores);
+      .mockResolvedValue(fakeStores());
 
     await runtime.run();
 
-    expect(openLocal).toHaveBeenCalledTimes(1);
-    expect(replicatedStateRegistry.register).toHaveBeenCalledWith(
-      'local',
-      stores,
-    );
-    expect(publisher.registerNetworkStores).toHaveBeenCalledWith(
-      'local',
-      'local',
-      stores,
-    );
+    expect(openLocal).not.toHaveBeenCalled();
+    expect(replicatedStateRegistry.register).not.toHaveBeenCalled();
+    expect(publisher.registerNetworkStores).not.toHaveBeenCalled();
     expect(networkRegistry.getAll).toHaveBeenCalled();
     expect(networkRegistry.onNetworkRegistered).toHaveBeenCalled();
   });

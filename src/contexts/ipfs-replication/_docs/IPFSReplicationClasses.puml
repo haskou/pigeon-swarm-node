@@ -30,8 +30,8 @@ package "ipfs-replication/application" {
 
 package "ipfs-replication/infrastructure" {
   class OrbitDBIPFSContentReplicationRepository
-  class MongoIPFSReplicationStatusSummaryRepository
-  class MongoIPFSReplicationStatusSummaryDocument
+  class LocalIPFSReplicationStatusSummaryRepository
+  class LocalIPFSReplicationStatusSummaryDocument
 }
 
 IPFSContentReplication *-- IPFSContentReplicaClaim
@@ -51,7 +51,7 @@ IPFSReplicationStatusSummaryRefresher ..> IPFSReplicationStatusSummaryRepository
 IPFSReplicationStatusSummaryUpdater ..> IPFSReplicationStatusSummaryRepository
 
 OrbitDBIPFSContentReplicationRepository ..|> IPFSContentReplicationRepository
-MongoIPFSReplicationStatusSummaryRepository ..|> IPFSReplicationStatusSummaryRepository
-MongoIPFSReplicationStatusSummaryRepository ..> MongoIPFSReplicationStatusSummaryDocument
+LocalIPFSReplicationStatusSummaryRepository ..|> IPFSReplicationStatusSummaryRepository
+LocalIPFSReplicationStatusSummaryRepository ..> LocalIPFSReplicationStatusSummaryDocument
 
 @enduml

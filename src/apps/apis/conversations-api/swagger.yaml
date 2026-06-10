@@ -130,7 +130,7 @@ paths:
       tags:
         - conversations
       summary: List authenticated identity conversation drafts
-      description: Drafts are MongoDB-only opaque encrypted payloads owned by the authenticated identity.
+      description: Drafts are local embedded DB opaque encrypted payloads owned by the authenticated identity.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

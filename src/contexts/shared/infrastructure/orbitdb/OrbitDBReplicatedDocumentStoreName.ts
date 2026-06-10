@@ -1,10 +1,18 @@
 export type OrbitDBReplicatedDocumentStoreName =
+  | 'calls'
   | 'communities'
   | 'conversations'
   | 'identities'
   | 'ipfsReplication'
   | 'keychains'
   | 'messages'
+  | 'moderationLogs'
+  | 'notificationSettings'
   | 'notifications'
+  | 'pins'
+  | 'polls'
+  | 'presence'
   | 'reactions'
-  | 'requests';
+  | 'requests'
+  | 'stickerPacks'
+  | 'stickerUserLibraries';

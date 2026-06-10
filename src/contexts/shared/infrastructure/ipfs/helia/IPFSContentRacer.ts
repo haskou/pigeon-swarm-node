@@ -7,13 +7,12 @@ export default class IPFSContentRacer {
 
   private readonly timeoutMs: number;
 
-  constructor(timeoutMs?: number) {
+  constructor() {
     this.timeoutMs = Math.min(
-      timeoutMs ??
-        Number(
-          process.env.IPFS_CONTENT_TIMEOUT_MS ??
-            (process.env.NODE_ENV === 'test' ? 500 : 3000),
-        ),
+      Number(
+        process.env.IPFS_CONTENT_TIMEOUT_MS ??
+          (process.env.NODE_ENV === 'test' ? 500 : 3000),
+      ),
       IPFSContentRacer.MAX_TIMEOUT_MS,
     );
   }

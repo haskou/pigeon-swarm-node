@@ -22,8 +22,8 @@ package "push-notifications/application" {
 }
 
 package "push-notifications/infrastructure" {
-  class MongoPushSubscriptionRepository
-  class MongoPushSubscriptionDocument
+  class LocalPushSubscriptionRepository
+  class LocalPushSubscriptionDocument
   class PushVapidConfiguration
   class WebPushNotificationDelivery
 }
@@ -38,9 +38,9 @@ PushNotificationDispatcher ..> PushNotificationDelivery
 PushNotificationDispatcher ..> PushNotificationPayload
 PushTestNotificationSender ..> PushNotificationDelivery
 
-MongoPushSubscriptionRepository ..|> PushSubscriptionRepository
-MongoPushSubscriptionRepository ..> MongoPushSubscriptionDocument
-MongoPushSubscriptionRepository ..> PushSubscription
+LocalPushSubscriptionRepository ..|> PushSubscriptionRepository
+LocalPushSubscriptionRepository ..> LocalPushSubscriptionDocument
+LocalPushSubscriptionRepository ..> PushSubscription
 
 WebPushNotificationDelivery ..|> PushNotificationDelivery
 WebPushNotificationDelivery ..> PushVapidConfiguration

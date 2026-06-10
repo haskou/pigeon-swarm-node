@@ -5,13 +5,11 @@ import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpReque
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import { MongoNodeMetadataDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodeMetadataDocument';
-import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodePeerDocument';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import Kernel from '@app/Kernel';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
@@ -109,6 +107,10 @@ export default class Definitions {
 
   @after()
   public async cleanupMemoryStorage(): Promise<void> {
+    const database =
+      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
+
+    await database.clear();
     await this.ipfsDefinition.cleanupRegisteredNetworks();
     this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
   }
@@ -120,13 +122,12 @@ export default class Definitions {
 
   @given('the local node has no owner and no networks')
   public async theLocalNodeHasNoOwnerAndNoNetworks(): Promise<void> {
-    const mongo = Kernel.di.getService<MongoDB>(MongoDB);
-    const collection =
-      await mongo.getCollection<MongoNodeMetadataDocument>('node_metadata');
+    const database =
+      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
     const networkRegistry =
       Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry);
 
-    await collection.deleteOne({ _id: 'local' });
+    await database.delete('node_metadata', 'local');
     await Promise.all(
       networkRegistry
         .getAll()
@@ -136,24 +137,17 @@ export default class Definitions {
 
   @given('a node peer heartbeat has been received')
   public async aNodePeerHeartbeatHasBeenReceived(): Promise<void> {
-    const mongo = Kernel.di.getService<MongoDB>(MongoDB);
-    const collection =
-      await mongo.getCollection<MongoNodePeerDocument>('node_peers');
+    const database =
+      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
     const ownerKeyPair = await KeyPair.generate();
     const ownerIdentityId = new IdentityId(
       ownerKeyPair.toPrimitives().publicKey,
     );
 
-    await collection.deleteMany({});
-    await collection.insertOne({
-      _id: '550e8400-e29b-41d4-a716-446655440010',
+    await database.deleteMany('node_peers', () => true);
+    await database.save('node_peers', '550e8400-e29b-41d4-a716-446655440010', {
       lastSeenAt: Date.now(),
-      networks: [
-        {
-          id: '550e8400-e29b-41d4-a716-446655440011',
-          name: 'public',
-        },
-      ],
+      networks: [{ id: '550e8400-e29b-41d4-a716-446655440011', name: 'public' }],
       owner: ownerIdentityId.valueOf(),
     });
   }

@@ -346,8 +346,8 @@ package "communities/infrastructure" {
   class OrbitDBCommunityInviteDocument
   class OrbitDBCommunityMembershipRequestRepository
   class OrbitDBCommunityMembershipRequestDocument
-  class MongoCommunityModerationLogRepository
-  class MongoCommunityModerationLogDocument
+  class OrbitDBCommunityModerationLogRepository
+  class OrbitDBCommunityModerationLogDocument
 
   OrbitDBCommunityRepository ..|> CommunityRepository
   OrbitDBCommunityRepository --> OrbitDBCommunityDocument
@@ -359,8 +359,8 @@ package "communities/infrastructure" {
   OrbitDBCommunityInviteRepository --> OrbitDBCommunityInviteDocument
   OrbitDBCommunityMembershipRequestRepository ..|> CommunityMembershipRequestRepository
   OrbitDBCommunityMembershipRequestRepository --> OrbitDBCommunityMembershipRequestDocument
-  MongoCommunityModerationLogRepository ..|> CommunityModerationLogRepository
-  MongoCommunityModerationLogRepository --> MongoCommunityModerationLogDocument
+  OrbitDBCommunityModerationLogRepository ..|> CommunityModerationLogRepository
+  OrbitDBCommunityModerationLogRepository --> OrbitDBCommunityModerationLogDocument
 }
 
 package "communities-api" {
@@ -456,9 +456,9 @@ note right of Community
   - members can send/list encrypted
     text channel messages
   - channel message reactions are
-    Mongo-only synchronized metadata
+    OrbitDB replicated synchronized metadata
   - moderation log entries are
-    Mongo-only administrative audit
+    OrbitDB replicated administrative audit
 end note
 
 @enduml

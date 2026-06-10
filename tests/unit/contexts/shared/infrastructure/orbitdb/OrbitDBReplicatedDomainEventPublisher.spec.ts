@@ -45,8 +45,7 @@ function stores(params: {
 }
 
 describe('OrbitDBReplicatedDomainEventPublisher', () => {
-  it('publishes network-scoped events to local state and the target network', async () => {
-    const local = stores();
+  it('publishes network-scoped events to the target network', async () => {
     const firstNetwork = stores();
     const secondNetwork = stores();
     const projector = {
@@ -54,7 +53,6 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
     } as unknown as OrbitDBDomainEventProjector;
     const publisher = new OrbitDBReplicatedDomainEventPublisher(projector);
 
-    publisher.registerNetworkStores('local', 'local-peer', local.stores);
     publisher.registerNetworkStores(
       'network-1',
       'network-1-peer',
@@ -73,13 +71,13 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
       }),
     ]);
 
-    expect(local.events.add).toHaveBeenCalledTimes(1);
     expect(firstNetwork.events.add).toHaveBeenCalledTimes(1);
     expect(secondNetwork.events.add).not.toHaveBeenCalled();
   });
 
   it('routes keychain events through the owner identity networks', async () => {
-    const local = stores({
+    const firstNetwork = stores();
+    const secondNetwork = stores({
       identities: [
         {
           id: 'identity-1',
@@ -88,14 +86,11 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
         },
       ],
     });
-    const firstNetwork = stores();
-    const secondNetwork = stores();
     const projector = {
       project: jest.fn().mockResolvedValue(undefined),
     } as unknown as OrbitDBDomainEventProjector;
     const publisher = new OrbitDBReplicatedDomainEventPublisher(projector);
 
-    publisher.registerNetworkStores('local', 'local-peer', local.stores);
     publisher.registerNetworkStores(
       'network-1',
       'network-1-peer',
@@ -114,24 +109,27 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
       }),
     ]);
 
-    expect(local.events.add).toHaveBeenCalledTimes(1);
     expect(firstNetwork.events.add).not.toHaveBeenCalled();
     expect(secondNetwork.events.add).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps unresolved events in local state only', async () => {
-    const local = stores();
+  it('publishes unresolved events to every registered network', async () => {
     const firstNetwork = stores();
+    const secondNetwork = stores();
     const projector = {
       project: jest.fn().mockResolvedValue(undefined),
     } as unknown as OrbitDBDomainEventProjector;
     const publisher = new OrbitDBReplicatedDomainEventPublisher(projector);
 
-    publisher.registerNetworkStores('local', 'local-peer', local.stores);
     publisher.registerNetworkStores(
       'network-1',
       'network-1-peer',
       firstNetwork.stores,
+    );
+    publisher.registerNetworkStores(
+      'network-2',
+      'network-2-peer',
+      secondNetwork.stores,
     );
 
     await publisher.publish([
@@ -140,7 +138,7 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
       }),
     ]);
 
-    expect(local.events.add).toHaveBeenCalledTimes(1);
-    expect(firstNetwork.events.add).not.toHaveBeenCalled();
+    expect(firstNetwork.events.add).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.events.add).toHaveBeenCalledTimes(1);
   });
 });

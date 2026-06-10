@@ -295,7 +295,7 @@ package "conversations.infrastructure" {
     Reconstitutes and persists the Conversation
     aggregate from OrbitDB replicated documents.
     Message storage and read markers are
-    replicated projections, not Mongo documents.
+    replicated projections, not storage documents.
   end note
 
   OrbitDBConversationRepository ..|> ConversationRepository

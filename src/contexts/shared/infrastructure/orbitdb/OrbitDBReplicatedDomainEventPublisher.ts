@@ -8,7 +8,6 @@ import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
 
 // eslint-disable-next-line max-len
 export default class OrbitDBReplicatedDomainEventPublisher implements EventPublisher {
-  private static readonly LOCAL_NETWORK_ID = 'local';
   private readonly storesByNetworkId = new Map<
     string,
     {
@@ -207,16 +206,6 @@ export default class OrbitDBReplicatedDomainEventPublisher implements EventPubli
         stores: OrbitDBReplicatedStateStores;
       }
     >();
-    const localStores = this.storesByNetworkId.get(
-      OrbitDBReplicatedDomainEventPublisher.LOCAL_NETWORK_ID,
-    );
-
-    if (localStores) {
-      targets.set(OrbitDBReplicatedDomainEventPublisher.LOCAL_NETWORK_ID, {
-        networkId: OrbitDBReplicatedDomainEventPublisher.LOCAL_NETWORK_ID,
-        ...localStores,
-      });
-    }
 
     for (const networkId of networkIds) {
       const registeredStores = this.storesByNetworkId.get(networkId);

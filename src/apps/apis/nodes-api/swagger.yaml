@@ -66,7 +66,7 @@ paths:
       tags:
         - nodes
       summary: Delete local node network
-      description: Removes the network from the local node, stops and deletes its local IPFS storage, and removes local MongoDB data scoped only to that network. Identity metadata that also belongs to other networks is kept and only loses the removed network id. Requires a signed request from the node owner; unowned nodes reject deletion because no owner can authorize the destructive operation.
+      description: Removes the network from the local node, stops and deletes its local IPFS storage, and removes local and replicated data scoped only to that network. Identity metadata that also belongs to other networks is kept and only loses the removed network id. Requires a signed request from the node owner; unowned nodes reject deletion because no owner can authorize the destructive operation.
       parameters:
         - in: path
           name: networkId

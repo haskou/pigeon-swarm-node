@@ -1,30 +1,41 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { LinkPreviewRateLimitExceededError } from '../errors/LinkPreviewRateLimitExceededError';
 import { LinkPreviewRatePolicy } from './LinkPreviewRatePolicy';
-import { LinkPreviewRateLimitDocument } from './rate-limits/LinkPreviewRateLimitDocument';
 
-export class LinkPreviewRateLimiter {
-  private static readonly COLLECTION = 'link_preview_rate_limits';
+export default class LinkPreviewRateLimiter {
+  private static readonly NAMESPACE = 'link_preview_rate_limits';
 
-  private readonly policy: LinkPreviewRatePolicy;
+  private readonly policy: LinkPreviewRatePolicy =
+    LinkPreviewRatePolicy.fromEnvironment();
 
-  constructor(
-    private readonly mongo: MongoDB,
-    policy: LinkPreviewRatePolicy = LinkPreviewRatePolicy.fromEnvironment(),
-  ) {
-    this.policy = policy;
-  }
-
-  private async collection() {
-    return this.mongo.getCollection<LinkPreviewRateLimitDocument>(
-      LinkPreviewRateLimiter.COLLECTION,
-    );
-  }
+  constructor(private readonly database: EmbeddedLocalDatabase) {}
 
   private id(identityId: IdentityId, ipAddress: string): string {
     return `${identityId.valueOf()}:${ipAddress}`;
+  }
+
+  private nextBucket(
+    current: Record<string, unknown> | undefined,
+    now: number,
+  ): { count: number; resetAt: number } {
+    const currentResetAt =
+      typeof current?.resetAt === 'number' ? current.resetAt : undefined;
+    const currentCount =
+      typeof current?.count === 'number' ? current.count : undefined;
+
+    if (!currentCount || !currentResetAt || currentResetAt <= now) {
+      return {
+        count: 1,
+        resetAt: now + LinkPreviewRatePolicy.WINDOW_MS,
+      };
+    }
+
+    return {
+      count: currentCount + 1,
+      resetAt: currentResetAt,
+    };
   }
 
   public async consume(
@@ -35,42 +46,20 @@ export class LinkPreviewRateLimiter {
       return;
     }
 
-    const collection = await this.collection();
+    const id = this.id(identityId, ipAddress);
     const now = Date.now();
-    const resetAt = now + LinkPreviewRatePolicy.WINDOW_MS;
-    const result = await collection.findOneAndUpdate(
-      { _id: this.id(identityId, ipAddress) },
-      [
-        {
-          $set: {
-            count: {
-              $cond: [
-                {
-                  $or: [{ $not: ['$count'] }, { $lte: ['$resetAt', now] }],
-                },
-                1,
-                { $add: ['$count', 1] },
-              ],
-            },
-            resetAt: {
-              $cond: [
-                {
-                  $or: [{ $not: ['$resetAt'] }, { $lte: ['$resetAt', now] }],
-                },
-                resetAt,
-                '$resetAt',
-              ],
-            },
-          },
-        },
-      ],
-      {
-        returnDocument: 'after',
-        upsert: true,
-      },
+    const current = await this.database.findOne(
+      LinkPreviewRateLimiter.NAMESPACE,
+      id,
     );
+    const bucket = this.nextBucket(current, now);
 
-    if (!result || result.count > this.policy.getLimit()) {
+    await this.database.save(LinkPreviewRateLimiter.NAMESPACE, id, {
+      count: bucket.count,
+      resetAt: bucket.resetAt,
+    });
+
+    if (bucket.count > this.policy.getLimit()) {
       throw new LinkPreviewRateLimitExceededError(this.policy.getLimit());
     }
   }

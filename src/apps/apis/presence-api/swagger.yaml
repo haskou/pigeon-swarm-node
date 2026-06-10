@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Presence API
   version: 1.0.0
-  description: Mongo-only identity presence, custom status and heartbeat state.
+  description: Replicated identity presence, custom status and heartbeat state.
 tags:
   - name: presence
 paths:

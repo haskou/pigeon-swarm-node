@@ -35,7 +35,7 @@ X-Signature: <signature>
 Implemented:
 
 - canonical request payload: method, path, timestamp, nonce and body hash
-- recent nonces in MongoDB to prevent replay
+- recent nonces in the local embedded database to prevent replay
 - timestamp freshness validation
 - Cucumber scenarios for invalid, replayed and stale signed requests
 
@@ -496,7 +496,7 @@ participant receives an unread `missed_call` notification.
 
 Implemented:
 
-- missed participant state is persisted in MongoDB
+- missed participant state is persisted in replicated call state
 - missed calls stay available through `GET /calls/history`
 - timeout emits `calls.v1.participant.missed`
 - timeout emits `calls.v1.call.missed`
@@ -579,7 +579,7 @@ Implemented:
 
 - allow unsigned network additions while the node has no owner
 - require signed request auth from the owner after the node is claimed
-- persist the network in MongoDB
+- persist the network in the local embedded database
 - synchronize the runtime IPFS network registry after saving
 
 ### Add generated public node network
@@ -597,7 +597,7 @@ Implemented:
 - allow unsigned creation while the node has no owner
 - require signed request auth from the owner after the node is claimed
 - reject the request when the node already has a public network
-- persist the network in MongoDB and synchronize the runtime IPFS network registry
+- persist the network in the local embedded database and synchronize the runtime IPFS network registry
 
 ### Delete local node network
 
@@ -614,7 +614,7 @@ Implemented:
   the destructive operation
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
-- delete local MongoDB data scoped to that network:
+- delete local and replicated data scoped to that network:
   conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and IPFS replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
@@ -637,7 +637,7 @@ Implemented:
 
 - claim an unowned node as the authenticated identity
 - change the owner only when the request is signed by the current owner
-- persist owner state in MongoDB
+- persist owner state in the local embedded database
 - load persisted node state when the API process starts
 
 ### Get active peers
@@ -904,8 +904,8 @@ Implemented security rules:
 
 ## Identity Presence HTTP API
 
-Presence is Mongo-only runtime state. It is not stored in IPFS and it is
-synced through network-scoped pubsub events.
+Presence is replicated runtime state. It is not stored in IPFS and it is synced
+through network-scoped OrbitDB state.
 
 Statuses:
 
@@ -1529,7 +1529,7 @@ List response:
 Implemented:
 
 - require signed request auth
-- drafts are MongoDB-only and scoped to the authenticated identity
+- drafts are local embedded DB state scoped to the authenticated identity
 - the backend treats `encryptedPayload` as opaque client-encrypted data
 - saving or deleting a draft requires conversation participation
 
@@ -1571,7 +1571,7 @@ Implemented:
 
 - require signed request auth
 - require the authenticated identity to be a conversation participant
-- pins are MongoDB-only metadata; message IPFS documents are not rewritten
+- pins are OrbitDB replicated metadata; message IPFS documents are not rewritten
 - pinning validates that the target message exists locally
 
 ### Send message
@@ -2344,7 +2344,7 @@ Response:
 Implemented:
 
 - require signed request auth from the owner or a member with `manage_members`
-- store log entries in MongoDB only; they are not written to IPFS
+- store log entries in OrbitDB replicated state; they are not written to IPFS
 - return newest entries first, with `beforeLogId` pagination
 - currently recorded actions:
   `community_updated`, `channel_created`, `channel_renamed`,
@@ -2403,7 +2403,7 @@ Implemented:
 - omit channels that are not visible to the authenticated member roles
 - return both text and voice channels
 - include up to 2 recent active thread summaries per text channel, ordered by
-  newest reply activity and calculated from MongoDB metadata without hydrating
+  newest reply activity and calculated from OrbitDB metadata without hydrating
   message payloads
 - include `connectedIdentityIds` for voice channels, derived from identities
   currently `joined` to the active call scoped to that voice channel
@@ -2982,7 +2982,7 @@ List response:
 Implemented:
 
 - require signed request auth
-- drafts are MongoDB-only and scoped to the authenticated identity
+- drafts are local embedded DB state scoped to the authenticated identity
 - the backend treats `encryptedPayload` as opaque client-encrypted data
 - saving or deleting a draft requires access to the target text channel
 
@@ -3025,7 +3025,7 @@ Implemented:
 - require signed request auth
 - listing pins requires channel visibility
 - pinning and unpinning requires `manage_messages`
-- pins are MongoDB-only metadata; message payload documents are not rewritten
+- pins are OrbitDB replicated metadata; message payload documents are not rewritten
 - pinning validates that the target channel message exists
 
 ### Search public channel messages
@@ -3355,7 +3355,7 @@ Implemented:
 ## Notification Settings HTTP API
 
 Notification settings are authenticated, per-identity preferences stored in
-MongoDB. They are not published to IPFS.
+OrbitDB replicated state. They are not published to IPFS.
 
 Scopes:
 
@@ -3671,7 +3671,8 @@ removed the stale subscription.
 
 Sticker files are public IPFS assets. Upload the binary first with
 `POST /ipfs/public`, then store the returned CID in sticker metadata. The
-sticker pack itself lives in MongoDB and is returned through this API.
+sticker pack metadata lives in OrbitDB replicated state and is returned through
+this API.
 
 Current limits:
 

@@ -1,6 +1,4 @@
-import { Document } from 'mongodb';
-
-export type CommunityRoutingDocument = Document & {
+export type CommunityRoutingDocument = Record<string, unknown> & {
   _id: string;
   memberIds?: string[];
 };

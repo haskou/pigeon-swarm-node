@@ -45,18 +45,18 @@ package "presence/application" {
 }
 
 package "presence/infrastructure" {
-  class MongoIdentityPresenceRepository
+  class OrbitDBIdentityPresenceRepository
 }
 
 IdentityPresence --> PresenceStatus
 IdentityPresence --> PresenceCustomMessage
 IdentityPresence --> IdentityPresenceWasUpdatedEvent
-IdentityPresenceFinder --> MongoIdentityPresenceRepository
-IdentityPresenceUpdater --> MongoIdentityPresenceRepository
+IdentityPresenceFinder --> OrbitDBIdentityPresenceRepository
+IdentityPresenceUpdater --> OrbitDBIdentityPresenceRepository
 IdentityPresenceUpdater --> IdentityPresenceNetworkResolver
-IdentityPresenceHeartbeatRecorder --> MongoIdentityPresenceRepository
+IdentityPresenceHeartbeatRecorder --> OrbitDBIdentityPresenceRepository
 IdentityPresenceHeartbeatRecorder --> IdentityPresenceNetworkResolver
-IdentityPresenceExpirationRegistrar --> MongoIdentityPresenceRepository
+IdentityPresenceExpirationRegistrar --> OrbitDBIdentityPresenceRepository
 IdentityPresenceExpirationRegistrar --> IdentityPresenceNetworkResolver
 
 @enduml

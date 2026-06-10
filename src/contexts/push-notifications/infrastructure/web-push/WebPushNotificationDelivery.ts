@@ -12,11 +12,10 @@ import { WebPushSendResult } from './types/WebPushSendResult';
 
 // eslint-disable-next-line max-len
 export default class WebPushNotificationDelivery extends PushNotificationDelivery {
-  private readonly configuration = new PushVapidConfiguration();
   private readonly webPush = this.loadWebPush();
   private hasLoggedDisabledDelivery = false;
 
-  constructor() {
+  constructor(private readonly configuration: PushVapidConfiguration) {
     super();
 
     if (this.isConfigured() && this.webPush) {

@@ -92,13 +92,30 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
-  it('routes documents to local state and the matching network only', async () => {
+  it('throws when replicated state is not ready yet', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
-    const local = createStores();
+
+    await expect(
+      registry.queryDocuments('communities', () => true),
+    ).rejects.toMatchObject({
+      code: 503020,
+      httpCode: 503,
+      message:
+        'Replicated state is not ready yet. Retry after the node finishes opening and synchronizing its stores.',
+    });
+    await expect(
+      registry.putDocument('communities', { id: 'community-1' }),
+    ).rejects.toMatchObject({
+      code: 503020,
+      httpCode: 503,
+    });
+  });
+
+  it('routes documents to the matching network only', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
     const secondNetwork = createStores();
 
-    registry.register('local', local.stores);
     registry.register('network-1', firstNetwork.stores);
     registry.register('network-2', secondNetwork.stores);
 
@@ -115,24 +132,19 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       id: 'local-notification',
     });
 
-    expect(local.communities.put).toHaveBeenCalledTimes(1);
     expect(firstNetwork.communities.put).toHaveBeenCalledTimes(1);
     expect(secondNetwork.communities.put).not.toHaveBeenCalled();
-    expect(local.messages.put).toHaveBeenCalledTimes(1);
     expect(firstNetwork.messages.put).toHaveBeenCalledTimes(1);
     expect(secondNetwork.messages.put).not.toHaveBeenCalled();
-    expect(local.notifications.put).toHaveBeenCalledTimes(1);
-    expect(firstNetwork.notifications.put).not.toHaveBeenCalled();
-    expect(secondNetwork.notifications.put).not.toHaveBeenCalled();
+    expect(firstNetwork.notifications.put).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.notifications.put).toHaveBeenCalledTimes(1);
   });
 
   it('routes keychain metadata through the owner identity networks', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
-    const local = createStores();
     const firstNetwork = createStores();
     const secondNetwork = createStores();
 
-    registry.register('local', local.stores);
     registry.register('network-1', firstNetwork.stores);
     registry.register('network-2', secondNetwork.stores);
 
@@ -146,39 +158,17 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       ownerIdentityId: 'identity-1',
     });
 
-    expect(local.keychains.put).toHaveBeenCalledTimes(1);
     expect(firstNetwork.keychains.put).not.toHaveBeenCalled();
     expect(secondNetwork.keychains.put).toHaveBeenCalledTimes(1);
   });
 
-  it('backfills matching local documents when a network store is registered', async () => {
+  it('does not backfill documents from an unsynchronized local store', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
-    const local = createStores();
     const firstNetwork = createStores();
 
-    registry.register('local', local.stores);
-
-    await registry.putDocument('communities', {
-      id: 'community-1',
-      networkId: 'network-1',
-    });
-    await registry.putDocument('messages', {
-      communityId: 'community-1',
-      id: 'message-1',
-      scopeType: 'community_channel',
-    });
-
     registry.register('network-1', firstNetwork.stores);
-    await registry.backfillLocalStateToNetwork('network-1');
 
-    expect(firstNetwork.communities.put).toHaveBeenCalledWith({
-      id: 'community-1',
-      networkId: 'network-1',
-    });
-    expect(firstNetwork.messages.put).toHaveBeenCalledWith({
-      communityId: 'community-1',
-      id: 'message-1',
-      scopeType: 'community_channel',
-    });
+    expect(firstNetwork.communities.put).not.toHaveBeenCalled();
+    expect(firstNetwork.messages.put).not.toHaveBeenCalled();
   });
 });

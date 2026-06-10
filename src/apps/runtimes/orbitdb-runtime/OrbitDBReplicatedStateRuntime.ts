@@ -112,7 +112,6 @@ export default class OrbitDBReplicatedStateRuntime {
       stores,
     });
     this.registry.register(networkId, stores);
-    await this.registry.backfillLocalStateToNetwork(networkId);
     this.publisher.registerNetworkStores(networkId, localPeerId, stores);
     this.subscribeToEvents(networkId, stores);
     await this.projectExistingEvents(networkId, stores);
@@ -122,31 +121,7 @@ export default class OrbitDBReplicatedStateRuntime {
     );
   }
 
-  private async registerLocalState(): Promise<void> {
-    const networkId = 'local';
-
-    if (this.registeredNetworks.has(networkId)) {
-      return;
-    }
-
-    const stores = await OrbitDBReplicatedStateStores.openLocal();
-    const localPeerId = 'local';
-
-    this.registeredNetworks.set(networkId, {
-      localPeerId,
-      processedEventIds: new Set(),
-      stores,
-    });
-    this.registry.register(networkId, stores);
-    this.publisher.registerNetworkStores(networkId, localPeerId, stores);
-    this.subscribeToEvents(networkId, stores);
-    await this.projectExistingEvents(networkId, stores);
-
-    Kernel.logger.info('OrbitDB local state ready');
-  }
-
   public async run(): Promise<void> {
-    await this.registerLocalState();
     await Promise.all(
       this.networkRegistry
         .getAll()

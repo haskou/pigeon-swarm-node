@@ -173,7 +173,7 @@ paths:
       tags:
         - communities
       summary: List community moderation log entries
-      description: Requires manage_members. Returns MongoDB-only audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes.
+      description: Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
@@ -732,7 +732,7 @@ paths:
       tags:
         - communities
       summary: List authenticated identity community channel drafts
-      description: Drafts are MongoDB-only opaque encrypted payloads owned by the authenticated identity.
+      description: Drafts are local embedded DB opaque encrypted payloads owned by the authenticated identity.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

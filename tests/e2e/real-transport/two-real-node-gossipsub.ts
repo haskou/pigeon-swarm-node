@@ -10,7 +10,6 @@ import axios, { AxiosError } from 'axios';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { generateKeyPairSync, randomUUID } from 'crypto';
 import fs from 'fs-extra';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import path from 'path';
 import WebSocket from 'ws';
 
@@ -22,8 +21,8 @@ type IdentityFixture = {
 
 type NodeRuntime = {
   baseUrl: string;
-  databaseName: string;
   ipfsPath: string;
+  localDbPath: string;
   name: string;
   port: number;
   process?: ChildProcessWithoutNullStreams;
@@ -58,7 +57,6 @@ async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
   await fs.ensureDir(TMP_ROOT);
 
-  const mongo = await MongoMemoryServer.create();
   const networkKey = generateNetworkKey();
   const nodeA = buildNodeRuntime('node-a', 19180);
   const nodeB = buildNodeRuntime('node-b', 19181);
@@ -66,16 +64,16 @@ async function main(): Promise<void> {
   let nodeBIdentity: IdentityFixture | undefined;
 
   try {
-    await startNode(nodeA, mongo.getUri());
+    await startNode(nodeA);
     await addPrivateNetwork(nodeA, networkKey);
     nodeAIdentity = await publishIdentity(nodeA, 'Node A', 'node-a');
     const nodeAKeychain = await publishKeychain(nodeA, nodeAIdentity);
 
-    await startNode(nodeB, mongo.getUri());
+    await startNode(nodeB);
     await addPrivateNetwork(nodeB, networkKey);
     await stopNode(nodeB);
 
-    await startNode(nodeB, mongo.getUri());
+    await startNode(nodeB);
     await waitForIdentity(nodeB, nodeAIdentity.id);
     await waitForKeychain(nodeB, nodeAIdentity);
 
@@ -117,7 +115,7 @@ async function main(): Promise<void> {
       'node-a-offline-message-payload',
     );
 
-    await startNode(nodeB, mongo.getUri());
+    await startNode(nodeB);
     await waitForMessage(
       nodeB,
       nodeBIdentity,
@@ -177,7 +175,6 @@ async function main(): Promise<void> {
     );
   } finally {
     await Promise.allSettled([stopNode(nodeA), stopNode(nodeB)]);
-    await mongo.stop();
     await fs.remove(TMP_ROOT);
   }
 }
@@ -185,8 +182,8 @@ async function main(): Promise<void> {
 function buildNodeRuntime(name: string, port: number): NodeRuntime {
   return {
     baseUrl: `http://127.0.0.1:${port}`,
-    databaseName: `pigeon_swarm_${name.replace('-', '_')}_e2e`,
     ipfsPath: path.join(TMP_ROOT, name, 'ipfs'),
+    localDbPath: path.join(TMP_ROOT, name, 'local-db'),
     name,
     port,
     stderr: [],
@@ -200,8 +197,9 @@ function generateNetworkKey(): string {
   return privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
 }
 
-async function startNode(node: NodeRuntime, mongoUrl: string): Promise<void> {
+async function startNode(node: NodeRuntime): Promise<void> {
   await fs.ensureDir(node.ipfsPath);
+  await fs.ensureDir(node.localDbPath);
 
   node.stdout = [];
   node.stderr = [];
@@ -211,9 +209,8 @@ async function startNode(node: NodeRuntime, mongoUrl: string): Promise<void> {
       ...process.env,
       API_PORT: String(node.port),
       IPFS_STORAGE_PATH: node.ipfsPath,
-      MONGO_DATABASE: node.databaseName,
-      MONGO_URL: mongoUrl,
       NODE_ENV: 'local',
+      PIGEON_LOCAL_DB_PATH: node.localDbPath,
       ROUTE_PREFIX: '',
       STARTUP_SYNC_PEER_WAIT_MS: '10000',
       TRANSPORT_DSN: 'libp2p-gossipsub://',

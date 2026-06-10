@@ -120,11 +120,11 @@ package "stickers/domain" {
 }
 
 package "stickers/infrastructure" {
-  class MongoStickerPackRepository
-  class MongoStickerUserLibraryRepository
+  class OrbitDBStickerPackRepository
+  class OrbitDBStickerUserLibraryRepository
 
-  MongoStickerPackRepository ..|> StickerPackRepository
-  MongoStickerUserLibraryRepository ..|> StickerUserLibraryRepository
+  OrbitDBStickerPackRepository ..|> StickerPackRepository
+  OrbitDBStickerUserLibraryRepository ..|> StickerUserLibraryRepository
 }
 
 StickerPackCreator ..> StickerPackRepository

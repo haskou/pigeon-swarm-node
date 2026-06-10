@@ -1,31 +1,42 @@
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
-import { CallSignalRateLimitDocument } from './CallSignalRateLimitDocument';
 import { CallSignalRatePolicy } from './CallSignalRatePolicy';
 import { CallSignalRateLimitExceededError } from './errors/CallSignalRateLimitExceededError';
 
 export default class CallSignalRateLimiter {
-  private static readonly COLLECTION = 'call_signal_rate_limits';
+  private static readonly NAMESPACE = 'call_signal_rate_limits';
 
-  private readonly policy: CallSignalRatePolicy;
+  private readonly policy: CallSignalRatePolicy =
+    CallSignalRatePolicy.fromEnvironment();
 
-  constructor(
-    private readonly mongo: MongoDB,
-    policy: CallSignalRatePolicy = CallSignalRatePolicy.fromEnvironment(),
-  ) {
-    this.policy = policy;
-  }
-
-  private async collection() {
-    return this.mongo.getCollection<CallSignalRateLimitDocument>(
-      CallSignalRateLimiter.COLLECTION,
-    );
-  }
+  constructor(private readonly database: EmbeddedLocalDatabase) {}
 
   private id(callId: CallId, senderIdentityId: IdentityId): string {
     return `${callId.valueOf()}:${senderIdentityId.valueOf()}`;
+  }
+
+  private nextBucket(
+    current: Record<string, unknown> | undefined,
+    now: number,
+  ): { count: number; resetAt: number } {
+    const currentResetAt =
+      typeof current?.resetAt === 'number' ? current.resetAt : undefined;
+    const currentCount =
+      typeof current?.count === 'number' ? current.count : undefined;
+
+    if (!currentCount || !currentResetAt || currentResetAt <= now) {
+      return {
+        count: 1,
+        resetAt: now + CallSignalRatePolicy.WINDOW_MS,
+      };
+    }
+
+    return {
+      count: currentCount + 1,
+      resetAt: currentResetAt,
+    };
   }
 
   public async consume(
@@ -37,43 +48,19 @@ export default class CallSignalRateLimiter {
     }
 
     const id = this.id(callId, senderIdentityId);
-    const collection = await this.collection();
     const now = Date.now();
-    const resetAt = now + CallSignalRatePolicy.WINDOW_MS;
-    const result = await collection.findOneAndUpdate(
-      { _id: id },
-      [
-        {
-          $set: {
-            count: {
-              $cond: [
-                {
-                  $or: [{ $not: ['$count'] }, { $lte: ['$resetAt', now] }],
-                },
-                1,
-                { $add: ['$count', 1] },
-              ],
-            },
-            resetAt: {
-              $cond: [
-                {
-                  $or: [{ $not: ['$resetAt'] }, { $lte: ['$resetAt', now] }],
-                },
-                resetAt,
-                '$resetAt',
-              ],
-            },
-          },
-        },
-      ],
-      {
-        returnDocument: 'after',
-        upsert: true,
-      },
+    const current = await this.database.findOne(
+      CallSignalRateLimiter.NAMESPACE,
+      id,
     );
-    const document = result || undefined;
+    const bucket = this.nextBucket(current, now);
 
-    if (!document || document.count > this.policy.getLimit()) {
+    await this.database.save(CallSignalRateLimiter.NAMESPACE, id, {
+      count: bucket.count,
+      resetAt: bucket.resetAt,
+    });
+
+    if (bucket.count > this.policy.getLimit()) {
       throw new CallSignalRateLimitExceededError(this.policy.getLimit());
     }
   }

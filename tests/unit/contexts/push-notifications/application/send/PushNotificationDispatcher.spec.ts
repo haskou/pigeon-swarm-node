@@ -1,6 +1,6 @@
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
-import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
+import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import NotificationScopeSettingsRepository from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
@@ -282,7 +282,7 @@ function deliveryResult(options: {
 function mockPresenceRepository(options: {
   busyIdentityIds: string[];
   presences: IdentityPresence[];
-}): MongoIdentityPresenceRepository {
+}): IdentityPresenceRepository {
   return {
     findByIdentityId: jest.fn(async (identityId: IdentityId) => {
       if (options.busyIdentityIds.includes(identityId.valueOf())) {
@@ -293,7 +293,7 @@ function mockPresenceRepository(options: {
         presence.getIdentityId().isEqual(identityId),
       );
     }),
-  } as unknown as MongoIdentityPresenceRepository;
+  } as unknown as IdentityPresenceRepository;
 }
 
 function mockRepository(

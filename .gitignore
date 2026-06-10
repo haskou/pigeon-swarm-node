@@ -30,6 +30,7 @@ coverage/
 
 
 /ipfs_storage/*
+/local_storage/*
 /tmp/*
 /db/*
 /public/*

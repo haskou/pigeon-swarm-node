@@ -1,13 +1,19 @@
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
+import ReplicatedStateNotReadyError from './ReplicatedStateNotReadyError';
 
 export default class OrbitDBReplicatedStateRegistry {
-  private static readonly LOCAL_NETWORK_ID = 'local';
   private readonly storesByNetworkId = new Map<
     string,
     OrbitDBReplicatedStateStores
   >();
+
+  private assertReady(): void {
+    if (this.storesByNetworkId.size === 0) {
+      throw new ReplicatedStateNotReadyError();
+    }
+  }
 
   private getStore(
     stores: OrbitDBReplicatedStateStores,
@@ -282,13 +288,6 @@ export default class OrbitDBReplicatedStateRegistry {
     networkIds: string[],
   ): OrbitDBReplicatedStateStores[] {
     const stores = new Map<string, OrbitDBReplicatedStateStores>();
-    const localStores = this.storesByNetworkId.get(
-      OrbitDBReplicatedStateRegistry.LOCAL_NETWORK_ID,
-    );
-
-    if (localStores) {
-      stores.set(OrbitDBReplicatedStateRegistry.LOCAL_NETWORK_ID, localStores);
-    }
 
     for (const networkId of networkIds) {
       const networkStores = this.storesByNetworkId.get(networkId);
@@ -309,73 +308,6 @@ export default class OrbitDBReplicatedStateRegistry {
     return [...this.storesByNetworkId.values()];
   }
 
-  private async backfillDocumentStore(
-    networkId: string,
-    localStores: OrbitDBReplicatedStateStores,
-    networkStores: OrbitDBReplicatedStateStores,
-    storeName: OrbitDBReplicatedDocumentStoreName,
-  ): Promise<void> {
-    const localStore = this.getStore(localStores, storeName);
-
-    if (!localStore) {
-      return;
-    }
-
-    const localDocuments = await this.allDocuments(localStore);
-    const networkDocuments: Record<string, unknown>[] = [];
-
-    for (const document of localDocuments) {
-      if (
-        (await this.targetNetworkIdsForDocument(document)).includes(networkId)
-      ) {
-        networkDocuments.push(document);
-      }
-    }
-
-    await Promise.all(
-      networkDocuments.map(async (document) =>
-        this.getStore(networkStores, storeName)?.put?.(
-          this.cleanDocument(document),
-        ),
-      ),
-    );
-  }
-
-  private async backfillHeads(
-    networkId: string,
-    localStores: OrbitDBReplicatedStateStores,
-    networkStores: OrbitDBReplicatedStateStores,
-  ): Promise<void> {
-    const localHeads = await this.allRecords(localStores.heads);
-    const networkHeads: Array<{
-      key?: string;
-      value: Record<string, unknown>;
-    }> = [];
-
-    for (const record of localHeads) {
-      if (
-        (await this.targetNetworkIdsForDocument(record.value)).includes(
-          networkId,
-        )
-      ) {
-        networkHeads.push(record);
-      }
-    }
-
-    await Promise.all(
-      networkHeads.map(async (record) => {
-        if (!record.key) {
-          return;
-        }
-
-        await networkStores.heads.put?.(
-          record.key,
-          this.cleanDocument(record.value),
-        );
-      }),
-    );
-  }
-
   public register(
     networkId: string,
     stores: OrbitDBReplicatedStateStores,
@@ -391,6 +323,7 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
     matcher: (document: Record<string, unknown>) => boolean,
   ): Promise<Array<Record<string, unknown>>> {
+    this.assertReady();
     const documents: Array<Record<string, unknown>> = [];
 
     for (const stores of this.storesByNetworkId.values()) {
@@ -414,6 +347,7 @@ export default class OrbitDBReplicatedStateRegistry {
     document: Record<string, unknown>,
     networkIds: string[] = [],
   ): Promise<void> {
+    this.assertReady();
     const cleanDocument = this.cleanDocument(document);
     const targetNetworkIds = await this.targetNetworkIdsForDocument(
       cleanDocument,
@@ -428,6 +362,7 @@ export default class OrbitDBReplicatedStateRegistry {
   public async findHead(
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
+    this.assertReady();
     for (const stores of this.storesByNetworkId.values()) {
       const directRecord = this.recordValue(await stores.heads.get?.(key));
 
@@ -452,6 +387,7 @@ export default class OrbitDBReplicatedStateRegistry {
     value: Record<string, unknown>,
     networkIds: string[] = [],
   ): Promise<void> {
+    this.assertReady();
     const cleanValue = this.cleanDocument(value);
     const targetNetworkIds = await this.targetNetworkIdsForDocument(
       cleanValue,
@@ -461,44 +397,5 @@ export default class OrbitDBReplicatedStateRegistry {
     for (const stores of this.storesForNetworkIds(targetNetworkIds)) {
       await stores.heads.put?.(key, cleanValue);
     }
-  }
-
-  public async backfillLocalStateToNetwork(networkId: string): Promise<void> {
-    const localStores = this.storesByNetworkId.get(
-      OrbitDBReplicatedStateRegistry.LOCAL_NETWORK_ID,
-    );
-    const networkStores = this.storesByNetworkId.get(networkId);
-
-    if (
-      !localStores ||
-      !networkStores ||
-      networkId === OrbitDBReplicatedStateRegistry.LOCAL_NETWORK_ID
-    ) {
-      return;
-    }
-
-    await Promise.all(
-      (
-        [
-          'communities',
-          'conversations',
-          'identities',
-          'ipfsReplication',
-          'keychains',
-          'messages',
-          'notifications',
-          'reactions',
-          'requests',
-        ] as OrbitDBReplicatedDocumentStoreName[]
-      ).map((storeName) =>
-        this.backfillDocumentStore(
-          networkId,
-          localStores,
-          networkStores,
-          storeName,
-        ),
-      ),
-    );
-    await this.backfillHeads(networkId, localStores, networkStores);
   }
 }
