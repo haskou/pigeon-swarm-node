@@ -149,6 +149,10 @@ export class Identity extends AggregateRoot {
     return this.id;
   }
 
+  public getNetworkIds(): NetworkId[] {
+    return this.networks.toArray();
+  }
+
   public hasNoPreviousReference(): boolean {
     return this.previousIdentityExternalIdentifier === undefined;
   }

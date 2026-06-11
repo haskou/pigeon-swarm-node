@@ -1,6 +1,8 @@
 import { ContentReplicationContext } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationContext';
 import { ContentReplicationPriority } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationPriority';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
 import ContentReplicationRegistrar from '../register-content/ContentReplicationRegistrar';
@@ -17,6 +19,7 @@ export default class ContentPublisher {
     private readonly ipfs: IPFS,
     private readonly nodeRepository: NodeRepository,
     private readonly replicationRegistrar: ContentReplicationRegistrar,
+    private readonly identityRepository: IdentityRepository,
   ) {}
 
   private commonDocument(
@@ -37,14 +40,24 @@ export default class ContentPublisher {
     return networks.map((network) => network.getId());
   }
 
+  private async ownerNetworkIds(
+    ownerIdentityId: IdentityId,
+  ): Promise<string[]> {
+    const identity = await this.identityRepository.findById(ownerIdentityId);
+
+    return identity.getNetworkIds().map((networkId) => networkId.valueOf());
+  }
+
   private async localNodeId(): Promise<string> {
     return (await this.nodeRepository.loadLocalNodeId()).valueOf();
   }
 
   private async registerReplication(params: {
+    claimedNetworkIds?: string[];
     cid: string;
     contentType: string;
     context: string;
+    deferSideEffects?: boolean;
     filename?: string;
     message: ContentPublishMessage;
     networkIds: string[];
@@ -53,13 +66,54 @@ export default class ContentPublisher {
       cid: params.cid,
       contentType: params.contentType,
       context: params.context,
+      deferSideEffects: params.deferSideEffects,
       filename: params.filename,
       localNodeId: await this.localNodeId(),
+      localReplicaNetworkIds: params.claimedNetworkIds,
       networkIds: params.networkIds,
       ownerIdentityId: params.message.ownerIdentityId.valueOf(),
       priority: ContentReplicationPriority.NORMAL,
       sizeBytes: params.message.body.length,
     });
+  }
+
+  private registerUploadedBytesReplication(params: {
+    cid: string;
+    claimedNetworkIds: string[];
+    completedNetworkIds: Promise<string[]>;
+    contentType: string;
+    context: string;
+    filename?: string;
+    message: ContentPublishMessage;
+    networkIds: string[];
+  }): void {
+    const firstRegistration = this.registerReplication({
+      ...params,
+      deferSideEffects: true,
+    }).catch((error: unknown): void => {
+      void error;
+    });
+
+    params.completedNetworkIds
+      .then(async (completedNetworkIds) => {
+        const pendingClaimedNetworkIds = completedNetworkIds.filter(
+          (networkId) => !params.claimedNetworkIds.includes(networkId),
+        );
+
+        if (pendingClaimedNetworkIds.length === 0) {
+          return;
+        }
+
+        await firstRegistration;
+        await this.registerReplication({
+          ...params,
+          claimedNetworkIds: pendingClaimedNetworkIds,
+          deferSideEffects: true,
+        });
+      })
+      .catch((error: unknown): void => {
+        void error;
+      });
   }
 
   private async publish(
@@ -92,15 +146,22 @@ export default class ContentPublisher {
     context: string,
   ): Promise<PublishedContent> {
     const contentType = message.contentType || defaultContentType;
-    const cid = await this.ipfs.addBytesToAll(message.body);
+    const networkIds = await this.ownerNetworkIds(message.ownerIdentityId);
+    const { cid, completedNetworkIds, networkId } =
+      await this.ipfs.addBytesToNetworksReturningFirst(
+        message.body,
+        networkIds,
+      );
 
-    await this.registerReplication({
+    this.registerUploadedBytesReplication({
       cid: cid.valueOf(),
+      claimedNetworkIds: [networkId],
+      completedNetworkIds,
       contentType,
       context,
       filename: message.filename,
       message,
-      networkIds: await this.networkIds(),
+      networkIds,
     });
 
     return {

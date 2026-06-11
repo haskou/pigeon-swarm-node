@@ -1,5 +1,6 @@
 import ContentReplicationRegistrar from '@app/contexts/content-replication/application/register-content/ContentReplicationRegistrar';
 import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
+import { ContentReplicaClaim } from '@app/contexts/content-replication/domain/ContentReplicaClaim';
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
 import ContentReplicaClaimRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicaClaimRepository';
 import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
@@ -76,6 +77,97 @@ describe('ContentReplicationRegistrar', () => {
     expect(publishedEvents[0].map((event) => event.attributes.networkIds)).toEqual([
       [firstNetworkId],
       [secondNetworkId],
+    ]);
+  });
+
+  it('can register content in several networks while claiming only local replicas', async () => {
+    const savedClaims: ContentReplicaClaim[] = [];
+    const savedContents: ContentReplication[] = [];
+    const contentRepository: ContentReplicationRepository = {
+      findAll: async () => [],
+      findByCid: async () => undefined,
+      save: async (content) => {
+        savedContents.push(content);
+      },
+    };
+    const claimRepository: ContentReplicaClaimRepository = {
+      findByCids: async () => [],
+      save: async (claim) => {
+        savedClaims.push(claim);
+      },
+    };
+    const eventPublisher: DomainEventPublisher = {
+      publish: async () => undefined,
+    };
+
+    const content = await new ContentReplicationRegistrar(
+      contentRepository,
+      claimRepository,
+      eventPublisher,
+    ).register({
+      cid,
+      context: 'public_upload',
+      localNodeId,
+      localReplicaNetworkIds: [secondNetworkId],
+      networkIds: [firstNetworkId, secondNetworkId],
+      sizeBytes: 128,
+    });
+
+    expect(content.toPrimitives().networkIds.sort()).toEqual([
+      firstNetworkId,
+      secondNetworkId,
+    ]);
+    expect(savedContents).toHaveLength(1);
+    expect(savedClaims.map((claim) => claim.toPrimitives().networkId)).toEqual([
+      secondNetworkId,
+    ]);
+  });
+
+  it('can defer replicated side effects after saving content and local claims', async () => {
+    const savedClaims: ContentReplicaClaim[] = [];
+    const savedContents: ContentReplication[] = [];
+    const contentRepository: ContentReplicationRepository = {
+      findAll: async () => [],
+      findByCid: async () => undefined,
+      save: async (content) => {
+        savedContents.push(content);
+      },
+    };
+    const claimRepository: ContentReplicaClaimRepository = {
+      findByCids: async () => [],
+      save: async (claim) => {
+        savedClaims.push(claim);
+      },
+    };
+    const eventPublisher: DomainEventPublisher = {
+      publish: () => new Promise<void>(() => undefined),
+    };
+
+    const result = await Promise.race([
+      new ContentReplicationRegistrar(
+        contentRepository,
+        claimRepository,
+        eventPublisher,
+      )
+        .register({
+          cid,
+          context: 'public_upload',
+          deferSideEffects: true,
+          localNodeId,
+          localReplicaNetworkIds: [secondNetworkId],
+          networkIds: [firstNetworkId, secondNetworkId],
+          sizeBytes: 128,
+        })
+        .then(() => 'resolved'),
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve('timeout'), 25);
+      }),
+    ]);
+
+    expect(result).toBe('resolved');
+    expect(savedContents).toHaveLength(1);
+    expect(savedClaims.map((claim) => claim.toPrimitives().networkId)).toEqual([
+      secondNetworkId,
     ]);
   });
 });

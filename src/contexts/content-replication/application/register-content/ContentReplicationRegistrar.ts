@@ -31,7 +31,7 @@ export default class ContentReplicationRegistrar {
     cid: IPFSId,
     networkIds: string[],
     nodeId: string,
-  ): Promise<void> {
+  ): Promise<ContentReplicaClaim[]> {
     const claimedAt = Timestamp.now();
     const claims = networkIds.map((networkId) =>
       ContentReplicaClaim.create(
@@ -46,6 +46,12 @@ export default class ContentReplicationRegistrar {
       await this.claimRepository.save(claim);
     }
 
+    return claims;
+  }
+
+  private async publishClaimEvents(
+    claims: ContentReplicaClaim[],
+  ): Promise<void> {
     await this.eventPublisher.publish(
       claims.map((claim) => {
         const primitives = claim.toPrimitives();
@@ -57,6 +63,26 @@ export default class ContentReplicationRegistrar {
           nodeId: primitives.nodeId,
         });
       }),
+    );
+  }
+
+  private async runPostRegistrationSideEffects(
+    content: ContentReplication,
+    claims: ContentReplicaClaim[],
+  ): Promise<void> {
+    await this.publishRegistration(content);
+    await this.publishClaimEvents(claims);
+    await this.summaryRefresher?.refresh();
+  }
+
+  private runDeferredPostRegistrationSideEffects(
+    content: ContentReplication,
+    claims: ContentReplicaClaim[],
+  ): void {
+    this.runPostRegistrationSideEffects(content, claims).catch(
+      (error: unknown): void => {
+        void error;
+      },
     );
   }
 
@@ -84,11 +110,68 @@ export default class ContentReplicationRegistrar {
     );
   }
 
+  private updateExistingContent(
+    content: ContentReplication,
+    networkIds: NetworkId[],
+    metadata: ContentReplicationMetadata,
+  ): ContentReplication {
+    content.addNetworkIds(networkIds);
+    content.updateMetadata(metadata);
+    content.touch();
+
+    return content;
+  }
+
+  private createContent(params: {
+    cid: IPFSId;
+    context: string;
+    metadata: ContentReplicationMetadata;
+    networkIds: NetworkId[];
+    ownerIdentityId?: string;
+    priority?: ContentReplicationPriority;
+  }): ContentReplication {
+    return ContentReplication.create(
+      params.cid,
+      new ContentReplicationContext(params.context),
+      params.networkIds,
+      params.metadata,
+      params.ownerIdentityId
+        ? new IdentityId(params.ownerIdentityId)
+        : undefined,
+      params.priority ?? ContentReplicationPriority.NORMAL,
+    );
+  }
+
+  private async completeRegistration(params: {
+    cid: IPFSId;
+    content: ContentReplication;
+    deferSideEffects?: boolean;
+    localNodeId: string;
+    localReplicaNetworkIds?: string[];
+    networkIds: string[];
+  }): Promise<void> {
+    const claims = await this.claimLocalReplicas(
+      params.cid,
+      params.localReplicaNetworkIds ?? params.networkIds,
+      params.localNodeId,
+    );
+
+    if (params.deferSideEffects) {
+      this.runDeferredPostRegistrationSideEffects(params.content, claims);
+
+      return;
+    }
+
+    await this.runPostRegistrationSideEffects(params.content, claims);
+  }
+
   public async register(params: {
     cid: string;
     contentType?: string;
     context: string;
+    deferSideEffects?: boolean;
     filename?: string;
+    localReplicaNetworkIds?: string[];
     localNodeId: string;
     networkIds: string[];
     ownerIdentityId?: string;
@@ -107,34 +190,26 @@ export default class ContentReplicationRegistrar {
         : ContentType.DEFAULT,
       params.filename ? new ContentFilename(params.filename) : undefined,
     );
-
-    if (existing) {
-      existing.addNetworkIds(networkIds);
-      existing.updateMetadata(metadata);
-      existing.touch();
-      await this.repository.save(existing);
-      await this.publishRegistration(existing);
-      await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
-      await this.summaryRefresher?.refresh();
-
-      return existing;
-    }
-
-    const content = ContentReplication.create(
-      cid,
-      new ContentReplicationContext(params.context),
-      networkIds,
-      metadata,
-      params.ownerIdentityId
-        ? new IdentityId(params.ownerIdentityId)
-        : undefined,
-      params.priority ?? ContentReplicationPriority.NORMAL,
-    );
+    const content = existing
+      ? this.updateExistingContent(existing, networkIds, metadata)
+      : this.createContent({
+          cid,
+          context: params.context,
+          metadata,
+          networkIds,
+          ownerIdentityId: params.ownerIdentityId,
+          priority: params.priority,
+        });
 
     await this.repository.save(content);
-    await this.publishRegistration(content);
-    await this.claimLocalReplicas(cid, params.networkIds, params.localNodeId);
-    await this.summaryRefresher?.refresh();
+    await this.completeRegistration({
+      cid,
+      content,
+      deferSideEffects: params.deferSideEffects,
+      localNodeId: params.localNodeId,
+      localReplicaNetworkIds: params.localReplicaNetworkIds,
+      networkIds: params.networkIds,
+    });
 
     return content;
   }

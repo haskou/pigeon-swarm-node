@@ -254,6 +254,45 @@ describe('IPFS', () => {
     });
   });
 
+  describe('addBytesToNetworksReturningFirst', () => {
+    it('should return the first successful add from the selected networks', async () => {
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+      const excludedNetwork = mock<IPFSNetwork>();
+      const expectedCid = new IPFSId('bafybytes');
+      const bytes = new Uint8Array([1, 2, 3]);
+
+      firstNetwork.getId.mockReturnValue('network-1');
+      secondNetwork.getId.mockReturnValue('network-2');
+      excludedNetwork.getId.mockReturnValue('network-3');
+      firstNetwork.addBytes.mockRejectedValue(new Error('network failed'));
+      secondNetwork.addBytes.mockResolvedValue(expectedCid);
+      excludedNetwork.addBytes.mockResolvedValue(new IPFSId('bafywrong'));
+      registry.getAll.mockReturnValue([
+        firstNetwork,
+        secondNetwork,
+        excludedNetwork,
+      ]);
+
+      const result = await ipfs.addBytesToNetworksReturningFirst(bytes, [
+        'network-1',
+        'network-2',
+      ]);
+
+      expect({
+        cid: result.cid,
+        networkId: result.networkId,
+      }).toEqual({
+        cid: expectedCid,
+        networkId: 'network-2',
+      });
+      await expect(result.completedNetworkIds).resolves.toEqual(['network-2']);
+      expect(firstNetwork.addBytes).toHaveBeenCalledWith(bytes);
+      expect(secondNetwork.addBytes).toHaveBeenCalledWith(bytes);
+      expect(excludedNetwork.addBytes).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addJSONToNetworks', () => {
     it('should add JSON only to selected networks and return first CID', async () => {
       const expectedCid = new IPFSId('bafyselected');
