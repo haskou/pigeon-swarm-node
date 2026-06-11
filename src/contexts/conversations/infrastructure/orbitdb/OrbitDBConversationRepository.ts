@@ -2,7 +2,6 @@ import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { Message } from '@app/contexts/conversations/domain/Message';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationMessageCandidate } from '@app/contexts/conversations/domain/repositories/types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
@@ -870,22 +869,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return this.findMessageById(conversationId, messageId);
   }
 
-  public async findMessageCandidates(
-    conversationId: ConversationId,
-    limit: number,
-  ): Promise<ConversationMessageCandidate[]> {
-    return (await this.findMessageDocumentsByConversationId(conversationId))
-      .sort((left, right) => right.createdAt - left.createdAt)
-      .slice(0, limit)
-      .reverse()
-      .map((document) => ({
-        authorIdentityId: document.authorId,
-        createdAt: document.createdAt,
-        messageId: document.id,
-        messageType: document.type,
-      }));
-  }
-
   public async findByParticipant(
     participantId: IdentityId,
     limit: number,
@@ -1133,10 +1116,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         readAt: Timestamp.now().valueOf(),
       },
     );
-  }
-
-  public async registerUnreadForMessage(): Promise<void> {
-    return Promise.resolve();
   }
 
   public async save(conversation: Conversation): Promise<void> {

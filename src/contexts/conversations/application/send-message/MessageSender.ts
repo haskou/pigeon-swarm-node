@@ -38,10 +38,6 @@ export default class MessageSender {
     this.signatureService.assertValidMessageSignature(sentMessage);
 
     await this.conversationRepository.save(conversation);
-    await this.conversationRepository.registerUnreadForMessage(
-      conversation,
-      sentMessage,
-    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return sentMessage;

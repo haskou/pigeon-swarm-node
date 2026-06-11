@@ -53,15 +53,10 @@ export default class ConversationMessageRegistrar {
     );
 
     this.assertCandidateMatchesAnnouncement(message, candidate);
-    const isAlreadyRegistered = conversation.findMessageById(message.messageId);
 
     this.signatureService.assertValidMessageSignature(candidate);
 
     conversation.registerMessage(candidate);
     await this.repository.save(conversation);
-
-    if (!isAlreadyRegistered) {
-      await this.repository.registerUnreadForMessage(conversation, candidate);
-    }
   }
 }

@@ -62,14 +62,10 @@ describe('ConversationMessageRegistrar', () => {
       candidate,
     );
     expect(repository.save).toHaveBeenCalledWith(conversation);
-    expect(repository.registerUnreadForMessage).toHaveBeenCalledWith(
-      conversation,
-      candidate,
-    );
     expect(conversation.toPrimitives().messages).toHaveLength(1);
   });
 
-  it('does not recreate unread flags for already registered messages', async () => {
+  it('does not duplicate already registered messages', async () => {
     const conversation = mother.build();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
@@ -90,7 +86,6 @@ describe('ConversationMessageRegistrar', () => {
       candidate,
     );
     expect(repository.save).toHaveBeenCalledWith(conversation);
-    expect(repository.registerUnreadForMessage).not.toHaveBeenCalled();
     expect(conversation.toPrimitives().messages).toHaveLength(1);
   });
 

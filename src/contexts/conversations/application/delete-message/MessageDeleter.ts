@@ -33,10 +33,6 @@ export default class MessageDeleter {
     this.signatureService.assertValidMessageSignature(deletedMessage);
 
     await this.conversationRepository.save(conversation);
-    await this.conversationRepository.registerUnreadForMessage(
-      conversation,
-      deletedMessage,
-    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return deletedMessage;

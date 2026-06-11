@@ -37,10 +37,6 @@ export default class MessageEditor {
     this.signatureService.assertValidMessageSignature(editedMessage);
 
     await this.conversationRepository.save(conversation);
-    await this.conversationRepository.registerUnreadForMessage(
-      conversation,
-      editedMessage,
-    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return editedMessage;

@@ -112,11 +112,9 @@ package "conversations.domain" {
     +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
     +findMessagesAround(conversationId: ConversationId, messageId: MessageId, before: number, after: number): Promise<ConversationMessagesAround>
     +findThreadMessages(conversationId: ConversationId, rootMessageId: MessageId, limit: number): Promise<Message[]>
-    +findMessageCandidates(conversationId: ConversationId, limit: number): Promise<object[]>
     +countUnreadByRecipient(recipientIdentityId: IdentityId, conversationIds: ConversationId[]): Promise<Map<string, number>>
     +hasUnreadMessageForRecipient(recipientIdentityId: IdentityId, conversationId: ConversationId, messageId: MessageId): Promise<boolean>
     +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId): Promise<void>
-    +registerUnreadForMessage(conversation: Conversation, message: Message): Promise<void>
   }
 
   interface MessageReactionRepository {

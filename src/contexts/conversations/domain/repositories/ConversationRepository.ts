@@ -6,7 +6,6 @@ import { Message } from '../Message';
 import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
-import { ConversationMessageCandidate } from './types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from './types/ConversationMessagesAround';
 
 export default abstract class ConversationRepository {
@@ -22,11 +21,6 @@ export default abstract class ConversationRepository {
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
-
-  public abstract findMessageCandidates(
-    conversationId: ConversationId,
-    limit: number,
-  ): Promise<ConversationMessageCandidate[]>;
 
   public abstract findByParticipant(
     participantId: IdentityId,
@@ -84,11 +78,6 @@ export default abstract class ConversationRepository {
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
     messageId: MessageId,
-  ): Promise<void>;
-
-  public abstract registerUnreadForMessage(
-    conversation: Conversation,
-    message: Message,
   ): Promise<void>;
 
   public abstract save(conversation: Conversation): Promise<void>;
