@@ -10,8 +10,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import Kernel from '@app/Kernel';
-import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { setDefaultTimeout } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
@@ -31,6 +29,8 @@ type TestLogger = {
 
 @binding()
 export default class RegisterIdentityWhenPublishedDefinition {
+  private consumer: RegisterIdentityWhenPublished | undefined;
+
   private identity: Identity | undefined;
 
   private cleanupStorageFolder(): void {
@@ -55,11 +55,6 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
   }
 
-  private resetMemoryBus(): void {
-    MemoryMessageBusAdapter.memoryMessages = {};
-    MemoryMessageBusAdapter.errorMemoryMessages = {};
-  }
-
   private installTestLogger(): void {
     (
       Kernel as unknown as {
@@ -71,23 +66,6 @@ export default class RegisterIdentityWhenPublishedDefinition {
       info: () => undefined,
       warn: () => undefined,
     };
-  }
-
-  private async waitUntilQueueIsEmpty(queueName: string): Promise<void> {
-    const deadline = Date.now() + 5000;
-
-    while (Date.now() < deadline) {
-      const pendingMessages =
-        MemoryMessageBusAdapter.memoryMessages[queueName]?.length || 0;
-
-      if (pendingMessages === 0) {
-        return;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-
-    throw new Error(`Queue ${queueName} was not consumed before timeout.`);
   }
 
   private async waitUntilIdentityIsRegistered(): Promise<void> {
@@ -102,15 +80,6 @@ export default class RegisterIdentityWhenPublishedDefinition {
     const identityId = new IdentityId(this.identity.toPrimitives().id);
 
     while (Date.now() < deadline) {
-      const consumerErrors =
-        MemoryMessageBusAdapter.errorMemoryMessages[
-          RegisterIdentityWhenPublished.QUEUE_NAME
-        ] || [];
-
-      if (consumerErrors.length > 0) {
-        throw new Error(consumerErrors.join('\n'));
-      }
-
       const metadata = await metadataRepository.findByIdentityId(identityId);
 
       if (metadata.length > 0) {
@@ -125,8 +94,8 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
   @before()
   public async startKernel(): Promise<void> {
+    this.consumer = undefined;
     this.identity = undefined;
-    this.resetMemoryBus();
 
     if (!kernel) {
       kernel = new Kernel();
@@ -142,7 +111,6 @@ export default class RegisterIdentityWhenPublishedDefinition {
   @after()
   public cleanup(): void {
     kernel?.removeConsumers();
-    this.resetMemoryBus();
     this.cleanupStorageFolder();
   }
 
@@ -152,9 +120,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
       throw new Error('Kernel is not initialized.');
     }
 
-    kernel.removeConsumers();
-    kernel.addConsumers(RegisterIdentityWhenPublished);
-    await kernel.runConsumers();
+    this.consumer = Kernel.di.getService<RegisterIdentityWhenPublished>(
+      RegisterIdentityWhenPublished,
+    );
   }
 
   @when('the identity publication is announced')
@@ -163,11 +131,13 @@ export default class RegisterIdentityWhenPublishedDefinition {
       throw new Error('Identity is not initialized.');
     }
 
-    const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
+    if (!this.consumer) {
+      throw new Error('Register identity consumer is not initialized.');
+    }
 
-    await messageBus.publish([
+    await this.consumer.handler(
       new IdentityWasCreatedEvent(this.identity.toPrimitives().id),
-    ]);
+    );
   }
 
   @given('a real identity has been published in network {string}')
@@ -209,14 +179,8 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
   @then('the published identity should be registered locally')
   public async thePublishedIdentityShouldBeRegisteredLocally(): Promise<void> {
-    await this.waitUntilQueueIsEmpty(RegisterIdentityWhenPublished.QUEUE_NAME);
     await this.waitUntilIdentityIsRegistered();
 
     expect(this.identity).to.not.equal(undefined);
-    expect(
-      MemoryMessageBusAdapter.errorMemoryMessages[
-        RegisterIdentityWhenPublished.QUEUE_NAME
-      ] || [],
-    ).to.deep.equal([]);
   }
 }
