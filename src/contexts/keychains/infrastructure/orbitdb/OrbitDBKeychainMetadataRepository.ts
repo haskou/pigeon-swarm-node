@@ -77,6 +77,27 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
       );
   }
 
+  private deduplicateDocuments(
+    documents: OrbitDBKeychainMetadataDocument[],
+  ): OrbitDBKeychainMetadataDocument[] {
+    const deduplicated = new Map<string, OrbitDBKeychainMetadataDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(`${document.ownerIdentityId}:${document.cid}`, document);
+    }
+
+    return this.sortByFreshness([...deduplicated.values()]);
+  }
+
+  private sortByFreshness(
+    documents: OrbitDBKeychainMetadataDocument[],
+  ): OrbitDBKeychainMetadataDocument[] {
+    return [...documents].sort(
+      (left, right) =>
+        right.version - left.version || right.receivedAt - left.receivedAt,
+    );
+  }
+
   private ownerHeadKey(ownerIdentityId: string): string {
     return `keychain:${ownerIdentityId}`;
   }
@@ -118,18 +139,17 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     const head = await this.findHead(
       this.ownerHeadKey(ownerIdentityId.valueOf()),
     );
-
-    if (head) {
-      return [head];
-    }
-
     const documents = await this.findDocuments((document) =>
       new IdentityId(document.ownerIdentityId).isEqual(ownerIdentityId),
     );
+    const candidates = this.deduplicateDocuments([
+      ...(head ? [head] : []),
+      ...documents,
+    ]);
 
-    await this.putHeadFrom(documents);
+    await this.putHeadFrom(candidates);
 
-    return documents;
+    return candidates;
   }
 
   public async save(

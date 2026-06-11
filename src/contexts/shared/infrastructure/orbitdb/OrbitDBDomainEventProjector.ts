@@ -162,6 +162,43 @@ export default class OrbitDBDomainEventProjector {
     return Number(message.occurred_on);
   }
 
+  private isAtLeastAsFresh(
+    candidate: Record<string, unknown>,
+    current: Record<string, unknown>,
+  ): boolean {
+    const candidateVersion = this.numberValue(candidate, 'version') ?? 0;
+    const currentVersion = this.numberValue(current, 'version') ?? 0;
+
+    if (candidateVersion !== currentVersion) {
+      return candidateVersion > currentVersion;
+    }
+
+    return (
+      (this.numberValue(candidate, 'receivedAt') ?? 0) >=
+      (this.numberValue(current, 'receivedAt') ?? 0)
+    );
+  }
+
+  private async shouldReplaceHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+    record: Record<string, unknown>,
+  ): Promise<boolean> {
+    const current = await this.findHead(stores, key);
+
+    return !current || this.isAtLeastAsFresh(record, current);
+  }
+
+  private async putFreshHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    if (await this.shouldReplaceHead(stores, key, record)) {
+      await this.putHead(stores, key, record);
+    }
+  }
+
   private async putEventHead(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
@@ -203,14 +240,22 @@ export default class OrbitDBDomainEventProjector {
       receivedAt: this.receivedAt(message),
       version: this.getNumberAttribute(message, 'version'),
     };
+    const shouldProject = await this.shouldReplaceHead(
+      stores,
+      `identity:${identityId}`,
+      identity,
+    );
+
+    if (!shouldProject) {
+      return;
+    }
 
     await this.put(stores.identities, identity);
     await this.putHead(stores, `identity:${identityId}`, identity);
-
     const handle = this.getStringAttribute(message, 'handle');
 
     if (handle) {
-      await this.putHead(stores, `identity-handle:${handle}`, identity);
+      await this.putFreshHead(stores, `identity-handle:${handle}`, identity);
     }
   }
 
@@ -234,6 +279,15 @@ export default class OrbitDBDomainEventProjector {
       receivedAt: this.receivedAt(message),
       version: this.getNumberAttribute(message, 'version'),
     };
+    const shouldProject = await this.shouldReplaceHead(
+      stores,
+      `keychain:${ownerIdentityId}`,
+      keychain,
+    );
+
+    if (!shouldProject) {
+      return;
+    }
 
     await this.put(stores.keychains, keychain);
     await this.putHead(stores, `keychain:${ownerIdentityId}`, keychain);

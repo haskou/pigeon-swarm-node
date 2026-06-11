@@ -101,6 +101,43 @@ describe('OrbitDBKeychainMetadataRepository', () => {
       }),
     ]);
   });
+
+  it('should repair stale keychain heads from newer documents', async () => {
+    const mother = await KeychainMother.create();
+    const ownerIdentityId = mother.ownerIdentityId.valueOf();
+
+    heads.set(`keychain:${ownerIdentityId}`, {
+      cid: 'bafykeychain-v1',
+      id: ownerIdentityId,
+      ownerIdentityId,
+      receivedAt: 1,
+      version: 1,
+    });
+    documents.push({
+      cid: 'bafykeychain-v2',
+      id: ownerIdentityId,
+      ownerIdentityId,
+      receivedAt: 2,
+      version: 2,
+    });
+
+    const records = await repository.findByOwnerIdentityId(
+      mother.ownerIdentityId,
+    );
+
+    expect(records[0]).toEqual(
+      expect.objectContaining({
+        cid: 'bafykeychain-v2',
+        version: 2,
+      }),
+    );
+    expect(heads.get(`keychain:${ownerIdentityId}`)).toEqual(
+      expect.objectContaining({
+        cid: 'bafykeychain-v2',
+        version: 2,
+      }),
+    );
+  });
 });
 
 function keychainStores(

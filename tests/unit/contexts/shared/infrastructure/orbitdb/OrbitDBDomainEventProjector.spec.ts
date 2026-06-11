@@ -12,6 +12,7 @@ import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/
 import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
 import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
@@ -20,6 +21,7 @@ import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructur
 import { ReplicatedDomainEventMessage } from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedDomainEventMessage';
 
 type FakeStore = {
+  get?: jest.Mock;
   put: jest.Mock;
 };
 
@@ -30,10 +32,25 @@ function fakeStore(): FakeStore {
 }
 
 function fakeStores(): Record<string, FakeStore> {
+  const heads = new Map<string, Record<string, unknown>>();
+
   return {
     communities: fakeStore(),
     conversations: fakeStore(),
-    heads: fakeStore(),
+    heads: {
+      get: jest.fn(async (key: string) => {
+        const value = heads.get(key);
+
+        return value ? { key, value } : undefined;
+      }),
+      put: jest.fn(
+        async (key: string, value: Record<string, unknown>) => {
+          heads.set(key, value);
+
+          return 'ok';
+        },
+      ),
+    },
     identities: fakeStore(),
     contentReplication: fakeStore(),
     keychains: fakeStore(),
@@ -138,6 +155,88 @@ describe('OrbitDBDomainEventProjector', () => {
       expect.objectContaining({
         cid: 'bafykeychain',
         ownerIdentityId: 'identity-1',
+      }),
+    );
+  });
+
+  it('does not downgrade identity and keychain heads with older replicated events', async () => {
+    const stores = fakeStores();
+
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        IdentityWasUpdatedEvent.EVENT_NAME,
+        {
+          externalIdentifier: 'bafyidentity-v2',
+          handle: 'hasko',
+          networkIds: ['network-1'],
+          version: 2,
+        },
+        'identity-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        IdentityWasCreatedEvent.EVENT_NAME,
+        {
+          externalIdentifier: 'bafyidentity-v1',
+          handle: 'hasko',
+          networkIds: ['network-1'],
+          version: 1,
+        },
+        'identity-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        KeychainWasPublishedEvent.EVENT_NAME,
+        {
+          externalIdentifier: 'bafykeychain-v2',
+          ownerIdentityId: 'identity-1',
+          version: 2,
+        },
+        'identity-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        KeychainWasPublishedEvent.EVENT_NAME,
+        {
+          externalIdentifier: 'bafykeychain-v1',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        },
+        'identity-1',
+      ),
+    );
+
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'identity:identity-1',
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        version: 2,
+      }),
+    );
+    expect(stores.heads.put).not.toHaveBeenCalledWith(
+      'identity:identity-1',
+      expect.objectContaining({
+        cid: 'bafyidentity-v1',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'keychain:identity-1',
+      expect.objectContaining({
+        cid: 'bafykeychain-v2',
+        version: 2,
+      }),
+    );
+    expect(stores.heads.put).not.toHaveBeenCalledWith(
+      'keychain:identity-1',
+      expect.objectContaining({
+        cid: 'bafykeychain-v1',
       }),
     );
   });

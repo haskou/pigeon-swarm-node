@@ -107,6 +107,27 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
       );
   }
 
+  private deduplicateDocuments(
+    documents: OrbitDBIdentityMetadataDocument[],
+  ): OrbitDBIdentityMetadataDocument[] {
+    const deduplicated = new Map<string, OrbitDBIdentityMetadataDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(`${document.identityId}:${document.cid}`, document);
+    }
+
+    return this.sortByFreshness([...deduplicated.values()]);
+  }
+
+  private sortByFreshness(
+    documents: OrbitDBIdentityMetadataDocument[],
+  ): OrbitDBIdentityMetadataDocument[] {
+    return [...documents].sort(
+      (left, right) =>
+        right.version - left.version || right.receivedAt - left.receivedAt,
+    );
+  }
+
   private identityHeadKey(identityId: string): string {
     return `identity:${identityId}`;
   }
@@ -170,18 +191,17 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
     const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
-
-    if (head) {
-      return [head];
-    }
-
     const documents = await this.findDocuments(
       (document) => document.handle === handle.valueOf(),
     );
+    const candidates = this.deduplicateDocuments([
+      ...(head ? [head] : []),
+      ...documents,
+    ]);
 
-    await this.putHeadsFrom(documents);
+    await this.putHeadsFrom(candidates);
 
-    return documents;
+    return candidates;
   }
 
   public async findByIdentityId(
@@ -191,17 +211,17 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
       this.identityHeadKey(identityId.valueOf()),
     );
 
-    if (head) {
-      return [head];
-    }
-
     const documents = await this.findDocuments((document) =>
       new IdentityId(document.identityId).isEqual(identityId),
     );
+    const candidates = this.deduplicateDocuments([
+      ...(head ? [head] : []),
+      ...documents,
+    ]);
 
-    await this.putHeadsFrom(documents);
+    await this.putHeadsFrom(candidates);
 
-    return documents;
+    return candidates;
   }
 
   public async findLatestByNetworkId(

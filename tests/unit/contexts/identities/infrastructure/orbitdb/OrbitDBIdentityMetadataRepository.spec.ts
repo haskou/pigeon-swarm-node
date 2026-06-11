@@ -1,5 +1,6 @@
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { Profile } from '@app/contexts/identities/domain/Profile';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import OrbitDBIdentityMetadataRepository from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataRepository';
@@ -91,6 +92,45 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     ]);
   });
 
+  it('should repair stale identity id heads from newer documents', async () => {
+    const mother = new IdentityMother();
+    const networkId = mother.networks[0];
+    const identityId = mother.id.valueOf();
+
+    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    heads.set(`identity:${identityId}`, {
+      cid: 'bafyidentity-v1',
+      id: identityId,
+      identityId,
+      networkIds: [networkId.valueOf()],
+      receivedAt: 1,
+      version: 1,
+    });
+    documents.push({
+      cid: 'bafyidentity-v2',
+      id: identityId,
+      identityId,
+      networkIds: [networkId.valueOf()],
+      receivedAt: 2,
+      version: 2,
+    });
+
+    const records = await repository.findByIdentityId(mother.id);
+
+    expect(records[0]).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        version: 2,
+      }),
+    );
+    expect(heads.get(`identity:${identityId}`)).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        version: 2,
+      }),
+    );
+  });
+
   it('should read identity metadata by handle from the head index', async () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother();
@@ -123,6 +163,48 @@ describe('OrbitDBIdentityMetadataRepository', () => {
         handle: handle.valueOf(),
       }),
     ]);
+  });
+
+  it('should repair stale identity handle heads from newer documents', async () => {
+    const handle = new ProfileHandle('hasko');
+    const mother = new IdentityMother().withVersion(new IdentityVersion(2));
+    const networkId = mother.networks[0];
+    const identityId = mother.id.valueOf();
+
+    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    heads.set(`identity-handle:${handle.valueOf()}`, {
+      cid: 'bafyidentity-handle-v1',
+      handle: handle.valueOf(),
+      id: identityId,
+      identityId,
+      networkIds: [networkId.valueOf()],
+      receivedAt: 1,
+      version: 1,
+    });
+    documents.push({
+      cid: 'bafyidentity-handle-v2',
+      handle: handle.valueOf(),
+      id: identityId,
+      identityId,
+      networkIds: [networkId.valueOf()],
+      receivedAt: 2,
+      version: 2,
+    });
+
+    const records = await repository.findByHandle(handle);
+
+    expect(records[0]).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-handle-v2',
+        version: 2,
+      }),
+    );
+    expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-handle-v2',
+        version: 2,
+      }),
+    );
   });
 });
 
