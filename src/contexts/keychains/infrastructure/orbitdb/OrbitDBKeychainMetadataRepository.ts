@@ -129,6 +129,20 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     }
   }
 
+  private async findLatest(
+    documents: OrbitDBKeychainMetadataDocument[],
+  ): Promise<KeychainMetadataRecord[]> {
+    const [latestDocument] = this.deduplicateDocuments(documents);
+
+    if (!latestDocument) {
+      return [];
+    }
+
+    await this.putHead(latestDocument);
+
+    return [latestDocument];
+  }
+
   public async findAll(): Promise<KeychainMetadataRecord[]> {
     return this.findDocuments(() => true);
   }
@@ -139,17 +153,17 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     const head = await this.findHead(
       this.ownerHeadKey(ownerIdentityId.valueOf()),
     );
+
+    if (head) {
+      return [head];
+    }
+
     const documents = await this.findDocuments((document) =>
       new IdentityId(document.ownerIdentityId).isEqual(ownerIdentityId),
     );
-    const candidates = this.deduplicateDocuments([
-      ...(head ? [head] : []),
-      ...documents,
-    ]);
+    const candidates = this.deduplicateDocuments(documents);
 
-    await this.putHeadFrom(candidates);
-
-    return candidates;
+    return this.findLatest(candidates);
   }
 
   public async save(

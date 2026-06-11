@@ -183,6 +183,20 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     }
   }
 
+  private async findLatest(
+    documents: OrbitDBIdentityMetadataDocument[],
+  ): Promise<IdentityMetadataRecord[]> {
+    const [latestDocument] = this.deduplicateDocuments(documents);
+
+    if (!latestDocument) {
+      return [];
+    }
+
+    await this.putHeads(latestDocument);
+
+    return [latestDocument];
+  }
+
   public async findAll(): Promise<IdentityMetadataRecord[]> {
     return this.findDocuments(() => true);
   }
@@ -191,17 +205,17 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
     const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
+
+    if (head) {
+      return [head];
+    }
+
     const documents = await this.findDocuments(
       (document) => document.handle === handle.valueOf(),
     );
-    const candidates = this.deduplicateDocuments([
-      ...(head ? [head] : []),
-      ...documents,
-    ]);
+    const candidates = this.deduplicateDocuments(documents);
 
-    await this.putHeadsFrom(candidates);
-
-    return candidates;
+    return this.findLatest(candidates);
   }
 
   public async findByIdentityId(
@@ -211,17 +225,16 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
       this.identityHeadKey(identityId.valueOf()),
     );
 
+    if (head) {
+      return [head];
+    }
+
     const documents = await this.findDocuments((document) =>
       new IdentityId(document.identityId).isEqual(identityId),
     );
-    const candidates = this.deduplicateDocuments([
-      ...(head ? [head] : []),
-      ...documents,
-    ]);
+    const candidates = this.deduplicateDocuments(documents);
 
-    await this.putHeadsFrom(candidates);
-
-    return candidates;
+    return this.findLatest(candidates);
   }
 
   public async findLatestByNetworkId(

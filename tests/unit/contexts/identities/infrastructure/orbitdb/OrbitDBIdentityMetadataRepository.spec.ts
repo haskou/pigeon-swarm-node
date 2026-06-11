@@ -92,7 +92,7 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     ]);
   });
 
-  it('should repair stale identity id heads from newer documents', async () => {
+  it('should keep identity id reads on the direct head path', async () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
@@ -119,14 +119,14 @@ describe('OrbitDBIdentityMetadataRepository', () => {
 
     expect(records[0]).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-v2',
-        version: 2,
+        cid: 'bafyidentity-v1',
+        version: 1,
       }),
     );
     expect(heads.get(`identity:${identityId}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-v2',
-        version: 2,
+        cid: 'bafyidentity-v1',
+        version: 1,
       }),
     );
   });
@@ -135,17 +135,19 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
-    const identity = await mother.build().updateProfile(
-      new Profile(
-        new ProfileName('Hasko'),
-        undefined,
-        undefined,
-        undefined,
-        handle,
-      ),
-      mother.password,
-      new IdentityExternalIdentifier('bafypreviousidentity'),
-    );
+    const identity = await mother
+      .build()
+      .updateProfile(
+        new Profile(
+          new ProfileName('Hasko'),
+          undefined,
+          undefined,
+          undefined,
+          handle,
+        ),
+        mother.password,
+        new IdentityExternalIdentifier('bafypreviousidentity'),
+      );
 
     registry.register(networkId.valueOf(), identityStores(documents, heads));
 
@@ -165,7 +167,7 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     ]);
   });
 
-  it('should repair stale identity handle heads from newer documents', async () => {
+  it('should keep identity handle reads on the direct head path', async () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother().withVersion(new IdentityVersion(2));
     const networkId = mother.networks[0];
@@ -195,14 +197,14 @@ describe('OrbitDBIdentityMetadataRepository', () => {
 
     expect(records[0]).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-handle-v2',
-        version: 2,
+        cid: 'bafyidentity-handle-v1',
+        version: 1,
       }),
     );
     expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-handle-v2',
-        version: 2,
+        cid: 'bafyidentity-handle-v1',
+        version: 1,
       }),
     );
   });

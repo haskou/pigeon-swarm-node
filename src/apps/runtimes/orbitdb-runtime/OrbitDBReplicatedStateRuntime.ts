@@ -2,6 +2,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
+import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
 import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
@@ -23,6 +24,7 @@ export default class OrbitDBReplicatedStateRuntime {
     private readonly publisher: OrbitDBReplicatedDomainEventPublisher,
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly projector: OrbitDBDomainEventProjector,
+    private readonly metadataHeadRepairer: OrbitDBMetadataHeadRepairer,
   ) {}
 
   private isReplicatedMessage(
@@ -115,9 +117,10 @@ export default class OrbitDBReplicatedStateRuntime {
     this.publisher.registerNetworkStores(networkId, localPeerId, stores);
     this.subscribeToEvents(networkId, stores);
     await this.projectExistingEvents(networkId, stores);
+    const repairedHeads = await this.metadataHeadRepairer.repair();
 
     Kernel.logger.info(
-      `OrbitDB replicated state ready: networkId=${networkId} peerId=${localPeerId}`,
+      `OrbitDB replicated state ready: networkId=${networkId} peerId=${localPeerId} repairedIdentityHeads=${repairedHeads.identities} repairedKeychainHeads=${repairedHeads.keychains}`,
     );
   }
 

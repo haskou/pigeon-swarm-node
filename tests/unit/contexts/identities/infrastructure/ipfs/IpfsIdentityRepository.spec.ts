@@ -391,9 +391,7 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
-        new IPFSId(cidString),
-      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(result.toPrimitives()).toEqual(primitives);
     });
@@ -424,30 +422,31 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
 
-    it('should skip remote IPFS lookups when metadata is not local and no peers are connected', async () => {
+    it('should try latest metadata before DHT fallback when no peers are connected', async () => {
       const identityId = mother.id;
+      const cid = new IPFSId('bafyremoteidentity');
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
-          cid: 'bafyremoteidentity',
+          cid: cid.valueOf(),
           identityId: identityId.valueOf(),
           previousCid: undefined,
           receivedAt: Date.now(),
           version: 1,
         },
       ]);
-      ipfsManager.stat.mockResolvedValue(false);
       ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+      ipfsManager.getJSON.mockRejectedValue(new Error('missing identity'));
 
       await expect(repository.findById(identityId)).rejects.toThrow(
         IdentityNotFoundError,
       );
 
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
-      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).not.toHaveBeenCalled();
+      ).toHaveBeenCalledWith(cid);
     });
   });
 
@@ -486,6 +485,5 @@ describe('IpfsIdentityRepository', () => {
       );
       expect(result.identity.toPrimitives()).toEqual(primitives);
     });
-
   });
 });

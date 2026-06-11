@@ -17,6 +17,7 @@ import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly IDENTITY_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
+  private readonly keychainByCid = new Map<string, Keychain>();
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -26,14 +27,37 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     super();
   }
 
+  private async getDocumentFromCid(cid: IPFSId): Promise<IpfsKeychainDocument> {
+    try {
+      const bytes = await this.ipfsManager.getBytes(cid);
+
+      return JSON.parse(bytes.toString('utf8')) as IpfsKeychainDocument;
+    } catch {
+      return this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
+    }
+  }
+
+  private async getKeychainFromCid(cid: IPFSId): Promise<Keychain> {
+    const cached = this.keychainByCid.get(cid.valueOf());
+
+    if (cached) {
+      return cached;
+    }
+
+    const document = await this.getDocumentFromCid(cid);
+    const keychain = this.mapper.toDomain(document);
+
+    this.keychainByCid.set(cid.valueOf(), keychain);
+
+    return keychain;
+  }
+
   private async findCandidateFromCid(
     cid: IPFSId,
     shouldSaveMetadata: boolean = true,
   ): Promise<Keychain | undefined> {
     try {
-      const document =
-        await this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
-      const keychain = this.mapper.toDomain(document);
+      const keychain = await this.getKeychainFromCid(cid);
 
       if (shouldSaveMetadata) {
         await this.metadataRepository.save(
@@ -44,6 +68,8 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
       return keychain;
     } catch {
+      this.keychainByCid.delete(cid.valueOf());
+
       return undefined;
     }
   }
@@ -101,36 +127,9 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  private async shouldResolveMetadataCid(
-    metadata: KeychainMetadataRecord,
-  ): Promise<boolean> {
-    if (await this.ipfsManager.hasConnectedPeers()) {
-      return true;
-    }
-
-    try {
-      const isAvailableLocally = await this.ipfsManager.stat(
-        new IPFSId(metadata.cid),
-        true,
-      );
-
-      if (isAvailableLocally) {
-        return true;
-      }
-    } catch {
-      // Missing local content is valid metadata while the node is offline.
-    }
-
-    return false;
-  }
-
   private async findCandidateReferenceFromMetadata(
     metadata: KeychainMetadataRecord,
   ): Promise<KeychainCandidate | undefined> {
-    if (!(await this.shouldResolveMetadataCid(metadata))) {
-      return undefined;
-    }
-
     const candidate = await this.findCandidateFromCid(
       new IPFSId(metadata.cid),
       false,
@@ -150,15 +149,12 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   private async findLocalCandidateReferences(
     metadata: KeychainMetadataRecord[],
   ): Promise<KeychainCandidate[]> {
-    for (const document of metadata) {
-      const candidate = await this.findCandidateReferenceFromMetadata(document);
+    const [latestDocument] = metadata;
+    const candidate = latestDocument
+      ? await this.findCandidateReferenceFromMetadata(latestDocument)
+      : undefined;
 
-      if (candidate) {
-        return [candidate];
-      }
-    }
-
-    return [];
+    return candidate ? [candidate] : [];
   }
 
   private deduplicateMetadata(
@@ -264,6 +260,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       keychain,
       new KeychainExternalIdentifier(cid.valueOf()),
     );
+    this.keychainByCid.set(cid.valueOf(), keychain);
     await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
@@ -288,10 +285,9 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
     for (const document of uniqueDocuments.values()) {
       try {
-        const keychainDocument =
-          await this.ipfsManager.getJSON<IpfsKeychainDocument>(
-            new IPFSId(document.cid),
-          );
+        const keychainDocument = await this.getDocumentFromCid(
+          new IPFSId(document.cid),
+        );
         const cid = await this.addJSONToOwnerNetworks(
           document.ownerIdentityId,
           keychainDocument,

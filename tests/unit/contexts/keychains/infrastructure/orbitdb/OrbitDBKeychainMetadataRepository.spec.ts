@@ -102,7 +102,7 @@ describe('OrbitDBKeychainMetadataRepository', () => {
     ]);
   });
 
-  it('should repair stale keychain heads from newer documents', async () => {
+  it('should keep keychain reads on the direct head path', async () => {
     const mother = await KeychainMother.create();
     const ownerIdentityId = mother.ownerIdentityId.valueOf();
 
@@ -127,14 +127,14 @@ describe('OrbitDBKeychainMetadataRepository', () => {
 
     expect(records[0]).toEqual(
       expect.objectContaining({
-        cid: 'bafykeychain-v2',
-        version: 2,
+        cid: 'bafykeychain-v1',
+        version: 1,
       }),
     );
     expect(heads.get(`keychain:${ownerIdentityId}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafykeychain-v2',
-        version: 2,
+        cid: 'bafykeychain-v1',
+        version: 1,
       }),
     );
   });

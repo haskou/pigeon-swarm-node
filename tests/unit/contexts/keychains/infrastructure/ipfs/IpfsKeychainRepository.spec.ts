@@ -101,21 +101,22 @@ describe('IpfsKeychainRepository', () => {
     expect(metadataRepository.save).toHaveBeenCalledWith(keychain, cid);
   });
 
-  it('should skip remote IPFS lookups when metadata is not local and no peers are connected', async () => {
+  it('should try latest metadata before DHT fallback when no peers are connected', async () => {
     const keychain = (await KeychainMother.create()).build();
     const primitives = keychain.toPrimitives();
+    const cid = new IPFSId('bafyremotekeychain');
 
     metadataRepository.findByOwnerIdentityId.mockResolvedValue([
       {
-        cid: 'bafyremotekeychain',
+        cid: cid.valueOf(),
         ownerIdentityId: primitives.ownerIdentityId,
         previousCid: primitives.previousKeychainExternalIdentifier,
         receivedAt: Date.now(),
         version: primitives.version,
       },
     ]);
-    ipfsManager.stat.mockResolvedValue(false);
     ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+    ipfsManager.getJSON.mockRejectedValue(new Error('missing keychain'));
 
     const result = await repository.findCandidateReferencesByOwnerId(
       new IdentityId(primitives.ownerIdentityId),
@@ -123,6 +124,6 @@ describe('IpfsKeychainRepository', () => {
 
     expect(result).toEqual([]);
     expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
-    expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+    expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
   });
 });
