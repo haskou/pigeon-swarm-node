@@ -23,6 +23,7 @@ export interface OrbitDBCommunityDocument extends Record<string, unknown> {
   ownerIdentityId: string;
   roles?: OrbitDBCommunityRoleDocument[];
   textChannels: OrbitDBCommunityTextChannelDocument[];
+  updatedAt?: number;
   visibility: CommunityVisibilityValue;
   voiceChannels?: OrbitDBCommunityVoiceChannelDocument[];
 }

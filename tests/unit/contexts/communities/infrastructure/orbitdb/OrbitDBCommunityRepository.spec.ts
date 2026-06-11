@@ -1,5 +1,6 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
 import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -76,13 +77,41 @@ describe('OrbitDBCommunityRepository', () => {
       'community-1',
     ]);
     expect(heads.get('community:community-1')).toEqual(
-      expect.objectContaining({ id: 'community-1' }),
+      expect.objectContaining({
+        id: 'community-1',
+        updatedAt: expect.any(Number),
+      }),
     );
     expect(
       heads.get(`community-member-index:${identityMother.id.valueOf()}`),
     ).toEqual(
       expect.objectContaining({
         communities: [expect.objectContaining({ id: 'community-1' })],
+      }),
+    );
+  });
+
+  it('should persist channel mutations as newer community documents', async () => {
+    const community = Community.fromPrimitives(communityPrimitives());
+
+    await repository.save(community);
+    community.addTextChannel(
+      identityMother.id,
+      new CommunityChannelName('updates'),
+    );
+    await repository.save(community);
+
+    const byId = await repository.findById(new CommunityId('community-1'));
+
+    expect(
+      byId?.toPrimitives().textChannels.map((channel) => channel.name),
+    ).toEqual(['general', 'updates']);
+    expect(heads.get('community:community-1')).toEqual(
+      expect.objectContaining({
+        textChannels: expect.arrayContaining([
+          expect.objectContaining({ name: 'updates' }),
+        ]),
+        updatedAt: expect.any(Number),
       }),
     );
   });

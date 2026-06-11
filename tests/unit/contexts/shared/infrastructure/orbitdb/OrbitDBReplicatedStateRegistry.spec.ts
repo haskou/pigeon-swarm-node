@@ -270,4 +270,35 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(firstNetwork.heads.get).not.toHaveBeenCalled();
     expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
+
+  it('does not replace a newer cached head with an older replicated update', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+
+    await registry.putHead('community:community-1', {
+      id: 'community-1',
+      name: 'new',
+      updatedAt: 2,
+    });
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          key: 'community:community-1',
+          value: {
+            id: 'community-1',
+            name: 'old',
+            updatedAt: 1,
+          },
+        },
+      },
+    });
+
+    await expect(registry.findHead('community:community-1')).resolves.toEqual({
+      id: 'community-1',
+      name: 'new',
+      updatedAt: 2,
+    });
+  });
 });

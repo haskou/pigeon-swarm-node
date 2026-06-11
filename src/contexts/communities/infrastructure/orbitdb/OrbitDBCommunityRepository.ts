@@ -72,7 +72,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       .filter((document): document is OrbitDBCommunityDocument =>
         this.isDocument(document),
       )
-      .sort((left, right) => right.createdAt - left.createdAt);
+      .sort((left, right) => this.freshness(right) - this.freshness(left));
   }
 
   private communityHeadKey(communityId: string): string {
@@ -111,11 +111,23 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const deduplicated = new Map<string, OrbitDBCommunityDocument>();
 
     for (const document of documents) {
-      deduplicated.set(document.id, document);
+      const current = deduplicated.get(document.id);
+
+      if (!current || this.freshness(current) <= this.freshness(document)) {
+        deduplicated.set(document.id, document);
+      }
     }
 
     return [...deduplicated.values()].sort(
-      (left, right) => right.createdAt - left.createdAt,
+      (left, right) => this.freshness(right) - this.freshness(left),
+    );
+  }
+
+  private freshness(document: OrbitDBCommunityDocument): number {
+    return Math.max(
+      document.deletedAt ?? 0,
+      document.updatedAt ?? 0,
+      document.createdAt,
     );
   }
 
@@ -156,8 +168,15 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
+  private toFreshDocument(community: Community): OrbitDBCommunityDocument {
+    return {
+      ...this.mapper.toDocument(community),
+      updatedAt: Date.now(),
+    };
+  }
+
   public async delete(community: Community): Promise<void> {
-    const document = this.mapper.toDocument(community);
+    const document = this.toFreshDocument(community);
 
     const deletedDocument = {
       ...document,
@@ -245,7 +264,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   public async save(community: Community): Promise<void> {
-    const document = this.mapper.toDocument(community);
+    const document = this.toFreshDocument(community);
 
     await this.registry.putDocument('communities', document);
     await this.putHeads(document);
