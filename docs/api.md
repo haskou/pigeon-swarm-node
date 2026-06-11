@@ -1061,24 +1061,13 @@ Response:
 Use `identityExternalIdentifier` as the next update's
 `previousIdentityExternalIdentifier`.
 
-### Create identity
+### Publish identity
 
 ```http
 POST /identities
 ```
 
-Legacy backend-generated request:
-
-```json
-{
-  "name": "Alice",
-  "handle": "alice",
-  "password": "Super-secret-password1!",
-  "networks": ["<networkId>"]
-}
-```
-
-Client-signed request:
+Request:
 
 ```json
 {
@@ -1105,18 +1094,14 @@ Client-signed request:
 
 Implemented:
 
-- keep the legacy password-based creation flow for local clients
-- accept client-generated encrypted keypairs and signed identity candidates
+- require client-generated encrypted keypairs and signed identity candidates
 - accept client-generated encrypted master keys and client-controlled master key
   derivation metadata as signed opaque identity fields
-- keep client passwords out of the backend in the client-signed flow
+- keep client passwords out of the backend
 - store `profile.handle` as part of the signed identity profile
 - normalize handles to lowercase
 - reject handles containing spaces, `@` or any character outside letters,
   numbers, dots, hyphens and underscores
-- require legacy backend-generated passwords to be 12 to 256 characters long
-  and include at least one uppercase letter, one lowercase letter, one number
-  and one symbol
 - return `identityExternalIdentifier`, which is the current published identity
   CID to send as `previousIdentityExternalIdentifier` in the next update
 - store `profile.picture` and `profile.banner` as public IPFS image CIDs, not as

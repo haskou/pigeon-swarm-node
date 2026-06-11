@@ -1,7 +1,7 @@
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
-import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
-import { IdentityCreateMessage } from '@app/contexts/identities/application/create/messages/IdentityCreateMessage';
+import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
+import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
@@ -11,6 +11,7 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import Kernel from '@app/Kernel';
 import { setDefaultTimeout } from '@cucumber/cucumber';
+import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import * as fsSync from 'fs';
@@ -144,13 +145,48 @@ export default class RegisterIdentityWhenPublishedDefinition {
   public async aRealIdentityHasBeenCreated(networkName: string): Promise<void> {
     const networkId = '123e4567-e89b-12d3-a456-426614174001';
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
-    const creator = Kernel.di.getService<IdentityCreator>(IdentityCreator);
+    const publisher =
+      Kernel.di.getService<IdentityPublisher>(IdentityPublisher);
+    const keyPair = await KeyPair.generate();
+    const encryptedKeyPair = await keyPair.encryptKeyPair(
+      'Super-secret-password1!',
+    );
+    const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
+    const previousIdentityExternalIdentifier: string | undefined = undefined;
+    const profile: {
+      banner: string | undefined;
+      biography: string | undefined;
+      handle: string;
+      name: string;
+      picture: string | undefined;
+    } = {
+      banner: undefined,
+      biography: undefined,
+      handle: 'alice',
+      name: 'alice',
+      picture: undefined,
+    };
+    const signaturePayload = {
+      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      id: identityId.valueOf(),
+      masterKeyDerivation: {
+        algorithm: 'test',
+        version: 1,
+      },
+      networks: [networkId],
+      previousIdentityExternalIdentifier,
+      profile,
+      timestamp: 1773848829055,
+      version: 1,
+    };
 
     await ipfs.registerNetwork(new IPFSNetworkConfig(networkId, networkName));
-    this.identity = await creator.create(
-      new IdentityCreateMessage('alice', 'Super-secret-password1!', [
-        networkId,
-      ]),
+    this.identity = await publisher.publish(
+      new IdentityPublishMessage({
+        ...signaturePayload,
+        signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+      }),
     );
   }
 

@@ -1,4 +1,3 @@
-import IdentityCreator from '@app/contexts/identities/application/create/IdentityCreator';
 import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
 import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
@@ -13,9 +12,6 @@ import { IdentityViewModel } from '../view-model/IdentityViewModel';
 
 @JsonController('/identities')
 export class PostIdentityRoute extends Route {
-  private readonly identityCreator: IdentityCreator =
-    this.get<IdentityCreator>(IdentityCreator);
-
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
@@ -28,11 +24,9 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const request = new PostIdentityRequest(body);
-    const identity = request.isClientSignedIdentity()
-      ? await this.identityPublisher.publish(
-          request.getIdentityPublishMessage(),
-        )
-      : await this.identityCreator.create(request.getIdentityCreateMessage());
+    const identity = await this.identityPublisher.publish(
+      request.getIdentityPublishMessage(),
+    );
     const candidate = await this.identityFinder.findCandidate(
       new IdentityFinderMessage(identity.toPrimitives().id),
     );

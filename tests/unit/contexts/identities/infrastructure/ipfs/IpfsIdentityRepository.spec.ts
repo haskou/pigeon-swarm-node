@@ -9,11 +9,10 @@ import IpfsIdentityRepository from '../../../../../../src/contexts/identities/in
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import IdentityMetadataRepository from '../../../../../../src/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
-import { NetworkId } from '../../../../../../src/contexts/shared/domain/value-objects/NetworkId';
-import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '../../../../../../src/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { KeyPair } from '@haskou/value-objects';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
@@ -43,6 +42,36 @@ describe('IpfsIdentityRepository', () => {
   afterEach(() => {
     replicatedStateRegistry.clear();
   });
+
+  async function createSignedIdentityForNetwork(
+    networkId: string,
+  ): Promise<Identity> {
+    const keyPair = await KeyPair.generate();
+    const encryptedKeyPair = await keyPair.encryptKeyPair(
+      'Super-secret-password1!',
+    );
+    const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
+    const previousIdentityExternalIdentifier: string | undefined = undefined;
+    const signaturePayload = {
+      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      id: identityId.valueOf(),
+      masterKeyDerivation: {
+        algorithm: 'test',
+        version: 1,
+      },
+      networks: [networkId],
+      previousIdentityExternalIdentifier,
+      profile: new Profile(new ProfileName('Mallory')).toPrimitives(),
+      timestamp: 1773848829055,
+      version: 1,
+    };
+
+    return Identity.fromPrimitives({
+      ...signaturePayload,
+      signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    });
+  }
 
   describe('save', () => {
     it('should save identity document to all networks and put record', async () => {
@@ -237,10 +266,8 @@ describe('IpfsIdentityRepository', () => {
       const identityId = new IdentityId(primitives.id);
       const wrongCidString = 'bafywrongidentity';
       const validCidString = 'bafyvalididentity';
-      const otherIdentity = await Identity.create(
-        new ProfileName('Mallory'),
-        new Password('Super-secret-password1!'),
-        [new NetworkId(primitives.networks[0])],
+      const otherIdentity = await createSignedIdentityForNetwork(
+        primitives.networks[0],
       );
 
       metadataRepository.findByIdentityId.mockResolvedValue([]);

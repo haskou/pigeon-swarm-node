@@ -5,6 +5,6 @@ export class IdentityPublishMessage {
   public readonly identity: Identity;
 
   constructor(primitives: PrimitiveOf<Identity>) {
-    this.identity = Identity.publishCandidate(primitives);
+    this.identity = Identity.fromSignedPublication(primitives);
   }
 }

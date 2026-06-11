@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Identities API
   version: 1.0.0
-  description: Endpoints for creating, updating and resolving identities.
+  description: Endpoints for publishing, updating and resolving signed identities.
 tags:
   - name: identities
 paths:
@@ -10,7 +10,7 @@ paths:
     post:
       tags:
         - identities
-      summary: Create identity
+      summary: Publish signed identity
       requestBody:
         required: true
         content:
@@ -19,7 +19,7 @@ paths:
               $ref: '#/components/schemas/PostIdentityBody'
       responses:
         '200':
-          description: Identity created successfully.
+          description: Identity published successfully.
           content:
             application/json:
               schema:
@@ -86,34 +86,7 @@ paths:
 components:
   schemas:
     PostIdentityBody:
-      oneOf:
-        - type: object
-          required:
-            - name
-            - password
-            - networks
-          properties:
-            name:
-              type: string
-              example: Alice
-            handle:
-              type: string
-              description: Lowercase profile handle. Use only letters, numbers, dots, hyphens or underscores; do not include @ or spaces.
-              pattern: '^[A-Za-z0-9._-]{3,32}$'
-              example: alice
-            password:
-              type: string
-              minLength: 12
-              maxLength: 256
-              description: Must include at least one uppercase letter, one lowercase letter, one number and one symbol.
-              example: Super-secret-password1!
-            networks:
-              type: array
-              description: Initial identity networks. Existing networks cannot be removed in later identity versions.
-              items:
-                type: string
-                format: uuid
-        - $ref: '#/components/schemas/SignedIdentityBody'
+      $ref: '#/components/schemas/SignedIdentityBody'
     SignedIdentityBody:
       type: object
       required:

@@ -1,9 +1,9 @@
 Feature: Post identity route
   As an API consumer
-  I want to create an identity
+  I want to publish a signed identity
   So that I can use it in the system
 
-  Scenario: Create identity successfully
+  Scenario: Reject legacy backend-generated identity creation
     Given I am an anonymous user
     And I register an in-memory IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
     And I set json body
@@ -18,27 +18,7 @@ Feature: Post identity route
       }
       """
     When I POST to "/identities/"
-    Then response code is equal to 200
-	    And response contains a valid resource with the following fields
-	      | profile.name | alice                                |
-	      | profile.handle | alice                              |
-	      | networks[0]  | 123e4567-e89b-12d3-a456-426614174000 |
-	    And response body should contain "encryptedMasterKey"
-	    And response body should contain "masterKeyDerivation"
-	    And response body should contain "identityExternalIdentifier"
-    And it has been pinned in ipfs
-    When I GET the created identity
-    Then response code is equal to 200
-    And response contains a valid resource with the following fields
-      | profile.name | alice                                |
-      | profile.handle | alice                              |
-    And response body should contain "identityExternalIdentifier"
-    When I GET "/identities/alice"
-    Then response code is equal to 200
-    And response contains a valid resource with the following fields
-      | profile.name   | alice |
-      | profile.handle | alice |
-    And response body should contain "identityExternalIdentifier"
+    Then response code is equal to 400
 
   Scenario: Publish a client-signed identity without sending a password
     Given I am an anonymous user

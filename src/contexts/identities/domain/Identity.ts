@@ -6,10 +6,8 @@ import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import {
   assert,
   EncryptedKeyPair,
-  KeyPair,
   PrimitiveOf,
   Signature,
-  SymmetricKey,
   Timestamp,
   UniqueObjectArray,
 } from '@haskou/value-objects';
@@ -27,33 +25,9 @@ import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIden
 import { IdentityVersion } from './value-objects/IdentityVersion';
 import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
-import { ProfileName } from './value-objects/ProfileName';
 
 export class Identity extends AggregateRoot {
   private readonly previousIdentityExternalIdentifier?: PreviousReference;
-
-  private static async createEncryptedMasterKey(password: Password): Promise<{
-    encryptedMasterKey: EncryptedMasterKey;
-    masterKeyDerivation: MasterKeyDerivation;
-  }> {
-    const masterKey = SymmetricKey.generate();
-    const salt = SymmetricKey.generate().valueOf();
-    const wrappingKey = await SymmetricKey.fromPasswordUsingOwasp(password, {
-      salt,
-    });
-
-    return {
-      encryptedMasterKey: new EncryptedMasterKey(
-        wrappingKey.encrypt(masterKey.valueOf()).valueOf(),
-      ),
-      masterKeyDerivation: new MasterKeyDerivation({
-        algorithm: 'scrypt-owasp',
-        encryptedPayloadScheme: 'symmetric',
-        salt,
-        version: 1,
-      }),
-    };
-  }
 
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
@@ -76,57 +50,9 @@ export class Identity extends AggregateRoot {
     );
   }
 
-  public static async create(
-    name: ProfileName,
-    password: Password,
-    networks: NetworkId[] = [],
-    handle?: ProfileHandle,
-  ): Promise<Identity> {
-    const keyPair = await KeyPair.generate();
-    const encryptedKeyPair = await keyPair.encryptKeyPair(password);
-    const encryptedMasterKey =
-      await Identity.createEncryptedMasterKey(password);
-    const primitiveEncryptedKeyPair = encryptedKeyPair.toPrimitives();
-    const identityId = new IdentityId(primitiveEncryptedKeyPair.publicKey);
-    const primitives: PrimitiveOf<Identity> = {
-      encryptedKeyPair: primitiveEncryptedKeyPair,
-      encryptedMasterKey: encryptedMasterKey.encryptedMasterKey.valueOf(),
-      id: identityId.valueOf(),
-      masterKeyDerivation:
-        encryptedMasterKey.masterKeyDerivation.toPrimitives(),
-      networks: networks.map((networkId) => networkId.valueOf()),
-      previousIdentityExternalIdentifier: undefined,
-      profile: new Profile(
-        name,
-        undefined,
-        undefined,
-        undefined,
-        handle,
-      ).toPrimitives(),
-      signature: '',
-      timestamp: Timestamp.now().valueOf(),
-      version: 1,
-    };
-    const signature =
-      await new IdentitySignatureDomainService().generateSignature(
-        primitives,
-        encryptedKeyPair,
-        password,
-      );
-    primitives.signature = signature.valueOf();
-
-    const identity = Identity.fromPrimitives(primitives);
-
-    identity.record(
-      new IdentityWasCreatedEvent(primitives.id, {
-        networkIds: primitives.networks,
-      }),
-    );
-
-    return identity;
-  }
-
-  public static publishCandidate(primitives: PrimitiveOf<Identity>): Identity {
+  public static fromSignedPublication(
+    primitives: PrimitiveOf<Identity>,
+  ): Identity {
     const identity = Identity.fromPrimitives(primitives);
 
     identity.record(

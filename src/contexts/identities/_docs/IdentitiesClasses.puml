@@ -12,8 +12,7 @@ package "identities.domain" {
     -profile: Profile
     -timestamp: Timestamp
     -signature: Signature
-    +create(name, password, networks, handle?): Identity
-    +publishCandidate(primitives): Identity
+    +fromSignedPublication(primitives): Identity
     +updateProfile(profile, password): Identity
     +updateNetworks(networks, password): Identity
   }
@@ -104,10 +103,6 @@ package "identities.domain" {
 }
 
 package "identities.application" {
-  class IdentityCreator {
-    +create(message: IdentityCreateMessage): Promise<Identity>
-  }
-
   class IdentityUpdater {
     +update(message: IdentityUpdateMessage): Promise<Identity>
   }
@@ -124,7 +119,6 @@ package "identities.application" {
     +register(message: RegisterPublishedIdentityMessage): Promise<Identity>
   }
 
-  IdentityCreator --> IdentitySaverService
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
   IdentityUpdater --> IdentityFinderService

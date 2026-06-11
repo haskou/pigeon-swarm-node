@@ -4,6 +4,11 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX3NoYXJlZF9fU2lnbmVkSHR0cFJlcXVlc3RBdXRoZW50aWNhdG9yX19TaWduZWRIdHRwUmVxdWVzdEF1dGhlbnRpY2F0b3I=:
+    class: /apps/apis/shared/SignedHttpRequestAuthenticator
+    arguments: []
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsUmVwb3NpdG9yeV9fT3JiaXREQkNhbGxSZXBvc2l0b3J5
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnk=: >-
@@ -309,13 +314,6 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2xpbmstcHJldmlld3MtYXBpX19zZXJ2aWNlc19fTGlua1ByZXZpZXdSYXRlTGltaXRlcl9fTGlua1ByZXZpZXdSYXRlTGltaXRlcg==:
     class: /apps/apis/link-previews-api/services/LinkPreviewRateLimiter
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX3NoYXJlZF9fU2lnbmVkSHR0cFJlcXVlc3RBdXRoZW50aWNhdG9yX19TaWduZWRIdHRwUmVxdWVzdEF1dGhlbnRpY2F0b3I=:
-    class: /apps/apis/shared/SignedHttpRequestAuthenticator
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
@@ -966,15 +964,6 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uTWVzc2FnZVBpblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvbk1lc3NhZ2VQaW5SZXBvc2l0b3J5
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fY3JlYXRlX19JZGVudGl0eUNyZWF0b3JfX0lkZW50aXR5Q3JlYXRvcg==:
-    class: /contexts/identities/application/create/IdentityCreator
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVNhdmVyU2VydmljZV9fSWRlbnRpdHlTYXZlclNlcnZpY2U=
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eUZpbmRlclNlcnZpY2VfX0lkZW50aXR5RmluZGVyU2VydmljZQ==:
     class: /contexts/identities/domain/services/IdentityFinderService
     arguments:
@@ -1308,7 +1297,7 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19pcGZzX19SZWdpc3RlckNvbnRlbnRSZXBsaWNhQ2xhaW1XaGVuQ2xhaW1lZF9fUmVnaXN0ZXJJUEZTUmVwbGljYUNsYWltV2hlbkNsYWltZWQ=:
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19pcGZzX19SZWdpc3RlckNvbnRlbnRSZXBsaWNhQ2xhaW1XaGVuQ2xhaW1lZF9fUmVnaXN0ZXJDb250ZW50UmVwbGljYUNsYWltV2hlbkNsYWltZWQ=:
     class: /apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed
     arguments:
       - >-
@@ -1318,7 +1307,7 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19pcGZzX19SZWdpc3RlckNvbnRlbnRSZXBsaWNhdGlvbldoZW5SZWdpc3RlcmVkX19SZWdpc3RlcklQRlNDb250ZW50V2hlblJlZ2lzdGVyZWQ=:
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19pcGZzX19SZWdpc3RlckNvbnRlbnRSZXBsaWNhdGlvbldoZW5SZWdpc3RlcmVkX19SZWdpc3RlckNvbnRlbnRSZXBsaWNhdGlvbldoZW5SZWdpc3RlcmVk:
     class: /apps/consumers/pubsub/ipfs/RegisterContentReplicationWhenRegistered
     arguments:
       - >-
