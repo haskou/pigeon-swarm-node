@@ -104,25 +104,12 @@ describe('OrbitDBContentReplicationRepository', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should find IPFS content replication metadata by CID from OrbitDB', async () => {
+  it('should not scan OrbitDB content replication documents when CID head is missing', async () => {
     const result = await repository.findByCid(new IPFSId(cid));
 
-    expect(result?.toPrimitives()).toEqual({
-      cid,
-      contentType: baseDocument.contentType,
-      context: baseDocument.context,
-      createdAt: baseDocument.createdAt,
-      filename: baseDocument.filename,
-      networkIds: baseDocument.networkIds,
-      ownerIdentityId,
-      priority: baseDocument.priority,
-      sizeBytes: baseDocument.sizeBytes,
-      updatedAt: baseDocument.updatedAt,
-    });
-    expect(headPut).toHaveBeenCalledWith(
-      `content-replication:${cid}`,
-      baseDocument,
-    );
+    expect(result).toBeUndefined();
+    expect(query).not.toHaveBeenCalled();
+    expect(headPut).not.toHaveBeenCalled();
   });
 
   it('should list replicated content metadata ordered by newest update', async () => {

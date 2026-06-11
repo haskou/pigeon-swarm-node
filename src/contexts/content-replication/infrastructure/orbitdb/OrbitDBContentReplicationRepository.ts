@@ -147,26 +147,7 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
       return this.mapper.toDomain(head);
     }
 
-    const documents = await this.findDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'cid') === cidValue ||
-        this.stringValue(candidate, 'id') === cidValue,
-    );
-    const [document] = this.deduplicateDocuments(documents).sort(
-      (left, right) => right.updatedAt - left.updatedAt,
-    );
-
-    if (!document) {
-      return undefined;
-    }
-
-    await this.registry.putHead(
-      this.headKey(document.cid),
-      { ...document },
-      document.networkIds,
-    );
-
-    return this.mapper.toDomain(document);
+    return undefined;
   }
 
   public async save(content: ContentReplication): Promise<void> {
