@@ -364,6 +364,25 @@ export default class OrbitDBDomainEventProjector {
     });
   }
 
+  private async putConversationMessageIndex(
+    stores: OrbitDBReplicatedStateStores,
+    conversationId: string,
+    message: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `conversation-message-index:${conversationId}`;
+    const messages = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'messages'),
+      message,
+    );
+
+    await this.putHead(stores, key, {
+      conversationId,
+      id: key,
+      messages,
+      updatedAt: Date.now(),
+    });
+  }
+
   private async putMessageDocument(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
@@ -375,13 +394,30 @@ export default class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'messageId') ||
       message.aggregate_id;
 
-    await this.put(stores.messages, {
+    const messageDocument = {
       ...document,
       id: messageId,
       lastEventId: message.event_id,
       lastEventType: message.type,
       receivedAt: this.receivedAt(message),
-    });
+    };
+
+    await this.put(stores.messages, messageDocument);
+
+    if (this.stringValue(messageDocument, 'scopeType') === 'conversation') {
+      const conversationId = this.stringValue(
+        messageDocument,
+        'conversationId',
+      );
+
+      if (conversationId) {
+        await this.putConversationMessageIndex(
+          stores,
+          conversationId,
+          messageDocument,
+        );
+      }
+    }
   }
 
   private async projectConversationMessage(
@@ -405,7 +441,7 @@ export default class OrbitDBDomainEventProjector {
       message.type === ConversationMessageWasDeletedEvent.EVENT_NAME &&
       targetMessageId
     ) {
-      await this.put(stores.messages, {
+      await this.putMessageDocument(stores, message, {
         conversationId,
         id: targetMessageId,
         messageId: targetMessageId,

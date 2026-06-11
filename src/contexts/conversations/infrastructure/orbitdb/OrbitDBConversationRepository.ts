@@ -207,6 +207,10 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return `conversation-participant-index:${participantId}`;
   }
 
+  private messageIndexHeadKey(conversationId: string): string {
+    return `conversation-message-index:${conversationId}`;
+  }
+
   private conversationDocumentsFromIndex(
     record: Record<string, unknown> | undefined,
   ): OrbitDBConversationDocument[] {
@@ -335,6 +339,140 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return documents;
   }
 
+  private rawMessageRecordsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): Record<string, unknown>[] {
+    const messages = record?.messages;
+
+    if (!Array.isArray(messages)) {
+      return [];
+    }
+
+    return messages.filter(
+      (message): message is Record<string, unknown> =>
+        typeof message === 'object' &&
+        message !== null &&
+        !Array.isArray(message),
+    );
+  }
+
+  private messageDocumentsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): OrbitDBConversationMessageDocument[] {
+    return this.rawMessageRecordsFromIndex(record)
+      .filter((message) => this.booleanValue(message, 'valid') !== false)
+      .map((message) => this.messageFromRecord(message))
+      .filter(
+        (document): document is OrbitDBConversationMessageDocument =>
+          document !== undefined,
+      );
+  }
+
+  private async findMessageIndexDocuments(
+    conversationId: string,
+  ): Promise<OrbitDBConversationMessageDocument[] | undefined> {
+    const head = await this.registry.findHead(
+      this.messageIndexHeadKey(conversationId),
+    );
+
+    return head ? this.messageDocumentsFromIndex(head) : undefined;
+  }
+
+  private mergeIndexedMessageRecord(
+    records: Record<string, unknown>[],
+    record: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    const recordId =
+      this.stringValue(record, 'id') || this.stringValue(record, 'messageId');
+
+    if (!recordId) {
+      return records;
+    }
+
+    const merged = new Map<string, Record<string, unknown>>();
+
+    for (const current of records) {
+      const currentId =
+        this.stringValue(current, 'id') ||
+        this.stringValue(current, 'messageId');
+
+      if (currentId) {
+        merged.set(currentId, current);
+      }
+    }
+
+    merged.set(recordId, record);
+
+    return [...merged.values()];
+  }
+
+  private async putMessageIndexRecord(
+    conversationId: string,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    const key = this.messageIndexHeadKey(conversationId);
+    const messages = this.mergeIndexedMessageRecord(
+      this.rawMessageRecordsFromIndex(await this.registry.findHead(key)),
+      record,
+    );
+    const networkIds = [
+      ...new Set(
+        messages
+          .map((message) => this.stringValue(message, 'networkId'))
+          .filter((networkId): networkId is string => networkId !== undefined),
+      ),
+    ];
+
+    await this.registry.putHead(
+      key,
+      {
+        conversationId,
+        id: key,
+        messages: messages.map((message) => ({ ...message })),
+        updatedAt: Date.now(),
+      },
+      networkIds,
+    );
+  }
+
+  private async putMessageIndex(
+    conversationId: string,
+    documents: OrbitDBConversationMessageDocument[],
+  ): Promise<void> {
+    const key = this.messageIndexHeadKey(conversationId);
+    const messages = this.deduplicateMessages(documents);
+    const networkIds = [
+      ...new Set(
+        messages
+          .map((message) => message.networkId)
+          .filter((networkId): networkId is string => networkId !== undefined),
+      ),
+    ];
+
+    await this.registry.putHead(
+      key,
+      {
+        conversationId,
+        id: key,
+        messages: messages.map((message) => ({ ...message })),
+        updatedAt: Date.now(),
+      },
+      networkIds,
+    );
+  }
+
+  private async putMessageRecord(
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    await this.registry.putDocument('messages', { ...record });
+
+    const conversationId = this.stringValue(record, 'conversationId');
+
+    if (conversationId) {
+      await this.putMessageIndexRecord(conversationId, record);
+    }
+  }
+
   private deduplicateMessages(
     documents: OrbitDBConversationMessageDocument[],
   ): OrbitDBConversationMessageDocument[] {
@@ -349,6 +487,96 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     }
 
     return [...deduplicated.values()];
+  }
+
+  private async findMessageDocumentsByConversationId(
+    conversationId: ConversationId,
+  ): Promise<OrbitDBConversationMessageDocument[]> {
+    const indexedDocuments = await this.findMessageIndexDocuments(
+      conversationId.valueOf(),
+    );
+
+    if (indexedDocuments !== undefined) {
+      return indexedDocuments;
+    }
+
+    const documents = this.deduplicateMessages(
+      await this.findMessageDocuments(
+        (candidate) =>
+          this.stringValue(candidate, 'scopeType') === 'conversation' &&
+          this.stringValue(candidate, 'conversationId') ===
+            conversationId.valueOf(),
+      ),
+    );
+
+    await this.putMessageIndex(conversationId.valueOf(), documents);
+
+    return documents;
+  }
+
+  private async findMessageDocumentsByConversationIds(
+    conversationIds: ConversationId[],
+  ): Promise<OrbitDBConversationMessageDocument[]> {
+    const indexedResults = await Promise.all(
+      conversationIds.map(async (conversationId) => ({
+        conversationId,
+        documents: await this.findMessageIndexDocuments(
+          conversationId.valueOf(),
+        ),
+      })),
+    );
+    const indexedDocuments = indexedResults
+      .filter(
+        (
+          result,
+        ): result is {
+          conversationId: ConversationId;
+          documents: OrbitDBConversationMessageDocument[];
+        } => result.documents !== undefined,
+      )
+      .flatMap((result) => result.documents);
+    const missingConversationIds = indexedResults
+      .filter((result) => result.documents === undefined)
+      .map((result) => result.conversationId);
+
+    if (missingConversationIds.length === 0) {
+      return this.deduplicateMessages(indexedDocuments);
+    }
+
+    const missingConversationIdValues = new Set(
+      missingConversationIds.map((conversationId) => conversationId.valueOf()),
+    );
+    const missingDocuments = this.deduplicateMessages(
+      await this.findMessageDocuments(
+        (candidate) =>
+          this.stringValue(candidate, 'scopeType') === 'conversation' &&
+          missingConversationIdValues.has(
+            this.stringValue(candidate, 'conversationId') || '',
+          ),
+      ),
+    );
+    const documentsByConversationId = new Map<
+      string,
+      OrbitDBConversationMessageDocument[]
+    >();
+
+    for (const document of missingDocuments) {
+      documentsByConversationId.set(document.conversationId, [
+        ...(documentsByConversationId.get(document.conversationId) || []),
+        document,
+      ]);
+    }
+
+    await Promise.all(
+      missingConversationIds.map((conversationId) =>
+        this.putMessageIndex(
+          conversationId.valueOf(),
+          documentsByConversationId.get(conversationId.valueOf()) || [],
+        ),
+      ),
+    );
+
+    return this.deduplicateMessages([...indexedDocuments, ...missingDocuments]);
   }
 
   private async readMarkerMessageCreatedAt(
@@ -378,31 +606,19 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<OrbitDBConversationMessageDocument | undefined> {
-    const [document] = this.deduplicateMessages(
-      await this.findMessageDocuments(
-        (candidate) =>
-          this.stringValue(candidate, 'scopeType') === 'conversation' &&
-          this.stringValue(candidate, 'conversationId') ===
-            conversationId.valueOf() &&
-          (this.stringValue(candidate, 'id') === messageId.valueOf() ||
-            this.stringValue(candidate, 'messageId') === messageId.valueOf()),
-      ),
+    return (
+      await this.findMessageDocumentsByConversationId(conversationId)
+    ).find(
+      (document) =>
+        document.id === messageId.valueOf() ||
+        document.messageId === messageId.valueOf(),
     );
-
-    return document;
   }
 
   private async findMessagesByConversationId(
     conversationId: ConversationId,
   ): Promise<Message[]> {
-    const documents = await this.findMessageDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'scopeType') === 'conversation' &&
-        this.stringValue(candidate, 'conversationId') ===
-          conversationId.valueOf(),
-    );
-
-    return this.deduplicateMessages(documents)
+    return (await this.findMessageDocumentsByConversationId(conversationId))
       .sort((left, right) => left.createdAt - right.createdAt)
       .map((document) => this.messageMapper.toDomain(document));
   }
@@ -453,14 +669,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     conversationId: ConversationId,
     limit: number,
   ): Promise<ConversationMessageCandidate[]> {
-    const documents = await this.findMessageDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'scopeType') === 'conversation' &&
-        this.stringValue(candidate, 'conversationId') ===
-          conversationId.valueOf(),
-    );
-
-    return this.deduplicateMessages(documents)
+    return (await this.findMessageDocumentsByConversationId(conversationId))
       .sort((left, right) => right.createdAt - left.createdAt)
       .slice(0, limit)
       .reverse()
@@ -500,14 +709,8 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     limit: number,
     beforeMessageId?: MessageId,
   ): Promise<Message[]> {
-    const documents = this.deduplicateMessages(
-      await this.findMessageDocuments(
-        (candidate) =>
-          this.stringValue(candidate, 'scopeType') === 'conversation' &&
-          this.stringValue(candidate, 'conversationId') ===
-            conversationId.valueOf(),
-      ),
-    );
+    const documents =
+      await this.findMessageDocumentsByConversationId(conversationId);
     const beforeDocument = beforeMessageId
       ? documents.find((document) => document.id === beforeMessageId.valueOf())
       : undefined;
@@ -550,13 +753,8 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     before: number,
     after: number,
   ): Promise<ConversationMessagesAround> {
-    const documents = this.deduplicateMessages(
-      await this.findMessageDocuments(
-        (candidate) =>
-          this.stringValue(candidate, 'scopeType') === 'conversation' &&
-          this.stringValue(candidate, 'conversationId') ===
-            conversationId.valueOf(),
-      ),
+    const documents = (
+      await this.findMessageDocumentsByConversationId(conversationId)
     ).sort((left, right) => left.createdAt - right.createdAt);
     const targetIndex = documents.findIndex(
       (document) => document.id === messageId.valueOf(),
@@ -583,13 +781,10 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     rootMessageId: MessageId,
     limit: number,
   ): Promise<Message[]> {
-    const documents = await this.findMessageDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'scopeType') === 'conversation' &&
-        this.stringValue(candidate, 'conversationId') ===
-          conversationId.valueOf() &&
-        this.stringValue(candidate, 'replyToMessageId') ===
-          rootMessageId.valueOf(),
+    const documents = (
+      await this.findMessageDocumentsByConversationId(conversationId)
+    ).filter(
+      (document) => document.replyToMessageId === rootMessageId.valueOf(),
     );
 
     return this.deduplicateMessages(documents)
@@ -603,11 +798,8 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     conversationIds: ConversationId[],
   ): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
-    const conversationIdValues = new Set(
-      conversationIds.map((conversationId) => conversationId.valueOf()),
-    );
 
-    if (conversationIdValues.size === 0) {
+    if (conversationIds.length === 0) {
       return counts;
     }
 
@@ -623,15 +815,8 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         };
       }),
     );
-    const documents = this.deduplicateMessages(
-      await this.findMessageDocuments(
-        (candidate) =>
-          this.stringValue(candidate, 'scopeType') === 'conversation' &&
-          conversationIdValues.has(
-            this.stringValue(candidate, 'conversationId') || '',
-          ),
-      ),
-    );
+    const documents =
+      await this.findMessageDocumentsByConversationIds(conversationIds);
     const documentsByMessageId = new Map(
       documents.map((document) => [
         `${document.conversationId}:${document.id}`,
@@ -766,7 +951,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         continue;
       }
 
-      await this.registry.putDocument('messages', {
+      await this.putMessageRecord({
         ...this.messageMapper.toDocument(conversation, domainMessage),
       });
 
@@ -776,7 +961,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         domainMessage.getType().isEqual(MessageType.DELETED) &&
         targetMessageId
       ) {
-        await this.registry.putDocument('messages', {
+        await this.putMessageRecord({
           ...this.messageMapper.tombstone(
             message.conversationId,
             targetMessageId.valueOf(),

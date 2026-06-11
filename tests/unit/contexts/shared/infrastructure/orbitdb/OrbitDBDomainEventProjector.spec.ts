@@ -233,6 +233,15 @@ describe('OrbitDBDomainEventProjector', () => {
         participantId: 'identity-1',
       }),
     );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'conversation-message-index:conversation-1',
+      expect.objectContaining({
+        conversationId: 'conversation-1',
+        messages: expect.arrayContaining([
+          expect.objectContaining({ id: 'message-1' }),
+        ]),
+      }),
+    );
   });
 
   it('projects community events into replicated read model stores', async () => {

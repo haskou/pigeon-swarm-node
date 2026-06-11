@@ -150,7 +150,7 @@ describe('OrbitDBConversationRepository', () => {
     expect(afterRead.get(conversation.getId().valueOf())).toBe(1);
   });
 
-  it('should count unread messages for several conversations with one messages query', async () => {
+  it('should count unread messages for several conversations from message indexes', async () => {
     const secondAuthor = await ConversationMother.generateIdentityId();
     const firstConversation = mother.build();
     const secondConversation = new ConversationMother(
@@ -180,7 +180,7 @@ describe('OrbitDBConversationRepository', () => {
       [firstConversation.getId(), secondConversation.getId()],
     );
 
-    expect(messagesQuery).toHaveBeenCalledTimes(1);
+    expect(messagesQuery).not.toHaveBeenCalled();
     expect(unreadCounts.get(firstConversation.getId().valueOf())).toBe(1);
     expect(unreadCounts.get(secondConversation.getId().valueOf())).toBe(1);
   });
