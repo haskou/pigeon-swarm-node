@@ -264,7 +264,9 @@ describe('OrbitDBDomainEventProjector', () => {
         ConversationMessageWasSentEvent.EVENT_NAME,
         {
           message: {
+            authorId: 'identity-1',
             conversationId: 'conversation-1',
+            createdAt: 1780000000000,
             encryptedPayload: 'payload',
             id: 'message-1',
             type: 'sent',
@@ -336,6 +338,18 @@ describe('OrbitDBDomainEventProjector', () => {
         conversationId: 'conversation-1',
         messages: expect.arrayContaining([
           expect.objectContaining({ id: 'message-1' }),
+        ]),
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'conversation-message-summary:conversation-1',
+      expect.objectContaining({
+        conversationId: 'conversation-1',
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            authorId: 'identity-1',
+            id: 'message-1',
+          }),
         ]),
       }),
     );

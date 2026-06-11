@@ -114,6 +114,21 @@ describe('OrbitDBConversationRepository', () => {
       }),
     ]);
     expect(participantConversations).toHaveLength(1);
+    const summary = heads.get(
+      `conversation-message-summary:${conversation.getId().valueOf()}`,
+    );
+
+    expect(summary?.messages).toHaveLength(2);
+    expect(summary?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: firstMessage.getId().valueOf() }),
+      ]),
+    );
+    expect(
+      (summary?.messages as Record<string, unknown>[]).every(
+        (message) => message.encryptedPayload === undefined,
+      ),
+    ).toBe(true);
   });
 
   it('should compute unread counts from OrbitDB read markers', async () => {

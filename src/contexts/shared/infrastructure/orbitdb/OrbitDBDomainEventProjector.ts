@@ -158,6 +158,15 @@ export default class OrbitDBDomainEventProjector {
     return typeof value === 'number' ? value : undefined;
   }
 
+  private booleanValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): boolean | undefined {
+    const value = record[attribute];
+
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
   private receivedAt(message: ReplicatedDomainEventMessage): number {
     return Number(message.occurred_on);
   }
@@ -463,6 +472,65 @@ export default class OrbitDBDomainEventProjector {
     });
   }
 
+  private messageSummaryFromRecord(
+    record: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const authorId = this.stringValue(record, 'authorId');
+    const createdAt = this.numberValue(record, 'createdAt');
+    const id =
+      this.stringValue(record, 'id') || this.stringValue(record, 'messageId');
+    const messageId =
+      this.stringValue(record, 'messageId') || this.stringValue(record, 'id');
+    const conversationId = this.stringValue(record, 'conversationId');
+    const type = this.stringValue(record, 'type');
+
+    if (
+      !authorId ||
+      createdAt === undefined ||
+      !id ||
+      !conversationId ||
+      !type
+    ) {
+      return undefined;
+    }
+
+    return {
+      authorId,
+      conversationId,
+      createdAt,
+      id,
+      messageId,
+      networkId: this.stringValue(record, 'networkId'),
+      type,
+      valid: this.booleanValue(record, 'valid'),
+    };
+  }
+
+  private async putConversationMessageSummary(
+    stores: OrbitDBReplicatedStateStores,
+    conversationId: string,
+    message: Record<string, unknown>,
+  ): Promise<void> {
+    const summary = this.messageSummaryFromRecord(message);
+
+    if (!summary) {
+      return;
+    }
+
+    const key = `conversation-message-summary:${conversationId}`;
+    const messages = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'messages'),
+      summary,
+    );
+
+    await this.putHead(stores, key, {
+      conversationId,
+      id: key,
+      messages,
+      updatedAt: Date.now(),
+    });
+  }
+
   private async putMessageDocument(
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
@@ -492,6 +560,11 @@ export default class OrbitDBDomainEventProjector {
 
       if (conversationId) {
         await this.putConversationMessageIndex(
+          stores,
+          conversationId,
+          messageDocument,
+        );
+        await this.putConversationMessageSummary(
           stores,
           conversationId,
           messageDocument,
@@ -644,11 +717,26 @@ export default class OrbitDBDomainEventProjector {
       return;
     }
 
+    const messageSummary = this.recordsFromIndex(
+      await this.findHead(
+        stores,
+        `conversation-message-summary:${message.aggregate_id}`,
+      ),
+      'messages',
+    ).find(
+      (candidate) =>
+        this.stringValue(candidate, 'id') === messageId ||
+        this.stringValue(candidate, 'messageId') === messageId,
+    );
+
     await this.putHead(
       stores,
       `read-marker:${message.aggregate_id}:${readerIdentityId}`,
       {
         eventId: message.event_id,
+        messageCreatedAt: messageSummary
+          ? this.numberValue(messageSummary, 'createdAt')
+          : undefined,
         messageId,
         networkId: this.getStringAttribute(message, 'networkId'),
         readAt: this.receivedAt(message),
