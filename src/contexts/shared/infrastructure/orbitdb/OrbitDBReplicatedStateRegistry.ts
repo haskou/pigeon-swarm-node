@@ -265,7 +265,7 @@ export default class OrbitDBReplicatedStateRegistry {
     document: Record<string, unknown>,
     explicitNetworkIds: string[] = [],
   ): Promise<string[]> {
-    return [
+    const directNetworkIds = [
       ...new Set([
         ...explicitNetworkIds,
         ...this.stringArrayValue(document, 'networkIds'),
@@ -279,9 +279,14 @@ export default class OrbitDBReplicatedStateRegistry {
         this.stringValue(document.payload, 'networkId')
           ? [this.stringValue(document.payload, 'networkId') as string]
           : []),
-        ...(await this.networkIdsFromRelatedDocument(document)),
       ]),
     ];
+
+    if (directNetworkIds.length > 0) {
+      return directNetworkIds;
+    }
+
+    return [...new Set(await this.networkIdsFromRelatedDocument(document))];
   }
 
   private storesForNetworkIds(

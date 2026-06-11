@@ -11,11 +11,13 @@ const identityMother = new IdentityMother();
 
 describe('OrbitDBCommunityChannelMessageRepository', () => {
   const documents: Record<string, unknown>[] = [];
+  let query: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityChannelMessageRepository;
 
   beforeEach(() => {
     documents.splice(0);
+    query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     registry.register('network-1', {
@@ -25,7 +27,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
           return 'ok';
         }),
-        query: jest.fn(async (matcher) => documents.filter(matcher)),
+        query,
       },
     } as never);
     repository = new OrbitDBCommunityChannelMessageRepository(
@@ -108,6 +110,63 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         id: 'public-message',
         plaintextPayload: 'hello public channel',
       }),
+    ]);
+  });
+
+  it('should build thread summaries for several channels with one messages query', async () => {
+    documents.push(
+      document({
+        channelId: 'channel-1',
+        createdAt: 1,
+        id: 'root-1',
+      }),
+      document({
+        channelId: 'channel-1',
+        createdAt: 2,
+        id: 'reply-1',
+        replyToMessageId: 'root-1',
+      }),
+      document({
+        channelId: 'channel-2',
+        createdAt: 3,
+        id: 'root-2',
+      }),
+      document({
+        channelId: 'channel-2',
+        createdAt: 4,
+        id: 'reply-2',
+        replyToMessageId: 'root-2',
+      }),
+      document({
+        channelId: 'channel-2',
+        createdAt: 5,
+        id: 'orphan-reply',
+        replyToMessageId: 'missing-root',
+      }),
+    );
+
+    const summaries = await repository.findThreadSummariesByChannel(
+      new CommunityId('community-1'),
+      [new CommunityChannelId('channel-1'), new CommunityChannelId('channel-2')],
+      2,
+    );
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(summaries.get('channel-1')).toEqual([
+      {
+        lastReplyAt: 2,
+        lastReplyMessageId: 'reply-1',
+        replyCount: 1,
+        rootMessageId: 'root-1',
+      },
+    ]);
+    expect(summaries.get('channel-2')).toEqual([
+      {
+        lastReplyAt: 4,
+        lastReplyMessageId: 'reply-2',
+        replyCount: 1,
+        rootMessageId: 'root-2',
+      },
     ]);
   });
 });

@@ -16,6 +16,8 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 describe('OrbitDBContentReplicationRepository', () => {
   let put: jest.Mock;
   let query: jest.Mock;
+  let headGet: jest.Mock;
+  let headPut: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBContentReplicationRepository;
 
@@ -38,6 +40,8 @@ describe('OrbitDBContentReplicationRepository', () => {
   };
 
   beforeEach(() => {
+    headGet = jest.fn().mockResolvedValue(undefined);
+    headPut = jest.fn().mockResolvedValue('ok');
     put = jest.fn().mockResolvedValue('ok');
     query = jest
       .fn()
@@ -69,6 +73,10 @@ describe('OrbitDBContentReplicationRepository', () => {
         put,
         query,
       },
+      heads: {
+        get: headGet,
+        put: headPut,
+      },
     } as never);
     repository = new OrbitDBContentReplicationRepository(
       registry,
@@ -78,6 +86,22 @@ describe('OrbitDBContentReplicationRepository', () => {
 
   afterEach(() => {
     registry.clear();
+  });
+
+  it('should find IPFS content replication metadata by CID from the direct head', async () => {
+    headGet.mockResolvedValue({ value: baseDocument });
+
+    const result = await repository.findByCid(new IPFSId(cid));
+
+    expect(result?.toPrimitives()).toEqual(
+      expect.objectContaining({
+        cid,
+        contentType: baseDocument.contentType,
+        filename: baseDocument.filename,
+      }),
+    );
+    expect(headGet).toHaveBeenCalledWith(`content-replication:${cid}`);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('should find IPFS content replication metadata by CID from OrbitDB', async () => {
@@ -95,6 +119,10 @@ describe('OrbitDBContentReplicationRepository', () => {
       sizeBytes: baseDocument.sizeBytes,
       updatedAt: baseDocument.updatedAt,
     });
+    expect(headPut).toHaveBeenCalledWith(
+      `content-replication:${cid}`,
+      baseDocument,
+    );
   });
 
   it('should list replicated content metadata ordered by newest update', async () => {
@@ -130,5 +158,9 @@ describe('OrbitDBContentReplicationRepository', () => {
     await repository.save(content);
 
     expect(put).toHaveBeenCalledWith(baseDocument);
+    expect(headPut).toHaveBeenCalledWith(
+      `content-replication:${cid}`,
+      baseDocument,
+    );
   });
 });

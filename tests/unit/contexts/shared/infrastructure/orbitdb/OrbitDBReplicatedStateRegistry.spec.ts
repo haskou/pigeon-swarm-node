@@ -56,6 +56,7 @@ function createStore(): Store {
 
 function createStores(): {
   communities: Store;
+  contentReplication: Store;
   identities: Store;
   keychains: Store;
   messages: Store;
@@ -63,6 +64,7 @@ function createStores(): {
   stores: OrbitDBReplicatedStateStores;
 } {
   const communities = createStore();
+  const contentReplication = createStore();
   const identities = createStore();
   const keychains = createStore();
   const messages = createStore();
@@ -73,7 +75,7 @@ function createStores(): {
     events: createStore(),
     heads: createStore(),
     identities,
-    contentReplication: createStore(),
+    contentReplication,
     keychains,
     messages,
     notifications,
@@ -83,6 +85,7 @@ function createStores(): {
 
   return {
     communities,
+    contentReplication,
     identities,
     keychains,
     messages,
@@ -160,6 +163,27 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     expect(firstNetwork.keychains.put).not.toHaveBeenCalled();
     expect(secondNetwork.keychains.put).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not inspect related documents when direct network ids are present', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const secondNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+    registry.register('network-2', secondNetwork.stores);
+
+    await registry.putDocument('contentReplication', {
+      cid: 'bafy',
+      id: 'bafy',
+      networkIds: ['network-1'],
+      ownerIdentityId: 'identity-1',
+    });
+
+    expect(firstNetwork.contentReplication.put).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.contentReplication.put).not.toHaveBeenCalled();
+    expect(firstNetwork.identities.query).not.toHaveBeenCalled();
+    expect(secondNetwork.identities.query).not.toHaveBeenCalled();
   });
 
   it('does not backfill documents from an unsynchronized local store', async () => {

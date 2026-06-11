@@ -503,12 +503,16 @@ export default class OrbitDBDomainEventProjector {
     stores: OrbitDBReplicatedStateStores,
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
-    await this.put(stores.contentReplication, {
+    const content = {
       ...message.attributes,
       id: message.aggregate_id,
       lastEventId: message.event_id,
       receivedAt: this.receivedAt(message),
-    });
+    };
+    const cid = this.stringValue(content, 'cid') || message.aggregate_id;
+
+    await this.put(stores.contentReplication, content);
+    await this.putHead(stores, `content-replication:${cid}`, content);
   }
 
   private async projectContentReplicaClaim(

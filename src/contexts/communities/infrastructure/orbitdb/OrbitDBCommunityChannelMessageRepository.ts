@@ -127,19 +127,15 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     return new Set(channelIds.map((channelId) => channelId.valueOf()));
   }
 
-  private async findThreadReplyDocuments(
+  private async findThreadCandidateDocuments(
     communityId: CommunityId,
     channelIdValues: Set<string>,
-    candidateLimit: number,
   ): Promise<OrbitDBCommunityChannelMessageDocument[]> {
-    const documents = await this.findDocuments(
+    return this.findDocuments(
       (document) =>
         new CommunityId(document.communityId).isEqual(communityId) &&
-        channelIdValues.has(document.channelId) &&
-        typeof document.replyToMessageId === 'string',
+        channelIdValues.has(document.channelId),
     );
-
-    return this.byCreatedAtDescending(documents).slice(0, candidateLimit);
   }
 
   private rootIdsFrom(
@@ -152,19 +148,26 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     );
   }
 
-  private async findExistingRootIds(
-    communityId: CommunityId,
-    channelIdValues: Set<string>,
+  private findExistingRootIds(
+    documents: OrbitDBCommunityChannelMessageDocument[],
     rootIds: Set<string>,
-  ): Promise<Set<string>> {
-    const rootMessages = await this.findDocuments(
-      (document) =>
-        new CommunityId(document.communityId).isEqual(communityId) &&
-        channelIdValues.has(document.channelId) &&
-        rootIds.has(this.getMessageId(document)),
+  ): Set<string> {
+    return new Set(
+      documents
+        .filter((document) => rootIds.has(this.getMessageId(document)))
+        .map((document) => this.getMessageId(document)),
     );
+  }
 
-    return new Set(rootMessages.map((document) => this.getMessageId(document)));
+  private findRecentThreadReplyDocuments(
+    documents: OrbitDBCommunityChannelMessageDocument[],
+    candidateLimit: number,
+  ): OrbitDBCommunityChannelMessageDocument[] {
+    return this.byCreatedAtDescending(
+      documents.filter(
+        (document) => typeof document.replyToMessageId === 'string',
+      ),
+    ).slice(0, candidateLimit);
   }
 
   private registerThreadReplySummary(
@@ -319,19 +322,21 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     }
 
     const channelIdValues = this.channelIdValueSet(channelIds);
-    const documents = await this.findThreadReplyDocuments(
+    const documents = await this.findThreadCandidateDocuments(
       communityId,
       channelIdValues,
+    );
+    const replyDocuments = this.findRecentThreadReplyDocuments(
+      documents,
       this.threadSummaryCandidateLimit(channelIds, limitPerChannel),
     );
-    const existingRootIds = await this.findExistingRootIds(
-      communityId,
-      channelIdValues,
-      this.rootIdsFrom(documents),
+    const existingRootIds = this.findExistingRootIds(
+      documents,
+      this.rootIdsFrom(replyDocuments),
     );
 
     return this.limitSummariesByChannel(
-      this.groupThreadSummaries(documents, existingRootIds),
+      this.groupThreadSummaries(replyDocuments, existingRootIds),
       limitPerChannel,
     );
   }

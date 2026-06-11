@@ -492,6 +492,13 @@ describe('OrbitDBDomainEventProjector', () => {
         sizeBytes: 128,
       }),
     );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'content-replication:bafy',
+      expect.objectContaining({
+        cid: 'bafy',
+        id: 'bafy',
+      }),
+    );
     expect(stores.contentReplication.put).toHaveBeenCalledWith(
       expect.objectContaining({
         cid: 'bafy',

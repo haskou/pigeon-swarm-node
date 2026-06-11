@@ -109,6 +109,10 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
     return [...deduplicated.values()];
   }
 
+  private headKey(cid: string): string {
+    return `content-replication:${cid}`;
+  }
+
   private async findDocuments(
     matcher: (document: Record<string, unknown>) => boolean,
   ): Promise<OrbitDBContentReplicationDocument[]> {
@@ -135,6 +139,14 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
 
   public async findByCid(cid: IPFSId): Promise<ContentReplication | undefined> {
     const cidValue = cid.valueOf();
+    const head = this.documentFromRecord(
+      (await this.registry.findHead(this.headKey(cidValue))) || {},
+    );
+
+    if (head) {
+      return this.mapper.toDomain(head);
+    }
+
     const documents = await this.findDocuments(
       (candidate) =>
         this.stringValue(candidate, 'cid') === cidValue ||
@@ -144,12 +156,29 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
       (left, right) => right.updatedAt - left.updatedAt,
     );
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    if (!document) {
+      return undefined;
+    }
+
+    await this.registry.putHead(
+      this.headKey(document.cid),
+      { ...document },
+      document.networkIds,
+    );
+
+    return this.mapper.toDomain(document);
   }
 
   public async save(content: ContentReplication): Promise<void> {
+    const document = this.mapper.toDocument(content);
+
     await this.registry.putDocument('contentReplication', {
-      ...this.mapper.toDocument(content),
+      ...document,
     });
+    await this.registry.putHead(
+      this.headKey(document.cid),
+      { ...document },
+      document.networkIds,
+    );
   }
 }

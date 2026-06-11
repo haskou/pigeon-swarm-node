@@ -50,32 +50,27 @@ export default class ContentGetter {
   }
 
   public async get(message: ContentGetMessage): Promise<ContentGetResult> {
-    try {
-      return await Promise.any([
-        this.getPublicBytes(message.cid).then(async (bytes) => {
-          if (bytes === undefined) {
-            throw new IPFSContentNotFoundError(message.cid.valueOf());
-          }
+    const metadata = this.metadata(message.cid);
 
-          return {
-            ...(await this.metadata(message.cid)),
-            bytes,
-            kind: 'binary' as const,
-          };
-        }),
-        this.getPublicJSON(message.cid).then((content) => {
-          if (content === undefined) {
-            throw new IPFSContentNotFoundError(message.cid.valueOf());
-          }
+    const bytes = await this.getPublicBytes(message.cid);
 
-          return {
-            content,
-            kind: 'json' as const,
-          };
-        }),
-      ]);
-    } catch {
-      throw new IPFSContentNotFoundError(message.cid.valueOf());
+    if (bytes !== undefined) {
+      return {
+        ...(await metadata),
+        bytes,
+        kind: 'binary',
+      };
     }
+
+    const content = await this.getPublicJSON(message.cid);
+
+    if (content !== undefined) {
+      return {
+        content,
+        kind: 'json',
+      };
+    }
+
+    throw new IPFSContentNotFoundError(message.cid.valueOf());
   }
 }
