@@ -16,5 +16,8 @@ export default abstract class IdentityPresenceRepository {
     threshold: Timestamp,
   ): Promise<IdentityPresence[]>;
 
-  public abstract save(presence: IdentityPresence): Promise<void>;
+  public abstract save(
+    presence: IdentityPresence,
+    networkIds?: string[],
+  ): Promise<void>;
 }

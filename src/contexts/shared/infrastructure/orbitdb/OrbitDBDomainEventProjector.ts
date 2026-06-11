@@ -120,6 +120,18 @@ export default class OrbitDBDomainEventProjector {
     return typeof value === 'string' ? value : undefined;
   }
 
+  private stringArrayValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): string[] {
+    const value = record[attribute];
+
+    return Array.isArray(value) &&
+      value.every((item) => typeof item === 'string')
+      ? value
+      : [];
+  }
+
   private numberValue(
     record: Record<string, unknown>,
     attribute: string,
@@ -258,13 +270,26 @@ export default class OrbitDBDomainEventProjector {
     const conversationId =
       this.stringValue(conversation || {}, 'id') || message.aggregate_id;
 
-    await this.put(stores.conversations, {
+    const document = {
       ...(conversation || message.attributes),
       id: conversationId,
       lastEventId: message.event_id,
       lastEventType: message.type,
       receivedAt: this.receivedAt(message),
-    });
+    };
+    const participantIds = this.stringArrayValue(document, 'participantIds');
+
+    await this.put(stores.conversations, document);
+    await this.putHead(stores, `conversation:${conversationId}`, document);
+    await Promise.all(
+      participantIds.map((participantId) =>
+        this.putHead(
+          stores,
+          `conversation-participant:${participantId}:${this.numberValue(document, 'createdAt') || 0}:${conversationId}`,
+          document,
+        ),
+      ),
+    );
   }
 
   private async putMessageDocument(
@@ -448,13 +473,32 @@ export default class OrbitDBDomainEventProjector {
     message: ReplicatedDomainEventMessage,
   ): Promise<void> {
     const notification = this.getRecordAttribute(message, 'notification');
-
-    await this.put(stores.notifications, {
+    const document = {
       ...(notification || message.attributes),
       id: message.aggregate_id,
       lastEventId: message.event_id,
       receivedAt: this.receivedAt(message),
-    });
+    };
+    const recipientIdentityId = this.stringValue(
+      document,
+      'recipientIdentityId',
+    );
+    const createdAt = this.numberValue(document, 'createdAt') || 0;
+
+    await this.put(stores.notifications, document);
+    await this.putHead(
+      stores,
+      `notification:${message.aggregate_id}`,
+      document,
+    );
+
+    if (recipientIdentityId) {
+      await this.putHead(
+        stores,
+        `notification-recipient:${recipientIdentityId}:${createdAt}:${message.aggregate_id}`,
+        document,
+      );
+    }
   }
 
   private async projectRequest(

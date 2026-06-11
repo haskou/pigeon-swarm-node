@@ -30,7 +30,7 @@ export default class IdentityPresenceExpirationRegistrar {
         continue;
       }
 
-      await this.repository.save(presence);
+      await this.repository.save(presence, networkIds);
       await this.eventPublisher.publish(presence.pullDomainEvents());
     }
   }

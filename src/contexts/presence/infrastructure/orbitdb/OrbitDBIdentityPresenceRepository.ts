@@ -75,35 +75,99 @@ export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceR
     });
   }
 
+  private headKey(identityId: string): string {
+    return `presence:${identityId}`;
+  }
+
+  private async findHead(
+    identityId: IdentityId,
+  ): Promise<OrbitDBIdentityPresenceDocument | undefined> {
+    const document = await this.registry.findHead(
+      this.headKey(identityId.valueOf()),
+    );
+
+    return document && this.isDocument(document) ? document : undefined;
+  }
+
+  private async putHead(
+    document: OrbitDBIdentityPresenceDocument,
+    networkIds: string[] = [],
+  ): Promise<void> {
+    await this.registry.putHead(
+      this.headKey(document.identityId),
+      { ...document },
+      networkIds,
+    );
+  }
+
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityPresence | undefined> {
+    const head = await this.findHead(identityId);
+
+    if (head) {
+      return this.toDomain(head);
+    }
+
     const [document] = await this.registry.queryDocuments(
       'presence',
       (candidate) => candidate.id === identityId.valueOf(),
     );
 
-    return document && this.isDocument(document)
-      ? this.toDomain(document)
-      : undefined;
+    if (!document || !this.isDocument(document)) {
+      return undefined;
+    }
+
+    await this.putHead(document);
+
+    return this.toDomain(document);
   }
 
   public async findByIdentityIds(
     identityIds: IdentityId[],
   ): Promise<IdentityPresence[]> {
-    const identityIdValues = identityIds.map((identityId) =>
+    const headDocuments = await Promise.all(
+      identityIds.map((identityId) => this.findHead(identityId)),
+    );
+    const presences = headDocuments
+      .filter(
+        (document): document is OrbitDBIdentityPresenceDocument =>
+          document !== undefined,
+      )
+      .map((document) => this.toDomain(document));
+    const existingIdentityIds = new Set(
+      presences.map((presence) => presence.getIdentityId().valueOf()),
+    );
+    const missingIdentityIds = identityIds.filter(
+      (identityId) => !existingIdentityIds.has(identityId.valueOf()),
+    );
+
+    if (missingIdentityIds.length === 0) {
+      return presences;
+    }
+
+    const identityIdValues = missingIdentityIds.map((identityId) =>
       identityId.valueOf(),
     );
     const documents = await this.registry.queryDocuments(
       'presence',
       (document) => identityIdValues.includes(String(document.id)),
     );
-
-    return documents
+    const fallbackPresences = documents
       .filter((document): document is OrbitDBIdentityPresenceDocument =>
         this.isDocument(document),
       )
       .map((document) => this.toDomain(document));
+
+    await Promise.all(
+      documents
+        .filter((document): document is OrbitDBIdentityPresenceDocument =>
+          this.isDocument(document),
+        )
+        .map((document) => this.putHead(document)),
+    );
+
+    return [...presences, ...fallbackPresences];
   }
 
   public async findPotentiallyExpired(
@@ -124,7 +188,13 @@ export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceR
       .map((document) => this.toDomain(document));
   }
 
-  public async save(presence: IdentityPresence): Promise<void> {
-    await this.registry.putDocument('presence', this.toDocument(presence));
+  public async save(
+    presence: IdentityPresence,
+    networkIds: string[] = [],
+  ): Promise<void> {
+    const document = this.toDocument(presence);
+
+    await this.registry.putDocument('presence', document, networkIds);
+    await this.putHead(document, networkIds);
   }
 }

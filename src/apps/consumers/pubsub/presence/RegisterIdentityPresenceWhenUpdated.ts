@@ -34,6 +34,12 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
+    const networkIds = Array.isArray(event.attributes.networkIds)
+      ? event.attributes.networkIds.filter(
+          (networkId): networkId is string => typeof networkId === 'string',
+        )
+      : [];
+
     await this.repository.save(
       IdentityPresence.fromPrimitives({
         customMessage:
@@ -54,6 +60,7 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
         ).valueOf(),
         updatedAt: Number(event.attributes.updatedAt),
       }),
+      networkIds,
     );
   }
 }

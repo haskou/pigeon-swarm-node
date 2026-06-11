@@ -22,7 +22,7 @@ export default class IdentityPresenceUpdater {
     const networkIds = await this.networkResolver.resolve(identityId);
 
     presence.clearCustomMessage(networkIds);
-    await this.repository.save(presence);
+    await this.repository.save(presence, networkIds);
     await this.eventPublisher.publish(presence.pullDomainEvents());
 
     return presence;
@@ -43,7 +43,7 @@ export default class IdentityPresenceUpdater {
       message.hasCustomMessage(),
       networkIds,
     );
-    await this.repository.save(presence);
+    await this.repository.save(presence, networkIds);
     await this.eventPublisher.publish(presence.pullDomainEvents());
 
     return presence;

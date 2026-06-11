@@ -199,6 +199,99 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return [...deduplicated.values()];
   }
 
+  private conversationHeadKey(conversationId: string): string {
+    return `conversation:${conversationId}`;
+  }
+
+  private participantHeadPrefix(participantId: string): string {
+    return `conversation-participant:${participantId}:`;
+  }
+
+  private participantHeadKey(
+    document: OrbitDBConversationDocument,
+    participantId: string,
+  ): string {
+    return `${this.participantHeadPrefix(participantId)}${document.createdAt}:${document.id}`;
+  }
+
+  private async putConversationHeads(
+    document: OrbitDBConversationDocument,
+  ): Promise<void> {
+    await Promise.all([
+      this.registry.putHead(this.conversationHeadKey(document.id), {
+        ...document,
+      }),
+      ...document.participantIds.map((participantId) =>
+        this.registry.putHead(
+          this.participantHeadKey(document, participantId),
+          {
+            ...document,
+          },
+        ),
+      ),
+    ]);
+  }
+
+  private async findConversationDocumentById(
+    conversationId: ConversationId,
+  ): Promise<OrbitDBConversationDocument | undefined> {
+    const head = await this.registry.findHead(
+      this.conversationHeadKey(conversationId.valueOf()),
+    );
+    const headDocument = head ? this.conversationFromRecord(head) : undefined;
+
+    if (headDocument) {
+      return headDocument;
+    }
+
+    const [document] = this.deduplicateConversations(
+      await this.findConversationDocuments(
+        (candidate) =>
+          this.stringValue(candidate, 'id') === conversationId.valueOf(),
+      ),
+    );
+
+    if (document) {
+      await this.putConversationHeads(document);
+    }
+
+    return document;
+  }
+
+  private async findConversationDocumentsByParticipant(
+    participantId: IdentityId,
+  ): Promise<OrbitDBConversationDocument[]> {
+    const indexedDocuments = (
+      await this.registry.findHeadsByPrefix(
+        this.participantHeadPrefix(participantId.valueOf()),
+      )
+    )
+      .map((document) => this.conversationFromRecord(document))
+      .filter(
+        (document): document is OrbitDBConversationDocument =>
+          document !== undefined,
+      );
+
+    if (indexedDocuments.length > 0) {
+      return indexedDocuments;
+    }
+
+    const documents = this.deduplicateConversations(
+      await this.findConversationDocuments(
+        (candidate) =>
+          this.stringArrayValue(candidate, 'participantIds')?.includes(
+            participantId.valueOf(),
+          ) === true,
+      ),
+    );
+
+    await Promise.all(
+      documents.map((document) => this.putConversationHeads(document)),
+    );
+
+    return documents;
+  }
+
   private deduplicateMessages(
     documents: OrbitDBConversationMessageDocument[],
   ): OrbitDBConversationMessageDocument[] {
@@ -288,16 +381,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   public async findById(
     conversationId: ConversationId,
   ): Promise<Conversation | undefined> {
-    const metadata = await this.findMetadataById(conversationId);
-
-    if (!metadata) {
-      return undefined;
-    }
-
-    const [document] = await this.findConversationDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'id') === conversationId.valueOf(),
-    );
+    const document = await this.findConversationDocumentById(conversationId);
 
     return document
       ? this.conversationMapper.toDomain(
@@ -310,12 +394,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   public async findMetadataById(
     conversationId: ConversationId,
   ): Promise<Conversation | undefined> {
-    const [document] = this.deduplicateConversations(
-      await this.findConversationDocuments(
-        (candidate) =>
-          this.stringValue(candidate, 'id') === conversationId.valueOf(),
-      ),
-    );
+    const document = await this.findConversationDocumentById(conversationId);
 
     return document ? this.conversationMapper.toDomain(document) : undefined;
   }
@@ -356,12 +435,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]> {
     const documents = this.deduplicateConversations(
-      await this.findConversationDocuments(
-        (candidate) =>
-          this.stringArrayValue(candidate, 'participantIds')?.includes(
-            participantId.valueOf(),
-          ) === true,
-      ),
+      await this.findConversationDocumentsByParticipant(participantId),
     );
     const beforeDocument = beforeConversationId
       ? documents.find(
@@ -621,17 +695,16 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   }
 
   public async save(conversation: Conversation): Promise<void> {
-    const existing = await this.findConversationDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'id') === conversation.getId().valueOf(),
+    const existingDocument = await this.findConversationDocumentById(
+      conversation.getId(),
     );
-    const [existingDocument] = this.deduplicateConversations(existing);
     const document = this.conversationMapper.toDocument(
       conversation,
       new Timestamp(existingDocument?.createdAt ?? Timestamp.now().valueOf()),
     );
 
     await this.registry.putDocument('conversations', { ...document });
+    await this.putConversationHeads(document);
 
     for (const message of conversation.toPrimitives().messages) {
       const messageId = new MessageId(message.id);

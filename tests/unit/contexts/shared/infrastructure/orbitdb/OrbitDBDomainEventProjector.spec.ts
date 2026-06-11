@@ -218,6 +218,18 @@ describe('OrbitDBDomainEventProjector', () => {
         eventId: `${ConversationWasCreatedEvent.EVENT_NAME}:event-id`,
       }),
     );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'conversation:conversation-1',
+      expect.objectContaining({
+        id: 'conversation-1',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'conversation-participant:identity-1:0:conversation-1',
+      expect.objectContaining({
+        id: 'conversation-1',
+      }),
+    );
   });
 
   it('projects community events into replicated read model stores', async () => {
@@ -460,6 +472,21 @@ describe('OrbitDBDomainEventProjector', () => {
         id: 'notification-1',
         state: 'accepted',
         status: 'read',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'notification:notification-1',
+      expect.objectContaining({
+        id: 'notification-1',
+        state: 'accepted',
+        status: 'read',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'notification-recipient:identity-1:1780000000000:notification-1',
+      expect.objectContaining({
+        id: 'notification-1',
+        recipientIdentityId: 'identity-1',
       }),
     );
     expect(stores.requests.put).toHaveBeenCalledWith(

@@ -12,6 +12,7 @@ describe('OrbitDBConversationRepository', () => {
   const heads = new Map<string, Record<string, unknown>>();
   const conversationDocuments: Record<string, unknown>[] = [];
   const messageDocuments: Record<string, unknown>[] = [];
+  let conversationsQuery: jest.Mock;
   let messagesQuery: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBConversationRepository;
@@ -22,6 +23,9 @@ describe('OrbitDBConversationRepository', () => {
     conversationDocuments.splice(0);
     messageDocuments.splice(0);
     mother = await ConversationMother.create();
+    conversationsQuery = jest.fn(async (matcher) =>
+      conversationDocuments.filter(matcher),
+    );
     messagesQuery = jest.fn(async (matcher) =>
       messageDocuments.filter(matcher),
     );
@@ -34,11 +38,12 @@ describe('OrbitDBConversationRepository', () => {
 
           return 'ok';
         }),
-        query: jest.fn(async (matcher) =>
-          conversationDocuments.filter(matcher),
-        ),
+        query: conversationsQuery,
       },
       heads: {
+        all: jest.fn(async () =>
+          [...heads.entries()].map(([key, value]) => ({ key, value })),
+        ),
         get: jest.fn(async (key) => ({
           key,
           value: heads.get(key as string),
@@ -178,6 +183,21 @@ describe('OrbitDBConversationRepository', () => {
     expect(messagesQuery).toHaveBeenCalledTimes(1);
     expect(unreadCounts.get(firstConversation.getId().valueOf())).toBe(1);
     expect(unreadCounts.get(secondConversation.getId().valueOf())).toBe(1);
+  });
+
+  it('should find participant conversations from heads after they are indexed', async () => {
+    const conversation = mother.build();
+
+    await repository.save(conversation);
+    conversationsQuery.mockClear();
+
+    const participantConversations = await repository.findByParticipant(
+      mother.author,
+      10,
+    );
+
+    expect(participantConversations).toHaveLength(1);
+    expect(conversationsQuery).not.toHaveBeenCalled();
   });
 
   it('should hide target messages after saving a deletion', async () => {

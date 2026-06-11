@@ -86,6 +86,50 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     return [...deduplicated.values()];
   }
 
+  private headKey(notificationId: string): string {
+    return `notification:${notificationId}`;
+  }
+
+  private recipientHeadPrefix(recipientIdentityId: string): string {
+    return `notification-recipient:${recipientIdentityId}:`;
+  }
+
+  private recipientHeadKey(document: OrbitDBNotificationDocument): string {
+    return `${this.recipientHeadPrefix(document.recipientIdentityId)}${document.createdAt}:${document.id}`;
+  }
+
+  private async putHeads(document: OrbitDBNotificationDocument): Promise<void> {
+    await Promise.all([
+      this.registry.putHead(this.headKey(document.id), { ...document }),
+      this.registry.putHead(this.recipientHeadKey(document), { ...document }),
+    ]);
+  }
+
+  private async findHead(
+    notificationId: NotificationId,
+  ): Promise<OrbitDBNotificationDocument | undefined> {
+    const document = await this.registry.findHead(
+      this.headKey(notificationId.valueOf()),
+    );
+
+    return document ? this.documentFromRecord(document) : undefined;
+  }
+
+  private async findRecipientIndexedDocuments(
+    recipientIdentityId: IdentityId,
+  ): Promise<OrbitDBNotificationDocument[]> {
+    const documents = await this.registry.findHeadsByPrefix(
+      this.recipientHeadPrefix(recipientIdentityId.valueOf()),
+    );
+
+    return documents
+      .map((document) => this.documentFromRecord(document))
+      .filter(
+        (document): document is OrbitDBNotificationDocument =>
+          document !== undefined,
+      );
+  }
+
   private async findDocuments(
     matcher: (document: Record<string, unknown>) => boolean,
   ): Promise<OrbitDBNotificationDocument[]> {
@@ -105,12 +149,24 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
   public async findById(
     notificationId: NotificationId,
   ): Promise<Notification | undefined> {
+    const head = await this.findHead(notificationId);
+
+    if (head) {
+      return this.mapper.toDomain(head);
+    }
+
     const [document] = await this.findDocuments(
       (candidate) =>
         this.stringValue(candidate, 'id') === notificationId.valueOf(),
     );
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    if (!document) {
+      return undefined;
+    }
+
+    await this.putHeads(document);
+
+    return this.mapper.toDomain(document);
   }
 
   public async findByRecipient(
@@ -118,16 +174,26 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     limit: number,
     beforeNotificationId?: NotificationId,
   ): Promise<Notification[]> {
-    const documents = await this.findDocuments(
-      (candidate) =>
-        this.stringValue(candidate, 'recipientIdentityId') ===
-        recipientIdentityId.valueOf(),
-    );
-    const beforeDocument = beforeNotificationId
-      ? documents.find(
-          (document) => document.id === beforeNotificationId.valueOf(),
-        )
+    const indexedDocuments =
+      await this.findRecipientIndexedDocuments(recipientIdentityId);
+    const documents =
+      indexedDocuments.length > 0
+        ? indexedDocuments
+        : await this.findDocuments(
+            (candidate) =>
+              this.stringValue(candidate, 'recipientIdentityId') ===
+              recipientIdentityId.valueOf(),
+          );
+    const beforeNotification = beforeNotificationId
+      ? await this.findById(beforeNotificationId)
       : undefined;
+    const beforeDocument = beforeNotification
+      ? this.mapper.toDocument(beforeNotification)
+      : undefined;
+
+    if (indexedDocuments.length === 0) {
+      await Promise.all(documents.map((document) => this.putHeads(document)));
+    }
 
     return this.deduplicateDocuments(documents)
       .filter((document) =>
@@ -139,8 +205,11 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
   }
 
   public async save(notification: Notification): Promise<void> {
+    const document = this.mapper.toDocument(notification);
+
     await this.registry.putDocument('notifications', {
-      ...this.mapper.toDocument(notification),
+      ...document,
     });
+    await this.putHeads(document);
   }
 }
