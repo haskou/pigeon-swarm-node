@@ -165,30 +165,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(secondNetwork.keychains.put).toHaveBeenCalledTimes(1);
   });
 
-  it('finds head documents by key prefix', async () => {
-    const registry = new OrbitDBReplicatedStateRegistry();
-    const firstNetwork = createStores();
-
-    registry.register('network-1', firstNetwork.stores);
-
-    await registry.putHead('presence:identity-1', {
-      id: 'identity-1',
-      status: 'available',
-    });
-    await registry.putHead('notification:notification-1', {
-      id: 'notification-1',
-    });
-
-    const results = await registry.findHeadsByPrefix('presence:');
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        id: 'identity-1',
-        status: 'available',
-      }),
-    ]);
-  });
-
   it('does not inspect related documents when direct network ids are present', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

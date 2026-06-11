@@ -225,9 +225,12 @@ describe('OrbitDBDomainEventProjector', () => {
       }),
     );
     expect(stores.heads.put).toHaveBeenCalledWith(
-      'conversation-participant:identity-1:0:conversation-1',
+      'conversation-participant-index:identity-1',
       expect.objectContaining({
-        id: 'conversation-1',
+        conversations: expect.arrayContaining([
+          expect.objectContaining({ id: 'conversation-1' }),
+        ]),
+        participantId: 'identity-1',
       }),
     );
   });
@@ -483,9 +486,11 @@ describe('OrbitDBDomainEventProjector', () => {
       }),
     );
     expect(stores.heads.put).toHaveBeenCalledWith(
-      'notification-recipient:identity-1:1780000000000:notification-1',
+      'notification-recipient-index:identity-1',
       expect.objectContaining({
-        id: 'notification-1',
+        notifications: expect.arrayContaining([
+          expect.objectContaining({ id: 'notification-1' }),
+        ]),
         recipientIdentityId: 'identity-1',
       }),
     );

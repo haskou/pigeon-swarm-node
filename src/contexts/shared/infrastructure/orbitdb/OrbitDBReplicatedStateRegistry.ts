@@ -387,23 +387,6 @@ export default class OrbitDBReplicatedStateRegistry {
     return undefined;
   }
 
-  public async findHeadsByPrefix(
-    prefix: string,
-  ): Promise<Array<Record<string, unknown>>> {
-    this.assertReady();
-    const records: Array<Record<string, unknown>> = [];
-
-    for (const stores of this.storesByNetworkId.values()) {
-      records.push(
-        ...(await this.allRecords(stores.heads))
-          .filter((record) => record.key?.startsWith(prefix))
-          .map((record) => record.value),
-      );
-    }
-
-    return this.deduplicateDocuments(records);
-  }
-
   public async putHead(
     key: string,
     value: Record<string, unknown>,

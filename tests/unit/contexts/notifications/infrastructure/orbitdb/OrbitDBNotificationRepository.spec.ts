@@ -111,8 +111,12 @@ describe('OrbitDBNotificationRepository', () => {
 
   it('should find recipient notifications from recipient heads', async () => {
     heads.set(
-      `notification-recipient:${recipientIdentityId}:${baseDocument.createdAt}:${baseDocument.id}`,
-      baseDocument,
+      `notification-recipient-index:${recipientIdentityId}`,
+      {
+        id: `notification-recipient-index:${recipientIdentityId}`,
+        notifications: [baseDocument],
+        recipientIdentityId,
+      },
     );
 
     const result = await repository.findByRecipient(
@@ -139,8 +143,11 @@ describe('OrbitDBNotificationRepository', () => {
       baseDocument,
     );
     expect(headPut).toHaveBeenCalledWith(
-      `notification-recipient:${recipientIdentityId}:${baseDocument.createdAt}:${baseDocument.id}`,
-      baseDocument,
+      `notification-recipient-index:${recipientIdentityId}`,
+      expect.objectContaining({
+        notifications: [baseDocument],
+        recipientIdentityId,
+      }),
     );
   });
 });

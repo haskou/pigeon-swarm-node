@@ -203,33 +203,78 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return `conversation:${conversationId}`;
   }
 
-  private participantHeadPrefix(participantId: string): string {
-    return `conversation-participant:${participantId}:`;
+  private participantIndexHeadKey(participantId: string): string {
+    return `conversation-participant-index:${participantId}`;
   }
 
-  private participantHeadKey(
-    document: OrbitDBConversationDocument,
+  private conversationDocumentsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): OrbitDBConversationDocument[] {
+    const conversations = record?.conversations;
+
+    if (!Array.isArray(conversations)) {
+      return [];
+    }
+
+    return conversations
+      .filter(
+        (conversation): conversation is Record<string, unknown> =>
+          typeof conversation === 'object' &&
+          conversation !== null &&
+          !Array.isArray(conversation),
+      )
+      .map((conversation) => this.conversationFromRecord(conversation))
+      .filter(
+        (document): document is OrbitDBConversationDocument =>
+          document !== undefined,
+      );
+  }
+
+  private async findParticipantIndexDocuments(
     participantId: string,
-  ): string {
-    return `${this.participantHeadPrefix(participantId)}${document.createdAt}:${document.id}`;
+  ): Promise<OrbitDBConversationDocument[]> {
+    return this.conversationDocumentsFromIndex(
+      await this.registry.findHead(this.participantIndexHeadKey(participantId)),
+    );
+  }
+
+  private async putParticipantIndex(
+    participantId: string,
+    documents: OrbitDBConversationDocument[],
+  ): Promise<void> {
+    const conversations = this.deduplicateConversations(documents);
+    const networkIds = [
+      ...new Set(conversations.map((conversation) => conversation.networkId)),
+    ];
+
+    await this.registry.putHead(
+      this.participantIndexHeadKey(participantId),
+      {
+        conversations: conversations.map((conversation) => ({
+          ...conversation,
+        })),
+        id: this.participantIndexHeadKey(participantId),
+        participantId,
+        updatedAt: Date.now(),
+      },
+      networkIds,
+    );
   }
 
   private async putConversationHeads(
     document: OrbitDBConversationDocument,
   ): Promise<void> {
-    await Promise.all([
-      this.registry.putHead(this.conversationHeadKey(document.id), {
-        ...document,
-      }),
-      ...document.participantIds.map((participantId) =>
-        this.registry.putHead(
-          this.participantHeadKey(document, participantId),
-          {
-            ...document,
-          },
-        ),
+    await this.registry.putHead(this.conversationHeadKey(document.id), {
+      ...document,
+    });
+    await Promise.all(
+      document.participantIds.map(async (participantId) =>
+        this.putParticipantIndex(participantId, [
+          ...(await this.findParticipantIndexDocuments(participantId)),
+          document,
+        ]),
       ),
-    ]);
+    );
   }
 
   private async findConversationDocumentById(
@@ -261,16 +306,9 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   private async findConversationDocumentsByParticipant(
     participantId: IdentityId,
   ): Promise<OrbitDBConversationDocument[]> {
-    const indexedDocuments = (
-      await this.registry.findHeadsByPrefix(
-        this.participantHeadPrefix(participantId.valueOf()),
-      )
-    )
-      .map((document) => this.conversationFromRecord(document))
-      .filter(
-        (document): document is OrbitDBConversationDocument =>
-          document !== undefined,
-      );
+    const indexedDocuments = await this.findParticipantIndexDocuments(
+      participantId.valueOf(),
+    );
 
     if (indexedDocuments.length > 0) {
       return indexedDocuments;
@@ -285,8 +323,13 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       ),
     );
 
+    await this.putParticipantIndex(participantId.valueOf(), documents);
     await Promise.all(
-      documents.map((document) => this.putConversationHeads(document)),
+      documents.map((document) =>
+        this.registry.putHead(this.conversationHeadKey(document.id), {
+          ...document,
+        }),
+      ),
     );
 
     return documents;

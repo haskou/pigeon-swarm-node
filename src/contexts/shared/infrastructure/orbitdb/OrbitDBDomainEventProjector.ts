@@ -71,6 +71,16 @@ export default class OrbitDBDomainEventProjector {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
+  private recordValue(
+    entry: { value?: unknown } | unknown,
+  ): Record<string, unknown> | undefined {
+    if (this.isRecord(entry) && 'value' in entry) {
+      return this.isRecord(entry.value) ? entry.value : undefined;
+    }
+
+    return this.isRecord(entry) ? entry : undefined;
+  }
+
   private withoutUndefined(value: unknown): unknown {
     if (Array.isArray(value)) {
       return value.map((item) => this.withoutUndefined(item));
@@ -109,6 +119,13 @@ export default class OrbitDBDomainEventProjector {
     record: Record<string, unknown>,
   ): Promise<void> {
     await stores.heads.put?.(key, this.cleanRecord(record));
+  }
+
+  private async findHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    return this.recordValue(await stores.heads.get?.(key));
   }
 
   private stringValue(
@@ -283,13 +300,68 @@ export default class OrbitDBDomainEventProjector {
     await this.putHead(stores, `conversation:${conversationId}`, document);
     await Promise.all(
       participantIds.map((participantId) =>
-        this.putHead(
-          stores,
-          `conversation-participant:${participantId}:${this.numberValue(document, 'createdAt') || 0}:${conversationId}`,
-          document,
-        ),
+        this.putConversationParticipantIndex(stores, participantId, document),
       ),
     );
+  }
+
+  private recordsFromIndex(
+    index: Record<string, unknown> | undefined,
+    attribute: string,
+  ): Record<string, unknown>[] {
+    const value = index?.[attribute];
+
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((item): item is Record<string, unknown> =>
+      this.isRecord(item),
+    );
+  }
+
+  private mergeIndexedRecord(
+    records: Record<string, unknown>[],
+    record: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    const recordId = this.stringValue(record, 'id');
+
+    if (!recordId) {
+      return records;
+    }
+
+    const merged = new Map<string, Record<string, unknown>>();
+
+    for (const current of records) {
+      const currentId = this.stringValue(current, 'id');
+
+      if (currentId) {
+        merged.set(currentId, current);
+      }
+    }
+
+    merged.set(recordId, record);
+
+    return [...merged.values()];
+  }
+
+  private async putConversationParticipantIndex(
+    stores: OrbitDBReplicatedStateStores,
+    participantId: string,
+    conversation: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `conversation-participant-index:${participantId}`;
+    const conversations = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'conversations'),
+      conversation,
+    );
+
+    await this.putHead(stores, key, {
+      conversations,
+      id: key,
+      participantId,
+      updatedAt: Date.now(),
+    });
   }
 
   private async putMessageDocument(
@@ -483,7 +555,6 @@ export default class OrbitDBDomainEventProjector {
       document,
       'recipientIdentityId',
     );
-    const createdAt = this.numberValue(document, 'createdAt') || 0;
 
     await this.put(stores.notifications, document);
     await this.putHead(
@@ -493,12 +564,31 @@ export default class OrbitDBDomainEventProjector {
     );
 
     if (recipientIdentityId) {
-      await this.putHead(
+      await this.putNotificationRecipientIndex(
         stores,
-        `notification-recipient:${recipientIdentityId}:${createdAt}:${message.aggregate_id}`,
+        recipientIdentityId,
         document,
       );
     }
+  }
+
+  private async putNotificationRecipientIndex(
+    stores: OrbitDBReplicatedStateStores,
+    recipientIdentityId: string,
+    notification: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `notification-recipient-index:${recipientIdentityId}`;
+    const notifications = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'notifications'),
+      notification,
+    );
+
+    await this.putHead(stores, key, {
+      id: key,
+      notifications,
+      recipientIdentityId,
+      updatedAt: Date.now(),
+    });
   }
 
   private async projectRequest(

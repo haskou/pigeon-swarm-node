@@ -90,19 +90,65 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     return `notification:${notificationId}`;
   }
 
-  private recipientHeadPrefix(recipientIdentityId: string): string {
-    return `notification-recipient:${recipientIdentityId}:`;
+  private recipientIndexHeadKey(recipientIdentityId: string): string {
+    return `notification-recipient-index:${recipientIdentityId}`;
   }
 
-  private recipientHeadKey(document: OrbitDBNotificationDocument): string {
-    return `${this.recipientHeadPrefix(document.recipientIdentityId)}${document.createdAt}:${document.id}`;
+  private notificationDocumentsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): OrbitDBNotificationDocument[] {
+    const notifications = record?.notifications;
+
+    if (!Array.isArray(notifications)) {
+      return [];
+    }
+
+    return notifications
+      .filter(
+        (notification): notification is Record<string, unknown> =>
+          typeof notification === 'object' &&
+          notification !== null &&
+          !Array.isArray(notification),
+      )
+      .map((notification) => this.documentFromRecord(notification))
+      .filter(
+        (document): document is OrbitDBNotificationDocument =>
+          document !== undefined,
+      );
+  }
+
+  private async findRecipientIndexedDocuments(
+    recipientIdentityId: IdentityId,
+  ): Promise<OrbitDBNotificationDocument[]> {
+    return this.notificationDocumentsFromIndex(
+      await this.registry.findHead(
+        this.recipientIndexHeadKey(recipientIdentityId.valueOf()),
+      ),
+    );
   }
 
   private async putHeads(document: OrbitDBNotificationDocument): Promise<void> {
-    await Promise.all([
-      this.registry.putHead(this.headKey(document.id), { ...document }),
-      this.registry.putHead(this.recipientHeadKey(document), { ...document }),
+    await this.registry.putHead(this.headKey(document.id), { ...document });
+
+    const recipientIdentityId = new IdentityId(document.recipientIdentityId);
+    const recipientDocuments =
+      await this.findRecipientIndexedDocuments(recipientIdentityId);
+    const notifications = this.deduplicateDocuments([
+      ...recipientDocuments,
+      document,
     ]);
+
+    await this.registry.putHead(
+      this.recipientIndexHeadKey(document.recipientIdentityId),
+      {
+        id: this.recipientIndexHeadKey(document.recipientIdentityId),
+        notifications: notifications.map((notification) => ({
+          ...notification,
+        })),
+        recipientIdentityId: document.recipientIdentityId,
+        updatedAt: Date.now(),
+      },
+    );
   }
 
   private async findHead(
@@ -113,21 +159,6 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     );
 
     return document ? this.documentFromRecord(document) : undefined;
-  }
-
-  private async findRecipientIndexedDocuments(
-    recipientIdentityId: IdentityId,
-  ): Promise<OrbitDBNotificationDocument[]> {
-    const documents = await this.registry.findHeadsByPrefix(
-      this.recipientHeadPrefix(recipientIdentityId.valueOf()),
-    );
-
-    return documents
-      .map((document) => this.documentFromRecord(document))
-      .filter(
-        (document): document is OrbitDBNotificationDocument =>
-          document !== undefined,
-      );
   }
 
   private async findDocuments(
