@@ -4,6 +4,7 @@ import { IdentityNotFoundError } from '../../../../../../src/contexts/identities
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
 import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { ProfileHandle } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
@@ -36,6 +37,7 @@ describe('IpfsIdentityRepository', () => {
     );
     mother = new IdentityMother();
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
+    ipfsManager.stat.mockResolvedValue(true);
     replicatedStateRegistry.clear();
   });
 
@@ -45,6 +47,7 @@ describe('IpfsIdentityRepository', () => {
 
   async function createSignedIdentityForNetwork(
     networkId: string,
+    handle?: string,
   ): Promise<Identity> {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(
@@ -62,7 +65,13 @@ describe('IpfsIdentityRepository', () => {
       },
       networks: [networkId],
       previousIdentityExternalIdentifier,
-      profile: new Profile(new ProfileName('Mallory')).toPrimitives(),
+      profile: new Profile(
+        new ProfileName('Mallory'),
+        undefined,
+        undefined,
+        undefined,
+        handle ? new ProfileHandle(handle) : undefined,
+      ).toPrimitives(),
       timestamp: 1773848829055,
       version: 1,
     };
@@ -430,5 +439,68 @@ describe('IpfsIdentityRepository', () => {
       ).toHaveBeenCalledWith(new IPFSId(candidateCidString));
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
+
+    it('should skip remote IPFS lookups when metadata is not local and no peers are connected', async () => {
+      const identityId = mother.id;
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: 'bafyremoteidentity',
+          identityId: identityId.valueOf(),
+          previousCid: undefined,
+          receivedAt: Date.now(),
+          version: 1,
+        },
+      ]);
+      ipfsManager.stat.mockResolvedValue(false);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+
+      await expect(repository.findById(identityId)).rejects.toThrow(
+        IdentityNotFoundError,
+      );
+
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findCandidateByHandle', () => {
+    it('should return the handle candidate without resolving it again by id', async () => {
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'hasko',
+      );
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const cidString = 'bafyhandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: cidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(metadataRepository.findByHandle).toHaveBeenCalledWith(handle);
+      expect(metadataRepository.findByIdentityId).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.stat).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(result.externalIdentifier).toEqual(
+        new IdentityExternalIdentifier(cidString),
+      );
+      expect(result.identity.toPrimitives()).toEqual(primitives);
+    });
+
   });
 });

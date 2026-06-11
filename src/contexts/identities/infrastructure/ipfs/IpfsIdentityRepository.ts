@@ -157,39 +157,24 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
   }
 
-  private async findCandidatesFromMetadata(
-    id: IdentityId,
-    metadata: IdentityMetadataRecord[],
-  ): Promise<Identity[]> {
-    const cids = [...new Set(metadata.map((document) => document.cid))];
-    const candidates: Identity[] = [];
+  private async shouldResolveMetadataCid(
+    metadata: IdentityMetadataRecord,
+  ): Promise<boolean> {
+    try {
+      const isAvailableLocally = await this.ipfsManager.stat(
+        new IPFSId(metadata.cid),
+        true,
+        metadata.networkIds,
+      );
 
-    for (const cid of cids) {
-      try {
-        const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
-          new IPFSId(cid),
-        );
-
-        const candidate = this.mapper.toDomain(document);
-
-        const isValid = await this.validator.isValidChainFor(
-          id,
-          candidate,
-          (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
-        );
-
-        if (!isValid) {
-          await this.deleteMetadata(new IPFSId(cid));
-          continue;
-        }
-
-        candidates.push(candidate);
-      } catch {
-        await this.deleteMetadata(new IPFSId(cid));
+      if (isAvailableLocally) {
+        return true;
       }
+    } catch {
+      // Missing local content is valid metadata while the node is offline.
     }
 
-    return candidates;
+    return this.ipfsManager.hasConnectedPeers();
   }
 
   private async findCandidateFromCid(
@@ -228,7 +213,15 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private async findCandidateFromMetadata(
     metadata: IdentityMetadataRecord,
+    shouldCheckAvailability: boolean = true,
   ): Promise<Identity | undefined> {
+    if (
+      shouldCheckAvailability &&
+      !(await this.shouldResolveMetadataCid(metadata))
+    ) {
+      return undefined;
+    }
+
     try {
       const id = new IdentityId(metadata.identityId);
       const cid = new IPFSId(metadata.cid);
@@ -252,6 +245,62 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
   }
 
+  private async findCandidateReferenceFromMetadata(
+    metadata: IdentityMetadataRecord,
+    shouldCheckAvailability: boolean = true,
+  ): Promise<IdentityCandidate | undefined> {
+    const identity = await this.findCandidateFromMetadata(
+      metadata,
+      shouldCheckAvailability,
+    );
+
+    if (!identity) {
+      return undefined;
+    }
+
+    return {
+      externalIdentifier: new IdentityExternalIdentifier(metadata.cid),
+      identity,
+    };
+  }
+
+  private async findCandidateReferencesFromMetadata(
+    metadata: IdentityMetadataRecord[],
+  ): Promise<IdentityCandidate[]> {
+    const candidates = await Promise.all(
+      metadata.map((document) =>
+        this.findCandidateReferenceFromMetadata(document),
+      ),
+    );
+
+    return candidates.filter(
+      (candidate): candidate is IdentityCandidate => candidate !== undefined,
+    );
+  }
+
+  private async findFirstHandleCandidateFromMetadata(
+    handle: ProfileHandle,
+    metadata: IdentityMetadataRecord[],
+  ): Promise<IdentityCandidate | undefined> {
+    try {
+      return await Promise.any(
+        metadata.map((document) =>
+          this.findCandidateReferenceFromMetadata(document, false).then(
+            (candidate) => {
+              if (candidate?.identity.hasHandle(handle)) {
+                return candidate;
+              }
+
+              throw new IdentityNotFoundError(handle.valueOf());
+            },
+          ),
+        ),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
   public async findById(id: IdentityId): Promise<Identity> {
     const candidates = await this.findCandidatesById(id);
 
@@ -259,14 +308,20 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   }
 
   public async findByHandle(handle: ProfileHandle): Promise<Identity> {
+    return (await this.findCandidateByHandle(handle)).identity;
+  }
+
+  public async findCandidateByHandle(
+    handle: ProfileHandle,
+  ): Promise<IdentityCandidate> {
     const metadata = await this.metadataRepository.findByHandle(handle);
+    const candidate = await this.findFirstHandleCandidateFromMetadata(
+      handle,
+      metadata,
+    );
 
-    for (const document of metadata) {
-      const candidate = await this.findCandidateFromMetadata(document);
-
-      if (candidate?.hasHandle(handle)) {
-        return candidate;
-      }
+    if (candidate) {
+      return candidate;
     }
 
     throw new IdentityNotFoundError(handle.valueOf());
@@ -291,18 +346,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {
     const metadata = await this.findValidMetadata(id);
-    const candidates: IdentityCandidate[] = [];
-
-    for (const document of metadata) {
-      const candidate = await this.findCandidateFromMetadata(document);
-
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new IdentityExternalIdentifier(document.cid),
-          identity: candidate,
-        });
-      }
-    }
+    const candidates = await this.findCandidateReferencesFromMetadata(metadata);
 
     if (candidates.length > 0) {
       return candidates;

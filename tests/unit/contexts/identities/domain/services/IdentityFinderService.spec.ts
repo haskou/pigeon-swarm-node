@@ -67,25 +67,22 @@ describe('IdentityFinderService', () => {
   });
 
   describe('findCandidateByHandle', () => {
-    it('should resolve the identity handle before returning the current candidate reference', async () => {
+    it('should return the current candidate reference for the handle', async () => {
       const identity = await mother.build();
-      const identityId = new IdentityId(identity.toPrimitives().id);
       const handle = new ProfileHandle('alice');
       const externalIdentifier = new IdentityExternalIdentifier(
         'bafyidentitycid',
       );
 
-      repository.findByHandle.mockResolvedValue(identity);
-      repository.findCandidateReferencesById.mockResolvedValue([
+      repository.findCandidateByHandle.mockResolvedValue(
         { externalIdentifier, identity },
-      ]);
+      );
 
       const result = await service.findCandidateByHandle(handle);
 
-      expect(repository.findByHandle).toHaveBeenCalledWith(handle);
-      expect(repository.findCandidateReferencesById).toHaveBeenCalledWith(
-        identityId,
-      );
+      expect(repository.findCandidateByHandle).toHaveBeenCalledWith(handle);
+      expect(repository.findByHandle).not.toHaveBeenCalled();
+      expect(repository.findCandidateReferencesById).not.toHaveBeenCalled();
       expect(result.externalIdentifier).toEqual(externalIdentifier);
     });
   });

@@ -14,6 +14,10 @@ export default abstract class IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityCandidate[]>;
 
+  public abstract findCandidateByHandle(
+    handle: ProfileHandle,
+  ): Promise<IdentityCandidate>;
+
   public abstract findByHandle(handle: ProfileHandle): Promise<Identity>;
 
   public abstract findByExternalIdentifier(

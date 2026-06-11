@@ -111,6 +111,14 @@ export default class IPFS {
     }
   }
 
+  public async hasConnectedPeers(): Promise<boolean> {
+    await this.initialize();
+
+    return this.registry
+      .getAll()
+      .some((network) => network.getPeers().length > 0);
+  }
+
   public async getJSONFromNetwork<T>(
     cid: IPFSId,
     networkId: string,

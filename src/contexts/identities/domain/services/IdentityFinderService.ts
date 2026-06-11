@@ -35,8 +35,6 @@ export default class IdentityFinderService {
   public async findCandidateByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityCandidate> {
-    const identity = await this.findByHandle(handle);
-
-    return this.findCandidateById(identity.getId());
+    return this.repository.findCandidateByHandle(handle);
   }
 }
