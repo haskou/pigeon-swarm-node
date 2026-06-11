@@ -6,6 +6,7 @@ describe('OrbitDBMetadataHeadRepairer', () => {
   const communities: Record<string, unknown>[] = [];
   const identities: Record<string, unknown>[] = [];
   const keychains: Record<string, unknown>[] = [];
+  const messages: Record<string, unknown>[] = [];
   let registry: OrbitDBReplicatedStateRegistry;
   let repairer: OrbitDBMetadataHeadRepairer;
 
@@ -14,10 +15,11 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     communities.splice(0);
     identities.splice(0);
     keychains.splice(0);
+    messages.splice(0);
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register(
       'network-1',
-      replicatedStores(heads, communities, identities, keychains),
+      replicatedStores(heads, communities, identities, keychains, messages),
     );
     repairer = new OrbitDBMetadataHeadRepairer(registry);
   });
@@ -88,9 +90,33 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         version: 2,
       },
     );
+    messages.push(
+      {
+        attachmentExternalIdentifiers: [],
+        authorIdentityId: 'identity-1',
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        createdAt: 1,
+        id: 'root-1',
+        scopeType: 'community_channel',
+        type: 'sent',
+      },
+      {
+        attachmentExternalIdentifiers: [],
+        authorIdentityId: 'identity-1',
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        createdAt: 2,
+        id: 'reply-1',
+        replyToMessageId: 'root-1',
+        scopeType: 'community_channel',
+        type: 'sent',
+      },
+    );
 
     await expect(repairer.repair()).resolves.toEqual({
       communities: 1,
+      communityThreadSummaries: 1,
       identities: 1,
       keychains: 1,
     });
@@ -111,6 +137,20 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     expect(heads.get('keychain:identity-1')).toEqual(
       expect.objectContaining({ cid: 'keychain-v2', version: 2 }),
     );
+    expect(
+      heads.get('community-channel-thread-summaries:community-1:channel-1'),
+    ).toEqual(
+      expect.objectContaining({
+        summaries: [
+          {
+            lastReplyAt: 2,
+            lastReplyMessageId: 'reply-1',
+            replyCount: 1,
+            rootMessageId: 'root-1',
+          },
+        ],
+      }),
+    );
   });
 });
 
@@ -119,6 +159,7 @@ function replicatedStores(
   communities: Record<string, unknown>[],
   identities: Record<string, unknown>[],
   keychains: Record<string, unknown>[],
+  messages: Record<string, unknown>[],
 ) {
   return {
     heads: {
@@ -152,6 +193,12 @@ function replicatedStores(
       query: jest.fn(
         async (matcher: (document: Record<string, unknown>) => boolean) =>
           keychains.filter(matcher),
+      ),
+    },
+    messages: {
+      query: jest.fn(
+        async (matcher: (document: Record<string, unknown>) => boolean) =>
+          messages.filter(matcher),
       ),
     },
   } as never;
