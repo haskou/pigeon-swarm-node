@@ -12,7 +12,6 @@ import OrbitDBCommunityChannelMessageMapper from './mappers/OrbitDBCommunityChan
 // eslint-disable-next-line max-len
 export default class OrbitDBCommunityChannelMessageRepository extends CommunityChannelMessageRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
-  private static readonly THREAD_LIMIT_MULTIPLIER = 25;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -97,14 +96,72 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     return documents.sort((left, right) => right.createdAt - left.createdAt);
   }
 
-  private threadSummaryCandidateLimit(
-    channelIds: CommunityChannelId[],
-    limitPerChannel: number,
-  ): number {
-    const multiplier =
-      OrbitDBCommunityChannelMessageRepository.THREAD_LIMIT_MULTIPLIER;
+  private threadSummaryHeadKey(communityId: string, channelId: string): string {
+    return `community-channel-thread-summaries:${communityId}:${channelId}`;
+  }
 
-    return channelIds.length * limitPerChannel * multiplier;
+  private isThreadSummary(
+    value: unknown,
+  ): value is CommunityChannelThreadSummary {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const summary = value as Record<string, unknown>;
+
+    return (
+      typeof summary.lastReplyAt === 'number' &&
+      typeof summary.lastReplyMessageId === 'string' &&
+      typeof summary.replyCount === 'number' &&
+      typeof summary.rootMessageId === 'string'
+    );
+  }
+
+  private threadSummariesFromHead(
+    document: Record<string, unknown> | undefined,
+  ): CommunityChannelThreadSummary[] | undefined {
+    if (!document) {
+      return undefined;
+    }
+
+    const summaries = document.summaries;
+
+    if (!Array.isArray(summaries)) {
+      return [];
+    }
+
+    return summaries.filter((summary) => this.isThreadSummary(summary));
+  }
+
+  private async findThreadSummaryHead(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<CommunityChannelThreadSummary[] | undefined> {
+    return this.threadSummariesFromHead(
+      await this.registry.findHead(
+        this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
+      ),
+    );
+  }
+
+  private async putThreadSummaryHead(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    summaries: CommunityChannelThreadSummary[],
+  ): Promise<void> {
+    await this.registry.putHead(
+      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: this.threadSummaryHeadKey(
+          communityId.valueOf(),
+          channelId.valueOf(),
+        ),
+        summaries,
+        updatedAt: Date.now(),
+      },
+    );
   }
 
   private async tombstone(
@@ -121,6 +178,8 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
         }),
       ),
     );
+
+    await this.refreshThreadSummaryHeadsForDocuments(documents);
   }
 
   private channelIdValueSet(channelIds: CommunityChannelId[]): Set<string> {
@@ -219,14 +278,89 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       const [channelId] = key.split(':');
       const summaries = summariesByChannelId.get(channelId) || [];
 
-      if (summaries.length < limitPerChannel) {
-        summaries.push(summary);
-        summaries.sort((left, right) => right.lastReplyAt - left.lastReplyAt);
-        summariesByChannelId.set(channelId, summaries);
-      }
+      summaries.push(summary);
+      summaries.sort((left, right) => right.lastReplyAt - left.lastReplyAt);
+      summariesByChannelId.set(channelId, summaries.slice(0, limitPerChannel));
     }
 
     return summariesByChannelId;
+  }
+
+  private threadSummariesFromDocuments(
+    documents: OrbitDBCommunityChannelMessageDocument[],
+    limitPerChannel: number,
+  ): Map<string, CommunityChannelThreadSummary[]> {
+    const replyDocuments = this.findRecentThreadReplyDocuments(
+      documents,
+      documents.length,
+    );
+    const existingRootIds = this.findExistingRootIds(
+      documents,
+      this.rootIdsFrom(replyDocuments),
+    );
+
+    return this.limitSummariesByChannel(
+      this.groupThreadSummaries(replyDocuments, existingRootIds),
+      limitPerChannel,
+    );
+  }
+
+  private async hydrateThreadSummaryHeads(
+    communityId: CommunityId,
+    channelIds: CommunityChannelId[],
+  ): Promise<Map<string, CommunityChannelThreadSummary[]>> {
+    const channelIdValues = this.channelIdValueSet(channelIds);
+    const documents = await this.findThreadCandidateDocuments(
+      communityId,
+      channelIdValues,
+    );
+    const summariesByChannelId = this.threadSummariesFromDocuments(
+      documents,
+      Number.MAX_SAFE_INTEGER,
+    );
+
+    await Promise.all(
+      channelIds.map((channelId) =>
+        this.putThreadSummaryHead(
+          communityId,
+          channelId,
+          summariesByChannelId.get(channelId.valueOf()) || [],
+        ),
+      ),
+    );
+
+    return summariesByChannelId;
+  }
+
+  private async refreshThreadSummaryHead(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<void> {
+    await this.hydrateThreadSummaryHeads(communityId, [channelId]);
+  }
+
+  private async refreshThreadSummaryHeadsForDocuments(
+    documents: OrbitDBCommunityChannelMessageDocument[],
+  ): Promise<void> {
+    const affectedChannels = new Map<string, CommunityChannelId>();
+
+    for (const document of documents) {
+      affectedChannels.set(
+        `${document.communityId}:${document.channelId}`,
+        new CommunityChannelId(document.channelId),
+      );
+    }
+
+    await Promise.all(
+      [...affectedChannels.entries()].map(([key, channelId]) => {
+        const [communityId] = key.split(':');
+
+        return this.refreshThreadSummaryHead(
+          new CommunityId(communityId),
+          channelId,
+        );
+      }),
+    );
   }
 
   public async findById(
@@ -321,24 +455,47 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       return new Map();
     }
 
-    const channelIdValues = this.channelIdValueSet(channelIds);
-    const documents = await this.findThreadCandidateDocuments(
-      communityId,
-      channelIdValues,
-    );
-    const replyDocuments = this.findRecentThreadReplyDocuments(
-      documents,
-      this.threadSummaryCandidateLimit(channelIds, limitPerChannel),
-    );
-    const existingRootIds = this.findExistingRootIds(
-      documents,
-      this.rootIdsFrom(replyDocuments),
-    );
+    const summariesByChannelId = new Map<
+      string,
+      CommunityChannelThreadSummary[]
+    >();
+    const missingChannelIds: CommunityChannelId[] = [];
 
-    return this.limitSummariesByChannel(
-      this.groupThreadSummaries(replyDocuments, existingRootIds),
-      limitPerChannel,
-    );
+    for (const channelId of channelIds) {
+      const summaries = await this.findThreadSummaryHead(
+        communityId,
+        channelId,
+      );
+
+      if (summaries === undefined) {
+        missingChannelIds.push(channelId);
+
+        continue;
+      }
+
+      summariesByChannelId.set(
+        channelId.valueOf(),
+        [...summaries]
+          .sort((left, right) => right.lastReplyAt - left.lastReplyAt)
+          .slice(0, limitPerChannel),
+      );
+    }
+
+    const hydratedSummariesByChannelId =
+      missingChannelIds.length > 0
+        ? await this.hydrateThreadSummaryHeads(communityId, missingChannelIds)
+        : new Map<string, CommunityChannelThreadSummary[]>();
+
+    for (const [channelId, summaries] of hydratedSummariesByChannelId) {
+      summariesByChannelId.set(
+        channelId,
+        [...summaries]
+          .sort((left, right) => right.lastReplyAt - left.lastReplyAt)
+          .slice(0, limitPerChannel),
+      );
+    }
+
+    return summariesByChannelId;
   }
 
   public async searchPublicByChannel(
@@ -380,10 +537,16 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
   }
 
   public async save(message: CommunityChannelMessage): Promise<void> {
-    await this.registry.putDocument(
-      'messages',
-      this.mapper.toDocument(message),
-    );
+    const document = this.mapper.toDocument(message);
+
+    await this.registry.putDocument('messages', document);
+
+    if (document.replyToMessageId) {
+      await this.refreshThreadSummaryHead(
+        new CommunityId(document.communityId),
+        new CommunityChannelId(document.channelId),
+      );
+    }
   }
 
   public async delete(

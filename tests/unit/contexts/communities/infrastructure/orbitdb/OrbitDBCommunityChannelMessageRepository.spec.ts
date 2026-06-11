@@ -1,5 +1,6 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityChannelMessageMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper';
 import OrbitDBCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository';
@@ -11,16 +12,32 @@ const identityMother = new IdentityMother();
 
 describe('OrbitDBCommunityChannelMessageRepository', () => {
   const documents: Record<string, unknown>[] = [];
+  const heads = new Map<string, Record<string, unknown>>();
   let query: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityChannelMessageRepository;
 
   beforeEach(() => {
     documents.splice(0);
+    heads.clear();
     query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     registry.register('network-1', {
+      heads: {
+        get: jest.fn(async (key: string) => {
+          const value = heads.get(key);
+
+          return value ? { key, value } : undefined;
+        }),
+        put: jest.fn(
+          async (key: string, value: Record<string, unknown>) => {
+            heads.set(key, value);
+
+            return 'ok';
+          },
+        ),
+      },
       messages: {
         put: jest.fn(async (document) => {
           upsertDocument(documents, document);
@@ -168,6 +185,99 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         rootMessageId: 'root-2',
       },
     ]);
+
+    query.mockClear();
+    const cachedSummaries = await repository.findThreadSummariesByChannel(
+      new CommunityId('community-1'),
+      [new CommunityChannelId('channel-1'), new CommunityChannelId('channel-2')],
+      2,
+    );
+
+    expect(query).not.toHaveBeenCalled();
+    expect(cachedSummaries.get('channel-1')).toEqual(summaries.get('channel-1'));
+    expect(cachedSummaries.get('channel-2')).toEqual(summaries.get('channel-2'));
+  });
+
+  it('should refresh thread summaries when saving a reply', async () => {
+    documents.push(
+      document({
+        channelId: 'channel-1',
+        createdAt: 1,
+        id: 'root-1',
+      }),
+    );
+
+    await repository.findThreadSummariesByChannel(
+      new CommunityId('community-1'),
+      [new CommunityChannelId('channel-1')],
+      2,
+    );
+    query.mockClear();
+
+    await repository.save(
+      CommunityChannelMessage.fromPrimitives(
+        document({
+          channelId: 'channel-1',
+          createdAt: 2,
+          id: 'reply-1',
+          replyToMessageId: 'root-1',
+        }) as never,
+      ),
+    );
+
+    const summaries = await repository.findThreadSummariesByChannel(
+      new CommunityId('community-1'),
+      [new CommunityChannelId('channel-1')],
+      2,
+    );
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(summaries.get('channel-1')).toEqual([
+      {
+        lastReplyAt: 2,
+        lastReplyMessageId: 'reply-1',
+        replyCount: 1,
+        rootMessageId: 'root-1',
+      },
+    ]);
+  });
+
+  it('should refresh thread summaries when deleting a root message', async () => {
+    documents.push(
+      document({
+        channelId: 'channel-1',
+        createdAt: 1,
+        id: 'root-1',
+      }),
+      document({
+        channelId: 'channel-1',
+        createdAt: 2,
+        id: 'reply-1',
+        replyToMessageId: 'root-1',
+      }),
+    );
+
+    await repository.findThreadSummariesByChannel(
+      new CommunityId('community-1'),
+      [new CommunityChannelId('channel-1')],
+      2,
+    );
+    query.mockClear();
+
+    await repository.delete(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      new CommunityChannelMessageId('root-1'),
+    );
+
+    const summaries = await repository.findThreadSummariesByChannel(
+      new CommunityId('community-1'),
+      [new CommunityChannelId('channel-1')],
+      2,
+    );
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(summaries.get('channel-1')).toEqual([]);
   });
 });
 
