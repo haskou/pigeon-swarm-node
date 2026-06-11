@@ -9,6 +9,8 @@ export default class OrbitDBReplicatedStateRegistry {
     OrbitDBReplicatedStateStores
   >();
 
+  private readonly cachedHeads = new Map<string, Record<string, unknown>>();
+
   private assertReady(): void {
     if (this.storesByNetworkId.size === 0) {
       throw new ReplicatedStateNotReadyError();
@@ -73,6 +75,50 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     return this.isRecord(entry) ? entry : undefined;
+  }
+
+  private cacheHead(key: string, value: Record<string, unknown>): void {
+    const current = this.cachedHeads.get(key);
+
+    if (
+      !current ||
+      this.documentFreshness(current) <= this.documentFreshness(value)
+    ) {
+      this.cachedHeads.set(key, value);
+    }
+  }
+
+  private cacheHeadUpdate(entry: { payload?: { value?: unknown } }): void {
+    const payloadValue = entry.payload?.value;
+
+    if (!this.isRecord(payloadValue)) {
+      return;
+    }
+
+    const record = this.recordValue(payloadValue);
+    const key =
+      this.stringValue(payloadValue, 'key') ||
+      this.stringValue(record || {}, 'id');
+
+    if (!key || !record) {
+      return;
+    }
+
+    this.cacheHead(key, record);
+  }
+
+  private async hydrateHeadCache(
+    stores: OrbitDBReplicatedStateStores,
+  ): Promise<void> {
+    const records = await this.allRecords(stores.heads);
+
+    for (const record of records) {
+      if (!record.key) {
+        continue;
+      }
+
+      this.cacheHead(record.key, record.value);
+    }
   }
 
   private withoutUndefined(value: unknown): unknown {
@@ -318,10 +364,15 @@ export default class OrbitDBReplicatedStateRegistry {
     stores: OrbitDBReplicatedStateStores,
   ): void {
     this.storesByNetworkId.set(networkId, stores);
+    stores.heads.events?.on?.('update', (entry) => this.cacheHeadUpdate(entry));
+    this.hydrateHeadCache(stores).catch((error: unknown): void => {
+      void error;
+    });
   }
 
   public clear(): void {
     this.storesByNetworkId.clear();
+    this.cachedHeads.clear();
   }
 
   public async queryDocuments(
@@ -368,10 +419,18 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
+    const cachedHead = this.cachedHeads.get(key);
+
+    if (cachedHead) {
+      return cachedHead;
+    }
+
     for (const stores of this.storesByNetworkId.values()) {
       const directRecord = this.recordValue(await stores.heads.get?.(key));
 
       if (directRecord) {
+        this.cacheHead(key, directRecord);
+
         return directRecord;
       }
 
@@ -380,6 +439,8 @@ export default class OrbitDBReplicatedStateRegistry {
       );
 
       if (fallbackRecord) {
+        this.cacheHead(key, fallbackRecord.value);
+
         return fallbackRecord.value;
       }
     }
@@ -401,6 +462,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     for (const stores of this.storesForNetworkIds(targetNetworkIds)) {
       await stores.heads.put?.(key, cleanValue);
+      this.cacheHead(key, cleanValue);
     }
   }
 }

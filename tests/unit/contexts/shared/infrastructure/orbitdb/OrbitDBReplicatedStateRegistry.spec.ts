@@ -8,6 +8,13 @@ type Entry = {
 
 type Store = {
   all: jest.Mock<Promise<Entry[]>>;
+  emitUpdate(entry: { payload?: { value?: unknown } }): void;
+  events: {
+    on: jest.Mock<
+      void,
+      ['update', (entry: { payload?: { value?: unknown } }) => void]
+    >;
+  };
   get: jest.Mock<Promise<Record<string, unknown> | undefined>, [string]>;
   put: jest.Mock<Promise<string>, [string | Record<string, unknown>, unknown?]>;
   query: jest.Mock<
@@ -18,9 +25,20 @@ type Store = {
 
 function createStore(): Store {
   const entries: Entry[] = [];
+  const updateHandlers: Array<
+    (entry: { payload?: { value?: unknown } }) => void
+  > = [];
 
   return {
     all: jest.fn(async () => entries),
+    emitUpdate(entry): void {
+      updateHandlers.forEach((handler) => handler(entry));
+    },
+    events: {
+      on: jest.fn((_event, handler) => {
+        updateHandlers.push(handler);
+      }),
+    },
     get: jest.fn(async (key: string) =>
       entries.find((entry) => entry.key === key)?.value,
     ),
@@ -59,6 +77,7 @@ function createStores(): {
   contentReplication: Store;
   identities: Store;
   keychains: Store;
+  heads: Store;
   messages: Store;
   notifications: Store;
   stores: OrbitDBReplicatedStateStores;
@@ -69,11 +88,12 @@ function createStores(): {
   const keychains = createStore();
   const messages = createStore();
   const notifications = createStore();
+  const heads = createStore();
   const storeSet = {
     communities,
     conversations: createStore(),
     events: createStore(),
-    heads: createStore(),
+    heads,
     identities,
     contentReplication,
     keychains,
@@ -88,6 +108,7 @@ function createStores(): {
     contentReplication,
     identities,
     keychains,
+    heads,
     messages,
     notifications,
     stores: storeSet as unknown as OrbitDBReplicatedStateStores,
@@ -194,5 +215,59 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     expect(firstNetwork.communities.put).not.toHaveBeenCalled();
     expect(firstNetwork.messages.put).not.toHaveBeenCalled();
+  });
+
+  it('serves heads from cache after writing them', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+
+    await registry.putHead('keychain:identity-1', {
+      id: 'keychain:identity-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    firstNetwork.heads.get.mockClear();
+    firstNetwork.heads.all.mockClear();
+
+    await expect(registry.findHead('keychain:identity-1')).resolves.toEqual({
+      id: 'keychain:identity-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    expect(firstNetwork.heads.get).not.toHaveBeenCalled();
+    expect(firstNetwork.heads.all).not.toHaveBeenCalled();
+  });
+
+  it('updates the head cache from replicated head updates', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          key: 'conversation:conversation-1',
+          value: {
+            id: 'conversation:conversation-1',
+            networkId: 'network-1',
+            updatedAt: 1,
+          },
+        },
+      },
+    });
+    firstNetwork.heads.get.mockClear();
+    firstNetwork.heads.all.mockClear();
+
+    await expect(registry.findHead('conversation:conversation-1')).resolves.toEqual(
+      {
+        id: 'conversation:conversation-1',
+        networkId: 'network-1',
+        updatedAt: 1,
+      },
+    );
+    expect(firstNetwork.heads.get).not.toHaveBeenCalled();
+    expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
 });
