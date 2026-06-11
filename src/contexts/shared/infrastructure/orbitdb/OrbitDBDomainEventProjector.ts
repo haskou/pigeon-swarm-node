@@ -158,7 +158,7 @@ export default class OrbitDBDomainEventProjector {
       'externalIdentifier',
     );
 
-    await this.put(stores.identities, {
+    const identity = {
       cid: externalIdentifier,
       handle: this.getStringAttribute(message, 'handle'),
       id: identityId,
@@ -173,7 +173,16 @@ export default class OrbitDBDomainEventProjector {
       ),
       receivedAt: this.receivedAt(message),
       version: this.getNumberAttribute(message, 'version'),
-    });
+    };
+
+    await this.put(stores.identities, identity);
+    await this.putHead(stores, `identity:${identityId}`, identity);
+
+    const handle = this.getStringAttribute(message, 'handle');
+
+    if (handle) {
+      await this.putHead(stores, `identity-handle:${handle}`, identity);
+    }
   }
 
   private async projectKeychain(
@@ -184,17 +193,21 @@ export default class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'ownerIdentityId') ||
       message.aggregate_id;
 
-    await this.put(stores.keychains, {
+    const keychain = {
       cid: this.getStringAttribute(message, 'externalIdentifier'),
       id: ownerIdentityId,
       lastEventId: message.event_id,
+      ownerIdentityId,
       previousCid: this.getStringAttribute(
         message,
         'previousExternalIdentifier',
       ),
       receivedAt: this.receivedAt(message),
       version: this.getNumberAttribute(message, 'version'),
-    });
+    };
+
+    await this.put(stores.keychains, keychain);
+    await this.putHead(stores, `keychain:${ownerIdentityId}`, keychain);
   }
 
   private async putCommunity(

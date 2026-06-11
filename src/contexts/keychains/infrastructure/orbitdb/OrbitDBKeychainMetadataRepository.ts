@@ -77,6 +77,37 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
       );
   }
 
+  private ownerHeadKey(ownerIdentityId: string): string {
+    return `keychain:${ownerIdentityId}`;
+  }
+
+  private async findHead(
+    key: string,
+  ): Promise<OrbitDBKeychainMetadataDocument | undefined> {
+    const document = await this.registry.findHead(key);
+
+    return document ? this.toRecord(document) : undefined;
+  }
+
+  private async putHead(
+    document: OrbitDBKeychainMetadataDocument,
+  ): Promise<void> {
+    await this.registry.putHead(
+      this.ownerHeadKey(document.ownerIdentityId),
+      document,
+    );
+  }
+
+  private async putHeadFrom(
+    documents: OrbitDBKeychainMetadataDocument[],
+  ): Promise<void> {
+    const [latestDocument] = documents;
+
+    if (latestDocument) {
+      await this.putHead(latestDocument);
+    }
+  }
+
   public async findAll(): Promise<KeychainMetadataRecord[]> {
     return this.findDocuments(() => true);
   }
@@ -84,9 +115,21 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
   public async findByOwnerIdentityId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainMetadataRecord[]> {
-    return this.findDocuments((document) =>
+    const head = await this.findHead(
+      this.ownerHeadKey(ownerIdentityId.valueOf()),
+    );
+
+    if (head) {
+      return [head];
+    }
+
+    const documents = await this.findDocuments((document) =>
       new IdentityId(document.ownerIdentityId).isEqual(ownerIdentityId),
     );
+
+    await this.putHeadFrom(documents);
+
+    return documents;
   }
 
   public async save(
@@ -94,14 +137,16 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<void> {
     const primitives = keychain.toPrimitives();
-
-    await this.registry.putDocument('keychains', {
+    const document: OrbitDBKeychainMetadataDocument = {
       cid: externalIdentifier.valueOf(),
       id: primitives.ownerIdentityId,
       ownerIdentityId: primitives.ownerIdentityId,
       previousCid: primitives.previousKeychainExternalIdentifier,
       receivedAt: Date.now(),
       version: primitives.version,
-    });
+    };
+
+    await this.registry.putDocument('keychains', document);
+    await this.putHead(document);
   }
 }

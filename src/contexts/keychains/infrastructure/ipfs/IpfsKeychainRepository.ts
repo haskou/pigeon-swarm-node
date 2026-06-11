@@ -10,7 +10,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
@@ -23,23 +22,25 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsKeychainMapper,
     private readonly metadataRepository: KeychainMetadataRepository,
-    private readonly replicatedStateRegistry: OrbitDBReplicatedStateRegistry,
   ) {
     super();
   }
 
   private async findCandidateFromCid(
     cid: IPFSId,
+    shouldSaveMetadata: boolean = true,
   ): Promise<Keychain | undefined> {
     try {
       const document =
         await this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
       const keychain = this.mapper.toDomain(document);
 
-      await this.metadataRepository.save(
-        keychain,
-        new KeychainExternalIdentifier(cid.valueOf()),
-      );
+      if (shouldSaveMetadata) {
+        await this.metadataRepository.save(
+          keychain,
+          new KeychainExternalIdentifier(cid.valueOf()),
+        );
+      }
 
       return keychain;
     } catch {
@@ -100,26 +101,64 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
+  private async shouldResolveMetadataCid(
+    metadata: KeychainMetadataRecord,
+  ): Promise<boolean> {
+    if (await this.ipfsManager.hasConnectedPeers()) {
+      return true;
+    }
+
+    try {
+      const isAvailableLocally = await this.ipfsManager.stat(
+        new IPFSId(metadata.cid),
+        true,
+      );
+
+      if (isAvailableLocally) {
+        return true;
+      }
+    } catch {
+      // Missing local content is valid metadata while the node is offline.
+    }
+
+    return false;
+  }
+
+  private async findCandidateReferenceFromMetadata(
+    metadata: KeychainMetadataRecord,
+  ): Promise<KeychainCandidate | undefined> {
+    if (!(await this.shouldResolveMetadataCid(metadata))) {
+      return undefined;
+    }
+
+    const candidate = await this.findCandidateFromCid(
+      new IPFSId(metadata.cid),
+      false,
+    );
+
+    if (!candidate) {
+      return undefined;
+    }
+
+    return {
+      externalIdentifier: new KeychainExternalIdentifier(metadata.cid),
+      keychain: candidate,
+      source: 'local',
+    };
+  }
+
   private async findLocalCandidateReferences(
     metadata: KeychainMetadataRecord[],
   ): Promise<KeychainCandidate[]> {
-    const candidates: KeychainCandidate[] = [];
-
     for (const document of metadata) {
-      const candidate = await this.findCandidateFromCid(
-        new IPFSId(document.cid),
-      );
+      const candidate = await this.findCandidateReferenceFromMetadata(document);
 
       if (candidate) {
-        candidates.push({
-          externalIdentifier: new KeychainExternalIdentifier(document.cid),
-          keychain: candidate,
-          source: 'local',
-        });
+        return [candidate];
       }
     }
 
-    return candidates;
+    return [];
   }
 
   private deduplicateMetadata(
@@ -137,70 +176,6 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  private replicatedStringValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  private replicatedNumberValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): number | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'number' ? value : undefined;
-  }
-
-  private metadataFromReplicatedDocument(
-    document: Record<string, unknown>,
-    ownerIdentityId: IdentityId,
-  ): KeychainMetadataRecord | undefined {
-    const cid = this.replicatedStringValue(document, 'cid');
-
-    if (!cid) {
-      return undefined;
-    }
-
-    return {
-      cid,
-      ownerIdentityId: ownerIdentityId.valueOf(),
-      previousCid: undefined,
-      receivedAt:
-        this.replicatedNumberValue(document, 'receivedAt') || Date.now(),
-      version: this.replicatedNumberValue(document, 'version') || 0,
-    };
-  }
-
-  private async findReplicatedMetadata(
-    ownerIdentityId: IdentityId,
-  ): Promise<KeychainMetadataRecord[]> {
-    try {
-      const documents = await this.replicatedStateRegistry.queryDocuments(
-        'keychains',
-        (document) =>
-          this.replicatedStringValue(document, 'id') ===
-            ownerIdentityId.valueOf() ||
-          this.replicatedStringValue(document, 'ownerIdentityId') ===
-            ownerIdentityId.valueOf(),
-      );
-
-      return documents
-        .map((document) =>
-          this.metadataFromReplicatedDocument(document, ownerIdentityId),
-        )
-        .filter(
-          (document): document is KeychainMetadataRecord =>
-            document !== undefined,
-        );
-    } catch {
-      return [];
-    }
-  }
-
   private async findRemoteCandidateReferences(
     ownerIdentityId: IdentityId,
     knownCids: Set<string>,
@@ -208,25 +183,31 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
     );
-    const candidates: KeychainCandidate[] = [];
+    const candidates = await Promise.all(
+      cidStrings
+        .filter((cidString) => !knownCids.has(cidString))
+        .map(async (cidString) => {
+          const candidate = await this.findCandidateFromCid(
+            new IPFSId(cidString),
+          );
 
-    for (const cidString of cidStrings) {
-      if (knownCids.has(cidString)) {
-        continue;
-      }
+          if (!candidate) {
+            return undefined;
+          }
 
-      const candidate = await this.findCandidateFromCid(new IPFSId(cidString));
+          const candidateReference: KeychainCandidate = {
+            externalIdentifier: new KeychainExternalIdentifier(cidString),
+            keychain: candidate,
+            source: 'remote',
+          };
 
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new KeychainExternalIdentifier(cidString),
-          keychain: candidate,
-          source: 'remote',
-        });
-      }
-    }
+          return candidateReference;
+        }),
+    );
 
-    return candidates;
+    return candidates.filter(
+      (candidate): candidate is KeychainCandidate => candidate !== undefined,
+    );
   }
 
   public async findByExternalIdentifier(
@@ -247,14 +228,17 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   public async findCandidateReferencesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]> {
-    const metadata = this.deduplicateMetadata([
-      ...(await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId)),
-      ...(await this.findReplicatedMetadata(ownerIdentityId)),
-    ]);
+    const metadata = this.deduplicateMetadata(
+      await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId),
+    );
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
     if (localCandidates.length > 0) {
       return localCandidates;
+    }
+
+    if (!(await this.ipfsManager.hasConnectedPeers())) {
+      return [];
     }
 
     return this.findRemoteCandidateReferences(

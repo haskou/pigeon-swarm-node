@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
@@ -23,7 +22,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsIdentityMapper,
     private readonly metadataRepository: IdentityMetadataRepository,
-    private readonly replicatedStateRegistry: OrbitDBReplicatedStateRegistry,
   ) {
     super();
   }
@@ -31,17 +29,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   private async findValidMetadata(
     id: IdentityId,
   ): Promise<IdentityMetadataRecord[]> {
-    const documents: IdentityMetadataRecord[] = [];
-
     try {
-      documents.push(...(await this.metadataRepository.findByIdentityId(id)));
+      return this.deduplicateMetadata(
+        await this.metadataRepository.findByIdentityId(id),
+      );
     } catch {
-      return this.findReplicatedMetadata(id);
+      return [];
     }
-
-    documents.push(...(await this.findReplicatedMetadata(id)));
-
-    return this.deduplicateMetadata(documents);
   }
 
   private deduplicateMetadata(
@@ -57,69 +51,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       (left, right) =>
         right.version - left.version || right.receivedAt - left.receivedAt,
     );
-  }
-
-  private replicatedStringValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  private replicatedNumberValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): number | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'number' ? value : undefined;
-  }
-
-  private metadataFromReplicatedDocument(
-    document: Record<string, unknown>,
-    identityId: IdentityId,
-  ): IdentityMetadataRecord | undefined {
-    const cid = this.replicatedStringValue(document, 'cid');
-
-    if (!cid) {
-      return undefined;
-    }
-
-    const networkId = this.replicatedStringValue(document, 'networkId');
-
-    return {
-      cid,
-      identityId: identityId.valueOf(),
-      networkIds: networkId ? [networkId] : undefined,
-      previousCid: undefined,
-      receivedAt:
-        this.replicatedNumberValue(document, 'receivedAt') || Date.now(),
-      version: this.replicatedNumberValue(document, 'version') || 0,
-    };
-  }
-
-  private async findReplicatedMetadata(
-    id: IdentityId,
-  ): Promise<IdentityMetadataRecord[]> {
-    try {
-      const documents = await this.replicatedStateRegistry.queryDocuments(
-        'identities',
-        (document) =>
-          this.replicatedStringValue(document, 'id') === id.valueOf() ||
-          this.replicatedStringValue(document, 'identityId') === id.valueOf(),
-      );
-
-      return documents
-        .map((document) => this.metadataFromReplicatedDocument(document, id))
-        .filter(
-          (document): document is IdentityMetadataRecord =>
-            document !== undefined,
-        );
-    } catch {
-      return [];
-    }
   }
 
   private async deleteMetadata(cid: IPFSId): Promise<void> {
@@ -160,6 +91,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   private async shouldResolveMetadataCid(
     metadata: IdentityMetadataRecord,
   ): Promise<boolean> {
+    if (await this.ipfsManager.hasConnectedPeers()) {
+      return true;
+    }
+
     try {
       const isAvailableLocally = await this.ipfsManager.stat(
         new IPFSId(metadata.cid),
@@ -174,7 +109,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       // Missing local content is valid metadata while the node is offline.
     }
 
-    return this.ipfsManager.hasConnectedPeers();
+    return false;
   }
 
   private async findCandidateFromCid(
@@ -235,8 +170,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         return undefined;
       }
 
-      await this.saveMetadata(candidate, cid);
-
       return candidate;
     } catch {
       await this.deleteMetadata(new IPFSId(metadata.cid));
@@ -264,13 +197,43 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     };
   }
 
-  private async findCandidateReferencesFromMetadata(
+  private async findFirstCandidateReferenceFromMetadata(
     metadata: IdentityMetadataRecord[],
+  ): Promise<IdentityCandidate | undefined> {
+    for (const document of metadata) {
+      const candidate = await this.findCandidateReferenceFromMetadata(document);
+
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async findCandidateReferencesFromCids(
+    id: IdentityId,
+    cidStrings: string[],
+    knownCids: Set<string>,
   ): Promise<IdentityCandidate[]> {
     const candidates = await Promise.all(
-      metadata.map((document) =>
-        this.findCandidateReferenceFromMetadata(document),
-      ),
+      cidStrings
+        .filter((cidString) => !knownCids.has(cidString))
+        .map(async (cidString) => {
+          const candidate = await this.findCandidateFromCid(
+            id,
+            new IPFSId(cidString),
+          );
+
+          if (!candidate) {
+            return undefined;
+          }
+
+          return {
+            externalIdentifier: new IdentityExternalIdentifier(cidString),
+            identity: candidate,
+          };
+        }),
     );
 
     return candidates.filter(
@@ -346,34 +309,27 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {
     const metadata = await this.findValidMetadata(id);
-    const candidates = await this.findCandidateReferencesFromMetadata(metadata);
+    const candidate =
+      await this.findFirstCandidateReferenceFromMetadata(metadata);
 
-    if (candidates.length > 0) {
-      return candidates;
+    if (candidate) {
+      return [candidate];
     }
 
     const knownCids = new Set(metadata.map((document) => document.cid));
+
+    if (!(await this.ipfsManager.hasConnectedPeers())) {
+      throw new IdentityNotFoundError(id.valueOf());
+    }
+
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + id.valueOf(),
     );
-
-    for (const cidString of cidStrings) {
-      if (knownCids.has(cidString)) {
-        continue;
-      }
-
-      const candidate = await this.findCandidateFromCid(
-        id,
-        new IPFSId(cidString),
-      );
-
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new IdentityExternalIdentifier(cidString),
-          identity: candidate,
-        });
-      }
-    }
+    const candidates = await this.findCandidateReferencesFromCids(
+      id,
+      cidStrings,
+      knownCids,
+    );
 
     if (candidates.length === 0) {
       throw new IdentityNotFoundError(id.valueOf());

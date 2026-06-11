@@ -12,6 +12,7 @@ describe('OrbitDBConversationRepository', () => {
   const heads = new Map<string, Record<string, unknown>>();
   const conversationDocuments: Record<string, unknown>[] = [];
   const messageDocuments: Record<string, unknown>[] = [];
+  let messagesQuery: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBConversationRepository;
   let mother: ConversationMother;
@@ -21,6 +22,9 @@ describe('OrbitDBConversationRepository', () => {
     conversationDocuments.splice(0);
     messageDocuments.splice(0);
     mother = await ConversationMother.create();
+    messagesQuery = jest.fn(async (matcher) =>
+      messageDocuments.filter(matcher),
+    );
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     registry.register(mother.networkId.valueOf(), {
@@ -51,7 +55,7 @@ describe('OrbitDBConversationRepository', () => {
 
           return 'ok';
         }),
-        query: jest.fn(async (matcher) => messageDocuments.filter(matcher)),
+        query: messagesQuery,
       },
     } as never);
     repository = new OrbitDBConversationRepository(
@@ -139,6 +143,41 @@ describe('OrbitDBConversationRepository', () => {
 
     expect(beforeRead.get(conversation.getId().valueOf())).toBe(2);
     expect(afterRead.get(conversation.getId().valueOf())).toBe(1);
+  });
+
+  it('should count unread messages for several conversations with one messages query', async () => {
+    const secondAuthor = await ConversationMother.generateIdentityId();
+    const firstConversation = mother.build();
+    const secondConversation = new ConversationMother(
+      secondAuthor,
+      mother.recipient,
+      mother.networkId,
+    ).build();
+
+    firstConversation.sendMessage(
+      mother.author,
+      new EncryptedMessagePayload('first'),
+      signature(),
+      { createdAt: new Timestamp(1780000000000) },
+    );
+    secondConversation.sendMessage(
+      secondAuthor,
+      new EncryptedMessagePayload('second'),
+      signature(),
+      { createdAt: new Timestamp(1780000000001) },
+    );
+    await repository.save(firstConversation);
+    await repository.save(secondConversation);
+    messagesQuery.mockClear();
+
+    const unreadCounts = await repository.countUnreadByRecipient(
+      mother.recipient,
+      [firstConversation.getId(), secondConversation.getId()],
+    );
+
+    expect(messagesQuery).toHaveBeenCalledTimes(1);
+    expect(unreadCounts.get(firstConversation.getId().valueOf())).toBe(1);
+    expect(unreadCounts.get(secondConversation.getId().valueOf())).toBe(1);
   });
 
   it('should hide target messages after saving a deletion', async () => {

@@ -6,23 +6,16 @@ import { KeychainMother } from '../../../../mothers/KeychainMother';
 
 describe('OrbitDBKeychainMetadataRepository', () => {
   const documents: Record<string, unknown>[] = [];
+  const heads = new Map<string, Record<string, unknown>>();
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBKeychainMetadataRepository;
 
   beforeEach(() => {
     documents.splice(0);
+    heads.clear();
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', {
-      keychains: {
-        put: jest.fn(async (document) => {
-          upsertDocument(documents, document);
-
-          return 'ok';
-        }),
-        query: jest.fn(async (matcher) => documents.filter(matcher)),
-      },
-    } as never);
+    registry.register('network-1', keychainStores(documents, heads));
     repository = new OrbitDBKeychainMetadataRepository(registry);
   });
 
@@ -85,7 +78,64 @@ describe('OrbitDBKeychainMetadataRepository', () => {
       expect.objectContaining({ cid: 'old' }),
     ]);
   });
+
+  it('should read keychain metadata by owner from the head index', async () => {
+    const mother = await KeychainMother.create();
+    const keychain = mother.withVersion(3).build();
+
+    await repository.save(
+      keychain,
+      new KeychainExternalIdentifier('bafykeychain-head'),
+    );
+    documents.splice(0);
+
+    const records = await repository.findByOwnerIdentityId(
+      mother.ownerIdentityId,
+    );
+
+    expect(records).toEqual([
+      expect.objectContaining({
+        cid: 'bafykeychain-head',
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+        version: 3,
+      }),
+    ]);
+  });
 });
+
+function keychainStores(
+  currentDocuments: Record<string, unknown>[],
+  currentHeads: Map<string, Record<string, unknown>>,
+) {
+  return {
+    heads: {
+      all: jest.fn(async () =>
+        [...currentHeads.entries()].map(([key, value]) => ({ key, value })),
+      ),
+      get: jest.fn(async (key: string) => {
+        const value = currentHeads.get(key);
+
+        return value ? { key, value } : undefined;
+      }),
+      put: jest.fn(async (key: string, value: Record<string, unknown>) => {
+        currentHeads.set(key, value);
+
+        return 'ok';
+      }),
+    },
+    keychains: {
+      put: jest.fn(async (document: Record<string, unknown>) => {
+        upsertDocument(currentDocuments, document);
+
+        return 'ok';
+      }),
+      query: jest.fn(
+        async (matcher: (document: Record<string, unknown>) => boolean) =>
+          currentDocuments.filter(matcher),
+      ),
+    },
+  } as never;
+}
 
 function upsertDocument(
   currentDocuments: Record<string, unknown>[],

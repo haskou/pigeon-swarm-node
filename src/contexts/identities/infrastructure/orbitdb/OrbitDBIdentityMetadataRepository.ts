@@ -107,6 +107,61 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
       );
   }
 
+  private identityHeadKey(identityId: string): string {
+    return `identity:${identityId}`;
+  }
+
+  private handleHeadKey(handle: string): string {
+    return `identity-handle:${handle}`;
+  }
+
+  private async findHead(
+    key: string,
+  ): Promise<OrbitDBIdentityMetadataDocument | undefined> {
+    const document = await this.registry.findHead(key);
+
+    return document ? this.toRecord(document) : undefined;
+  }
+
+  private networkIdsFor(document: OrbitDBIdentityMetadataDocument): string[] {
+    return [
+      ...new Set([
+        ...(document.networkIds || []),
+        ...(document.networkId ? [document.networkId] : []),
+      ]),
+    ];
+  }
+
+  private async putHeads(
+    document: OrbitDBIdentityMetadataDocument,
+  ): Promise<void> {
+    const networkIds = this.networkIdsFor(document);
+
+    await this.registry.putHead(
+      this.identityHeadKey(document.identityId),
+      document,
+      networkIds,
+    );
+
+    if (document.handle) {
+      await this.registry.putHead(
+        this.handleHeadKey(document.handle),
+        document,
+        networkIds,
+      );
+    }
+  }
+
+  private async putHeadsFrom(
+    documents: OrbitDBIdentityMetadataDocument[],
+  ): Promise<void> {
+    const [latestDocument] = documents;
+
+    if (latestDocument) {
+      await this.putHeads(latestDocument);
+    }
+  }
+
   public async findAll(): Promise<IdentityMetadataRecord[]> {
     return this.findDocuments(() => true);
   }
@@ -114,17 +169,39 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
   public async findByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
-    return this.findDocuments(
+    const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
+
+    if (head) {
+      return [head];
+    }
+
+    const documents = await this.findDocuments(
       (document) => document.handle === handle.valueOf(),
     );
+
+    await this.putHeadsFrom(documents);
+
+    return documents;
   }
 
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityMetadataRecord[]> {
-    return this.findDocuments((document) =>
+    const head = await this.findHead(
+      this.identityHeadKey(identityId.valueOf()),
+    );
+
+    if (head) {
+      return [head];
+    }
+
+    const documents = await this.findDocuments((document) =>
       new IdentityId(document.identityId).isEqual(identityId),
     );
+
+    await this.putHeadsFrom(documents);
+
+    return documents;
   }
 
   public async findLatestByNetworkId(
@@ -151,8 +228,7 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     const primitives = identity.toPrimitives();
-
-    await this.registry.putDocument('identities', {
+    const document: OrbitDBIdentityMetadataDocument = {
       cid: externalIdentifier.valueOf(),
       handle: primitives.profile.handle,
       id: primitives.id,
@@ -161,7 +237,10 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
       previousCid: primitives.previousIdentityExternalIdentifier,
       receivedAt: Date.now(),
       version: primitives.version,
-    });
+    };
+
+    await this.registry.putDocument('identities', document);
+    await this.putHeads(document);
   }
 
   public async deleteByExternalIdentifier(
@@ -174,6 +253,14 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     await Promise.all(
       documents.map((document) =>
         this.registry.putDocument('identities', {
+          ...document,
+          deleted: true,
+        }),
+      ),
+    );
+    await Promise.all(
+      documents.map((document) =>
+        this.putHeads({
           ...document,
           deleted: true,
         }),

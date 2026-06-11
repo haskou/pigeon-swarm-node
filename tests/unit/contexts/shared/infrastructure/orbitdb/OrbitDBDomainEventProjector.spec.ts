@@ -11,6 +11,8 @@ import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/dom
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
 import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
+import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
 import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
@@ -73,6 +75,72 @@ function replicatedMessage(
 
 describe('OrbitDBDomainEventProjector', () => {
   const projector = new OrbitDBDomainEventProjector();
+
+  it('projects identity and keychain events into direct lookup heads', async () => {
+    const stores = fakeStores();
+
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        IdentityWasCreatedEvent.EVENT_NAME,
+        {
+          externalIdentifier: 'bafyidentity',
+          handle: 'hasko',
+          networkIds: ['network-1'],
+          version: 1,
+        },
+        'identity-1',
+      ),
+    );
+    await projector.project(
+      storesFrom(stores),
+      replicatedMessage(
+        KeychainWasPublishedEvent.EVENT_NAME,
+        {
+          externalIdentifier: 'bafykeychain',
+          ownerIdentityId: 'identity-1',
+          version: 2,
+        },
+        'identity-1',
+      ),
+    );
+
+    expect(stores.identities.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cid: 'bafyidentity',
+        handle: 'hasko',
+        id: 'identity-1',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'identity:identity-1',
+      expect.objectContaining({
+        cid: 'bafyidentity',
+        id: 'identity-1',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'identity-handle:hasko',
+      expect.objectContaining({
+        cid: 'bafyidentity',
+        id: 'identity-1',
+      }),
+    );
+    expect(stores.keychains.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cid: 'bafykeychain',
+        id: 'identity-1',
+        ownerIdentityId: 'identity-1',
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'keychain:identity-1',
+      expect.objectContaining({
+        cid: 'bafykeychain',
+        ownerIdentityId: 'identity-1',
+      }),
+    );
+  });
 
   it('projects conversation events into replicated read model stores', async () => {
     const stores = fakeStores();

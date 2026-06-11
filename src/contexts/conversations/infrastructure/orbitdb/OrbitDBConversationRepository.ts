@@ -486,25 +486,65 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     conversationIds: ConversationId[],
   ): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
+    const conversationIdValues = new Set(
+      conversationIds.map((conversationId) => conversationId.valueOf()),
+    );
 
-    for (const conversationId of conversationIds) {
-      const readUntil = await this.readMarkerMessageCreatedAt(
-        conversationId,
-        recipientIdentityId,
-      );
-      const documents = await this.findMessageDocuments(
+    if (conversationIdValues.size === 0) {
+      return counts;
+    }
+
+    const readMarkers = await Promise.all(
+      conversationIds.map(async (conversationId) => {
+        const marker = await this.registry.findHead(
+          `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
+        );
+
+        return {
+          conversationId: conversationId.valueOf(),
+          messageId: marker ? this.stringValue(marker, 'messageId') : undefined,
+        };
+      }),
+    );
+    const documents = this.deduplicateMessages(
+      await this.findMessageDocuments(
         (candidate) =>
           this.stringValue(candidate, 'scopeType') === 'conversation' &&
-          this.stringValue(candidate, 'conversationId') ===
-            conversationId.valueOf(),
-      );
-      const count = this.deduplicateMessages(documents).filter((document) =>
-        this.isUnreadFor(document, recipientIdentityId, readUntil),
-      ).length;
+          conversationIdValues.has(
+            this.stringValue(candidate, 'conversationId') || '',
+          ),
+      ),
+    );
+    const documentsByMessageId = new Map(
+      documents.map((document) => [
+        `${document.conversationId}:${document.id}`,
+        document,
+      ]),
+    );
+    const readUntilByConversationId = new Map<string, number | undefined>(
+      readMarkers.map((marker) => [
+        marker.conversationId,
+        marker.messageId
+          ? documentsByMessageId.get(
+              `${marker.conversationId}:${marker.messageId}`,
+            )?.createdAt
+          : undefined,
+      ]),
+    );
 
-      if (count > 0) {
-        counts.set(conversationId.valueOf(), count);
+    for (const document of documents) {
+      const readUntil = readUntilByConversationId.get(document.conversationId);
+
+      if (
+        this.isUnreadFor(document, recipientIdentityId, readUntil) === false
+      ) {
+        continue;
       }
+
+      counts.set(
+        document.conversationId,
+        (counts.get(document.conversationId) || 0) + 1,
+      );
     }
 
     return counts;

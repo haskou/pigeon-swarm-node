@@ -12,7 +12,6 @@ import IdentityMetadataRepository from '../../../../../../src/contexts/identitie
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
-import OrbitDBReplicatedStateRegistry from '../../../../../../src/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { KeyPair } from '@haskou/value-objects';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
@@ -20,7 +19,6 @@ describe('IpfsIdentityRepository', () => {
   let ipfsManager: MockProxy<IPFS>;
   let mapper: IpfsIdentityMapper;
   let metadataRepository: MockProxy<IdentityMetadataRepository>;
-  let replicatedStateRegistry: OrbitDBReplicatedStateRegistry;
   let repository: IpfsIdentityRepository;
   let mother: IdentityMother;
 
@@ -28,21 +26,15 @@ describe('IpfsIdentityRepository', () => {
     ipfsManager = mock<IPFS>();
     mapper = new IpfsIdentityMapper();
     metadataRepository = mock<IdentityMetadataRepository>();
-    replicatedStateRegistry = new OrbitDBReplicatedStateRegistry();
     repository = new IpfsIdentityRepository(
       ipfsManager,
       mapper,
       metadataRepository,
-      replicatedStateRegistry,
     );
     mother = new IdentityMother();
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
     ipfsManager.stat.mockResolvedValue(true);
-    replicatedStateRegistry.clear();
-  });
-
-  afterEach(() => {
-    replicatedStateRegistry.clear();
+    ipfsManager.hasConnectedPeers.mockResolvedValue(true);
   });
 
   async function createSignedIdentityForNetwork(
@@ -113,7 +105,7 @@ describe('IpfsIdentityRepository', () => {
   });
 
   describe('findById', () => {
-    it('should find identity using mongo metadata before DHT fallback', async () => {
+    it('should find identity using metadata before DHT fallback', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -134,10 +126,11 @@ describe('IpfsIdentityRepository', () => {
 
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(metadataRepository.save).not.toHaveBeenCalled();
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should not wait for DHT candidates when mongo has a valid candidate', async () => {
+    it('should not wait for DHT candidates when metadata has a valid candidate', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -166,39 +159,6 @@ describe('IpfsIdentityRepository', () => {
         new IPFSId(dhtCidString),
       );
       expect(result).toHaveLength(1);
-    });
-
-    it('should find identity using replicated OrbitDB metadata before DHT fallback', async () => {
-      const identity = await mother.build();
-      const primitives = identity.toPrimitives();
-      const identityId = new IdentityId(primitives.id);
-      const cidString = 'bafyorbitidentity';
-
-      metadataRepository.findByIdentityId.mockResolvedValue([]);
-      replicatedStateRegistry.register('network-1', {
-        identities: {
-          query: jest.fn().mockResolvedValue([
-            {
-              cid: cidString,
-              id: primitives.id,
-              networkId: primitives.networks[0],
-              receivedAt: Date.now(),
-              version: primitives.version,
-            },
-          ]),
-        },
-      } as never);
-      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
-
-      const result = await repository.findById(identityId);
-
-      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
-      expect(metadataRepository.save).toHaveBeenCalledWith(
-        identity,
-        new IPFSId(cidString),
-      );
-      expect(result.toPrimitives()).toEqual(primitives);
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
@@ -459,6 +419,7 @@ describe('IpfsIdentityRepository', () => {
         IdentityNotFoundError,
       );
 
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(
         metadataRepository.deleteByExternalIdentifier,

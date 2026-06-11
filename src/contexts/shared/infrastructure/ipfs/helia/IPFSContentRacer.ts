@@ -17,10 +17,25 @@ export default class IPFSContentRacer {
     );
   }
 
-  private startTimeout(
+  private async withTimeout<T>(
     controller: AbortController,
-  ): ReturnType<typeof setTimeout> {
-    return setTimeout(() => controller.abort(), this.timeoutMs);
+    operation: Promise<T>,
+  ): Promise<T> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutOperation = new Promise<T>((_, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new Error('IPFS operation timed out'));
+      }, this.timeoutMs);
+    });
+
+    try {
+      return await Promise.race([operation, timeoutOperation]);
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
   }
 
   public async raceGetJSON<T>(
@@ -28,11 +43,13 @@ export default class IPFSContentRacer {
     cid: IPFSId,
   ): Promise<T> {
     const controller = new AbortController();
-    const timeout = this.startTimeout(controller);
 
     try {
-      const result = await Promise.any(
-        networks.map((network) => network.getJSON<T>(cid, controller.signal)),
+      const result = await this.withTimeout(
+        controller,
+        Promise.any(
+          networks.map((network) => network.getJSON<T>(cid, controller.signal)),
+        ),
       );
 
       controller.abort();
@@ -41,7 +58,7 @@ export default class IPFSContentRacer {
     } catch {
       throw new IPFSContentNotFoundError(cid.valueOf());
     } finally {
-      clearTimeout(timeout);
+      controller.abort();
     }
   }
 
@@ -50,11 +67,13 @@ export default class IPFSContentRacer {
     cid: IPFSId,
   ): Promise<Buffer> {
     const controller = new AbortController();
-    const timeout = this.startTimeout(controller);
 
     try {
-      const result = await Promise.any(
-        networks.map((network) => network.getBytes(cid, controller.signal)),
+      const result = await this.withTimeout(
+        controller,
+        Promise.any(
+          networks.map((network) => network.getBytes(cid, controller.signal)),
+        ),
       );
 
       controller.abort();
@@ -63,28 +82,28 @@ export default class IPFSContentRacer {
     } catch {
       throw new IPFSContentNotFoundError(cid.valueOf());
     } finally {
-      clearTimeout(timeout);
+      controller.abort();
     }
   }
 
   public async raceStat(networks: IPFSNetwork[], cid: IPFSId): Promise<void> {
     const controller = new AbortController();
-    const timeout = this.startTimeout(controller);
 
     try {
-      await Promise.any(
-        networks.map((network) => network.stat(cid, false, controller.signal)),
+      await this.withTimeout(
+        controller,
+        Promise.any(
+          networks.map((network) =>
+            network.stat(cid, false, controller.signal),
+          ),
+        ),
       );
 
       controller.abort();
-    } catch (error) {
-      if (controller.signal.aborted) {
-        throw error;
-      }
-
+    } catch {
       throw new IPFSContentNotFoundError(cid.valueOf());
     } finally {
-      clearTimeout(timeout);
+      controller.abort();
     }
   }
 
@@ -93,18 +112,20 @@ export default class IPFSContentRacer {
     key: string,
   ): Promise<string | undefined> {
     const controller = new AbortController();
-    const timeout = this.startTimeout(controller);
 
     try {
-      const result = await Promise.any(
-        networks.map((network) =>
-          network.getRecord(key, controller.signal).then((value) => {
-            if (value === undefined) {
-              throw new Error('Record not found in this network');
-            }
+      const result = await this.withTimeout(
+        controller,
+        Promise.any(
+          networks.map((network) =>
+            network.getRecord(key, controller.signal).then((value) => {
+              if (value === undefined) {
+                throw new Error('Record not found in this network');
+              }
 
-            return value;
-          }),
+              return value;
+            }),
+          ),
         ),
       );
 
@@ -114,7 +135,7 @@ export default class IPFSContentRacer {
     } catch {
       return undefined;
     } finally {
-      clearTimeout(timeout);
+      controller.abort();
     }
   }
 
@@ -123,11 +144,13 @@ export default class IPFSContentRacer {
     key: string,
   ): Promise<string[]> {
     const controller = new AbortController();
-    const timeout = this.startTimeout(controller);
 
     try {
-      const results = await Promise.allSettled(
-        networks.map((network) => network.getRecord(key, controller.signal)),
+      const results = await this.withTimeout(
+        controller,
+        Promise.allSettled(
+          networks.map((network) => network.getRecord(key, controller.signal)),
+        ),
       );
 
       return [
@@ -138,9 +161,10 @@ export default class IPFSContentRacer {
             .filter((value) => value !== undefined),
         ),
       ];
+    } catch {
+      return [];
     } finally {
       controller.abort();
-      clearTimeout(timeout);
     }
   }
 }
