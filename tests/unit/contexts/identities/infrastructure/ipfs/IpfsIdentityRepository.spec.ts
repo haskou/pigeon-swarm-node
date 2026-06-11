@@ -185,6 +185,30 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
+    it('should resolve local record candidates when metadata is missing and no peers are connected', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const cidString = 'bafylocalrecordidentity';
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+      ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(cidString),
+      );
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
     it('should delete broken mongo metadata and fallback to DHT', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();

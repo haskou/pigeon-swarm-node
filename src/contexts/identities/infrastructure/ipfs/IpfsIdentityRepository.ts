@@ -318,7 +318,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
     const knownCids = new Set(metadata.map((document) => document.cid));
 
-    if (!(await this.ipfsManager.hasConnectedPeers())) {
+    if (metadata.length > 0 && !(await this.ipfsManager.hasConnectedPeers())) {
       throw new IdentityNotFoundError(id.valueOf());
     }
 
