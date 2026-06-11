@@ -43,13 +43,11 @@ function fakeStores(): Record<string, FakeStore> {
 
         return value ? { key, value } : undefined;
       }),
-      put: jest.fn(
-        async (key: string, value: Record<string, unknown>) => {
-          heads.set(key, value);
+      put: jest.fn(async (key: string, value: Record<string, unknown>) => {
+        heads.set(key, value);
 
-          return 'ok';
-        },
-      ),
+        return 'ok';
+      }),
     },
     identities: fakeStore(),
     contentReplication: fakeStore(),
@@ -400,6 +398,22 @@ describe('OrbitDBDomainEventProjector', () => {
       expect.objectContaining({
         id: 'community-1',
         lastEventType: CommunityWasCreatedEvent.EVENT_NAME,
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'community:community-1',
+      expect.objectContaining({
+        id: 'community-1',
+        lastEventType: CommunityWasCreatedEvent.EVENT_NAME,
+      }),
+    );
+    expect(stores.heads.put).toHaveBeenCalledWith(
+      'community-member-index:identity-1',
+      expect.objectContaining({
+        communities: expect.arrayContaining([
+          expect.objectContaining({ id: 'community-1' }),
+        ]),
+        memberId: 'identity-1',
       }),
     );
     expect(stores.messages.put).toHaveBeenCalledWith(

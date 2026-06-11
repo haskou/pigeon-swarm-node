@@ -303,12 +303,41 @@ export default class OrbitDBDomainEventProjector {
       this.getStringAttribute(message, 'communityId') ||
       message.aggregate_id;
 
-    await this.put(stores.communities, {
+    const document = {
       ...community,
       id: communityId,
       lastEventId: message.event_id,
       lastEventType: message.type,
       receivedAt: this.receivedAt(message),
+    };
+
+    await this.put(stores.communities, document);
+    await this.putFreshHead(stores, `community:${communityId}`, document);
+    await Promise.all(
+      this.stringArrayValue(document, 'memberIds').map((memberId) =>
+        this.putCommunityMemberIndex(stores, memberId, document),
+      ),
+    );
+  }
+
+  private async putCommunityMemberIndex(
+    stores: OrbitDBReplicatedStateStores,
+    memberId: string,
+    community: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `community-member-index:${memberId}`;
+    const communities = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'communities'),
+      community,
+    ).filter((document) =>
+      this.stringArrayValue(document, 'memberIds').includes(memberId),
+    );
+
+    await this.putHead(stores, key, {
+      communities,
+      id: key,
+      memberId,
+      updatedAt: Date.now(),
     });
   }
 
@@ -324,12 +353,9 @@ export default class OrbitDBDomainEventProjector {
       return;
     }
 
-    await this.put(stores.communities, {
+    await this.putCommunity(stores, message, {
       ...message.attributes,
       id: message.aggregate_id,
-      lastEventId: message.event_id,
-      lastEventType: message.type,
-      receivedAt: this.receivedAt(message),
     });
   }
 

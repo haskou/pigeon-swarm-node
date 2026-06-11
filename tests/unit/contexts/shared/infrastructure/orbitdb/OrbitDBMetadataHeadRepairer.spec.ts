@@ -3,6 +3,7 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 
 describe('OrbitDBMetadataHeadRepairer', () => {
   const heads = new Map<string, Record<string, unknown>>();
+  const communities: Record<string, unknown>[] = [];
   const identities: Record<string, unknown>[] = [];
   const keychains: Record<string, unknown>[] = [];
   let registry: OrbitDBReplicatedStateRegistry;
@@ -10,12 +11,13 @@ describe('OrbitDBMetadataHeadRepairer', () => {
 
   beforeEach(() => {
     heads.clear();
+    communities.splice(0);
     identities.splice(0);
     keychains.splice(0);
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register(
       'network-1',
-      replicatedStores(heads, identities, keychains),
+      replicatedStores(heads, communities, identities, keychains),
     );
     repairer = new OrbitDBMetadataHeadRepairer(registry);
   });
@@ -24,7 +26,18 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     registry.clear();
   });
 
-  it('should repair identity and keychain heads from latest metadata documents', async () => {
+  it('should repair community, identity and keychain heads from latest metadata documents', async () => {
+    communities.push({
+      createdAt: 1,
+      description: 'Community',
+      id: 'community-1',
+      memberIds: ['identity-1'],
+      name: 'Community',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-1',
+      textChannels: [],
+      visibility: 'private',
+    });
     heads.set('identity:identity-1', {
       cid: 'identity-v1',
       id: 'identity-1',
@@ -77,9 +90,18 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     );
 
     await expect(repairer.repair()).resolves.toEqual({
+      communities: 1,
       identities: 1,
       keychains: 1,
     });
+    expect(heads.get('community:community-1')).toEqual(
+      expect.objectContaining({ id: 'community-1' }),
+    );
+    expect(heads.get('community-member-index:identity-1')).toEqual(
+      expect.objectContaining({
+        communities: [expect.objectContaining({ id: 'community-1' })],
+      }),
+    );
     expect(heads.get('identity:identity-1')).toEqual(
       expect.objectContaining({ cid: 'identity-v2', version: 2 }),
     );
@@ -94,6 +116,7 @@ describe('OrbitDBMetadataHeadRepairer', () => {
 
 function replicatedStores(
   heads: Map<string, Record<string, unknown>>,
+  communities: Record<string, unknown>[],
   identities: Record<string, unknown>[],
   keychains: Record<string, unknown>[],
 ) {
@@ -112,6 +135,12 @@ function replicatedStores(
 
         return 'ok';
       }),
+    },
+    communities: {
+      query: jest.fn(
+        async (matcher: (document: Record<string, unknown>) => boolean) =>
+          communities.filter(matcher),
+      ),
     },
     identities: {
       query: jest.fn(

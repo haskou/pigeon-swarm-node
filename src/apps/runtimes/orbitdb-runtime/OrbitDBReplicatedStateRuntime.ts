@@ -120,7 +120,7 @@ export default class OrbitDBReplicatedStateRuntime {
     const repairedHeads = await this.metadataHeadRepairer.repair();
 
     Kernel.logger.info(
-      `OrbitDB replicated state ready: networkId=${networkId} peerId=${localPeerId} repairedIdentityHeads=${repairedHeads.identities} repairedKeychainHeads=${repairedHeads.keychains}`,
+      `OrbitDB replicated state ready: networkId=${networkId} peerId=${localPeerId} repairedCommunityHeads=${repairedHeads.communities} repairedIdentityHeads=${repairedHeads.identities} repairedKeychainHeads=${repairedHeads.keychains}`,
     );
   }
 

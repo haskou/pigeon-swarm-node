@@ -30,6 +30,10 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
   private hasStringFields(
     value: Record<string, unknown>,
     fields: string[],
@@ -71,20 +75,121 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       .sort((left, right) => right.createdAt - left.createdAt);
   }
 
-  public async delete(community: Community): Promise<void> {
-    const document = this.mapper.toDocument(community);
+  private communityHeadKey(communityId: string): string {
+    return `community:${communityId}`;
+  }
 
-    await this.registry.putDocument('communities', {
-      ...document,
-      deleted: true,
-      deletedAt: Date.now(),
+  private memberIndexHeadKey(identityId: string): string {
+    return `community-member-index:${identityId}`;
+  }
+
+  private communityDocumentsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): OrbitDBCommunityDocument[] | undefined {
+    if (!record) {
+      return undefined;
+    }
+
+    const communities = record.communities;
+
+    if (!Array.isArray(communities)) {
+      return [];
+    }
+
+    return communities
+      .filter((community): community is Record<string, unknown> =>
+        this.isRecord(community),
+      )
+      .filter((community): community is OrbitDBCommunityDocument =>
+        this.isDocument(community),
+      );
+  }
+
+  private deduplicateDocuments(
+    documents: OrbitDBCommunityDocument[],
+  ): OrbitDBCommunityDocument[] {
+    const deduplicated = new Map<string, OrbitDBCommunityDocument>();
+
+    for (const document of documents) {
+      deduplicated.set(document.id, document);
+    }
+
+    return [...deduplicated.values()].sort(
+      (left, right) => right.createdAt - left.createdAt,
+    );
+  }
+
+  private async findHead(
+    id: CommunityId,
+  ): Promise<Record<string, unknown> | undefined> {
+    return this.registry.findHead(this.communityHeadKey(id.valueOf()));
+  }
+
+  private async putMemberIndex(
+    identityId: string,
+    community: OrbitDBCommunityDocument,
+  ): Promise<void> {
+    const key = this.memberIndexHeadKey(identityId);
+    const indexedCommunities =
+      this.communityDocumentsFromIndex(await this.registry.findHead(key)) || [];
+    const communities = this.deduplicateDocuments([
+      ...indexedCommunities,
+      community,
+    ]).filter((document) => document.memberIds.includes(identityId));
+
+    await this.registry.putHead(key, {
+      communities: communities.map((document) => ({ ...document })),
+      id: key,
+      identityId,
+      updatedAt: Date.now(),
     });
   }
 
+  private async putHeads(document: OrbitDBCommunityDocument): Promise<void> {
+    await this.registry.putHead(this.communityHeadKey(document.id), {
+      ...document,
+    });
+    await Promise.all(
+      document.memberIds.map((memberId) =>
+        this.putMemberIndex(memberId, document),
+      ),
+    );
+  }
+
+  public async delete(community: Community): Promise<void> {
+    const document = this.mapper.toDocument(community);
+
+    const deletedDocument = {
+      ...document,
+      deleted: true,
+      deletedAt: Date.now(),
+    };
+
+    await this.registry.putDocument('communities', deletedDocument);
+    await this.registry.putHead(this.communityHeadKey(document.id), {
+      ...deletedDocument,
+    });
+    await Promise.all(
+      document.memberIds.map((memberId) =>
+        this.putMemberIndex(memberId, deletedDocument),
+      ),
+    );
+  }
+
   public async findById(id: CommunityId): Promise<Community | undefined> {
+    const head = await this.findHead(id);
+
+    if (head) {
+      return this.isDocument(head) ? this.mapper.toDomain(head) : undefined;
+    }
+
     const [document] = await this.findDocuments((candidate) =>
       new CommunityId(candidate.id).isEqual(id),
     );
+
+    if (document) {
+      await this.putHeads(document);
+    }
 
     return document ? this.mapper.toDomain(document) : undefined;
   }
@@ -113,11 +218,24 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
-    const documents = await this.findDocuments((document) =>
-      document.memberIds.includes(identityId.valueOf()),
+    const indexedDocuments = this.communityDocumentsFromIndex(
+      await this.registry.findHead(
+        this.memberIndexHeadKey(identityId.valueOf()),
+      ),
     );
+    const documents =
+      indexedDocuments ??
+      (await this.findDocuments((document) =>
+        document.memberIds.includes(identityId.valueOf()),
+      ));
 
-    return documents.map((document) => this.mapper.toDomain(document));
+    if (!indexedDocuments) {
+      await Promise.all(documents.map((document) => this.putHeads(document)));
+    }
+
+    return this.deduplicateDocuments(documents)
+      .filter((document) => document.memberIds.includes(identityId.valueOf()))
+      .map((document) => this.mapper.toDomain(document));
   }
 
   public async findSyncable(): Promise<Community[]> {
@@ -127,9 +245,9 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   public async save(community: Community): Promise<void> {
-    await this.registry.putDocument(
-      'communities',
-      this.mapper.toDocument(community),
-    );
+    const document = this.mapper.toDocument(community);
+
+    await this.registry.putDocument('communities', document);
+    await this.putHeads(document);
   }
 }

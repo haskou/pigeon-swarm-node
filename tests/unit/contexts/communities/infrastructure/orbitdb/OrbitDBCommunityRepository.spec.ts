@@ -11,11 +11,13 @@ describe('OrbitDBCommunityRepository', () => {
   const identityMother = new IdentityMother();
   const networkId = '550e8400-e29b-41d4-a716-446655440000';
   const documents: Record<string, unknown>[] = [];
+  const heads = new Map<string, Record<string, unknown>>();
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityRepository;
 
   beforeEach(() => {
     documents.splice(0);
+    heads.clear();
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     registry.register(networkId, {
@@ -26,6 +28,18 @@ describe('OrbitDBCommunityRepository', () => {
           return 'ok';
         }),
         query: jest.fn(async (matcher) => documents.filter(matcher)),
+      },
+      heads: {
+        get: jest.fn(async (key: string) => {
+          const value = heads.get(key);
+
+          return value ? { key, value } : undefined;
+        }),
+        put: jest.fn(async (key: string, value: Record<string, unknown>) => {
+          heads.set(key, value);
+
+          return 'ok';
+        }),
       },
     } as never);
     repository = new OrbitDBCommunityRepository(
@@ -61,6 +75,37 @@ describe('OrbitDBCommunityRepository', () => {
     expect(discoverable.map((item) => item.getId().valueOf())).toEqual([
       'community-1',
     ]);
+    expect(heads.get('community:community-1')).toEqual(
+      expect.objectContaining({ id: 'community-1' }),
+    );
+    expect(
+      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+    ).toEqual(
+      expect.objectContaining({
+        communities: [expect.objectContaining({ id: 'community-1' })],
+      }),
+    );
+  });
+
+  it('should read communities from heads when indexes exist', async () => {
+    const primitives = communityPrimitives();
+
+    heads.set('community:community-1', primitives);
+    heads.set(`community-member-index:${identityMother.id.valueOf()}`, {
+      communities: [primitives],
+      id: `community-member-index:${identityMother.id.valueOf()}`,
+      identityId: identityMother.id.valueOf(),
+      updatedAt: Date.now(),
+    });
+
+    const byId = await repository.findById(new CommunityId('community-1'));
+    const byMember = await repository.findByMember(identityMother.id);
+
+    expect(byId?.getId().valueOf()).toBe('community-1');
+    expect(byMember.map((item) => item.getId().valueOf())).toEqual([
+      'community-1',
+    ]);
+    expect(documents).toEqual([]);
   });
 
   it('should not return deleted communities', async () => {
