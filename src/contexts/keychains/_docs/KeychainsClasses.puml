@@ -25,7 +25,7 @@ package "keychains.domain" {
   class KeychainWasPublishedEvent <<DomainEvent>>
 
   interface KeychainRepository {
-    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
     +republishLocalRoutingRecords(): Promise<number>
   }
@@ -65,12 +65,8 @@ package "keychains.application" {
     +register(message): Promise<void>
   }
 
-  class KeychainSyncResponder {
-    +respond(message): Promise<void>
-  }
-
   class KeychainSaverService {
-    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
   }
 
   class IdentityRepository <<external>>
@@ -80,8 +76,6 @@ package "keychains.application" {
   KeychainSaverService --> KeychainRepository
   CurrentKeychainFinder --> KeychainRepository
   KeychainCandidateRegistrar --> KeychainRepository
-  KeychainSyncResponder --> CurrentKeychainFinder
-  KeychainSyncResponder ..> KeychainWasPublishedEvent
 
   note right of KeychainPublisher
     Resolves the owner identity and publishes
@@ -99,8 +93,8 @@ package "keychains.infrastructure" {
     -version: number
   }
 
-  class MongoKeychainMetadataDocument {
-    -_id: string
+  class OrbitDBKeychainMetadataDocument {
+    -id: string
     -cid: string
     -ownerIdentityId: string
     -previousCid?: string
@@ -109,7 +103,7 @@ package "keychains.infrastructure" {
   }
 
   class IpfsKeychainRepository {
-    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<void>
+    +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
     +republishLocalRoutingRecords(): Promise<number>
   }
@@ -119,17 +113,13 @@ package "keychains.infrastructure" {
     +toDomain(document: IpfsKeychainDocument): Keychain
   }
 
-  class MongoKeychainMetadataRepository {
+  class OrbitDBKeychainMetadataRepository {
     +save(keychain: Keychain, cid: IPFSId): Promise<void>
-    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<MongoKeychainMetadataDocument[]>
-  }
-
-  class MongoKeychainMetadataMapper {
-    +toDocument(keychain: Keychain, cid: IPFSId): MongoKeychainMetadataDocument
+    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<OrbitDBKeychainMetadataDocument[]>
   }
 
   note right of IpfsKeychainRepository
-    Encapsulates IPFS documents, MongoDB metadata,
+    Encapsulates IPFS documents, OrbitDB metadata,
     DHT record candidates and content addressing.
     New keychain versions are published only in
     the owner's identity networks.
@@ -139,10 +129,9 @@ package "keychains.infrastructure" {
 
   IpfsKeychainRepository ..|> KeychainRepository
   IpfsKeychainRepository --> IpfsKeychainMapper
-  IpfsKeychainRepository --> MongoKeychainMetadataRepository
+  IpfsKeychainRepository --> OrbitDBKeychainMetadataRepository
   IpfsKeychainRepository --> IpfsKeychainDocument
-  MongoKeychainMetadataRepository --> MongoKeychainMetadataMapper
-  MongoKeychainMetadataRepository --> MongoKeychainMetadataDocument
+  OrbitDBKeychainMetadataRepository --> OrbitDBKeychainMetadataDocument
 }
 
 @enduml

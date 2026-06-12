@@ -1,8 +1,8 @@
 import { PushSubscription } from '../../domain/PushSubscription';
-import { PushSubscriptionRepository } from '../../domain/repositories/PushSubscriptionRepository';
+import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import { PushSubscriptionRegisterMessage } from './messages/PushSubscriptionRegisterMessage';
 
-export class PushSubscriptionRegistrar {
+export default class PushSubscriptionRegistrar {
   constructor(private readonly repository: PushSubscriptionRepository) {}
 
   public async register(

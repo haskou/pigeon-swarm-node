@@ -15,10 +15,13 @@ import { NotificationType } from './value-objects/NotificationType';
 
 export class Notification extends AggregateRoot {
   private static recordCreated(notification: Notification): Notification {
+    const primitives = notification.toPrimitives();
+
     notification.record(
-      new NotificationWasCreatedEvent(notification.toPrimitives().id, {
-        recipientIdentityId: notification.toPrimitives().recipientIdentityId,
-        type: notification.toPrimitives().type,
+      new NotificationWasCreatedEvent(primitives.id, {
+        notification: primitives,
+        recipientIdentityId: primitives.recipientIdentityId,
+        type: primitives.type,
       }),
     );
 
@@ -143,24 +146,31 @@ export class Notification extends AggregateRoot {
     super();
   }
 
+  private recordUpdated(
+    EventClass:
+      | typeof NotificationWasAcceptedEvent
+      | typeof NotificationWasDeclinedEvent,
+  ): void {
+    const primitives = this.toPrimitives();
+
+    this.record(
+      new EventClass(primitives.id, {
+        notification: primitives,
+        recipientIdentityId: primitives.recipientIdentityId,
+      }),
+    );
+  }
+
   public accept(): void {
     this.state = NotificationState.ACCEPTED;
     this.status = NotificationStatus.READ;
-    this.record(
-      new NotificationWasAcceptedEvent(this.id.valueOf(), {
-        recipientIdentityId: this.recipientIdentityId.valueOf(),
-      }),
-    );
+    this.recordUpdated(NotificationWasAcceptedEvent);
   }
 
   public decline(): void {
     this.state = NotificationState.DECLINED;
     this.status = NotificationStatus.READ;
-    this.record(
-      new NotificationWasDeclinedEvent(this.id.valueOf(), {
-        recipientIdentityId: this.recipientIdentityId.valueOf(),
-      }),
-    );
+    this.recordUpdated(NotificationWasDeclinedEvent);
   }
 
   public getRecipientIdentityId(): IdentityId {

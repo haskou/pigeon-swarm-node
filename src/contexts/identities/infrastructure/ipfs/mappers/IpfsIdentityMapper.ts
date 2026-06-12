@@ -6,7 +6,9 @@ export default class IpfsIdentityMapper {
   public toDomain(document: IpfsIdentityDocument): Identity {
     return Identity.fromPrimitives({
       encryptedKeyPair: document.encryptedKeyPair,
+      encryptedMasterKey: document.encryptedMasterKey,
       id: document._id,
+      masterKeyDerivation: document.masterKeyDerivation,
       networks: document.networks,
       previousIdentityExternalIdentifier: document.previousCid,
       profile: document.profile,
@@ -22,6 +24,8 @@ export default class IpfsIdentityMapper {
     return {
       _id: primitives.id,
       encryptedKeyPair: primitives.encryptedKeyPair,
+      encryptedMasterKey: primitives.encryptedMasterKey,
+      masterKeyDerivation: primitives.masterKeyDerivation,
       networks: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,
       profile: primitives.profile,

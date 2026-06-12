@@ -1,6 +1,6 @@
 import { NotificationCreateMessage } from '@app/contexts/notifications/application/create/messages/NotificationCreateMessage';
 import NotificationCreator from '@app/contexts/notifications/application/create/NotificationCreator';
-import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';

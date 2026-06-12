@@ -17,6 +17,12 @@ export class PutIdentityBody {
     publicKey: string;
   };
 
+  @IsString()
+  public readonly encryptedMasterKey: string;
+
+  @IsObject()
+  public readonly masterKeyDerivation: Record<string, unknown>;
+
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)

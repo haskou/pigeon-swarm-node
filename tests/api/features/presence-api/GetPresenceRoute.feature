@@ -1,5 +1,8 @@
 Feature: GET /presence
 
+  Background:
+    Given I register an in-memory IPFS network "presence-api-network"
+
   Scenario: Read current identity presence
     Given I set json body
       """

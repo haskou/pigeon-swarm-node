@@ -3,8 +3,8 @@ import { assert } from '@haskou/value-objects';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { RemoteMessageCandidateMismatchError } from '../../domain/errors/RemoteMessageCandidateMismatchError';
 import { Message } from '../../domain/Message';
-import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
-import { MessageSignatureDomainService } from '../../domain/services/MessageSignatureDomainService';
+import ConversationRepository from '../../domain/repositories/ConversationRepository';
+import MessageSignatureDomainService from '../../domain/services/MessageSignatureDomainService';
 import { RegisterConversationMessage } from './messages/RegisterConversationMessage';
 
 export default class ConversationMessageRegistrar {
@@ -53,15 +53,10 @@ export default class ConversationMessageRegistrar {
     );
 
     this.assertCandidateMatchesAnnouncement(message, candidate);
-    const isAlreadyRegistered = conversation.findMessageById(message.messageId);
 
     this.signatureService.assertValidMessageSignature(candidate);
 
     conversation.registerMessage(candidate);
     await this.repository.save(conversation);
-
-    if (!isAlreadyRegistered) {
-      await this.repository.registerUnreadForMessage(conversation, candidate);
-    }
   }
 }

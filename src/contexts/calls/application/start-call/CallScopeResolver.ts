@@ -1,12 +1,12 @@
-import { CommunityRepository } from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 
 import { CallScope } from '../../domain/CallScope';
 import { InvalidCallScopeError } from '../../domain/errors/InvalidCallScopeError';
 import { CallStartMessage } from './messages/CallStartMessage';
 import { ResolvedCallScope } from './ResolvedCallScope';
 
-export class CallScopeResolver {
+export default class CallScopeResolver {
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly communityRepository: CommunityRepository,

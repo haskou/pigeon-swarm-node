@@ -28,16 +28,16 @@ Authenticated endpoints use a canonical request signature:
 ```http
 X-Identity-Id: <identityId>
 X-Timestamp: <timestamp>
-X-Nonce: <nonce>
 X-Signature: <signature>
 ```
 
 Implemented:
 
-- canonical request payload: method, path, timestamp, nonce and body hash
-- recent nonces in MongoDB to prevent replay
-- timestamp freshness validation
-- Cucumber scenarios for invalid, replayed and stale signed requests
+- canonical request payload: method, path, timestamp and body hash
+- canonical payload `timestamp` is a JSON number; HTTP headers and WebSocket
+  query parameters still carry it as text
+- timestamp freshness validation with a 30 second maximum clock skew
+- Cucumber scenarios for invalid and stale signed requests
 
 ## Path Parameters
 
@@ -79,13 +79,11 @@ so they must authenticate with signed query parameters:
 
 ```ts
 const path = '/ws';
-const timestamp = String(Date.now());
-const nonce = crypto.randomUUID();
+const timestamp = Date.now();
 const body = {};
 const canonicalPayload = {
   bodyHash: sha256(JSON.stringify(body)),
   method: 'GET',
-  nonce,
   path,
   timestamp,
 };
@@ -93,8 +91,7 @@ const signature = sign(JSON.stringify(canonicalPayload));
 const url =
   `ws://localhost:8080${path}` +
   `?identityId=${encodeURIComponent(identityId)}` +
-  `&timestamp=${encodeURIComponent(timestamp)}` +
-  `&nonce=${encodeURIComponent(nonce)}` +
+  `&timestamp=${encodeURIComponent(String(timestamp))}` +
   `&signature=${encodeURIComponent(signature)}`;
 const socket = new WebSocket(url);
 ```
@@ -104,7 +101,6 @@ Non-browser clients may send the same signature through headers:
 ```http
 X-Identity-Id: <identityId>
 X-Timestamp: <timestamp>
-X-Nonce: <nonce>
 X-Signature: <signature>
 ```
 
@@ -231,7 +227,7 @@ Implemented:
 - require a valid signed WebSocket handshake
 - accept browser-compatible query parameter authentication
 - accept header authentication for non-browser clients
-- reject stale timestamps and reused WebSocket nonces
+- reject stale timestamps outside the 30 second freshness window
 - push domain events after they have been published by the local node
 - deliver identity events only to the matching identity connection
 - deliver keychain events only to the matching keychain owner
@@ -496,7 +492,7 @@ participant receives an unread `missed_call` notification.
 
 Implemented:
 
-- missed participant state is persisted in MongoDB
+- missed participant state is persisted in replicated call state
 - missed calls stay available through `GET /calls/history`
 - timeout emits `calls.v1.participant.missed`
 - timeout emits `calls.v1.call.missed`
@@ -533,7 +529,6 @@ Implemented:
 GET /node/networks
 X-Identity-Id: <ownerIdentityId>
 X-Timestamp: <millisecondsSinceEpoch>
-X-Nonce: <uniqueNonce>
 X-Signature: <signature>
 ```
 
@@ -579,7 +574,7 @@ Implemented:
 
 - allow unsigned network additions while the node has no owner
 - require signed request auth from the owner after the node is claimed
-- persist the network in MongoDB
+- persist the network in the local embedded database
 - synchronize the runtime IPFS network registry after saving
 
 ### Add generated public node network
@@ -597,7 +592,7 @@ Implemented:
 - allow unsigned creation while the node has no owner
 - require signed request auth from the owner after the node is claimed
 - reject the request when the node already has a public network
-- persist the network in MongoDB and synchronize the runtime IPFS network registry
+- persist the network in the local embedded database and synchronize the runtime IPFS network registry
 
 ### Delete local node network
 
@@ -614,8 +609,8 @@ Implemented:
   the destructive operation
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
-- delete local MongoDB data scoped to that network:
-  conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and IPFS replication records
+- delete local and replicated data scoped to that network:
+  conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
 
@@ -637,7 +632,7 @@ Implemented:
 
 - claim an unowned node as the authenticated identity
 - change the owner only when the request is signed by the current owner
-- persist owner state in MongoDB
+- persist owner state in the local embedded database
 - load persisted node state when the API process starts
 
 ### Get active peers
@@ -708,7 +703,7 @@ Response:
 Implemented:
 
 - publish public content to every configured IPFS network
-- register the returned CID in local MongoDB replication metadata
+- register the returned CID in OrbitDB replication metadata
 - accept raw request bytes instead of wrapping the content in JSON/base64
 - store the binary bytes directly in IPFS
 - preserve response metadata from `Content-Type` and `X-Filename` in local
@@ -775,7 +770,7 @@ Response:
 Implemented:
 
 - publish client-encrypted private content to every configured IPFS network
-- register the returned CID in local MongoDB replication metadata
+- register the returned CID in OrbitDB replication metadata
 - accept raw encrypted request bytes instead of wrapping the content in
   JSON/base64
 - store content as a JSON IPFS document with `encrypted: true`,
@@ -798,7 +793,7 @@ Implemented:
 - read JSON content by CID from any configured IPFS network
 - return `404` when the CID is not found
 
-### Get IPFS replication status
+### Get content replication status
 
 ```http
 GET /ipfs/replication/status
@@ -904,8 +899,8 @@ Implemented security rules:
 
 ## Identity Presence HTTP API
 
-Presence is Mongo-only runtime state. It is not stored in IPFS and it is
-synced through network-scoped pubsub events.
+Presence is replicated runtime state. It is not stored in IPFS and it is synced
+through network-scoped OrbitDB state.
 
 Statuses:
 
@@ -1040,11 +1035,16 @@ Response:
 {
   "id": "<identityId>",
   "identityExternalIdentifier": "<currentIdentityCid>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<encryptedPrivateKey>"
-  },
-  "networks": ["<networkId>"],
+	  "encryptedKeyPair": {
+	    "publicKey": "<publicKeyPem>",
+	    "encryptedPrivateKey": "<encryptedPrivateKey>"
+	  },
+	  "encryptedMasterKey": "<encryptedMasterKey>",
+	  "masterKeyDerivation": {
+	    "algorithm": "<clientDerivationAlgorithm>",
+	    "version": 1
+	  },
+	  "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
     "handle": "alice",
@@ -1061,33 +1061,27 @@ Response:
 Use `identityExternalIdentifier` as the next update's
 `previousIdentityExternalIdentifier`.
 
-### Create identity
+### Publish identity
 
 ```http
 POST /identities
 ```
 
-Legacy backend-generated request:
-
-```json
-{
-  "name": "Alice",
-  "handle": "alice",
-  "password": "Super-secret-password1!",
-  "networks": ["<networkId>"]
-}
-```
-
-Client-signed request:
+Request:
 
 ```json
 {
   "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<encryptedPrivateKey>"
-  },
-  "networks": ["<networkId>"],
+	  "encryptedKeyPair": {
+	    "publicKey": "<publicKeyPem>",
+	    "encryptedPrivateKey": "<encryptedPrivateKey>"
+	  },
+	  "encryptedMasterKey": "<encryptedMasterKey>",
+	  "masterKeyDerivation": {
+	    "algorithm": "<clientDerivationAlgorithm>",
+	    "version": 1
+	  },
+	  "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
     "handle": "alice"
@@ -1100,16 +1094,14 @@ Client-signed request:
 
 Implemented:
 
-- keep the legacy password-based creation flow for local clients
-- accept client-generated encrypted keypairs and signed identity candidates
-- keep client passwords out of the backend in the client-signed flow
+- require client-generated encrypted keypairs and signed identity candidates
+- accept client-generated encrypted master keys and client-controlled master key
+  derivation metadata as signed opaque identity fields
+- keep client passwords out of the backend
 - store `profile.handle` as part of the signed identity profile
 - normalize handles to lowercase
 - reject handles containing spaces, `@` or any character outside letters,
   numbers, dots, hyphens and underscores
-- require legacy backend-generated passwords to be 12 to 256 characters long
-  and include at least one uppercase letter, one lowercase letter, one number
-  and one symbol
 - return `identityExternalIdentifier`, which is the current published identity
   CID to send as `previousIdentityExternalIdentifier` in the next update
 - store `profile.picture` and `profile.banner` as public IPFS image CIDs, not as
@@ -1120,7 +1112,12 @@ Client-signed identity signatures must cover the canonical identity payload:
 ```json
 {
   "encryptedKeyPair": "<encryptedKeyPair>",
+  "encryptedMasterKey": "<encryptedMasterKey>",
   "id": "<identityId>",
+  "masterKeyDerivation": {
+    "algorithm": "<clientDerivationAlgorithm>",
+    "version": 1
+  },
   "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": null,
   "profile": {
@@ -1149,11 +1146,16 @@ Request:
 ```json
 {
   "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<encryptedPrivateKey>"
-  },
-  "networks": ["<networkId>"],
+	  "encryptedKeyPair": {
+	    "publicKey": "<publicKeyPem>",
+	    "encryptedPrivateKey": "<encryptedPrivateKey>"
+	  },
+	  "encryptedMasterKey": "<encryptedMasterKey>",
+	  "masterKeyDerivation": {
+	    "algorithm": "<clientDerivationAlgorithm>",
+	    "version": 1
+	  },
+	  "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": "<previousIdentityCid>",
   "profile": {
     "name": "Alice Updated",
@@ -1219,7 +1221,7 @@ Implemented:
 - validate owner identity from the signed request
 - validate keychain signature and version chain
 - persist immutable encrypted document in IPFS
-- persist metadata in MongoDB
+- persist metadata in OrbitDB replicated metadata
 - publish keychain announcement through the domain event publisher
 
 ### Get current keychain
@@ -1248,13 +1250,13 @@ Response:
 Implemented:
 
 - only return the authenticated identity keychain
-- resolve latest valid candidate from local MongoDB and DHT candidates
+- resolve latest valid candidate from OrbitDB metadata and DHT candidates
 - return encrypted payload as-is for client-side unlock/decryption
 
 ## Conversation HTTP API
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
-`X-Timestamp`, `X-Nonce` and `X-Signature`.
+`X-Timestamp` and `X-Signature`.
 
 ### List conversations
 
@@ -1323,7 +1325,7 @@ Implemented:
 - require the conversation network id; messages and sync for this conversation
   are published only through that network
 - validate that the keychain candidate belongs to the authenticated identity
-- persist conversation metadata in MongoDB
+- persist conversation metadata in OrbitDB replicated metadata
 - publish `ConversationWasCreatedEvent`
 
 Standalone group conversations are different from future community channels:
@@ -1529,7 +1531,7 @@ List response:
 Implemented:
 
 - require signed request auth
-- drafts are MongoDB-only and scoped to the authenticated identity
+- drafts are local embedded DB state scoped to the authenticated identity
 - the backend treats `encryptedPayload` as opaque client-encrypted data
 - saving or deleting a draft requires conversation participation
 
@@ -1571,7 +1573,7 @@ Implemented:
 
 - require signed request auth
 - require the authenticated identity to be a conversation participant
-- pins are MongoDB-only metadata; message IPFS documents are not rewritten
+- pins are OrbitDB replicated metadata; message IPFS documents are not rewritten
 - pinning validates that the target message exists locally
 
 ### Send message
@@ -1622,10 +1624,10 @@ Implemented:
   non-deleted `sent` message in the same conversation
 - validate the signature against the canonical message payload
 - persist immutable message document in IPFS
-- persist message metadata in MongoDB
+- persist message metadata in OrbitDB replicated metadata
 - publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
   `networkId` and `participantIds`
-- create Mongo-only unread flags for every participant except the author
+- derive unread state from OrbitDB replicated read markers and message metadata
 - store only attachment CIDs in the message; private attachment bytes must be
   encrypted by the client and published first with `POST /ipfs/private`
 
@@ -1705,11 +1707,11 @@ Implemented:
 
 - require signed request auth
 - require the authenticated identity to be a conversation participant
-- delete Mongo-only unread flags for the authenticated identity up to and
-  including `messageId`
+- update the OrbitDB replicated read marker for the authenticated identity up to
+  and including `messageId`
 - publish `ConversationMessagesWereReadEvent` with `messageId`,
   `readerIdentityId`, `networkId` and `participantIds`
-- consuming nodes apply the same unread-flag deletion locally
+- consuming nodes apply the same replicated read marker update locally
 - send a Web Push control payload of type `notifications_cleared` to the
   reader identity subscriptions so service workers can close displayed
   notifications tagged as `conversation:<conversationId>`
@@ -1743,7 +1745,8 @@ Implemented:
 - require signed request auth
 - require the authenticated identity to be a conversation participant
 - require the target message to exist and be visible locally
-- store reactions in MongoDB only; message IPFS documents are not rewritten
+- store reactions in OrbitDB replicated metadata; message IPFS documents are not
+  rewritten
 - keep reactions unique by conversation id, message id, author id and emoji
 - include reactions in `GET /conversations/{conversationId}/messages`,
   `GET /conversations/{conversationId}/messages/{messageId}` and
@@ -1836,8 +1839,7 @@ Implemented:
 
 Signed HTTP request validation:
 
-- reject reused `X-Nonce` values per identity
-- reject stale `X-Timestamp` values outside the freshness window
+- reject stale `X-Timestamp` values outside the 30 second freshness window
 
 ## Community HTTP API
 
@@ -1847,7 +1849,7 @@ text channel messages. Community channels are not backed by `Conversation`;
 they live inside the `communities` context.
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
-`X-Timestamp`, `X-Nonce` and `X-Signature`.
+`X-Timestamp` and `X-Signature`.
 
 ### List communities
 
@@ -2343,7 +2345,7 @@ Response:
 Implemented:
 
 - require signed request auth from the owner or a member with `manage_members`
-- store log entries in MongoDB only; they are not written to IPFS
+- store log entries in OrbitDB replicated state; they are not written to IPFS
 - return newest entries first, with `beforeLogId` pagination
 - currently recorded actions:
   `community_updated`, `channel_created`, `channel_renamed`,
@@ -2402,7 +2404,7 @@ Implemented:
 - omit channels that are not visible to the authenticated member roles
 - return both text and voice channels
 - include up to 2 recent active thread summaries per text channel, ordered by
-  newest reply activity and calculated from MongoDB metadata without hydrating
+  newest reply activity and calculated from OrbitDB metadata without hydrating
   message payloads
 - include `connectedIdentityIds` for voice channels, derived from identities
   currently `joined` to the active call scoped to that voice channel
@@ -2981,7 +2983,7 @@ List response:
 Implemented:
 
 - require signed request auth
-- drafts are MongoDB-only and scoped to the authenticated identity
+- drafts are local embedded DB state scoped to the authenticated identity
 - the backend treats `encryptedPayload` as opaque client-encrypted data
 - saving or deleting a draft requires access to the target text channel
 
@@ -3024,7 +3026,7 @@ Implemented:
 - require signed request auth
 - listing pins requires channel visibility
 - pinning and unpinning requires `manage_messages`
-- pins are MongoDB-only metadata; message payload documents are not rewritten
+- pins are OrbitDB replicated metadata; message payload documents are not rewritten
 - pinning validates that the target channel message exists
 
 ### Search public channel messages
@@ -3096,7 +3098,7 @@ Implemented:
 - require the authenticated member to have channel visibility through their
   roles
 - return messages ordered from oldest to newest in the page
-- include MongoDB-only reactions for each message
+- include OrbitDB replicated reactions for each message
 - include `poll` timeline items scoped to the same community text channel. The
   poll `id` is also registered as a channel message id, so it is valid as
   `beforeMessageId` for pagination.
@@ -3135,7 +3137,8 @@ Implemented:
 - require the channel and target message to exist
 - require the authenticated member to have channel visibility through their
   roles and `send_stickers`
-- store reactions in MongoDB only; encrypted message documents are not rewritten
+- store reactions in OrbitDB replicated metadata; encrypted message documents are
+  not rewritten
 - keep reactions unique by community id, channel id, message id, author id and
   emoji
 - publish `communities.v1.channel.message.reaction.was_added` to community
@@ -3313,7 +3316,7 @@ Community invitation request:
 Implemented:
 
 - require signed request auth from the inviter
-- persist the notification in MongoDB
+- persist the notification in OrbitDB replicated metadata
 - store encrypted key material as opaque payload only
 - keep private keys and decrypted conversation keys out of the backend
 - group conversation invitations use the same encrypted conversation key payload
@@ -3353,7 +3356,7 @@ Implemented:
 ## Notification Settings HTTP API
 
 Notification settings are authenticated, per-identity preferences stored in
-MongoDB. They are not published to IPFS.
+OrbitDB replicated state. They are not published to IPFS.
 
 Scopes:
 
@@ -3669,7 +3672,8 @@ removed the stale subscription.
 
 Sticker files are public IPFS assets. Upload the binary first with
 `POST /ipfs/public`, then store the returned CID in sticker metadata. The
-sticker pack itself lives in MongoDB and is returned through this API.
+sticker pack metadata lives in OrbitDB replicated state and is returned through
+this API.
 
 Current limits:
 
@@ -4038,13 +4042,13 @@ Client realtime does not replace PubSub. The intended flow is:
 ```text
 Client A -> Node A: POST /conversations/{id}/messages
 Node A -> IPFS: store immutable encrypted message document
-Node A -> MongoDB: index metadata
+Node A -> OrbitDB: index replicated metadata
 Node A -> DomainEventPublisher: publish accepted domain event
 Node A -> PubSub: announce conversation message
 Node B <- PubSub: receive announcement
 Node B -> IPFS: fetch message document
 Node B -> Domain: validate candidate
-Node B -> MongoDB: cache valid metadata
+Node B -> OrbitDB: project valid replicated metadata
 Node B -> Client B: WebSocket message event
 ```
 

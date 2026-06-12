@@ -17,6 +17,8 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class PatchStickerRoute extends StickerRouteSupport {
+  private readonly updater = this.get<StickerUpdater>(StickerUpdater);
+
   @Patch('/:packId/stickers/:stickerId')
   public async updateSticker(
     @Param('packId') packId: string,
@@ -26,7 +28,7 @@ export class PatchStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const pack = await new StickerUpdater(this.packRepository()).update(
+    const pack = await this.updater.update(
       new StickerUpdateMessage(packId, stickerId, actor.valueOf(), body),
     );
 

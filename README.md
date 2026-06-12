@@ -75,8 +75,8 @@ The backend is organized around bounded contexts:
 * `stickers`: sticker packs, sticker assets and user sticker state.
 * `polls`: polls, votes and poll lifecycle for conversations and communities.
 * `ipfs-replication`: local replica policy, claims and replication summaries.
-* `shared`: common value objects plus IPFS, MongoDB, message bus, HTTP,
-  WebSocket and dependency-injection infrastructure.
+* `shared`: common value objects plus IPFS, OrbitDB, local embedded storage,
+  message bus, HTTP, WebSocket and dependency-injection infrastructure.
 
 The backend does not receive private keys, passwords, or decrypted
 conversation/community keys. Clients generate identity material, encrypt local
@@ -148,7 +148,7 @@ packaging, not as backend source.
 
 The node expects:
 
-* MongoDB for local persistent state.
+* OrbitDB for replicated state and local embedded storage for node-local state.
 * IPFS network configuration for content publication and retrieval.
 * Libp2p GossipSub transport for node-to-node event propagation.
 * Signed HTTP/WebSocket requests from clients.

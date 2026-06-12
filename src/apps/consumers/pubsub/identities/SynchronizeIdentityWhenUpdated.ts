@@ -9,10 +9,10 @@ export default class SynchronizeIdentityWhenUpdated extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.synchronize-identity-when-updated';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: RegisterPublishedIdentity,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

@@ -1,5 +1,7 @@
 import { IPFSContentNotFoundError } from './errors/IPFSContentNotFoundError';
 import { IPFSNetworksNotFoundByIdsError } from './errors/IPFSNetworksNotFoundByIdsError';
+import heliaRuntimeAdapter from './helia/adapters/HeliaRuntimeAdapter';
+import IPFSCidCodec from './helia/IPFSCidCodec';
 import IPFSContentRacer from './helia/IPFSContentRacer';
 import { IPFSId } from './helia/IPFSId';
 import { IPFSNetwork } from './networks/IPFSNetwork';
@@ -79,6 +81,12 @@ export default class IPFS {
     return this.racer.raceGetBytes(this.registry.getAll(), cid);
   }
 
+  public async isRawCid(cid: IPFSId): Promise<boolean> {
+    const parsedCid = await heliaRuntimeAdapter.parseCid(cid.valueOf());
+
+    return IPFSCidCodec.isRaw(parsedCid);
+  }
+
   public async stat(
     cid: IPFSId,
     offlineOnly: boolean = false,
@@ -111,6 +119,14 @@ export default class IPFS {
     }
   }
 
+  public async hasConnectedPeers(): Promise<boolean> {
+    await this.initialize();
+
+    return this.registry
+      .getAll()
+      .some((network) => network.getPeers().length > 0);
+  }
+
   public async getJSONFromNetwork<T>(
     cid: IPFSId,
     networkId: string,
@@ -122,6 +138,15 @@ export default class IPFS {
     return network.getJSON<T>(cid);
   }
 
+  public async getJSONFromNetworks<T>(
+    cid: IPFSId,
+    networkIds: string[],
+  ): Promise<T> {
+    await this.initialize();
+
+    return this.racer.raceGetJSON<T>(this.getNetworksByIds(networkIds), cid);
+  }
+
   public async getBytesFromNetwork(
     cid: IPFSId,
     networkId: string,
@@ -131,6 +156,15 @@ export default class IPFS {
     const network = this.registry.find(networkId);
 
     return network.getBytes(cid);
+  }
+
+  public async getBytesFromNetworks(
+    cid: IPFSId,
+    networkIds: string[],
+  ): Promise<Buffer> {
+    await this.initialize();
+
+    return this.racer.raceGetBytes(this.getNetworksByIds(networkIds), cid);
   }
 
   public async getRecord(key: string): Promise<string | undefined> {
@@ -184,23 +218,45 @@ export default class IPFS {
     return results[0];
   }
 
-  public async removeJSONFromAll(cid: IPFSId): Promise<void> {
+  public async addBytesToNetworksReturningFirst(
+    bytes: Uint8Array,
+    networkIds: string[],
+  ): Promise<{
+    cid: IPFSId;
+    completedNetworkIds: Promise<string[]>;
+    networkId: string;
+  }> {
     await this.initialize();
-
-    await Promise.all(
-      this.registry.getAll().map((network) => network.removeJSON(cid)),
+    const networks = this.getNetworksByIds(networkIds);
+    const uploads = networks.map(async (network) => ({
+      cid: await network.addBytes(bytes),
+      networkId: network.getId(),
+    }));
+    const completedNetworkIds = Promise.allSettled(uploads).then((results) =>
+      results.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value.networkId] : [],
+      ),
     );
+    const result = await Promise.any(uploads);
+
+    return {
+      ...result,
+      completedNetworkIds,
+    };
   }
 
-  public async removeJSONFromNetwork(
-    cid: IPFSId,
-    networkId: string,
-  ): Promise<void> {
+  public async addBytesToNetworks(
+    bytes: Uint8Array,
+    networkIds: string[],
+  ): Promise<IPFSId> {
     await this.initialize();
 
-    const network = this.registry.find(networkId);
+    const networks = this.getNetworksByIds(networkIds);
+    const results = await Promise.all(
+      networks.map((network) => network.addBytes(bytes)),
+    );
 
-    await network.removeJSON(cid);
+    return results[0];
   }
 
   public async addJSONToNetworks(
@@ -247,6 +303,25 @@ export default class IPFS {
     await Promise.all(
       this.registry.getAll().map((network) => network.putRecord(key, value)),
     );
+  }
+
+  public async removeJSONFromAll(cid: IPFSId): Promise<void> {
+    await this.initialize();
+
+    await Promise.all(
+      this.registry.getAll().map((network) => network.removeJSON(cid)),
+    );
+  }
+
+  public async removeJSONFromNetwork(
+    cid: IPFSId,
+    networkId: string,
+  ): Promise<void> {
+    await this.initialize();
+
+    const network = this.registry.find(networkId);
+
+    await network.removeJSON(cid);
   }
 
   public async getNetworks(): Promise<IPFSNetwork[]> {

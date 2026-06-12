@@ -97,6 +97,10 @@ export class Node extends AggregateRoot {
     return this.id.isEqual(id);
   }
 
+  public getId(): NodeId {
+    return this.id;
+  }
+
   public toPrimitives() {
     return {
       id: this.id.valueOf(),

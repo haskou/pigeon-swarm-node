@@ -1,9 +1,9 @@
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
-import { CallRepository } from '../../domain/repositories/CallRepository';
+import CallRepository from '../../domain/repositories/CallRepository';
 import { CallFindMessage } from './messages/CallFindMessage';
 
-export class CallFinder {
+export default class CallFinder {
   constructor(private readonly repository: CallRepository) {}
 
   public async find(message: CallFindMessage): Promise<Call> {

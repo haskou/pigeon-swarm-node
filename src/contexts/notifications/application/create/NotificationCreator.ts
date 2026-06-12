@@ -1,5 +1,5 @@
 import { Notification } from '@app/contexts/notifications/domain/Notification';
-import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { NotificationCreateMessage } from './messages/NotificationCreateMessage';

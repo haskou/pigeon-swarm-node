@@ -1,4 +1,4 @@
-import { CallLeaver } from '@app/contexts/calls/application/leave-call/CallLeaver';
+import CallLeaver from '@app/contexts/calls/application/leave-call/CallLeaver';
 import { CallLeaveMessage } from '@app/contexts/calls/application/leave-call/messages/CallLeaveMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -9,6 +9,8 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class DeleteCallParticipantRoute extends CallRouteSupport {
+  private readonly leaver = this.get<CallLeaver>(CallLeaver);
+
   @Delete('/:callId/participants/me')
   public async leaveCall(
     @Param('callId') callId: string,
@@ -16,10 +18,9 @@ export class DeleteCallParticipantRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await new CallLeaver(
-      this.callRepository(),
-      this.eventPublisher,
-    ).leave(new CallLeaveMessage(callId, participantIdentityId.valueOf()));
+    const call = await this.leaver.leave(
+      new CallLeaveMessage(callId, participantIdentityId.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

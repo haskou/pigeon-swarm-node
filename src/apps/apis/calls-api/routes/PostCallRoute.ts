@@ -1,5 +1,4 @@
-import { CallScopeResolver } from '@app/contexts/calls/application/start-call/CallScopeResolver';
-import { CallStarter } from '@app/contexts/calls/application/start-call/CallStarter';
+import CallStarter from '@app/contexts/calls/application/start-call/CallStarter';
 import { CallStartMessage } from '@app/contexts/calls/application/start-call/messages/CallStartMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -11,6 +10,8 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class PostCallRoute extends CallRouteSupport {
+  private readonly starter = this.get<CallStarter>(CallStarter);
+
   @Post('/')
   public async startCall(
     @Body() body: PostCallBody,
@@ -18,14 +19,7 @@ export class PostCallRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const creatorIdentityId = await this.authenticate(request);
-    const call = await new CallStarter(
-      this.callRepository(),
-      new CallScopeResolver(
-        this.conversationRepository(),
-        this.communityRepository(),
-      ),
-      this.eventPublisher,
-    ).start(
+    const call = await this.starter.start(
       new CallStartMessage(
         creatorIdentityId.valueOf(),
         body.scopeType,

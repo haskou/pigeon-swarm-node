@@ -12,8 +12,7 @@ package "identities.domain" {
     -profile: Profile
     -timestamp: Timestamp
     -signature: Signature
-    +create(name, password, networks, handle?): Identity
-    +publishCandidate(primitives): Identity
+    +fromSignedPublication(primitives): Identity
     +updateProfile(profile, password): Identity
     +updateNetworks(networks, password): Identity
   }
@@ -60,7 +59,7 @@ package "identities.domain" {
   }
 
   interface IdentityRepository {
-    +save(identity: Identity): Promise<void>
+    +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
     +findByHandle(handle: ProfileHandle): Promise<Identity>
     +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
@@ -68,7 +67,7 @@ package "identities.domain" {
   }
 
   class IdentitySaverService {
-    +save(identity): Promise<void>
+    +save(identity): Promise<IdentityExternalIdentifier>
   }
 
   class IdentityFinderService {
@@ -104,10 +103,6 @@ package "identities.domain" {
 }
 
 package "identities.application" {
-  class IdentityCreator {
-    +create(message: IdentityCreateMessage): Promise<Identity>
-  }
-
   class IdentityUpdater {
     +update(message: IdentityUpdateMessage): Promise<Identity>
   }
@@ -124,19 +119,12 @@ package "identities.application" {
     +register(message: RegisterPublishedIdentityMessage): Promise<Identity>
   }
 
-  class IdentitySynchronizer {
-    +sync(identityId: IdentityId): Promise<Identity>
-  }
-
-  IdentityCreator --> IdentitySaverService
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
   IdentityUpdater --> IdentityFinderService
   IdentityUpdater --> IdentitySaverService
   IdentityFinder --> IdentityFinderService
   RegisterPublishedIdentity --> IdentityRegistrarService
-  IdentitySynchronizer --> IdentityRepository
-  IdentitySynchronizer --> IdentityResolutionDomainService
 }
 
 package "identities.infrastructure" {
@@ -151,17 +139,19 @@ package "identities.infrastructure" {
     -signature: string
   }
 
-  class MongoIdentityDocumentIndex {
+  class OrbitDBIdentityMetadataDocument {
+    -id: string
     -identityId: string
     -handle?: string
-    -externalIdentifier: string
+    -cid: string
     -version: number
-    -previousExternalIdentifier?: string
+    -previousCid?: string
+    -networkIds: string[]
     -receivedAt: number
   }
 
   class IpfsIdentityRepository {
-    +save(identity: Identity): Promise<void>
+    +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
     +findByHandle(handle: ProfileHandle): Promise<Identity>
     +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
@@ -169,14 +159,14 @@ package "identities.infrastructure" {
   }
 
   note right of IpfsIdentityRepository
-    Encapsulates IPFS documents, MongoDB indexes,
+    Encapsulates IPFS documents, OrbitDB metadata,
     DHT head hints and PubSub announcements.
     The domain only receives Identity objects.
   end note
 
   IpfsIdentityRepository ..|> IdentityRepository
   IpfsIdentityRepository --> IpfsIdentityDocument
-  IpfsIdentityRepository --> MongoIdentityDocumentIndex
+  IpfsIdentityRepository --> OrbitDBIdentityMetadataDocument
 }
 
 @enduml

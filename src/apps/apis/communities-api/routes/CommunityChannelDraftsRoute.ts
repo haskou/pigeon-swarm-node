@@ -1,7 +1,6 @@
+import CommunityChannelDraftRepository from '@app/contexts/communities/domain/repositories/CommunityChannelDraftRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityChannelDraftRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelDraftRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
@@ -21,9 +20,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
-  private draftRepository(): MongoCommunityChannelDraftRepository {
-    return new MongoCommunityChannelDraftRepository(this.get<MongoDB>(MongoDB));
-  }
+  private readonly draftRepository = this.get<CommunityChannelDraftRepository>(
+    CommunityChannelDraftRepository,
+  );
 
   @Get('/me/drafts')
   public async listDrafts(
@@ -31,7 +30,7 @@ export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const drafts = await this.draftRepository().findByIdentity(identityId);
+    const drafts = await this.draftRepository.findByIdentity(identityId);
 
     return response.status(HttpRouteStatusEnum.OK).send({
       drafts: drafts.map((draft) => ({
@@ -60,7 +59,7 @@ export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
       : Timestamp.now();
 
     community.assertCanViewTextChannel(actorIdentityId, domainChannelId);
-    await this.draftRepository().save(
+    await this.draftRepository.save(
       actorIdentityId,
       domainCommunityId,
       domainChannelId,
@@ -89,7 +88,7 @@ export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
     const domainChannelId = new CommunityChannelId(channelId);
 
     community.assertCanViewTextChannel(actorIdentityId, domainChannelId);
-    await this.draftRepository().delete(
+    await this.draftRepository.delete(
       actorIdentityId,
       domainCommunityId,
       domainChannelId,

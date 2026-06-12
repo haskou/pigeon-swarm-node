@@ -1,6 +1,6 @@
-import { IdentityRepository } from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import IdentityRegistrarService from '@app/contexts/identities/domain/services/IdentityRegistrarService';
-import { IdentityResolutionDomainService } from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
+import IdentityResolutionDomainService from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';

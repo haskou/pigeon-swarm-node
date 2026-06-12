@@ -1,7 +1,7 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import NodeLoaderService from '../../domain/services/NodeLoaderService';
-import { NodeNetworkDataCleaner } from '../../domain/services/NodeNetworkDataCleaner';
+import NodeNetworkDataCleaner from '../../domain/services/NodeNetworkDataCleaner';
 import NodeSaverService from '../../domain/services/NodeSaverService';
 import { NodeNetworkRemoverMessage } from './messages/NodeNetworkRemoverMessage';
 

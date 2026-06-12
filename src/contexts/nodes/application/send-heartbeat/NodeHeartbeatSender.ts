@@ -1,7 +1,7 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { NodeHeartbeatWasSent } from '../../domain/events/NodeHeartbeatWasSent';
-import { NodeRepository } from '../../domain/repositories/NodeRepository';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 
 export default class NodeHeartbeatSender {
   constructor(

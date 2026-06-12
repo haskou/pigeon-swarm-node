@@ -8,7 +8,9 @@ export class PutIdentityRequest {
   public getIdentityPublishMessage(): IdentityPublishMessage {
     return new IdentityPublishMessage({
       encryptedKeyPair: this.body.encryptedKeyPair,
+      encryptedMasterKey: this.body.encryptedMasterKey,
       id: this.body.id,
+      masterKeyDerivation: this.body.masterKeyDerivation,
       networks: this.body.networks,
       previousIdentityExternalIdentifier:
         this.body.previousIdentityExternalIdentifier,

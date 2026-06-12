@@ -244,7 +244,7 @@ package "communities/domain" {
     + save(invite): void
   }
 
-  interface CommunityRequestStore {
+  interface CommunityMembershipRequestRepository {
     + findByCommunityAndIdentity(communityId, identityId): CommunityMembershipRequest[]
     + findById(id): CommunityMembershipRequest?
     + findByIdentity(identityId): CommunityMembershipRequest[]
@@ -319,7 +319,7 @@ package "communities/domain" {
   CommunityChannelMessageRepository ..> CommunityChannelMessage
   CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
   CommunityInviteRepository ..> CommunityInvite
-  CommunityRequestStore ..> CommunityMembershipRequest
+  CommunityMembershipRequestRepository ..> CommunityMembershipRequest
   CommunityModerationLogRepository ..> CommunityModerationLogEntry
 }
 
@@ -336,31 +336,31 @@ Community --> Timestamp
 CommunityTextChannel --> Timestamp
 
 package "communities/infrastructure" {
-  class MongoCommunityRepository
-  class MongoCommunityDocument
-  class MongoCommunityChannelMessageRepository
-  class MongoCommunityChannelMessageDocument
-  class MongoCommunityChannelMessageReactionRepository
-  class MongoCommunityChannelMessageReactionDocument
-  class MongoCommunityInviteRepository
-  class MongoCommunityInviteDocument
-  class MongoCommunityRequestStore
-  class MongoCommunityRequestDocument
-  class MongoCommunityModerationLogRepository
-  class MongoCommunityModerationLogDocument
+  class OrbitDBCommunityRepository
+  class OrbitDBCommunityDocument
+  class OrbitDBCommunityChannelMessageRepository
+  class OrbitDBCommunityChannelMessageDocument
+  class OrbitDBCommunityMessageReactionRepository
+  class OrbitDBCommunityChannelMessageReactionDocument
+  class OrbitDBCommunityInviteRepository
+  class OrbitDBCommunityInviteDocument
+  class OrbitDBCommunityMembershipRequestRepository
+  class OrbitDBCommunityMembershipRequestDocument
+  class OrbitDBCommunityModerationLogRepository
+  class OrbitDBCommunityModerationLogDocument
 
-  MongoCommunityRepository ..|> CommunityRepository
-  MongoCommunityRepository --> MongoCommunityDocument
-  MongoCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
-  MongoCommunityChannelMessageRepository --> MongoCommunityChannelMessageDocument
-  MongoCommunityChannelMessageReactionRepository ..|> CommunityChannelMessageReactionRepository
-  MongoCommunityChannelMessageReactionRepository --> MongoCommunityChannelMessageReactionDocument
-  MongoCommunityInviteRepository ..|> CommunityInviteRepository
-  MongoCommunityInviteRepository --> MongoCommunityInviteDocument
-  MongoCommunityRequestStore ..|> CommunityRequestStore
-  MongoCommunityRequestStore --> MongoCommunityRequestDocument
-  MongoCommunityModerationLogRepository ..|> CommunityModerationLogRepository
-  MongoCommunityModerationLogRepository --> MongoCommunityModerationLogDocument
+  OrbitDBCommunityRepository ..|> CommunityRepository
+  OrbitDBCommunityRepository --> OrbitDBCommunityDocument
+  OrbitDBCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
+  OrbitDBCommunityChannelMessageRepository --> OrbitDBCommunityChannelMessageDocument
+  OrbitDBCommunityMessageReactionRepository ..|> CommunityMessageReactionRepository
+  OrbitDBCommunityMessageReactionRepository --> OrbitDBCommunityChannelMessageReactionDocument
+  OrbitDBCommunityInviteRepository ..|> CommunityInviteRepository
+  OrbitDBCommunityInviteRepository --> OrbitDBCommunityInviteDocument
+  OrbitDBCommunityMembershipRequestRepository ..|> CommunityMembershipRequestRepository
+  OrbitDBCommunityMembershipRequestRepository --> OrbitDBCommunityMembershipRequestDocument
+  OrbitDBCommunityModerationLogRepository ..|> CommunityModerationLogRepository
+  OrbitDBCommunityModerationLogRepository --> OrbitDBCommunityModerationLogDocument
 }
 
 package "communities-api" {
@@ -397,11 +397,11 @@ package "communities-api" {
   PostCommunityRoute ..> CommunityCreator
   GetCommunitiesRoute ..> CommunityRepository
   GetCommunityDiscoveryRoute ..> CommunityRepository
-  GetCommunityDiscoveryRoute ..> CommunityRequestStore
+  GetCommunityDiscoveryRoute ..> CommunityMembershipRequestRepository
   GetCommunityRoute ..> CommunityFinder
   PatchCommunityRoute ..> Community
   GetCommunityMembersRoute ..> Community
-  GetCommunityMembershipRequestsRoute ..> CommunityRequestStore
+  GetCommunityMembershipRequestsRoute ..> CommunityMembershipRequestRepository
   PostCommunityMemberRoute ..> CommunityMembershipRequest
   PostCommunityJoinRequestRoute ..> CommunityMembershipRequest
   PatchCommunityRequestRoute ..> CommunityMembershipRequest
@@ -456,9 +456,9 @@ note right of Community
   - members can send/list encrypted
     text channel messages
   - channel message reactions are
-    Mongo-only synchronized metadata
+    OrbitDB replicated synchronized metadata
   - moderation log entries are
-    Mongo-only administrative audit
+    OrbitDB replicated administrative audit
 end note
 
 @enduml

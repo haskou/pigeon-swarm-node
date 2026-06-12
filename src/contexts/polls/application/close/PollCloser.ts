@@ -3,7 +3,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { PollWasClosedEvent } from '../../domain/events/PollWasClosedEvent';
 import { Poll } from '../../domain/Poll';
-import { PollRepository } from '../../domain/repositories/PollRepository';
+import PollRepository from '../../domain/repositories/PollRepository';
 import { PollCloseMessage } from './messages/PollCloseMessage';
 
 export class PollCloser {

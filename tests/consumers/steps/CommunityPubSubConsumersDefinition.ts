@@ -1,18 +1,12 @@
 import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
-import RegisterCommunityMessagesWhenSync from '@app/apps/consumers/pubsub/communities/RegisterCommunityMessagesWhenSyncAvailable';
-import RespondToCommunitySyncRequest from '@app/apps/consumers/pubsub/communities/RespondToCommunitySyncRequest';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
-import { CommunitySyncAvailableEvent } from '@app/contexts/communities/domain/events/CommunitySyncAvailableEvent';
-import { CommunitySyncRequestedEvent } from '@app/contexts/communities/domain/events/CommunitySyncRequestedEvent';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { PrimitiveOf } from '@haskou/value-objects';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
@@ -35,28 +29,14 @@ class FakeCommunityReactionRepository {
 }
 
 class FakeCommunityRepository {
-  public saved: Community[] = [];
-
-  public async save(community: Community): Promise<void> {
-    this.saved.push(community);
+  public async save(): Promise<void> {
+    return undefined;
   }
 }
 
 class FakeCommunityMessageRepository {
   public async findById(): Promise<object> {
     return {};
-  }
-
-  public async save(): Promise<void> {
-    return undefined;
-  }
-}
-
-class FakeEventPublisher implements DomainEventPublisher {
-  public publishedEvents: DomainEvent[][] = [];
-
-  public async publish(events: DomainEvent[]): Promise<void> {
-    this.publishedEvents.push(events);
   }
 }
 
@@ -67,20 +47,13 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   private readonly emoji = '👍';
   private readonly messageId = 'community-message-1';
   private readonly networkId = '550e8400-e29b-41d4-a716-446655440001';
-  private readonly otherNetworkId = '550e8400-e29b-41d4-a716-446655440002';
   private readonly reactionCreatedAt = 1778513696020;
 
-  private eventPublisher = new FakeEventPublisher();
-  private communityRepository = new FakeCommunityRepository();
-  private messageRepository = new FakeCommunityMessageRepository();
   private reactionRepository = new FakeCommunityReactionRepository();
 
   @before()
   public async reset(): Promise<void> {
     await this.resetConsumerTestContext();
-    this.eventPublisher = new FakeEventPublisher();
-    this.communityRepository = new FakeCommunityRepository();
-    this.messageRepository = new FakeCommunityMessageRepository();
     this.reactionRepository = new FakeCommunityReactionRepository();
   }
 
@@ -145,19 +118,16 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async addedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenAdded(
       this.eventConsumer(),
-      this.communityRepository as unknown as MongoCommunityRepository,
-      this.messageRepository as unknown as MongoCommunityChannelMessageRepository,
-      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+      new FakeCommunityRepository() as unknown as CommunityRepository,
+      new FakeCommunityMessageRepository() as unknown as CommunityChannelMessageRepository,
+      this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
 
     await consumer.handler(
-      new CommunityChannelMessageReactionWasAddedEvent(
-        this.communityId,
-        {
-          ...this.reactionAttributes(),
-          community: this.communityPrimitives(),
-        },
-      ),
+      new CommunityChannelMessageReactionWasAddedEvent(this.communityId, {
+        ...this.reactionAttributes(),
+        community: this.communityPrimitives(),
+      }),
     );
   }
 
@@ -167,159 +137,15 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async removedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenRemoved(
       this.eventConsumer(),
-      this.communityRepository as unknown as MongoCommunityRepository,
-      this.messageRepository as unknown as MongoCommunityChannelMessageRepository,
-      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
+      new FakeCommunityRepository() as unknown as CommunityRepository,
+      new FakeCommunityMessageRepository() as unknown as CommunityChannelMessageRepository,
+      this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
 
     await consumer.handler(
-      new CommunityChannelMessageReactionRemovedEvent(
-        this.communityId,
-        {
-          ...this.reactionAttributes(),
-          community: this.communityPrimitives(),
-        },
-      ),
-    );
-  }
-
-  @when(
-    'the community sync available consumer handles a reaction sync response',
-  )
-  public async syncAvailableConsumerHandlesAReactionSyncResponse(): Promise<void> {
-    const consumer = new RegisterCommunityMessagesWhenSync(
-      this.eventConsumer(),
-      {
-        save: async (): Promise<void> => undefined,
-      } as unknown as MongoCommunityRepository,
-      {
-        findById: async (): Promise<object> => ({}),
-        save: async (): Promise<void> => undefined,
-      } as unknown as MongoCommunityChannelMessageRepository,
-      this.reactionRepository as unknown as MongoCommunityMessageReactionRepository,
-    );
-
-    await consumer.handler(
-      new CommunitySyncAvailableEvent(this.communityId, {
+      new CommunityChannelMessageReactionRemovedEvent(this.communityId, {
+        ...this.reactionAttributes(),
         community: this.communityPrimitives(),
-        communityId: this.communityId,
-        reactionCandidates: [this.reactionAttributes(), { messageId: 123 }],
-      }),
-    );
-  }
-
-  @when(
-    'the community sync request consumer handles a request without local data',
-  )
-  public async syncRequestConsumerHandlesARequestWithoutLocalData(): Promise<void> {
-    const consumer = new RespondToCommunitySyncRequest(
-      this.eventConsumer(),
-      {
-        findById: async (): Promise<undefined> => undefined,
-      } as unknown as MongoCommunityRepository,
-      {
-        findSyncableByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityChannelMessageRepository,
-      {
-        findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
-      this.eventPublisher,
-    );
-
-    await consumer.handler(
-      new CommunitySyncRequestedEvent(this.communityId, {
-        communityId: this.communityId,
-        networkId: this.networkId,
-        requestId: this.requestId,
-      }),
-    );
-  }
-
-  @when(
-    'the community sync request consumer handles a request with orphan local messages',
-  )
-  public async syncRequestConsumerHandlesARequestWithOrphanMessages(): Promise<void> {
-    const consumer = new RespondToCommunitySyncRequest(
-      this.eventConsumer(),
-      {
-        findById: async (): Promise<undefined> => undefined,
-      } as unknown as MongoCommunityRepository,
-      {
-        findSyncableByCommunity: async (): Promise<unknown[]> => [
-          { toPrimitives: (): object => ({ id: this.messageId }) },
-        ],
-      } as unknown as MongoCommunityChannelMessageRepository,
-      {
-        findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
-      this.eventPublisher,
-    );
-
-    await consumer.handler(
-      new CommunitySyncRequestedEvent(this.communityId, {
-        communityId: this.communityId,
-        networkId: this.networkId,
-        requestId: this.requestId,
-      }),
-    );
-  }
-
-  @when(
-    'the community sync request consumer handles a request for a community in another network',
-  )
-  public async syncRequestConsumerHandlesARequestForAnotherNetwork(): Promise<void> {
-    const consumer = new RespondToCommunitySyncRequest(
-      this.eventConsumer(),
-      {
-        findById: async (): Promise<Community> =>
-          Community.fromPrimitives({
-            autoJoinEnabled: false,
-            avatar: undefined,
-            bannedMemberIds: [],
-            banner: undefined,
-            createdAt: 1778513696020,
-            description: 'Community description',
-            discoverable: true,
-            id: this.communityId,
-            memberIds: [this.ownerIdentityId()],
-            memberRoles: [],
-            name: 'Community',
-            networkId: this.otherNetworkId,
-            ownerIdentityId: this.ownerIdentityId(),
-            roles: [
-              {
-                builtIn: true,
-                id: 'everyone',
-                name: 'everyone',
-                permissions: [
-                  'attach_files',
-                  'connect_voice',
-                  'embed_links',
-                  'send_messages',
-                  'send_stickers',
-                  'view_channels',
-                ],
-              },
-            ],
-            textChannels: [],
-            visibility: 'private',
-            voiceChannels: [],
-          }),
-      } as unknown as MongoCommunityRepository,
-      {
-        findSyncableByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityChannelMessageRepository,
-      {
-        findByCommunity: async (): Promise<[]> => [],
-      } as unknown as MongoCommunityMessageReactionRepository,
-      this.eventPublisher,
-    );
-
-    await consumer.handler(
-      new CommunitySyncRequestedEvent(this.communityId, {
-        communityId: this.communityId,
-        networkId: this.networkId,
-        requestId: this.requestId,
       }),
     );
   }
@@ -336,10 +162,5 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     const reaction = this.reactionRepository.deleted.at(-1);
 
     expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
-  }
-
-  @then('no community sync response should be published')
-  public noCommunitySyncResponseShouldBePublished(): void {
-    expect(this.eventPublisher.publishedEvents).to.deep.equal([]);
   }
 }

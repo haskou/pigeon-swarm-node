@@ -3,6 +3,9 @@ Feature: Get sticker user library route
   I want to read my sticker library
   So that clients can render saved, favorite and recent stickers
 
+  Background:
+    Given I register an in-memory IPFS network "api-stickers-network"
+
   Scenario: Read my sticker library
     Given I am an anonymous user
     And I set a sticker pack body

@@ -1,7 +1,7 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
-import { IdentityResolutionDomainService } from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
+import IdentityResolutionDomainService from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';

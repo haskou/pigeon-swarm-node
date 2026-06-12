@@ -1,7 +1,7 @@
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { Keychain } from '../Keychain';
-import { KeychainRepository } from '../repositories/KeychainRepository';
+import KeychainRepository from '../repositories/KeychainRepository';
 import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
 
 export default class KeychainSaverService {

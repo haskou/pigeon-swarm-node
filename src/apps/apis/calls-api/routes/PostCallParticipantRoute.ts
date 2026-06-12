@@ -1,4 +1,4 @@
-import { CallJoiner } from '@app/contexts/calls/application/join-call/CallJoiner';
+import CallJoiner from '@app/contexts/calls/application/join-call/CallJoiner';
 import { CallJoinMessage } from '@app/contexts/calls/application/join-call/messages/CallJoinMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -9,6 +9,8 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class PostCallParticipantRoute extends CallRouteSupport {
+  private readonly joiner = this.get<CallJoiner>(CallJoiner);
+
   @Post('/:callId/participants')
   public async joinCall(
     @Param('callId') callId: string,
@@ -16,10 +18,9 @@ export class PostCallParticipantRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const participantIdentityId = await this.authenticate(request);
-    const call = await new CallJoiner(
-      this.callRepository(),
-      this.eventPublisher,
-    ).join(new CallJoinMessage(callId, participantIdentityId.valueOf()));
+    const call = await this.joiner.join(
+      new CallJoinMessage(callId, participantIdentityId.valueOf()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

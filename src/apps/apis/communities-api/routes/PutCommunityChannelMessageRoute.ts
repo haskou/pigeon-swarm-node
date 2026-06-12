@@ -4,7 +4,7 @@ import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain
 import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
@@ -29,7 +29,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 @JsonController('/communities')
 export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
   private readonly signatureService =
-    new CommunityChannelMessageSignatureDomainService();
+    this.get<CommunityChannelMessageSignatureDomainService>(
+      CommunityChannelMessageSignatureDomainService,
+    );
 
   @Put('/:communityId/channels/:channelId/messages/:messageId')
   public async editMessage(

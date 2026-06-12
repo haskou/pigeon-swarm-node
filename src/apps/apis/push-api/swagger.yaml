@@ -26,7 +26,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
@@ -48,7 +47,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
@@ -81,7 +79,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: false
@@ -107,12 +104,6 @@ components:
     XTimestamp:
       in: header
       name: X-Timestamp
-      required: true
-      schema:
-        type: string
-    XNonce:
-      in: header
-      name: X-Nonce
       required: true
       schema:
         type: string

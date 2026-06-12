@@ -1,7 +1,7 @@
 import { DeleteCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityChannelMessageBody';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -25,7 +25,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 @JsonController('/communities')
 export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
   private readonly signatureService =
-    new CommunityChannelMessageSignatureDomainService();
+    this.get<CommunityChannelMessageSignatureDomainService>(
+      CommunityChannelMessageSignatureDomainService,
+    );
 
   @Delete('/:communityId/channels/:channelId/messages/:messageId')
   public async deleteMessage(

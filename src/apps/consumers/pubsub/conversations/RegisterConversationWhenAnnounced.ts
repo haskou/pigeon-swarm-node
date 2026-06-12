@@ -17,10 +17,10 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
     'pigeon-swarm.register-conversation-when-announced';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationRegistrar,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

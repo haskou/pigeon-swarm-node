@@ -1,6 +1,6 @@
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { ConversationMother } from '../../../../mothers/ConversationMother';

@@ -1,6 +1,4 @@
-import { Document } from 'mongodb';
-
-export type ConversationRoutingDocument = Document & {
+export type ConversationRoutingDocument = Record<string, unknown> & {
   _id: string;
   participantIds?: string[];
 };

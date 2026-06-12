@@ -1,9 +1,9 @@
 import { IdentityPresence } from '../../domain/IdentityPresence';
-import MongoIdentityPresenceRepository from '../../infrastructure/mongo/MongoIdentityPresenceRepository';
+import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
 import { IdentityPresenceFindMessage } from './messages/IdentityPresenceFindMessage';
 
 export default class IdentityPresenceFinder {
-  constructor(private readonly repository: MongoIdentityPresenceRepository) {}
+  constructor(private readonly repository: IdentityPresenceRepository) {}
 
   public async find(
     message: IdentityPresenceFindMessage,

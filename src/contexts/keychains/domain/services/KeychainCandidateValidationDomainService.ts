@@ -1,12 +1,12 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Keychain } from '../Keychain';
-import { KeychainSignatureDomainService } from './KeychainSignatureDomainService';
+import KeychainSignatureDomainService from './KeychainSignatureDomainService';
 import { PreviousKeychainFinder } from './types/PreviousKeychainFinder';
 
-export class KeychainCandidateValidationDomainService {
+export default class KeychainCandidateValidationDomainService {
   constructor(
-    private readonly signatureService = new KeychainSignatureDomainService(),
+    private readonly signatureService: KeychainSignatureDomainService,
   ) {}
 
   private async hasValidPrevious(

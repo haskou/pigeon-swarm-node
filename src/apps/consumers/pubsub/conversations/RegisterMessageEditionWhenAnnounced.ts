@@ -10,10 +10,10 @@ export default class RegisterMessageEditionWhenAnnounced extends Consumer {
     'pigeon-swarm.register-message-edition-when-announced';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

@@ -3,6 +3,9 @@ Feature: Get notifications route
   I want to list my notifications
   So that I can see pending actions for my identity
 
+  Background:
+    Given I register an in-memory IPFS network "notifications-api-network"
+
   Scenario: List notifications for the recipient
     Given I am an anonymous user
     And I have created a conversation invitation notification

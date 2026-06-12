@@ -5,6 +5,20 @@ import IPFSContentRacer from '../../../../../../../src/contexts/shared/infrastru
 import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 
+function never<T>(): Promise<T> {
+  return new Promise<T>(() => undefined);
+}
+
+function restoreTimeout(previousTimeout: string | undefined): void {
+  if (previousTimeout === undefined) {
+    delete process.env.IPFS_CONTENT_TIMEOUT_MS;
+
+    return;
+  }
+
+  process.env.IPFS_CONTENT_TIMEOUT_MS = previousTimeout;
+}
+
 describe('IPFSContentRacer', () => {
   let racer: IPFSContentRacer;
 
@@ -36,6 +50,25 @@ describe('IPFSContentRacer', () => {
       await expect(racer.raceGetJSON([network], cid)).rejects.toThrow(
         IPFSContentNotFoundError,
       );
+    });
+
+    it('should enforce a hard timeout when a network ignores abort', async () => {
+      const previousTimeout = process.env.IPFS_CONTENT_TIMEOUT_MS;
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network = mock<IPFSNetwork>();
+
+      process.env.IPFS_CONTENT_TIMEOUT_MS = '1';
+      network.getJSON.mockReturnValue(never());
+
+      try {
+        const timeoutRacer = new IPFSContentRacer();
+
+        await expect(timeoutRacer.raceGetJSON([network], cid)).rejects.toThrow(
+          IPFSContentNotFoundError,
+        );
+      } finally {
+        restoreTimeout(previousTimeout);
+      }
     });
   });
 
@@ -100,6 +133,26 @@ describe('IPFSContentRacer', () => {
       );
 
       expect(result).toEqual(['cid-b']);
+    });
+
+    it('should return no candidates when record lookups ignore abort', async () => {
+      const previousTimeout = process.env.IPFS_CONTENT_TIMEOUT_MS;
+      const network = mock<IPFSNetwork>();
+
+      process.env.IPFS_CONTENT_TIMEOUT_MS = '1';
+      network.getRecord.mockReturnValue(never());
+
+      try {
+        const timeoutRacer = new IPFSContentRacer();
+        const result = await timeoutRacer.raceGetRecordCandidates(
+          [network],
+          'my-key',
+        );
+
+        expect(result).toEqual([]);
+      } finally {
+        restoreTimeout(previousTimeout);
+      }
     });
   });
 

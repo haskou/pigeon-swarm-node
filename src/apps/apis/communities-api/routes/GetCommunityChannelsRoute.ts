@@ -1,8 +1,7 @@
-import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -14,20 +13,16 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 export class GetCommunityChannelsRoute extends CommunityRouteSupport {
   private static readonly THREAD_SUMMARY_LIMIT_PER_CHANNEL = 2;
 
-  private callRepository(): MongoCallRepository {
-    return new MongoCallRepository(this.get<MongoDB>(MongoDB));
-  }
+  private readonly calls = this.get<CallRepository>(CallRepository);
 
-  private channelMessageRepository(): MongoCommunityChannelMessageRepository {
-    return new MongoCommunityChannelMessageRepository(
-      this.get<MongoDB>(MongoDB),
-    );
-  }
+  private readonly messages = this.get<CommunityChannelMessageRepository>(
+    CommunityChannelMessageRepository,
+  );
 
   private async findConnectedIdentityIdsByChannelId(
     communityId: string,
   ): Promise<Map<string, string[]>> {
-    const calls = await this.callRepository().findActiveByCommunity(
+    const calls = await this.calls.findActiveByCommunity(
       new CommunityId(communityId),
     );
     const connectedIdentityIdsByChannelId = new Map<string, string[]>();
@@ -67,7 +62,7 @@ export class GetCommunityChannelsRoute extends CommunityRouteSupport {
       .visibleChannelsFor(actorIdentityId)
       .textChannels.map((channel) => new CommunityChannelId(channel.id));
     const threadSummariesByChannelId =
-      await this.channelMessageRepository().findThreadSummariesByChannel(
+      await this.messages.findThreadSummariesByChannel(
         new CommunityId(communityId),
         visibleTextChannelIds,
         GetCommunityChannelsRoute.THREAD_SUMMARY_LIMIT_PER_CHANNEL,

@@ -1,0 +1,21 @@
+export type OrbitDBReplicatedStoreAddresses = {
+  calls: string;
+  communities: string;
+  conversations: string;
+  events: string;
+  heads: string;
+  identities: string;
+  contentReplication: string;
+  keychains: string;
+  messages: string;
+  moderationLogs: string;
+  notificationSettings: string;
+  notifications: string;
+  pins: string;
+  polls: string;
+  presence: string;
+  reactions: string;
+  requests: string;
+  stickerPacks: string;
+  stickerUserLibraries: string;
+};

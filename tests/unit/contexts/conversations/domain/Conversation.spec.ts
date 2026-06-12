@@ -199,6 +199,7 @@ describe('Conversation', () => {
 
       expect(events).toEqual([expect.any(ConversationMessageWasEditedEvent)]);
       expect(events[0].attributes).toEqual({
+        message: edited.toPrimitives(),
         messageId: edited.getId().valueOf(),
         networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
@@ -308,6 +309,7 @@ describe('Conversation', () => {
 
       expect(events).toEqual([expect.any(ConversationMessageWasDeletedEvent)]);
       expect(events[0].attributes).toEqual({
+        message: deleted.toPrimitives(),
         messageId: deleted.getId().valueOf(),
         networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],

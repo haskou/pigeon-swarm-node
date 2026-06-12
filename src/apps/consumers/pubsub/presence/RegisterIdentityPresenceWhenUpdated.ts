@@ -1,25 +1,20 @@
 import { IdentityPresenceWasUpdatedEvent } from '@app/contexts/presence/domain/events/IdentityPresenceWasUpdatedEvent';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
+import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '@app/contexts/presence/domain/value-objects/PresenceStatus';
-import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
-import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
 export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.register-identity-presence-when-updated';
 
-  constructor(consumer: DomainEventConsumer) {
-    super(consumer);
-  }
-
-  private repository(): MongoIdentityPresenceRepository {
-    return new MongoIdentityPresenceRepository(
-      Kernel.di.getService<MongoDB>(MongoDB),
-    );
+  constructor(
+    private readonly eventConsumer: DomainEventConsumer,
+    private readonly repository: IdentityPresenceRepository,
+  ) {
+    super(eventConsumer);
   }
 
   public get queueName(): string {
@@ -39,7 +34,13 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    await this.repository().save(
+    const networkIds = Array.isArray(event.attributes.networkIds)
+      ? event.attributes.networkIds.filter(
+          (networkId): networkId is string => typeof networkId === 'string',
+        )
+      : [];
+
+    await this.repository.save(
       IdentityPresence.fromPrimitives({
         customMessage:
           typeof event.attributes.customMessage === 'string'
@@ -59,6 +60,7 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
         ).valueOf(),
         updatedAt: Number(event.attributes.updatedAt),
       }),
+      networkIds,
     );
   }
 }

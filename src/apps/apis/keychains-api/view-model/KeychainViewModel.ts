@@ -1,4 +1,4 @@
-import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/types/KeychainCandidate';
 
 import { KeychainResource } from '../resources/KeychainResource';
 

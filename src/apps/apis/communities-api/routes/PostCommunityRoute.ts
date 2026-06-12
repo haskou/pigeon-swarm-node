@@ -1,4 +1,4 @@
-import { CommunityCreator } from '@app/contexts/communities/application/create-community/CommunityCreator';
+import CommunityCreator from '@app/contexts/communities/application/create-community/CommunityCreator';
 import { CommunityCreateMessage } from '@app/contexts/communities/application/create-community/messages/CommunityCreateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -10,6 +10,8 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PostCommunityRoute extends CommunityRouteSupport {
+  private readonly creator = this.get<CommunityCreator>(CommunityCreator);
+
   @Post('/')
   public async createCommunity(
     @Body() body: PostCommunityBody,
@@ -17,7 +19,7 @@ export class PostCommunityRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const ownerIdentityId = await this.authenticate(request);
-    const community = await new CommunityCreator(this.repository()).create(
+    const community = await this.creator.create(
       new CommunityCreateMessage(
         ownerIdentityId.valueOf(),
         body.networkId,
@@ -32,8 +34,6 @@ export class PostCommunityRoute extends CommunityRouteSupport {
         },
       ),
     );
-
-    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

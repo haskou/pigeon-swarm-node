@@ -1,6 +1,6 @@
 import { NodePeer } from '../../domain/NodePeer';
-import { NodePeerRepository } from '../../domain/repositories/NodePeerRepository';
-import { NodeRepository } from '../../domain/repositories/NodeRepository';
+import NodePeerRepository from '../../domain/repositories/NodePeerRepository';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import { NodePeerRegisterMessage } from './messages/NodePeerRegisterMessage';
 
 export default class NodePeerRegistrar {

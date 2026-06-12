@@ -1,8 +1,5 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { MongoIdentityMetadataRepository } from '@app/contexts/identities/infrastructure/mongo';
-import { IdentityPresenceServicesFactory } from '@app/contexts/presence/application/IdentityPresenceServicesFactory';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import IdentityPresenceFinder from '@app/contexts/presence/application/find/IdentityPresenceFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -18,15 +15,9 @@ export class GetPresenceRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private presenceServices(): IdentityPresenceServicesFactory {
-    return new IdentityPresenceServicesFactory(
-      this.get<MongoDB>(MongoDB),
-      this.get<MongoIdentityMetadataRepository>(
-        MongoIdentityMetadataRepository,
-      ),
-      this.get<MessageBus>(MessageBus),
-    );
-  }
+  private readonly finder = this.get<IdentityPresenceFinder>(
+    IdentityPresenceFinder,
+  );
 
   private identityIdsFrom(request: Request): string | string[] | undefined {
     const { identityIds } = request.query;
@@ -45,14 +36,12 @@ export class GetPresenceRoute extends Route {
   ): Promise<Response> {
     const viewerIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const presences = await this.presenceServices()
-      .finder()
-      .find(
-        new GetPresenceListRequest(
-          viewerIdentityId.valueOf(),
-          this.identityIdsFrom(request),
-        ).getMessage(),
-      );
+    const presences = await this.finder.find(
+      new GetPresenceListRequest(
+        viewerIdentityId.valueOf(),
+        this.identityIdsFrom(request),
+      ).getMessage(),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -72,14 +61,12 @@ export class GetPresenceRoute extends Route {
   ): Promise<Response> {
     const viewerIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const [presence] = await this.presenceServices()
-      .finder()
-      .find(
-        new GetPresenceRequest(
-          viewerIdentityId.valueOf(),
-          identityId,
-        ).getMessage(),
-      );
+    const [presence] = await this.finder.find(
+      new GetPresenceRequest(
+        viewerIdentityId.valueOf(),
+        identityId,
+      ).getMessage(),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

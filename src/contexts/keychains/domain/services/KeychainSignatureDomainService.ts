@@ -1,6 +1,6 @@
 import { Keychain, KeychainSignaturePayload } from '../Keychain';
 
-export class KeychainSignatureDomainService {
+export default class KeychainSignatureDomainService {
   private getCanonicalPayload(
     payload: KeychainSignaturePayload,
   ): KeychainSignaturePayload {

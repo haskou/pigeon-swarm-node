@@ -1,4 +1,5 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
+import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
@@ -44,6 +45,13 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
     );
 
     await this.inviteRepository().save(invite);
+    await this.eventPublisher.publish([
+      new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {
+        communityId: community.getId().valueOf(),
+        invite: invite.toPrimitives(),
+        networkId: community.getNetworkId().valueOf(),
+      }),
+    ]);
     await this.recordModerationLog(
       community,
       actorIdentityId,

@@ -1,5 +1,8 @@
 Feature: DELETE /notification-settings/scopes
 
+  Background:
+    Given I register an in-memory IPFS network "notification-settings-api-network"
+
   Scenario: Reset conversation notification settings
     Given I set json body
       """

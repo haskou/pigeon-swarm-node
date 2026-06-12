@@ -10,7 +10,9 @@ export class IdentitySignatureDomainService {
   ): IdentitySignaturePayload {
     return {
       encryptedKeyPair: payload.encryptedKeyPair,
+      encryptedMasterKey: payload.encryptedMasterKey,
       id: payload.id,
+      masterKeyDerivation: payload.masterKeyDerivation,
       networks: payload.networks,
       previousIdentityExternalIdentifier:
         payload.previousIdentityExternalIdentifier,

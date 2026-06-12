@@ -2,10 +2,10 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
-import { CallRepository } from '../../domain/repositories/CallRepository';
+import CallRepository from '../../domain/repositories/CallRepository';
 import { CallSignalSendMessage } from './messages/CallSignalSendMessage';
 
-export class CallSignalSender {
+export default class CallSignalSender {
   constructor(
     private readonly repository: CallRepository,
     private readonly eventPublisher: DomainEventPublisher,

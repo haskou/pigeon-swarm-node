@@ -7,21 +7,7 @@ import { IncomingMessage } from 'http';
 import { WebSocketCredentials } from './WebSocketCredentials';
 
 export class WebSocketConnectionAuthenticator {
-  private static readonly maximumClockSkewInMilliseconds = 5 * 60 * 1000;
-  private static readonly usedNonces = new Set<string>();
-
-  private ensureNonceHasNotBeenUsed(
-    identityId: IdentityId,
-    nonce: string,
-  ): void {
-    const nonceKey = `${identityId.toString()}:${nonce}`;
-
-    if (WebSocketConnectionAuthenticator.usedNonces.has(nonceKey)) {
-      throw new InvalidSignedRequestError();
-    }
-
-    WebSocketConnectionAuthenticator.usedNonces.add(nonceKey);
-  }
+  private static readonly maximumClockSkewInMilliseconds = 30 * 1000;
 
   private ensureTimestampIsFresh(timestamp: string): void {
     const timestampAsNumber = Number(timestamp);
@@ -61,7 +47,6 @@ export class WebSocketConnectionAuthenticator {
         'identityId',
         'x-identity-id',
       ),
-      nonce: this.getCredential(request, url, 'nonce', 'x-nonce'),
       signature: this.getCredential(request, url, 'signature', 'x-signature'),
       timestamp: this.getCredential(request, url, 'timestamp', 'x-timestamp'),
     };
@@ -91,7 +76,6 @@ export class WebSocketConnectionAuthenticator {
         'GET',
         websocketPath,
         credentials.timestamp,
-        credentials.nonce,
         {},
       );
     const isValid = PublicKey.fromPEM(identityId.toString()).isValidSignature(
@@ -104,7 +88,6 @@ export class WebSocketConnectionAuthenticator {
     }
 
     this.ensureTimestampIsFresh(credentials.timestamp);
-    this.ensureNonceHasNotBeenUsed(identityId, credentials.nonce);
 
     return identityId;
   }

@@ -1,12 +1,11 @@
 import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import MongoProcessedDomainEventRepository from '@app/shared/infrastructure/messageBus/mongo/MongoProcessedDomainEventRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import LocalProcessedDomainEventRepository from '@app/shared/infrastructure/messageBus/LocalProcessedDomainEventRepository';
 
 export default abstract class Consumer {
   private static processedEventIds = new Set<string>();
-  private processedEventRepository?: MongoProcessedDomainEventRepository;
+  private processedEventRepository?: LocalProcessedDomainEventRepository;
 
   constructor(private readonly consumer: DomainEventConsumer) {}
 
@@ -15,16 +14,17 @@ export default abstract class Consumer {
   }
 
   private getProcessedEventRepository():
-    | MongoProcessedDomainEventRepository
+    | LocalProcessedDomainEventRepository
     | undefined {
     if (this.processedEventRepository) {
       return this.processedEventRepository;
     }
 
     try {
-      this.processedEventRepository = new MongoProcessedDomainEventRepository(
-        Kernel.di.getService<MongoDB>(MongoDB),
-      );
+      this.processedEventRepository =
+        Kernel.di.getService<LocalProcessedDomainEventRepository>(
+          LocalProcessedDomainEventRepository,
+        );
 
       return this.processedEventRepository;
     } catch (_error) {

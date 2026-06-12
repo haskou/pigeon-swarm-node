@@ -1,8 +1,8 @@
-import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
+import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerUnfavoriteMessage } from './messages/StickerUnfavoriteMessage';
 
-export class StickerUnfavoriter {
+export default class StickerUnfavoriter {
   constructor(private readonly repository: StickerUserLibraryRepository) {}
 
   private async findLibrary(

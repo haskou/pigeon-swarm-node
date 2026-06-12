@@ -1,17 +1,15 @@
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
-import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
-import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
+import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
+import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
-import { NotificationScopeSettingsRepository } from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
+import NotificationScopeSettingsRepository from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
-import {
-  PushNotificationDelivery,
-  PushNotificationDeliveryResult,
-} from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
-import { PushNotificationDispatcher } from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import PushNotificationDelivery from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
+import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/types/PushNotificationDeliveryResult';
+import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { PushSubscription } from '@app/contexts/push-notifications/domain/PushSubscription';
-import { PushSubscriptionRepository } from '@app/contexts/push-notifications/domain/repositories/PushSubscriptionRepository';
+import PushSubscriptionRepository from '@app/contexts/push-notifications/domain/repositories/PushSubscriptionRepository';
 import { PushSubscriptionEndpoint } from '@app/contexts/push-notifications/domain/value-objects/PushSubscriptionEndpoint';
 import { PushSubscriptionKey } from '@app/contexts/push-notifications/domain/value-objects/PushSubscriptionKey';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -284,7 +282,7 @@ function deliveryResult(options: {
 function mockPresenceRepository(options: {
   busyIdentityIds: string[];
   presences: IdentityPresence[];
-}): MongoIdentityPresenceRepository {
+}): IdentityPresenceRepository {
   return {
     findByIdentityId: jest.fn(async (identityId: IdentityId) => {
       if (options.busyIdentityIds.includes(identityId.valueOf())) {
@@ -295,7 +293,7 @@ function mockPresenceRepository(options: {
         presence.getIdentityId().isEqual(identityId),
       );
     }),
-  } as unknown as MongoIdentityPresenceRepository;
+  } as unknown as IdentityPresenceRepository;
 }
 
 function mockRepository(

@@ -4,6 +4,8 @@ export interface IdentityResource {
     encryptedPrivateKey: string;
     publicKey: string;
   };
+  encryptedMasterKey: string;
+  masterKeyDerivation: Record<string, unknown>;
   networks: string[];
   profile: {
     banner: string | undefined;

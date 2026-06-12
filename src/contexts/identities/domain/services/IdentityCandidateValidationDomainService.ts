@@ -4,7 +4,7 @@ import { Identity } from '../Identity';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 import { PreviousIdentityResolver } from './types/PreviousIdentityResolver';
 
-export class IdentityCandidateValidationDomainService {
+export default class IdentityCandidateValidationDomainService {
   private isValidPreviousLink(
     candidate: Identity,
     previousIdentity: Identity,

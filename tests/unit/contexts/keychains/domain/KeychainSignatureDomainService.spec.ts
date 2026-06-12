@@ -1,4 +1,4 @@
-import { KeychainSignatureDomainService } from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
+import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 
 describe('KeychainSignatureDomainService', () => {
   it('serializes keychain payloads with the public signing contract order', () => {

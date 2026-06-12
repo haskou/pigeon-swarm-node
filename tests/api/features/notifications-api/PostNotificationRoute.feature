@@ -3,6 +3,9 @@ Feature: Post notification route
   I want to create conversation invitation notifications
   So that recipients can accept invitations without exposing private keys
 
+  Background:
+    Given I register an in-memory IPFS network "notifications-api-network"
+
   Scenario: Create a conversation invitation notification
     Given I am an anonymous user
     And I set a conversation invitation notification body

@@ -1,11 +1,10 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import MessageSender from '@app/contexts/conversations/application/send-message/MessageSender';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
+import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
-import { MongoPollRepository } from '@app/contexts/polls/infrastructure/mongo/MongoPollRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Signature } from '@haskou/value-objects';
@@ -31,16 +30,14 @@ export class PostConversationMessageRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private pollRepository(): MongoPollRepository {
-    return new MongoPollRepository(this.get<MongoDB>(MongoDB));
-  }
+  private readonly polls = this.get<PollRepository>(PollRepository);
 
-  private conversationRepository(): MongoConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
+  private conversationRepository(): ConversationRepository {
+    return this.get<ConversationRepository>(ConversationRepository);
   }
 
   private async registerPreviousPollMessage(
-    conversation: Awaited<ReturnType<MongoConversationRepository['findById']>>,
+    conversation: Awaited<ReturnType<ConversationRepository['findById']>>,
     conversationId: ConversationId,
     previousMessageId: string,
     request: Request,
@@ -53,9 +50,7 @@ export class PostConversationMessageRoute extends Route {
     if (conversation.findMessageById(messageId)) {
       return false;
     }
-    const poll = await this.pollRepository().findById(
-      new PollId(previousMessageId),
-    );
+    const poll = await this.polls.findById(new PollId(previousMessageId));
 
     if (
       !poll ||

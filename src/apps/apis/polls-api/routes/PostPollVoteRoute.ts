@@ -17,6 +17,8 @@ import { PollRouteSupport } from './PollRouteSupport';
 
 @JsonController('/polls')
 export class PostPollVoteRoute extends PollRouteSupport {
+  private readonly caster = this.get<PollVoteCaster>(PollVoteCaster);
+
   @Post('/:pollId/votes')
   public async castVote(
     @Param('pollId') pollId: string,
@@ -27,10 +29,7 @@ export class PostPollVoteRoute extends PollRouteSupport {
     const actor = await this.authenticate(request);
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.accessPollScope(actor, poll);
-    const updatedPoll = await new PollVoteCaster(
-      this.repository(),
-      this.eventPublisher,
-    ).cast(
+    const updatedPoll = await this.caster.cast(
       new PollVoteCastMessage(
         pollId,
         actor.valueOf(),

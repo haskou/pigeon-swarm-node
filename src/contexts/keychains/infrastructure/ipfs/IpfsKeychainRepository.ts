@@ -1,43 +1,77 @@
 import { IpfsIdentityDocument } from '@app/contexts/identities/infrastructure/ipfs/documents/IpfsIdentityDocument';
 import { KeychainOwnerNetworksNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainOwnerNetworksNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import {
-  KeychainCandidate,
-  KeychainRepository,
-} from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import KeychainMetadataRepository from '@app/contexts/keychains/domain/repositories/KeychainMetadataRepository';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/types/KeychainCandidate';
+import { KeychainMetadataRecord } from '@app/contexts/keychains/domain/repositories/types/KeychainMetadataRecord';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
-import { MongoKeychainMetadataDocument } from '../mongo/documents/MongoKeychainMetadataDocument';
-import MongoKeychainMetadataRepository from '../mongo/MongoKeychainMetadataRepository';
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 
-export default class IpfsKeychainRepository implements KeychainRepository {
+export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly IDENTITY_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
+  private readonly keychainByCid = new Map<string, Keychain>();
 
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsKeychainMapper,
-    private readonly metadataRepository: MongoKeychainMetadataRepository,
-  ) {}
+    private readonly metadataRepository: KeychainMetadataRepository,
+  ) {
+    super();
+  }
+
+  private async getDocumentFromCid(cid: IPFSId): Promise<IpfsKeychainDocument> {
+    try {
+      return await this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
+    } catch {
+      const bytes = await this.ipfsManager.getBytes(cid);
+
+      return JSON.parse(
+        Buffer.from(bytes).toString('utf8'),
+      ) as IpfsKeychainDocument;
+    }
+  }
+
+  private async getKeychainFromCid(cid: IPFSId): Promise<Keychain> {
+    const cached = this.keychainByCid.get(cid.valueOf());
+
+    if (cached) {
+      return cached;
+    }
+
+    const document = await this.getDocumentFromCid(cid);
+    const keychain = this.mapper.toDomain(document);
+
+    this.keychainByCid.set(cid.valueOf(), keychain);
+
+    return keychain;
+  }
 
   private async findCandidateFromCid(
     cid: IPFSId,
+    shouldSaveMetadata: boolean = true,
   ): Promise<Keychain | undefined> {
     try {
-      const document =
-        await this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
-      const keychain = this.mapper.toDomain(document);
+      const keychain = await this.getKeychainFromCid(cid);
 
-      await this.metadataRepository.save(keychain, cid);
+      if (shouldSaveMetadata) {
+        await this.metadataRepository.save(
+          keychain,
+          new KeychainExternalIdentifier(cid.valueOf()),
+        );
+      }
 
       return keychain;
     } catch {
+      this.keychainByCid.delete(cid.valueOf());
+
       return undefined;
     }
   }
@@ -95,26 +129,54 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     );
   }
 
+  private async findCandidateReferenceFromMetadata(
+    metadata: KeychainMetadataRecord,
+  ): Promise<KeychainCandidate | undefined> {
+    const candidate = await this.findCandidateFromCid(
+      new IPFSId(metadata.cid),
+      false,
+    ).catch((): undefined => undefined);
+
+    const keychain = candidate || metadata.keychain;
+
+    return keychain
+      ? {
+          externalIdentifier: new KeychainExternalIdentifier(metadata.cid),
+          keychain,
+          source: 'local',
+        }
+      : undefined;
+  }
+
   private async findLocalCandidateReferences(
-    metadata: MongoKeychainMetadataDocument[],
+    metadata: KeychainMetadataRecord[],
   ): Promise<KeychainCandidate[]> {
     const candidates: KeychainCandidate[] = [];
 
     for (const document of metadata) {
-      const candidate = document.keychain
-        ? this.mapper.toDomain(document.keychain)
-        : await this.findCandidateFromCid(new IPFSId(document.cid));
+      const candidate = await this.findCandidateReferenceFromMetadata(document);
 
       if (candidate) {
-        candidates.push({
-          externalIdentifier: new KeychainExternalIdentifier(document.cid),
-          keychain: candidate,
-          source: 'local',
-        });
+        candidates.push(candidate);
       }
     }
 
     return candidates;
+  }
+
+  private deduplicateMetadata(
+    documents: KeychainMetadataRecord[],
+  ): KeychainMetadataRecord[] {
+    const deduplicated = new Map<string, KeychainMetadataRecord>();
+
+    for (const document of documents) {
+      deduplicated.set(`${document.ownerIdentityId}:${document.cid}`, document);
+    }
+
+    return [...deduplicated.values()].sort(
+      (left, right) =>
+        right.version - left.version || right.receivedAt - left.receivedAt,
+    );
   }
 
   private async findRemoteCandidateReferences(
@@ -124,30 +186,45 @@ export default class IpfsKeychainRepository implements KeychainRepository {
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
     );
-    const candidates: KeychainCandidate[] = [];
+    const candidates = await Promise.all(
+      cidStrings
+        .filter((cidString) => !knownCids.has(cidString))
+        .map(async (cidString) => {
+          const candidate = await this.findCandidateFromCid(
+            new IPFSId(cidString),
+          );
 
-    for (const cidString of cidStrings) {
-      if (knownCids.has(cidString)) {
-        continue;
-      }
+          if (!candidate) {
+            return undefined;
+          }
 
-      const candidate = await this.findCandidateFromCid(new IPFSId(cidString));
+          const candidateReference: KeychainCandidate = {
+            externalIdentifier: new KeychainExternalIdentifier(cidString),
+            keychain: candidate,
+            source: 'remote',
+          };
 
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new KeychainExternalIdentifier(cidString),
-          keychain: candidate,
-          source: 'remote',
-        });
-      }
-    }
+          return candidateReference;
+        }),
+    );
 
-    return candidates;
+    return candidates.filter(
+      (candidate): candidate is KeychainCandidate => candidate !== undefined,
+    );
   }
 
   public async findByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
+    const metadata =
+      await this.metadataRepository.findByExternalIdentifier(
+        externalIdentifier,
+      );
+
+    if (metadata?.keychain) {
+      return metadata.keychain;
+    }
+
     return this.findCandidateFromCid(new IPFSId(externalIdentifier.valueOf()));
   }
 
@@ -163,8 +240,9 @@ export default class IpfsKeychainRepository implements KeychainRepository {
   public async findCandidateReferencesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]> {
-    const metadata =
-      await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId);
+    const metadata = this.deduplicateMetadata(
+      await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId),
+    );
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
     if (localCandidates.length > 0) {
@@ -190,7 +268,11 @@ export default class IpfsKeychainRepository implements KeychainRepository {
       primitiveNetworkIds,
     );
 
-    await this.metadataRepository.save(keychain, cid);
+    await this.metadataRepository.save(
+      keychain,
+      new KeychainExternalIdentifier(cid.valueOf()),
+    );
+    this.keychainByCid.set(cid.valueOf(), keychain);
     await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
@@ -202,23 +284,21 @@ export default class IpfsKeychainRepository implements KeychainRepository {
 
   public async republishLocalRoutingRecords(): Promise<number> {
     const metadata = await this.metadataRepository.findAll();
-    const uniqueDocuments = new Map<string, MongoKeychainMetadataDocument>();
+    const latestDocumentsByOwner = new Map<string, KeychainMetadataRecord>();
 
     for (const document of metadata) {
-      uniqueDocuments.set(
-        `${document.ownerIdentityId}:${document.cid}`,
-        document,
-      );
+      if (!latestDocumentsByOwner.has(document.ownerIdentityId)) {
+        latestDocumentsByOwner.set(document.ownerIdentityId, document);
+      }
     }
 
     let republished = 0;
 
-    for (const document of uniqueDocuments.values()) {
+    for (const document of latestDocumentsByOwner.values()) {
       try {
-        const keychainDocument =
-          await this.ipfsManager.getJSON<IpfsKeychainDocument>(
-            new IPFSId(document.cid),
-          );
+        const keychainDocument = await this.getDocumentFromCid(
+          new IPFSId(document.cid),
+        );
         const cid = await this.addJSONToOwnerNetworks(
           document.ownerIdentityId,
           keychainDocument,

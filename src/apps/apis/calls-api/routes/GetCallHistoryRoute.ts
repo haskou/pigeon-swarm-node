@@ -1,4 +1,4 @@
-import { CallHistoryFinder } from '@app/contexts/calls/application/find-call-history/CallHistoryFinder';
+import CallHistoryFinder from '@app/contexts/calls/application/find-call-history/CallHistoryFinder';
 import { CallHistoryFindMessage } from '@app/contexts/calls/application/find-call-history/messages/CallHistoryFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -9,13 +9,15 @@ import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
 export class GetCallHistoryRoute extends CallRouteSupport {
+  private readonly finder = this.get<CallHistoryFinder>(CallHistoryFinder);
+
   @Get('/history')
   public async getCallHistory(
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const requesterIdentityId = await this.authenticate(request);
-    const calls = await new CallHistoryFinder(this.callRepository()).find(
+    const calls = await this.finder.find(
       new CallHistoryFindMessage(requesterIdentityId.valueOf()),
     );
 

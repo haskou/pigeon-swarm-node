@@ -1,8 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { InvalidKeychainCandidateError } from '../../domain/errors/InvalidKeychainCandidateError';
-import { KeychainRepository } from '../../domain/repositories/KeychainRepository';
-import { KeychainCandidateValidationDomainService } from '../../domain/services/KeychainCandidateValidationDomainService';
+import KeychainRepository from '../../domain/repositories/KeychainRepository';
+import KeychainCandidateValidationDomainService from '../../domain/services/KeychainCandidateValidationDomainService';
 import { RegisterKeychainCandidateMessage } from './messages/RegisterKeychainCandidateMessage';
 
 export default class KeychainCandidateRegistrar {

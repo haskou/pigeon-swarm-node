@@ -1,19 +1,19 @@
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
-import { NotificationDeliveryPreferenceChecker } from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
+import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
-import MongoIdentityPresenceRepository from '@app/contexts/presence/infrastructure/mongo/MongoIdentityPresenceRepository';
+import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { PushSubscriptionRepository } from '../../domain/repositories/PushSubscriptionRepository';
-import { PushNotificationDelivery } from './PushNotificationDelivery';
+import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
+import PushNotificationDelivery from './PushNotificationDelivery';
 import { PushNotificationIntent } from './types/PushNotificationIntent';
 import { PushNotificationScope } from './types/PushNotificationScope';
 
-export class PushNotificationDispatcher {
+export default class PushNotificationDispatcher {
   private static identityIdsFrom(value: unknown): IdentityId[] {
     if (!Array.isArray(value)) {
       return [];
@@ -91,7 +91,7 @@ export class PushNotificationDispatcher {
 
   constructor(
     private readonly subscriptionRepository: PushSubscriptionRepository,
-    private readonly presenceRepository: MongoIdentityPresenceRepository,
+    private readonly presenceRepository: IdentityPresenceRepository,
     private readonly conversationRepository: ConversationRepository,
     private readonly delivery: PushNotificationDelivery,
     private readonly preferenceChecker: NotificationDeliveryPreferenceChecker,

@@ -4,6 +4,8 @@ export interface IpfsIdentityDocument {
     publicKey: string;
     encryptedPrivateKey: string;
   };
+  encryptedMasterKey: string;
+  masterKeyDerivation: Record<string, unknown>;
   networks: string[];
   previousCid: string | undefined;
   profile: {

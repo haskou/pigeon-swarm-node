@@ -3,8 +3,8 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
 import { Identity } from '../../domain/Identity';
-import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
-import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
+import IdentityRepository from '../../domain/repositories/IdentityRepository';
+import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import IdentitySaverService from '../../domain/services/IdentitySaverService';
 import { IdentityPublishMessage } from './messages/IdentityPublishMessage';
 
@@ -30,8 +30,19 @@ export default class IdentityPublisher {
       throw new InvalidIdentityCandidateError();
     }
 
-    await this.saver.save(identity);
-    await this.eventPublisher.publish(identity.pullDomainEvents());
+    const externalIdentifier = await this.saver.save(identity);
+    const events = identity.pullDomainEvents();
+
+    for (const event of events) {
+      event.attributes.externalIdentifier = externalIdentifier.valueOf();
+      event.attributes.handle = primitives.profile.handle;
+      event.attributes.networkIds = primitives.networks;
+      event.attributes.previousExternalIdentifier =
+        primitives.previousIdentityExternalIdentifier;
+      event.attributes.version = primitives.version;
+    }
+
+    await this.eventPublisher.publish(events);
 
     return identity;
   }

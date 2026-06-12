@@ -3,8 +3,9 @@ import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
 
 export default class NodeHeartbeatScheduler extends Scheduler {
-  private readonly sender: NodeHeartbeatSender =
-    this.get<NodeHeartbeatSender>(NodeHeartbeatSender);
+  constructor(private readonly sender: NodeHeartbeatSender) {
+    super();
+  }
 
   public async execute(): Promise<void> {
     await this.sender.send();
