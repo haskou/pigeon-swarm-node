@@ -1,4 +1,4 @@
-import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
+import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import { MessagesReadMarkMessage } from './messages/MessagesReadMarkMessage';
 
 export default class MessagesReadRegistrar {

@@ -4,8 +4,8 @@ import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFo
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import { MessageReaction } from '../../domain/MessageReaction';
-import { ConversationRepository } from '../../domain/repositories/ConversationRepository';
-import { MessageReactionRepository } from '../../domain/repositories/MessageReactionRepository';
+import ConversationRepository from '../../domain/repositories/ConversationRepository';
+import MessageReactionRepository from '../../domain/repositories/MessageReactionRepository';
 import { RegisterMessageReaction } from './messages/RegisterMessageReaction';
 
 export default class MessageReactionRegistrar {

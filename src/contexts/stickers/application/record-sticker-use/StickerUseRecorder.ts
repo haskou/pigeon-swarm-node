@@ -1,10 +1,10 @@
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
-import { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
-import { StickerUserLibraryRepository } from '../../domain/repositories/StickerUserLibraryRepository';
+import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
+import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerUseRecordMessage } from './messages/StickerUseRecordMessage';
 
-export class StickerUseRecorder {
+export default class StickerUseRecorder {
   constructor(
     private readonly packRepository: StickerPackRepository,
     private readonly libraryRepository: StickerUserLibraryRepository,

@@ -4,41 +4,61 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
-import {
-  IdentityCandidate,
-  IdentityRepository,
-} from '../../domain/repositories/IdentityRepository';
-import { IdentityCandidateValidationDomainService } from '../../domain/services/IdentityCandidateValidationDomainService';
+import IdentityMetadataRepository from '../../domain/repositories/IdentityMetadataRepository';
+import IdentityRepository from '../../domain/repositories/IdentityRepository';
+import { IdentityCandidate } from '../../domain/repositories/types/IdentityCandidate';
+import { IdentityMetadataRecord } from '../../domain/repositories/types/IdentityMetadataRecord';
+import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
-import { MongoIdentityMetadataDocument } from '../mongo/documents/MongoIdentityMetadataDocument';
-import MongoIdentityMetadataRepository from '../mongo/MongoIdentityMetadataRepository';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
-export default class IpfsIdentityRepository implements IdentityRepository {
+export default class IpfsIdentityRepository extends IdentityRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
+  private readonly identityByCid = new Map<string, Identity>();
 
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsIdentityMapper,
-    private readonly metadataRepository: MongoIdentityMetadataRepository,
-  ) {}
+    private readonly metadataRepository: IdentityMetadataRepository,
+  ) {
+    super();
+  }
 
   private async findValidMetadata(
     id: IdentityId,
-  ): Promise<MongoIdentityMetadataDocument[]> {
+  ): Promise<IdentityMetadataRecord[]> {
     try {
-      return await this.metadataRepository.findByIdentityId(id);
+      return this.deduplicateMetadata(
+        await this.metadataRepository.findByIdentityId(id),
+      );
     } catch {
       return [];
     }
   }
 
+  private deduplicateMetadata(
+    documents: IdentityMetadataRecord[],
+  ): IdentityMetadataRecord[] {
+    const deduplicated = new Map<string, IdentityMetadataRecord>();
+
+    for (const document of documents) {
+      deduplicated.set(`${document.identityId}:${document.cid}`, document);
+    }
+
+    return [...deduplicated.values()].sort(
+      (left, right) =>
+        right.version - left.version || right.receivedAt - left.receivedAt,
+    );
+  }
+
   private async deleteMetadata(cid: IPFSId): Promise<void> {
     try {
-      await this.metadataRepository.deleteByExternalIdentifier(cid);
+      await this.metadataRepository.deleteByExternalIdentifier(
+        new IdentityExternalIdentifier(cid.valueOf()),
+      );
     } catch {
       return;
     }
@@ -46,59 +66,66 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
   private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
     try {
-      await this.metadataRepository.save(identity, cid);
+      await this.metadataRepository.save(
+        identity,
+        new IdentityExternalIdentifier(cid.valueOf()),
+      );
     } catch {
       return;
     }
+  }
+
+  private async getDocumentFromCid(
+    cid: IPFSId,
+    networkIds?: string[],
+  ): Promise<IpfsIdentityDocument> {
+    try {
+      return networkIds && networkIds.length > 0
+        ? await this.ipfsManager.getJSONFromNetworks<IpfsIdentityDocument>(
+            cid,
+            networkIds,
+          )
+        : await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
+    } catch {
+      const bytes =
+        networkIds && networkIds.length > 0
+          ? await this.ipfsManager.getBytesFromNetworks(cid, networkIds)
+          : await this.ipfsManager.getBytes(cid);
+
+      return JSON.parse(
+        Buffer.from(bytes).toString('utf8'),
+      ) as IpfsIdentityDocument;
+    }
+  }
+
+  private async getIdentityFromCid(
+    cid: IPFSId,
+    networkIds?: string[],
+  ): Promise<Identity> {
+    const cached = this.identityByCid.get(cid.valueOf());
+
+    if (cached) {
+      return cached;
+    }
+
+    const document = await this.getDocumentFromCid(cid, networkIds);
+    const identity = this.mapper.toDomain(document);
+
+    this.identityByCid.set(cid.valueOf(), identity);
+
+    return identity;
   }
 
   private async findPreviousIdentity(
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity | undefined> {
     try {
-      const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+      return await this.getIdentityFromCid(
         new IPFSId(externalIdentifier.valueOf()),
       );
-
-      return this.mapper.toDomain(document);
     } catch {
       return undefined;
     }
-  }
-
-  private async findCandidatesFromMetadata(
-    id: IdentityId,
-    metadata: MongoIdentityMetadataDocument[],
-  ): Promise<Identity[]> {
-    const cids = [...new Set(metadata.map((document) => document.cid))];
-    const candidates: Identity[] = [];
-
-    for (const cid of cids) {
-      try {
-        const document = await this.ipfsManager.getJSON<IpfsIdentityDocument>(
-          new IPFSId(cid),
-        );
-
-        const candidate = this.mapper.toDomain(document);
-
-        const isValid = await this.validator.isValidChainFor(
-          id,
-          candidate,
-          (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
-        );
-
-        if (!isValid) {
-          await this.deleteMetadata(new IPFSId(cid));
-          continue;
-        }
-
-        candidates.push(candidate);
-      } catch {
-        await this.deleteMetadata(new IPFSId(cid));
-      }
-    }
-
-    return candidates;
   }
 
   private async findCandidateFromCid(
@@ -107,9 +134,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     shouldSaveMetadata: boolean = true,
   ): Promise<Identity | undefined> {
     try {
-      const document =
-        await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
-      const identity = this.mapper.toDomain(document);
+      const identity = await this.getIdentityFromCid(cid);
 
       const isValid = await this.validator.isValidChainFor(
         id,
@@ -118,6 +143,7 @@ export default class IpfsIdentityRepository implements IdentityRepository {
       );
 
       if (!isValid) {
+        this.identityByCid.delete(cid.valueOf());
         await this.deleteMetadata(cid);
 
         return undefined;
@@ -136,32 +162,104 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   }
 
   private async findCandidateFromMetadata(
-    metadata: MongoIdentityMetadataDocument,
+    metadata: IdentityMetadataRecord,
   ): Promise<Identity | undefined> {
     try {
       const id = new IdentityId(metadata.identityId);
       const cid = new IPFSId(metadata.cid);
-      const document =
-        metadata.identity ??
-        (await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid));
-      const candidate = this.mapper.toDomain(document);
+      const hasEmbeddedIdentity = metadata.identity !== undefined;
+      const candidate =
+        metadata.identity ||
+        (await this.getIdentityFromCid(cid, metadata.networkIds));
 
       if (!this.validator.isValidFor(id, candidate)) {
+        this.identityByCid.delete(cid.valueOf());
         await this.deleteMetadata(cid);
 
         return undefined;
       }
 
-      if (!metadata.identity) {
+      if (!hasEmbeddedIdentity) {
         await this.saveMetadata(candidate, cid);
       }
 
       return candidate;
     } catch {
+      this.identityByCid.delete(metadata.cid);
       await this.deleteMetadata(new IPFSId(metadata.cid));
 
       return undefined;
     }
+  }
+
+  private async findCandidateReferenceFromMetadata(
+    metadata: IdentityMetadataRecord,
+  ): Promise<IdentityCandidate | undefined> {
+    const identity = await this.findCandidateFromMetadata(metadata);
+
+    if (!identity) {
+      return undefined;
+    }
+
+    return {
+      externalIdentifier: new IdentityExternalIdentifier(metadata.cid),
+      identity,
+    };
+  }
+
+  private async findFirstCandidateReferenceFromMetadata(
+    metadata: IdentityMetadataRecord[],
+  ): Promise<IdentityCandidate | undefined> {
+    const [latestDocument] = metadata;
+
+    return latestDocument
+      ? this.findCandidateReferenceFromMetadata(latestDocument)
+      : undefined;
+  }
+
+  private async findCandidateReferencesFromCids(
+    id: IdentityId,
+    cidStrings: string[],
+    knownCids: Set<string>,
+  ): Promise<IdentityCandidate[]> {
+    const candidates = await Promise.all(
+      cidStrings
+        .filter((cidString) => !knownCids.has(cidString))
+        .map(async (cidString) => {
+          const candidate = await this.findCandidateFromCid(
+            id,
+            new IPFSId(cidString),
+          );
+
+          if (!candidate) {
+            return undefined;
+          }
+
+          return {
+            externalIdentifier: new IdentityExternalIdentifier(cidString),
+            identity: candidate,
+          };
+        }),
+    );
+
+    return candidates.filter(
+      (candidate): candidate is IdentityCandidate => candidate !== undefined,
+    );
+  }
+
+  private async findFirstHandleCandidateFromMetadata(
+    handle: ProfileHandle,
+    metadata: IdentityMetadataRecord[],
+  ): Promise<IdentityCandidate | undefined> {
+    for (const document of metadata) {
+      const candidate = await this.findCandidateReferenceFromMetadata(document);
+
+      if (candidate?.identity.hasHandle(handle)) {
+        return candidate;
+      }
+    }
+
+    return undefined;
   }
 
   public async findById(id: IdentityId): Promise<Identity> {
@@ -171,14 +269,20 @@ export default class IpfsIdentityRepository implements IdentityRepository {
   }
 
   public async findByHandle(handle: ProfileHandle): Promise<Identity> {
+    return (await this.findCandidateByHandle(handle)).identity;
+  }
+
+  public async findCandidateByHandle(
+    handle: ProfileHandle,
+  ): Promise<IdentityCandidate> {
     const metadata = await this.metadataRepository.findByHandle(handle);
+    const candidate = await this.findFirstHandleCandidateFromMetadata(
+      handle,
+      metadata,
+    );
 
-    for (const document of metadata) {
-      const candidate = await this.findCandidateFromMetadata(document);
-
-      if (candidate?.hasHandle(handle)) {
-        return candidate;
-      }
+    if (candidate) {
+      return candidate;
     }
 
     throw new IdentityNotFoundError(handle.valueOf());
@@ -203,45 +307,27 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {
     const metadata = await this.findValidMetadata(id);
-    const candidates: IdentityCandidate[] = [];
+    const candidate =
+      await this.findFirstCandidateReferenceFromMetadata(metadata);
 
-    for (const document of metadata) {
-      const candidate = await this.findCandidateFromMetadata(document);
-
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new IdentityExternalIdentifier(document.cid),
-          identity: candidate,
-        });
-      }
-    }
-
-    if (candidates.length > 0) {
-      return candidates;
+    if (candidate) {
+      return [candidate];
     }
 
     const knownCids = new Set(metadata.map((document) => document.cid));
+
+    if (metadata.length > 0 && !(await this.ipfsManager.hasConnectedPeers())) {
+      throw new IdentityNotFoundError(id.valueOf());
+    }
+
     const cidStrings = await this.ipfsManager.getRecordCandidates(
       this.ROUTING_KEY_PREFIX + id.valueOf(),
     );
-
-    for (const cidString of cidStrings) {
-      if (knownCids.has(cidString)) {
-        continue;
-      }
-
-      const candidate = await this.findCandidateFromCid(
-        id,
-        new IPFSId(cidString),
-      );
-
-      if (candidate) {
-        candidates.push({
-          externalIdentifier: new IdentityExternalIdentifier(cidString),
-          identity: candidate,
-        });
-      }
-    }
+    const candidates = await this.findCandidateReferencesFromCids(
+      id,
+      cidStrings,
+      knownCids,
+    );
 
     if (candidates.length === 0) {
       throw new IdentityNotFoundError(id.valueOf());
@@ -256,23 +342,26 @@ export default class IpfsIdentityRepository implements IdentityRepository {
     return candidates.map((candidate) => candidate.identity);
   }
 
-  public async save(identity: Identity): Promise<void> {
+  public async save(identity: Identity): Promise<IdentityExternalIdentifier> {
     const document = this.mapper.toDocument(identity);
     const networks: string[] = document.networks;
     const cid = await this.ipfsManager.addJSONToNetworks(document, networks);
 
     await this.saveMetadata(identity, cid);
+    this.identityByCid.set(cid.valueOf(), identity);
 
     await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,
       cid.valueOf(),
       networks,
     );
+
+    return new IdentityExternalIdentifier(cid.valueOf());
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {
     const metadata = await this.metadataRepository.findAll();
-    const uniqueDocuments = new Map<string, MongoIdentityMetadataDocument>();
+    const uniqueDocuments = new Map<string, IdentityMetadataRecord>();
 
     for (const document of metadata) {
       uniqueDocuments.set(`${document.identityId}:${document.cid}`, document);
@@ -282,10 +371,9 @@ export default class IpfsIdentityRepository implements IdentityRepository {
 
     for (const document of uniqueDocuments.values()) {
       try {
-        const identityDocument =
-          await this.ipfsManager.getJSON<IpfsIdentityDocument>(
-            new IPFSId(document.cid),
-          );
+        const identityDocument = await this.getDocumentFromCid(
+          new IPFSId(String(document.cid)),
+        );
         const cid = await this.ipfsManager.addJSONToNetworks(
           identityDocument,
           identityDocument.networks,

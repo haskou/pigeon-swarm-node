@@ -1,7 +1,5 @@
 import DomainEvent from './DomainEvent';
 
-interface DomainEventPublisher {
-  publish(domainEvents: DomainEvent[]): Promise<void>;
+export default abstract class DomainEventPublisher {
+  public abstract publish(domainEvents: DomainEvent[]): Promise<void>;
 }
-
-export default DomainEventPublisher;

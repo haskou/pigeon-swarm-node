@@ -1,3 +1,4 @@
+import { Constructor } from '@app/shared/domain/Constructor';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -7,14 +8,26 @@ import { webSocketEventHub } from '../websocket/WebSocketEventHub';
 import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
 import Libp2pGossipsubAdapter from './libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
+import { Message } from './Message';
 import MessageBusAdapter from './MessageBusAdapter';
+
+type LocalSubscriptionHandler = {
+  DomainEventInstance: typeof DomainEvent;
+  handler: (event: DomainEvent) => Promise<void>;
+};
 
 export default class MessageBus
   implements DomainEventConsumer, DomainEventPublisher
 {
   private static sourceEventContext = new Map<string, DomainEvent>();
   private static activeContextIds: string[] = [];
+  private static replicatedEventPublisher?: DomainEventPublisher;
   private adapter: MessageBusAdapter;
+  private readonly domainEventTypes = new Map<string, typeof DomainEvent>();
+  private readonly localSubscriptionHandlers = new Map<
+    string,
+    LocalSubscriptionHandler[]
+  >();
 
   private static setSourceEvent(event: DomainEvent): void {
     if (!event.eventId) {
@@ -42,6 +55,16 @@ export default class MessageBus
     }
 
     return MessageBus.sourceEventContext.get(currentEventId);
+  }
+
+  public static setReplicatedEventPublisher(
+    publisher: DomainEventPublisher,
+  ): void {
+    MessageBus.replicatedEventPublisher = publisher;
+  }
+
+  public static clearReplicatedEventPublisher(): void {
+    MessageBus.replicatedEventPublisher = undefined;
   }
 
   constructor(
@@ -112,10 +135,73 @@ export default class MessageBus
     });
   }
 
+  private instanceDomainEvent(
+    DomainEventInstance: typeof DomainEvent,
+    message: Message,
+  ): DomainEvent {
+    const EventConstructor = DomainEventInstance as Constructor<DomainEvent>;
+
+    return new EventConstructor(
+      message.aggregate_id,
+      message.attributes,
+      message.event_id,
+      new Date(message.occurred_on),
+      message.user_id,
+    );
+  }
+
+  private registerLocalHandler(
+    bindingKey: string,
+    DomainEventInstance: typeof DomainEvent,
+    handler: (event: DomainEvent) => Promise<void>,
+  ): void {
+    const handlers = this.localSubscriptionHandlers.get(bindingKey) || [];
+
+    this.registerEventType(bindingKey, DomainEventInstance);
+    handlers.push({ DomainEventInstance, handler });
+    this.localSubscriptionHandlers.set(bindingKey, handlers);
+  }
+
+  public registerEventType(
+    bindingKey: string,
+    DomainEventInstance: typeof DomainEvent,
+  ): void {
+    this.domainEventTypes.set(bindingKey, DomainEventInstance);
+  }
+
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
     const enrichedEvents = this.enrichEventsWithContext(domainEvents);
     await this.adapter.publish(enrichedEvents);
+    await MessageBus.replicatedEventPublisher?.publish(enrichedEvents);
     webSocketEventHub.publish(enrichedEvents);
+  }
+
+  public async dispatchReplicated(message: Message): Promise<void> {
+    const handlers = this.localSubscriptionHandlers.get(message.type) || [];
+    const eventType = this.domainEventTypes.get(message.type);
+    const events =
+      handlers.length > 0
+        ? handlers.map(({ DomainEventInstance }) =>
+            this.instanceDomainEvent(DomainEventInstance, message),
+          )
+        : eventType
+          ? [this.instanceDomainEvent(eventType, message)]
+          : [];
+
+    await Promise.all(
+      handlers.map(async ({ DomainEventInstance, handler }) => {
+        const event = this.instanceDomainEvent(DomainEventInstance, message);
+
+        try {
+          MessageBus.setSourceEvent(event);
+          await handler(event);
+        } finally {
+          MessageBus.clearSourceEvent();
+        }
+      }),
+    );
+
+    webSocketEventHub.publish(events);
   }
 
   public async consume(
@@ -133,6 +219,8 @@ export default class MessageBus
         MessageBus.clearSourceEvent();
       }
     };
+
+    this.registerLocalHandler(bindingKey, domainEvent, wrappedHandler);
 
     await this.adapter.consume(
       queueName,

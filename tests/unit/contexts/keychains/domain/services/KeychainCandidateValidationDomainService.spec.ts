@@ -1,4 +1,5 @@
-import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
 
@@ -6,7 +7,9 @@ describe('KeychainCandidateValidationDomainService', () => {
   let service: KeychainCandidateValidationDomainService;
 
   beforeEach(() => {
-    service = new KeychainCandidateValidationDomainService();
+    service = new KeychainCandidateValidationDomainService(
+      new KeychainSignatureDomainService(),
+    );
   });
 
   it('should accept a valid first keychain version', async () => {

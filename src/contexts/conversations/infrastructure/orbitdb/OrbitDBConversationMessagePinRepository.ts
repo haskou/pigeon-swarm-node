@@ -1,0 +1,178 @@
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { Timestamp } from '@haskou/value-objects';
+
+import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
+import { ConversationMessagePin } from '../../domain/repositories/types/ConversationMessagePin';
+import { OrbitDBConversationMessagePinDocument } from './documents/OrbitDBConversationMessagePinDocument';
+
+// eslint-disable-next-line max-len
+export default class OrbitDBConversationMessagePinRepository extends ConversationMessagePinRepository {
+  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+    super();
+  }
+
+  private pinId(conversationId: ConversationId, messageId: MessageId): string {
+    return `conversation:${conversationId.valueOf()}:${messageId.valueOf()}`;
+  }
+
+  private indexHeadKey(conversationId: ConversationId): string {
+    return `conversation-pin-index:${conversationId.valueOf()}`;
+  }
+
+  private freshness(document: Record<string, unknown>): number {
+    return Math.max(
+      typeof document.updatedAt === 'number' ? document.updatedAt : 0,
+      typeof document.createdAt === 'number' ? document.createdAt : 0,
+    );
+  }
+
+  private isDocument(
+    document: Record<string, unknown>,
+  ): document is OrbitDBConversationMessagePinDocument {
+    return (
+      document.removed !== true &&
+      typeof document.id === 'string' &&
+      typeof document.conversationId === 'string' &&
+      typeof document.createdAt === 'number' &&
+      typeof document.messageId === 'string' &&
+      typeof document.pinnedByIdentityId === 'string'
+    );
+  }
+
+  private rawDocumentsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): Record<string, unknown>[] | undefined {
+    if (!record) {
+      return undefined;
+    }
+
+    const pins = record.pins;
+
+    if (!Array.isArray(pins)) {
+      return [];
+    }
+
+    return pins.filter(
+      (pin): pin is Record<string, unknown> =>
+        typeof pin === 'object' && pin !== null && !Array.isArray(pin),
+    );
+  }
+
+  private mergeDocuments(
+    documents: Record<string, unknown>[],
+    document: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    const merged = new Map<string, Record<string, unknown>>();
+
+    for (const current of documents) {
+      if (typeof current.id === 'string') {
+        merged.set(current.id, current);
+      }
+    }
+
+    if (typeof document.id === 'string') {
+      const current = merged.get(document.id);
+
+      if (!current || this.freshness(current) <= this.freshness(document)) {
+        merged.set(document.id, document);
+      }
+    }
+
+    return [...merged.values()].filter((pin) => pin.removed !== true);
+  }
+
+  private async putIndex(
+    conversationId: ConversationId,
+    documents: Record<string, unknown>[],
+  ): Promise<void> {
+    const key = this.indexHeadKey(conversationId);
+    const pins = documents.reduce(
+      (merged, document) => this.mergeDocuments(merged, document),
+      [] as Record<string, unknown>[],
+    );
+
+    await this.registry.putHead(key, {
+      conversationId: conversationId.valueOf(),
+      id: key,
+      pins: pins.map((pin) => ({ ...pin })),
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async putIndexDocument(
+    conversationId: ConversationId,
+    document: Record<string, unknown>,
+  ): Promise<void> {
+    await this.putIndex(conversationId, [
+      ...(this.rawDocumentsFromIndex(
+        await this.registry.findHead(this.indexHeadKey(conversationId)),
+      ) || []),
+      document,
+    ]);
+  }
+
+  private toPin(
+    document: OrbitDBConversationMessagePinDocument,
+  ): ConversationMessagePin {
+    return {
+      createdAt: document.createdAt,
+      messageId: document.messageId,
+      pinnedByIdentityId: document.pinnedByIdentityId,
+    };
+  }
+
+  public async pin(
+    conversationId: ConversationId,
+    messageId: MessageId,
+    pinnedByIdentityId: IdentityId,
+    createdAt: Timestamp = Timestamp.now(),
+  ): Promise<void> {
+    const document = {
+      conversationId: conversationId.valueOf(),
+      createdAt: createdAt.valueOf(),
+      id: this.pinId(conversationId, messageId),
+      messageId: messageId.valueOf(),
+      pinnedByIdentityId: pinnedByIdentityId.valueOf(),
+      scopeType: 'conversation',
+    };
+
+    await this.registry.putDocument('pins', document);
+    await this.putIndexDocument(conversationId, document);
+  }
+
+  public async unpin(
+    conversationId: ConversationId,
+    messageId: MessageId,
+  ): Promise<void> {
+    const document = {
+      conversationId: conversationId.valueOf(),
+      id: this.pinId(conversationId, messageId),
+      messageId: messageId.valueOf(),
+      removed: true,
+      scopeType: 'conversation',
+      updatedAt: Date.now(),
+    };
+
+    await this.registry.putDocument('pins', document);
+    await this.putIndexDocument(conversationId, document);
+  }
+
+  public async findByConversation(
+    conversationId: ConversationId,
+  ): Promise<ConversationMessagePin[]> {
+    const indexedDocuments = this.rawDocumentsFromIndex(
+      await this.registry.findHead(this.indexHeadKey(conversationId)),
+    );
+    const documents = indexedDocuments ?? [];
+
+    return documents
+      .filter((document): document is OrbitDBConversationMessagePinDocument =>
+        this.isDocument(document),
+      )
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .map((document) => this.toPin(document));
+  }
+}

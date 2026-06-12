@@ -1,4 +1,4 @@
-import { IdentityRepository } from '../../domain/repositories/IdentityRepository';
+import IdentityRepository from '../../domain/repositories/IdentityRepository';
 import { RegisterIdentityCandidateMessage } from './messages/RegisterIdentityCandidateMessage';
 
 export default class IdentityCandidateRegistrar {

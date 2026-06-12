@@ -1,7 +1,7 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
-import { IdentityCandidateValidationDomainService } from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
+import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';

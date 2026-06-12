@@ -23,11 +23,6 @@ paths:
           schema:
             type: string
         - in: header
-          name: X-Nonce
-          required: true
-          schema:
-            type: string
-        - in: header
           name: X-Signature
           required: true
           schema:
@@ -69,11 +64,6 @@ paths:
             type: string
         - in: header
           name: X-Timestamp
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-Nonce
           required: true
           schema:
             type: string

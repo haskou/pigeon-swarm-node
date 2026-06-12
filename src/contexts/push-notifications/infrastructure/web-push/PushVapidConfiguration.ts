@@ -1,20 +1,8 @@
-export class PushVapidConfiguration {
-  constructor(
-    private readonly publicKey: string = process.env.PUSH_VAPID_PUBLIC_KEY ||
-      '',
-    private readonly privateKey: string = process.env.PUSH_VAPID_PRIVATE_KEY ||
-      '',
-    private readonly subject: string = process.env.PUSH_VAPID_SUBJECT ||
-      'mailto:admin@localhost',
-  ) {}
+import ConfigurationReader from '../../application/find-vapid-public-key/PushVapidConfigurationReader';
 
-  public getPublicKey(): string | null {
-    return this.publicKey || null;
-  }
-
-  public isConfigured(): boolean {
-    return this.publicKey.length > 0 && this.privateKey.length > 0;
-  }
+export default class PushVapidConfiguration extends ConfigurationReader {
+  private readonly subject: string =
+    process.env.PUSH_VAPID_SUBJECT || 'mailto:admin@localhost';
 
   public setVapidDetailsWith(
     setVapidDetails: (
@@ -27,6 +15,10 @@ export class PushVapidConfiguration {
       return;
     }
 
-    setVapidDetails(this.subject, this.publicKey, this.privateKey);
+    setVapidDetails(
+      this.subject,
+      process.env.PUSH_VAPID_PUBLIC_KEY || '',
+      process.env.PUSH_VAPID_PRIVATE_KEY || '',
+    );
   }
 }

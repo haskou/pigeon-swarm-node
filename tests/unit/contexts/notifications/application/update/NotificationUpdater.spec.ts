@@ -1,6 +1,6 @@
 import { NotificationUpdateMessage } from '@app/contexts/notifications/application/update/messages/NotificationUpdateMessage';
 import NotificationUpdater from '@app/contexts/notifications/application/update/NotificationUpdater';
-import { NotificationRepository } from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { NotificationRecipientMismatchError } from '@app/contexts/notifications/domain/errors/NotificationRecipientMismatchError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';

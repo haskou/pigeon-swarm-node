@@ -9,14 +9,14 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class GetStickerPackRoute extends StickerRouteSupport {
+  private readonly finder = this.get<StickerPackFinder>(StickerPackFinder);
+
   @Get('/:packId')
   public async getStickerPack(
     @Param('packId') packId: string,
     @Res() response: Response,
   ): Promise<Response> {
-    const pack = await new StickerPackFinder(this.packRepository()).find(
-      new StickerPackFindMessage(packId),
-    );
+    const pack = await this.finder.find(new StickerPackFindMessage(packId));
 
     return response
       .status(HttpRouteStatusEnum.OK)

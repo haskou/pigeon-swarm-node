@@ -1,6 +1,14 @@
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
+import * as fs from 'fs/promises';
 import { mock } from 'jest-mock-extended';
+
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn(),
+  readFile: jest.fn(),
+  rm: jest.fn(),
+  writeFile: jest.fn(),
+}));
 
 jest.mock(
   '@libp2p/crypto/keys',
@@ -127,11 +135,29 @@ import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastruc
 import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 
+type IPFSNetworkRegistryTestGlobal = typeof globalThis & {
+  __pigeonSwarmIPFSNetworkRegistryState?: unknown;
+};
+
 describe('IPFSNetworkRegistry', () => {
   const { privateKey } = generateKeyPairSync('ed25519');
   const validPem = privateKey
     .export({ format: 'pem', type: 'pkcs8' })
     .toString();
+  const previousStoragePath = process.env.IPFS_STORAGE_PATH;
+
+  afterEach(() => {
+    delete (globalThis as IPFSNetworkRegistryTestGlobal)
+      .__pigeonSwarmIPFSNetworkRegistryState;
+
+    if (previousStoragePath === undefined) {
+      delete process.env.IPFS_STORAGE_PATH;
+    } else {
+      process.env.IPFS_STORAGE_PATH = previousStoragePath;
+    }
+
+    jest.restoreAllMocks();
+  });
 
   describe('register', () => {
     it('should allow the same peer id in different networks', async () => {
@@ -139,17 +165,17 @@ describe('IPFSNetworkRegistry', () => {
       const existingNetwork = mock<IPFSNetwork>();
       const duplicatedNetwork = mock<IPFSNetwork>();
 
+      existingNetwork.getId.mockReturnValue(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
       existingNetwork.getName.mockReturnValue('private_0');
       existingNetwork.getPeerId.mockReturnValue('12D3KooWDuplicatedPeerId');
 
+      duplicatedNetwork.getId.mockReturnValue(
+        '550e8400-e29b-41d4-a716-446655440001',
+      );
       duplicatedNetwork.getName.mockReturnValue('private_1');
       duplicatedNetwork.getPeerId.mockReturnValue('12D3KooWDuplicatedPeerId');
-
-      (
-        registry as unknown as {
-          networks: IPFSNetwork[];
-        }
-      ).networks = [existingNetwork];
 
       jest
         .spyOn(
@@ -167,23 +193,26 @@ describe('IPFSNetworkRegistry', () => {
           },
           'createNetworkFromConfig',
         )
-        .mockResolvedValue(duplicatedNetwork);
+        .mockResolvedValueOnce(existingNetwork)
+        .mockResolvedValueOnce(duplicatedNetwork);
 
       await registry.register(
         new IPFSNetworkConfig(
           '550e8400-e29b-41d4-a716-446655440000',
+          'private_0',
+          new PrivateKey(validPem),
+        ),
+      );
+
+      await registry.register(
+        new IPFSNetworkConfig(
+          '550e8400-e29b-41d4-a716-446655440001',
           'private_1',
           new PrivateKey(validPem),
         ),
       );
 
-      expect(
-        (
-          registry as unknown as {
-            networks: IPFSNetwork[];
-          }
-        ).networks,
-      ).toEqual([existingNetwork, duplicatedNetwork]);
+      expect(registry.getAll()).toEqual([existingNetwork, duplicatedNetwork]);
     });
 
     it('should allow different network ids with the same name', async () => {
@@ -196,12 +225,6 @@ describe('IPFSNetworkRegistry', () => {
       duplicatedNameNetwork.getId.mockReturnValue('network-2');
       duplicatedNameNetwork.getName.mockReturnValue('shared-name');
 
-      (
-        registry as unknown as {
-          networks: IPFSNetwork[];
-        }
-      ).networks = [existingNetwork];
-
       jest
         .spyOn(
           registry as unknown as {
@@ -218,7 +241,16 @@ describe('IPFSNetworkRegistry', () => {
           },
           'createNetworkFromConfig',
         )
-        .mockResolvedValue(duplicatedNameNetwork);
+        .mockResolvedValueOnce(existingNetwork)
+        .mockResolvedValueOnce(duplicatedNameNetwork);
+
+      await registry.register(
+        new IPFSNetworkConfig(
+          'network-1',
+          'shared-name',
+          new PrivateKey(validPem),
+        ),
+      );
 
       await registry.register(
         new IPFSNetworkConfig(
@@ -228,13 +260,10 @@ describe('IPFSNetworkRegistry', () => {
         ),
       );
 
-      expect(
-        (
-          registry as unknown as {
-            networks: IPFSNetwork[];
-          }
-        ).networks,
-      ).toEqual([existingNetwork, duplicatedNameNetwork]);
+      expect(registry.getAll()).toEqual([
+        existingNetwork,
+        duplicatedNameNetwork,
+      ]);
     });
 
     it('should notify listeners when a network is registered', async () => {
@@ -271,6 +300,63 @@ describe('IPFSNetworkRegistry', () => {
       );
 
       expect(listener).toHaveBeenCalledWith(network);
+    });
+  });
+
+  describe('deleteNetwork', () => {
+    it('should delete IPFS and OrbitDB storage for the network', async () => {
+      process.env.IPFS_STORAGE_PATH = '/tmp/pigeon-swarm-ipfs';
+      const registry = new IPFSNetworkRegistry();
+      const network = mock<IPFSNetwork>();
+      const removeStorage = fs.rm as jest.MockedFunction<typeof fs.rm>;
+      removeStorage.mockResolvedValue(undefined);
+
+      network.getId.mockReturnValue('network-1');
+      network.stop.mockResolvedValue(undefined);
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockResolvedValue(network);
+
+      await registry.register(
+        new IPFSNetworkConfig(
+          'network-1',
+          'private_1',
+          new PrivateKey(validPem),
+        ),
+      );
+
+      await registry.deleteNetwork('network-1');
+
+      expect(network.stop).toHaveBeenCalled();
+      expect(removeStorage).toHaveBeenCalledWith(
+        '/tmp/pigeon-swarm-ipfs/network-1',
+        {
+          force: true,
+          recursive: true,
+        },
+      );
+      expect(removeStorage).toHaveBeenCalledWith(
+        '/tmp/pigeon-swarm-ipfs/orbitdb/network-1',
+        {
+          force: true,
+          recursive: true,
+        },
+      );
     });
   });
 });

@@ -4,28 +4,28 @@ import { IdentityNotFoundError } from '../../../../../../src/contexts/identities
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
 import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { ProfileHandle } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
-import MongoIdentityMetadataRepository from '../../../../../../src/contexts/identities/infrastructure/mongo/MongoIdentityMetadataRepository';
+import IdentityMetadataRepository from '../../../../../../src/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
-import { NetworkId } from '../../../../../../src/contexts/shared/domain/value-objects/NetworkId';
-import { Password } from '../../../../../../src/contexts/shared/domain/value-objects/Password';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
+import { KeyPair } from '@haskou/value-objects';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
   let ipfsManager: MockProxy<IPFS>;
   let mapper: IpfsIdentityMapper;
-  let metadataRepository: MockProxy<MongoIdentityMetadataRepository>;
+  let metadataRepository: MockProxy<IdentityMetadataRepository>;
   let repository: IpfsIdentityRepository;
   let mother: IdentityMother;
 
   beforeEach(() => {
     ipfsManager = mock<IPFS>();
     mapper = new IpfsIdentityMapper();
-    metadataRepository = mock<MongoIdentityMetadataRepository>();
+    metadataRepository = mock<IdentityMetadataRepository>();
     repository = new IpfsIdentityRepository(
       ipfsManager,
       mapper,
@@ -33,7 +33,46 @@ describe('IpfsIdentityRepository', () => {
     );
     mother = new IdentityMother();
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
+    ipfsManager.stat.mockResolvedValue(true);
+    ipfsManager.hasConnectedPeers.mockResolvedValue(true);
   });
+
+  async function createSignedIdentityForNetwork(
+    networkId: string,
+    handle?: string,
+  ): Promise<Identity> {
+    const keyPair = await KeyPair.generate();
+    const encryptedKeyPair = await keyPair.encryptKeyPair(
+      'Super-secret-password1!',
+    );
+    const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
+    const previousIdentityExternalIdentifier: string | undefined = undefined;
+    const signaturePayload = {
+      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      id: identityId.valueOf(),
+      masterKeyDerivation: {
+        algorithm: 'test',
+        version: 1,
+      },
+      networks: [networkId],
+      previousIdentityExternalIdentifier,
+      profile: new Profile(
+        new ProfileName('Mallory'),
+        undefined,
+        undefined,
+        undefined,
+        handle ? new ProfileHandle(handle) : undefined,
+      ).toPrimitives(),
+      timestamp: 1773848829055,
+      version: 1,
+    };
+
+    return Identity.fromPrimitives({
+      ...signaturePayload,
+      signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    });
+  }
 
   describe('save', () => {
     it('should save identity document to all networks and put record', async () => {
@@ -48,7 +87,6 @@ describe('IpfsIdentityRepository', () => {
 
       expect(ipfsManager.addJSONToNetworks).toHaveBeenCalledWith(
         expect.objectContaining({
-          _id: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           version: primitives.version,
         }),
@@ -67,7 +105,7 @@ describe('IpfsIdentityRepository', () => {
   });
 
   describe('findById', () => {
-    it('should find identity using mongo metadata before DHT fallback', async () => {
+    it('should find identity using metadata before DHT fallback', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -75,7 +113,6 @@ describe('IpfsIdentityRepository', () => {
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
-          _id: primitives.id + ':' + cidString,
           cid: cidString,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
@@ -83,25 +120,45 @@ describe('IpfsIdentityRepository', () => {
           version: primitives.version,
         },
       ]);
-      ipfsManager.getJSON.mockResolvedValue({
-        _id: primitives.id,
-        encryptedKeyPair: primitives.encryptedKeyPair,
-        networks: primitives.networks,
-        previousCid: primitives.previousIdentityExternalIdentifier,
-        profile: primitives.profile,
-        signature: primitives.signature,
-        timestamp: primitives.timestamp,
-        version: primitives.version,
-      });
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
 
       const result = await repository.findById(identityId);
 
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(cidString),
+      );
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should not wait for DHT candidates when mongo has a valid candidate', async () => {
+    it('should use embedded metadata identity without fetching IPFS bytes', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: 'bafyembeddedidentity',
+          identity,
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
+    it('should not wait for DHT candidates when metadata has a valid candidate', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -110,7 +167,6 @@ describe('IpfsIdentityRepository', () => {
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
-          _id: primitives.id + ':' + mongoCidString,
           cid: mongoCidString,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
@@ -119,16 +175,7 @@ describe('IpfsIdentityRepository', () => {
         },
       ]);
       ipfsManager.getRecordCandidates.mockResolvedValue([dhtCidString]);
-      ipfsManager.getJSON.mockResolvedValue({
-        _id: primitives.id,
-        encryptedKeyPair: primitives.encryptedKeyPair,
-        networks: primitives.networks,
-        previousCid: primitives.previousIdentityExternalIdentifier,
-        profile: primitives.profile,
-        signature: primitives.signature,
-        timestamp: primitives.timestamp,
-        version: primitives.version,
-      });
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
 
       const result = await repository.findCandidatesById(identityId);
 
@@ -150,16 +197,7 @@ describe('IpfsIdentityRepository', () => {
 
       metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
-      ipfsManager.getJSON.mockResolvedValue({
-        _id: primitives.id,
-        encryptedKeyPair: primitives.encryptedKeyPair,
-        networks: primitives.networks,
-        previousCid: primitives.previousIdentityExternalIdentifier,
-        profile: primitives.profile,
-        signature: primitives.signature,
-        timestamp: primitives.timestamp,
-        version: primitives.version,
-      });
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
 
       const result = await repository.findById(identityId);
 
@@ -175,6 +213,30 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
+    it('should resolve local record candidates when metadata is missing and no peers are connected', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+      const identityId = new IdentityId(primitives.id);
+      const cidString = 'bafylocalrecordidentity';
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+      ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const result = await repository.findById(identityId);
+
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(cidString),
+      );
+      expect(result.toPrimitives()).toEqual(primitives);
+    });
+
     it('should delete broken mongo metadata and fallback to DHT', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
@@ -184,7 +246,6 @@ describe('IpfsIdentityRepository', () => {
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
-          _id: primitives.id + ':' + brokenCidString,
           cid: brokenCidString,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
@@ -194,16 +255,7 @@ describe('IpfsIdentityRepository', () => {
       ]);
       ipfsManager.getJSON
         .mockRejectedValueOnce(new Error('missing block'))
-        .mockResolvedValueOnce({
-          _id: primitives.id,
-          encryptedKeyPair: primitives.encryptedKeyPair,
-          networks: primitives.networks,
-          previousCid: primitives.previousIdentityExternalIdentifier,
-          profile: primitives.profile,
-          signature: primitives.signature,
-          timestamp: primitives.timestamp,
-          version: primitives.version,
-        });
+        .mockResolvedValueOnce(mapper.toDocument(identity));
       ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
 
       const result = await repository.findById(identityId);
@@ -235,10 +287,8 @@ describe('IpfsIdentityRepository', () => {
       const identityId = new IdentityId(primitives.id);
       const wrongCidString = 'bafywrongidentity';
       const validCidString = 'bafyvalididentity';
-      const otherIdentity = await Identity.create(
-        new ProfileName('Mallory'),
-        new Password('Super-secret-password1!'),
-        [new NetworkId(primitives.networks[0])],
+      const otherIdentity = await createSignedIdentityForNetwork(
+        primitives.networks[0],
       );
 
       metadataRepository.findByIdentityId.mockResolvedValue([]);
@@ -330,7 +380,6 @@ describe('IpfsIdentityRepository', () => {
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
-          _id: previousPrimitives.id + ':' + currentCidString,
           cid: currentCidString,
           identityId: previousPrimitives.id,
           previousCid: previousCidString,
@@ -351,7 +400,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
 
-    it('should use cached identity metadata without reading IPFS', async () => {
+    it('should use local identity metadata before DHT fallback', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -359,19 +408,19 @@ describe('IpfsIdentityRepository', () => {
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
-          _id: primitives.id + ':' + cidString,
           cid: cidString,
-          identity: mapper.toDocument(identity),
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
           version: primitives.version,
         },
       ]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
@@ -399,6 +448,148 @@ describe('IpfsIdentityRepository', () => {
         metadataRepository.deleteByExternalIdentifier,
       ).toHaveBeenCalledWith(new IPFSId(candidateCidString));
       expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should try latest metadata before DHT fallback when no peers are connected', async () => {
+      const identityId = mother.id;
+      const cid = new IPFSId('bafyremoteidentity');
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: cid.valueOf(),
+          identityId: identityId.valueOf(),
+          previousCid: undefined,
+          receivedAt: Date.now(),
+          version: 1,
+        },
+      ]);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+      ipfsManager.getJSON.mockRejectedValue(new Error('missing identity'));
+
+      await expect(repository.findById(identityId)).rejects.toThrow(
+        IdentityNotFoundError,
+      );
+
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).toHaveBeenCalledWith(cid);
+    });
+  });
+
+  describe('findCandidateByHandle', () => {
+    it('should return the handle candidate without resolving it again by id', async () => {
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'hasko',
+      );
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const cidString = 'bafyhandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: cidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(metadataRepository.findByHandle).toHaveBeenCalledWith(handle);
+      expect(metadataRepository.findByIdentityId).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.stat).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(result.externalIdentifier).toEqual(
+        new IdentityExternalIdentifier(cidString),
+      );
+      expect(result.identity.toPrimitives()).toEqual(primitives);
+    });
+
+    it('should not fetch older handle metadata when the latest candidate is valid', async () => {
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'hasko',
+      );
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const latestCidString = 'bafylatesthandleidentity';
+      const olderCidString = 'bafyolderhandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: latestCidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+        {
+          cid: olderCidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          previousCid: undefined,
+          receivedAt: Date.now() - 1,
+          version: primitives.version - 1,
+        },
+      ]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(latestCidString),
+      );
+      expect(ipfsManager.getJSON).not.toHaveBeenCalledWith(
+        new IPFSId(olderCidString),
+      );
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(result.identity.toPrimitives()).toEqual(primitives);
+    });
+
+    it('should read handle metadata from the known identity networks', async () => {
+      const networkId = '550e8400-e29b-41d4-a716-446655440000';
+      const identity = await createSignedIdentityForNetwork(networkId, 'hasko');
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const cidString = 'bafynetworkhandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: cidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          networkIds: [networkId],
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getJSONFromNetworks.mockResolvedValue(
+        mapper.toDocument(identity),
+      );
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(ipfsManager.getJSONFromNetworks).toHaveBeenCalledWith(
+        new IPFSId(cidString),
+        [networkId],
+      );
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytesFromNetworks).not.toHaveBeenCalled();
+      expect(result.identity.toPrimitives()).toEqual(primitives);
     });
   });
 });

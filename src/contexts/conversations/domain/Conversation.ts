@@ -243,6 +243,7 @@ export class Conversation extends AggregateRoot {
     this.messages.push(message);
     this.record(
       new ConversationMessageWasEditedEvent(this.id.valueOf(), {
+        message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: this.networkId.valueOf(),
         participantIds: this.toPrimitives().participantIds,
@@ -275,6 +276,7 @@ export class Conversation extends AggregateRoot {
     this.messages.push(message);
     this.record(
       new ConversationMessageWasDeletedEvent(this.id.valueOf(), {
+        message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: this.networkId.valueOf(),
         participantIds: this.toPrimitives().participantIds,

@@ -2,15 +2,14 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable no-case-declarations */
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import { MongoNodeMetadataDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodeMetadataDocument';
-import { MongoNodePeerDocument } from '@app/contexts/nodes/infrastructure/mongo/documents/MongoNodePeerDocument';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Kernel from '@app/Kernel';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
@@ -102,11 +101,16 @@ export default class Definitions {
       await kernel.dependencyInjection();
       await kernel.runServer();
       kernel.logs();
+      await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
     }
   }
 
   @after()
   public async cleanupMemoryStorage(): Promise<void> {
+    const database =
+      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
+
+    await database.clear();
     await this.ipfsDefinition.cleanupRegisteredNetworks();
     this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
   }
@@ -118,13 +122,12 @@ export default class Definitions {
 
   @given('the local node has no owner and no networks')
   public async theLocalNodeHasNoOwnerAndNoNetworks(): Promise<void> {
-    const mongo = Kernel.di.getService<MongoDB>(MongoDB);
-    const collection =
-      await mongo.getCollection<MongoNodeMetadataDocument>('node_metadata');
+    const database =
+      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
     const networkRegistry =
       Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry);
 
-    await collection.deleteOne({ _id: 'local' });
+    await database.delete('node_metadata', 'local');
     await Promise.all(
       networkRegistry
         .getAll()
@@ -134,24 +137,17 @@ export default class Definitions {
 
   @given('a node peer heartbeat has been received')
   public async aNodePeerHeartbeatHasBeenReceived(): Promise<void> {
-    const mongo = Kernel.di.getService<MongoDB>(MongoDB);
-    const collection =
-      await mongo.getCollection<MongoNodePeerDocument>('node_peers');
+    const database =
+      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
     const ownerKeyPair = await KeyPair.generate();
     const ownerIdentityId = new IdentityId(
       ownerKeyPair.toPrimitives().publicKey,
     );
 
-    await collection.deleteMany({});
-    await collection.insertOne({
-      _id: '550e8400-e29b-41d4-a716-446655440010',
+    await database.deleteMany('node_peers', () => true);
+    await database.save('node_peers', '550e8400-e29b-41d4-a716-446655440010', {
       lastSeenAt: Date.now(),
-      networks: [
-        {
-          id: '550e8400-e29b-41d4-a716-446655440011',
-          name: 'public',
-        },
-      ],
+      networks: [{ id: '550e8400-e29b-41d4-a716-446655440011', name: 'public' }],
       owner: ownerIdentityId.valueOf(),
     });
   }
@@ -229,10 +225,15 @@ export default class Definitions {
       name,
       picture: undefined,
     };
-    const signaturePayload = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      id: ownerIdentityId.valueOf(),
-      networks,
+	    const signaturePayload = {
+	      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+	      encryptedMasterKey: 'v1.test.encrypted-master-key',
+	      id: ownerIdentityId.valueOf(),
+	      masterKeyDerivation: {
+	        algorithm: 'test',
+	        version: 1,
+	      },
+	      networks,
       previousIdentityExternalIdentifier,
       profile,
       timestamp: 1773848829055 + version,
@@ -247,34 +248,48 @@ export default class Definitions {
   }
 
   private async ensureAuthenticatedIdentityIsPublished(): Promise<void> {
-    const ownerIdentityId = this.ownerIdentityId ?? new IdentityId(
-      (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
-    );
+    const previousBinaryBody = this.binaryBody;
+    const previousBody = this.body;
+    const previousHeaders = { ...this.headers };
+    const ownerIdentityId =
+      this.ownerIdentityId ??
+      new IdentityId(
+        (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
+      );
 
     if (this.createdIdentityId === ownerIdentityId.valueOf()) {
       return;
     }
 
-    await this.buildClientSignedIdentityBody(
-      'Test Identity',
-      'test-identity',
-      'Client-secret1!',
-    );
-    await this.signCurrentRequest('POST', '/identities/');
+    this.binaryBody = undefined;
+    this.headers = {};
 
-    const response = await this.restClient.post(
-      '/identities/',
-      JSON.parse(this.body || '{}'),
-      { headers: this.headers },
-    );
-
-    if (response.status !== 200) {
-      throw new Error(
-        `Could not publish identity: ${JSON.stringify(response.data)}`,
+    try {
+      await this.buildClientSignedIdentityBody(
+        'Test Identity',
+        'test-identity',
+        'Client-secret1!',
       );
-    }
+      await this.signCurrentRequest('POST', '/identities/');
 
-    this.createdIdentityId = response.data.id;
+      const response = await this.restClient.post(
+        '/identities/',
+        JSON.parse(this.body || '{}'),
+        { headers: this.headers },
+      );
+
+      if (response.status !== 200) {
+        throw new Error(
+          `Could not publish identity: ${JSON.stringify(response.data)}`,
+        );
+      }
+
+      this.createdIdentityId = response.data.id;
+    } finally {
+      this.binaryBody = previousBinaryBody;
+      this.body = previousBody;
+      this.headers = previousHeaders;
+    }
   }
 
   private async findCreatedIdentityExternalIdentifier(): Promise<string> {
@@ -303,19 +318,16 @@ export default class Definitions {
   ): Promise<void> {
     const signerKeyPair = keyPair ?? (await this.ensureIdentityKeyPair());
     const signerIdentityId = identityId ?? this.ownerIdentityId;
-    const nonce = `api-nonce-${timestamp}-${Math.random()}`;
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
       path,
       timestamp,
-      nonce,
       this.binaryBody ?? (this.body ? JSON.parse(this.body) : {}),
     );
 
     this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
     this.headers['x-timestamp'] = timestamp;
-    this.headers['x-nonce'] = nonce;
     this.headers['x-signature'] = signerKeyPair
       .sign(JSON.stringify(signedRequestPayload))
       .valueOf();
@@ -574,8 +586,8 @@ export default class Definitions {
   @given('I set a community profile body with empty channel lists')
   public iSetACommunityProfileBodyWithEmptyChannelLists(): void {
     this.body = JSON.stringify({
-      avatar: 'bafybeigcommunityavatarupdated',
       autoJoinEnabled: false,
+      avatar: 'bafybeigcommunityavatarupdated',
       banner: 'bafybeigcommunitybannerupdated',
       description: 'Updated private API community',
       discoverable: true,
@@ -588,8 +600,8 @@ export default class Definitions {
   @given('I set a community profile body enabling auto join')
   public iSetACommunityProfileBodyEnablingAutoJoin(): void {
     this.body = JSON.stringify({
-      avatar: 'bafybeigcommunityavatarupdated',
       autoJoinEnabled: true,
+      avatar: 'bafybeigcommunityavatarupdated',
       banner: 'bafybeigcommunitybannerupdated',
       description: 'Updated private API community',
       discoverable: true,
@@ -887,7 +899,9 @@ export default class Definitions {
     );
   }
 
-  @given('the community member signs the current community invite accept request')
+  @given(
+    'the community member signs the current community invite accept request',
+  )
   public async theCommunityMemberSignsTheCurrentCommunityInviteAcceptRequest(): Promise<void> {
     if (!this.communityInviteToken) {
       throw new Error('Community invite must be created first.');
@@ -1108,7 +1122,9 @@ export default class Definitions {
     );
   }
 
-  @given('another identity signs the current community channel deletion request')
+  @given(
+    'another identity signs the current community channel deletion request',
+  )
   public async anotherIdentitySignsTheCurrentCommunityChannelDeletionRequest(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
       throw new Error('Community and channel must be created first.');
@@ -1215,7 +1231,9 @@ export default class Definitions {
   @given('I restore the remembered community channel thread root message')
   public iRestoreTheRememberedCommunityChannelThreadRootMessage(): void {
     if (!this.communityThreadRootMessageId) {
-      throw new Error('Community channel thread root must be remembered first.');
+      throw new Error(
+        'Community channel thread root must be remembered first.',
+      );
     }
 
     this.communityChannelMessageId = this.communityThreadRootMessageId;
@@ -1250,7 +1268,9 @@ export default class Definitions {
     });
   }
 
-  @given('I set an encrypted community channel message body mentioning everyone')
+  @given(
+    'I set an encrypted community channel message body mentioning everyone',
+  )
   public async iSetAnEncryptedCommunityChannelMessageBodyMentioningEveryone(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
       throw new Error('Community and channel must be created first.');
@@ -1958,9 +1978,7 @@ export default class Definitions {
     );
   }
 
-  @given(
-    'I set raw IPFS content with content type {string} and text {string}',
-  )
+  @given('I set raw IPFS content with content type {string} and text {string}')
   public iSetPublicIPFSContent(contentType: string, text: string): void {
     this.binaryBody = Buffer.from(text);
     this.headers['content-type'] = contentType;
@@ -1969,6 +1987,7 @@ export default class Definitions {
 
   @given('I sign the current public IPFS content request')
   public async iSignTheCurrentPublicIPFSContentRequest(): Promise<void> {
+    await this.ensureAuthenticatedIdentityIsPublished();
     await this.signCurrentRequest('POST', '/ipfs/public');
   }
 
@@ -1982,15 +2001,17 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/ipfs/secure');
   }
 
+  @given('I sign the current content replication status request')
   @given('I sign the current IPFS replication status request')
-  public async iSignTheCurrentIPFSReplicationStatusRequest(): Promise<void> {
+  public async iSignTheCurrentContentReplicationStatusRequest(): Promise<void> {
     this.binaryBody = undefined;
     this.body = undefined;
     await this.signCurrentRequest('GET', '/ipfs/replication/status');
   }
 
+  @given('another identity signs the current content replication status request')
   @given('another identity signs the current IPFS replication status request')
-  public async anotherIdentitySignsTheCurrentIPFSReplicationStatusRequest(): Promise<void> {
+  public async anotherIdentitySignsTheCurrentContentReplicationStatusRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
     this.binaryBody = undefined;
@@ -2035,7 +2056,9 @@ export default class Definitions {
     });
   }
 
-  @given('the other identity signs the current read conversation messages request')
+  @given(
+    'the other identity signs the current read conversation messages request',
+  )
   public async theOtherIdentitySignsTheCurrentReadConversationMessagesRequest(): Promise<void> {
     if (!this.conversationId) {
       throw new Error('Conversation must be created first.');
@@ -2056,10 +2079,10 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequestWithAnExpiredTimestamp(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest(
-      'GET',
-      '/conversations/',
-      String(Date.now() - 10 * 60 * 1000),
-    );
+	      'GET',
+	      '/conversations/',
+	      String(Date.now() - 31_000),
+	    );
   }
 
   @given('I sign the current node owner request')
@@ -2126,7 +2149,9 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/node/networks/public/');
   }
 
-  @given('I sign the current node network deletion request for network {string}')
+  @given(
+    'I sign the current node network deletion request for network {string}',
+  )
   public async iSignTheCurrentNodeNetworkDeletionRequestForNetwork(
     networkId: string,
   ): Promise<void> {
@@ -2161,7 +2186,9 @@ export default class Definitions {
       conversationId: 'one-to-one:notification-api-conversation',
       encryptedConversationKey: 'encrypted-conversation-key',
       inviterIdentityId: this.ownerIdentityId?.valueOf(),
-      inviterSignature: inviterKeyPair.sign('conversation-invitation').valueOf(),
+      inviterSignature: inviterKeyPair
+        .sign('conversation-invitation')
+        .valueOf(),
       recipientIdentityId: this.otherIdentityId?.valueOf(),
       type: 'conversation_invitation',
     });
@@ -2454,7 +2481,9 @@ export default class Definitions {
     );
   }
 
-  @given('the notification recipient signs the current notification patch request')
+  @given(
+    'the notification recipient signs the current notification patch request',
+  )
   public async notificationRecipientSignsTheCurrentNotificationPatchRequest(): Promise<void> {
     if (!this.notificationId) {
       throw new Error('Notification must be created first.');
@@ -2525,9 +2554,7 @@ export default class Definitions {
     });
   }
 
-  @given(
-    'I set a private node network body with id {string} and name {string}',
-  )
+  @given('I set a private node network body with id {string} and name {string}')
   public iSetAPrivateNodeNetworkBodyWithIdAndName(
     id: string,
     name: string,
@@ -2672,9 +2699,9 @@ export default class Definitions {
   ): Promise<void> {
     this.currentNetworkId =
       await this.ipfsDefinition.registerInMemoryNetworkWithId(
-      networkId,
-      networkName,
-    );
+        networkId,
+        networkName,
+      );
   }
 
   @given('I store the following json in IPFS network {string}')
@@ -2714,10 +2741,12 @@ export default class Definitions {
       path,
       isFormData
         ? this.formData
-        : this.binaryBody ?? (this.body && JSON.parse(this.body)),
-      isFormData ? { headers: this.formData?.getHeaders() } : {
-        headers: this.headers,
-      },
+        : (this.binaryBody ?? (this.body && JSON.parse(this.body))),
+      isFormData
+        ? { headers: this.formData?.getHeaders() }
+        : {
+            headers: this.headers,
+          },
     );
 
     if (this.response?.data?.id) {
@@ -2914,10 +2943,7 @@ export default class Definitions {
 
   @when('I GET current communities')
   public async iGETCurrentCommunities(): Promise<void> {
-    this.response = await this.restClient.get(
-      '/communities/',
-      this.headers,
-    );
+    this.response = await this.restClient.get('/communities/', this.headers);
   }
 
   @when('I PATCH the current community')
@@ -3270,7 +3296,7 @@ export default class Definitions {
   }
 
   @when('I GET the published IPFS content as binary')
-  public async iGETThePublishedIPFSContentAsBinary(): Promise<void> {
+  public async iGETThePublishedContentAsBinary(): Promise<void> {
     this.response = await this.restClient.getBinary(
       `/ipfs/${this.response.data.cid}`,
       this.headers,
@@ -3487,9 +3513,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    expect(JSON.stringify(this.response.data)).to.not.contain(
-      this.communityId,
-    );
+    expect(JSON.stringify(this.response.data)).to.not.contain(this.communityId);
   }
 
   @then('response body should contain the other identity id')

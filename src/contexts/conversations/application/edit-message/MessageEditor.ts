@@ -1,7 +1,7 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { MessageEdited } from '@app/contexts/conversations/domain/MessageEdited';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { MessageSignatureDomainService } from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessageEditMessage } from './messages/MessageEditMessage';
@@ -37,10 +37,6 @@ export default class MessageEditor {
     this.signatureService.assertValidMessageSignature(editedMessage);
 
     await this.conversationRepository.save(conversation);
-    await this.conversationRepository.registerUnreadForMessage(
-      conversation,
-      editedMessage,
-    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return editedMessage;

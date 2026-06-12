@@ -3,6 +3,9 @@ Feature: Post sticker route
   I want to add stickers to a pack
   So that clients can render sticker metadata
 
+  Background:
+    Given I register an in-memory IPFS network "api-stickers-network"
+
   Scenario: Add a static sticker to a pack
     Given I am an anonymous user
     And I set a sticker pack body

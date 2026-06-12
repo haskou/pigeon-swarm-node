@@ -1,5 +1,5 @@
 import { StickerAddMessage } from '@app/contexts/stickers/application/add-sticker/messages/StickerAddMessage';
-import { StickerAdder } from '@app/contexts/stickers/application/add-sticker/StickerAdder';
+import StickerAdder from '@app/contexts/stickers/application/add-sticker/StickerAdder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -17,6 +17,8 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class PostStickerRoute extends StickerRouteSupport {
+  private readonly adder = this.get<StickerAdder>(StickerAdder);
+
   @Post('/:packId/stickers')
   public async addSticker(
     @Param('packId') packId: string,
@@ -25,7 +27,7 @@ export class PostStickerRoute extends StickerRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const pack = await new StickerAdder(this.packRepository()).add(
+    const pack = await this.adder.add(
       new StickerAddMessage(packId, actor.valueOf(), body),
     );
 

@@ -163,27 +163,27 @@ package "nodes" {
   }
 
   package "infrastructure" {
-    class MongoNodeMetadataRepository {
+    class LocalNodeMetadataRepository {
       -networkRegistry: IPFSNetworkRegistry
       +loadLocalNode(): Promise<Node>
       +saveLocalNode(node: Node): Promise<void>
     }
 
-    class MongoNodePeerRepository {
+    class LocalNodePeerRepository {
       +save(peer: NodePeer): Promise<void>
       +findActive(): Promise<NodePeer[]>
     }
 
-    note right of MongoNodeMetadataRepository
+    note right of LocalNodeMetadataRepository
       Active node metadata repository.
-      MongoDB owns nodeId, owner and
+      Local embedded storage owns nodeId, owner and
       configured network metadata.
       Loading and saving synchronizes
       the runtime IPFSNetworkRegistry.
     end note
 
-    MongoNodeMetadataRepository ..|> NodeRepository
-    MongoNodePeerRepository ..|> NodePeerRepository
+    LocalNodeMetadataRepository ..|> NodeRepository
+    LocalNodePeerRepository ..|> NodePeerRepository
   }
 }
 

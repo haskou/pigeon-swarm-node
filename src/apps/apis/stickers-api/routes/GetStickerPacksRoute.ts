@@ -1,5 +1,5 @@
 import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
-import { StickerPacksFinder } from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
+import StickerPacksFinder from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Response } from 'express';
 import { Get, JsonController, QueryParam, Res } from 'routing-controllers';
@@ -10,12 +10,14 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
 export class GetStickerPacksRoute extends StickerRouteSupport {
+  private readonly finder = this.get<StickerPacksFinder>(StickerPacksFinder);
+
   @Get('/')
   public async getStickerPacks(
     @QueryParam('ownerIdentityId') ownerIdentityId: string | undefined,
     @Res() response: Response,
   ): Promise<Response> {
-    const packs = await new StickerPacksFinder(this.packRepository()).find(
+    const packs = await this.finder.find(
       new StickerPacksFindMessage(ownerIdentityId),
     );
     const resource: StickerPacksResource = {

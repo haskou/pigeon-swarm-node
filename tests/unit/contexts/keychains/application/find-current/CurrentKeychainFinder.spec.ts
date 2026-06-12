@@ -1,8 +1,9 @@
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
 import { KeychainNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainNotFoundError';
-import { KeychainRepository } from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidateValidationDomainService } from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
+import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -12,12 +13,19 @@ import { KeychainMother } from '../../../../mothers/KeychainMother';
 describe('CurrentKeychainFinder', () => {
   let repository: MockProxy<KeychainRepository>;
   let validator: MockProxy<KeychainCandidateValidationDomainService>;
+  let signatureService: MockProxy<KeychainSignatureDomainService>;
   let finder: CurrentKeychainFinder;
 
   beforeEach(() => {
     repository = mock<KeychainRepository>();
     validator = mock<KeychainCandidateValidationDomainService>();
-    finder = new CurrentKeychainFinder(repository, validator);
+    signatureService = mock<KeychainSignatureDomainService>();
+    signatureService.isValidSignature.mockReturnValue(true);
+    finder = new CurrentKeychainFinder(
+      repository,
+      validator,
+      signatureService,
+    );
   });
 
   it('should throw keychain not found when the identity has no valid keychain candidates', async () => {

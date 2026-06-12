@@ -1,4 +1,4 @@
-import { MessageSignatureDomainService } from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
+import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 
 describe('MessageSignatureDomainService', () => {
   it('serializes sent message payloads with the public signing contract order', () => {

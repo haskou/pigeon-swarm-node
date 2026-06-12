@@ -10,10 +10,10 @@ export default class RegisterMessageReactionWhenAdded extends Consumer {
     'pigeon-swarm.register-message-reaction-when-added';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: MessageReactionRegistrar,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

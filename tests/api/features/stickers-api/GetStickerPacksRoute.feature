@@ -3,6 +3,9 @@ Feature: Get sticker packs route
   I want to list sticker packs
   So that clients can show available packs
 
+  Background:
+    Given I register an in-memory IPFS network "api-stickers-network"
+
   Scenario: List sticker packs
     Given I am an anonymous user
     And I set a sticker pack body

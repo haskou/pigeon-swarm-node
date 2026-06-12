@@ -1,6 +1,6 @@
-import RegisterIPFSReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterIPFSContentReplicaClaimWhenClaimed';
-import IPFSContentReplicaClaimRegistrar from '@app/contexts/ipfs-replication/application/register-claim/IPFSContentReplicaClaimRegistrar';
-import { IPFSContentReplicationWasClaimedEvent } from '@app/contexts/ipfs-replication/domain/events/IPFSContentReplicationWasClaimedEvent';
+import RegisterContentReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed';
+import ContentReplicaClaimRegistrar from '@app/contexts/content-replication/application/register-claim/ContentReplicaClaimRegistrar';
+import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
@@ -13,7 +13,7 @@ type RegisteredReplicaClaim = {
   nodeId: string;
 };
 
-class FakeIPFSContentReplicaClaimRegistrar {
+class FakeContentReplicaClaimRegistrar {
   public registeredClaims: RegisteredReplicaClaim[] = [];
 
   public async register(params: RegisteredReplicaClaim): Promise<void> {
@@ -28,25 +28,25 @@ export default class IPFSPubSubConsumersDefinition extends PubSubConsumerTestCon
   private readonly networkId = '550e8400-e29b-41d4-a716-446655440001';
   private readonly nodeId = '550e8400-e29b-41d4-a716-446655440010';
 
-  private registrar = new FakeIPFSContentReplicaClaimRegistrar();
+  private registrar = new FakeContentReplicaClaimRegistrar();
 
   @before()
   public async reset(): Promise<void> {
     await this.resetConsumerTestContext();
-    this.registrar = new FakeIPFSContentReplicaClaimRegistrar();
+    this.registrar = new FakeContentReplicaClaimRegistrar();
   }
 
   @when(
     'the IPFS content replica claimed consumer handles a replica claim',
   )
   public async ipfsReplicaClaimedConsumerHandlesAReplicaClaim(): Promise<void> {
-    const consumer = new RegisterIPFSReplicaClaimWhenClaimed(
+    const consumer = new RegisterContentReplicaClaimWhenClaimed(
       this.eventConsumer(),
-      this.registrar as unknown as IPFSContentReplicaClaimRegistrar,
+      this.registrar as unknown as ContentReplicaClaimRegistrar,
     );
 
     await consumer.handler(
-      new IPFSContentReplicationWasClaimedEvent(this.cid, {
+      new ContentReplicationWasClaimedEvent(this.cid, {
         cid: this.cid,
         claimedAt: this.claimedAt,
         networkId: this.networkId,

@@ -2,12 +2,12 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityMessageReactionRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageReactionRepository';
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
-import { MongoCommunityRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
@@ -17,19 +17,17 @@ import { assert } from '@haskou/value-objects';
 import { isCommunityChannelMessageReactionPrimitive } from './isCommunityChannelMessageReactionPrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
-type ReactionRepository = MongoCommunityMessageReactionRepository;
-
 export default class RegisterCommunityReactionWhenAdded extends Consumer {
   public static QUEUE_NAME =
     'pigeon-swarm.register-community-channel-message-reaction-when-added';
 
   constructor(
-    consumer: DomainEventConsumer,
-    private readonly communityRepository: MongoCommunityRepository,
-    private readonly messageRepository: MongoCommunityChannelMessageRepository,
-    private readonly reactionRepository: ReactionRepository,
+    private readonly eventConsumer: DomainEventConsumer,
+    private readonly communityRepository: CommunityRepository,
+    private readonly messageRepository: CommunityChannelMessageRepository,
+    private readonly reactionRepository: CommunityMessageReactionRepository,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

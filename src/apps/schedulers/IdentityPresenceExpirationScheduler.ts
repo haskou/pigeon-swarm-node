@@ -1,23 +1,16 @@
-import { MongoIdentityMetadataRepository } from '@app/contexts/identities/infrastructure/mongo';
-import { IdentityPresenceServicesFactory } from '@app/contexts/presence/application/IdentityPresenceServicesFactory';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import IdentityPresenceExpirationRegistrar from '@app/contexts/presence/application/expire/IdentityPresenceExpirationRegistrar';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
 
 export default class IdentityPresenceExpirationScheduler extends Scheduler {
-  private presenceServices(): IdentityPresenceServicesFactory {
-    return new IdentityPresenceServicesFactory(
-      this.get<MongoDB>(MongoDB),
-      this.get<MongoIdentityMetadataRepository>(
-        MongoIdentityMetadataRepository,
-      ),
-      this.get<MessageBus>(MessageBus),
-    );
+  constructor(
+    private readonly expirationRegistrar: IdentityPresenceExpirationRegistrar,
+  ) {
+    super();
   }
 
   public async execute(): Promise<void> {
-    await this.presenceServices().expirationRegistrar().expire();
+    await this.expirationRegistrar.expire();
   }
 
   public getProcessName(): string {

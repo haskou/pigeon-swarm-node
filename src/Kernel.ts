@@ -6,8 +6,12 @@ import path from 'path';
 
 import NodeLoader from './contexts/nodes/application/load/NodeLoader';
 import { ServiceClass } from './shared/infrastructure/dependencyInjection/ServiceClass';
+import { Initializer } from './shared/infrastructure/lifecycle/Initializer';
+import { Runtime } from './shared/infrastructure/lifecycle/Runtime';
 import Scheduler from './shared/infrastructure/scheduler/Scheduler';
 import Consumer from './shared/infrastructure/ui/consumers/Consumer';
+import WebSocketClientMessageHandler from './shared/infrastructure/websocket/WebSocketClientMessageHandler';
+import { webSocketEventHub } from './shared/infrastructure/websocket/WebSocketEventHub';
 
 export default class Kernel {
   private static _consumers: Consumer[] = [];
@@ -44,6 +48,16 @@ export default class Kernel {
     return Kernel._di.getService(ClassDefinition) as Scheduler;
   }
 
+  private getInitializerFromClass(
+    ClassDefinition: ServiceClass<Initializer>,
+  ): Initializer {
+    return Kernel._di.getService(ClassDefinition) as Initializer;
+  }
+
+  private getRuntimeFromClass(ClassDefinition: ServiceClass<Runtime>): Runtime {
+    return Kernel._di.getService(ClassDefinition) as Runtime;
+  }
+
   public async loadLocalNodeState(): Promise<void> {
     const nodeLoader = Kernel._di.getService<NodeLoader>(NodeLoader);
 
@@ -61,6 +75,14 @@ export default class Kernel {
   public async dependencyInjection(): Promise<void> {
     Kernel._di = new DependencyInjection();
     await Kernel._di.compile();
+  }
+
+  public configureWebSocketEventHub(): void {
+    webSocketEventHub.setClientMessageHandler(
+      Kernel._di.getService<WebSocketClientMessageHandler>(
+        WebSocketClientMessageHandler,
+      ),
+    );
   }
 
   public async runServer(): Promise<void> {
@@ -93,6 +115,31 @@ export default class Kernel {
       const scheduler = this.getSchedulerFromClass(ClassDefinition);
       Kernel.schedulers.push(scheduler);
     }
+  }
+
+  public async runInitializers(
+    ...ClassDefinitions: ServiceClass<Initializer>[]
+  ): Promise<void> {
+    for (const ClassDefinition of ClassDefinitions) {
+      await this.getInitializerFromClass(ClassDefinition).ensure();
+    }
+  }
+
+  public async runRuntimes(
+    ...ClassDefinitions: ServiceClass<Runtime>[]
+  ): Promise<void> {
+    for (const ClassDefinition of ClassDefinitions) {
+      await this.getRuntimeFromClass(ClassDefinition).run();
+    }
+  }
+
+  public async runSchedulerNowAndSchedule(
+    ClassDefinition: ServiceClass<Scheduler>,
+  ): Promise<void> {
+    const scheduler = this.getSchedulerFromClass(ClassDefinition);
+
+    await scheduler.runOnce();
+    await scheduler.init();
   }
 
   public addAcceptanceInstanceScheduler(instance: Scheduler): void {

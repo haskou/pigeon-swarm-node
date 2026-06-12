@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Identities API
   version: 1.0.0
-  description: Endpoints for creating, updating and resolving identities.
+  description: Endpoints for publishing, updating and resolving signed identities.
 tags:
   - name: identities
 paths:
@@ -10,7 +10,7 @@ paths:
     post:
       tags:
         - identities
-      summary: Create identity
+      summary: Publish signed identity
       requestBody:
         required: true
         content:
@@ -19,7 +19,7 @@ paths:
               $ref: '#/components/schemas/PostIdentityBody'
       responses:
         '200':
-          description: Identity created successfully.
+          description: Identity published successfully.
           content:
             application/json:
               schema:
@@ -66,11 +66,6 @@ paths:
           schema:
             type: string
         - in: header
-          name: X-Nonce
-          required: true
-          schema:
-            type: string
-        - in: header
           name: X-Signature
           required: true
           schema:
@@ -91,39 +86,14 @@ paths:
 components:
   schemas:
     PostIdentityBody:
-      oneOf:
-        - type: object
-          required:
-            - name
-            - password
-            - networks
-          properties:
-            name:
-              type: string
-              example: Alice
-            handle:
-              type: string
-              description: Lowercase profile handle. Use only letters, numbers, dots, hyphens or underscores; do not include @ or spaces.
-              pattern: '^[A-Za-z0-9._-]{3,32}$'
-              example: alice
-            password:
-              type: string
-              minLength: 12
-              maxLength: 256
-              description: Must include at least one uppercase letter, one lowercase letter, one number and one symbol.
-              example: Super-secret-password1!
-            networks:
-              type: array
-              description: Initial identity networks. Existing networks cannot be removed in later identity versions.
-              items:
-                type: string
-                format: uuid
-        - $ref: '#/components/schemas/SignedIdentityBody'
+      $ref: '#/components/schemas/SignedIdentityBody'
     SignedIdentityBody:
       type: object
       required:
         - id
         - encryptedKeyPair
+        - encryptedMasterKey
+        - masterKeyDerivation
         - networks
         - profile
         - timestamp
@@ -142,6 +112,13 @@ components:
               type: string
             publicKey:
               type: string
+        encryptedMasterKey:
+          type: string
+          description: Opaque encrypted identity master key. Backend stores and signs it but does not decrypt it.
+        masterKeyDerivation:
+          type: object
+          additionalProperties: true
+          description: Opaque client-controlled derivation metadata required to decrypt encryptedMasterKey.
         networks:
           type: array
           description: Identity networks. Signed updates may add networks but cannot remove existing ones.
@@ -190,6 +167,8 @@ components:
       required:
         - id
         - encryptedKeyPair
+        - encryptedMasterKey
+        - masterKeyDerivation
         - profile
         - networks
         - timestamp
@@ -211,6 +190,18 @@ components:
             publicKey:
               type: string
               example: -----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=\n-----END PUBLIC KEY-----\n
+        encryptedMasterKey:
+          type: string
+          description: Opaque encrypted identity master key. The backend never decrypts it.
+          example: v1.aes-gcm.exampleEncryptedMasterKey
+        masterKeyDerivation:
+          type: object
+          additionalProperties: true
+          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey.
+          example:
+            algorithm: argon2id
+            version: 1
+            salt: base64urlSalt
         networks:
           type: array
           items:

@@ -27,7 +27,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XOptionalIdentityId'
         - $ref: '#/components/parameters/XOptionalTimestamp'
-        - $ref: '#/components/parameters/XOptionalNonce'
         - $ref: '#/components/parameters/XOptionalSignature'
       responses:
         '200':
@@ -44,7 +43,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
@@ -66,7 +64,7 @@ paths:
       tags:
         - nodes
       summary: Delete local node network
-      description: Removes the network from the local node, stops and deletes its local IPFS storage, and removes local MongoDB data scoped only to that network. Identity metadata that also belongs to other networks is kept and only loses the removed network id. Requires a signed request from the node owner; unowned nodes reject deletion because no owner can authorize the destructive operation.
+      description: Removes the network from the local node, stops and deletes its local IPFS storage, and removes local and replicated data scoped only to that network. Identity metadata that also belongs to other networks is kept and only loses the removed network id. Requires a signed request from the node owner; unowned nodes reject deletion because no owner can authorize the destructive operation.
       parameters:
         - in: path
           name: networkId
@@ -75,7 +73,6 @@ paths:
             type: string
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
@@ -97,7 +94,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
@@ -119,7 +115,6 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
         - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: false
@@ -170,12 +165,6 @@ components:
       required: false
       schema:
         type: string
-    XOptionalNonce:
-      in: header
-      name: X-Nonce
-      required: false
-      schema:
-        type: string
     XOptionalSignature:
       in: header
       name: X-Signature
@@ -185,12 +174,6 @@ components:
     XTimestamp:
       in: header
       name: X-Timestamp
-      required: true
-      schema:
-        type: string
-    XNonce:
-      in: header
-      name: X-Nonce
       required: true
       schema:
         type: string

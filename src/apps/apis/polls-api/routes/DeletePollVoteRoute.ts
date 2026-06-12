@@ -9,6 +9,8 @@ import { PollRouteSupport } from './PollRouteSupport';
 
 @JsonController('/polls')
 export class DeletePollVoteRoute extends PollRouteSupport {
+  private readonly remover = this.get<PollVoteRemover>(PollVoteRemover);
+
   @Delete('/:pollId/votes/me')
   public async removeVote(
     @Param('pollId') pollId: string,
@@ -18,10 +20,7 @@ export class DeletePollVoteRoute extends PollRouteSupport {
     const actor = await this.authenticate(request);
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.accessPollScope(actor, poll);
-    const updatedPoll = await new PollVoteRemover(
-      this.repository(),
-      this.eventPublisher,
-    ).remove(
+    const updatedPoll = await this.remover.remove(
       new PollVoteRemoveMessage(
         pollId,
         actor.valueOf(),

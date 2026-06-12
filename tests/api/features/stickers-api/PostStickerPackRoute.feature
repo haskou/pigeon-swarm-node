@@ -3,6 +3,9 @@ Feature: Post sticker pack route
   I want to create sticker packs
   So that identities can publish reusable stickers
 
+  Background:
+    Given I register an in-memory IPFS network "api-stickers-network"
+
   Scenario: Create a sticker pack
     Given I am an anonymous user
     And I set a sticker pack body

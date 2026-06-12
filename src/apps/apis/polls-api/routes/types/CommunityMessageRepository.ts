@@ -1,3 +1,3 @@
-import { MongoCommunityChannelMessageRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessageRepository';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 
-export type CommunityMessageRepository = MongoCommunityChannelMessageRepository;
+export type CommunityMessageRepository = CommunityChannelMessageRepository;

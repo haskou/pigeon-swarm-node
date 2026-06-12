@@ -6,75 +6,79 @@ import { Message } from '../Message';
 import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
-import { ConversationMessageCandidate } from './types/ConversationMessageCandidate';
 import { ConversationMessagesAround } from './types/ConversationMessagesAround';
-import { ConversationSyncScope } from './types/ConversationSyncScope';
 
-export interface ConversationRepository {
-  findById(conversationId: ConversationId): Promise<Conversation | undefined>;
-  findMetadataById(
+export default abstract class ConversationRepository {
+  public abstract findById(
     conversationId: ConversationId,
   ): Promise<Conversation | undefined>;
-  findCandidateMessageById(
+
+  public abstract findMetadataById(
+    conversationId: ConversationId,
+  ): Promise<Conversation | undefined>;
+
+  public abstract findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
-  findMessageCandidates(
-    conversationId: ConversationId,
-    limit: number,
-  ): Promise<ConversationMessageCandidate[]>;
-  findByParticipant(
+
+  public abstract findByParticipant(
     participantId: IdentityId,
     limit: number,
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]>;
-  findLatestMessages(
+
+  public abstract findLatestMessages(
     conversationId: ConversationId,
     limit: number,
     beforeMessageId?: MessageId,
   ): Promise<Message[]>;
-  findMessageById(
+
+  public abstract findMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<Message | undefined>;
-  hasMessage(
+
+  public abstract hasMessage(
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<boolean>;
-  findMessagesAround(
+
+  public abstract findMessagesAround(
     conversationId: ConversationId,
     messageId: MessageId,
     before: number,
     after: number,
   ): Promise<ConversationMessagesAround>;
-  findThreadMessages(
+
+  public abstract findThreadMessages(
     conversationId: ConversationId,
     rootMessageId: MessageId,
     limit: number,
   ): Promise<Message[]>;
-  countUnreadByRecipient(
+
+  public abstract countUnreadByRecipient(
     recipientIdentityId: IdentityId,
     conversationIds: ConversationId[],
   ): Promise<Map<string, number>>;
-  hasUnreadMessageForRecipient(
+
+  public abstract hasUnreadMessageForRecipient(
     recipientIdentityId: IdentityId,
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<boolean>;
-  findOneToOne(
+
+  public abstract findOneToOne(
     firstIdentityId: IdentityId,
     secondIdentityId: IdentityId,
     networkId: NetworkId,
   ): Promise<OneToOneConversation | undefined>;
-  findConversationSyncScopes(): Promise<ConversationSyncScope[]>;
-  markReadUntil(
+
+  public abstract markReadUntil(
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
     messageId: MessageId,
   ): Promise<void>;
-  registerUnreadForMessage(
-    conversation: Conversation,
-    message: Message,
-  ): Promise<void>;
-  save(conversation: Conversation): Promise<void>;
+
+  public abstract save(conversation: Conversation): Promise<void>;
 }

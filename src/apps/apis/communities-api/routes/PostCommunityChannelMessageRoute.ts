@@ -5,7 +5,7 @@ import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domai
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
@@ -30,7 +30,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 @JsonController('/communities')
 export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
   private readonly signatureService =
-    new CommunityChannelMessageSignatureDomainService();
+    this.get<CommunityChannelMessageSignatureDomainService>(
+      CommunityChannelMessageSignatureDomainService,
+    );
 
   @Post('/:communityId/channels/:channelId/messages')
   public async sendMessage(

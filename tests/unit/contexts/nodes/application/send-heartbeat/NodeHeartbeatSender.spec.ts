@@ -2,7 +2,7 @@ import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { Network } from '@app/contexts/nodes/domain/Network';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
-import { NodeRepository } from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
 import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';

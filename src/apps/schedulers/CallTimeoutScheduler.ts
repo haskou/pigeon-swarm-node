@@ -1,11 +1,8 @@
-import { MongoCallRepository } from '@app/contexts/calls/infrastructure/mongo/MongoCallRepository';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCallPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
-import MongoNotificationMapper from '@app/contexts/notifications/infrastructure/mongo/mappers/MongoNotificationMapper';
-import MongoNotificationRepository from '@app/contexts/notifications/infrastructure/mongo/MongoNotificationRepository';
+import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
 import { Timestamp } from '@haskou/value-objects';
@@ -13,46 +10,13 @@ import { Timestamp } from '@haskou/value-objects';
 const callRingingTimeoutMs = 60_000;
 const callParticipantHeartbeatTimeoutMs = 5_000;
 
-type CallTimeoutSchedulerDependencies = {
-  callRepository?: Pick<
-    MongoCallRepository,
-    'findTimedOutJoinedCalls' | 'findTimedOutRingingCalls' | 'save'
-  >;
-  eventPublisher?: DomainEventPublisher;
-  notificationRepository?: Pick<MongoNotificationRepository, 'save'>;
-};
-
 export default class CallTimeoutScheduler extends Scheduler {
-  private readonly eventPublisher: DomainEventPublisher;
-
-  private readonly callRepository: Pick<
-    MongoCallRepository,
-    'findTimedOutJoinedCalls' | 'findTimedOutRingingCalls' | 'save'
-  >;
-
-  private readonly notificationRepository: Pick<
-    MongoNotificationRepository,
-    'save'
-  >;
-
-  constructor(dependencies: CallTimeoutSchedulerDependencies = {}) {
+  constructor(
+    private readonly callRepository: CallRepository,
+    private readonly eventPublisher: DomainEventPublisher,
+    private readonly notificationRepository: NotificationRepository,
+  ) {
     super();
-
-    const mongo =
-      dependencies.callRepository && dependencies.notificationRepository
-        ? undefined
-        : this.get<MongoDB>(MongoDB);
-
-    this.eventPublisher =
-      dependencies.eventPublisher || this.get<MessageBus>(MessageBus);
-    this.callRepository =
-      dependencies.callRepository || new MongoCallRepository(mongo as MongoDB);
-    this.notificationRepository =
-      dependencies.notificationRepository ||
-      new MongoNotificationRepository(
-        mongo as MongoDB,
-        new MongoNotificationMapper(),
-      );
   }
 
   private async markTimedOutJoinedParticipants(): Promise<void> {

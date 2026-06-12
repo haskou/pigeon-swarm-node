@@ -1,6 +1,6 @@
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
-import { IdentityCandidate } from '../../domain/repositories/IdentityRepository';
+import { IdentityCandidate } from '../../domain/repositories/types/IdentityCandidate';
 import IdentityFinderService from '../../domain/services/IdentityFinderService';
 import { IdentityFinderMessage } from './messages/IdentityFinderMessage';
 

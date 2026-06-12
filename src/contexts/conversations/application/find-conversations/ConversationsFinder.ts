@@ -1,5 +1,5 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { ConversationsFindMessage } from './messages/ConversationsFindMessage';

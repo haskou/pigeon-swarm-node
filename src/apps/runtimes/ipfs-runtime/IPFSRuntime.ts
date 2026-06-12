@@ -1,10 +1,7 @@
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import Kernel from '@app/Kernel';
 
-export class IPFSRuntime {
-  private readonly ipfs: IPFS = Kernel.di.getService(IPFS);
-
-  constructor() {}
+export default class IPFSRuntime {
+  constructor(private readonly ipfs: IPFS) {}
 
   public async run(): Promise<void> {
     await this.ipfs.initialize();

@@ -1,14 +1,12 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MongoConversationDraftRepository } from '@app/contexts/conversations/infrastructure/mongo/MongoConversationDraftRepository';
-import MongoConversationRepository from '@app/contexts/conversations/infrastructure/mongo/MongoConversationRepository';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import ConversationDraftDeleter from '@app/contexts/conversations/application/manage-draft/ConversationDraftDeleter';
+import ConversationDraftSaver from '@app/contexts/conversations/application/manage-draft/ConversationDraftSaver';
+import ConversationDraftsFinder from '@app/contexts/conversations/application/manage-draft/ConversationDraftsFinder';
+import { ConversationDraftDeleteMessage } from '@app/contexts/conversations/application/manage-draft/messages/ConversationDraftDeleteMessage';
+import { ConversationDraftSaveMessage } from '@app/contexts/conversations/application/manage-draft/messages/ConversationDraftSaveMessage';
+import { ConversationDraftsFindMessage } from '@app/contexts/conversations/application/manage-draft/messages/ConversationDraftsFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
-import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -29,29 +27,17 @@ export class ConversationDraftsRoute extends Route {
     SignedHttpRequestAuthenticator,
   );
 
-  private conversationRepository(): MongoConversationRepository {
-    return this.get<MongoConversationRepository>(MongoConversationRepository);
-  }
+  private readonly deleter = this.get<ConversationDraftDeleter>(
+    ConversationDraftDeleter,
+  );
 
-  private draftRepository(): MongoConversationDraftRepository {
-    return new MongoConversationDraftRepository(this.get<MongoDB>(MongoDB));
-  }
+  private readonly finder = this.get<ConversationDraftsFinder>(
+    ConversationDraftsFinder,
+  );
 
-  private async assertCanRead(
-    conversationId: ConversationId,
-    identityId: IdentityId,
-  ): Promise<void> {
-    const conversation =
-      await this.conversationRepository().findMetadataById(conversationId);
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(conversationId);
-    }
-
-    if (!conversation.hasParticipant(identityId)) {
-      throw new ConversationParticipantNotFoundError();
-    }
-  }
+  private readonly saver = this.get<ConversationDraftSaver>(
+    ConversationDraftSaver,
+  );
 
   @Get('/me/drafts')
   public async listDrafts(
@@ -59,7 +45,9 @@ export class ConversationDraftsRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-    const drafts = await this.draftRepository().findByIdentity(identityId);
+    const drafts = await this.finder.find(
+      new ConversationDraftsFindMessage(identityId.valueOf()),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({
       drafts: drafts.map((draft) => ({
@@ -78,23 +66,19 @@ export class ConversationDraftsRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-    const domainConversationId = new ConversationId(conversationId);
-    const updatedAt = body.updatedAt
-      ? new Timestamp(body.updatedAt)
-      : Timestamp.now();
-
-    await this.assertCanRead(domainConversationId, identityId);
-    await this.draftRepository().save(
-      identityId,
-      domainConversationId,
+    const message = new ConversationDraftSaveMessage(
+      identityId.valueOf(),
+      conversationId,
       body.encryptedPayload,
-      updatedAt,
+      body.updatedAt,
     );
+
+    await this.saver.save(message);
 
     return response.status(HttpRouteStatusEnum.OK).send({
       conversationId,
       encryptedPayload: body.encryptedPayload,
-      updatedAt: updatedAt.valueOf(),
+      updatedAt: message.updatedAt.valueOf(),
     });
   }
 
@@ -105,10 +89,10 @@ export class ConversationDraftsRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-    const domainConversationId = new ConversationId(conversationId);
 
-    await this.assertCanRead(domainConversationId, identityId);
-    await this.draftRepository().delete(identityId, domainConversationId);
+    await this.deleter.delete(
+      new ConversationDraftDeleteMessage(identityId.valueOf(), conversationId),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({ conversationId });
   }

@@ -1,0 +1,377 @@
+import { Call } from '@app/contexts/calls/domain/Call';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { Timestamp } from '@haskou/value-objects';
+
+import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
+
+export default class OrbitDBCallRepository extends CallRepository {
+  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+    super();
+  }
+
+  private hasCallIdentityFields(document: Record<string, unknown>): boolean {
+    return (
+      typeof document.id === 'string' &&
+      typeof document.createdAt === 'number' &&
+      typeof document.creatorIdentityId === 'string' &&
+      typeof document.networkId === 'string'
+    );
+  }
+
+  private hasCallStateFields(document: Record<string, unknown>): boolean {
+    return (
+      Array.isArray(document.participantIds) &&
+      Array.isArray(document.participants) &&
+      typeof document.scope === 'object' &&
+      document.scope !== null &&
+      typeof document.status === 'string'
+    );
+  }
+
+  private isDocument(
+    document: Record<string, unknown>,
+  ): document is OrbitDBCallDocument {
+    return (
+      this.hasCallIdentityFields(document) && this.hasCallStateFields(document)
+    );
+  }
+
+  private toDocument(call: Call): OrbitDBCallDocument {
+    const primitives = call.toPrimitives();
+
+    return {
+      createdAt: primitives.createdAt,
+      creatorIdentityId: primitives.creatorIdentityId,
+      endedAt: primitives.endedAt,
+      endedByIdentityId: primitives.endedByIdentityId,
+      id: primitives.id,
+      networkId: primitives.networkId,
+      participantIds: primitives.participantIds,
+      participants: primitives.participants,
+      scope: primitives.scope,
+      status: primitives.status,
+      updatedAt: Date.now(),
+    };
+  }
+
+  private toDomain(document: OrbitDBCallDocument): Call {
+    return Call.fromPrimitives({
+      createdAt: document.createdAt,
+      creatorIdentityId: document.creatorIdentityId,
+      endedAt: document.endedAt,
+      endedByIdentityId: document.endedByIdentityId,
+      id: document.id,
+      networkId: document.networkId,
+      participantIds: document.participantIds,
+      participants: document.participants,
+      scope: document.scope,
+      status: document.status,
+    });
+  }
+
+  private freshness(document: OrbitDBCallDocument): number {
+    return Math.max(
+      document.updatedAt ?? 0,
+      document.endedAt ?? 0,
+      document.createdAt,
+    );
+  }
+
+  private deduplicateDocuments(
+    documents: OrbitDBCallDocument[],
+  ): OrbitDBCallDocument[] {
+    const deduplicated = new Map<string, OrbitDBCallDocument>();
+
+    for (const document of documents) {
+      const current = deduplicated.get(document.id);
+
+      if (!current || this.freshness(current) <= this.freshness(document)) {
+        deduplicated.set(document.id, document);
+      }
+    }
+
+    return [...deduplicated.values()];
+  }
+
+  private callHeadKey(callId: string): string {
+    return `call:${callId}`;
+  }
+
+  private activeIndexHeadKey(): string {
+    return 'call-active-index';
+  }
+
+  private participantIndexHeadKey(participantId: string): string {
+    return `call-participant-index:${participantId}`;
+  }
+
+  private conversationIndexHeadKey(conversationId: string): string {
+    return `call-conversation-index:${conversationId}`;
+  }
+
+  private communityChannelIndexHeadKey(
+    communityId: string,
+    channelId: string,
+  ): string {
+    return `call-community-channel-index:${communityId}:${channelId}`;
+  }
+
+  private communityActiveIndexHeadKey(communityId: string): string {
+    return `call-community-active-index:${communityId}`;
+  }
+
+  private documentsFromIndex(
+    record: Record<string, unknown> | undefined,
+  ): OrbitDBCallDocument[] | undefined {
+    if (!record) {
+      return undefined;
+    }
+
+    const calls = record.calls;
+
+    if (!Array.isArray(calls)) {
+      return [];
+    }
+
+    return calls
+      .filter(
+        (call): call is Record<string, unknown> =>
+          typeof call === 'object' && call !== null && !Array.isArray(call),
+      )
+      .filter((call): call is OrbitDBCallDocument => this.isDocument(call));
+  }
+
+  private async findIndexDocuments(
+    key: string,
+  ): Promise<OrbitDBCallDocument[] | undefined> {
+    return this.documentsFromIndex(await this.registry.findHead(key));
+  }
+
+  private async putIndex(
+    key: string,
+    documents: OrbitDBCallDocument[],
+    filter: (document: OrbitDBCallDocument) => boolean = () => true,
+  ): Promise<void> {
+    const calls = this.deduplicateDocuments(documents).filter(filter);
+    const networkIds = [...new Set(calls.map((call) => call.networkId))];
+
+    await this.registry.putHead(
+      key,
+      {
+        calls: calls.map((call) => ({ ...call })),
+        id: key,
+        updatedAt: Date.now(),
+      },
+      networkIds,
+    );
+  }
+
+  private async putIndexDocument(
+    key: string,
+    document: OrbitDBCallDocument,
+    filter: (candidate: OrbitDBCallDocument) => boolean = () => true,
+  ): Promise<void> {
+    await this.putIndex(
+      key,
+      [...((await this.findIndexDocuments(key)) || []), document],
+      filter,
+    );
+  }
+
+  private isActive(document: OrbitDBCallDocument): boolean {
+    return document.status === 'active';
+  }
+
+  private async putHeads(document: OrbitDBCallDocument): Promise<void> {
+    await this.registry.putHead(
+      this.callHeadKey(document.id),
+      { ...document },
+      [document.networkId],
+    );
+
+    await this.putIndexDocument(this.activeIndexHeadKey(), document, (call) =>
+      this.isActive(call),
+    );
+
+    await Promise.all(
+      document.participantIds.map((participantId) =>
+        this.putIndexDocument(
+          this.participantIndexHeadKey(participantId),
+          document,
+        ),
+      ),
+    );
+
+    if (
+      document.scope.type === 'conversation' &&
+      document.scope.conversationId
+    ) {
+      await this.putIndexDocument(
+        this.conversationIndexHeadKey(document.scope.conversationId),
+        document,
+      );
+    }
+
+    if (
+      document.scope.type === 'community_channel' &&
+      document.scope.communityId &&
+      document.scope.channelId
+    ) {
+      await this.putIndexDocument(
+        this.communityChannelIndexHeadKey(
+          document.scope.communityId,
+          document.scope.channelId,
+        ),
+        document,
+      );
+      await this.putIndexDocument(
+        this.communityActiveIndexHeadKey(document.scope.communityId),
+        document,
+        (call) => this.isActive(call),
+      );
+    }
+  }
+
+  public async findById(id: CallId): Promise<Call | undefined> {
+    const head = await this.registry.findHead(this.callHeadKey(id.valueOf()));
+
+    return head && this.isDocument(head) ? this.toDomain(head) : undefined;
+  }
+
+  public async findActiveByParticipant(
+    participantId: IdentityId,
+  ): Promise<Call[]> {
+    const indexedDocuments = await this.findIndexDocuments(
+      this.participantIndexHeadKey(participantId.valueOf()),
+    );
+    const documents = indexedDocuments ?? [];
+
+    return documents
+      .filter(
+        (document) =>
+          document.status === 'active' &&
+          document.participants.some(
+            (participant) =>
+              participant.identityId === participantId.valueOf() &&
+              ['joined', 'ringing'].includes(participant.status),
+          ),
+      )
+      .map((document) => this.toDomain(document));
+  }
+
+  public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
+    const documents =
+      (await this.findIndexDocuments(
+        this.participantIndexHeadKey(participantId.valueOf()),
+      )) ?? [];
+
+    return documents.map((document) => this.toDomain(document));
+  }
+
+  public async findByConversationId(
+    conversationId: ConversationId,
+  ): Promise<Call[]> {
+    const documents =
+      (await this.findIndexDocuments(
+        this.conversationIndexHeadKey(conversationId.valueOf()),
+      )) ?? [];
+
+    return documents
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map((document) => this.toDomain(document));
+  }
+
+  public async findByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call[]> {
+    const documents =
+      (await this.findIndexDocuments(
+        this.communityChannelIndexHeadKey(
+          communityId.valueOf(),
+          channelId.valueOf(),
+        ),
+      )) ?? [];
+
+    return documents
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map((document) => this.toDomain(document));
+  }
+
+  public async findActiveByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call | undefined> {
+    const [document] = (
+      (await this.findIndexDocuments(
+        this.communityChannelIndexHeadKey(
+          communityId.valueOf(),
+          channelId.valueOf(),
+        ),
+      )) ?? []
+    ).filter((candidate) => candidate.status === 'active');
+
+    return document ? this.toDomain(document) : undefined;
+  }
+
+  public async findActiveByCommunity(
+    communityId: CommunityId,
+  ): Promise<Call[]> {
+    const documents =
+      (await this.findIndexDocuments(
+        this.communityActiveIndexHeadKey(communityId.valueOf()),
+      )) ?? [];
+
+    return documents
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map((document) => this.toDomain(document));
+  }
+
+  public async findTimedOutRingingCalls(
+    timeoutThreshold: Timestamp,
+  ): Promise<Call[]> {
+    const documents =
+      (await this.findIndexDocuments(this.activeIndexHeadKey())) ?? [];
+
+    return documents
+      .filter(
+        (document) =>
+          document.createdAt <= timeoutThreshold.valueOf() &&
+          document.participants.some(
+            (participant) => participant.status === 'ringing',
+          ),
+      )
+      .map((document) => this.toDomain(document));
+  }
+
+  public async findTimedOutJoinedCalls(
+    timeoutThreshold: Timestamp,
+  ): Promise<Call[]> {
+    const documents =
+      (await this.findIndexDocuments(this.activeIndexHeadKey())) ?? [];
+
+    return documents
+      .filter((document) =>
+        document.participants.some(
+          (participant) =>
+            participant.status === 'joined' &&
+            participant.lastSeenAt !== undefined &&
+            participant.lastSeenAt <= timeoutThreshold.valueOf(),
+        ),
+      )
+      .map((document) => this.toDomain(document));
+  }
+
+  public async save(call: Call): Promise<void> {
+    const document = this.toDocument(call);
+
+    await this.registry.putDocument('calls', document);
+    await this.putHeads(document);
+  }
+}

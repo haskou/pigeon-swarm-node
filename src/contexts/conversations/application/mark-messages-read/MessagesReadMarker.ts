@@ -1,6 +1,6 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
-import { ConversationRepository } from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessagesReadMarkMessage } from './messages/MessagesReadMarkMessage';

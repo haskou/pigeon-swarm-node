@@ -1,7 +1,9 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
+import { EncryptedMasterKey } from '@app/contexts/identities/domain/value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
+import { MasterKeyDerivation } from '@app/contexts/identities/domain/value-objects/MasterKeyDerivation';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -29,6 +31,15 @@ export class IdentityMother {
     'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=',
   );
 
+  public encryptedMasterKey: EncryptedMasterKey = new EncryptedMasterKey(
+    'v1.fixture.encrypted-master-key',
+  );
+
+  public masterKeyDerivation: MasterKeyDerivation = new MasterKeyDerivation({
+    algorithm: 'fixture',
+    version: 1,
+  });
+
   public profile: Profile = new Profile(new ProfileName('John'));
 
   public networks: NetworkId[] = [
@@ -40,7 +51,7 @@ export class IdentityMother {
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'PXcne5HUw9qR94mKIYV37y521BdMOWtK+evZNeEoAfOQrbt8AR6iE5uEpl/tLXFu/Zr+BVqdpAAI0ZDrh97pDg==',
+    'mWsKbEJgufmUujQYXT4PoF5nUObFOTno9e7BJsri3rrLAy2TH0psG3jFbIEO/bEvi0X/ayuEMBe55l4DfGiwDg==',
   );
 
   public version: IdentityVersion = new IdentityVersion(1);
@@ -57,6 +68,20 @@ export class IdentityMother {
 
   public withEncryptedKeyPair(encryptedKeyPair: EncryptedKeyPair): this {
     this.encryptedKeyPair = encryptedKeyPair;
+
+    return this;
+  }
+
+  public withEncryptedMasterKey(encryptedMasterKey: EncryptedMasterKey): this {
+    this.encryptedMasterKey = encryptedMasterKey;
+
+    return this;
+  }
+
+  public withMasterKeyDerivation(
+    masterKeyDerivation: MasterKeyDerivation,
+  ): this {
+    this.masterKeyDerivation = masterKeyDerivation;
 
     return this;
   }
@@ -104,6 +129,8 @@ export class IdentityMother {
     return new Identity(
       this.id,
       this.encryptedKeyPair,
+      this.encryptedMasterKey,
+      this.masterKeyDerivation,
       UniqueObjectArray.fromArray(this.networks),
       this.profile,
       this.timestamp,

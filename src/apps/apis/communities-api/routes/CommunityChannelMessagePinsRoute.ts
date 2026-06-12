@@ -1,11 +1,10 @@
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasPinnedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasPinnedEvent';
 import { CommunityChannelMessageWasUnpinnedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasUnpinnedEvent';
+import CommunityChannelMessagePinRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessagePinRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { MongoCommunityChannelMessagePinRepository } from '@app/contexts/communities/infrastructure/mongo/MongoCommunityChannelMessagePinRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -23,11 +22,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
-  private pinRepository(): MongoCommunityChannelMessagePinRepository {
-    return new MongoCommunityChannelMessagePinRepository(
-      this.get<MongoDB>(MongoDB),
+  private readonly pinRepository =
+    this.get<CommunityChannelMessagePinRepository>(
+      CommunityChannelMessagePinRepository,
     );
-  }
 
   @Get('/:communityId/channels/:channelId/pins')
   public async listPins(
@@ -43,7 +41,7 @@ export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
 
     community.assertCanViewTextChannel(actorIdentityId, domainChannelId);
 
-    const pins = await this.pinRepository().findByChannel(
+    const pins = await this.pinRepository.findByChannel(
       domainCommunityId,
       domainChannelId,
     );
@@ -99,7 +97,7 @@ export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
       throw new CommunityChannelMessageNotFoundError();
     }
 
-    await this.pinRepository().pin(
+    await this.pinRepository.pin(
       domainCommunityId,
       domainChannelId,
       domainMessageId,
@@ -141,7 +139,7 @@ export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
     const domainMessageId = new CommunityChannelMessageId(messageId);
 
     community.assertCanManageMessages(actorIdentityId, domainChannelId);
-    await this.pinRepository().unpin(
+    await this.pinRepository.unpin(
       domainCommunityId,
       domainChannelId,
       domainMessageId,

@@ -1,23 +1,23 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostLinkPreviewBody } from '../bodies/PostLinkPreviewBody';
-import { LinkPreviewCacheRepository } from '../services/LinkPreviewCacheRepository';
-import { LinkPreviewFetcher } from '../services/LinkPreviewFetcher';
-import { LinkPreviewRateLimiter } from '../services/LinkPreviewRateLimiter';
+import LinkPreviewFetcher from '../services/LinkPreviewFetcher';
+import LinkPreviewRateLimiter from '../services/LinkPreviewRateLimiter';
 
 @JsonController('/link-previews')
 export class PostLinkPreviewRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private mongo(): MongoDB {
-    return this.get<MongoDB>(MongoDB);
-  }
+  private readonly fetcher = this.get<LinkPreviewFetcher>(LinkPreviewFetcher);
+
+  private readonly rateLimiter = this.get<LinkPreviewRateLimiter>(
+    LinkPreviewRateLimiter,
+  );
 
   private requesterIp(request: Request): string {
     return request.ip || request.socket.remoteAddress || 'unknown';
@@ -32,14 +32,9 @@ export class PostLinkPreviewRoute extends Route {
     const identityId =
       await this.signedRequestAuthenticator.authenticate(request);
 
-    await new LinkPreviewRateLimiter(this.mongo()).consume(
-      identityId,
-      this.requesterIp(request),
-    );
+    await this.rateLimiter.consume(identityId, this.requesterIp(request));
 
-    const preview = await new LinkPreviewFetcher(
-      new LinkPreviewCacheRepository(this.mongo()),
-    ).fetch(body.url);
+    const preview = await this.fetcher.fetch(body.url);
 
     return response.status(HttpRouteStatusEnum.OK).send(preview);
   }

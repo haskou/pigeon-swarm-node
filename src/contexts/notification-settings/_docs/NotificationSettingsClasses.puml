@@ -12,7 +12,7 @@ package "notification-settings/domain" {
   class NotificationSettingScope <<ValueObject>>
   class NotificationSettingScopeType <<ValueObject>>
 
-  interface NotificationScopeSettingsRepository
+  abstract class NotificationScopeSettingsRepository
 
   class NotificationSettingsWereUpdatedEvent <<DomainEvent>>
   class NotificationSettingsWereResetEvent <<DomainEvent>>
@@ -22,14 +22,13 @@ package "notification-settings/application" {
   class NotificationSettingsFinder
   class NotificationSettingsUpdater
   class NotificationSettingsResetter
-  class NotificationSettingsServicesFactory
   class NotificationSettingsFindMessage
   class NotificationSettingsUpdateMessage
   class NotificationSettingsResetMessage
 }
 
 package "notification-settings/infrastructure" {
-  class MongoNotificationScopeSettingsRepository
+  class OrbitDBNotificationScopeSettingsRepository
 }
 
 NotificationScopeSettings *-- NotificationScopeSettingsPreferences
@@ -47,11 +46,7 @@ NotificationSettingsUpdater ..> NotificationSettingsUpdateMessage
 NotificationSettingsUpdater ..> NotificationScopeSettingsRepository
 NotificationSettingsResetter ..> NotificationSettingsResetMessage
 NotificationSettingsResetter ..> NotificationScopeSettingsRepository
-NotificationSettingsServicesFactory ..> NotificationSettingsFinder
-NotificationSettingsServicesFactory ..> NotificationSettingsUpdater
-NotificationSettingsServicesFactory ..> NotificationSettingsResetter
-
-MongoNotificationScopeSettingsRepository ..|> NotificationScopeSettingsRepository
-MongoNotificationScopeSettingsRepository ..> NotificationScopeSettings
+OrbitDBNotificationScopeSettingsRepository ..|> NotificationScopeSettingsRepository
+OrbitDBNotificationScopeSettingsRepository ..> NotificationScopeSettings
 
 @enduml

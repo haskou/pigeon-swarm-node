@@ -2,12 +2,16 @@ import { MessageReaction } from '../MessageReaction';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 
-export interface MessageReactionRepository {
-  delete(reaction: MessageReaction): Promise<void>;
-  findByMessageIds(
+export default abstract class MessageReactionRepository {
+  public abstract delete(reaction: MessageReaction): Promise<void>;
+  public abstract findByMessageIds(
     conversationId: ConversationId,
     messageIds: MessageId[],
   ): Promise<MessageReaction[]>;
-  findCandidates(conversationId: ConversationId): Promise<MessageReaction[]>;
-  save(reaction: MessageReaction): Promise<void>;
+
+  public abstract findCandidates(
+    conversationId: ConversationId,
+  ): Promise<MessageReaction[]>;
+
+  public abstract save(reaction: MessageReaction): Promise<void>;
 }

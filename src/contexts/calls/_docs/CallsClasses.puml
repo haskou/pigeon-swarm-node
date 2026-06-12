@@ -89,7 +89,7 @@ package "calls" {
   }
 
   note right of Call
-    Calls are persisted in MongoDB only.
+    Calls are persisted in OrbitDB replicated state.
     They do not publish media or signalling payloads to IPFS.
     Frontend uses these records to drive ringing,
     active call UI, missed calls and call history.
@@ -97,9 +97,9 @@ package "calls" {
 }
 
 package "calls/infrastructure" {
-  class MongoCallRepository
+  class OrbitDBCallRepository
 
-  MongoCallRepository ..|> CallRepository
+  OrbitDBCallRepository ..|> CallRepository
 }
 
 CallStarter ..> CallRepository

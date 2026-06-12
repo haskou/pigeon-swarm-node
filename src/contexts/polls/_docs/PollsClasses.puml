@@ -33,7 +33,7 @@ package "polls/application" {
 }
 
 package "polls/infrastructure" {
-  class MongoPollRepository
+  class OrbitDBPollRepository
 }
 
 Poll *-- PollContent
@@ -56,7 +56,7 @@ PollVoteCaster ..> PollRepository
 PollVoteRemover ..> PollVoteRemoveMessage
 PollVoteRemover ..> PollRepository
 
-MongoPollRepository ..|> PollRepository
-MongoPollRepository ..> Poll
+OrbitDBPollRepository ..|> PollRepository
+OrbitDBPollRepository ..> Poll
 
 @enduml

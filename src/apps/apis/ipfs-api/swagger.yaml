@@ -127,8 +127,8 @@ paths:
     get:
       tags:
         - ipfs
-      summary: Get local IPFS replication status
-      description: Returns the precomputed local IPFS replication summary. The endpoint does not list known CIDs or calculate replica responsibility on demand; uploads, pubsub replication events and the maintenance scheduler refresh the summary document.
+      summary: Get local content replication status
+      description: Returns the precomputed local content replication summary. The endpoint does not list known CIDs or calculate replica responsibility on demand; uploads, pubsub replication events and the maintenance scheduler refresh the summary document.
       security:
         - signedRequest: []
       responses:
@@ -137,7 +137,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IPFSReplicationStatusResource'
+                $ref: '#/components/schemas/ContentReplicationStatusResource'
         '401':
           description: Invalid signed request.
   /ipfs/{cid}:
@@ -232,7 +232,7 @@ components:
         error:
           type: string
           example: CID not found in any network
-    IPFSReplicationStatusResource:
+    ContentReplicationStatusResource:
       type: object
       required:
         - localNodeId
@@ -242,8 +242,8 @@ components:
           type: string
           example: 550e8400-e29b-41d4-a716-446655440010
         summary:
-          $ref: '#/components/schemas/IPFSReplicationSummaryResource'
-    IPFSReplicationSummaryResource:
+          $ref: '#/components/schemas/ContentReplicationSummaryResource'
+    ContentReplicationSummaryResource:
       type: object
       required:
         - contentCount

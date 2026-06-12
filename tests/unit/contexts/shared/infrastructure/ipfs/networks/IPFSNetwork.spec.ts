@@ -214,6 +214,29 @@ describe('IPFSNetwork', () => {
     });
   });
 
+  describe('getMultiaddrs', () => {
+    it('should delegate to connection.getMultiaddrs', () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+
+      connection.getMultiaddrs.mockReturnValue(['/ip4/127.0.0.1/tcp/4001']);
+
+      expect(network.getMultiaddrs()).toEqual(['/ip4/127.0.0.1/tcp/4001']);
+    });
+  });
+
+  describe('dial', () => {
+    it('should delegate to connection.dial', async () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const multiaddr = '/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWtestPeerId';
+
+      await network.dial(multiaddr);
+
+      expect(connection.dial).toHaveBeenCalledWith(multiaddr);
+    });
+  });
+
   describe('getPeerId', () => {
     it('should delegate to connection.getPeerId', () => {
       const config = new IPFSNetworkConfig(networkId, 'net');

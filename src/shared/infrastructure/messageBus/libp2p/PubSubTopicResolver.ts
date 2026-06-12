@@ -1,7 +1,6 @@
 export default class PubSubTopicResolver {
   private readonly defaultPrefix = 'pigeon-swarm';
-
-  constructor(private readonly prefix = process.env.PUBSUB_TOPIC_PREFIX) {}
+  private readonly prefix = process.env.PUBSUB_TOPIC_PREFIX;
 
   private getPrefix(): string {
     return this.prefix || this.defaultPrefix;

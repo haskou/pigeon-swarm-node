@@ -1,7 +1,7 @@
-import { PushSubscriptionRepository } from '../../domain/repositories/PushSubscriptionRepository';
+import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import { PushSubscriptionRemoveMessage } from './messages/PushSubscriptionRemoveMessage';
 
-export class PushSubscriptionRemover {
+export default class PushSubscriptionRemover {
   constructor(private readonly repository: PushSubscriptionRepository) {}
 
   public async remove(message: PushSubscriptionRemoveMessage): Promise<void> {

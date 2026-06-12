@@ -2,9 +2,9 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { IdentityNotFoundError } from '../errors/IdentityNotFoundError';
 import { Identity } from '../Identity';
-import { IdentityCandidate } from '../repositories/IdentityRepository';
+import { IdentityCandidate } from '../repositories/types/IdentityCandidate';
 
-export class IdentityResolutionDomainService {
+export default class IdentityResolutionDomainService {
   public resolve(identityId: IdentityId, candidates: Identity[]): Identity {
     const matchingCandidates = candidates.filter((candidate) =>
       candidate.isIdentifiedBy(identityId),

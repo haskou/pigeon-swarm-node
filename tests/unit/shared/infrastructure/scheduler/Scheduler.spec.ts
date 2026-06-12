@@ -1,4 +1,5 @@
 import Kernel from '@app/Kernel';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
 import cron from 'node-cron';
@@ -61,5 +62,19 @@ describe('Scheduler', () => {
     expect(logger.error).toHaveBeenCalledWith(
       'Error on test-scheduler: boom',
     );
+  });
+
+  it('skips replicated state not ready errors without logging execution failures', async () => {
+    await new TestScheduler(async () => {
+      throw new ReplicatedStateNotReadyError();
+    }).runOnce();
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Scheduler: Executing test-scheduler',
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Scheduler: Skipping test-scheduler; replicated state is not ready.',
+    );
+    expect(logger.error).not.toHaveBeenCalled();
   });
 });

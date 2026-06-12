@@ -3,7 +3,7 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { PollVoteWasRemovedEvent } from '../../domain/events/PollVoteWasRemovedEvent';
 import { Poll } from '../../domain/Poll';
-import { PollRepository } from '../../domain/repositories/PollRepository';
+import PollRepository from '../../domain/repositories/PollRepository';
 import { PollVoteRemoveMessage } from './messages/PollVoteRemoveMessage';
 
 export class PollVoteRemover {

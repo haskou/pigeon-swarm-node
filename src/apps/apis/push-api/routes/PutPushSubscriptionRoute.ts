@@ -1,8 +1,6 @@
-import { SignedHttpRequestAuthenticator } from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { PushSubscriptionRegisterMessage } from '@app/contexts/push-notifications/application/register/messages/PushSubscriptionRegisterMessage';
-import { PushSubscriptionRegistrar } from '@app/contexts/push-notifications/application/register/PushSubscriptionRegistrar';
-import { MongoPushSubscriptionRepository } from '@app/contexts/push-notifications/infrastructure/mongo/MongoPushSubscriptionRepository';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
+import PushSubscriptionRegistrar from '@app/contexts/push-notifications/application/register/PushSubscriptionRegistrar';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -16,11 +14,9 @@ export class PutPushSubscriptionRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private registrar(): PushSubscriptionRegistrar {
-    return new PushSubscriptionRegistrar(
-      new MongoPushSubscriptionRepository(this.get<MongoDB>(MongoDB)),
-    );
-  }
+  private readonly registrar = this.get<PushSubscriptionRegistrar>(
+    PushSubscriptionRegistrar,
+  );
 
   @Put('/subscriptions')
   public async putSubscription(
@@ -30,7 +26,7 @@ export class PutPushSubscriptionRoute extends Route {
   ): Promise<Response> {
     const identityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const subscription = await this.registrar().register(
+    const subscription = await this.registrar.register(
       new PushSubscriptionRegisterMessage(
         identityId.valueOf(),
         body.endpoint,

@@ -1,0 +1,1306 @@
+import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
+import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
+import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
+import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
+import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
+import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasCreatedEvent';
+import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
+import { CommunityChannelWasRenamedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasRenamedEvent';
+import { CommunityInviteWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasAcceptedEvent';
+import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
+import { CommunityMembershipRequestWasAcceptedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasAcceptedEvent';
+import { CommunityMembershipRequestWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasCreatedEvent';
+import { CommunityMembershipRequestWasDeclinedEvent } from '@app/contexts/communities/domain/events/CommunityMembershipRequestWasDeclinedEvent';
+import { CommunityMemberWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasAddedEvent';
+import { CommunityMemberWasLeftEvent } from '@app/contexts/communities/domain/events/CommunityMemberWasLeftEvent';
+import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityWasCreatedEvent';
+import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
+import { ContentReplicationWasClaimedEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasClaimedEvent';
+import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
+import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
+import { ConversationMessageReactionWasRemovedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasRemovedEvent';
+import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
+import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
+import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
+import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
+import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
+import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
+import { NotificationWasAcceptedEvent } from '@app/contexts/notifications/domain/events/NotificationWasAcceptedEvent';
+import { NotificationWasCreatedEvent } from '@app/contexts/notifications/domain/events/NotificationWasCreatedEvent';
+import { NotificationWasDeclinedEvent } from '@app/contexts/notifications/domain/events/NotificationWasDeclinedEvent';
+
+import { OrbitDBDatabase } from './OrbitDBDatabase';
+import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
+import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
+
+export default class OrbitDBDomainEventProjector {
+  private getStringAttribute(
+    message: ReplicatedDomainEventMessage,
+    attribute: string,
+  ): string | undefined {
+    const value = message.attributes[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private getNumberAttribute(
+    message: ReplicatedDomainEventMessage,
+    attribute: string,
+  ): number | undefined {
+    const value = message.attributes[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private getRecordAttribute(
+    message: ReplicatedDomainEventMessage,
+    attribute: string,
+  ): Record<string, unknown> | undefined {
+    const value = message.attributes[attribute];
+
+    return this.isRecord(value) ? value : undefined;
+  }
+
+  private getArrayAttribute(
+    message: ReplicatedDomainEventMessage,
+    attribute: string,
+  ): unknown[] {
+    const value = message.attributes[attribute];
+
+    return Array.isArray(value) ? value : [];
+  }
+
+  private arrayValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): unknown[] {
+    const value = record[attribute];
+
+    return Array.isArray(value) ? value : [];
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private recordValue(
+    entry: { value?: unknown } | unknown,
+  ): Record<string, unknown> | undefined {
+    if (this.isRecord(entry) && 'value' in entry) {
+      return this.isRecord(entry.value) ? entry.value : undefined;
+    }
+
+    return this.isRecord(entry) ? entry : undefined;
+  }
+
+  private withoutUndefined(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.withoutUndefined(item));
+    }
+
+    if (!this.isRecord(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .map(([entryKey, entryValue]) => [
+          entryKey,
+          this.withoutUndefined(entryValue),
+        ]),
+    );
+  }
+
+  private cleanRecord(
+    record: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return this.withoutUndefined(record) as Record<string, unknown>;
+  }
+
+  private async put(
+    store: OrbitDBDatabase,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    await store.put?.(this.cleanRecord(record));
+  }
+
+  private async putHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    await stores.heads.put?.(key, this.cleanRecord(record));
+  }
+
+  private async findHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    return this.recordValue(await stores.heads.get?.(key));
+  }
+
+  private stringValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = record[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private stringArrayValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): string[] {
+    const value = record[attribute];
+
+    return Array.isArray(value) &&
+      value.every((item) => typeof item === 'string')
+      ? value
+      : [];
+  }
+
+  private numberValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = record[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private booleanValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): boolean | undefined {
+    const value = record[attribute];
+
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  private receivedAt(message: ReplicatedDomainEventMessage): number {
+    return Number(message.occurred_on);
+  }
+
+  private isAtLeastAsFresh(
+    candidate: Record<string, unknown>,
+    current: Record<string, unknown>,
+  ): boolean {
+    const candidateVersion = this.numberValue(candidate, 'version') ?? 0;
+    const currentVersion = this.numberValue(current, 'version') ?? 0;
+
+    if (candidateVersion !== currentVersion) {
+      return candidateVersion > currentVersion;
+    }
+
+    return (
+      (this.numberValue(candidate, 'receivedAt') ?? 0) >=
+      (this.numberValue(current, 'receivedAt') ?? 0)
+    );
+  }
+
+  private async shouldReplaceHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+    record: Record<string, unknown>,
+  ): Promise<boolean> {
+    const current = await this.findHead(stores, key);
+
+    return !current || this.isAtLeastAsFresh(record, current);
+  }
+
+  private async putFreshHead(
+    stores: OrbitDBReplicatedStateStores,
+    key: string,
+    record: Record<string, unknown>,
+  ): Promise<void> {
+    if (await this.shouldReplaceHead(stores, key, record)) {
+      await this.putHead(stores, key, record);
+    }
+  }
+
+  private async putEventHead(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    await this.putHead(
+      stores,
+      `event:${message.type}:${message.aggregate_id}`,
+      {
+        eventId: message.event_id,
+        occurredOn: message.occurred_on,
+      },
+    );
+  }
+
+  private async projectIdentity(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const identityId =
+      this.getStringAttribute(message, 'identityId') || message.aggregate_id;
+    const externalIdentifier = this.getStringAttribute(
+      message,
+      'externalIdentifier',
+    );
+
+    const identity = {
+      cid: externalIdentifier,
+      handle: this.getStringAttribute(message, 'handle'),
+      id: identityId,
+      lastEventId: message.event_id,
+      networkId: this.getStringAttribute(message, 'networkId'),
+      networkIds: this.getArrayAttribute(message, 'networkIds').filter(
+        (networkId): networkId is string => typeof networkId === 'string',
+      ),
+      previousCid: this.getStringAttribute(
+        message,
+        'previousExternalIdentifier',
+      ),
+      receivedAt: this.receivedAt(message),
+      version: this.getNumberAttribute(message, 'version'),
+    };
+    const shouldProject = await this.shouldReplaceHead(
+      stores,
+      `identity:${identityId}`,
+      identity,
+    );
+
+    if (!shouldProject) {
+      return;
+    }
+
+    await this.put(stores.identities, identity);
+    await this.putHead(stores, `identity:${identityId}`, identity);
+    const handle = this.getStringAttribute(message, 'handle');
+
+    if (handle) {
+      await this.putFreshHead(stores, `identity-handle:${handle}`, identity);
+    }
+  }
+
+  private async projectKeychain(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const ownerIdentityId =
+      this.getStringAttribute(message, 'ownerIdentityId') ||
+      message.aggregate_id;
+    const cid = this.getStringAttribute(message, 'externalIdentifier');
+
+    const keychain = {
+      cid,
+      encryptedPayload: this.getStringAttribute(message, 'encryptedPayload'),
+      id: cid || ownerIdentityId,
+      lastEventId: message.event_id,
+      ownerIdentityId,
+      previousCid: this.getStringAttribute(
+        message,
+        'previousExternalIdentifier',
+      ),
+      receivedAt: this.receivedAt(message),
+      signature: this.getStringAttribute(message, 'signature'),
+      timestamp: this.getNumberAttribute(message, 'timestamp'),
+      version: this.getNumberAttribute(message, 'version'),
+    };
+    const shouldProject = await this.shouldReplaceHead(
+      stores,
+      `keychain:${ownerIdentityId}`,
+      keychain,
+    );
+
+    await this.put(stores.keychains, keychain);
+
+    if (cid) {
+      await this.putHead(stores, `keychain-cid:${cid}`, keychain);
+    }
+
+    if (shouldProject) {
+      await this.putHead(stores, `keychain:${ownerIdentityId}`, keychain);
+    }
+  }
+
+  private async putCommunity(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+    community: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const communityId =
+      this.stringValue(community, 'id') ||
+      this.getStringAttribute(message, 'communityId') ||
+      message.aggregate_id;
+
+    const document = {
+      ...community,
+      id: communityId,
+      lastEventId:
+        this.stringValue(community, 'lastEventId') || message.event_id,
+      lastEventType:
+        this.stringValue(community, 'lastEventType') || message.type,
+      receivedAt:
+        this.numberValue(community, 'receivedAt') ?? this.receivedAt(message),
+    };
+
+    await this.put(stores.communities, document);
+    await this.putFreshHead(stores, `community:${communityId}`, document);
+    await Promise.all(
+      this.stringArrayValue(document, 'memberIds').map((memberId) =>
+        this.putCommunityMemberIndex(stores, memberId, document),
+      ),
+    );
+
+    return document;
+  }
+
+  private async putCommunityMemberIndex(
+    stores: OrbitDBReplicatedStateStores,
+    memberId: string,
+    community: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `community-member-index:${memberId}`;
+    const communities = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'communities'),
+      community,
+    ).filter((document) =>
+      this.stringArrayValue(document, 'memberIds').includes(memberId),
+    );
+
+    await this.putHead(stores, key, {
+      communities,
+      id: key,
+      memberId,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async projectCommunity(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const community = this.getRecordAttribute(message, 'community');
+
+    if (community) {
+      await this.putCommunity(stores, message, community);
+
+      return;
+    }
+
+    await this.putCommunity(stores, message, {
+      ...message.attributes,
+      id: message.aggregate_id,
+    });
+  }
+
+  private async projectCommunityMembership(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const community = this.getRecordAttribute(message, 'community') || {
+      ...message.attributes,
+      id: message.aggregate_id,
+    };
+    const document = await this.putCommunity(stores, message, community);
+    const changedIdentityId = this.getStringAttribute(message, 'identityId');
+
+    if (changedIdentityId) {
+      await this.putCommunityMemberIndex(stores, changedIdentityId, document);
+    }
+  }
+
+  private async findCommunityDocument(
+    stores: OrbitDBReplicatedStateStores,
+    communityId: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    return this.findHead(stores, `community:${communityId}`);
+  }
+
+  private communityChannelArrayKey(
+    channel: Record<string, unknown>,
+  ): 'textChannels' | 'voiceChannels' | undefined {
+    const type = this.stringValue(channel, 'type');
+
+    if (type === 'text') {
+      return 'textChannels';
+    }
+
+    if (type === 'voice') {
+      return 'voiceChannels';
+    }
+
+    return undefined;
+  }
+
+  private upsertCommunityChannel(
+    channels: unknown[],
+    channel: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    const channelId = this.stringValue(channel, 'id');
+    const existingChannels = channels.filter(
+      (candidate): candidate is Record<string, unknown> =>
+        this.isRecord(candidate),
+    );
+
+    if (!channelId) {
+      return existingChannels;
+    }
+
+    const index = existingChannels.findIndex(
+      (candidate) => this.stringValue(candidate, 'id') === channelId,
+    );
+
+    if (index === -1) {
+      return [...existingChannels, channel];
+    }
+
+    return existingChannels.map((candidate, candidateIndex) =>
+      candidateIndex === index ? { ...candidate, ...channel } : candidate,
+    );
+  }
+
+  private renameCommunityChannel(
+    channels: unknown[],
+    channelId: string,
+    name: string,
+  ): Record<string, unknown>[] {
+    return channels
+      .filter((channel): channel is Record<string, unknown> =>
+        this.isRecord(channel),
+      )
+      .map((channel) =>
+        this.stringValue(channel, 'id') === channelId
+          ? { ...channel, name }
+          : channel,
+      );
+  }
+
+  private deleteCommunityChannel(
+    channels: unknown[],
+    channelId: string,
+  ): Record<string, unknown>[] {
+    return channels
+      .filter((channel): channel is Record<string, unknown> =>
+        this.isRecord(channel),
+      )
+      .filter((channel) => this.stringValue(channel, 'id') !== channelId);
+  }
+
+  private withCommunityProjectionMetadata(
+    current: Record<string, unknown>,
+    message: ReplicatedDomainEventMessage,
+    next: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const currentReceivedAt = this.numberValue(current, 'receivedAt') || 0;
+    const eventReceivedAt = this.receivedAt(message);
+    const eventIsNewer = eventReceivedAt >= currentReceivedAt;
+
+    return {
+      ...next,
+      lastEventId: eventIsNewer
+        ? message.event_id
+        : this.stringValue(current, 'lastEventId'),
+      lastEventType: eventIsNewer
+        ? message.type
+        : this.stringValue(current, 'lastEventType'),
+      receivedAt: Math.max(currentReceivedAt, eventReceivedAt),
+    };
+  }
+
+  private async putProjectedCommunity(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+    current: Record<string, unknown>,
+    next: Record<string, unknown>,
+  ): Promise<void> {
+    await this.putCommunity(
+      stores,
+      message,
+      this.withCommunityProjectionMetadata(current, message, next),
+    );
+  }
+
+  private async projectCommunityChannelCreated(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const communityId =
+      this.getStringAttribute(message, 'communityId') || message.aggregate_id;
+    const current = await this.findCommunityDocument(stores, communityId);
+    const channel = this.getRecordAttribute(message, 'channel');
+
+    if (!current || !channel) {
+      return;
+    }
+
+    const channelArrayKey = this.communityChannelArrayKey(channel);
+
+    if (!channelArrayKey) {
+      return;
+    }
+
+    await this.putProjectedCommunity(stores, message, current, {
+      ...current,
+      [channelArrayKey]: this.upsertCommunityChannel(
+        this.arrayValue(current, channelArrayKey),
+        channel,
+      ),
+    });
+  }
+
+  private async projectCommunityChannelRenamed(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const communityId =
+      this.getStringAttribute(message, 'communityId') || message.aggregate_id;
+    const channelId = this.getStringAttribute(message, 'channelId');
+    const name = this.getStringAttribute(message, 'name');
+    const current = await this.findCommunityDocument(stores, communityId);
+
+    if (!current || !channelId || !name) {
+      return;
+    }
+
+    await this.putProjectedCommunity(stores, message, current, {
+      ...current,
+      textChannels: this.renameCommunityChannel(
+        this.arrayValue(current, 'textChannels'),
+        channelId,
+        name,
+      ),
+      voiceChannels: this.renameCommunityChannel(
+        this.arrayValue(current, 'voiceChannels'),
+        channelId,
+        name,
+      ),
+    });
+  }
+
+  private async projectCommunityChannelDeleted(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const communityId =
+      this.getStringAttribute(message, 'communityId') || message.aggregate_id;
+    const channelId = this.getStringAttribute(message, 'channelId');
+    const current = await this.findCommunityDocument(stores, communityId);
+
+    if (!current || !channelId) {
+      return;
+    }
+
+    await this.putProjectedCommunity(stores, message, current, {
+      ...current,
+      textChannels: this.deleteCommunityChannel(
+        this.arrayValue(current, 'textChannels'),
+        channelId,
+      ),
+      voiceChannels: this.deleteCommunityChannel(
+        this.arrayValue(current, 'voiceChannels'),
+        channelId,
+      ),
+    });
+  }
+
+  private async projectConversation(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const conversation = this.getRecordAttribute(message, 'conversation');
+    const conversationId =
+      this.stringValue(conversation || {}, 'id') || message.aggregate_id;
+
+    const document = {
+      ...(conversation || message.attributes),
+      id: conversationId,
+      lastEventId: message.event_id,
+      lastEventType: message.type,
+      receivedAt: this.receivedAt(message),
+    };
+    const participantIds = this.stringArrayValue(document, 'participantIds');
+
+    await this.put(stores.conversations, document);
+    await this.putHead(stores, `conversation:${conversationId}`, document);
+    await Promise.all(
+      participantIds.map((participantId) =>
+        this.putConversationParticipantIndex(stores, participantId, document),
+      ),
+    );
+  }
+
+  private recordsFromIndex(
+    index: Record<string, unknown> | undefined,
+    attribute: string,
+  ): Record<string, unknown>[] {
+    const value = index?.[attribute];
+
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((item): item is Record<string, unknown> =>
+      this.isRecord(item),
+    );
+  }
+
+  private mergeIndexedRecord(
+    records: Record<string, unknown>[],
+    record: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    const recordId = this.stringValue(record, 'id');
+
+    if (!recordId) {
+      return records;
+    }
+
+    const merged = new Map<string, Record<string, unknown>>();
+
+    for (const current of records) {
+      const currentId = this.stringValue(current, 'id');
+
+      if (currentId) {
+        merged.set(currentId, current);
+      }
+    }
+
+    merged.set(recordId, record);
+
+    return [...merged.values()];
+  }
+
+  private async putConversationParticipantIndex(
+    stores: OrbitDBReplicatedStateStores,
+    participantId: string,
+    conversation: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `conversation-participant-index:${participantId}`;
+    const conversations = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'conversations'),
+      conversation,
+    );
+
+    await this.putHead(stores, key, {
+      conversations,
+      id: key,
+      participantId,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async putConversationMessageIndex(
+    stores: OrbitDBReplicatedStateStores,
+    conversationId: string,
+    message: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `conversation-message-index:${conversationId}`;
+    const messages = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'messages'),
+      message,
+    );
+
+    await this.putHead(stores, key, {
+      conversationId,
+      id: key,
+      messages,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async putCommunityChannelMessageIndex(
+    stores: OrbitDBReplicatedStateStores,
+    communityId: string,
+    channelId: string,
+    message: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `community-channel-message-index:${communityId}:${channelId}`;
+    const messages = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'messages'),
+      message,
+    );
+
+    await this.putHead(stores, key, {
+      channelId,
+      communityId,
+      id: key,
+      messages,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async putCommunityChannelMessageIndexes(
+    stores: OrbitDBReplicatedStateStores,
+    messageDocument: Record<string, unknown>,
+  ): Promise<void> {
+    const communityId = this.stringValue(messageDocument, 'communityId');
+    const channelId = this.stringValue(messageDocument, 'channelId');
+
+    if (!communityId || !channelId) {
+      return;
+    }
+
+    await this.putCommunityChannelMessageIndex(
+      stores,
+      communityId,
+      channelId,
+      messageDocument,
+    );
+  }
+
+  private messageSummaryFromRecord(
+    record: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const authorId = this.stringValue(record, 'authorId');
+    const createdAt = this.numberValue(record, 'createdAt');
+    const id =
+      this.stringValue(record, 'id') || this.stringValue(record, 'messageId');
+    const messageId =
+      this.stringValue(record, 'messageId') || this.stringValue(record, 'id');
+    const conversationId = this.stringValue(record, 'conversationId');
+    const type = this.stringValue(record, 'type');
+
+    if (
+      !authorId ||
+      createdAt === undefined ||
+      !id ||
+      !conversationId ||
+      !type
+    ) {
+      return undefined;
+    }
+
+    return {
+      authorId,
+      conversationId,
+      createdAt,
+      id,
+      messageId,
+      networkId: this.stringValue(record, 'networkId'),
+      type,
+      valid: this.booleanValue(record, 'valid'),
+    };
+  }
+
+  private async putConversationMessageSummary(
+    stores: OrbitDBReplicatedStateStores,
+    conversationId: string,
+    message: Record<string, unknown>,
+  ): Promise<void> {
+    const summary = this.messageSummaryFromRecord(message);
+
+    if (!summary) {
+      return;
+    }
+
+    const key = `conversation-message-summary:${conversationId}`;
+    const messages = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'messages'),
+      summary,
+    );
+
+    await this.putHead(stores, key, {
+      conversationId,
+      id: key,
+      messages,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async putConversationMessageIndexes(
+    stores: OrbitDBReplicatedStateStores,
+    messageDocument: Record<string, unknown>,
+  ): Promise<void> {
+    const conversationId = this.stringValue(messageDocument, 'conversationId');
+
+    if (!conversationId) {
+      return;
+    }
+
+    await this.putConversationMessageIndex(
+      stores,
+      conversationId,
+      messageDocument,
+    );
+    await this.putConversationMessageSummary(
+      stores,
+      conversationId,
+      messageDocument,
+    );
+  }
+
+  private async putMessageIndexes(
+    stores: OrbitDBReplicatedStateStores,
+    messageDocument: Record<string, unknown>,
+  ): Promise<void> {
+    const scopeType = this.stringValue(messageDocument, 'scopeType');
+
+    if (scopeType === 'conversation') {
+      await this.putConversationMessageIndexes(stores, messageDocument);
+    }
+
+    if (scopeType === 'community_channel') {
+      await this.putCommunityChannelMessageIndexes(stores, messageDocument);
+    }
+  }
+
+  private async putMessageDocument(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+    document: Record<string, unknown>,
+  ): Promise<void> {
+    const messageId =
+      this.stringValue(document, 'id') ||
+      this.stringValue(document, 'messageId') ||
+      this.getStringAttribute(message, 'messageId') ||
+      message.aggregate_id;
+
+    const messageDocument = {
+      ...document,
+      id: messageId,
+      lastEventId: message.event_id,
+      lastEventType: message.type,
+      receivedAt: this.receivedAt(message),
+    };
+
+    await this.put(stores.messages, messageDocument);
+    await this.putMessageIndexes(stores, messageDocument);
+  }
+
+  private async projectConversationMessage(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const document = this.getRecordAttribute(message, 'message') || {};
+    const targetMessageId = this.getStringAttribute(message, 'targetMessageId');
+    const conversationId =
+      this.stringValue(document, 'conversationId') || message.aggregate_id;
+
+    await this.putMessageDocument(stores, message, {
+      ...document,
+      conversationId,
+      messageId: this.getStringAttribute(message, 'messageId'),
+      scopeType: 'conversation',
+      targetMessageId,
+    });
+
+    if (
+      message.type === ConversationMessageWasDeletedEvent.EVENT_NAME &&
+      targetMessageId
+    ) {
+      await this.putMessageDocument(stores, message, {
+        conversationId,
+        id: targetMessageId,
+        messageId: targetMessageId,
+        scopeType: 'conversation',
+        valid: false,
+      });
+    }
+  }
+
+  private async projectCommunityMessage(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const document = this.getRecordAttribute(message, 'message') || {};
+    const targetMessageId = this.getStringAttribute(message, 'targetMessageId');
+    const channelId =
+      this.stringValue(document, 'channelId') ||
+      this.getStringAttribute(message, 'channelId');
+    const communityId =
+      this.stringValue(document, 'communityId') ||
+      this.getStringAttribute(message, 'communityId') ||
+      message.aggregate_id;
+
+    await this.putMessageDocument(stores, message, {
+      ...document,
+      channelId,
+      communityId,
+      messageId: this.getStringAttribute(message, 'messageId'),
+      scopeType: 'community_channel',
+      targetMessageId,
+    });
+
+    if (
+      message.type === CommunityChannelMessageWasDeletedEvent.EVENT_NAME &&
+      targetMessageId
+    ) {
+      await this.putMessageDocument(stores, message, {
+        channelId,
+        communityId,
+        id: targetMessageId,
+        messageId: targetMessageId,
+        scopeType: 'community_channel',
+        valid: false,
+      });
+    }
+  }
+
+  private reactionValue(
+    message: ReplicatedDomainEventMessage,
+    reaction: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    return (
+      this.stringValue(reaction, attribute) ||
+      this.getStringAttribute(message, attribute)
+    );
+  }
+
+  private reactionScopeType(
+    message: ReplicatedDomainEventMessage,
+    reaction: Record<string, unknown>,
+  ): 'community_channel' | 'conversation' {
+    return this.reactionValue(message, reaction, 'communityId')
+      ? 'community_channel'
+      : 'conversation';
+  }
+
+  private reactionDocumentId(
+    message: ReplicatedDomainEventMessage,
+    reaction: Record<string, unknown>,
+    scopeType: string,
+  ): string {
+    const conversationId =
+      scopeType === 'conversation'
+        ? this.reactionValue(message, reaction, 'conversationId') ||
+          message.aggregate_id
+        : undefined;
+
+    return [
+      scopeType,
+      this.reactionValue(message, reaction, 'communityId'),
+      this.reactionValue(message, reaction, 'channelId'),
+      conversationId,
+      this.reactionValue(message, reaction, 'messageId'),
+      this.stringValue(reaction, 'authorId') ||
+        this.stringValue(reaction, 'authorIdentityId'),
+      this.stringValue(reaction, 'emoji'),
+    ]
+      .filter((part): part is string => typeof part === 'string')
+      .join(':');
+  }
+
+  private async putReactionDocument(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+    reaction: Record<string, unknown>,
+    removed: boolean,
+  ): Promise<void> {
+    const scopeType = this.reactionScopeType(message, reaction);
+    const id = this.reactionDocumentId(message, reaction, scopeType);
+
+    await this.put(stores.reactions, {
+      ...reaction,
+      id,
+      lastEventId: message.event_id,
+      lastEventType: message.type,
+      receivedAt: this.receivedAt(message),
+      removed,
+      scopeType,
+    });
+  }
+
+  private async projectReaction(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+    removed: boolean,
+  ): Promise<void> {
+    await this.putReactionDocument(
+      stores,
+      message,
+      message.attributes,
+      removed,
+    );
+  }
+
+  private async projectReadMarker(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const readerIdentityId = this.getStringAttribute(
+      message,
+      'readerIdentityId',
+    );
+    const messageId = this.getStringAttribute(message, 'messageId');
+
+    if (!readerIdentityId || !messageId) {
+      return;
+    }
+
+    const messageSummary = this.recordsFromIndex(
+      await this.findHead(
+        stores,
+        `conversation-message-summary:${message.aggregate_id}`,
+      ),
+      'messages',
+    ).find(
+      (candidate) =>
+        this.stringValue(candidate, 'id') === messageId ||
+        this.stringValue(candidate, 'messageId') === messageId,
+    );
+
+    await this.putHead(
+      stores,
+      `read-marker:${message.aggregate_id}:${readerIdentityId}`,
+      {
+        eventId: message.event_id,
+        messageCreatedAt: messageSummary
+          ? this.numberValue(messageSummary, 'createdAt')
+          : undefined,
+        messageId,
+        networkId: this.getStringAttribute(message, 'networkId'),
+        readAt: this.receivedAt(message),
+      },
+    );
+  }
+
+  private async projectNotification(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const notification = this.getRecordAttribute(message, 'notification');
+    const document = {
+      ...(notification || message.attributes),
+      id: message.aggregate_id,
+      lastEventId: message.event_id,
+      receivedAt: this.receivedAt(message),
+    };
+    const recipientIdentityId = this.stringValue(
+      document,
+      'recipientIdentityId',
+    );
+
+    await this.put(stores.notifications, document);
+    await this.putHead(
+      stores,
+      `notification:${message.aggregate_id}`,
+      document,
+    );
+
+    if (recipientIdentityId) {
+      await this.putNotificationRecipientIndex(
+        stores,
+        recipientIdentityId,
+        document,
+      );
+    }
+  }
+
+  private async putNotificationRecipientIndex(
+    stores: OrbitDBReplicatedStateStores,
+    recipientIdentityId: string,
+    notification: Record<string, unknown>,
+  ): Promise<void> {
+    const key = `notification-recipient-index:${recipientIdentityId}`;
+    const notifications = this.mergeIndexedRecord(
+      this.recordsFromIndex(await this.findHead(stores, key), 'notifications'),
+      notification,
+    );
+
+    await this.putHead(stores, key, {
+      id: key,
+      notifications,
+      recipientIdentityId,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private async projectRequest(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const request = this.getRecordAttribute(message, 'request');
+    const requestId =
+      this.stringValue(request || {}, 'id') ||
+      this.getStringAttribute(message, 'requestId') ||
+      this.getStringAttribute(message, 'inviteId') ||
+      message.aggregate_id;
+
+    await this.put(stores.requests, {
+      ...(request || message.attributes),
+      id: requestId,
+      kind: 'community_membership_request',
+      lastEventId: message.event_id,
+      lastEventType: message.type,
+      receivedAt: this.receivedAt(message),
+    });
+  }
+
+  private async projectInvite(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const invite = this.getRecordAttribute(message, 'invite') || {};
+    const token =
+      this.stringValue(invite, 'token') ||
+      this.getStringAttribute(message, 'inviteToken') ||
+      message.aggregate_id;
+
+    await this.put(stores.requests, {
+      ...invite,
+      id: token,
+      kind: 'community_invite',
+      lastEventId: message.event_id,
+      lastEventType: message.type,
+      receivedAt: this.receivedAt(message),
+      token,
+    });
+  }
+
+  private async projectContentReplication(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const content = {
+      ...message.attributes,
+      id: message.aggregate_id,
+      lastEventId: message.event_id,
+      receivedAt: this.receivedAt(message),
+    };
+    const cid = this.stringValue(content, 'cid') || message.aggregate_id;
+
+    await this.put(stores.contentReplication, content);
+    await this.putHead(stores, `content-replication:${cid}`, content);
+  }
+
+  private async projectContentReplicaClaim(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const cid = this.getStringAttribute(message, 'cid') || message.aggregate_id;
+    const networkId = this.getStringAttribute(message, 'networkId');
+    const nodeId = this.getStringAttribute(message, 'nodeId');
+
+    if (!networkId || !nodeId) {
+      return;
+    }
+
+    await this.put(stores.contentReplication, {
+      ...message.attributes,
+      cid,
+      id: `${cid}:${networkId}:${nodeId}`,
+      kind: 'content_replica_claim',
+      lastEventId: message.event_id,
+      receivedAt: this.receivedAt(message),
+    });
+  }
+
+  public async project(
+    stores: OrbitDBReplicatedStateStores,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    await this.putEventHead(stores, message);
+
+    const projection = [
+      {
+        eventNames: [
+          IdentityWasCreatedEvent.EVENT_NAME,
+          IdentityWasUpdatedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectIdentity(stores, message),
+      },
+      {
+        eventNames: [KeychainWasPublishedEvent.EVENT_NAME],
+        project: () => this.projectKeychain(stores, message),
+      },
+      {
+        eventNames: [
+          CommunityWasCreatedEvent.EVENT_NAME,
+          CommunityWasUpdatedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectCommunity(stores, message),
+      },
+      {
+        eventNames: [
+          CommunityMemberWasAddedEvent.EVENT_NAME,
+          CommunityMemberWasLeftEvent.EVENT_NAME,
+        ],
+        project: () => this.projectCommunityMembership(stores, message),
+      },
+      {
+        eventNames: [CommunityChannelWasCreatedEvent.EVENT_NAME],
+        project: () => this.projectCommunityChannelCreated(stores, message),
+      },
+      {
+        eventNames: [CommunityChannelWasRenamedEvent.EVENT_NAME],
+        project: () => this.projectCommunityChannelRenamed(stores, message),
+      },
+      {
+        eventNames: [CommunityChannelWasDeletedEvent.EVENT_NAME],
+        project: () => this.projectCommunityChannelDeleted(stores, message),
+      },
+      {
+        eventNames: [ConversationWasCreatedEvent.EVENT_NAME],
+        project: () => this.projectConversation(stores, message),
+      },
+      {
+        eventNames: [
+          ConversationMessageWasSentEvent.EVENT_NAME,
+          ConversationMessageWasEditedEvent.EVENT_NAME,
+          ConversationMessageWasDeletedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectConversationMessage(stores, message),
+      },
+      {
+        eventNames: [
+          CommunityChannelMessageWasSentEvent.EVENT_NAME,
+          CommunityChannelMessageWasEditedEvent.EVENT_NAME,
+          CommunityChannelMessageWasDeletedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectCommunityMessage(stores, message),
+      },
+      {
+        eventNames: [ConversationMessagesWereReadEvent.EVENT_NAME],
+        project: () => this.projectReadMarker(stores, message),
+      },
+      {
+        eventNames: [
+          NotificationWasAcceptedEvent.EVENT_NAME,
+          NotificationWasCreatedEvent.EVENT_NAME,
+          NotificationWasDeclinedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectNotification(stores, message),
+      },
+      {
+        eventNames: [
+          ConversationMessageReactionWasAddedEvent.EVENT_NAME,
+          CommunityChannelMessageReactionWasAddedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectReaction(stores, message, false),
+      },
+      {
+        eventNames: [
+          ConversationMessageReactionWasRemovedEvent.EVENT_NAME,
+          CommunityChannelMessageReactionRemovedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectReaction(stores, message, true),
+      },
+      {
+        eventNames: [
+          CommunityMembershipRequestWasCreatedEvent.EVENT_NAME,
+          CommunityMembershipRequestWasAcceptedEvent.EVENT_NAME,
+          CommunityMembershipRequestWasDeclinedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectRequest(stores, message),
+      },
+      {
+        eventNames: [
+          CommunityInviteWasCreatedEvent.EVENT_NAME,
+          CommunityInviteWasAcceptedEvent.EVENT_NAME,
+        ],
+        project: () => this.projectInvite(stores, message),
+      },
+      {
+        eventNames: [ContentReplicationWasRegisteredEvent.EVENT_NAME],
+        project: () => this.projectContentReplication(stores, message),
+      },
+      {
+        eventNames: [ContentReplicationWasClaimedEvent.EVENT_NAME],
+        project: () => this.projectContentReplicaClaim(stores, message),
+      },
+    ].find(({ eventNames }) => eventNames.includes(message.type));
+
+    await projection?.project();
+  }
+}

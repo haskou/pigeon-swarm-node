@@ -1,6 +1,6 @@
 import { NodePeer } from '../NodePeer';
 
-export interface NodePeerRepository {
-  findActive(since: Date): Promise<NodePeer[]>;
-  save(peer: NodePeer): Promise<void>;
+export default abstract class NodePeerRepository {
+  public abstract findActive(since: Date): Promise<NodePeer[]>;
+  public abstract save(peer: NodePeer): Promise<void>;
 }

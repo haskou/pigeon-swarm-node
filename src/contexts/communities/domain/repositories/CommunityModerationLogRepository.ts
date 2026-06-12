@@ -2,12 +2,13 @@ import { CommunityModerationLogEntry } from '../entities/moderation/CommunityMod
 import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityModerationLogId } from '../value-objects/CommunityModerationLogId';
 
-export interface CommunityModerationLogRepository {
-  deleteByCommunity(communityId: CommunityId): Promise<void>;
-  findByCommunity(
+export default abstract class CommunityModerationLogRepository {
+  public abstract deleteByCommunity(communityId: CommunityId): Promise<void>;
+  public abstract findByCommunity(
     communityId: CommunityId,
     limit: number,
     beforeLogId?: CommunityModerationLogId,
   ): Promise<CommunityModerationLogEntry[]>;
-  save(entry: CommunityModerationLogEntry): Promise<void>;
+
+  public abstract save(entry: CommunityModerationLogEntry): Promise<void>;
 }

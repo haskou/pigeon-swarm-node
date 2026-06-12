@@ -1,9 +1,14 @@
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+
 import { Community } from '../../domain/Community';
-import { CommunityRepository } from '../../domain/repositories/CommunityRepository';
+import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityCreateMessage } from './messages/CommunityCreateMessage';
 
-export class CommunityCreator {
-  constructor(private readonly repository: CommunityRepository) {}
+export default class CommunityCreator {
+  constructor(
+    private readonly repository: CommunityRepository,
+    private readonly eventPublisher: DomainEventPublisher,
+  ) {}
 
   public async create(message: CommunityCreateMessage): Promise<Community> {
     const community = Community.create(
@@ -14,6 +19,7 @@ export class CommunityCreator {
     );
 
     await this.repository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

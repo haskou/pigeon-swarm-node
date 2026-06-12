@@ -15,10 +15,10 @@ export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
     'pigeon-swarm.register-node-peer-when-heartbeat-received';
 
   constructor(
-    consumer: DomainEventConsumer,
+    private readonly eventConsumer: DomainEventConsumer,
     private readonly registrar: NodePeerRegistrar,
   ) {
-    super(consumer);
+    super(eventConsumer);
   }
 
   public get queueName(): string {

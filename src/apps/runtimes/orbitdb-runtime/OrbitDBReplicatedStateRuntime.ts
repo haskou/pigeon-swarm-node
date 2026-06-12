@@ -1,0 +1,209 @@
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
+import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
+import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
+import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
+import { ReplicatedDomainEventMessage } from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedDomainEventMessage';
+import Kernel from '@app/Kernel';
+import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+
+import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
+
+export default class OrbitDBReplicatedStateRuntime {
+  private readonly registeredNetworks = new Map<
+    string,
+    RegisteredOrbitDBNetwork
+  >();
+
+  private readonly repairingCriticalNetworkIds = new Set<string>();
+
+  private readonly repairingSecondaryNetworkIds = new Set<string>();
+
+  constructor(
+    private readonly networkRegistry: IPFSNetworkRegistry,
+    private readonly messageBus: MessageBus,
+    private readonly publisher: OrbitDBReplicatedDomainEventPublisher,
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly projector: OrbitDBDomainEventProjector,
+    private readonly headRepairer: OrbitDBMetadataHeadRepairer,
+  ) {}
+
+  private isReplicatedMessage(
+    value: unknown,
+  ): value is ReplicatedDomainEventMessage {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'aggregate_id' in value &&
+      'attributes' in value &&
+      'event_id' in value &&
+      'occurred_on' in value &&
+      'replication' in value &&
+      'type' in value
+    );
+  }
+
+  private async projectAndDispatch(
+    networkId: string,
+    message: ReplicatedDomainEventMessage,
+  ): Promise<void> {
+    const registeredNetwork = this.registeredNetworks.get(networkId);
+
+    if (!registeredNetwork) {
+      return;
+    }
+
+    if (registeredNetwork.processedEventIds.has(message.event_id)) {
+      return;
+    }
+
+    registeredNetwork.processedEventIds.add(message.event_id);
+    await this.projector.project(registeredNetwork.stores, message);
+
+    if (message.replication.originPeerId === registeredNetwork.localPeerId) {
+      return;
+    }
+
+    await this.messageBus.dispatchReplicated(message);
+  }
+
+  private subscribeToEvents(
+    networkId: string,
+    stores: OrbitDBReplicatedStateStores,
+  ): void {
+    stores.events.events.on('update', (entry: OrbitDBEntry) => {
+      const value = entry.payload?.value;
+
+      if (!this.isReplicatedMessage(value)) {
+        return;
+      }
+
+      this.projectAndDispatch(networkId, value).catch((error: unknown) => {
+        Kernel.logger.error(
+          `OrbitDB replicated event dispatch failed: networkId=${networkId} error=${String(error)}`,
+        );
+      });
+    });
+  }
+
+  private async registerNetwork(network: IPFSNetwork): Promise<void> {
+    const networkId = network.getId();
+
+    if (this.registeredNetworks.has(networkId)) {
+      return;
+    }
+
+    const stores = await OrbitDBReplicatedStateStores.open(network);
+    const localPeerId = network.getPeerId();
+
+    this.registeredNetworks.set(networkId, {
+      localPeerId,
+      processedEventIds: new Set(),
+      stores,
+    });
+    await this.registry.register(networkId, stores);
+    this.publisher.registerNetworkStores(networkId, localPeerId, stores);
+    this.subscribeToEvents(networkId, stores);
+    this.repairHeads(networkId);
+    Kernel.logger.info(
+      `OrbitDB replicated state stores registered: networkId=${networkId}` +
+        ` peerId=${localPeerId}`,
+    );
+  }
+
+  private repairHeads(networkId: string): void {
+    if (this.repairingCriticalNetworkIds.has(networkId)) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (this.repairingCriticalNetworkIds.has(networkId)) {
+        return;
+      }
+
+      this.repairingCriticalNetworkIds.add(networkId);
+      this.headRepairer
+        .repairCritical()
+        .then((result) => {
+          Kernel.logger.info(
+            `OrbitDB critical read indexes repaired: networkId=${networkId}` +
+              ` identities=${result.identities}` +
+              ` keychains=${result.keychains}` +
+              ` communities=${result.communities}` +
+              ` conversations=${result.conversations}` +
+              ` notificationIndexes=${result.notificationIndexes}` +
+              ` presenceHeads=${result.presenceHeads}`,
+          );
+          this.repairSecondaryHeads(networkId);
+        })
+        .catch((error: unknown) => {
+          Kernel.logger.warn(
+            `OrbitDB critical read index repair failed: networkId=${networkId} error=${String(error)}`,
+          );
+        })
+        .finally(() => {
+          this.repairingCriticalNetworkIds.delete(networkId);
+        });
+    }, 1_000);
+    timeout.unref?.();
+  }
+
+  private repairSecondaryHeads(networkId: string): void {
+    if (this.repairingSecondaryNetworkIds.has(networkId)) {
+      return;
+    }
+
+    this.repairingSecondaryNetworkIds.add(networkId);
+    const timeout = setTimeout(() => {
+      this.headRepairer
+        .repairSecondary()
+        .then((result) => {
+          Kernel.logger.info(
+            `OrbitDB secondary read indexes repaired: networkId=${networkId}` +
+              ` conversationMessageIndexes=${result.conversationMessageIndexes}` +
+              ` communityChannelMessageIndexes=${result.communityChannelMessageIndexes}` +
+              ` reactionIndexes=${result.reactionIndexes}` +
+              ` pollIndexes=${result.pollIndexes}` +
+              ` callIndexes=${result.callIndexes}`,
+          );
+        })
+        .catch((error: unknown) => {
+          Kernel.logger.warn(
+            `OrbitDB secondary read index repair failed: networkId=${networkId} error=${String(error)}`,
+          );
+        })
+        .finally(() => {
+          this.repairingSecondaryNetworkIds.delete(networkId);
+        });
+    }, 120_000);
+    timeout.unref?.();
+  }
+
+  public async run(): Promise<void> {
+    await Promise.all(
+      this.networkRegistry
+        .getAll()
+        .map((network) => this.registerNetwork(network)),
+    );
+
+    this.networkRegistry.onNetworkRegistered(async (network) => {
+      try {
+        await this.registerNetwork(network);
+      } catch (error: unknown) {
+        Kernel.logger.error(
+          `OrbitDB replicated state network registration failed: networkId=${network.getId()} error=${String(error)}`,
+        );
+      }
+    });
+    this.networkRegistry.onNetworkRemoved(async (networkId) => {
+      this.registeredNetworks.delete(networkId);
+      await this.registry.unregister(networkId);
+      this.publisher.unregisterNetworkStores(networkId);
+    });
+
+    MessageBus.setReplicatedEventPublisher(this.publisher);
+  }
+}

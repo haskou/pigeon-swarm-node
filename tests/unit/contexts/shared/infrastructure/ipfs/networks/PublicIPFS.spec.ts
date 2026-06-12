@@ -27,6 +27,9 @@ const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockMultiaddr = jest
   .fn()
   .mockImplementation((address: string) => `mock-multiaddr:${address}`);
+const mockParseCid = jest
+  .fn()
+  .mockReturnValue({ code: 0x70, toString: () => 'bafymockcid' });
 
 jest.mock(
   'helia',
@@ -115,7 +118,7 @@ jest.mock(
   'multiformats/cid',
   () => ({
     CID: {
-      parse: jest.fn().mockReturnValue({ toString: () => 'bafymockcid' }),
+      parse: mockParseCid,
     },
   }),
   { virtual: true },
@@ -140,6 +143,7 @@ describe('PublicIPFS', () => {
     ).connectionPool = {};
     jest.clearAllMocks();
     mockHeliaNode.libp2p.getPeers.mockReturnValue([]);
+    mockParseCid.mockReturnValue({ code: 0x70, toString: () => 'bafymockcid' });
     mockHeliaNode.pins.add.mockReturnValue(
       pinResults({ toString: () => 'bafymockcid' }),
     );
@@ -251,6 +255,26 @@ describe('PublicIPFS', () => {
     });
   });
 
+  describe('getBytes', () => {
+    it('should read raw CIDs from connected peers when available', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const parsedCid = { code: 0x55, toString: () => 'bafkrawcid' };
+      const signal = new AbortController().signal;
+
+      mockParseCid.mockReturnValue(parsedCid);
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['connected-peer']);
+      mockHeliaNode.blockstore.get.mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+      const result = await connection.getBytes(new IPFSId('bafkrawcid'), signal);
+
+      expect(result).toEqual(Buffer.from([1, 2, 3]));
+      expect(mockHeliaNode.blockstore.get).toHaveBeenCalledWith(parsedCid, {
+        providers: ['connected-peer'],
+        signal,
+      });
+    });
+  });
+
   describe('removeJSON', () => {
     it('should unpin pinned content before deleting the block', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
@@ -295,7 +319,7 @@ describe('PublicIPFS', () => {
 
       expect(mockHeliaNode.datastore.put).toHaveBeenCalled();
       expect(mockHeliaNode.routing.put).toHaveBeenCalled();
-      expect(Kernel.logger.warn).toHaveBeenCalledWith(
+      expect(Kernel.logger.debug).toHaveBeenCalledWith(
         'DHT record publication skipped for key: identity-id',
       );
     });

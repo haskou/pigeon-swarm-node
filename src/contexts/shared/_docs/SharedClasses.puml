@@ -21,12 +21,15 @@ package "shared/infrastructure/http" {
   class BaseRequester
 }
 
-package "shared/infrastructure/mongo" {
-  class MongoDB
-  class MongoIndexInitializer
-  class ExistingIndex
-  class IndexDefinition
-  class MongoProcessedDomainEventRepository
+package "shared/infrastructure/local-db" {
+  class EmbeddedLocalDatabase
+  class LocalProcessedDomainEventRepository
+}
+
+package "shared/infrastructure/orbitdb" {
+  class OrbitDBReplicatedStateRegistry
+  class OrbitDBReplicatedStateStores
+  class OrbitDBReplicatedDomainEventPublisher
 }
 
 package "shared/infrastructure/ipfs" {
@@ -60,10 +63,9 @@ HttpServer ..> HttpApp
 AxiosHttpClient ..|> HttpClient
 BaseRequester ..> HttpClient
 
-MongoIndexInitializer ..> MongoDB
-MongoProcessedDomainEventRepository ..> MongoDB
-MongoIndexInitializer ..> ExistingIndex
-MongoIndexInitializer ..> IndexDefinition
+LocalProcessedDomainEventRepository ..> EmbeddedLocalDatabase
+OrbitDBReplicatedDomainEventPublisher ..> OrbitDBReplicatedStateStores
+OrbitDBReplicatedStateRegistry ..> OrbitDBReplicatedStateStores
 
 HeliaIPFS ..|> IPFS
 HeliaIPFS ..> HeliaIPFSParser

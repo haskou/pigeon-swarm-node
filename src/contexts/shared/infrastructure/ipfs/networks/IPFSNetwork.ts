@@ -1,6 +1,7 @@
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
+import { HeliaInstance } from '../helia/adapters/HeliaRuntimeAdapter';
 import { IPFSConnection } from '../helia/IPFSConnection';
 import { IPFSId } from '../helia/IPFSId';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
@@ -69,6 +70,10 @@ export class IPFSNetwork {
     return this.connection.addBytes(bytes, signal);
   }
 
+  public async dial(multiaddr: string): Promise<void> {
+    return this.connection.dial(multiaddr);
+  }
+
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
     return this.connection.addJSON(data, signal);
   }
@@ -109,6 +114,14 @@ export class IPFSNetwork {
 
   public getPeers(): string[] {
     return this.connection.getPeers();
+  }
+
+  public getMultiaddrs(): string[] {
+    return this.connection.getMultiaddrs();
+  }
+
+  public getHeliaCore(): HeliaInstance {
+    return this.connection.getHeliaCore();
   }
 
   public getPeerId(): string {

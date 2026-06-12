@@ -1,6 +1,5 @@
 import { IdentityCannotLeaveNetworkError } from '@app/contexts/identities/domain/errors/IdentityCannotLeaveNetworkError';
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
-import { IdentityMustHaveAtLeastOneNetworkError } from '@app/contexts/identities/domain/errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
 import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
@@ -14,7 +13,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import { faker } from '@faker-js/faker';
-import { EncryptedKeyPair, PrimitiveOf } from '@haskou/value-objects';
+import { KeyPair, PrimitiveOf } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 
@@ -43,6 +42,12 @@ describe('Identity', () => {
       expect(primitives.version).toBe(mother.version.valueOf());
       expect(primitives.encryptedKeyPair).toEqual(
         mother.encryptedKeyPair.toPrimitives(),
+      );
+      expect(primitives.encryptedMasterKey).toBe(
+        mother.encryptedMasterKey.valueOf(),
+      );
+      expect(primitives.masterKeyDerivation).toEqual(
+        mother.masterKeyDerivation.toPrimitives(),
       );
     });
 
@@ -81,6 +86,35 @@ describe('Identity', () => {
       );
     });
 
+    it('should throw InvalidIdentitySignatureError when encrypted master key is tampered', () => {
+      const identity = mother.build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        encryptedMasterKey: 'tampered-encrypted-master-key',
+      };
+
+      expect(() => Identity.fromPrimitives(tampered)).toThrow(
+        InvalidIdentitySignatureError,
+      );
+    });
+
+    it('should throw InvalidIdentitySignatureError when master key derivation is tampered', () => {
+      const identity = mother.build();
+      const primitives = identity.toPrimitives();
+      const tampered: PrimitiveOf<Identity> = {
+        ...primitives,
+        masterKeyDerivation: {
+          ...primitives.masterKeyDerivation,
+          version: 2,
+        },
+      };
+
+      expect(() => Identity.fromPrimitives(tampered)).toThrow(
+        InvalidIdentitySignatureError,
+      );
+    });
+
     it('should throw InvalidIdentitySignatureError when previousIdentityExternalIdentifier is tampered', () => {
       const identity = mother.build();
       const primitives = identity.toPrimitives();
@@ -95,31 +129,38 @@ describe('Identity', () => {
     });
 
     it('should reject a payload signed by a different key than the identity id', async () => {
-      const networkId = new NetworkId(faker.string.uuid());
-      const attackerIdentity = await Identity.create(
-        new ProfileName('Mallory'),
-        new Password(validPassword),
-        [networkId],
+      const attackerKeyPair = await KeyPair.generate();
+      const victimKeyPair = await KeyPair.generate();
+      const encryptedKeyPair = await attackerKeyPair.encryptKeyPair(
+        validPassword,
       );
-      const victimIdentity = await Identity.create(
-        new ProfileName('Victim'),
-        new Password(validPassword),
-        [networkId],
+      const victimIdentityId = new IdentityId(
+        victimKeyPair.toPrimitives().publicKey,
       );
-      const attackerPrimitives = attackerIdentity.toPrimitives();
+      const previousIdentityExternalIdentifier: string | undefined = undefined;
+      const signaturePayload = {
+        encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+        encryptedMasterKey: 'v1.test.encrypted-master-key',
+        id: victimIdentityId.valueOf(),
+        masterKeyDerivation: {
+          algorithm: 'test',
+          version: 1,
+        },
+        networks: [new NetworkId(faker.string.uuid()).valueOf()],
+        previousIdentityExternalIdentifier,
+        profile: new Profile(new ProfileName('Mallory')).toPrimitives(),
+        timestamp: 1773848829055,
+        version: 1,
+      };
       const spoofedPrimitives: PrimitiveOf<Identity> = {
-        ...attackerPrimitives,
-        id: victimIdentity.toPrimitives().id,
+        ...signaturePayload,
         signature: '',
       };
-      const spoofedSignature =
-        await new IdentitySignatureDomainService().generateSignature(
+      const spoofedSignature = attackerKeyPair.sign(
+        new IdentitySignatureDomainService().serializePayload(
           spoofedPrimitives,
-          EncryptedKeyPair.fromPrimitives(
-            attackerPrimitives.encryptedKeyPair,
-          ),
-          new Password(validPassword),
-        );
+        ),
+      );
 
       expect(() =>
         Identity.fromPrimitives({
@@ -134,7 +175,9 @@ describe('Identity', () => {
 
       expect(identity.toPrimitives()).toEqual({
         encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),
+        encryptedMasterKey: mother.encryptedMasterKey.valueOf(),
         id: mother.id.valueOf(),
+        masterKeyDerivation: mother.masterKeyDerivation.toPrimitives(),
         networks: mother.networks.map((network) => network.valueOf()),
         previousIdentityExternalIdentifier:
           mother.previousIdentityExternalIdentifier?.valueOf(),
@@ -143,70 +186,6 @@ describe('Identity', () => {
         timestamp: mother.timestamp.valueOf(),
         version: mother.version.valueOf(),
       });
-    });
-  });
-
-  describe('create', () => {
-    it('should record an IdentityWasCreatedEvent', async () => {
-      const identity = await Identity.create(
-        new ProfileName(faker.person.firstName().substring(0, 20)),
-        new Password(validPassword),
-        [new NetworkId(faker.string.uuid())],
-      );
-
-      const events = identity.pullDomainEvents();
-
-      expect(events).toHaveLength(1);
-      expect(events[0]).toBeInstanceOf(IdentityWasCreatedEvent);
-    });
-
-    it('should create an identity with multiple networks', async () => {
-      const networks = [
-        new NetworkId(faker.string.uuid()),
-        new NetworkId(faker.string.uuid()),
-      ];
-      const identity = await Identity.create(
-        new ProfileName(faker.person.firstName().substring(0, 20)),
-        new Password(validPassword),
-        networks,
-      );
-      const primitives = identity.toPrimitives();
-
-      expect(primitives.networks).toHaveLength(2);
-      expect(primitives.previousIdentityExternalIdentifier).toBeUndefined();
-      expect(primitives.version).toBe(1);
-      expect(primitives.networks).toEqual(
-        networks.map((network) => network.valueOf()),
-      );
-    });
-
-    it('should throw IdentityMustHaveAtLeastOneNetworkError when networks is empty', async () => {
-      await expect(
-        Identity.create(
-          new ProfileName(faker.person.firstName().substring(0, 20)),
-          new Password(validPassword),
-          [],
-        ),
-      ).rejects.toThrow(IdentityMustHaveAtLeastOneNetworkError);
-    });
-
-    it('should include all network ids in primitives', async () => {
-      const networks = [
-        new NetworkId(faker.string.uuid()),
-        new NetworkId(faker.string.uuid()),
-        new NetworkId(faker.string.uuid()),
-      ];
-      const identity = await Identity.create(
-        new ProfileName(faker.person.firstName().substring(0, 20)),
-        new Password(validPassword),
-        networks,
-      );
-      const primitives = identity.toPrimitives();
-
-      expect(primitives.networks).toHaveLength(3);
-      expect(primitives.networks).toEqual(
-        networks.map((network) => network.valueOf()),
-      );
     });
   });
 

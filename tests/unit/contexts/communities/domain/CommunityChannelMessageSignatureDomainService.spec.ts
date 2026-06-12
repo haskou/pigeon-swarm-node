@@ -1,4 +1,4 @@
-import { CommunityChannelMessageSignatureDomainService } from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 
 describe('CommunityChannelMessageSignatureDomainService', () => {
   it('serializes sent channel messages with the public signing contract order', () => {

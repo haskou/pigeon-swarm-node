@@ -91,13 +91,13 @@ package "notifications" {
   }
 
   package "infrastructure" {
-    class MongoNotificationRepository {
+    class OrbitDBNotificationRepository {
       +findById(notificationId: NotificationId): Promise<Notification?>
       +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
       +save(notification: Notification): Promise<void>
     }
 
-    MongoNotificationRepository ..|> NotificationRepository
+    OrbitDBNotificationRepository ..|> NotificationRepository
   }
 }
 

@@ -18,12 +18,12 @@ package "push-notifications/application" {
   class PushNotificationDispatcher
   class PushNotificationDelivery <<Port>>
   class PushNotificationPayload
-  class PushNotificationTester
+  class PushTestNotificationSender
 }
 
 package "push-notifications/infrastructure" {
-  class MongoPushSubscriptionRepository
-  class MongoPushSubscriptionDocument
+  class LocalPushSubscriptionRepository
+  class LocalPushSubscriptionDocument
   class PushVapidConfiguration
   class WebPushNotificationDelivery
 }
@@ -36,11 +36,11 @@ PushSubscriptionRemover ..> PushSubscriptionRepository
 PushNotificationDispatcher ..> PushSubscriptionRepository
 PushNotificationDispatcher ..> PushNotificationDelivery
 PushNotificationDispatcher ..> PushNotificationPayload
-PushNotificationTester ..> PushNotificationDelivery
+PushTestNotificationSender ..> PushNotificationDelivery
 
-MongoPushSubscriptionRepository ..|> PushSubscriptionRepository
-MongoPushSubscriptionRepository ..> MongoPushSubscriptionDocument
-MongoPushSubscriptionRepository ..> PushSubscription
+LocalPushSubscriptionRepository ..|> PushSubscriptionRepository
+LocalPushSubscriptionRepository ..> LocalPushSubscriptionDocument
+LocalPushSubscriptionRepository ..> PushSubscription
 
 WebPushNotificationDelivery ..|> PushNotificationDelivery
 WebPushNotificationDelivery ..> PushVapidConfiguration

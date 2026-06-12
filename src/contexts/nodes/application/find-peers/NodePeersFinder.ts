@@ -1,5 +1,5 @@
 import { NodePeer } from '../../domain/NodePeer';
-import { NodePeerRepository } from '../../domain/repositories/NodePeerRepository';
+import NodePeerRepository from '../../domain/repositories/NodePeerRepository';
 
 export default class NodePeersFinder {
   private static readonly ACTIVE_WINDOW_MS = 15 * 60 * 1000;

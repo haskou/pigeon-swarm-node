@@ -1,11 +1,14 @@
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 describe('CallTimeoutScheduler', () => {
   const creator = new IdentityId(
@@ -33,11 +36,11 @@ describe('CallTimeoutScheduler', () => {
     const notificationRepository = {
       save: jest.fn().mockResolvedValue(undefined),
     };
-    const scheduler = new CallTimeoutScheduler({
-      callRepository,
-      eventPublisher,
-      notificationRepository,
-    });
+    const scheduler = new CallTimeoutScheduler(
+      callRepository as unknown as CallRepository,
+      eventPublisher as unknown as DomainEventPublisher,
+      notificationRepository as unknown as NotificationRepository,
+    );
 
     call.pullDomainEvents();
     await scheduler.execute();
@@ -69,11 +72,11 @@ describe('CallTimeoutScheduler', () => {
     const notificationRepository = {
       save: jest.fn().mockResolvedValue(undefined),
     };
-    const scheduler = new CallTimeoutScheduler({
-      callRepository,
-      eventPublisher,
-      notificationRepository,
-    });
+    const scheduler = new CallTimeoutScheduler(
+      callRepository as unknown as CallRepository,
+      eventPublisher as unknown as DomainEventPublisher,
+      notificationRepository as unknown as NotificationRepository,
+    );
 
     call.pullDomainEvents();
     await scheduler.execute();
@@ -124,11 +127,11 @@ describe('CallTimeoutScheduler', () => {
     const notificationRepository = {
       save: jest.fn().mockResolvedValue(undefined),
     };
-    const scheduler = new CallTimeoutScheduler({
-      callRepository,
-      eventPublisher,
-      notificationRepository,
-    });
+    const scheduler = new CallTimeoutScheduler(
+      callRepository as unknown as CallRepository,
+      eventPublisher as unknown as DomainEventPublisher,
+      notificationRepository as unknown as NotificationRepository,
+    );
 
     call.pullDomainEvents();
     await scheduler.execute();

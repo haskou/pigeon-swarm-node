@@ -1,17 +1,11 @@
-import { MongoIdentityMetadataRepository } from '@app/contexts/identities/infrastructure/mongo';
-import { IdentityPresenceServicesFactory } from '@app/contexts/presence/application/IdentityPresenceServicesFactory';
-import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/application/record-heartbeat/messages/IdentityPresenceHeartbeatMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@app/Kernel';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import MongoDB from '@app/shared/infrastructure/mongodb/MongoDB';
 import { RawData, WebSocket } from 'ws';
 
-import { CommunityRoutingDocument } from './CommunityRoutingDocument';
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
-import { ConversationRoutingDocument } from './ConversationRoutingDocument';
 import { WebSocketClientMessage } from './WebSocketClientMessage';
+import WebSocketClientMessageHandler from './WebSocketClientMessageHandler';
 import { WebSocketRealtimeMessage } from './WebSocketRealtimeMessage';
 
 const identityAttributeKeys = [
@@ -46,6 +40,8 @@ const identityAttributeKeys = [
 export class WebSocketEventHub {
   private readonly conversationCallEventMapper =
     new ConversationCallEventRealtimeMapper();
+
+  private clientMessageHandler?: WebSocketClientMessageHandler;
 
   private readonly clients = new Map<string, Set<WebSocket>>();
 
@@ -112,6 +108,10 @@ export class WebSocketEventHub {
 
   private isIdentityEvent(event: DomainEvent): boolean {
     return event.eventName().startsWith('identities.');
+  }
+
+  private isIdentityUpdateEvent(event: DomainEvent): boolean {
+    return event.eventName() === 'identities.v1.identity.was_updated';
   }
 
   private isKeychainEvent(event: DomainEvent): boolean {
@@ -257,22 +257,12 @@ export class WebSocketEventHub {
     identityId: string,
     conversationId: string,
   ): Promise<string[]> {
-    const collection = await Kernel.di
-      .getService<MongoDB>(MongoDB)
-      .getCollection<ConversationRoutingDocument>('conversations');
-    const conversation = await collection.findOne(
-      {
-        _id: conversationId,
-        participantIds: identityId,
-      },
-      {
-        projection: {
-          participantIds: 1,
-        },
-      },
+    return (
+      (await this.clientMessageHandler?.findConversationTypingRecipients(
+        identityId,
+        conversationId,
+      )) || []
     );
-
-    return this.excludeIdentity(conversation?.participantIds || [], identityId);
   }
 
   private async findCommunityChannelTypingRecipients(
@@ -280,27 +270,45 @@ export class WebSocketEventHub {
     communityId: string,
     channelId: string,
   ): Promise<string[]> {
-    const collection = await Kernel.di
-      .getService<MongoDB>(MongoDB)
-      .getCollection<CommunityRoutingDocument>('communities');
-    const community = await collection.findOne(
-      {
-        _id: communityId,
-        memberIds: identityId,
-        'textChannels.id': channelId,
-      },
-      {
-        projection: {
-          memberIds: 1,
-        },
-      },
+    return (
+      (await this.clientMessageHandler?.findCommunityChannelTypingRecipients(
+        identityId,
+        communityId,
+        channelId,
+      )) || []
     );
-
-    return this.excludeIdentity(community?.memberIds || [], identityId);
   }
 
-  private excludeIdentity(identityIds: string[], identityId: string): string[] {
-    return identityIds.filter((candidate) => candidate !== identityId);
+  private async relayIdentityUpdateToRelatedRecipients(
+    event: DomainEvent,
+    message: WebSocketRealtimeMessage,
+  ): Promise<void> {
+    if (!this.isIdentityUpdateEvent(event)) {
+      return;
+    }
+
+    const baseRecipients = this.getEventRecipients(event);
+    const relatedRecipients = await this.findIdentityUpdateRecipients(
+      event.aggregateId,
+    );
+    const recipients = relatedRecipients.filter(
+      (recipient) => !baseRecipients.has(recipient),
+    );
+
+    this.debug(
+      `WebSocket identity update fanout "${event.aggregateId}" relatedRecipients="${recipients.join(',')}"`,
+    );
+    this.sendToRecipients(recipients, message);
+  }
+
+  private async findIdentityUpdateRecipients(
+    identityId: string,
+  ): Promise<string[]> {
+    return (
+      (await this.clientMessageHandler?.findIdentityUpdateRecipients(
+        identityId,
+      )) || []
+    );
   }
 
   private sendToRecipients(
@@ -324,16 +332,9 @@ export class WebSocketEventHub {
     identityId: string,
     active: boolean,
   ): Promise<void> {
-    const recorder = new IdentityPresenceServicesFactory(
-      Kernel.di.getService<MongoDB>(MongoDB),
-      Kernel.di.getService<MongoIdentityMetadataRepository>(
-        MongoIdentityMetadataRepository,
-      ),
-      Kernel.di.getService<MessageBus>(MessageBus),
-    ).heartbeatRecorder();
-
-    await recorder.record(
-      new IdentityPresenceHeartbeatMessage(identityId, active),
+    await this.clientMessageHandler?.recordIdentityHeartbeat(
+      identityId,
+      active,
     );
   }
 
@@ -399,11 +400,25 @@ export class WebSocketEventHub {
     this.clients.clear();
   }
 
+  public setClientMessageHandler(handler: WebSocketClientMessageHandler): void {
+    this.clientMessageHandler = handler;
+  }
+
   public publish(events: DomainEvent[]): void {
     for (const event of events) {
-      this.broadcast(event, {
+      const domainEventMessage: WebSocketRealtimeMessage = {
         event: JSON.parse(event.decode()),
         type: 'domain_event',
+      };
+
+      this.broadcast(event, domainEventMessage);
+      this.relayIdentityUpdateToRelatedRecipients(
+        event,
+        domainEventMessage,
+      ).catch((error: unknown) => {
+        Kernel.logger?.error(
+          `WebSocket identity update fanout failed for "${event.aggregateId}": ${String(error)}`,
+        );
       });
       const conversationCallEvents =
         this.conversationCallEventMapper.toEvents(event);
