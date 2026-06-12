@@ -1,5 +1,4 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import EventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import OrbitDBDomainEventProjector from './OrbitDBDomainEventProjector';
@@ -7,7 +6,7 @@ import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
 
 // eslint-disable-next-line max-len
-export default class OrbitDBReplicatedDomainEventPublisher implements EventPublisher {
+export default class OrbitDBReplicatedDomainEventPublisher {
   private readonly storesByNetworkId = new Map<
     string,
     {
