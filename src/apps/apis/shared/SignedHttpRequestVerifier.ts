@@ -7,6 +7,8 @@ import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHe
 import { SignedHttpRequest } from './SignedHttpRequest';
 import { SignedRequestPayload } from './SignedRequestPayload';
 
+export type { SignedHttpRequest } from './SignedHttpRequest';
+
 export class SignedHttpRequestVerifier {
   private hashBody(body: unknown): string {
     if (Buffer.isBuffer(body)) {
