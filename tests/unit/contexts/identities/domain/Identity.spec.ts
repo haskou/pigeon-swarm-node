@@ -143,9 +143,13 @@ describe('Identity', () => {
         encryptedMasterKey: 'v1.test.encrypted-master-key',
         id: victimIdentityId.valueOf(),
         masterKeyDerivation: {
-          algorithm: 'test',
+        passkeyPrf: {
+          algorithm: 'webauthn-prf',
+          credentialId: 'test-credential-id',
+          salt: 'test-salt',
           version: 1,
         },
+      },
         networks: [new NetworkId(faker.string.uuid()).valueOf()],
         previousIdentityExternalIdentifier,
         profile: new Profile(new ProfileName('Mallory')).toPrimitives(),

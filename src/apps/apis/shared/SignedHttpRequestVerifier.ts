@@ -4,14 +4,8 @@ import { createHash } from 'crypto';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
+import { SignedHttpRequest } from './SignedHttpRequest';
 import { SignedRequestPayload } from './SignedRequestPayload';
-
-export type SignedHttpRequest = {
-  body?: unknown;
-  header(header: string): string | string[] | undefined;
-  method: string;
-  path: string;
-};
 
 export class SignedHttpRequestVerifier {
   private hashBody(body: unknown): string {
