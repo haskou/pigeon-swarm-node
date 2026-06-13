@@ -23,6 +23,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     ReturnType<typeof setInterval>
   > = {};
 
+  private readonly noPublicPeerWarningKeys: Set<string> = new Set();
+
   private publicConnection?: Promise<IPFSConnection>;
 
   private getPublicRelayDirectoryStorageLocation(): string {
@@ -60,12 +62,60 @@ export default class PrivateNetworkRelayRecordDirectory {
     return this.publicConnection;
   }
 
+  private warnWhenPublicConnectionHasNoPeers(
+    operation: 'discover' | 'publish',
+    network: IPFSNetwork,
+    publicConnection: IPFSConnection,
+  ): void {
+    if (publicConnection.getPeers().length > 0) {
+      return;
+    }
+
+    const warningKey = `${operation}:${network.getId()}`;
+
+    if (this.noPublicPeerWarningKeys.has(warningKey)) {
+      return;
+    }
+
+    this.noPublicPeerWarningKeys.add(warningKey);
+
+    Kernel.logger.warn(
+      `Private IPFS relay record ${operation} has no public IPFS peers:` +
+        ` networkId=${network.getId()}` +
+        ` publicPeerId=${publicConnection.getPeerId()}` +
+        ' reason="The relay record cannot leave local storage without public IPFS peers."',
+    );
+  }
+
   private ensurePeerIdInMultiaddr(multiaddr: string, peerId: string): string {
     if (multiaddr.includes(`/p2p/${peerId}`)) {
       return multiaddr;
     }
 
     return `${multiaddr}/p2p/${peerId}`;
+  }
+
+  private getCircuitRelayListenMultiaddr(relayMultiaddr: string): string {
+    if (relayMultiaddr.includes('/p2p-circuit')) {
+      return relayMultiaddr;
+    }
+
+    return `${relayMultiaddr}/p2p-circuit`;
+  }
+
+  private isListeningThroughRelay(
+    network: IPFSNetwork,
+    relayMultiaddr: string,
+  ): boolean {
+    const circuitRelayMultiaddr =
+      this.getCircuitRelayListenMultiaddr(relayMultiaddr);
+
+    return network.getMultiaddrs().some((multiaddr) => {
+      return (
+        multiaddr.includes('/p2p-circuit') &&
+        multiaddr.startsWith(circuitRelayMultiaddr)
+      );
+    });
   }
 
   private getPrivateRelayRecordMultiaddrs(
@@ -111,16 +161,29 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
   ): Promise<void> {
-    if (
-      relayRecord.peerId === network.getPeerId() ||
-      network.getPeers().includes(relayRecord.peerId)
-    ) {
+    if (relayRecord.peerId === network.getPeerId()) {
       return;
     }
 
     for (const multiaddr of relayRecord.multiaddrs) {
       try {
-        await network.dial(multiaddr);
+        if (!network.getPeers().includes(relayRecord.peerId)) {
+          await network.dial(multiaddr);
+        }
+
+        const circuitRelayMultiaddr =
+          this.getCircuitRelayListenMultiaddr(multiaddr);
+
+        if (!this.isListeningThroughRelay(network, multiaddr)) {
+          await network.listen(circuitRelayMultiaddr);
+          Kernel.logger.info(
+            `Private IPFS relay record listening through relay: networkId=${network.getId()}` +
+              ` peerId=${relayRecord.peerId}` +
+              ` multiaddr="${circuitRelayMultiaddr}"` +
+              ` localMultiaddrs="${network.getMultiaddrs().join(',')}"`,
+          );
+        }
+
         Kernel.logger.info(
           `Private IPFS relay record connected: networkId=${network.getId()}` +
             ` peerId=${relayRecord.peerId}` +
@@ -167,6 +230,11 @@ export default class PrivateNetworkRelayRecordDirectory {
       version: 1,
     };
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
+    this.warnWhenPublicConnectionHasNoPeers(
+      'publish',
+      network,
+      publicConnection,
+    );
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
     const routingAbort = this.createRoutingAbortSignal();
@@ -181,6 +249,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         `Private IPFS relay record published: networkId=${network.getId()}` +
           ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
           ` peerId=${relayRecord.peerId}` +
+          ` publicPeers=${publicConnection.getPeers().length}` +
           ` multiaddrs="${multiaddrs.join(',')}"`,
       );
     } catch (error) {
@@ -198,6 +267,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<void> {
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
+    this.warnWhenPublicConnectionHasNoPeers(
+      'discover',
+      network,
+      publicConnection,
+    );
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const routingAbort = this.createRoutingAbortSignal();
 

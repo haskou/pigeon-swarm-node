@@ -74,6 +74,10 @@ export class IPFSNetwork {
     return this.connection.dial(multiaddr);
   }
 
+  public async listen(multiaddr: string): Promise<void> {
+    return this.connection.listen(multiaddr);
+  }
+
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
     return this.connection.addJSON(data, signal);
   }

@@ -53,14 +53,14 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const libp2p = await heliaRuntimeAdapter.createLibp2p(
       libp2pConfig as unknown as HeliaLibp2pConfig,
     );
-    const heliaCore = await heliaRuntimeAdapter.createHelia({
+    const heliaCore = await heliaRuntimeAdapter.createPrivateHelia({
       ...(baseOptions.blockBrokers
         ? { blockBrokers: baseOptions.blockBrokers }
         : {}),
       blockstore: baseOptions.blockstore,
       datastore: baseOptions.datastore,
       libp2p,
-    } as unknown as Parameters<typeof heliaRuntimeAdapter.createHelia>[0]);
+    });
 
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
@@ -179,10 +179,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private createBlockRetrievalOptions(
     signal?: AbortSignal,
   ): NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]> {
-    const providers = this.getConnectedPeerIds();
-
     return {
-      ...(providers.length > 0 ? { providers } : {}),
       signal,
     };
   }
@@ -269,6 +266,25 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await this.heliaCore.libp2p.dial(
       await heliaRuntimeAdapter.createMultiaddr(multiaddr),
     );
+  }
+
+  public async listen(multiaddr: string): Promise<void> {
+    const libp2p = this.heliaCore.libp2p as unknown as {
+      components?: {
+        transportManager?: {
+          listen(addrs: unknown[]): Promise<void>;
+        };
+      };
+    };
+    const transportManager = libp2p.components?.transportManager;
+
+    if (!transportManager) {
+      throw new Error('IPFS network does not expose a transport manager.');
+    }
+
+    await transportManager.listen([
+      await heliaRuntimeAdapter.createMultiaddr(multiaddr),
+    ]);
   }
 
   public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {

@@ -37,6 +37,7 @@ export class HeliaRuntimeAdapter {
   private circuitRelayModulePromise?: Promise<typeof CircuitRelayModule>;
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
+  private heliaRoutersModulePromise?: Promise<typeof import('@helia/routers')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
   private gossipsubModulePromise?: Promise<typeof GossipsubModule>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
@@ -93,6 +94,13 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof import('@helia/unixfs')>('@helia/unixfs');
 
     return this.heliaUnixfsModulePromise;
+  }
+
+  private loadHeliaRoutersModule(): Promise<typeof import('@helia/routers')> {
+    this.heliaRoutersModulePromise ??=
+      this.nativeImport<typeof import('@helia/routers')>('@helia/routers');
+
+    return this.heliaRoutersModulePromise;
   }
 
   private loadBlockBrokersModule(): Promise<typeof HeliaBlockBrokersModule> {
@@ -311,6 +319,31 @@ export class HeliaRuntimeAdapter {
     const heliaModule = await this.loadHeliaModule();
 
     return heliaModule.createHelia(options);
+  }
+
+  public async createPrivateHelia(options: {
+    blockstore?: unknown;
+    datastore?: unknown;
+    libp2p: unknown;
+  }): Promise<HeliaInstance> {
+    const [heliaModule, blockBrokersModule, routersModule] = await Promise.all([
+      this.loadHeliaModule(),
+      this.loadBlockBrokersModule(),
+      this.loadHeliaRoutersModule(),
+    ]);
+    const libp2p = options.libp2p as Parameters<
+      typeof routersModule.libp2pRouting
+    >[0];
+
+    return heliaModule.createHelia({
+      ...options,
+      blockBrokers: [
+        blockBrokersModule.bitswap({
+          runOnLimitedConnections: true,
+        }),
+      ],
+      routers: [routersModule.libp2pRouting(libp2p)],
+    } as unknown as Parameters<typeof HeliaCore.createHelia>[0]);
   }
 
   public async createLibp2p(
