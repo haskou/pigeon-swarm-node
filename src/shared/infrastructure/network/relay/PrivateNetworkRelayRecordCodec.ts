@@ -20,6 +20,9 @@ export default class PrivateNetworkRelayRecordCodec {
   private static readonly lookupContext =
     'pigeon-swarm.private-relay-record.lookup.v1';
 
+  private static readonly ipnsContext =
+    'pigeon-swarm.private-relay-record.ipns.v1';
+
   private static readonly recordPrefix = 'pigeon-swarm/private-relays/v1';
 
   private static requireNetworkKey(network: IPFSNetwork): PrivateKey {
@@ -121,6 +124,17 @@ export default class PrivateNetworkRelayRecordCodec {
     );
 
     return `${PrivateNetworkRelayRecordCodec.recordPrefix}/${digest}`;
+  }
+
+  public static ipnsSeed(network: IPFSNetwork, windowId: number): Uint8Array {
+    const networkKey =
+      PrivateNetworkRelayRecordCodec.requireNetworkKey(network);
+
+    return createHmac('sha256', networkKey.valueOf())
+      .update(PrivateNetworkRelayRecordCodec.ipnsContext)
+      .update('\n')
+      .update(String(windowId))
+      .digest();
   }
 
   public static seal(

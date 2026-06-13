@@ -1,3 +1,4 @@
+import { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPrivateKeyLike';
 import { HeliaInstance } from './adapters/HeliaRuntimeAdapter';
 import { IPFSId } from './IPFSId';
 
@@ -12,6 +13,17 @@ export interface IPFSConnection {
   getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T>;
   putRecord(key: string, value: string, signal?: AbortSignal): Promise<void>;
   getRecord(key: string, signal?: AbortSignal): Promise<string | undefined>;
+  publishIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    value: string,
+    sequence: number | bigint,
+    lifetimeMs: number,
+    signal?: AbortSignal,
+  ): Promise<string>;
+  resolveIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    signal?: AbortSignal,
+  ): Promise<string | undefined>;
   publishPubSub(topic: string, payload: string): Promise<void>;
   subscribePubSub(
     topic: string,

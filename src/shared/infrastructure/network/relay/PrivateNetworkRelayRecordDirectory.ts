@@ -1,4 +1,5 @@
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
+import libp2pKeyAdapter from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
@@ -15,6 +16,9 @@ export type PrivateRelayListenOptions = {
 };
 
 export default class PrivateNetworkRelayRecordDirectory {
+  private static readonly inlineIPNSValuePrefix =
+    '/pigeon-swarm/private-relay/v1/';
+
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
@@ -24,6 +28,9 @@ export default class PrivateNetworkRelayRecordDirectory {
   > = {};
 
   private readonly noPublicPeerWarningKeys: Set<string> = new Set();
+
+  private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
+    new Map();
 
   private publicConnection?: Promise<IPFSConnection>;
 
@@ -39,6 +46,42 @@ export default class PrivateNetworkRelayRecordDirectory {
     return Number(
       process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS || 15 * 1000,
     );
+  }
+
+  private getRelayRecordIPNSWindowMs(): number {
+    return Number(
+      process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS || 10 * 60_000,
+    );
+  }
+
+  private getCurrentIPNSWindowId(): number {
+    return Math.floor(Date.now() / this.getRelayRecordIPNSWindowMs());
+  }
+
+  private getDiscoveryIPNSWindowIds(): number[] {
+    const currentWindowId = this.getCurrentIPNSWindowId();
+
+    return [currentWindowId, currentWindowId - 1];
+  }
+
+  private getIPNSPrivateKey(
+    network: IPFSNetwork,
+    windowId: number,
+  ): Promise<Libp2pPrivateKeyLike> {
+    const cacheKey = `${PrivateNetworkRelayRecordCodec.fingerprint(
+      network,
+    )}:${windowId}`;
+
+    if (!this.ipnsPrivateKeys.has(cacheKey)) {
+      this.ipnsPrivateKeys.set(
+        cacheKey,
+        libp2pKeyAdapter.generateEd25519KeyPairFromSeed(
+          PrivateNetworkRelayRecordCodec.ipnsSeed(network, windowId),
+        ),
+      );
+    }
+
+    return this.ipnsPrivateKeys.get(cacheKey) as Promise<Libp2pPrivateKeyLike>;
   }
 
   private createRoutingAbortSignal(): {
@@ -157,6 +200,114 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
   }
 
+  private getInlineIPNSValue(
+    envelope: PrivateNetworkRelayRecordEnvelope,
+  ): string {
+    return `${PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix}${Buffer.from(
+      JSON.stringify(envelope),
+    ).toString('base64url')}`;
+  }
+
+  private getEnvelopeFromIPNSValue(
+    value: string,
+  ): PrivateNetworkRelayRecordEnvelope | undefined {
+    if (
+      !value.startsWith(
+        PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix,
+      )
+    ) {
+      return undefined;
+    }
+
+    try {
+      return this.decodeEnvelope(
+        Buffer.from(
+          value.slice(
+            PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix.length,
+          ),
+          'base64url',
+        ).toString('utf8'),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private getRelayRecordFromEnvelope(
+    network: IPFSNetwork,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+  ): PrivateNetworkRelayRecord | undefined {
+    const relayRecord = PrivateNetworkRelayRecordCodec.open(network, envelope);
+
+    if (!relayRecord || relayRecord.expiresAt <= Date.now()) {
+      return undefined;
+    }
+
+    return relayRecord;
+  }
+
+  private async publishRelayIPNSRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): Promise<void> {
+    const ipnsPrivateKey = await this.getIPNSPrivateKey(
+      network,
+      this.getCurrentIPNSWindowId(),
+    );
+    const lifetimeMs = Math.max(60_000, relayRecord.expiresAt - Date.now());
+    const ipnsName = await publicConnection.publishIPNSRecord(
+      ipnsPrivateKey,
+      this.getInlineIPNSValue(envelope),
+      Date.now(),
+      lifetimeMs,
+    );
+
+    Kernel.logger.info(
+      `Private IPFS relay IPNS record published: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` ipnsName=${ipnsName}` +
+        ` publicPeers=${publicConnection.getPeers().length}`,
+    );
+  }
+
+  private async discoverRelayIPNSRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<PrivateNetworkRelayRecord | undefined> {
+    for (const windowId of this.getDiscoveryIPNSWindowIds()) {
+      const ipnsPrivateKey = await this.getIPNSPrivateKey(network, windowId);
+      const ipnsValue =
+        await publicConnection.resolveIPNSRecord(ipnsPrivateKey);
+
+      if (!ipnsValue) {
+        continue;
+      }
+
+      const envelope = this.getEnvelopeFromIPNSValue(ipnsValue);
+
+      if (!envelope) {
+        continue;
+      }
+
+      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
+
+      if (relayRecord) {
+        Kernel.logger.info(
+          `Private IPFS relay IPNS record discovered: networkId=${network.getId()}` +
+            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+            ` peerId=${relayRecord.peerId}` +
+            ` publicPeers=${publicConnection.getPeers().length}`,
+        );
+
+        return relayRecord;
+      }
+    }
+
+    return undefined;
+  }
+
   private async dialPrivateRelayRecord(
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
@@ -245,6 +396,12 @@ export default class PrivateNetworkRelayRecordDirectory {
         JSON.stringify(envelope),
         routingAbort.signal,
       );
+      await this.publishRelayIPNSRecord(
+        publicConnection,
+        network,
+        envelope,
+        relayRecord,
+      );
       Kernel.logger.info(
         `Private IPFS relay record published: networkId=${network.getId()}` +
           ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
@@ -276,6 +433,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     const routingAbort = this.createRoutingAbortSignal();
 
     try {
+      const ipnsRelayRecord = await this.discoverRelayIPNSRecord(
+        publicConnection,
+        network,
+      );
+
+      if (ipnsRelayRecord) {
+        await this.dialPrivateRelayRecord(network, ipnsRelayRecord);
+
+        return;
+      }
+
       const value = await publicConnection.getRecord(
         lookupKey,
         routingAbort.signal,
@@ -301,12 +469,9 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      const relayRecord = PrivateNetworkRelayRecordCodec.open(
-        network,
-        envelope,
-      );
+      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
 
-      if (!relayRecord || relayRecord.expiresAt <= Date.now()) {
+      if (!relayRecord) {
         Kernel.logger.debug(
           `Private IPFS relay record ignored: networkId=${network.getId()}` +
             ' reason="Expired or not decryptable."',
@@ -393,5 +558,11 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     clearInterval(interval);
     delete this.discoveryIntervals[networkId];
+  }
+
+  public async stopPublicConnection(): Promise<void> {
+    const publicConnection = await this.publicConnection;
+
+    await publicConnection?.stop();
   }
 }

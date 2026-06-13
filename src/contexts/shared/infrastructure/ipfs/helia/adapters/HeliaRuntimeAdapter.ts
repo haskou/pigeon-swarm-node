@@ -1,6 +1,7 @@
 import type * as HeliaBlockBrokersModule from '@helia/block-brokers';
 import type * as CircuitRelayModule from '@libp2p/circuit-relay-v2';
 import type * as GossipsubModule from '@libp2p/gossipsub';
+import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
 import type { MemoryBlockstore } from 'blockstore-core';
@@ -9,6 +10,8 @@ import type { MemoryDatastore } from 'datastore-core';
 import type { FsDatastore } from 'datastore-fs';
 import type * as HeliaCore from 'helia';
 import type { Key as DatastoreKey } from 'interface-datastore/key';
+import type * as IPNSModule from 'ipns';
+import type * as IPNSValidatorModule from 'ipns/validator';
 import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
 
@@ -33,6 +36,14 @@ export type { RuntimeDatastore } from './types/RuntimeDatastore';
 export class HeliaRuntimeAdapter {
   private static readonly DEFAULT_RELAY_DATA_LIMIT_BYTES = 64 * 1024 * 1024;
 
+  private static readonly DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS = [
+    '/dnsaddr/am6.bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+    '/dnsaddr/sg1.bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',
+    '/dnsaddr/ny5.bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+    '/dnsaddr/sv15.bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+  ];
+
+  private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
   private blockBrokersModulePromise?: Promise<typeof HeliaBlockBrokersModule>;
   private circuitRelayModulePromise?: Promise<typeof CircuitRelayModule>;
   private heliaModulePromise?: Promise<typeof HeliaCore>;
@@ -40,6 +51,8 @@ export class HeliaRuntimeAdapter {
   private heliaRoutersModulePromise?: Promise<typeof import('@helia/routers')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
   private gossipsubModulePromise?: Promise<typeof GossipsubModule>;
+  private ipnsModulePromise?: Promise<typeof IPNSModule>;
+  private ipnsValidatorModulePromise?: Promise<typeof IPNSValidatorModule>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private pnetModulePromise?: Promise<typeof import('@libp2p/pnet')>;
   private multiaddrModulePromise?: Promise<
@@ -124,6 +137,28 @@ export class HeliaRuntimeAdapter {
     >('@libp2p/circuit-relay-v2');
 
     return this.circuitRelayModulePromise;
+  }
+
+  private loadBootstrapModule(): Promise<typeof import('@libp2p/bootstrap')> {
+    this.bootstrapModulePromise ??=
+      this.nativeImport<typeof import('@libp2p/bootstrap')>(
+        '@libp2p/bootstrap',
+      );
+
+    return this.bootstrapModulePromise;
+  }
+
+  private loadIPNSModule(): Promise<typeof IPNSModule> {
+    this.ipnsModulePromise ??= this.nativeImport<typeof IPNSModule>('ipns');
+
+    return this.ipnsModulePromise;
+  }
+
+  private loadIPNSValidatorModule(): Promise<typeof IPNSValidatorModule> {
+    this.ipnsValidatorModulePromise ??=
+      this.nativeImport<typeof IPNSValidatorModule>('ipns/validator');
+
+    return this.ipnsValidatorModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
@@ -258,6 +293,46 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private getPublicBootstrapMultiaddrs(): string[] {
+    if (process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED === 'false') {
+      return [];
+    }
+
+    return (
+      process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS ||
+      HeliaRuntimeAdapter.DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS.join(',')
+    )
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
+  private async withPublicBootstrap(
+    defaults: Libp2pDefaults,
+  ): Promise<Libp2pDefaults> {
+    const bootstrapMultiaddrs = this.getPublicBootstrapMultiaddrs();
+
+    if (bootstrapMultiaddrs.length === 0) {
+      return defaults;
+    }
+
+    const bootstrapModule = await this.loadBootstrapModule();
+    const config = defaults as unknown as {
+      peerDiscovery?: unknown[];
+    };
+
+    config.peerDiscovery = [
+      ...(config.peerDiscovery || []),
+      bootstrapModule.bootstrap({
+        list: bootstrapMultiaddrs,
+        tagName: 'pigeon-public-bootstrap',
+        tagTTL: Infinity,
+      }),
+    ];
+
+    return defaults;
+  }
+
   public async withRelayServer(
     defaults: Libp2pDefaults,
     dataLimitBytes: number = HeliaRuntimeAdapter.DEFAULT_RELAY_DATA_LIMIT_BYTES,
@@ -370,6 +445,57 @@ export class HeliaRuntimeAdapter {
     return pnetModule.preSharedKey(config);
   }
 
+  public async createMarshalledIPNSRecord(
+    privateKey: Libp2pPrivateKey,
+    value: string,
+    sequence: number | bigint,
+    lifetimeMs: number,
+  ): Promise<Uint8Array> {
+    const ipnsModule = await this.loadIPNSModule();
+    const record = await ipnsModule.createIPNSRecord(
+      privateKey,
+      value,
+      sequence,
+      lifetimeMs,
+    );
+
+    return ipnsModule.marshalIPNSRecord(record);
+  }
+
+  public async createIPNSRoutingKey(
+    privateKey: Libp2pPrivateKey,
+  ): Promise<Uint8Array> {
+    const ipnsModule = await this.loadIPNSModule();
+
+    return ipnsModule.multihashToIPNSRoutingKey(
+      privateKey.publicKey.toMultihash(),
+    );
+  }
+
+  public getIPNSName(privateKey: Libp2pPrivateKey): string {
+    return privateKey.publicKey.toString();
+  }
+
+  public async readIPNSRecordValue(
+    routingKey: Uint8Array,
+    marshalledRecord: Uint8Array,
+  ): Promise<string | undefined> {
+    const [ipnsModule, ipnsValidatorModule] = await Promise.all([
+      this.loadIPNSModule(),
+      this.loadIPNSValidatorModule(),
+    ]);
+
+    await ipnsValidatorModule.ipnsValidator(routingKey, marshalledRecord);
+
+    const record = ipnsModule.unmarshalIPNSRecord(marshalledRecord);
+
+    if (ipnsValidatorModule.validFor(record) <= 0) {
+      return undefined;
+    }
+
+    return record.value;
+  }
+
   public async getLibp2pDefaults(options?: {
     offline?: boolean;
   }): Promise<Libp2pDefaults> {
@@ -385,7 +511,7 @@ export class HeliaRuntimeAdapter {
       return this.withGossipsub(this.withoutNetwork(defaults));
     }
 
-    return this.withGossipsub(defaults);
+    return this.withGossipsub(await this.withPublicBootstrap(defaults));
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {
