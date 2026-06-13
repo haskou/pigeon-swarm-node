@@ -1,7 +1,9 @@
+import Kernel from '@app/Kernel';
 import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
+import { IPFSConnection } from '../helia/IPFSConnection';
 import libp2pKeyAdapter from './adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from './adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from './IPFSNetwork';
@@ -57,12 +59,34 @@ export default class IPFSNetworkRegistry {
     return `${this.storagePath}/orbitdb/${id}`;
   }
 
+  private isPrivateRelayServerDisabledByEnv(): boolean {
+    const relayEnabled = process.env.PIGEON_RELAY_ENABLED;
+
+    if (!relayEnabled) {
+      return false;
+    }
+
+    return ['0', 'false', 'no', 'off'].includes(relayEnabled.toLowerCase());
+  }
+
+  private getPrivateRelayDisabledReason(): string {
+    if (this.isPrivateRelayServerDisabledByEnv()) {
+      return 'PIGEON_RELAY_ENABLED disables private relay server.';
+    }
+
+    return 'PIGEON_PRIVATE_RELAY_PORT_START/END not configured or invalid.';
+  }
+
   private getPrivateRelayPortRange():
     | {
         end: number;
         start: number;
       }
     | undefined {
+    if (this.isPrivateRelayServerDisabledByEnv()) {
+      return undefined;
+    }
+
     const start = Number(
       process.env.PIGEON_PRIVATE_RELAY_PORT_START ||
         process.env.PIGEON_RELAY_PORT_START,
@@ -83,6 +107,18 @@ export default class IPFSNetworkRegistry {
     return Number(
       process.env.PIGEON_RELAY_DATA_LIMIT_BYTES || 64 * 1024 * 1024,
     );
+  }
+
+  private getPrivateRelayBootstrapMultiaddrs(): string[] {
+    const bootstrapMultiaddrs =
+      process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS ||
+      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS ||
+      '';
+
+    return bootstrapMultiaddrs
+      .split(/[\n,]+/)
+      .map((multiaddr) => multiaddr.trim())
+      .filter(Boolean);
   }
 
   private getPrivateRelayPort(networkId: string): number | undefined {
@@ -141,6 +177,91 @@ export default class IPFSNetworkRegistry {
       listenAddresses: [`/ip4/0.0.0.0/tcp/${port}`],
       relayDataLimitBytes: this.getRelayDataLimitBytes(),
     };
+  }
+
+  private logPrivateRelayServerState(
+    networkId: string,
+    relayOptions:
+      | {
+          announceAddresses?: string[];
+          listenAddresses: string[];
+          relayDataLimitBytes: number;
+        }
+      | undefined,
+  ): void {
+    if (!relayOptions) {
+      Kernel.logger.info(
+        `Private IPFS relay server disabled: networkId=${networkId}` +
+          ` reason="${this.getPrivateRelayDisabledReason()}"`,
+      );
+
+      return;
+    }
+
+    Kernel.logger.info(
+      `Private IPFS relay server enabled: networkId=${networkId}` +
+        ` listenAddresses="${relayOptions.listenAddresses.join(',')}"` +
+        ` announceAddresses="${(relayOptions.announceAddresses || []).join(',')}"` +
+        ` relayDataLimitBytes=${relayOptions.relayDataLimitBytes}`,
+    );
+  }
+
+  private logPrivateRelayBootstrapState(
+    networkId: string,
+    bootstrapMultiaddrs: string[],
+  ): void {
+    if (bootstrapMultiaddrs.length === 0) {
+      Kernel.logger.info(
+        `Private IPFS relay bootstrap disabled: networkId=${networkId}` +
+          ' reason="PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS not configured."',
+      );
+
+      return;
+    }
+
+    Kernel.logger.info(
+      `Private IPFS relay bootstrap configured: networkId=${networkId}` +
+        ` relayCount=${bootstrapMultiaddrs.length}`,
+    );
+  }
+
+  private async dialPrivateRelayBootstrap(
+    networkId: string,
+    connection: IPFSConnection,
+    multiaddr: string,
+  ): Promise<void> {
+    try {
+      await connection.dial(multiaddr);
+      Kernel.logger.info(
+        `Private IPFS relay bootstrap connected: networkId=${networkId}` +
+          ` multiaddr="${multiaddr}" peers=${connection.getPeers().length}`,
+      );
+    } catch (error) {
+      Kernel.logger.warn(
+        `Private IPFS relay bootstrap failed: networkId=${networkId}` +
+          ` multiaddr="${multiaddr}" error=${String(error)}`,
+      );
+    }
+  }
+
+  private dialPrivateRelayBootstraps(
+    networkId: string,
+    connection: IPFSConnection,
+  ): void {
+    const bootstrapMultiaddrs = this.getPrivateRelayBootstrapMultiaddrs();
+
+    this.logPrivateRelayBootstrapState(networkId, bootstrapMultiaddrs);
+
+    for (const multiaddr of bootstrapMultiaddrs) {
+      this.dialPrivateRelayBootstrap(networkId, connection, multiaddr).catch(
+        (error: unknown) => {
+          Kernel.logger.warn(
+            `Private IPFS relay bootstrap crashed: networkId=${networkId}` +
+              ` multiaddr="${multiaddr}" error=${String(error)}`,
+          );
+        },
+      );
+    }
   }
 
   // eslint-disable-next-line max-len
@@ -221,6 +342,7 @@ export default class IPFSNetworkRegistry {
 
     if (key) {
       const relayOptions = this.getPrivateRelayListenAddresses(config.getId());
+      this.logPrivateRelayServerState(config.getId(), relayOptions);
       const connection = await PrivateIPFS.create({
         key,
         name: config.getName(),
@@ -235,6 +357,7 @@ export default class IPFSNetworkRegistry {
           : {}),
         storageLocation,
       });
+      this.dialPrivateRelayBootstraps(config.getId(), connection);
 
       return new IPFSNetwork(config, connection);
     }

@@ -115,8 +115,10 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `PIGEON_RELAY_ENABLED` | unset | No | Optional private relay toggle. Leave unset or set `true` to allow relay startup when a port range exists. Set `false` to force-disable private relay startup. |
 | `PIGEON_PRIVATE_RELAY_PORT_START` | unset | No | First TCP port in the private PSK circuit-relay range. When unset, private networks do not start relay servers. |
 | `PIGEON_PRIVATE_RELAY_PORT_END` | unset | No | Last TCP port in the private PSK circuit-relay range. Must be greater than or equal to `PIGEON_PRIVATE_RELAY_PORT_START`. |
+| `PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS` | unset | No | Comma- or newline-separated private relay multiaddrs to dial when this node starts a private network as a leaf. Each value must be a full libp2p multiaddr, including `/p2p/<peerId>`. |
 | `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
 | `PIGEON_PUBLIC_HOST` | unset | Required for public relay advertising | Public DNS name used in announced private relay multiaddrs when the node is reachable from other hosts. |
 
@@ -135,8 +137,15 @@ Example:
 ```dotenv
 PIGEON_PRIVATE_RELAY_PORT_START=4100
 PIGEON_PRIVATE_RELAY_PORT_END=4199
+PIGEON_RELAY_ENABLED=true
 PIGEON_RELAY_DATA_LIMIT_BYTES=67108864
 PIGEON_PUBLIC_HOST=relay.example.com
+```
+
+Leaf node bootstrap example:
+
+```dotenv
+PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS=/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId
 ```
 
 Operational rules:
@@ -144,8 +153,8 @@ Operational rules:
 - expose the whole configured port range in Docker/firewall when the node should
   relay more than one private network;
 - each private network gets a stable port from the range;
-- nodes without the range still work as leaf nodes and can use other private
-  relay nodes;
+- nodes without the range do not start relay servers; they can use other private
+  relay nodes only after dialing a known relay multiaddr;
 - CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.
