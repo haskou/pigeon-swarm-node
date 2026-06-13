@@ -110,6 +110,7 @@ components:
           properties:
             encryptedPrivateKey:
               type: string
+              description: Opaque encrypted private key blob. Backend stores and signs it but never decrypts it.
             publicKey:
               type: string
         encryptedMasterKey:
@@ -118,7 +119,7 @@ components:
         masterKeyDerivation:
           type: object
           additionalProperties: true
-          description: Opaque client-controlled derivation metadata required to decrypt encryptedMasterKey.
+          description: Opaque client-controlled derivation metadata required to decrypt encryptedMasterKey. For passkey PRF identities, passkeyPrf contains version, algorithm, credentialId and salt only.
         networks:
           type: array
           description: Identity networks. Signed updates may add networks but cannot remove existing ones.
@@ -186,6 +187,7 @@ components:
           properties:
             encryptedPrivateKey:
               type: string
+              description: Opaque encrypted private key blob. Backend stores and signs it but never decrypts it.
               example: 2s2IhQsbhsmzNWia+DRGOMIQHEcR+Gi45fSM6Di1FOhOPFTs1NB3Fzhi8/bCEcmGdn0WRq5AjN1pb8iZkZpGpNstPm9v4gcPbGqAUnGCAtAQqiPMiJ1Tr9YQCSIUodxwfowdFvBAZaFGNcoObVoYJgnRjWWq2YQ=.f1itGk2AXdi33/e8.OEIZELL7lzYRXWwFSB0wtA==.CuZAT6/b/TiVLT+sp03ULg==
             publicKey:
               type: string
@@ -197,11 +199,13 @@ components:
         masterKeyDerivation:
           type: object
           additionalProperties: true
-          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey.
+          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey. Backend does not require or persist passkeyPrf.encryptedPasswordKey or passkeyPrf.keyAlgorithm.
           example:
-            algorithm: argon2id
-            version: 1
-            salt: base64urlSalt
+            passkeyPrf:
+              version: 1
+              algorithm: webauthn-prf
+              credentialId: base64urlCredentialId
+              salt: base64urlSalt
         networks:
           type: array
           items:

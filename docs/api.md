@@ -1035,16 +1035,20 @@ Response:
 {
   "id": "<identityId>",
   "identityExternalIdentifier": "<currentIdentityCid>",
-	  "encryptedKeyPair": {
-	    "publicKey": "<publicKeyPem>",
-	    "encryptedPrivateKey": "<encryptedPrivateKey>"
-	  },
-	  "encryptedMasterKey": "<encryptedMasterKey>",
-	  "masterKeyDerivation": {
-	    "algorithm": "<clientDerivationAlgorithm>",
-	    "version": 1
-	  },
-	  "networks": ["<networkId>"],
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
+  },
+  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
+  "masterKeyDerivation": {
+    "passkeyPrf": {
+      "version": 1,
+      "algorithm": "webauthn-prf",
+      "credentialId": "<credentialId>",
+      "salt": "<base64urlSalt>"
+    }
+  },
+  "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
     "handle": "alice",
@@ -1072,16 +1076,20 @@ Request:
 ```json
 {
   "id": "<identityId>",
-	  "encryptedKeyPair": {
-	    "publicKey": "<publicKeyPem>",
-	    "encryptedPrivateKey": "<encryptedPrivateKey>"
-	  },
-	  "encryptedMasterKey": "<encryptedMasterKey>",
-	  "masterKeyDerivation": {
-	    "algorithm": "<clientDerivationAlgorithm>",
-	    "version": 1
-	  },
-	  "networks": ["<networkId>"],
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
+  },
+  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
+  "masterKeyDerivation": {
+    "passkeyPrf": {
+      "version": 1,
+      "algorithm": "webauthn-prf",
+      "credentialId": "<credentialId>",
+      "salt": "<base64urlSalt>"
+    }
+  },
+  "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
     "handle": "alice"
@@ -1097,7 +1105,8 @@ Implemented:
 - require client-generated encrypted keypairs and signed identity candidates
 - accept client-generated encrypted master keys and client-controlled master key
   derivation metadata as signed opaque identity fields
-- keep client passwords out of the backend
+- keep client passwords, passkey PRF material and identity decryption secrets out
+  of the backend
 - store `profile.handle` as part of the signed identity profile
 - normalize handles to lowercase
 - reject handles containing spaces, `@` or any character outside letters,
@@ -1111,12 +1120,19 @@ Client-signed identity signatures must cover the canonical identity payload:
 
 ```json
 {
-  "encryptedKeyPair": "<encryptedKeyPair>",
-  "encryptedMasterKey": "<encryptedMasterKey>",
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
+  },
+  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
   "id": "<identityId>",
   "masterKeyDerivation": {
-    "algorithm": "<clientDerivationAlgorithm>",
-    "version": 1
+    "passkeyPrf": {
+      "version": 1,
+      "algorithm": "webauthn-prf",
+      "credentialId": "<credentialId>",
+      "salt": "<base64urlSalt>"
+    }
   },
   "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": null,
@@ -1146,16 +1162,20 @@ Request:
 ```json
 {
   "id": "<identityId>",
-	  "encryptedKeyPair": {
-	    "publicKey": "<publicKeyPem>",
-	    "encryptedPrivateKey": "<encryptedPrivateKey>"
-	  },
-	  "encryptedMasterKey": "<encryptedMasterKey>",
-	  "masterKeyDerivation": {
-	    "algorithm": "<clientDerivationAlgorithm>",
-	    "version": 1
-	  },
-	  "networks": ["<networkId>"],
+  "encryptedKeyPair": {
+    "publicKey": "<publicKeyPem>",
+    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
+  },
+  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
+  "masterKeyDerivation": {
+    "passkeyPrf": {
+      "version": 1,
+      "algorithm": "webauthn-prf",
+      "credentialId": "<credentialId>",
+      "salt": "<base64urlSalt>"
+    }
+  },
+  "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": "<previousIdentityCid>",
   "profile": {
     "name": "Alice Updated",
@@ -1174,7 +1194,9 @@ Implemented:
 - require signed request auth from the identity owner
 - accept profile changes, profile image/banner removal and handle changes as signed
   identity updates
-- accept encrypted keypair changes, including client-side password changes
+- accept encrypted master key and derivation metadata changes for client-side
+  password/passkey changes; `encryptedKeyPair.encryptedPrivateKey` is stored and
+  signed as an opaque client-encrypted blob
 - allow adding networks, but reject signed identity updates that remove any
   previously joined network
 - validate the signed identity candidate and previous identity chain before
@@ -1187,7 +1209,7 @@ Implemented:
 ## Keychain HTTP API
 
 The node stores and announces encrypted keychain documents. It must never
-receive the keychain password and must never decrypt the payload.
+receive keychain decryption secrets and must never decrypt the payload.
 
 ### Publish keychain version
 

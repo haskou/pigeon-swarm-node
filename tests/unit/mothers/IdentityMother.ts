@@ -36,8 +36,12 @@ export class IdentityMother {
   );
 
   public masterKeyDerivation: MasterKeyDerivation = new MasterKeyDerivation({
-    algorithm: 'fixture',
-    version: 1,
+    passkeyPrf: {
+      algorithm: 'webauthn-prf',
+      credentialId: 'fixture-credential-id',
+      salt: 'fixture-salt',
+      version: 1,
+    },
   });
 
   public profile: Profile = new Profile(new ProfileName('John'));
@@ -51,7 +55,7 @@ export class IdentityMother {
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'mWsKbEJgufmUujQYXT4PoF5nUObFOTno9e7BJsri3rrLAy2TH0psG3jFbIEO/bEvi0X/ayuEMBe55l4DfGiwDg==',
+    '7a5S2DyvsnSAJy6gVN574/zVDGWtAS3gJ0gdGc8U/jhTfdutftUklsMHQmGDr1/bwCZDMnRiZrsrxLL4On7gBw==',
   );
 
   public version: IdentityVersion = new IdentityVersion(1);

@@ -52,8 +52,12 @@ describe('IpfsIdentityRepository', () => {
       encryptedMasterKey: 'v1.test.encrypted-master-key',
       id: identityId.valueOf(),
       masterKeyDerivation: {
-        algorithm: 'test',
-        version: 1,
+        passkeyPrf: {
+          algorithm: 'webauthn-prf',
+          credentialId: 'test-credential-id',
+          salt: 'test-salt',
+          version: 1,
+        },
       },
       networks: [networkId],
       previousIdentityExternalIdentifier,
