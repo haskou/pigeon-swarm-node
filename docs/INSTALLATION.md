@@ -118,7 +118,9 @@ installed `web-push` module path.
 | `PIGEON_RELAY_ENABLED` | unset | No | Optional private relay toggle. Leave unset or set `true` to allow relay startup when a port range exists. Set `false` to force-disable private relay startup. |
 | `PIGEON_PRIVATE_RELAY_PORT_START` | unset | No | First TCP port in the private PSK circuit-relay range. When unset, private networks do not start relay servers. |
 | `PIGEON_PRIVATE_RELAY_PORT_END` | unset | No | Last TCP port in the private PSK circuit-relay range. Must be greater than or equal to `PIGEON_PRIVATE_RELAY_PORT_START`. |
-| `PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS` | unset | No | Comma- or newline-separated private relay multiaddrs to dial when this node starts a private network as a leaf. Each value must be a full libp2p multiaddr, including `/p2p/<peerId>`. |
+| `PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS` | unset | No | Optional fallback. Comma- or newline-separated private relay multiaddrs to dial when public relay record discovery has not found a relay yet. Each value must be a full libp2p multiaddr, including `/p2p/<peerId>`. |
+| `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `15000` | No | How often private networks refresh relay record discovery and publication. |
+| `PIGEON_RELAY_RECORD_TTL_MS` | `600000` | No | Private relay record lifetime. Defaults to 10 minutes. |
 | `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
 | `PIGEON_PUBLIC_HOST` | unset | Required for public relay advertising | Public DNS name used in announced private relay multiaddrs when the node is reachable from other hosts. |
 
@@ -153,8 +155,14 @@ Operational rules:
 - expose the whole configured port range in Docker/firewall when the node should
   relay more than one private network;
 - each private network gets a stable port from the range;
-- nodes without the range do not start relay servers; they can use other private
-  relay nodes only after dialing a known relay multiaddr;
+- nodes with a relay range publish an encrypted private relay record through the
+  public IPFS routing layer for each private network;
+- the relay record lookup key and encrypted payload are derived from the private
+  network key, so nodes outside the private network cannot read the relay
+  multiaddrs;
+- nodes without the range do not start relay servers; they discover private
+  relay records automatically and may also use
+  `PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS` as an explicit fallback;
 - CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.

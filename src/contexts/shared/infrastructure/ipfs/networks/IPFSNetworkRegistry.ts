@@ -1,4 +1,7 @@
 import Kernel from '@app/Kernel';
+import PrivateNetworkRelayRecordDirectory, {
+  PrivateRelayListenOptions,
+} from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
@@ -12,6 +15,7 @@ import { PrivateIPFS } from './PrivateIPFS';
 import { PublicIPFS } from './PublicIPFS';
 
 type IPFSNetworkRegistryState = {
+  disabledBootstrapLoggedNetworkIds: string[];
   initialized: boolean;
   listeners: Array<(network: IPFSNetwork) => Promise<void> | void>;
   networks: IPFSNetwork[];
@@ -27,12 +31,20 @@ export default class IPFSNetworkRegistry {
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
+  private readonly relayRecordDirectory: PrivateNetworkRelayRecordDirectory;
+
+  constructor(relayRecordDirectory?: PrivateNetworkRelayRecordDirectory) {
+    this.relayRecordDirectory =
+      relayRecordDirectory ?? new PrivateNetworkRelayRecordDirectory();
+  }
+
   private getState(): IPFSNetworkRegistryState {
     const globalState = globalThis as typeof globalThis & {
       [globalRegistryStateKey]?: IPFSNetworkRegistryState;
     };
 
     globalState[globalRegistryStateKey] ??= {
+      disabledBootstrapLoggedNetworkIds: [],
       initialized: false,
       listeners: [],
       networks: [],
@@ -155,13 +167,9 @@ export default class IPFSNetworkRegistry {
     return undefined;
   }
 
-  private getPrivateRelayListenAddresses(networkId: string):
-    | {
-        announceAddresses?: string[];
-        listenAddresses: string[];
-        relayDataLimitBytes: number;
-      }
-    | undefined {
+  private getPrivateRelayListenAddresses(
+    networkId: string,
+  ): PrivateRelayListenOptions | undefined {
     const port = this.getPrivateRelayPort(networkId);
 
     if (!port) {
@@ -211,6 +219,13 @@ export default class IPFSNetworkRegistry {
     bootstrapMultiaddrs: string[],
   ): void {
     if (bootstrapMultiaddrs.length === 0) {
+      const state = this.getState();
+
+      if (state.disabledBootstrapLoggedNetworkIds.includes(networkId)) {
+        return;
+      }
+
+      state.disabledBootstrapLoggedNetworkIds.push(networkId);
       Kernel.logger.info(
         `Private IPFS relay bootstrap disabled: networkId=${networkId}` +
           ' reason="PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS not configured."',
@@ -358,8 +373,11 @@ export default class IPFSNetworkRegistry {
         storageLocation,
       });
       this.dialPrivateRelayBootstraps(config.getId(), connection);
+      const network = new IPFSNetwork(config, connection);
 
-      return new IPFSNetwork(config, connection);
+      this.relayRecordDirectory.start(network, relayOptions, sharedPrivateKey);
+
+      return network;
     }
 
     const connection = await PublicIPFS.create({
@@ -434,6 +452,7 @@ export default class IPFSNetworkRegistry {
     await Promise.all(
       this.getState().removedListeners.map((listener) => listener(id)),
     );
+    this.relayRecordDirectory.stop(id);
     await network.stop();
   }
 
