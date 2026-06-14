@@ -73,10 +73,13 @@ publico para que otros peers de esa misma red puedan encontrarlo.
 4. Otro nodo de la misma red privada abre su conexion publica de discovery,
    resuelve el record cifrado, lo descifra con la misma PSK y diale el multiaddr
    anunciado.
-5. Al conectarse al relay privado, el nodo leaf escucha por `/p2p-circuit` y
+5. Cada record de relay valido descubierto se guarda como cache local cifrada
+   por red. En el siguiente arranque, el nodo intenta ese cache antes de esperar
+   a que IPFS publico resuelva de nuevo el record.
+6. Al conectarse al relay privado, el nodo leaf escucha por `/p2p-circuit` y
    puede intercambiar IPFS, gossip y OrbitDB con peers de la misma red.
-6. Cuando IPFS escribe contenido o registros, publica providers en routing.
-7. OrbitDB y gossip se benefician de esos peers libp2p ya conectados, sin
+7. Cuando IPFS escribe contenido o registros, publica providers en routing.
+8. OrbitDB y gossip se benefician de esos peers libp2p ya conectados, sin
    necesitar el flujo antiguo de Mongo.
 
 ## Variables relevantes
@@ -149,6 +152,8 @@ puerto/firewall, no OrbitDB ni `NetworkSyncRequested`.
 El cambio se considera correcto cuando un nodo sin conectividad directa puede:
 
 - descubrir o recibir multiaddrs de relay;
+- reutilizar un relay cifrado guardado en cache local cuando el discovery
+  publico aun no ha resuelto records;
 - comprobar que el multiaddr anunciado acepta conexion TCP desde fuera;
 - dialear el relay desde su libp2p privado;
 - publicar providers de contenido y registros IPFS;

@@ -27,6 +27,10 @@ export default class EmbeddedLocalDatabase {
     await this.database.clear();
   }
 
+  public async close(): Promise<void> {
+    await this.database.close();
+  }
+
   public async delete(namespace: string, id: string): Promise<void> {
     await this.database.del(this.key(namespace, id));
   }

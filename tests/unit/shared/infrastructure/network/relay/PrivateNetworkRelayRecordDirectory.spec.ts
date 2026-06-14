@@ -2,11 +2,18 @@ import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/I
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import Kernel from '@app/Kernel';
-import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
+import { PrivateNetworkRelayRecord } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecord';
+import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec';
+import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import { PrivateRelayRecordCacheDocument } from '@app/shared/infrastructure/network/relay/PrivateRelayRecordCacheDocument';
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
+import * as fs from 'fs/promises';
 import { mock, MockProxy } from 'jest-mock-extended';
+import os from 'os';
+import path from 'path';
 
 function privateKey(): PrivateKey {
   const { privateKey: key } = generateKeyPairSync('ed25519');
@@ -16,10 +23,12 @@ function privateKey(): PrivateKey {
   );
 }
 
-function privateNetwork(networkKey: PrivateKey): IPFSNetwork {
-  const connection = mock<IPFSConnection>();
-
-  connection.getPeerId.mockReturnValue('12D3KooWRelay');
+function privateNetwork(
+  networkKey: PrivateKey,
+  connection: MockProxy<IPFSConnection> = mock<IPFSConnection>(),
+  peerId: string = '12D3KooWRelay',
+): IPFSNetwork {
+  connection.getPeerId.mockReturnValue(peerId);
 
   return new IPFSNetwork(
     new IPFSNetworkConfig('network-1', 'private', networkKey),
@@ -28,22 +37,40 @@ function privateNetwork(networkKey: PrivateKey): IPFSNetwork {
 }
 
 describe('PrivateNetworkRelayRecordDirectory', () => {
+  let localDatabase: EmbeddedLocalDatabase;
+  let localDatabasePath: string;
   let logger: MockProxy<WinstonLogger>;
+  let previousLocalDatabasePath: string | undefined;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED;
+    previousLocalDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
+    localDatabasePath = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'pigeon-relay-cache-'),
+    );
+    process.env.PIGEON_LOCAL_DB_PATH = localDatabasePath;
+    localDatabase = new EmbeddedLocalDatabase();
 
     logger = mock<WinstonLogger>();
     jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await localDatabase.close();
+
+    if (previousLocalDatabasePath === undefined) {
+      delete process.env.PIGEON_LOCAL_DB_PATH;
+    } else {
+      process.env.PIGEON_LOCAL_DB_PATH = previousLocalDatabasePath;
+    }
+
+    await fs.rm(localDatabasePath, { force: true, recursive: true });
     jest.restoreAllMocks();
   });
 
   it('should not fail the whole relay record publication when generic DHT aborts after pubsub publishes', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory();
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
 
     publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
@@ -88,9 +115,57 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       expect.stringContaining('Private IPFS relay record publication failed'),
     );
     expect(logger.warn).not.toHaveBeenCalledWith(
-      expect.stringContaining(
-        'reason="No publication channel succeeded."',
-      ),
+      expect.stringContaining('reason="No publication channel succeeded."'),
     );
+  });
+
+  it('should dial a locally cached relay before waiting for public routing peers', async () => {
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const networkKey = privateKey();
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      networkKey,
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const relayRecord: PrivateNetworkRelayRecord = {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: ['/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay'],
+      peerId: '12D3KooWRelay',
+      role: 'relay',
+      version: 1,
+    };
+    const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
+
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(false);
+
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+    await localDatabase.save(
+      PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+      network.getId(),
+      {
+        _id: network.getId(),
+        cachedAt: Date.now(),
+        envelope,
+        networkId: network.getId(),
+      } satisfies PrivateRelayRecordCacheDocument,
+    );
+
+    await directory.discover(network, mock());
+
+    expect(privateConnection.dial).toHaveBeenCalledWith(
+      relayRecord.multiaddrs[0],
+      expect.any(AbortSignal),
+    );
+    expect(publicConnection.waitForPeers).not.toHaveBeenCalled();
   });
 });

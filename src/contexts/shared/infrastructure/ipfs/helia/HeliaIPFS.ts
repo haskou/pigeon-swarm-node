@@ -228,6 +228,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return { signal: controller.signal, timeout };
   }
 
+  private getIPNSResolutionSkipReason(error: unknown): string {
+    const message = String(error);
+
+    if (message.includes('No public IPFS peers')) {
+      return 'No public IPFS peers are available for IPNS resolution.';
+    }
+
+    if (message.includes('AbortError') || message.includes('aborted')) {
+      return 'The IPNS routing lookup timed out before a record was found.';
+    }
+
+    if (
+      message.includes('GetFailedError') ||
+      message.includes('Failed to get value')
+    ) {
+      return 'The IPNS name has not propagated to this public IPFS node yet.';
+    }
+
+    return 'IPNS routing did not return a record.';
+  }
+
   private async getLocalRecord(
     key: string,
     signal?: AbortSignal,
@@ -901,9 +922,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
       );
     } catch (error: unknown) {
       Kernel.logger.debug?.(
-        `IPNS record resolution skipped name="${heliaRuntimeAdapter.getIPNSName(
+        `IPNS record not available in public routing yet: name="${heliaRuntimeAdapter.getIPNSName(
           privateKey,
-        )}" error=${String(error)}`,
+        )}" reason="${this.getIPNSResolutionSkipReason(error)}"` +
+          ` publicPeers=${this.getPeers().length}` +
+          ` details=${String(error)}`,
       );
     } finally {
       clearTimeout(routingAbort.timeout);
