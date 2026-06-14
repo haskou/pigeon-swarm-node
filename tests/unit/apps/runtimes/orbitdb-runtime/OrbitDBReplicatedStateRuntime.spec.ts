@@ -47,13 +47,17 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     (
       Kernel as unknown as {
         _logs: {
+          debug: jest.Mock;
           error: jest.Mock;
           info: jest.Mock;
+          warn: jest.Mock;
         };
       }
     )._logs = {
+      debug: jest.fn(),
       error: jest.fn(),
       info: jest.fn(),
+      warn: jest.fn(),
     };
   });
 

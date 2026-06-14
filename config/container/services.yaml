@@ -206,11 +206,6 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==:
-    class: /contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry
-    arguments: []
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCRG9tYWluRXZlbnRQcm9qZWN0b3JfX09yYml0REJEb21haW5FdmVudFByb2plY3Rvcg==:
     class: /contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector
     arguments: []
@@ -271,6 +266,16 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX21lbW9yeV9fTWVtb3J5TWVzc2FnZUJ1c0FkYXB0ZXJfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVy:
     class: /shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkQ29kZWNfX1ByaXZhdGVOZXR3b3JrUmVsYXlSZWNvcmRDb2RlYw==:
+    class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec
+    arguments: []
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5:
+    class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory
     arguments: []
     abstract: false
     parent: null
@@ -572,6 +577,13 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19maW5kLXZhcGlkLXB1YmxpYy1rZXlfX1B1c2hWYXBpZENvbmZpZ3VyYXRpb25SZWFkZXJfX0NvbmZpZ3VyYXRpb25SZWFkZXI=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==:
+    class: /contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCTWV0YWRhdGFIZWFkUmVwYWlyZXJfX09yYml0REJNZXRhZGF0YUhlYWRSZXBhaXJlcg==:
     class: /contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer
     arguments:
@@ -700,6 +712,13 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19QdWJsaWNSZWxheVJ1bnRpbWVfX1B1YmxpY1JlbGF5UnVudGltZQ==:
+    class: /shared/infrastructure/network/relay/PublicRelayRuntime
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==: >-

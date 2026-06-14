@@ -14,6 +14,8 @@ import type * as IPNSModule from 'ipns';
 import type * as IPNSValidatorModule from 'ipns/validator';
 import type { createLibp2p } from 'libp2p';
 import type { CID as MultiformatsCid } from 'multiformats/cid';
+import type * as MultiformatsDigest from 'multiformats/hashes/digest';
+import type * as Sha2Module from 'multiformats/hashes/sha2';
 
 import type { HeliaBlockBrokers } from './types/HeliaBlockBrokers';
 import type { HeliaInstance } from './types/HeliaInstance';
@@ -34,6 +36,8 @@ export type { RuntimeBlockstore } from './types/RuntimeBlockstore';
 export type { RuntimeDatastore } from './types/RuntimeDatastore';
 
 export class HeliaRuntimeAdapter {
+  private static readonly RAW_CODEC_CODE = 0x55;
+
   private static readonly DEFAULT_RELAY_DATA_LIMIT_BYTES = 64 * 1024 * 1024;
 
   private static readonly DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS = [
@@ -64,6 +68,8 @@ export class HeliaRuntimeAdapter {
   >;
 
   private cidModulePromise?: Promise<typeof import('multiformats/cid')>;
+  private digestModulePromise?: Promise<typeof MultiformatsDigest>;
+  private sha2ModulePromise?: Promise<typeof Sha2Module>;
   private blockstoreCoreModulePromise?: Promise<
     typeof import('blockstore-core')
   >;
@@ -202,6 +208,22 @@ export class HeliaRuntimeAdapter {
     return this.cidModulePromise;
   }
 
+  private loadDigestModule(): Promise<typeof MultiformatsDigest> {
+    this.digestModulePromise ??= this.nativeImport<typeof MultiformatsDigest>(
+      'multiformats/hashes/digest',
+    );
+
+    return this.digestModulePromise;
+  }
+
+  private loadSha2Module(): Promise<typeof Sha2Module> {
+    this.sha2ModulePromise ??= this.nativeImport<typeof Sha2Module>(
+      'multiformats/hashes/sha2',
+    );
+
+    return this.sha2ModulePromise;
+  }
+
   private loadBlockstoreCoreModule(): Promise<
     typeof import('blockstore-core')
   > {
@@ -307,6 +329,13 @@ export class HeliaRuntimeAdapter {
       .filter(Boolean);
   }
 
+  private getRelayBootstrapMultiaddrs(): string[] {
+    return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
   private async withPublicBootstrap(
     defaults: Libp2pDefaults,
   ): Promise<Libp2pDefaults> {
@@ -326,6 +355,32 @@ export class HeliaRuntimeAdapter {
       bootstrapModule.bootstrap({
         list: bootstrapMultiaddrs,
         tagName: 'pigeon-public-bootstrap',
+        tagTTL: Infinity,
+      }),
+    ];
+
+    return defaults;
+  }
+
+  public async withBootstrapRelays(
+    defaults: Libp2pDefaults,
+  ): Promise<Libp2pDefaults> {
+    const relayMultiaddrs = this.getRelayBootstrapMultiaddrs();
+
+    if (relayMultiaddrs.length === 0) {
+      return defaults;
+    }
+
+    const bootstrapModule = await this.loadBootstrapModule();
+    const config = defaults as unknown as {
+      peerDiscovery?: unknown[];
+    };
+
+    config.peerDiscovery = [
+      ...(config.peerDiscovery || []),
+      bootstrapModule.bootstrap({
+        list: relayMultiaddrs,
+        tagName: 'pigeon-relay-bootstrap',
         tagTTL: Infinity,
       }),
     ];
@@ -435,6 +490,22 @@ export class HeliaRuntimeAdapter {
     const multiaddrModule = await this.loadMultiaddrModule();
 
     return multiaddrModule.multiaddr(address);
+  }
+
+  public async createRawSha256Cid(value: string): Promise<MultiformatsCid> {
+    const [cidModule, digestModule, sha2Module] = await Promise.all([
+      this.loadCidModule(),
+      this.loadDigestModule(),
+      this.loadSha2Module(),
+    ]);
+    const hash = await sha2Module.sha256.digest(
+      new TextEncoder().encode(value),
+    );
+
+    return cidModule.CID.createV1(
+      HeliaRuntimeAdapter.RAW_CODEC_CODE,
+      digestModule.create(hash.code, hash.digest),
+    );
   }
 
   public async createPreSharedKey(

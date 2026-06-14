@@ -31,12 +31,9 @@ export default class IPFSNetworkRegistry {
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
-  private readonly relayRecordDirectory: PrivateNetworkRelayRecordDirectory;
-
-  constructor(relayRecordDirectory?: PrivateNetworkRelayRecordDirectory) {
-    this.relayRecordDirectory =
-      relayRecordDirectory ?? new PrivateNetworkRelayRecordDirectory();
-  }
+  constructor(
+    private readonly relayRecordDirectory: PrivateNetworkRelayRecordDirectory,
+  ) {}
 
   private getState(): IPFSNetworkRegistryState {
     const globalState = globalThis as typeof globalThis & {
@@ -392,6 +389,10 @@ export default class IPFSNetworkRegistry {
     const privateKey = await this.loadOrCreateSharedPeerPrivateKey();
 
     return Promise.resolve(this.exportSharedPeerPrivateKeyPem(privateKey));
+  }
+
+  public async getSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
+    return this.loadOrCreateSharedPeerPrivateKey();
   }
 
   public async initialize(): Promise<void> {

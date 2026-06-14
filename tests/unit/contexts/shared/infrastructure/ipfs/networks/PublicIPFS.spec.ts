@@ -269,6 +269,9 @@ describe('PublicIPFS', () => {
 
       expect(result).toEqual(Buffer.from([1, 2, 3]));
       expect(mockHeliaNode.blockstore.get).toHaveBeenCalledWith(parsedCid, {
+        maxProviders: 1,
+        minProviders: 1,
+        providers: ['connected-peer'],
         signal,
       });
     });

@@ -2,6 +2,10 @@ import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
 import type * as NobleEd25519Module from '@noble/curves/ed25519.js';
 
 import { Libp2pKeysModule } from './types/Libp2pKeysModule';
+import { Libp2pPublicKeyLike } from './types/Libp2pPublicKeyLike';
+
+export { Libp2pPrivateKeyLike } from './types/Libp2pPrivateKeyLike';
+export { Libp2pPublicKeyLike } from './types/Libp2pPublicKeyLike';
 
 export class Libp2pKeyAdapter {
   private keysModulePromise?: Promise<Libp2pKeysModule>;
@@ -77,8 +81,28 @@ export class Libp2pKeyAdapter {
     return keysModule.privateKeyToProtobuf(privateKey);
   }
 
+  public async publicKeyFromProtobuf(
+    protobuf: Uint8Array,
+  ): Promise<Libp2pPublicKeyLike> {
+    const keysModule = await this.loadKeysModule();
+
+    return keysModule.publicKeyFromProtobuf(protobuf);
+  }
+
+  public async publicKeyToProtobuf(
+    publicKey: Libp2pPublicKeyLike,
+  ): Promise<Uint8Array> {
+    const keysModule = await this.loadKeysModule();
+
+    return keysModule.publicKeyToProtobuf(publicKey);
+  }
+
   public peerIdFromPrivateKey(privateKey: Libp2pPrivateKey): string {
     return privateKey.publicKey.toString();
+  }
+
+  public peerIdFromPublicKey(publicKey: Libp2pPublicKeyLike): string {
+    return publicKey.toString();
   }
 }
 

@@ -8,6 +8,8 @@ import Kernel from '@app/Kernel';
 import { PrivateNetworkRelayRecord } from './PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from './PrivateNetworkRelayRecordCodec';
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
+import { PublicRelayRecordDiscovery } from './PublicRelayRecordDiscovery';
+import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 
 export type PrivateRelayListenOptions = {
   announceAddresses?: string[];
@@ -44,6 +46,12 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
     new Map();
+
+  private readonly publicRelayRecordRegistry = new PublicRelayRecordRegistry();
+
+  private readonly publicRelayDiscovery = new PublicRelayRecordDiscovery(
+    this.publicRelayRecordRegistry,
+  );
 
   private publicConnection?: Promise<IPFSConnection>;
 
@@ -132,6 +140,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.publicConnection ??= PublicIPFS.create({
       privateKey: sharedPrivateKey,
       storageLocation: this.getPublicRelayDirectoryStorageLocation(),
+    }).then(async (connection) => {
+      await this.publicRelayDiscovery.startConnection(connection);
+
+      return connection;
     });
 
     return this.publicConnection;
@@ -409,6 +421,25 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private async provideRelayRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    lookupKey: string,
+  ): Promise<void> {
+    const routingAbort = this.createRoutingAbortSignal();
+
+    try {
+      await publicConnection.provideRecord(lookupKey, routingAbort.signal);
+    } catch (error) {
+      Kernel.logger.debug(
+        `Private IPFS relay record provider publication skipped: networkId=${network.getId()}` +
+          ` error=${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+  }
+
   private async discoverRelayIPNSRecord(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -546,6 +577,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         JSON.stringify(envelope),
         routingAbort.signal,
       );
+      await this.provideRelayRecord(publicConnection, network, lookupKey);
       await this.publishRelayIPNSRecord(
         publicConnection,
         network,
