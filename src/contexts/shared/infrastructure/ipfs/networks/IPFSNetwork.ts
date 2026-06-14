@@ -77,8 +77,8 @@ export class IPFSNetwork {
     return this.connection.addBytes(bytes, signal);
   }
 
-  public async dial(multiaddr: string): Promise<void> {
-    return this.connection.dial(multiaddr);
+  public async dial(multiaddr: string, signal?: AbortSignal): Promise<void> {
+    return this.connection.dial(multiaddr, signal);
   }
 
   public async listen(multiaddr: string): Promise<void> {

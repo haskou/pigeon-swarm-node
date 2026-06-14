@@ -571,9 +571,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return ipfsId;
   }
 
-  public async dial(multiaddr: string): Promise<void> {
+  public async dial(multiaddr: string, signal?: AbortSignal): Promise<void> {
     await this.heliaCore.libp2p.dial(
       await heliaRuntimeAdapter.createMultiaddr(multiaddr),
+      { signal },
     );
   }
 

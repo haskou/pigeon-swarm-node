@@ -230,10 +230,11 @@ describe('IPFSNetwork', () => {
       const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
       const multiaddr = '/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWtestPeerId';
+      const signal = new AbortController().signal;
 
-      await network.dial(multiaddr);
+      await network.dial(multiaddr, signal);
 
-      expect(connection.dial).toHaveBeenCalledWith(multiaddr);
+      expect(connection.dial).toHaveBeenCalledWith(multiaddr, signal);
     });
   });
 

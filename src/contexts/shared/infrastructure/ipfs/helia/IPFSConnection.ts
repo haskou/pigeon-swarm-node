@@ -5,7 +5,7 @@ import { IPFSId } from './IPFSId';
 export interface IPFSConnection {
   stat(cid: IPFSId, offlineOnly: boolean, signal?: AbortSignal): Promise<void>;
   addBytes(bytes: Uint8Array, signal?: AbortSignal): Promise<IPFSId>;
-  dial(multiaddr: string): Promise<void>;
+  dial(multiaddr: string, signal?: AbortSignal): Promise<void>;
   listen(multiaddr: string): Promise<void>;
   getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer>;
   addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId>;

@@ -57,6 +57,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly relayRecordEnvelopeCache: Map<string, string> = new Map();
 
+  private readonly activePrivateRelayDialKeys: Set<string> = new Set();
+
   private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
     new Map();
 
@@ -139,6 +141,20 @@ export default class PrivateNetworkRelayRecordDirectory {
     return 15_000;
   }
 
+  private getPrivateRelayDialTimeoutMs(): number {
+    const configuredTimeoutMs = Number(
+      process.env.PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS ||
+        process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
+        process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS,
+    );
+
+    if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
+      return configuredTimeoutMs;
+    }
+
+    return 15_000;
+  }
+
   private isPubSubRecordEnabled(): boolean {
     return process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED !== 'false';
   }
@@ -187,6 +203,23 @@ export default class PrivateNetworkRelayRecordDirectory {
     const timeout = setTimeout(
       () => controller.abort(),
       this.getRoutingRecordTimeoutMs(),
+    );
+
+    return { signal: controller.signal, timeout };
+  }
+
+  private createPrivateRelayDialAbortSignal(): {
+    signal: AbortSignal;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
+    const controller = new AbortController();
+    const timeoutMs = this.getPrivateRelayDialTimeoutMs();
+    const timeout = setTimeout(
+      () =>
+        controller.abort(
+          new Error(`Private relay dial timed out after ${timeoutMs}ms.`),
+        ),
+      timeoutMs,
     );
 
     return { signal: controller.signal, timeout };
@@ -715,6 +748,46 @@ export default class PrivateNetworkRelayRecordDirectory {
     return undefined;
   }
 
+  private async dialDiscoveredPrivateRelay(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+    multiaddr: string,
+  ): Promise<boolean> {
+    if (network.getPeers().includes(relayRecord.peerId)) {
+      return true;
+    }
+
+    const dialKey = `${network.getId()}:${relayRecord.peerId}:${multiaddr}`;
+
+    if (this.activePrivateRelayDialKeys.has(dialKey)) {
+      Kernel.logger.debug(
+        `Private IPFS relay record dial already in progress: networkId=${network.getId()}` +
+          ` peerId=${relayRecord.peerId}` +
+          ` multiaddr="${multiaddr}"`,
+      );
+
+      return false;
+    }
+
+    this.activePrivateRelayDialKeys.add(dialKey);
+    const dialAbort = this.createPrivateRelayDialAbortSignal();
+
+    Kernel.logger.debug(
+      `Private IPFS relay record dialing: networkId=${network.getId()}` +
+        ` peerId=${relayRecord.peerId}` +
+        ` multiaddr="${multiaddr}"`,
+    );
+
+    try {
+      await network.dial(multiaddr, dialAbort.signal);
+
+      return true;
+    } finally {
+      clearTimeout(dialAbort.timeout);
+      this.activePrivateRelayDialKeys.delete(dialKey);
+    }
+  }
+
   private async dialPrivateRelayRecord(
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
@@ -725,13 +798,14 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     for (const multiaddr of relayRecord.multiaddrs) {
       try {
-        if (!network.getPeers().includes(relayRecord.peerId)) {
-          Kernel.logger.debug(
-            `Private IPFS relay record dialing: networkId=${network.getId()}` +
-              ` peerId=${relayRecord.peerId}` +
-              ` multiaddr="${multiaddr}"`,
-          );
-          await network.dial(multiaddr);
+        if (
+          !(await this.dialDiscoveredPrivateRelay(
+            network,
+            relayRecord,
+            multiaddr,
+          ))
+        ) {
+          continue;
         }
 
         const circuitRelayMultiaddr =

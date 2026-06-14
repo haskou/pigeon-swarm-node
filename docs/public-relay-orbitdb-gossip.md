@@ -97,6 +97,8 @@ publico para que otros peers de esa misma red puedan encontrarlo.
 - `PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS` o
   `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS`: timeout para operaciones de
   publicacion/resolucion IPNS y routing. El valor por defecto es 15000 ms.
+- `PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS`: timeout para dialear un multiaddr de
+  relay privado descubierto. El valor por defecto es 15000 ms.
 - `PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED=false`: desactiva el canal pubsub
   publico usado como fallback de discovery del relay privado.
 - `PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED=false`: desactiva el fallback
