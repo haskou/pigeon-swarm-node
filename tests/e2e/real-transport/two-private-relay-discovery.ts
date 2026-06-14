@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   const networkKey = new PrivateKey(generateNetworkKey());
   const relay = await createNode('relay', networkKey, {
     enableRelayServer: true,
-    listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
+    listenAddresses: ['/ip4/0.0.0.0/tcp/0'],
     relayDataLimitBytes: 16 * 1024 * 1024,
   });
   const leaf = await createNode('leaf', networkKey, {
@@ -61,14 +61,17 @@ async function main(): Promise<void> {
   try {
     const relayAddress = await waitForMultiaddr(
       relay.network,
-      (multiaddr) =>
-        multiaddr.includes('/ip4/127.0.0.1/tcp/') &&
-        !multiaddr.includes('/p2p-circuit'),
+      (multiaddr) => isDirectTcpMultiaddr(multiaddr),
       'relay direct multiaddr',
     );
 
+    const cid = await assertNoPrivateConnectivityBeforeDiscovery(
+      relay.network,
+      leaf.network,
+    );
+
     await discoverRelay(relay, leaf, relayAddress);
-    await assertIPFSFetch(relay.network, leaf.network);
+    await assertIPFSFetch(relay.network, leaf.network, cid);
     await assertPubSub(relay.network, leaf.network);
     await assertOrbitDBReplication(relay, leaf);
 
@@ -100,10 +103,6 @@ async function main(): Promise<void> {
 function configureEnvironment(): void {
   delete process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS;
   delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
-  process.env.PIGEON_RELAY_RECORD_TTL_MS = '600000';
-  process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS = '600000';
-  process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED =
-    process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED || 'true';
 }
 
 function configureTestLogger(): void {
@@ -149,6 +148,21 @@ async function createNode(
   };
 }
 
+async function publishRelayRecord(
+  relay: PrivateRelayDiscoveryNode,
+  relayAddress: string,
+): Promise<void> {
+  await relay.directory.publish(
+    relay.network,
+    {
+      announceAddresses: [relayAddress],
+      listenAddresses: [relayAddress],
+      relayDataLimitBytes: 16 * 1024 * 1024,
+    },
+    relay.publicPrivateKey,
+  );
+}
+
 async function discoverRelay(
   relay: PrivateRelayDiscoveryNode,
   leaf: PrivateRelayDiscoveryNode,
@@ -156,15 +170,7 @@ async function discoverRelay(
 ): Promise<void> {
   await waitFor(
     async () => {
-      await relay.directory.publish(
-        relay.network,
-        {
-          announceAddresses: [relayAddress],
-          listenAddresses: [relayAddress],
-          relayDataLimitBytes: 16 * 1024 * 1024,
-        },
-        relay.publicPrivateKey,
-      );
+      await publishRelayRecord(relay, relayAddress);
       await leaf.directory.discover(leaf.network, leaf.publicPrivateKey);
 
       return leaf.network.getPeers().includes(relay.network.getPeerId())
@@ -175,21 +181,76 @@ async function discoverRelay(
   );
 }
 
+async function assertNoPrivateConnectivityBeforeDiscovery(
+  provider: IPFSNetwork,
+  requester: IPFSNetwork,
+): Promise<IPFSId> {
+  if (requester.getPeers().includes(provider.getPeerId())) {
+    throw new Error(
+      'False-positive guard failed: requester is connected before discovery.',
+    );
+  }
+
+  const bytes = randomBytes(128 * 1024);
+  const cid = await provider.addBytes(bytes);
+
+  await expectOfflineCIDMiss(requester, cid);
+  await expectRemoteCIDMiss(requester, cid);
+
+  return cid;
+}
+
+async function expectOfflineCIDMiss(
+  requester: IPFSNetwork,
+  cid: IPFSId,
+): Promise<void> {
+  try {
+    await requester.stat(cid, true);
+  } catch {
+    return;
+  }
+
+  throw new Error(
+    `False-positive guard failed: CID ${cid.valueOf()} is already local before discovery.`,
+  );
+}
+
+async function expectRemoteCIDMiss(
+  requester: IPFSNetwork,
+  cid: IPFSId,
+): Promise<void> {
+  try {
+    await withTimeout(
+      (signal) => requester.getBytes(cid, signal),
+      1500,
+      `pre-discovery fetch ${cid.valueOf()}`,
+    );
+  } catch {
+    return;
+  }
+
+  throw new Error(
+    `False-positive guard failed: CID ${cid.valueOf()} is fetchable before discovery.`,
+  );
+}
+
 async function assertIPFSFetch(
   provider: IPFSNetwork,
   requester: IPFSNetwork,
+  cid: IPFSId,
 ): Promise<void> {
-  const bytes = randomBytes(128 * 1024);
-  const cid = await provider.addBytes(bytes);
+  const expectedBytes = await provider.getBytes(cid);
   const fetched = await withTimeout(
     (signal) => requester.getBytes(cid, signal),
     FETCH_TIMEOUT_MS,
     `fetch private IPFS CID ${cid.valueOf()}`,
   );
 
-  if (!Buffer.from(bytes).equals(fetched)) {
+  if (!expectedBytes.equals(fetched)) {
     throw new Error(`Fetched bytes mismatch for ${cid.valueOf()}`);
   }
+
+  await requester.stat(cid, true);
 }
 
 async function assertPubSub(
@@ -289,6 +350,14 @@ async function waitForMultiaddr(
   return waitFor(() => network.getMultiaddrs().find(predicate), label);
 }
 
+function isDirectTcpMultiaddr(multiaddr: string): boolean {
+  return (
+    multiaddr.includes('/ip4/') &&
+    multiaddr.includes('/tcp/') &&
+    !multiaddr.includes('/p2p-circuit')
+  );
+}
+
 async function waitFor<T>(
   getter: () => Promise<T | undefined> | T | undefined,
   label: string,
@@ -353,6 +422,6 @@ main()
     process.exit(0);
   })
   .catch((error) => {
-  console.error(error);
-  process.exit(1);
+    console.error(error);
+    process.exit(1);
   });
