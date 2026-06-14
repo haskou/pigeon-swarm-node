@@ -21,6 +21,11 @@ export default class PrivateNetworkRelayRecordDirectory {
   private static readonly inlineIPNSValuePrefix =
     '/pigeon-swarm/private-relay/v1/';
 
+  private static readonly relayRecordPubSubTopicPrefix =
+    'pigeon-swarm.private-relay-records.v1';
+
+  private static readonly defaultRelayRecordPublicationIntervalMs = 15_000;
+
   private readonly storagePath: string =
     process.env.IPFS_STORAGE_PATH || './ipfs_storage';
 
@@ -43,6 +48,12 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly missingRelayInfoKeys: Set<string> = new Set();
 
   private readonly fallbackRelayInfoKeys: Set<string> = new Set();
+
+  private readonly pubSubRelayInfoKeys: Set<string> = new Set();
+
+  private readonly subscribedRelayRecordTopics: Set<string> = new Set();
+
+  private readonly relayRecordEnvelopeCache: Map<string, string> = new Map();
 
   private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
     new Map();
@@ -70,10 +81,29 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getRelayRecordPublicationIntervalMs(): number {
-    return Number(
-      process.env.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS ||
-        Math.max(15 * 1000, Math.floor(this.getRelayRecordTtlMs() / 2)),
+    const configuredIntervalMs = Number(
+      process.env.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS,
     );
+
+    if (Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0) {
+      return configuredIntervalMs;
+    }
+
+    const configuredRefreshSeconds = Number(
+      process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS,
+    );
+
+    if (
+      Number.isFinite(configuredRefreshSeconds) &&
+      configuredRefreshSeconds > 0
+    ) {
+      return configuredRefreshSeconds * 1000;
+    }
+
+    const Directory = PrivateNetworkRelayRecordDirectory;
+    const defaultInterval = Directory.defaultRelayRecordPublicationIntervalMs;
+
+    return defaultInterval;
   }
 
   private getPublicPeerWaitMs(): number {
@@ -272,6 +302,26 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private infoWhenRelayPubSubRecordIsDiscovered(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): void {
+    const infoKey = `${network.getId()}:pubsub:${relayRecord.peerId}`;
+
+    if (this.pubSubRelayInfoKeys.has(infoKey)) {
+      return;
+    }
+
+    this.pubSubRelayInfoKeys.add(infoKey);
+    Kernel.logger.info(
+      `Private IPFS relay pubsub record discovered: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` peerId=${relayRecord.peerId}` +
+        ` publicPeers=${publicConnection.getPeers().length}`,
+    );
+  }
+
   private infoWhenRelayRecordIsMissing(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -391,6 +441,70 @@ export default class PrivateNetworkRelayRecordDirectory {
     return relayRecord;
   }
 
+  private getRelayRecordTopic(network: IPFSNetwork): string {
+    return [
+      PrivateNetworkRelayRecordDirectory.relayRecordPubSubTopicPrefix,
+      Buffer.from(PrivateNetworkRelayRecordCodec.lookupKey(network)).toString(
+        'base64url',
+      ),
+    ].join('.');
+  }
+
+  private async subscribeRelayRecordTopic(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    const topic = this.getRelayRecordTopic(network);
+
+    if (this.subscribedRelayRecordTopics.has(topic)) {
+      return;
+    }
+
+    await publicConnection.subscribePubSub(topic, async (payload) => {
+      const envelope = this.decodeEnvelope(payload);
+
+      if (!envelope) {
+        return;
+      }
+
+      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
+
+      if (!relayRecord) {
+        return;
+      }
+
+      this.relayRecordEnvelopeCache.set(
+        PrivateNetworkRelayRecordCodec.lookupKey(network),
+        payload,
+      );
+      this.infoWhenRelayPubSubRecordIsDiscovered(
+        publicConnection,
+        network,
+        relayRecord,
+      );
+      await this.dialPrivateRelayRecord(network, relayRecord);
+    });
+    this.subscribedRelayRecordTopics.add(topic);
+  }
+
+  private async publishRelayPubSubRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+  ): Promise<void> {
+    try {
+      await publicConnection.publishPubSub(
+        this.getRelayRecordTopic(network),
+        JSON.stringify(envelope),
+      );
+    } catch (error) {
+      Kernel.logger.debug(
+        `Private IPFS relay pubsub record publication skipped: networkId=${network.getId()}` +
+          ` error=${String(error)}`,
+      );
+    }
+  }
+
   private async publishRelayIPNSRecord(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -435,6 +549,87 @@ export default class PrivateNetworkRelayRecordDirectory {
         `Private IPFS relay record provider publication skipped: networkId=${network.getId()}` +
           ` error=${String(error)}`,
       );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+  }
+
+  private async dialRelayRecordWhenAvailable(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord | undefined,
+  ): Promise<boolean> {
+    if (!relayRecord) {
+      return false;
+    }
+
+    return this.dialPrivateRelayRecord(network, relayRecord);
+  }
+
+  private async dialCachedRelayRecord(network: IPFSNetwork): Promise<boolean> {
+    const cachedEnvelope = this.relayRecordEnvelopeCache.get(
+      PrivateNetworkRelayRecordCodec.lookupKey(network),
+    );
+
+    if (!cachedEnvelope) {
+      return false;
+    }
+
+    const envelope = this.decodeEnvelope(cachedEnvelope);
+    const relayRecord = envelope
+      ? this.getRelayRecordFromEnvelope(network, envelope)
+      : undefined;
+
+    return this.dialRelayRecordWhenAvailable(network, relayRecord);
+  }
+
+  private logIgnoredRelayRecord(network: IPFSNetwork, reason: string): void {
+    Kernel.logger.debug(
+      `Private IPFS relay record ignored: networkId=${network.getId()}` +
+        ` reason="${reason}"`,
+    );
+  }
+
+  private async discoverFallbackRelayRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
+    const routingAbort = this.createRoutingAbortSignal();
+
+    try {
+      const value = await publicConnection.getRecord(
+        lookupKey,
+        routingAbort.signal,
+      );
+
+      if (!value) {
+        this.infoWhenRelayRecordIsMissing(publicConnection, network);
+
+        return;
+      }
+
+      const envelope = this.decodeEnvelope(value);
+
+      if (!envelope) {
+        this.logIgnoredRelayRecord(network, 'Invalid envelope.');
+
+        return;
+      }
+
+      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
+
+      if (!relayRecord) {
+        this.logIgnoredRelayRecord(network, 'Expired or not decryptable.');
+
+        return;
+      }
+
+      this.infoWhenRelayFallbackRecordIsDiscovered(
+        publicConnection,
+        network,
+        relayRecord,
+      );
+      await this.dialPrivateRelayRecord(network, relayRecord);
     } finally {
       clearTimeout(routingAbort.timeout);
     }
@@ -577,6 +772,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         JSON.stringify(envelope),
         routingAbort.signal,
       );
+      await this.publishRelayPubSubRecord(publicConnection, network, envelope);
       await this.provideRelayRecord(publicConnection, network, lookupKey);
       await this.publishRelayIPNSRecord(
         publicConnection,
@@ -607,6 +803,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): Promise<void> {
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
 
+    await this.subscribeRelayRecordTopic(publicConnection, network);
+
     if (
       !(await this.waitForPublicConnectionPeers(
         'discover',
@@ -623,59 +821,15 @@ export default class PrivateNetworkRelayRecordDirectory {
         network,
       );
 
-      if (
-        ipnsRelayRecord &&
-        (await this.dialPrivateRelayRecord(network, ipnsRelayRecord))
-      ) {
+      if (await this.dialRelayRecordWhenAvailable(network, ipnsRelayRecord)) {
         return;
       }
 
-      const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
-      const routingAbort = this.createRoutingAbortSignal();
-
-      try {
-        const value = await publicConnection.getRecord(
-          lookupKey,
-          routingAbort.signal,
-        );
-
-        if (!value) {
-          this.infoWhenRelayRecordIsMissing(publicConnection, network);
-
-          return;
-        }
-
-        const envelope = this.decodeEnvelope(value);
-
-        if (!envelope) {
-          Kernel.logger.debug(
-            `Private IPFS relay record ignored: networkId=${network.getId()}` +
-              ' reason="Invalid envelope."',
-          );
-
-          return;
-        }
-
-        const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
-
-        if (!relayRecord) {
-          Kernel.logger.debug(
-            `Private IPFS relay record ignored: networkId=${network.getId()}` +
-              ' reason="Expired or not decryptable."',
-          );
-
-          return;
-        }
-
-        this.infoWhenRelayFallbackRecordIsDiscovered(
-          publicConnection,
-          network,
-          relayRecord,
-        );
-        await this.dialPrivateRelayRecord(network, relayRecord);
-      } finally {
-        clearTimeout(routingAbort.timeout);
+      if (await this.dialCachedRelayRecord(network)) {
+        return;
       }
+
+      await this.discoverFallbackRelayRecord(publicConnection, network);
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay record discovery failed: networkId=${network.getId()}` +

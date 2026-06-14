@@ -37,6 +37,10 @@ const FETCH_TIMEOUT_MS = Number(
 const FALSE_POSITIVE_GUARD_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_FALSE_POSITIVE_GUARD_MS || 1500,
 );
+const MISSED_INITIAL_PUBLICATION_WAIT_MS = Number(
+  process.env
+    .PRIVATE_RELAY_DISCOVERY_E2E_MISSED_INITIAL_PUBLICATION_WAIT_MS || 2000,
+);
 
 type PrivateRelayDiscoveryNode = {
   directory: PrivateNetworkRelayRecordDirectory;
@@ -83,7 +87,7 @@ async function main(): Promise<void> {
     );
 
     await assertNoPubSubBeforeDiscovery(relay.network, leaf.network);
-    await discoverRelay(relay, leaf, relayAddress);
+    await discoverRelayAutomatically(relay, leaf, relayAddress);
     await assertIPFSFetch(relay.network, leaf.network, cid);
     await assertPubSub(relay.network, leaf.network);
     await assertOrbitDBReplication(relay, leaf);
@@ -187,11 +191,11 @@ async function createNode(
   };
 }
 
-async function publishRelayRecord(
+function startRelayRecordPublication(
   relay: PrivateRelayDiscoveryNode,
   relayAddress: string,
-): Promise<void> {
-  await relay.directory.publish(
+): void {
+  relay.directory.start(
     relay.network,
     {
       announceAddresses: [relayAddress],
@@ -202,20 +206,20 @@ async function publishRelayRecord(
   );
 }
 
-async function discoverRelay(
+async function discoverRelayAutomatically(
   relay: PrivateRelayDiscoveryNode,
   leaf: PrivateRelayDiscoveryNode,
   relayAddress: string,
 ): Promise<void> {
-  await waitFor(
-    async () => {
-      await publishRelayRecord(relay, relayAddress);
-      await leaf.directory.discover(leaf.network, leaf.publicPrivateKey);
+  startRelayRecordPublication(relay, relayAddress);
+  await sleep(MISSED_INITIAL_PUBLICATION_WAIT_MS);
+  leaf.directory.start(leaf.network, undefined, leaf.publicPrivateKey);
 
-      return leaf.network.getPeers().includes(relay.network.getPeerId())
+  await waitFor(
+    () =>
+      leaf.network.getPeers().includes(relay.network.getPeerId())
         ? true
-        : undefined;
-    },
+        : undefined,
     'leaf to discover and dial relay from public relay record',
   );
 }
