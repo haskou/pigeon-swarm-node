@@ -552,17 +552,21 @@ export default class PrivateNetworkRelayRecordDirectory {
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
     envelope: PrivateNetworkRelayRecordEnvelope,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await publicConnection.publishPubSub(
         this.getRelayRecordTopic(network),
         JSON.stringify(envelope),
       );
+
+      return true;
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay pubsub record publication skipped: networkId=${network.getId()}` +
           ` error=${String(error)}`,
       );
+
+      return false;
     }
   }
 
@@ -571,7 +575,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
     envelope: PrivateNetworkRelayRecordEnvelope,
     relayRecord: PrivateNetworkRelayRecord,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const ipnsPrivateKey = await this.getIPNSPrivateKey(
       network,
       this.getCurrentIPNSWindowId(),
@@ -596,7 +600,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         );
       }
 
-      return;
+      return false;
     }
 
     Kernel.logger.debug(
@@ -605,6 +609,8 @@ export default class PrivateNetworkRelayRecordDirectory {
         ` ipnsName=${ipnsName}` +
         ` publicPeers=${publicConnection.getPeers().length}`,
     );
+
+    return true;
   }
 
   private async provideRelayRecord(
@@ -624,6 +630,73 @@ export default class PrivateNetworkRelayRecordDirectory {
     } finally {
       clearTimeout(routingAbort.timeout);
     }
+  }
+
+  private async publishGenericDHTRelayRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    lookupKey: string,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+  ): Promise<boolean> {
+    const routingAbort = this.createRoutingAbortSignal();
+
+    try {
+      await publicConnection.putRecord(
+        lookupKey,
+        JSON.stringify(envelope),
+        routingAbort.signal,
+      );
+      await this.provideRelayRecord(publicConnection, network, lookupKey);
+
+      return true;
+    } catch (error) {
+      Kernel.logger.warn(
+        `Private IPFS relay generic DHT record publication failed: networkId=${network.getId()}` +
+          ` error=${String(error)}`,
+      );
+
+      return false;
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+  }
+
+  private async publishRelayRecordChannels(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    lookupKey: string,
+    envelope: PrivateNetworkRelayRecordEnvelope,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): Promise<boolean> {
+    let published = false;
+
+    if (this.isPubSubRecordEnabled()) {
+      published =
+        (await this.publishRelayPubSubRecord(
+          publicConnection,
+          network,
+          envelope,
+        )) || published;
+    }
+
+    if (this.isGenericDHTRecordEnabled()) {
+      published =
+        (await this.publishGenericDHTRelayRecord(
+          publicConnection,
+          network,
+          lookupKey,
+          envelope,
+        )) || published;
+    }
+
+    return (
+      (await this.publishRelayIPNSRecord(
+        publicConnection,
+        network,
+        envelope,
+        relayRecord,
+      )) || published
+    );
   }
 
   private async dialRelayRecordWhenAvailable(
@@ -883,32 +956,26 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
-    const routingAbort = this.createRoutingAbortSignal();
 
     try {
-      await this.publishRelayIPNSRecord(
+      const published = await this.publishRelayRecordChannels(
         publicConnection,
         network,
+        lookupKey,
         envelope,
         relayRecord,
       );
 
-      if (this.isPubSubRecordEnabled()) {
-        await this.publishRelayPubSubRecord(
-          publicConnection,
-          network,
-          envelope,
+      if (!published) {
+        Kernel.logger.warn(
+          `Private IPFS relay record not published: networkId=${network.getId()}` +
+            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+            ' reason="No publication channel succeeded."',
         );
+
+        return;
       }
 
-      if (this.isGenericDHTRecordEnabled()) {
-        await publicConnection.putRecord(
-          lookupKey,
-          JSON.stringify(envelope),
-          routingAbort.signal,
-        );
-        await this.provideRelayRecord(publicConnection, network, lookupKey);
-      }
       Kernel.logger.debug(
         `Private IPFS relay record published: networkId=${network.getId()}` +
           ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
@@ -921,8 +988,6 @@ export default class PrivateNetworkRelayRecordDirectory {
         `Private IPFS relay record publication failed: networkId=${network.getId()}` +
           ` error=${String(error)}`,
       );
-    } finally {
-      clearTimeout(routingAbort.timeout);
     }
   }
 
