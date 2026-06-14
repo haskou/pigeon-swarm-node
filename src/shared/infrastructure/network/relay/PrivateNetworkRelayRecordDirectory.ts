@@ -34,6 +34,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly noPublicPeerWarningKeys: Set<string> = new Set();
 
+  private readonly dialFailureWarningKeys: Set<string> = new Set();
+
   private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
     new Map();
 
@@ -190,6 +192,28 @@ export default class PrivateNetworkRelayRecordDirectory {
     return `${relayMultiaddr}/p2p-circuit`;
   }
 
+  private warnWhenPrivateRelayDialFails(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+    multiaddr: string,
+    error: unknown,
+  ): void {
+    const message = String(error);
+    const warningKey = `${network.getId()}:${relayRecord.peerId}:${multiaddr}:${message}`;
+
+    if (this.dialFailureWarningKeys.has(warningKey)) {
+      return;
+    }
+
+    this.dialFailureWarningKeys.add(warningKey);
+    Kernel.logger.warn(
+      `Private IPFS relay record dial failed: networkId=${network.getId()}` +
+        ` peerId=${relayRecord.peerId}` +
+        ` multiaddr="${multiaddr}"` +
+        ` error=${message}`,
+    );
+  }
+
   private isListeningThroughRelay(
     network: IPFSNetwork,
     relayMultiaddr: string,
@@ -342,7 +366,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
 
       if (relayRecord) {
-        Kernel.logger.info(
+        Kernel.logger.debug(
           `Private IPFS relay IPNS record discovered: networkId=${network.getId()}` +
             ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
             ` peerId=${relayRecord.peerId}` +
@@ -367,6 +391,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     for (const multiaddr of relayRecord.multiaddrs) {
       try {
         if (!network.getPeers().includes(relayRecord.peerId)) {
+          Kernel.logger.debug(
+            `Private IPFS relay record dialing: networkId=${network.getId()}` +
+              ` peerId=${relayRecord.peerId}` +
+              ` multiaddr="${multiaddr}"`,
+          );
           await network.dial(multiaddr);
         }
 
@@ -391,10 +420,11 @@ export default class PrivateNetworkRelayRecordDirectory {
 
         return true;
       } catch (error) {
-        Kernel.logger.debug(
-          `Private IPFS relay record dial failed: networkId=${network.getId()}` +
-            ` peerId=${relayRecord.peerId}` +
-            ` multiaddr="${multiaddr}" error=${String(error)}`,
+        this.warnWhenPrivateRelayDialFails(
+          network,
+          relayRecord,
+          multiaddr,
+          error,
         );
       }
     }
