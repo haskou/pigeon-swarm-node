@@ -17,6 +17,7 @@ import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/netwo
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync, randomBytes, randomUUID } from 'crypto';
 import fs from 'fs-extra';
+import { createConnection } from 'net';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -37,10 +38,17 @@ const FETCH_TIMEOUT_MS = Number(
 const FALSE_POSITIVE_GUARD_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_FALSE_POSITIVE_GUARD_MS || 1500,
 );
+const TCP_REACHABILITY_TIMEOUT_MS = Number(
+  process.env.PRIVATE_RELAY_DISCOVERY_E2E_TCP_REACHABILITY_TIMEOUT_MS || 5000,
+);
 const MISSED_INITIAL_PUBLICATION_WAIT_MS = Number(
   process.env
     .PRIVATE_RELAY_DISCOVERY_E2E_MISSED_INITIAL_PUBLICATION_WAIT_MS || 2000,
 );
+const PUBLIC_RECORD_ONLY =
+  process.env.PRIVATE_RELAY_DISCOVERY_E2E_PUBLIC_RECORD_ONLY === 'true';
+const USE_DEFAULT_PUBLIC_BOOTSTRAP =
+  process.env.PRIVATE_RELAY_DISCOVERY_E2E_USE_DEFAULT_PUBLIC_BOOTSTRAP === 'true';
 
 type PrivateRelayDiscoveryNode = {
   directory: PrivateNetworkRelayRecordDirectory;
@@ -61,9 +69,12 @@ async function main(): Promise<void> {
   configureEnvironment();
   configureTestLogger();
 
-  const publicBootstrap = await createPublicBootstrapNode();
-  const publicBootstrapAddress =
-    await configurePublicBootstrap(publicBootstrap);
+  const publicBootstrap = USE_DEFAULT_PUBLIC_BOOTSTRAP
+    ? undefined
+    : await createPublicBootstrapNode();
+  const publicBootstrapAddress = publicBootstrap
+    ? await configurePublicBootstrap(publicBootstrap)
+    : 'default-public-bootstrap';
   const networkKey = new PrivateKey(generateNetworkKey());
   const relay = await createNode('relay', networkKey, {
     enableRelayServer: true,
@@ -80,6 +91,8 @@ async function main(): Promise<void> {
       (multiaddr) => isDirectTcpMultiaddr(multiaddr),
       'relay direct multiaddr',
     );
+
+    await assertRelayAddressReachable(relayAddress);
 
     const cid = await assertNoPrivateConnectivityBeforeDiscovery(
       relay.network,
@@ -113,7 +126,7 @@ async function main(): Promise<void> {
       relay.directory.stopPublicConnection(),
       leaf.network.stop(),
       relay.network.stop(),
-      publicBootstrap.stop(),
+      publicBootstrap?.stop(),
     ]);
     await removeTmpRoot();
   }
@@ -122,6 +135,14 @@ async function main(): Promise<void> {
 function configureEnvironment(): void {
   delete process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS;
   delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
+
+  if (USE_DEFAULT_PUBLIC_BOOTSTRAP) {
+    delete process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED;
+    delete process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS;
+
+    return;
+  }
+
   process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED = 'false';
   process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS = '';
 }
@@ -191,19 +212,30 @@ async function createNode(
   };
 }
 
-function startRelayRecordPublication(
+function relayListenOptions(relayAddress: string) {
+  return {
+    announceAddresses: [relayAddress],
+    listenAddresses: [relayAddress],
+    relayDataLimitBytes: 16 * 1024 * 1024,
+  };
+}
+
+async function startRelayRecordPublication(
   relay: PrivateRelayDiscoveryNode,
   relayAddress: string,
-): void {
-  relay.directory.start(
-    relay.network,
-    {
-      announceAddresses: [relayAddress],
-      listenAddresses: [relayAddress],
-      relayDataLimitBytes: 16 * 1024 * 1024,
-    },
-    relay.publicPrivateKey,
-  );
+): Promise<void> {
+  const options = relayListenOptions(relayAddress);
+
+  if (PUBLIC_RECORD_ONLY) {
+    await relay.directory.publish(relay.network, options, relay.publicPrivateKey);
+    await sleep(MISSED_INITIAL_PUBLICATION_WAIT_MS);
+    relay.directory.stop(relay.network.getId());
+    await relay.directory.stopPublicConnection();
+
+    return;
+  }
+
+  relay.directory.start(relay.network, options, relay.publicPrivateKey);
 }
 
 async function discoverRelayAutomatically(
@@ -211,7 +243,7 @@ async function discoverRelayAutomatically(
   leaf: PrivateRelayDiscoveryNode,
   relayAddress: string,
 ): Promise<void> {
-  startRelayRecordPublication(relay, relayAddress);
+  await startRelayRecordPublication(relay, relayAddress);
   await sleep(MISSED_INITIAL_PUBLICATION_WAIT_MS);
   leaf.directory.start(leaf.network, undefined, leaf.publicPrivateKey);
 
@@ -428,6 +460,54 @@ function isDirectTcpMultiaddr(multiaddr: string): boolean {
     multiaddr.includes('/tcp/') &&
     !multiaddr.includes('/p2p-circuit')
   );
+}
+
+async function assertRelayAddressReachable(multiaddr: string): Promise<void> {
+  const endpoint = parseTcpMultiaddr(multiaddr);
+
+  if (!endpoint) {
+    throw new Error(`Relay multiaddr is not a TCP endpoint: ${multiaddr}`);
+  }
+
+  await withTimeout(
+    () => connectToTcpEndpoint(endpoint.host, endpoint.port),
+    TCP_REACHABILITY_TIMEOUT_MS,
+    `TCP connection to advertised relay address ${multiaddr}`,
+  );
+}
+
+function parseTcpMultiaddr(
+  multiaddr: string,
+): { host: string; port: number } | undefined {
+  const match = multiaddr.match(/\/(?:ip4|dns4)\/([^/]+)\/tcp\/(\d+)/);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const [, rawHost, rawPort] = match;
+  const port = Number(rawPort);
+
+  if (!Number.isInteger(port) || port <= 0) {
+    return undefined;
+  }
+
+  return {
+    host: rawHost === '0.0.0.0' ? '127.0.0.1' : rawHost,
+    port,
+  };
+}
+
+async function connectToTcpEndpoint(host: string, port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const socket = createConnection({ host, port });
+
+    socket.once('connect', () => {
+      socket.end();
+      resolve();
+    });
+    socket.once('error', reject);
+  });
 }
 
 async function waitFor<T>(
