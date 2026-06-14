@@ -19,6 +19,11 @@ export type PrivateRelayListenOptions = {
   relayDataLimitBytes: number;
 };
 
+type PrivateRelayDiscoveryState = {
+  shouldConnectRelayRecords: boolean;
+  shouldDiscover: boolean;
+};
+
 export default class PrivateNetworkRelayRecordDirectory {
   private static readonly defaultRelayRecordPublicationIntervalMs = 15_000;
 
@@ -531,6 +536,31 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private markActiveRelayDiscoveryAttempt(network: IPFSNetwork): void {
     this.activeRelayDiscoveryAttempts[network.getId()] = Date.now();
+  }
+
+  private getDiscoveryState(network: IPFSNetwork): PrivateRelayDiscoveryState {
+    const activeRelayRecord = this.findActiveRelayRecord(network);
+
+    if (!activeRelayRecord) {
+      return {
+        shouldConnectRelayRecords: true,
+        shouldDiscover: true,
+      };
+    }
+
+    if (!this.shouldRefreshActiveRelayDiscovery(network)) {
+      return {
+        shouldConnectRelayRecords: false,
+        shouldDiscover: false,
+      };
+    }
+
+    this.markActiveRelayDiscoveryAttempt(network);
+
+    return {
+      shouldConnectRelayRecords: false,
+      shouldDiscover: true,
+    };
   }
 
   private getPrivateRelayRecordMultiaddrs(
@@ -1063,6 +1093,45 @@ export default class PrivateNetworkRelayRecordDirectory {
     return undefined;
   }
 
+  private async discoverRemoteRelayRecords(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    connectRelayRecords: boolean,
+  ): Promise<void> {
+    try {
+      const ipnsRelayRecord = await this.discoverRelayIPNSRecord(
+        publicConnection,
+        network,
+      );
+
+      if (
+        connectRelayRecords &&
+        (await this.dialRelayRecordWhenAvailable(network, ipnsRelayRecord))
+      ) {
+        return;
+      }
+
+      if (
+        connectRelayRecords &&
+        this.isPubSubRecordEnabled() &&
+        (await this.dialCachedRelayRecord(network))
+      ) {
+        return;
+      }
+
+      await this.discoverFallbackRelayRecord(
+        publicConnection,
+        network,
+        connectRelayRecords,
+      );
+    } catch (error) {
+      Kernel.logger.debug(
+        `Private IPFS relay record discovery failed: networkId=${network.getId()}` +
+          ` error=${String(error)}`,
+      );
+    }
+  }
+
   private async dialDiscoveredPrivateRelay(
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
@@ -1249,28 +1318,20 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<void> {
-    const activeRelayRecord = this.findActiveRelayRecord(network);
+    const discoveryState = this.getDiscoveryState(network);
 
-    if (
-      activeRelayRecord &&
-      !this.shouldRefreshActiveRelayDiscovery(network)
-    ) {
+    if (!discoveryState.shouldDiscover) {
       return;
     }
 
-    if (activeRelayRecord) {
-      this.markActiveRelayDiscoveryAttempt(network);
-    }
-
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
-    const shouldConnectRelayRecords = !activeRelayRecord;
 
     if (this.isPubSubRecordEnabled()) {
       await this.subscribeRelayRecordTopic(publicConnection, network);
     }
 
     if (
-      shouldConnectRelayRecords &&
+      discoveryState.shouldConnectRelayRecords &&
       (await this.dialCachedLocalRelayRecord(network))
     ) {
       return;
@@ -1286,38 +1347,11 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
-    try {
-      const ipnsRelayRecord = await this.discoverRelayIPNSRecord(
-        publicConnection,
-        network,
-      );
-
-      if (
-        shouldConnectRelayRecords &&
-        (await this.dialRelayRecordWhenAvailable(network, ipnsRelayRecord))
-      ) {
-        return;
-      }
-
-      if (
-        shouldConnectRelayRecords &&
-        this.isPubSubRecordEnabled() &&
-        (await this.dialCachedRelayRecord(network))
-      ) {
-        return;
-      }
-
-      await this.discoverFallbackRelayRecord(
-        publicConnection,
-        network,
-        shouldConnectRelayRecords,
-      );
-    } catch (error) {
-      Kernel.logger.debug(
-        `Private IPFS relay record discovery failed: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
-      );
-    }
+    await this.discoverRemoteRelayRecords(
+      publicConnection,
+      network,
+      discoveryState.shouldConnectRelayRecords,
+    );
   }
 
   public start(
