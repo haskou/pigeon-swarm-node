@@ -111,10 +111,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private cacheHead(key: string, value: Record<string, unknown>): boolean {
     const current = this.cachedHeads.get(key);
 
-    if (
-      !current ||
-      this.documentFreshness(current) <= this.documentFreshness(value)
-    ) {
+    if (!current || this.isNewerOrEqualDocument(current, value)) {
       this.cachedHeads.set(key, value);
 
       return true;
@@ -289,6 +286,33 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  private numberValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = document[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private documentVersion(document: Record<string, unknown>): number {
+    return this.numberValue(document, 'version') || 0;
+  }
+
+  private isNewerOrEqualDocument(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): boolean {
+    const currentVersion = this.documentVersion(current);
+    const candidateVersion = this.documentVersion(candidate);
+
+    if (currentVersion !== candidateVersion) {
+      return currentVersion < candidateVersion;
+    }
+
+    return this.documentFreshness(current) <= this.documentFreshness(candidate);
+  }
+
   private deduplicateDocuments(
     documents: Array<Record<string, unknown>>,
   ): Array<Record<string, unknown>> {
@@ -306,10 +330,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
       const current = deduplicated.get(id);
 
-      if (
-        !current ||
-        this.documentFreshness(current) <= this.documentFreshness(document)
-      ) {
+      if (!current || this.isNewerOrEqualDocument(current, document)) {
         deduplicated.set(id, document);
       }
     }

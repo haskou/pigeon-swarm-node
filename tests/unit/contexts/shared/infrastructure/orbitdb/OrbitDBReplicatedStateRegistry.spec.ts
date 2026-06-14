@@ -409,6 +409,43 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
+  it('does not replace a higher version cached head with a lower version replicated update', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+
+    await registry.putHead('identity:identity-1', {
+      cid: 'identity-v5',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      receivedAt: 100,
+      version: 5,
+    });
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          key: 'identity:identity-1',
+          value: {
+            cid: 'identity-v1',
+            id: 'identity-1',
+            identityId: 'identity-1',
+            receivedAt: 200,
+            version: 1,
+          },
+        },
+      },
+    });
+
+    await expect(registry.findHead('identity:identity-1')).resolves.toEqual({
+      cid: 'identity-v5',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      receivedAt: 100,
+      version: 5,
+    });
+  });
+
   it('restores heads from the local cache before rebuilding OrbitDB heads', async () => {
     const headCache = new InMemoryOrbitDBReplicatedHeadCache();
     const registry = new OrbitDBReplicatedStateRegistry(headCache);
