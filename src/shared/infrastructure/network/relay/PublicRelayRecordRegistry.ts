@@ -221,6 +221,13 @@ export class PublicRelayRecordRegistry {
     );
   }
 
+  public allExceptPeer(
+    peerId: string | undefined,
+    now: number = Date.now(),
+  ): PublicRelayRecordPrimitives[] {
+    return this.all(now).filter((record) => record.peerId !== peerId);
+  }
+
   public fallbackAll(now: number = Date.now()): PublicRelayRecordPrimitives[] {
     this.loadPersistedRecords();
 
@@ -229,12 +236,37 @@ export class PublicRelayRecordRegistry {
     );
   }
 
+  public fallbackAllExceptPeer(
+    peerId: string | undefined,
+    now: number = Date.now(),
+  ): PublicRelayRecordPrimitives[] {
+    return this.fallbackAll(now).filter((record) => record.peerId !== peerId);
+  }
+
   public multiaddrs(now: number = Date.now()): string[] {
     return this.all(now).flatMap((record) => record.multiaddrs);
   }
 
+  public multiaddrsExceptPeer(
+    peerId: string | undefined,
+    now: number = Date.now(),
+  ): string[] {
+    return this.allExceptPeer(peerId, now).flatMap(
+      (record) => record.multiaddrs,
+    );
+  }
+
   public fallbackMultiaddrs(now: number = Date.now()): string[] {
     return this.fallbackAll(now).flatMap((record) => record.multiaddrs);
+  }
+
+  public fallbackMultiaddrsExceptPeer(
+    peerId: string | undefined,
+    now: number = Date.now(),
+  ): string[] {
+    return this.fallbackAllExceptPeer(peerId, now).flatMap(
+      (record) => record.multiaddrs,
+    );
   }
 
   public pruneExpired(now: number = Date.now()): void {

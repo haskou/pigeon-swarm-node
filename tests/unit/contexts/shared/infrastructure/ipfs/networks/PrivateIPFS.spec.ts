@@ -146,10 +146,15 @@ import {
   PrivateIPFS,
   PrivateIPFSOptions,
 } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
+import { PublicRelayRecordPrimitives } from '../../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
+import { PublicRelayRecordRegistry } from '../../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 
 describe('PrivateIPFS', () => {
   const { privateKey: nodeKey } = generateKeyPairSync('ed25519');
   const validPem = nodeKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+  const publicRelayRecordRegistry = new PublicRelayRecordRegistry();
+  let previousBootstrapRelayMultiaddrs: string | undefined;
+  let previousPublicRelayRecordsPath: string | undefined;
 
   const defaultOptions: PrivateIPFSOptions = {
     key: new PrivateKey(validPem),
@@ -158,11 +163,49 @@ describe('PrivateIPFS', () => {
   };
 
   beforeEach(() => {
+    previousBootstrapRelayMultiaddrs =
+      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
+    previousPublicRelayRecordsPath =
+      process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH;
+    delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
+    delete process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH;
+    publicRelayRecordRegistry.clear();
     (
       PrivateIPFS as unknown as { connectionPool: Record<string, unknown> }
     ).connectionPool = {};
     jest.clearAllMocks();
   });
+
+  afterEach(() => {
+    publicRelayRecordRegistry.clear();
+
+    if (previousBootstrapRelayMultiaddrs === undefined) {
+      delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
+    } else {
+      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS =
+        previousBootstrapRelayMultiaddrs;
+    }
+
+    if (previousPublicRelayRecordsPath === undefined) {
+      delete process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH;
+    } else {
+      process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH =
+        previousPublicRelayRecordsPath;
+    }
+  });
+
+  function publicRelayRecord(peerId: string): PublicRelayRecordPrimitives {
+    return {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: [`/dns4/relay.example.com/tcp/4011/p2p/${peerId}`],
+      peerId,
+      publicKey: `${peerId}-public-key`,
+      role: 'relay',
+      signature: `${peerId}-signature`,
+      version: 1,
+    };
+  }
 
   describe('create', () => {
     it('should create a new PrivateIPFS instance', async () => {
@@ -211,6 +254,14 @@ describe('PrivateIPFS', () => {
       await PrivateIPFS.create(defaultOptions);
 
       expect(mockHeliaNode.libp2p.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it('should not dial cached public relay records advertised by itself', async () => {
+      publicRelayRecordRegistry.save(publicRelayRecord('mock-peer-id'));
+
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockHeliaNode.libp2p.dial).not.toHaveBeenCalled();
     });
 
     it('should reuse connection from pool on second call with same options', async () => {

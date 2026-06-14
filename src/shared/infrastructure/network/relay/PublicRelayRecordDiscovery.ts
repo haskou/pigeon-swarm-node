@@ -104,7 +104,11 @@ export class PublicRelayRecordDiscovery {
     node: Libp2pPubSubNode,
     record: PublicRelayRecordPrimitives,
   ): Promise<void> {
-    if (!node.dial || this.dialedRelays.has(record.peerId)) {
+    if (
+      !node.dial ||
+      node.peerId?.toString() === record.peerId ||
+      this.dialedRelays.has(record.peerId)
+    ) {
       return;
     }
 

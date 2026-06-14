@@ -59,6 +59,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
       .filter(Boolean);
   }
 
+  private static localPeerId(heliaCore: HeliaInstance): string | undefined {
+    return heliaCore.libp2p.peerId?.toString();
+  }
+
   private static async dialConfiguredBootstrapRelays(
     heliaCore: HeliaInstance,
     networkName: string,
@@ -75,9 +79,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     heliaCore: HeliaInstance,
     networkName: string,
   ): Promise<void> {
+    const localPeerId = HeliaIPFS.localPeerId(heliaCore);
+
     await Promise.all(
       HeliaIPFS.publicRelayRecordRegistry
-        .fallbackAll()
+        .fallbackAllExceptPeer(localPeerId)
         .map((record) =>
           HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
         ),
@@ -105,6 +111,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     networkName: string,
     record: PublicRelayRecordPrimitives,
   ): Promise<void> {
+    if (record.peerId === HeliaIPFS.localPeerId(heliaCore)) {
+      return;
+    }
+
     await HeliaIPFS.dialMultiaddrs(
       heliaCore,
       networkName,
@@ -338,7 +348,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
     return Promise.all(
       HeliaIPFS.publicRelayRecordRegistry
-        .fallbackMultiaddrs()
+        .fallbackMultiaddrsExceptPeer(HeliaIPFS.localPeerId(this.heliaCore))
         .map((address) => heliaRuntimeAdapter.createMultiaddr(address)),
     );
   }
