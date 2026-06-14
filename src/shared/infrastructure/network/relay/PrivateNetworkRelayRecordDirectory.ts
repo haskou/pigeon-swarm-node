@@ -264,6 +264,10 @@ export default class PrivateNetworkRelayRecordDirectory {
       lifetimeMs,
     );
 
+    if (!ipnsName) {
+      return;
+    }
+
     Kernel.logger.info(
       `Private IPFS relay IPNS record published: networkId=${network.getId()}` +
         ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
@@ -311,9 +315,9 @@ export default class PrivateNetworkRelayRecordDirectory {
   private async dialPrivateRelayRecord(
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (relayRecord.peerId === network.getPeerId()) {
-      return;
+      return true;
     }
 
     for (const multiaddr of relayRecord.multiaddrs) {
@@ -341,7 +345,7 @@ export default class PrivateNetworkRelayRecordDirectory {
             ` multiaddr="${multiaddr}" peers=${network.getPeers().length}`,
         );
 
-        return;
+        return true;
       } catch (error) {
         Kernel.logger.debug(
           `Private IPFS relay record dial failed: networkId=${network.getId()}` +
@@ -350,6 +354,8 @@ export default class PrivateNetworkRelayRecordDirectory {
         );
       }
     }
+
+    return false;
   }
 
   public async publish(
@@ -429,8 +435,6 @@ export default class PrivateNetworkRelayRecordDirectory {
       network,
       publicConnection,
     );
-    const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
-    const routingAbort = this.createRoutingAbortSignal();
 
     try {
       const ipnsRelayRecord = await this.discoverRelayIPNSRecord(
@@ -438,56 +442,62 @@ export default class PrivateNetworkRelayRecordDirectory {
         network,
       );
 
-      if (ipnsRelayRecord) {
-        await this.dialPrivateRelayRecord(network, ipnsRelayRecord);
-
+      if (
+        ipnsRelayRecord &&
+        (await this.dialPrivateRelayRecord(network, ipnsRelayRecord))
+      ) {
         return;
       }
 
-      const value = await publicConnection.getRecord(
-        lookupKey,
-        routingAbort.signal,
-      );
+      const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
+      const routingAbort = this.createRoutingAbortSignal();
 
-      if (!value) {
-        Kernel.logger.debug(
-          `Private IPFS relay record not found: networkId=${network.getId()}` +
-            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+      try {
+        const value = await publicConnection.getRecord(
+          lookupKey,
+          routingAbort.signal,
         );
 
-        return;
+        if (!value) {
+          Kernel.logger.debug(
+            `Private IPFS relay record not found: networkId=${network.getId()}` +
+              ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+          );
+
+          return;
+        }
+
+        const envelope = this.decodeEnvelope(value);
+
+        if (!envelope) {
+          Kernel.logger.debug(
+            `Private IPFS relay record ignored: networkId=${network.getId()}` +
+              ' reason="Invalid envelope."',
+          );
+
+          return;
+        }
+
+        const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
+
+        if (!relayRecord) {
+          Kernel.logger.debug(
+            `Private IPFS relay record ignored: networkId=${network.getId()}` +
+              ' reason="Expired or not decryptable."',
+          );
+
+          return;
+        }
+
+        await this.dialPrivateRelayRecord(network, relayRecord);
+      } finally {
+        clearTimeout(routingAbort.timeout);
       }
-
-      const envelope = this.decodeEnvelope(value);
-
-      if (!envelope) {
-        Kernel.logger.debug(
-          `Private IPFS relay record ignored: networkId=${network.getId()}` +
-            ' reason="Invalid envelope."',
-        );
-
-        return;
-      }
-
-      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
-
-      if (!relayRecord) {
-        Kernel.logger.debug(
-          `Private IPFS relay record ignored: networkId=${network.getId()}` +
-            ' reason="Expired or not decryptable."',
-        );
-
-        return;
-      }
-
-      await this.dialPrivateRelayRecord(network, relayRecord);
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay record discovery failed: networkId=${network.getId()}` +
           ` error=${String(error)}`,
       );
-    } finally {
-      clearTimeout(routingAbort.timeout);
     }
   }
 

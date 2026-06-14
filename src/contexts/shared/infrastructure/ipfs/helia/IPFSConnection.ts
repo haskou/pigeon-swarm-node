@@ -19,7 +19,7 @@ export interface IPFSConnection {
     sequence: number | bigint,
     lifetimeMs: number,
     signal?: AbortSignal,
-  ): Promise<string>;
+  ): Promise<string | undefined>;
   resolveIPNSRecord(
     privateKey: Libp2pPrivateKeyLike,
     signal?: AbortSignal,

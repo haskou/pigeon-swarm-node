@@ -11,6 +11,8 @@ const mockHeliaNode = {
 };
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
+const mockBitswap = jest.fn().mockReturnValue('mock-bitswap');
+const mockLibp2pRouting = jest.fn().mockReturnValue('mock-libp2p-routing');
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockLibp2pDefaults = jest.fn().mockReturnValue({
   connectionEncrypters: [],
@@ -44,6 +46,22 @@ jest.mock(
       add: jest.fn().mockResolvedValue({ toString: () => 'bafymockcid' }),
       get: jest.fn().mockResolvedValue({ test: true }),
     }),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/block-brokers',
+  () => ({
+    bitswap: mockBitswap,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/routers',
+  () => ({
+    libp2pRouting: mockLibp2pRouting,
   }),
   { virtual: true },
 );

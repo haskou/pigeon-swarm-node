@@ -460,7 +460,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     sequence: number | bigint,
     lifetimeMs: number,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<string | undefined> {
     const routingKey =
       await heliaRuntimeAdapter.createIPNSRoutingKey(privateKey);
     const marshalledRecord =
@@ -480,6 +480,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
       await this.heliaCore.routing.put(routingKey, marshalledRecord, {
         signal: routingAbort.signal,
       });
+
+      return heliaRuntimeAdapter.getIPNSName(privateKey);
     } catch (error: unknown) {
       Kernel.logger.debug?.(
         `IPNS record publication skipped name="${heliaRuntimeAdapter.getIPNSName(
@@ -490,7 +492,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       clearTimeout(routingAbort.timeout);
     }
 
-    return heliaRuntimeAdapter.getIPNSName(privateKey);
+    return undefined;
   }
 
   public async resolveIPNSRecord(
