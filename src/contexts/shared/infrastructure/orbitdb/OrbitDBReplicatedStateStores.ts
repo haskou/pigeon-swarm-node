@@ -11,6 +11,8 @@ import { OrbitDBReplicatedStoreSet } from './OrbitDBReplicatedStoreSet';
 import orbitDBRuntimeAdapter from './OrbitDBRuntimeAdapter';
 
 export class OrbitDBReplicatedStateStores {
+  private static readonly syncErrorWarningKeys = new Set<string>();
+
   private readonly orbitdb: OrbitDBInstance;
   public readonly calls: OrbitDBDatabase;
   public readonly communities: OrbitDBDatabase;
@@ -57,10 +59,65 @@ export class OrbitDBReplicatedStateStores {
     store: string,
     AccessController: unknown,
   ): Promise<OrbitDBDatabase> {
-    return orbitdb.open(this.getStoreName(networkId, store), {
+    const database = await orbitdb.open(this.getStoreName(networkId, store), {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
       type: 'documents',
+    });
+
+    this.registerSyncErrorLogger(networkId, store, database);
+
+    return database;
+  }
+
+  private static getSyncErrorWarningKey(
+    networkId: string,
+    store: string,
+    error: unknown,
+  ): string {
+    const message = String(error);
+    const blockMatch = message.match(/Failed to load block for ([a-z0-9]+)/i);
+
+    if (blockMatch) {
+      return `${networkId}:${store}:missing-block:${blockMatch[1]}`;
+    }
+
+    return `${networkId}:${store}:${message}`;
+  }
+
+  private static isTransientSyncError(error: unknown): boolean {
+    const message = String(error);
+
+    return (
+      message.includes('LoadBlockFailedError') ||
+      message.includes('Failed to load block') ||
+      message.includes('Want was aborted') ||
+      message.includes('TimeoutError') ||
+      message.includes('operation was aborted due to timeout')
+    );
+  }
+
+  private static registerSyncErrorLogger(
+    networkId: string,
+    store: string,
+    database: OrbitDBDatabase,
+  ): void {
+    database.events.on('error', (error: unknown) => {
+      const warningKey = this.getSyncErrorWarningKey(networkId, store, error);
+
+      if (this.syncErrorWarningKeys.has(warningKey)) {
+        return;
+      }
+
+      this.syncErrorWarningKeys.add(warningKey);
+      const level = this.isTransientSyncError(error) ? 'debug' : 'warn';
+
+      Kernel.logger[level]?.(
+        `OrbitDB replicated store sync error handled: networkId=${networkId}` +
+          ` store=${store}` +
+          ` transient=${this.isTransientSyncError(error)}` +
+          ` error=${String(error)}`,
+      );
     });
   }
 
@@ -83,6 +140,8 @@ export class OrbitDBReplicatedStateStores {
         type: 'events',
       },
     );
+    this.registerSyncErrorLogger(networkId, 'events/domain-events', events);
+
     const heads = await orbitdb.open(
       this.getStoreName(networkId, 'keyvalue/heads'),
       {
@@ -90,6 +149,7 @@ export class OrbitDBReplicatedStateStores {
         type: 'keyvalue',
       },
     );
+    this.registerSyncErrorLogger(networkId, 'keyvalue/heads', heads);
 
     Kernel.logger.debug?.(
       `OrbitDB replicated state opened: networkId=${networkId} peerId=${network.getPeerId()}`,
