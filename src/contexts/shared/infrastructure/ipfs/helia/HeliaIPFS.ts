@@ -26,7 +26,6 @@ import { ContentRetrievalOptions } from './types/ContentRetrievalOptions';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {
-  private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
   private static readonly CONTENT_RETRIEVAL_DEBUG_EVENTS = new Set([
     'bitswap:block',
     'bitswap:found-provider',
@@ -39,6 +38,19 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly successfulPublicRelayDials = new Set<string>();
 
   private readonly pinningStrategy: HeliaPinningStrategy;
+
+  private static getRoutingRecordTimeoutMs(): number {
+    const configuredTimeoutMs = Number(
+      process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS ||
+        process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS,
+    );
+
+    if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
+      return configuredTimeoutMs;
+    }
+
+    return 15_000;
+  }
 
   private static configuredBootstrapRelayMultiaddrs(): string[] {
     return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
@@ -204,7 +216,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+      HeliaIPFS.getRoutingRecordTimeoutMs(),
     );
 
     if (signal) {
@@ -471,7 +483,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     try {
       if (
         !(await this.waitForPeers(
-          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
           routingAbort.signal,
         ))
       ) {
@@ -522,7 +534,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   }
 
   public async waitForPeers(
-    timeoutMs: number = HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+    timeoutMs: number = HeliaIPFS.getRoutingRecordTimeoutMs(),
     signal?: AbortSignal,
   ): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
@@ -733,7 +745,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     try {
       if (
         !(await this.waitForPeers(
-          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
           routingAbort.signal,
         ))
       ) {
@@ -763,7 +775,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     try {
       if (
         !(await this.waitForPeers(
-          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
           routingAbort.signal,
         ))
       ) {
@@ -835,7 +847,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     try {
       if (
         !(await this.waitForPeers(
-          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
           routingAbort.signal,
         ))
       ) {
@@ -871,7 +883,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     try {
       if (
         !(await this.waitForPeers(
-          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
           routingAbort.signal,
         ))
       ) {

@@ -51,6 +51,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly pubSubRelayInfoKeys: Set<string> = new Set();
 
+  private readonly ipnsPublicationFailureWarningKeys: Set<string> = new Set();
+
   private readonly subscribedRelayRecordTopics: Set<string> = new Set();
 
   private readonly relayRecordEnvelopeCache: Map<string, string> = new Map();
@@ -124,6 +126,29 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private getRoutingRecordTimeoutMs(): number {
+    const configuredTimeoutMs = Number(
+      process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
+        process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS,
+    );
+
+    if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
+      return configuredTimeoutMs;
+    }
+
+    return 15_000;
+  }
+
+  private isPubSubRecordEnabled(): boolean {
+    return process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED !== 'false';
+  }
+
+  private isGenericDHTRecordEnabled(): boolean {
+    return (
+      process.env.PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED !== 'false'
+    );
+  }
+
   private getCurrentIPNSWindowId(): number {
     return Math.floor(Date.now() / this.getRelayRecordIPNSWindowMs());
   }
@@ -159,7 +184,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     timeout: ReturnType<typeof setTimeout>;
   } {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(
+      () => controller.abort(),
+      this.getRoutingRecordTimeoutMs(),
+    );
 
     return { signal: controller.signal, timeout };
   }
@@ -524,6 +552,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
 
     if (!ipnsName) {
+      const warningKey = `${network.getId()}:${this.getCurrentIPNSWindowId()}`;
+
+      if (!this.ipnsPublicationFailureWarningKeys.has(warningKey)) {
+        this.ipnsPublicationFailureWarningKeys.add(warningKey);
+        Kernel.logger.warn(
+          `Private IPFS relay IPNS record not published: networkId=${network.getId()}` +
+            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+            ` publicPeers=${publicConnection.getPeers().length}`,
+        );
+      }
+
       return;
     }
 
@@ -593,6 +632,12 @@ export default class PrivateNetworkRelayRecordDirectory {
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
   ): Promise<void> {
+    if (!this.isGenericDHTRecordEnabled()) {
+      this.infoWhenRelayRecordIsMissing(publicConnection, network);
+
+      return;
+    }
+
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const routingAbort = this.createRoutingAbortSignal();
 
@@ -767,19 +812,29 @@ export default class PrivateNetworkRelayRecordDirectory {
     const routingAbort = this.createRoutingAbortSignal();
 
     try {
-      await publicConnection.putRecord(
-        lookupKey,
-        JSON.stringify(envelope),
-        routingAbort.signal,
-      );
-      await this.publishRelayPubSubRecord(publicConnection, network, envelope);
-      await this.provideRelayRecord(publicConnection, network, lookupKey);
       await this.publishRelayIPNSRecord(
         publicConnection,
         network,
         envelope,
         relayRecord,
       );
+
+      if (this.isPubSubRecordEnabled()) {
+        await this.publishRelayPubSubRecord(
+          publicConnection,
+          network,
+          envelope,
+        );
+      }
+
+      if (this.isGenericDHTRecordEnabled()) {
+        await publicConnection.putRecord(
+          lookupKey,
+          JSON.stringify(envelope),
+          routingAbort.signal,
+        );
+        await this.provideRelayRecord(publicConnection, network, lookupKey);
+      }
       Kernel.logger.debug(
         `Private IPFS relay record published: networkId=${network.getId()}` +
           ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
@@ -803,7 +858,9 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): Promise<void> {
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
 
-    await this.subscribeRelayRecordTopic(publicConnection, network);
+    if (this.isPubSubRecordEnabled()) {
+      await this.subscribeRelayRecordTopic(publicConnection, network);
+    }
 
     if (
       !(await this.waitForPublicConnectionPeers(
@@ -825,7 +882,10 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      if (await this.dialCachedRelayRecord(network)) {
+      if (
+        this.isPubSubRecordEnabled() &&
+        (await this.dialCachedRelayRecord(network))
+      ) {
         return;
       }
 

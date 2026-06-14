@@ -36,8 +36,12 @@ alcanzable desde fuera del host.
 
 - Runtime de relay publico con `PIGEON_RELAY_ENABLED`,
   `PIGEON_RELAY_AUTO_ENABLE`, `PIGEON_PUBLIC_HOST` y `PIGEON_RELAY_PORT`.
-- Publicacion de registros publicos firmados del relay en pubsub.
-- Cache local de registros publicos de relay como fallback temporal.
+- Publicacion IPNS de registros cifrados del relay privado sobre el IPFS
+  publico.
+- Publicacion de registros publicos firmados del relay en pubsub solo como
+  fallback temporal.
+- Cache local de registros publicos de relay como fallback temporal cuando
+  pubsub esta habilitado.
 - Dial automatico de relays configurados en `PIGEON_BOOTSTRAP_RELAY_MULTIADDRS`.
 - Dial automatico de relays descubiertos por pubsub.
 - Publicacion de providers de contenido y registros para que el routing de IPFS
@@ -64,7 +68,8 @@ publico para que otros peers de esa misma red puedan encontrarlo.
 2. Ese nodo anuncia un multiaddr publico mediante `PIGEON_PUBLIC_HOST` y el
    puerto asignado por `PIGEON_PRIVATE_RELAY_PORT_START/END`.
 3. `PrivateNetworkRelayRecordDirectory` cifra el record con la key privada de la
-   red y lo publica en el IPFS publico mediante IPNS/routing/pubsub.
+   red y lo publica en el IPFS publico mediante IPNS. Esta es la ruta que debe
+   funcionar entre procesos/hosts distintos.
 4. Otro nodo de la misma red privada abre su conexion publica de discovery,
    resuelve el record cifrado, lo descifra con la misma PSK y diale el multiaddr
    anunciado.
@@ -89,6 +94,14 @@ publico para que otros peers de esa misma red puedan encontrarlo.
   discovery privado.
 - `PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS`: intervalo de republicacion del
   record privado.
+- `PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS` o
+  `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS`: timeout para operaciones de
+  publicacion/resolucion IPNS y routing. El valor por defecto es 15000 ms.
+- `PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED=false`: desactiva el canal pubsub
+  publico usado como fallback de discovery del relay privado.
+- `PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED=false`: desactiva el fallback
+  legacy basado en `putRecord/getRecord`. Ese fallback guarda records genericos
+  de routing, no IPNS, y no debe ser necesario para demostrar discovery remoto.
 - `PIGEON_RELAY_ENABLED=true`: fuerza el arranque del relay publico heredado de
   la rama tmp. No sustituye el relay privado protegido por PSK.
 - `PIGEON_RELAY_AUTO_ENABLE=true`: permite que un nodo con host publico arranque
@@ -151,5 +164,8 @@ Ese test levanta dos procesos Node separados, con storage y `process.env`
 distintos. El proceso `leaf` no recibe el multiaddr del relay; solo recibe el
 `peerId`, el CID/hash que debe poder leer tras discovery y la clave privada de
 red compartida. La conexion al relay debe salir del record cifrado publicado en
-IPFS publico. Antes de arrancar discovery verifica falsos positivos: el CID no
+IPFS publico. En el test, `PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED=false` y
+`PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED=false`, de modo que no puede
+pasar por pubsub publico ni por `putRecord/getRecord`; si pasa, ha resuelto el
+record IPNS. Antes de arrancar discovery verifica falsos positivos: el CID no
 esta local, no se puede leer remotamente y gossip no llega.
