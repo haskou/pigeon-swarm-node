@@ -19,11 +19,6 @@ export type PrivateRelayListenOptions = {
   relayDataLimitBytes: number;
 };
 
-type PrivateRelayDiscoveryState = {
-  shouldConnectRelayRecords: boolean;
-  shouldDiscover: boolean;
-};
-
 export default class PrivateNetworkRelayRecordDirectory {
   private static readonly defaultRelayRecordPublicationIntervalMs = 15_000;
 
@@ -74,6 +69,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly activeRelayRecords: Map<string, PrivateNetworkRelayRecord> =
     new Map();
 
+  private readonly activeRelayRecordObservedAt: Record<string, number> = {};
+
   private readonly activeRelayDiscoveryAttempts: Record<string, number> = {};
 
   private readonly activePrivateRelayDialKeys: Set<string> = new Set();
@@ -120,6 +117,18 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     return 5 * 60_000;
+  }
+
+  private getActiveRelayConnectionGraceMs(): number {
+    const configuredGraceMs = Number(
+      process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS,
+    );
+
+    if (Number.isFinite(configuredGraceMs) && configuredGraceMs > 0) {
+      return configuredGraceMs;
+    }
+
+    return 60_000;
   }
 
   private getRelayRecordPublicationIntervalMs(): number {
@@ -500,10 +509,18 @@ export default class PrivateNetworkRelayRecordDirectory {
     relayRecord: PrivateNetworkRelayRecord,
   ): void {
     this.activeRelayRecords.set(network.getId(), relayRecord);
+    this.activeRelayRecordObservedAt[network.getId()] = Date.now();
 
     if (!this.activeRelayDiscoveryAttempts[network.getId()]) {
       this.markActiveRelayDiscoveryAttempt(network);
     }
+  }
+
+  private hasRecentlyObservedRelayRecord(network: IPFSNetwork): boolean {
+    const lastObservedAt =
+      this.activeRelayRecordObservedAt[network.getId()] || 0;
+
+    return Date.now() - lastObservedAt < this.getActiveRelayConnectionGraceMs();
   }
 
   private findActiveRelayRecord(
@@ -515,13 +532,45 @@ export default class PrivateNetworkRelayRecordDirectory {
       return undefined;
     }
 
-    if (!this.isActiveRelayRecord(network, relayRecord)) {
+    if (relayRecord.expiresAt <= Date.now()) {
       this.activeRelayRecords.delete(network.getId());
+      delete this.activeRelayRecordObservedAt[network.getId()];
 
       return undefined;
     }
 
-    return relayRecord;
+    if (this.isActiveRelayRecord(network, relayRecord)) {
+      this.rememberActiveRelayRecord(network, relayRecord);
+
+      return relayRecord;
+    }
+
+    if (this.hasRecentlyObservedRelayRecord(network)) {
+      return relayRecord;
+    }
+
+    this.activeRelayRecords.delete(network.getId());
+    delete this.activeRelayRecordObservedAt[network.getId()];
+
+    return undefined;
+  }
+
+  private hasActiveRelayRecord(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): boolean {
+    const activeRelayRecord = this.findActiveRelayRecord(network);
+
+    if (!activeRelayRecord) {
+      return false;
+    }
+
+    return activeRelayRecord.peerId === relayRecord.peerId;
+  }
+
+  private forgetActiveRelayRecord(networkId: string): void {
+    this.activeRelayRecords.delete(networkId);
+    delete this.activeRelayRecordObservedAt[networkId];
   }
 
   private shouldRefreshActiveRelayDiscovery(network: IPFSNetwork): boolean {
@@ -538,7 +587,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.activeRelayDiscoveryAttempts[network.getId()] = Date.now();
   }
 
-  private getDiscoveryState(network: IPFSNetwork): PrivateRelayDiscoveryState {
+  private getDiscoveryState(network: IPFSNetwork): {
+    shouldConnectRelayRecords: boolean;
+    shouldDiscover: boolean;
+  } {
     const activeRelayRecord = this.findActiveRelayRecord(network);
 
     if (!activeRelayRecord) {
@@ -1176,7 +1228,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
   ): Promise<boolean> {
-    if (this.isActiveRelayRecord(network, relayRecord)) {
+    if (this.hasActiveRelayRecord(network, relayRecord)) {
       this.rememberActiveRelayRecord(network, relayRecord);
 
       return true;
@@ -1418,7 +1470,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   public stop(networkId: string): void {
-    this.activeRelayRecords.delete(networkId);
+    this.forgetActiveRelayRecord(networkId);
     delete this.activeRelayDiscoveryAttempts[networkId];
 
     const interval = this.discoveryIntervals[networkId];

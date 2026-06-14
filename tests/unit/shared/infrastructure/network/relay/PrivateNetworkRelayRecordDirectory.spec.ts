@@ -45,6 +45,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   beforeEach(async () => {
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED;
+    delete process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS;
+    delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
+    delete process.env.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
     previousLocalDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
     localDatabasePath = await fs.mkdtemp(
       path.join(os.tmpdir(), 'pigeon-relay-cache-'),
@@ -238,5 +241,152 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(getPublicConnection).not.toHaveBeenCalled();
     expect(privateConnection.dial).not.toHaveBeenCalled();
     expect(publicConnection.waitForPeers).not.toHaveBeenCalled();
+  });
+
+  it('should not rediscover a cached relay while the recent connection is settling', async () => {
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const networkKey = privateKey();
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      networkKey,
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const relayMultiaddr =
+      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayRecord: PrivateNetworkRelayRecord = {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: [relayMultiaddr],
+      peerId: '12D3KooWRelay',
+      role: 'relay',
+      version: 1,
+    };
+    const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
+    const getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.dial.mockResolvedValue(undefined);
+    privateConnection.listen.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(false);
+
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = getPublicConnection;
+    await localDatabase.save(
+      PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+      network.getId(),
+      {
+        _id: network.getId(),
+        cachedAt: Date.now(),
+        envelope,
+        networkId: network.getId(),
+      } satisfies PrivateRelayRecordCacheDocument,
+    );
+
+    const findOneSpy = jest.spyOn(localDatabase, 'findOne');
+
+    await directory.discover(network, mock());
+
+    expect(privateConnection.dial).toHaveBeenCalledWith(
+      relayRecord.multiaddrs[0],
+      expect.any(AbortSignal),
+    );
+    expect(privateConnection.listen).toHaveBeenCalledWith(
+      `${relayRecord.multiaddrs[0]}/p2p-circuit`,
+    );
+
+    findOneSpy.mockClear();
+    getPublicConnection.mockClear();
+    privateConnection.dial.mockClear();
+    privateConnection.listen.mockClear();
+
+    await directory.discover(network, mock());
+
+    expect(findOneSpy).not.toHaveBeenCalled();
+    expect(getPublicConnection).not.toHaveBeenCalled();
+    expect(privateConnection.dial).not.toHaveBeenCalled();
+    expect(privateConnection.listen).not.toHaveBeenCalled();
+    expect(publicConnection.waitForPeers).not.toHaveBeenCalled();
+  });
+
+  it('should retry a cached relay after the recent connection grace expires without peer confirmation', async () => {
+    process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS = '1';
+    const now = 1_000_000;
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const networkKey = privateKey();
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      networkKey,
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const relayMultiaddr =
+      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayRecord: PrivateNetworkRelayRecord = {
+      expiresAt: now + 60_000,
+      issuedAt: now,
+      multiaddrs: [relayMultiaddr],
+      peerId: '12D3KooWRelay',
+      role: 'relay',
+      version: 1,
+    };
+    const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
+    const getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.dial.mockResolvedValue(undefined);
+    privateConnection.listen.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(false);
+
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = getPublicConnection;
+    await localDatabase.save(
+      PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+      network.getId(),
+      {
+        _id: network.getId(),
+        cachedAt: now,
+        envelope,
+        networkId: network.getId(),
+      } satisfies PrivateRelayRecordCacheDocument,
+    );
+
+    const findOneSpy = jest.spyOn(localDatabase, 'findOne');
+
+    await directory.discover(network, mock());
+
+    findOneSpy.mockClear();
+    getPublicConnection.mockClear();
+    privateConnection.dial.mockClear();
+    privateConnection.listen.mockClear();
+    dateNowSpy.mockReturnValue(now + 2);
+
+    await directory.discover(network, mock());
+
+    expect(findOneSpy).toHaveBeenCalledWith(
+      PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+      network.getId(),
+    );
+    expect(getPublicConnection).toHaveBeenCalled();
+    expect(privateConnection.dial).toHaveBeenCalledWith(
+      relayRecord.multiaddrs[0],
+      expect.any(AbortSignal),
+    );
+    expect(privateConnection.listen).toHaveBeenCalledWith(
+      `${relayRecord.multiaddrs[0]}/p2p-circuit`,
+    );
   });
 });
