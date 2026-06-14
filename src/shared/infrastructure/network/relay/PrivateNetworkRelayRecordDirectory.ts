@@ -36,6 +36,12 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly dialFailureWarningKeys: Set<string> = new Set();
 
+  private readonly discoveredRelayInfoKeys: Set<string> = new Set();
+
+  private readonly missingRelayInfoKeys: Set<string> = new Set();
+
+  private readonly fallbackRelayInfoKeys: Set<string> = new Set();
+
   private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
     new Map();
 
@@ -214,6 +220,65 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private infoWhenRelayIPNSRecordIsDiscovered(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): void {
+    const infoKey = `${network.getId()}:ipns:${relayRecord.peerId}`;
+
+    if (this.discoveredRelayInfoKeys.has(infoKey)) {
+      return;
+    }
+
+    this.discoveredRelayInfoKeys.add(infoKey);
+    Kernel.logger.info(
+      `Private IPFS relay IPNS record discovered: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` peerId=${relayRecord.peerId}` +
+        ` publicPeers=${publicConnection.getPeers().length}`,
+    );
+  }
+
+  private infoWhenRelayFallbackRecordIsDiscovered(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): void {
+    const infoKey = `${network.getId()}:fallback:${relayRecord.peerId}`;
+
+    if (this.fallbackRelayInfoKeys.has(infoKey)) {
+      return;
+    }
+
+    this.fallbackRelayInfoKeys.add(infoKey);
+    Kernel.logger.info(
+      `Private IPFS relay fallback record discovered: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` peerId=${relayRecord.peerId}` +
+        ` publicPeers=${publicConnection.getPeers().length}`,
+    );
+  }
+
+  private infoWhenRelayRecordIsMissing(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): void {
+    const infoKey = network.getId();
+
+    if (this.missingRelayInfoKeys.has(infoKey)) {
+      return;
+    }
+
+    this.missingRelayInfoKeys.add(infoKey);
+    Kernel.logger.info(
+      `Private IPFS relay record not found yet: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` publicPeerId=${publicConnection.getPeerId()}` +
+        ` publicPeers=${publicConnection.getPeers().length}`,
+    );
+  }
+
   private isListeningThroughRelay(
     network: IPFSNetwork,
     relayMultiaddr: string,
@@ -366,11 +431,10 @@ export default class PrivateNetworkRelayRecordDirectory {
       const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
 
       if (relayRecord) {
-        Kernel.logger.debug(
-          `Private IPFS relay IPNS record discovered: networkId=${network.getId()}` +
-            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-            ` peerId=${relayRecord.peerId}` +
-            ` publicPeers=${publicConnection.getPeers().length}`,
+        this.infoWhenRelayIPNSRecordIsDiscovered(
+          publicConnection,
+          network,
+          relayRecord,
         );
 
         return relayRecord;
@@ -544,10 +608,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         );
 
         if (!value) {
-          Kernel.logger.debug(
-            `Private IPFS relay record not found: networkId=${network.getId()}` +
-              ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-          );
+          this.infoWhenRelayRecordIsMissing(publicConnection, network);
 
           return;
         }
@@ -574,6 +635,11 @@ export default class PrivateNetworkRelayRecordDirectory {
           return;
         }
 
+        this.infoWhenRelayFallbackRecordIsDiscovered(
+          publicConnection,
+          network,
+          relayRecord,
+        );
         await this.dialPrivateRelayRecord(network, relayRecord);
       } finally {
         clearTimeout(routingAbort.timeout);
