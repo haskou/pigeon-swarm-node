@@ -183,7 +183,7 @@ export default class OrbitDBReplicatedStateRuntime {
       this.headRepairer
         .repairCritical()
         .then((result) => {
-          Kernel.logger.info(
+          Kernel.logger.debug(
             `OrbitDB critical read indexes repaired: networkId=${networkId}` +
               ` identities=${result.identities}` +
               ` keychains=${result.keychains}` +
@@ -220,7 +220,7 @@ export default class OrbitDBReplicatedStateRuntime {
       this.headRepairer
         .repairSecondary()
         .then((result) => {
-          Kernel.logger.info(
+          Kernel.logger.debug(
             `OrbitDB secondary read indexes repaired: networkId=${networkId}` +
               ` conversationMessageIndexes=${result.conversationMessageIndexes}` +
               ` communityChannelMessageIndexes=${result.communityChannelMessageIndexes}` +
