@@ -1,4 +1,7 @@
 import Kernel from '@app/Kernel';
+import OrbitDBReplicatedHeadCache, {
+  OrbitDBReplicatedHeadCacheEntry,
+} from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
 import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
@@ -10,6 +13,51 @@ type Entry = {
   key?: string;
   value: Record<string, unknown>;
 };
+
+class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
+  private readonly entries: Array<
+    OrbitDBReplicatedHeadCacheEntry & { networkId: string }
+  > = [];
+  private readonly warmNetworkIds = new Set<string>();
+
+  public async findByNetworkId(
+    networkId: string,
+  ): Promise<OrbitDBReplicatedHeadCacheEntry[]> {
+    return this.entries
+      .filter((entry) => entry.networkId === networkId)
+      .map((entry) => ({
+        key: entry.key,
+        value: entry.value,
+      }));
+  }
+
+  public async isWarm(networkId: string): Promise<boolean> {
+    return this.warmNetworkIds.has(networkId);
+  }
+
+  public async markWarm(networkId: string): Promise<void> {
+    this.warmNetworkIds.add(networkId);
+  }
+
+  public async save(
+    networkId: string,
+    key: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
+    const currentIndex = this.entries.findIndex(
+      (entry) => entry.networkId === networkId && entry.key === key,
+    );
+    const entry = { key, networkId, value };
+
+    if (currentIndex >= 0) {
+      this.entries[currentIndex] = entry;
+
+      return;
+    }
+
+    this.entries.push(entry);
+  }
+}
 
 type Store = {
   all: jest.Mock<Promise<Entry[]>>;
@@ -359,6 +407,126 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       name: 'new',
       updatedAt: 2,
     });
+  });
+
+  it('restores heads from the local cache before rebuilding OrbitDB heads', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = new OrbitDBReplicatedStateRegistry(headCache);
+    const firstNetwork = createStores();
+    let releaseHeadScan = (): void => undefined;
+    let headScanResolved = false;
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1');
+    firstNetwork.heads.all.mockImplementation(
+      async () =>
+        new Promise<Entry[]>((resolve) => {
+          releaseHeadScan = () => {
+            headScanResolved = true;
+            resolve([
+              {
+                key: 'community:community-2',
+                value: {
+                  id: 'community-2',
+                  networkId: 'network-1',
+                  updatedAt: 1,
+                },
+              },
+            ]);
+          };
+        }),
+    );
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(registry.findCachedHeadsByPrefix('community:')).toEqual([
+      {
+        id: 'community-1',
+        networkId: 'network-1',
+        updatedAt: 1,
+      },
+    ]);
+    expect(firstNetwork.heads.all).toHaveBeenCalledTimes(1);
+    expect(headScanResolved).toBe(false);
+
+    releaseHeadScan();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it('waits for OrbitDB heads when the local cache is not marked warm', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = new OrbitDBReplicatedStateRegistry(headCache);
+    const firstNetwork = createStores();
+    let headScanResolved = false;
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    firstNetwork.heads.all.mockImplementation(async () => {
+      headScanResolved = true;
+
+      return [
+        {
+          key: 'community:community-2',
+          value: {
+            id: 'community-2',
+            networkId: 'network-1',
+            updatedAt: 1,
+          },
+        },
+      ];
+    });
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(headScanResolved).toBe(true);
+    expect(registry.findCachedHeadsByPrefix('community:')).toEqual([
+      {
+        id: 'community-1',
+        networkId: 'network-1',
+        updatedAt: 1,
+      },
+      {
+        id: 'community-2',
+        networkId: 'network-1',
+        updatedAt: 1,
+      },
+    ]);
+  });
+
+  it('persists written heads in the local cache for the next startup', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = new OrbitDBReplicatedStateRegistry(headCache);
+    const firstNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.putHead(
+      'identity:identity-1',
+      {
+        id: 'identity-1',
+        networkId: 'network-1',
+        updatedAt: 1,
+      },
+      ['network-1'],
+    );
+
+    await expect(headCache.findByNetworkId('network-1')).resolves.toEqual([
+      {
+        key: 'identity:identity-1',
+        value: {
+          id: 'identity-1',
+          networkId: 'network-1',
+          updatedAt: 1,
+        },
+      },
+    ]);
   });
 
   it('warns when an HTTP request performs a slow document query', async () => {
