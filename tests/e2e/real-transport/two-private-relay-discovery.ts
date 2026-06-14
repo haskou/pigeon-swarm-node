@@ -9,24 +9,33 @@ import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/netw
 import libp2pKeyAdapter from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
 import { PrivateIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
+import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
 import orbitDBRuntimeAdapter from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { PrivateKey } from '@haskou/value-objects';
-import { generateKeyPairSync, randomBytes } from 'crypto';
+import { generateKeyPairSync, randomBytes, randomUUID } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../../..');
-const TMP_ROOT = path.join(ROOT, '.tmp', 'two-private-relay-discovery-e2e');
-const NETWORK_ID = 'private-relay-discovery-e2e';
-const NETWORK_NAME = 'private-relay-discovery-e2e';
+const RUN_ID = randomUUID();
+const TMP_ROOT = path.join(
+  ROOT,
+  '.tmp',
+  `two-private-relay-discovery-e2e-${RUN_ID}`,
+);
+const NETWORK_ID = randomUUID();
+const NETWORK_NAME = `private-relay-discovery-e2e-${RUN_ID}`;
 const WAIT_TIMEOUT_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_TIMEOUT_MS || 60000,
 );
 const FETCH_TIMEOUT_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_FETCH_TIMEOUT_MS || 10000,
+);
+const FALSE_POSITIVE_GUARD_MS = Number(
+  process.env.PRIVATE_RELAY_DISCOVERY_E2E_FALSE_POSITIVE_GUARD_MS || 1500,
 );
 
 type PrivateRelayDiscoveryNode = {
@@ -48,6 +57,9 @@ async function main(): Promise<void> {
   configureEnvironment();
   configureTestLogger();
 
+  const publicBootstrap = await createPublicBootstrapNode();
+  const publicBootstrapAddress =
+    await configurePublicBootstrap(publicBootstrap);
   const networkKey = new PrivateKey(generateNetworkKey());
   const relay = await createNode('relay', networkKey, {
     enableRelayServer: true,
@@ -70,6 +82,7 @@ async function main(): Promise<void> {
       leaf.network,
     );
 
+    await assertNoPubSubBeforeDiscovery(relay.network, leaf.network);
     await discoverRelay(relay, leaf, relayAddress);
     await assertIPFSFetch(relay.network, leaf.network, cid);
     await assertPubSub(relay.network, leaf.network);
@@ -79,6 +92,7 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           leafPeerId: leaf.network.getPeerId(),
+          publicBootstrapAddress,
           relayPeerId: relay.network.getPeerId(),
           result: 'PASS',
           transportDsn: 'private-relay-record-discovery://',
@@ -95,6 +109,7 @@ async function main(): Promise<void> {
       relay.directory.stopPublicConnection(),
       leaf.network.stop(),
       relay.network.stop(),
+      publicBootstrap.stop(),
     ]);
     await removeTmpRoot();
   }
@@ -103,6 +118,8 @@ async function main(): Promise<void> {
 function configureEnvironment(): void {
   delete process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS;
   delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
+  process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED = 'false';
+  process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS = '';
 }
 
 function configureTestLogger(): void {
@@ -114,6 +131,28 @@ function configureTestLogger(): void {
     info: noop,
     warn: (message: string): void => console.warn(message),
   };
+}
+
+async function createPublicBootstrapNode(): Promise<IPFSConnection> {
+  return PublicIPFS.create({
+    listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
+    storageLocation: path.join(TMP_ROOT, 'public-bootstrap', 'ipfs'),
+  });
+}
+
+async function configurePublicBootstrap(
+  publicBootstrap: IPFSConnection,
+): Promise<string> {
+  const publicBootstrapAddress = await waitForConnectionMultiaddr(
+    publicBootstrap,
+    (multiaddr) => isDirectTcpMultiaddr(multiaddr),
+    'public IPFS bootstrap direct multiaddr',
+  );
+
+  process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED = 'true';
+  process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS = publicBootstrapAddress;
+
+  return publicBootstrapAddress;
 }
 
 async function createNode(
@@ -222,7 +261,7 @@ async function expectRemoteCIDMiss(
   try {
     await withTimeout(
       (signal) => requester.getBytes(cid, signal),
-      1500,
+      FALSE_POSITIVE_GUARD_MS,
       `pre-discovery fetch ${cid.valueOf()}`,
     );
   } catch {
@@ -232,6 +271,27 @@ async function expectRemoteCIDMiss(
   throw new Error(
     `False-positive guard failed: CID ${cid.valueOf()} is fetchable before discovery.`,
   );
+}
+
+async function assertNoPubSubBeforeDiscovery(
+  publisher: IPFSNetwork,
+  subscriber: IPFSNetwork,
+): Promise<void> {
+  const topic = `pigeon-swarm.e2e.${NETWORK_ID}.pre-discovery.${randomUUID()}`;
+  const payload = `payload-${randomUUID()}`;
+  let received = false;
+
+  await subscriber.subscribePubSub(topic, async (message) => {
+    received = message === payload;
+  });
+  await publisher.publishPubSub(topic, payload);
+  await sleep(FALSE_POSITIVE_GUARD_MS);
+
+  if (received) {
+    throw new Error(
+      'False-positive guard failed: pubsub message arrived before relay discovery.',
+    );
+  }
 }
 
 async function assertIPFSFetch(
@@ -257,8 +317,8 @@ async function assertPubSub(
   publisher: IPFSNetwork,
   subscriber: IPFSNetwork,
 ): Promise<void> {
-  const topic = `pigeon-swarm.e2e.${NETWORK_ID}.pubsub`;
-  const payload = `payload-${Date.now()}`;
+  const topic = `pigeon-swarm.e2e.${NETWORK_ID}.pubsub.${randomUUID()}`;
+  const payload = `payload-${randomUUID()}`;
   let received: string | undefined;
 
   await subscriber.subscribePubSub(topic, async (message) => {
@@ -288,7 +348,7 @@ async function assertOrbitDBReplication(
   const writer = await openDocuments(writerDb, address, AccessController, Database);
   const reader = await openDocuments(readerDb, address, AccessController, Database);
   const document = {
-    id: `orbitdb-proof-${Date.now()}`,
+    id: `orbitdb-proof-${randomUUID()}`,
     replicated: true,
   };
 
@@ -348,6 +408,14 @@ async function waitForMultiaddr(
   label: string,
 ): Promise<string> {
   return waitFor(() => network.getMultiaddrs().find(predicate), label);
+}
+
+async function waitForConnectionMultiaddr(
+  connection: IPFSConnection,
+  predicate: (multiaddr: string) => boolean,
+  label: string,
+): Promise<string> {
+  return waitFor(() => connection.getMultiaddrs().find(predicate), label);
 }
 
 function isDirectTcpMultiaddr(multiaddr: string): boolean {
