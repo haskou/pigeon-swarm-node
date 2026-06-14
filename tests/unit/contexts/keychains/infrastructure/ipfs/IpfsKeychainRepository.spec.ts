@@ -94,7 +94,7 @@ describe('IpfsKeychainRepository', () => {
     expect(ipfs.hasConnectedPeers).toHaveBeenCalled();
   });
 
-  it('should merge remote candidates when local metadata is stale and peers are connected', async () => {
+  it('should return local metadata without waiting for remote refresh', async () => {
     const mother = await KeychainMother.create();
     const local = mother.withVersion(1).build();
     const remote = mother
@@ -127,13 +127,12 @@ describe('IpfsKeychainRepository', () => {
       mother.ownerIdentityId,
     );
 
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].externalIdentifier.valueOf()).toBe('bafy-keychain-v1');
+    expect(candidates[0].keychain.toPrimitives()).toEqual(local.toPrimitives());
+    await flushBackgroundTasks();
     expect(ipfs.getRecordCandidates).toHaveBeenCalledWith(
       `pigeon-swarm_keychain-${mother.ownerIdentityId.valueOf()}`,
-    );
-    expect(candidates).toHaveLength(2);
-    expect(candidates[0].externalIdentifier.valueOf()).toBe('bafy-keychain-v2');
-    expect(candidates[0].keychain.toPrimitives()).toEqual(
-      remote.toPrimitives(),
     );
   });
 
@@ -205,3 +204,9 @@ describe('IpfsKeychainRepository', () => {
     );
   });
 });
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}

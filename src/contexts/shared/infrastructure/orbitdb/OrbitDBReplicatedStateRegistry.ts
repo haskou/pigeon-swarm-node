@@ -120,6 +120,38 @@ export default class OrbitDBReplicatedStateRegistry {
     return false;
   }
 
+  private headKeysFromRecord(record: Record<string, unknown>): string[] {
+    const keys = new Set<string>();
+    const identityId =
+      this.stringValue(record, 'identityId') || this.stringValue(record, 'id');
+    const handle = this.stringValue(record, 'handle');
+    const ownerIdentityId = this.stringValue(record, 'ownerIdentityId');
+    const cid = this.stringValue(record, 'cid');
+    const id = this.stringValue(record, 'id');
+
+    if (identityId) {
+      keys.add(`identity:${identityId}`);
+    }
+
+    if (handle) {
+      keys.add(`identity-handle:${handle}`);
+    }
+
+    if (ownerIdentityId) {
+      keys.add(`keychain:${ownerIdentityId}`);
+    }
+
+    if (ownerIdentityId && cid) {
+      keys.add(`keychain-cid:${cid}`);
+    }
+
+    if (id) {
+      keys.add(id);
+    }
+
+    return [...keys];
+  }
+
   private cacheHeadUpdate(
     networkId: string,
     entry: { payload?: { value?: unknown } },
@@ -131,16 +163,18 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     const record = this.recordValue(payloadValue);
-    const key =
-      this.stringValue(payloadValue, 'key') ||
-      this.stringValue(record || {}, 'id');
+    const explicitKey = this.stringValue(payloadValue, 'key');
 
-    if (!key || !record) {
+    if (!record) {
       return;
     }
 
-    if (this.cacheHead(key, record)) {
-      void this.persistHeadCache(networkId, key, record);
+    const keys = explicitKey ? [explicitKey] : this.headKeysFromRecord(record);
+
+    for (const key of keys) {
+      if (this.cacheHead(key, record)) {
+        void this.persistHeadCache(networkId, key, record);
+      }
     }
   }
 

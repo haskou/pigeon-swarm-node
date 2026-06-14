@@ -9,6 +9,8 @@ import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMeta
 
 // eslint-disable-next-line max-len
 export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataRepository {
+  private readonly activeHeadRepairs = new Set<string>();
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -185,6 +187,41 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     await this.putHead(this.toStorageDocument(latest));
   }
 
+  private repairHeadInBackground(
+    repairKey: string,
+    repair: () => Promise<void>,
+  ): void {
+    if (this.activeHeadRepairs.has(repairKey)) {
+      return;
+    }
+
+    this.activeHeadRepairs.add(repairKey);
+    void repair()
+      .catch((): undefined => undefined)
+      .finally(() => {
+        this.activeHeadRepairs.delete(repairKey);
+      });
+  }
+
+  private repairOwnerHeadInBackground(
+    ownerIdentityId: string,
+    head: KeychainMetadataRecord | undefined,
+  ): void {
+    this.repairHeadInBackground(
+      this.ownerHeadKey(ownerIdentityId),
+      async () => {
+        const latest = this.sortByFreshness([
+          ...(head ? [head] : []),
+          ...(await this.findStoredRecordsByOwnerIdentityId(ownerIdentityId)),
+        ])[0];
+
+        if (latest) {
+          await this.readRepairHead(head, latest);
+        }
+      },
+    );
+  }
+
   private deduplicate(
     records: KeychainMetadataRecord[],
   ): KeychainMetadataRecord[] {
@@ -260,9 +297,18 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     const head = await this.findHead(
       this.ownerHeadKey(ownerIdentityId.valueOf()),
     );
-    const records = this.deduplicate([
+    const cachedRecords = this.deduplicate([
       ...(head ? [head] : []),
       ...this.findCachedCidRecordsByOwner(ownerIdentityId),
+    ]);
+
+    if (cachedRecords.length > 0) {
+      this.repairOwnerHeadInBackground(ownerIdentityId.valueOf(), head);
+
+      return this.sortByFreshness(cachedRecords);
+    }
+
+    const records = this.deduplicate([
       ...(await this.findStoredRecordsByOwnerIdentityId(
         ownerIdentityId.valueOf(),
       )),

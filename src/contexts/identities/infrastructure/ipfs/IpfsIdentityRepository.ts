@@ -18,6 +18,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
   private readonly identityByCid = new Map<string, Identity>();
+  private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -155,8 +156,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
       return identity;
     } catch {
-      await this.deleteMetadata(cid);
-
       return undefined;
     }
   }
@@ -186,7 +185,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return candidate;
     } catch {
       this.identityByCid.delete(metadata.cid);
-      await this.deleteMetadata(new IPFSId(metadata.cid));
 
       return undefined;
     }
@@ -274,6 +272,37 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       throw error;
+    }
+  }
+
+  private refreshRemoteCandidateReferencesInBackground(
+    id: IdentityId,
+    knownCids: Set<string>,
+  ): void {
+    const refreshKey = id.valueOf();
+
+    if (this.activeRemoteCandidateRefreshes.has(refreshKey)) {
+      return;
+    }
+
+    this.activeRemoteCandidateRefreshes.add(refreshKey);
+    void this.refreshRemoteCandidateReferences(id, knownCids).finally(() => {
+      this.activeRemoteCandidateRefreshes.delete(refreshKey);
+    });
+  }
+
+  private async refreshRemoteCandidateReferences(
+    id: IdentityId,
+    knownCids: Set<string>,
+  ): Promise<void> {
+    try {
+      if (!(await this.ipfsManager.hasConnectedPeers())) {
+        return;
+      }
+
+      await this.findRemoteCandidateReferences(id, knownCids);
+    } catch {
+      return;
     }
   }
 
@@ -371,6 +400,12 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       await this.findFirstCandidateReferenceFromMetadata(metadata);
     const localCandidates = localCandidate ? [localCandidate] : [];
     const knownCids = new Set(metadata.map((document) => document.cid));
+
+    if (localCandidates.length > 0) {
+      this.refreshRemoteCandidateReferencesInBackground(id, knownCids);
+
+      return this.sortCandidateReferencesByFreshness(localCandidates);
+    }
 
     if (await this.shouldUseOnlyLocalMetadata(metadata)) {
       return this.localCandidatesOrNotFound(id, localCandidates);

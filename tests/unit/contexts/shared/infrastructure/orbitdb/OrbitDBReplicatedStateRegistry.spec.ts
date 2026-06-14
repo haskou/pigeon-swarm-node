@@ -378,6 +378,69 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
 
+  it('derives identity head keys from replicated head updates without explicit keys', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          cid: 'identity-v5',
+          handle: 'hasko',
+          id: 'identity-1',
+          identityId: 'identity-1',
+          receivedAt: 100,
+          version: 5,
+        },
+      },
+    });
+
+    await expect(registry.findHead('identity:identity-1')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'identity-v5',
+        version: 5,
+      }),
+    );
+    await expect(registry.findHead('identity-handle:hasko')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'identity-v5',
+        version: 5,
+      }),
+    );
+  });
+
+  it('derives keychain head keys from replicated head updates without explicit keys', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          cid: 'keychain-v3',
+          id: 'keychain-v3',
+          ownerIdentityId: 'identity-1',
+          receivedAt: 100,
+          version: 3,
+        },
+      },
+    });
+
+    await expect(registry.findHead('keychain:identity-1')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'keychain-v3',
+        version: 3,
+      }),
+    );
+    await expect(registry.findHead('keychain-cid:keychain-v3')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'keychain-v3',
+        version: 3,
+      }),
+    );
+  });
+
   it('does not replace a newer cached head with an older replicated update', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

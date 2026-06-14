@@ -101,7 +101,7 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     ]);
   });
 
-  it('should repair stale identity id heads from newer metadata documents', async () => {
+  it('should repair stale identity id heads in background', async () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
@@ -131,10 +131,11 @@ describe('OrbitDBIdentityMetadataRepository', () => {
 
     expect(records[0]).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-v2',
-        version: 2,
+        cid: 'bafyidentity-v1',
+        version: 1,
       }),
     );
+    await flushBackgroundTasks();
     expect(heads.get(`identity:${identityId}`)).toEqual(
       expect.objectContaining({
         cid: 'bafyidentity-v2',
@@ -185,7 +186,7 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     );
   });
 
-  it('should repair stale identity handle heads from newer metadata documents', async () => {
+  it('should repair stale identity handle heads in background', async () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother().withVersion(new IdentityVersion(2));
     const networkId = mother.networks[0];
@@ -218,10 +219,11 @@ describe('OrbitDBIdentityMetadataRepository', () => {
 
     expect(records[0]).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-handle-v2',
-        version: 2,
+        cid: 'bafyidentity-handle-v1',
+        version: 1,
       }),
     );
+    await flushBackgroundTasks();
     expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
       expect.objectContaining({
         cid: 'bafyidentity-handle-v2',
@@ -282,4 +284,10 @@ function upsertDocument(
   }
 
   currentDocuments[existingIndex] = newDocument;
+}
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }

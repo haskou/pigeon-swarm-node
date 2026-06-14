@@ -193,7 +193,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result).toHaveLength(1);
     });
 
-    it('should merge remote candidates when local metadata is stale and peers are connected', async () => {
+    it('should return local metadata without waiting for remote refresh', async () => {
       const previousIdentity = await mother.build();
       const previousPrimitives = previousIdentity.toPrimitives();
       const previousCidString = 'bafyidentity-v1';
@@ -228,10 +228,11 @@ describe('IpfsIdentityRepository', () => {
         new IdentityId(previousPrimitives.id),
       );
 
+      expect(result.toPrimitives()).toEqual(previousIdentity.toPrimitives());
+      await flushBackgroundTasks();
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + previousPrimitives.id,
       );
-      expect(result.toPrimitives()).toEqual(currentIdentity.toPrimitives());
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
@@ -282,7 +283,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should delete broken mongo metadata and fallback to DHT', async () => {
+    it('should keep temporarily unavailable metadata and fallback to DHT', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -308,7 +309,7 @@ describe('IpfsIdentityRepository', () => {
 
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).toHaveBeenCalledWith(new IPFSId(brokenCidString));
+      ).not.toHaveBeenCalled();
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
@@ -376,7 +377,7 @@ describe('IpfsIdentityRepository', () => {
       );
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).toHaveBeenCalledWith(new IPFSId(tamperedCidString));
+      ).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
 
@@ -520,7 +521,7 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).toHaveBeenCalledWith(cid);
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -639,3 +640,9 @@ describe('IpfsIdentityRepository', () => {
     });
   });
 });
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}

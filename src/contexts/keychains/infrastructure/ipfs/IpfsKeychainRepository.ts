@@ -18,6 +18,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly IDENTITY_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly keychainByCid = new Map<string, Keychain>();
+  private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -229,6 +230,40 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
+  private refreshRemoteCandidateReferencesInBackground(
+    ownerIdentityId: IdentityId,
+    knownCids: Set<string>,
+  ): void {
+    const refreshKey = ownerIdentityId.valueOf();
+
+    if (this.activeRemoteCandidateRefreshes.has(refreshKey)) {
+      return;
+    }
+
+    this.activeRemoteCandidateRefreshes.add(refreshKey);
+    void this.refreshRemoteCandidateReferences(
+      ownerIdentityId,
+      knownCids,
+    ).finally(() => {
+      this.activeRemoteCandidateRefreshes.delete(refreshKey);
+    });
+  }
+
+  private async refreshRemoteCandidateReferences(
+    ownerIdentityId: IdentityId,
+    knownCids: Set<string>,
+  ): Promise<void> {
+    try {
+      if (!(await this.ipfsManager.hasConnectedPeers())) {
+        return;
+      }
+
+      await this.findRemoteCandidateReferences(ownerIdentityId, knownCids);
+    } catch {
+      return;
+    }
+  }
+
   public async findByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
@@ -261,10 +296,12 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
-    if (
-      localCandidates.length > 0 &&
-      !(await this.ipfsManager.hasConnectedPeers())
-    ) {
+    if (localCandidates.length > 0) {
+      this.refreshRemoteCandidateReferencesInBackground(
+        ownerIdentityId,
+        new Set(metadata.map((document) => document.cid)),
+      );
+
       return this.sortCandidateReferencesByFreshness(localCandidates);
     }
 

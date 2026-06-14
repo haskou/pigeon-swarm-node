@@ -196,7 +196,7 @@ describe('OrbitDBKeychainMetadataRepository', () => {
     expect(records[0].keychain?.toPrimitives()).toEqual(latest.toPrimitives());
   });
 
-  it('should repair stale keychain owner heads from newer metadata documents', async () => {
+  it('should repair stale keychain owner heads in background', async () => {
     const mother = await KeychainMother.create();
     const ownerIdentityId = mother.ownerIdentityId.valueOf();
 
@@ -221,10 +221,11 @@ describe('OrbitDBKeychainMetadataRepository', () => {
 
     expect(records[0]).toEqual(
       expect.objectContaining({
-        cid: 'bafykeychain-v2',
-        version: 2,
+        cid: 'bafykeychain-v1',
+        version: 1,
       }),
     );
+    await flushBackgroundTasks();
     expect(heads.get(`keychain:${ownerIdentityId}`)).toEqual(
       expect.objectContaining({
         cid: 'bafykeychain-v2',
@@ -285,4 +286,10 @@ function upsertDocument(
   }
 
   currentDocuments[existingIndex] = newDocument;
+}
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }

@@ -12,6 +12,8 @@ import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMeta
 
 // eslint-disable-next-line max-len
 export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataRepository {
+  private readonly activeHeadRepairs = new Set<string>();
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -175,6 +177,54 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     await this.putHeads(latest);
   }
 
+  private repairHeadInBackground(
+    repairKey: string,
+    repair: () => Promise<void>,
+  ): void {
+    if (this.activeHeadRepairs.has(repairKey)) {
+      return;
+    }
+
+    this.activeHeadRepairs.add(repairKey);
+    void repair()
+      .catch((): undefined => undefined)
+      .finally(() => {
+        this.activeHeadRepairs.delete(repairKey);
+      });
+  }
+
+  private repairIdentityHeadInBackground(
+    identityId: string,
+    head: IdentityMetadataRecord,
+  ): void {
+    this.repairHeadInBackground(this.identityHeadKey(identityId), async () => {
+      const latest = this.latestRecordFrom([
+        head,
+        ...(await this.findStoredRecordsByIdentityId(identityId)),
+      ]);
+
+      if (latest) {
+        await this.readRepairHead(head, latest);
+      }
+    });
+  }
+
+  private repairHandleHeadInBackground(
+    handle: string,
+    head: IdentityMetadataRecord,
+  ): void {
+    this.repairHeadInBackground(this.handleHeadKey(handle), async () => {
+      const latest = this.latestRecordFrom([
+        head,
+        ...(await this.findStoredRecordsByHandle(handle)),
+      ]);
+
+      if (latest) {
+        await this.readRepairHead(head, latest);
+      }
+    });
+  }
+
   private async findStoredRecordsByIdentityId(
     identityId: string,
   ): Promise<IdentityMetadataRecord[]> {
@@ -315,8 +365,14 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
     const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
+
+    if (head) {
+      this.repairHandleHeadInBackground(handle.valueOf(), head);
+
+      return [head];
+    }
+
     const latest = this.latestRecordFrom([
-      ...(head ? [head] : []),
       ...this.registry
         .findCachedHeadsByPrefix('identity:')
         .map((document) => this.toRecord(document))
@@ -342,8 +398,14 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
     const head = await this.findHead(
       this.identityHeadKey(identityId.valueOf()),
     );
+
+    if (head) {
+      this.repairIdentityHeadInBackground(identityId.valueOf(), head);
+
+      return [head];
+    }
+
     const latest = this.latestRecordFrom([
-      ...(head ? [head] : []),
       ...(await this.findStoredRecordsByIdentityId(identityId.valueOf())),
     ]);
 
