@@ -140,3 +140,16 @@ El cambio se considera correcto cuando un nodo sin conectividad directa puede:
 - recuperar contenido y registros a traves de peers/proveedores encontrados por
   routing;
 - replicar OrbitDB y mantener gossip usando la conectividad libp2p resultante.
+
+El e2e que valida este contrato es:
+
+```bash
+yarn test:e2e:real-transport:private-relay-discovery
+```
+
+Ese test levanta dos procesos Node separados, con storage y `process.env`
+distintos. El proceso `leaf` no recibe el multiaddr del relay; solo recibe el
+`peerId`, el CID/hash que debe poder leer tras discovery y la clave privada de
+red compartida. La conexion al relay debe salir del record cifrado publicado en
+IPFS publico. Antes de arrancar discovery verifica falsos positivos: el CID no
+esta local, no se puede leer remotamente y gossip no llega.
