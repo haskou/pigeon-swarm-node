@@ -3,15 +3,58 @@ import { Level } from 'level';
 import path from 'path';
 
 export default class EmbeddedLocalDatabase {
+  private static readonly databases = new Map<
+    string,
+    Level<string, Record<string, unknown>>
+  >();
+
   private readonly database: Level<string, Record<string, unknown>>;
+  private readonly databasePath: string;
+
+  private static getDatabase(
+    databasePath: string,
+  ): Level<string, Record<string, unknown>> {
+    const currentDatabase = EmbeddedLocalDatabase.databases.get(databasePath);
+
+    if (currentDatabase && currentDatabase.status !== 'closed') {
+      return currentDatabase;
+    }
+
+    const database = new Level<string, Record<string, unknown>>(databasePath, {
+      valueEncoding: 'json',
+    });
+
+    EmbeddedLocalDatabase.databases.set(databasePath, database);
+
+    return database;
+  }
 
   constructor() {
-    this.database = new Level<string, Record<string, unknown>>(
+    this.databasePath =
       process.env.PIGEON_LOCAL_DB_PATH ||
-        path.join(Kernel.rootDirectory, 'local_storage'),
-      {
-        valueEncoding: 'json',
-      },
+      path.join(Kernel.rootDirectory, 'local_storage');
+    this.database = EmbeddedLocalDatabase.getDatabase(this.databasePath);
+  }
+
+  private async ensureOpen(): Promise<void> {
+    if (this.database.status === 'open') {
+      return;
+    }
+
+    if (this.database.status === 'opening') {
+      await this.database.open();
+
+      return;
+    }
+
+    if (this.database.status === 'closed') {
+      throw new Error(
+        `Local database is closed and cannot be reused: ${this.databasePath}`,
+      );
+    }
+
+    throw new Error(
+      `Local database is not available: path=${this.databasePath} status=${this.database.status}`,
     );
   }
 
@@ -24,14 +67,23 @@ export default class EmbeddedLocalDatabase {
   }
 
   public async clear(): Promise<void> {
+    await this.ensureOpen();
     await this.database.clear();
   }
 
   public async close(): Promise<void> {
+    if (this.database.status === 'closed') {
+      EmbeddedLocalDatabase.databases.delete(this.databasePath);
+
+      return;
+    }
+
     await this.database.close();
+    EmbeddedLocalDatabase.databases.delete(this.databasePath);
   }
 
   public async delete(namespace: string, id: string): Promise<void> {
+    await this.ensureOpen();
     await this.database.del(this.key(namespace, id));
   }
 
@@ -54,6 +106,7 @@ export default class EmbeddedLocalDatabase {
     namespace: string,
     matcher: (document: Record<string, unknown>) => boolean = () => true,
   ): Promise<Array<Record<string, unknown>>> {
+    await this.ensureOpen();
     const documents: Array<Record<string, unknown>> = [];
 
     for await (const [, value] of this.database.iterator({
@@ -72,6 +125,8 @@ export default class EmbeddedLocalDatabase {
     namespace: string,
     id: string,
   ): Promise<Record<string, unknown> | undefined> {
+    await this.ensureOpen();
+
     try {
       return await this.database.get(this.key(namespace, id));
     } catch (error) {
@@ -88,6 +143,7 @@ export default class EmbeddedLocalDatabase {
     id: string,
     document: Record<string, unknown>,
   ): Promise<void> {
+    await this.ensureOpen();
     await this.database.put(this.key(namespace, id), {
       ...document,
       _id: id,
