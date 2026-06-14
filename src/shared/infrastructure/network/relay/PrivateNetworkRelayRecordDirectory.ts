@@ -60,6 +60,18 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private getPublicPeerWaitMs(): number {
+    const configuredWaitMs = Number(
+      process.env.PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS,
+    );
+
+    if (!Number.isFinite(configuredWaitMs) || configuredWaitMs < 0) {
+      return 8000;
+    }
+
+    return Math.min(configuredWaitMs, 10_000);
+  }
+
   private getRelayRecordIPNSWindowMs(): number {
     return Number(
       process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS || 10 * 60_000,
@@ -140,6 +152,26 @@ export default class PrivateNetworkRelayRecordDirectory {
         ` publicPeerId=${publicConnection.getPeerId()}` +
         ' reason="The relay record cannot leave local storage without public IPFS peers."',
     );
+  }
+
+  private async waitForPublicConnectionPeers(
+    operation: 'discover' | 'publish',
+    network: IPFSNetwork,
+    publicConnection: IPFSConnection,
+  ): Promise<boolean> {
+    const hasPeers = await publicConnection.waitForPeers(
+      this.getPublicPeerWaitMs(),
+    );
+
+    if (!hasPeers) {
+      this.warnWhenPublicConnectionHasNoPeers(
+        operation,
+        network,
+        publicConnection,
+      );
+    }
+
+    return hasPeers;
   }
 
   private ensurePeerIdInMultiaddr(multiaddr: string, peerId: string): string {
@@ -399,11 +431,17 @@ export default class PrivateNetworkRelayRecordDirectory {
       version: 1,
     };
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
-    this.warnWhenPublicConnectionHasNoPeers(
-      'publish',
-      network,
-      publicConnection,
-    );
+
+    if (
+      !(await this.waitForPublicConnectionPeers(
+        'publish',
+        network,
+        publicConnection,
+      ))
+    ) {
+      return;
+    }
+
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
     const routingAbort = this.createRoutingAbortSignal();
@@ -442,11 +480,16 @@ export default class PrivateNetworkRelayRecordDirectory {
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<void> {
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
-    this.warnWhenPublicConnectionHasNoPeers(
-      'discover',
-      network,
-      publicConnection,
-    );
+
+    if (
+      !(await this.waitForPublicConnectionPeers(
+        'discover',
+        network,
+        publicConnection,
+      ))
+    ) {
+      return;
+    }
 
     try {
       const ipnsRelayRecord = await this.discoverRelayIPNSRecord(

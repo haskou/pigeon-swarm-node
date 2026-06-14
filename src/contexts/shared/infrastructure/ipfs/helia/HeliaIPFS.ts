@@ -121,26 +121,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return this.getPeers().length > 0;
   }
 
-  private async waitForPeers(signal?: AbortSignal): Promise<boolean> {
-    const deadline = Date.now() + HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS;
-
-    while (Date.now() < deadline) {
-      if (signal?.aborted) {
-        return false;
-      }
-
-      if (this.hasPeers()) {
-        return true;
-      }
-
-      await new Promise((resolve) => {
-        setTimeout(resolve, 250);
-      });
-    }
-
-    return this.hasPeers();
-  }
-
   private getPubSubMessage(event: PubSubEvent): {
     data?: Uint8Array;
     topic?: string;
@@ -269,6 +249,29 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const cid = await heliaJSONClient.add(data, { signal });
 
     return new IPFSId(cid.toString());
+  }
+
+  public async waitForPeers(
+    timeoutMs: number = HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      if (signal?.aborted) {
+        return false;
+      }
+
+      if (this.hasPeers()) {
+        return true;
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 250);
+      });
+    }
+
+    return this.hasPeers();
   }
 
   public async addBytes(
@@ -473,7 +476,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const routingAbort = this.createRoutingAbortSignal(signal);
 
     try {
-      if (!(await this.waitForPeers(routingAbort.signal))) {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          routingAbort.signal,
+        ))
+      ) {
         throw new Error('No public IPFS peers available for IPNS publication.');
       }
 
@@ -504,7 +512,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const routingAbort = this.createRoutingAbortSignal(signal);
 
     try {
-      if (!(await this.waitForPeers(routingAbort.signal))) {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+          routingAbort.signal,
+        ))
+      ) {
         throw new Error('No public IPFS peers available for IPNS resolution.');
       }
 

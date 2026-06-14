@@ -34,5 +34,6 @@ export interface IPFSConnection {
   getHeliaCore(): HeliaInstance;
   getPeers(): string[];
   getPeerId(): string;
+  waitForPeers(timeoutMs?: number, signal?: AbortSignal): Promise<boolean>;
   stop(): Promise<void>;
 }
