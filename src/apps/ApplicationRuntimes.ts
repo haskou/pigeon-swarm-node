@@ -1,3 +1,4 @@
+import CallRelayRuntime from '@app/apps/apis/calls-api/CallRelayRuntime';
 import IPFSRuntime from '@app/apps/runtimes/ipfs-runtime/IPFSRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { ServiceClass } from '@app/shared/infrastructure/dependencyInjection/ServiceClass';
@@ -6,6 +7,7 @@ import PublicRelayRuntime from '@app/shared/infrastructure/network/relay/PublicR
 
 export const applicationRuntimes: ServiceClass<Runtime>[] = [
   PublicRelayRuntime,
+  CallRelayRuntime,
   IPFSRuntime,
   OrbitDBReplicatedStateRuntime,
 ];

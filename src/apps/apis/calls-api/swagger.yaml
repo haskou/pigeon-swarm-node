@@ -74,7 +74,7 @@ paths:
       tags:
         - calls
       summary: Get ICE servers for WebRTC calls
-      description: Returns the node-configured TURN/STUN servers. Production nodes should use CALLS_TURN_SHARED_SECRET so credentials are generated temporarily per authenticated identity, and prefer iceTransportPolicy relay.
+      description: Returns node-configured and discovered TURN/STUN servers. Production nodes should use CALLS_TURN_SHARED_SECRET so credentials are generated temporarily per authenticated identity, and prefer iceTransportPolicy relay. Nodes with CALLS_TURN_SHARED_SECRET and local TURN URLs publish signed call relay records through the public IPFS pubsub network; other nodes include active discovered TURN URLs when generating ICE servers.
       responses:
         '200':
           description: ICE server configuration for the authenticated client.

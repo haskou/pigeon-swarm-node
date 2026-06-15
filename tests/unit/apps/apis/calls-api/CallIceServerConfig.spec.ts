@@ -52,6 +52,52 @@ describe('CallIceServerConfig', () => {
     });
   });
 
+  it('should derive local TURN urls from the public host and configured TURN port', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_PORT: '4199',
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      PIGEON_PUBLIC_HOST: 'relay.example.test',
+    }).toResource(identityId);
+    const username = `1770003600:${identityId.valueOf()}`;
+    const credential = createHmac('sha1', 'turn-shared-secret')
+      .update(username)
+      .digest('base64');
+
+    expect(resource.iceServers[0]).toEqual({
+      credential,
+      urls: [
+        'turn:relay.example.test:4199?transport=udp',
+        'turn:relay.example.test:4199?transport=tcp',
+      ],
+      username,
+    });
+  });
+
+  it('should include discovered TURN urls only when shared secret exists', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    const discoveredUrl = 'turn:remote-relay.example.test:4199?transport=udp';
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: 'turn:local-relay.example.test:4199?transport=udp',
+    }).toResource(identityId, [discoveredUrl]);
+
+    expect(resource.iceServers[0].urls).toEqual([
+      'turn:local-relay.example.test:4199?transport=udp',
+      discoveredUrl,
+    ]);
+
+    const staticCredentialResource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_CREDENTIAL: 'turn-password',
+      CALLS_TURN_URLS: 'turn:local-relay.example.test:4199?transport=udp',
+      CALLS_TURN_USERNAME: 'turn-user',
+    }).toResource(identityId, [discoveredUrl]);
+
+    expect(staticCredentialResource.iceServers[0].urls).toEqual([
+      'turn:local-relay.example.test:4199?transport=udp',
+    ]);
+  });
+
   it('should include STUN only when explicitly configured', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_ICE_TRANSPORT_POLICY: 'all',
