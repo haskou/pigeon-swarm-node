@@ -63,6 +63,13 @@ export class IPFSNetwork {
     return this.connection.getBytes(cid, signal);
   }
 
+  public async provideContent(
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this.connection.provideContent(cid, signal);
+  }
+
   public async addBytes(
     bytes: Uint8Array,
     signal?: AbortSignal,
@@ -70,8 +77,12 @@ export class IPFSNetwork {
     return this.connection.addBytes(bytes, signal);
   }
 
-  public async dial(multiaddr: string): Promise<void> {
-    return this.connection.dial(multiaddr);
+  public async dial(multiaddr: string, signal?: AbortSignal): Promise<void> {
+    return this.connection.dial(multiaddr, signal);
+  }
+
+  public async listen(multiaddr: string): Promise<void> {
+    return this.connection.listen(multiaddr);
   }
 
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
@@ -95,6 +106,17 @@ export class IPFSNetwork {
     signal?: AbortSignal,
   ): Promise<string | undefined> {
     return this.connection.getRecord(key, signal);
+  }
+
+  public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {
+    return this.connection.provideRecord(key, signal);
+  }
+
+  public async findRecordProviderMultiaddrs(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    return this.connection.findRecordProviderMultiaddrs(key, signal);
   }
 
   public publishPubSub(topic: string, payload: string): Promise<void> {

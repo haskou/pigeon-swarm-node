@@ -27,11 +27,11 @@ function fakeStore(): FakeStore {
 function fakeStores(): OrbitDBReplicatedStateStores {
   const stores = {
     communities: fakeStore(),
+    contentReplication: fakeStore(),
     conversations: fakeStore(),
     events: fakeStore(),
     heads: fakeStore(),
     identities: fakeStore(),
-    contentReplication: fakeStore(),
     keychains: fakeStore(),
     messages: fakeStore(),
     notifications: fakeStore(),
@@ -47,17 +47,22 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     (
       Kernel as unknown as {
         _logs: {
+          debug: jest.Mock;
           error: jest.Mock;
           info: jest.Mock;
+          warn: jest.Mock;
         };
       }
     )._logs = {
+      debug: jest.fn(),
       error: jest.fn(),
       info: jest.fn(),
+      warn: jest.fn(),
     };
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -152,5 +157,59 @@ describe('OrbitDBReplicatedStateRuntime', () => {
       stores,
     );
     expect((stores.events as unknown as FakeStore).all).not.toHaveBeenCalled();
+  });
+
+  it('repairs read indexes again when replicated documents arrive after network registration', async () => {
+    jest.useFakeTimers();
+
+    const stores = fakeStores();
+    const network = {
+      getId: jest.fn().mockReturnValue('network-1'),
+      getPeerId: jest.fn().mockReturnValue('peer-1'),
+    };
+    const networkRegistry = {
+      getAll: jest.fn().mockReturnValue([network]),
+      onNetworkRegistered: jest.fn(),
+      onNetworkRemoved: jest.fn(),
+    } as unknown as IPFSNetworkRegistry;
+    const replicatedStateRegistry = {
+      register: jest.fn(),
+      unregister: jest.fn(),
+    } as unknown as OrbitDBReplicatedStateRegistry;
+    const publisher = {
+      registerNetworkStores: jest.fn(),
+      unregisterNetworkStores: jest.fn(),
+    } as unknown as OrbitDBReplicatedDomainEventPublisher;
+    const repairCritical = jest.fn().mockResolvedValue({});
+    const runtime = new OrbitDBReplicatedStateRuntime(
+      networkRegistry,
+      {} as MessageBus,
+      publisher,
+      replicatedStateRegistry,
+      { project: jest.fn() } as unknown as OrbitDBDomainEventProjector,
+      {
+        repairCritical,
+        repairSecondary: jest.fn().mockResolvedValue({}),
+      } as unknown as OrbitDBMetadataHeadRepairer,
+    );
+
+    jest.spyOn(OrbitDBReplicatedStateStores, 'open').mockResolvedValue(stores);
+
+    await runtime.run();
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    const updateHandler = (
+      stores.identities as unknown as FakeStore
+    ).events.on.mock.calls.find(([event]) => event === 'update')?.[1] as
+      | (() => void)
+      | undefined;
+
+    expect(updateHandler).toBeDefined();
+    expect(repairCritical).toHaveBeenCalledTimes(1);
+
+    updateHandler?.();
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    expect(repairCritical).toHaveBeenCalledTimes(2);
   });
 });

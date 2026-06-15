@@ -1,4 +1,6 @@
 import Kernel from '@app/Kernel';
+import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
+import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
@@ -6,6 +8,7 @@ import * as fs from 'fs/promises';
 
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
+import { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPrivateKeyLike';
 import heliaRuntimeAdapter, {
   DatastoreKeyLike,
   HeliaInstance,
@@ -19,11 +22,147 @@ import IPFSCidCodec from './IPFSCidCodec';
 import { IPFSConnection } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 import { IPFSOptions } from './IPFSOptions';
+import { ContentRetrievalOptions } from './types/ContentRetrievalOptions';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {
-  private static readonly ROUTING_RECORD_TIMEOUT_MS = 3000;
+  private static readonly CONTENT_RETRIEVAL_DEBUG_EVENTS = new Set([
+    'bitswap:block',
+    'bitswap:found-provider',
+  ]);
+
+  private static readonly publicRelayRecordRegistry =
+    new PublicRelayRecordRegistry();
+
+  private static readonly publicRelayRecordListeners = new WeakSet<object>();
+  private static readonly successfulPublicRelayDials = new Set<string>();
+
   private readonly pinningStrategy: HeliaPinningStrategy;
+
+  private static getRoutingRecordTimeoutMs(): number {
+    const configuredTimeoutMs = Number(
+      process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS ||
+        process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS,
+    );
+
+    if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
+      return configuredTimeoutMs;
+    }
+
+    return 15_000;
+  }
+
+  private static configuredBootstrapRelayMultiaddrs(): string[] {
+    return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean);
+  }
+
+  private static localPeerId(heliaCore: HeliaInstance): string | undefined {
+    return heliaCore.libp2p.peerId?.toString();
+  }
+
+  private static async dialConfiguredBootstrapRelays(
+    heliaCore: HeliaInstance,
+    networkName: string,
+  ): Promise<void> {
+    await HeliaIPFS.dialMultiaddrs(
+      heliaCore,
+      networkName,
+      HeliaIPFS.configuredBootstrapRelayMultiaddrs(),
+      'configured bootstrap relay',
+    );
+  }
+
+  private static async dialKnownPublicRelayRecords(
+    heliaCore: HeliaInstance,
+    networkName: string,
+  ): Promise<void> {
+    const localPeerId = HeliaIPFS.localPeerId(heliaCore);
+
+    await Promise.all(
+      HeliaIPFS.publicRelayRecordRegistry
+        .fallbackAllExceptPeer(localPeerId)
+        .map((record) =>
+          HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
+        ),
+    );
+  }
+
+  private static dialPublicRelayRecordsWhenDiscovered(
+    heliaCore: HeliaInstance,
+    networkName: string,
+  ): void {
+    const listenerKey = heliaCore.libp2p as unknown as object;
+
+    if (HeliaIPFS.publicRelayRecordListeners.has(listenerKey)) {
+      return;
+    }
+
+    HeliaIPFS.publicRelayRecordListeners.add(listenerKey);
+    HeliaIPFS.publicRelayRecordRegistry.onRecordSaved((record) =>
+      HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
+    );
+  }
+
+  private static async dialPublicRelayRecord(
+    heliaCore: HeliaInstance,
+    networkName: string,
+    record: PublicRelayRecordPrimitives,
+  ): Promise<void> {
+    if (record.peerId === HeliaIPFS.localPeerId(heliaCore)) {
+      return;
+    }
+
+    await HeliaIPFS.dialMultiaddrs(
+      heliaCore,
+      networkName,
+      record.multiaddrs,
+      `public relay record peerId="${record.peerId}"`,
+    );
+  }
+
+  private static async dialMultiaddrs(
+    heliaCore: HeliaInstance,
+    networkName: string,
+    multiaddrs: string[],
+    source: string,
+  ): Promise<void> {
+    const dialer = heliaCore.libp2p as unknown as {
+      dial?: (address: unknown) => Promise<unknown>;
+    };
+
+    if (multiaddrs.length === 0 || !dialer.dial) {
+      return;
+    }
+
+    await Promise.all(
+      multiaddrs.map(async (address) => {
+        try {
+          await dialer.dial(await heliaRuntimeAdapter.createMultiaddr(address));
+          const dialKey = `${networkName}:${source}`;
+
+          if (!HeliaIPFS.successfulPublicRelayDials.has(dialKey)) {
+            HeliaIPFS.successfulPublicRelayDials.add(dialKey);
+            Kernel.logger.info(
+              `Private network "${networkName}" connected to ${source} "${address}"`,
+            );
+          } else {
+            Kernel.logger.debug(
+              `Private network "${networkName}" already connected to ${source} "${address}"`,
+            );
+          }
+        } catch (error: unknown) {
+          Kernel.logger.debug(
+            `Private network "${networkName}" failed to connect to ${source} "${address}": ${String(
+              error,
+            )}`,
+          );
+        }
+      }),
+    );
+  }
 
   public static async createPublicHeliaCore(
     options: IPFSOptions,
@@ -53,18 +192,21 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const libp2p = await heliaRuntimeAdapter.createLibp2p(
       libp2pConfig as unknown as HeliaLibp2pConfig,
     );
-    const heliaCore = await heliaRuntimeAdapter.createHelia({
+    const heliaCore = await heliaRuntimeAdapter.createPrivateHelia({
       ...(baseOptions.blockBrokers
         ? { blockBrokers: baseOptions.blockBrokers }
         : {}),
       blockstore: baseOptions.blockstore,
       datastore: baseOptions.datastore,
       libp2p,
-    } as unknown as Parameters<typeof heliaRuntimeAdapter.createHelia>[0]);
+    });
 
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
+    await HeliaIPFS.dialConfiguredBootstrapRelays(heliaCore, networkName);
+    await HeliaIPFS.dialKnownPublicRelayRecords(heliaCore, networkName);
+    HeliaIPFS.dialPublicRelayRecordsWhenDiscovered(heliaCore, networkName);
 
     return heliaCore;
   }
@@ -84,7 +226,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      HeliaIPFS.ROUTING_RECORD_TIMEOUT_MS,
+      HeliaIPFS.getRoutingRecordTimeoutMs(),
     );
 
     if (signal) {
@@ -94,6 +236,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     return { signal: controller.signal, timeout };
+  }
+
+  private getIPNSResolutionSkipReason(error: unknown): string {
+    const message = String(error);
+
+    if (message.includes('No public IPFS peers')) {
+      return 'No public IPFS peers are available for IPNS resolution.';
+    }
+
+    if (message.includes('AbortError') || message.includes('aborted')) {
+      return 'The IPNS routing lookup timed out before a record was found.';
+    }
+
+    if (
+      message.includes('GetFailedError') ||
+      message.includes('Failed to get value')
+    ) {
+      return 'The IPNS name has not propagated to this public IPFS node yet.';
+    }
+
+    return 'IPNS routing did not return a record.';
   }
 
   private async getLocalRecord(
@@ -155,13 +318,116 @@ export abstract class HeliaIPFS implements IPFSConnection {
     );
   }
 
+  private providerMultiaddrWithPeerId(provider: {
+    id: { toString: () => string };
+    multiaddrs: { toString: () => string }[];
+  }): string[] {
+    const peerId = provider.id.toString();
+
+    return provider.multiaddrs.map((multiaddr) => {
+      const value = multiaddr.toString();
+
+      if (value.includes('/p2p/')) {
+        return value;
+      }
+
+      return `${value}/p2p/${peerId}`;
+    });
+  }
+
+  private isPrivateNetwork(): boolean {
+    return 'key' in this.options;
+  }
+
+  private async knownRelayProviderMultiaddrs(): Promise<
+    NonNullable<ContentRetrievalOptions['providers']>
+  > {
+    if (!this.isPrivateNetwork()) {
+      return [];
+    }
+
+    return Promise.all(
+      HeliaIPFS.publicRelayRecordRegistry
+        .fallbackMultiaddrsExceptPeer(HeliaIPFS.localPeerId(this.heliaCore))
+        .map((address) => heliaRuntimeAdapter.createMultiaddr(address)),
+    );
+  }
+
+  private async contentRetrievalProviders(): Promise<
+    NonNullable<ContentRetrievalOptions['providers']>
+  > {
+    return [
+      ...this.getConnectedPeerIds(),
+      ...(await this.knownRelayProviderMultiaddrs()),
+    ];
+  }
+
+  private async createContentRetrievalOptions(
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<ContentRetrievalOptions> {
+    const providers = await this.contentRetrievalProviders();
+    const onProgress = this.contentRetrievalProgressLogger(cid);
+
+    if (providers.length === 0) {
+      return onProgress ? { onProgress, signal } : { signal };
+    }
+
+    const options: ContentRetrievalOptions = {
+      maxProviders: providers.length,
+      minProviders: 1,
+      providers,
+      signal,
+    };
+
+    if (onProgress) {
+      options.onProgress = onProgress;
+    }
+
+    return options;
+  }
+
+  private contentRetrievalProgressLogger(
+    cid: IPFSId,
+  ): ContentRetrievalOptions['onProgress'] | undefined {
+    if (process.env.DEBUG_NETWORK !== 'true') {
+      return undefined;
+    }
+
+    return (event) => {
+      if (!HeliaIPFS.CONTENT_RETRIEVAL_DEBUG_EVENTS.has(event.type)) {
+        return;
+      }
+
+      const detail = event.detail as
+        | {
+            provider?: {
+              id?: { toString: () => string };
+              routing?: string;
+            };
+            sender?: { toString: () => string };
+          }
+        | undefined;
+      const providerId = detail?.provider?.id?.toString();
+      const providerRouting = detail?.provider?.routing;
+      const senderId = detail?.sender?.toString();
+
+      Kernel.logger.debug(
+        `IPFS content retrieval progress: cid="${cid.valueOf()}" event="${event.type}" provider="${providerId ?? ''}" routing="${providerRouting ?? ''}" sender="${senderId ?? ''}"`,
+      );
+    };
+  }
+
   private async collectRawBlockBytes(
     parsedCid: ParsedCidLike,
-    options: NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]>,
+    options: ContentRetrievalOptions,
     blockstore: Pick<HeliaInstance['blockstore'], 'get'> = this.heliaCore
       .blockstore,
   ): Promise<Uint8Array[]> {
-    const rawBlocks = blockstore.get(parsedCid, options) as unknown;
+    const rawBlocks = blockstore.get(
+      parsedCid,
+      options as NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]>,
+    ) as unknown;
 
     if (this.isAsyncIterableBytes(rawBlocks)) {
       const chunks: Uint8Array[] = [];
@@ -179,10 +445,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private createBlockRetrievalOptions(
     signal?: AbortSignal,
   ): NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]> {
-    const providers = this.getConnectedPeerIds();
-
     return {
-      ...(providers.length > 0 ? { providers } : {}),
       signal,
     };
   }
@@ -197,6 +460,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     return options;
+  }
+
+  private async createUnixfsContentRetrievalOptions(
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<HeliaUnixfsCatOptions & ContentRetrievalOptions> {
+    return {
+      ...this.createUnixfsCatOptions(signal),
+      ...(await this.createContentRetrievalOptions(cid, signal)),
+    };
   }
 
   private usesLimitedConnections(): boolean {
@@ -231,6 +504,41 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
   }
 
+  private async publishContentProvider(
+    parsedCid: ParsedCidLike,
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
+          routingAbort.signal,
+        ))
+      ) {
+        throw new Error('No IPFS peers available for provider publication.');
+      }
+
+      await this.heliaCore.routing.provide(parsedCid, {
+        signal: routingAbort.signal,
+      });
+    } catch (error: unknown) {
+      Kernel.logger.debug?.(
+        `IPFS provider publication skipped for cid="${cid.valueOf()}": ${String(
+          error,
+        )}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+  }
+
+  private provideContentInBackground(cid: IPFSId): void {
+    void this.provideContent(cid).catch((): undefined => undefined);
+  }
+
   private pinReadThroughContent(
     parsedCid: ParsedCidLike,
     signal?: AbortSignal,
@@ -249,8 +557,34 @@ export abstract class HeliaIPFS implements IPFSConnection {
       this.heliaCore,
     );
     const cid = await heliaJSONClient.add(data, { signal });
+    const ipfsId = new IPFSId(cid.toString());
 
-    return new IPFSId(cid.toString());
+    this.provideContentInBackground(ipfsId);
+
+    return ipfsId;
+  }
+
+  public async waitForPeers(
+    timeoutMs: number = HeliaIPFS.getRoutingRecordTimeoutMs(),
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      if (signal?.aborted) {
+        return false;
+      }
+
+      if (this.hasPeers()) {
+        return true;
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 250);
+      });
+    }
+
+    return this.hasPeers();
   }
 
   public async addBytes(
@@ -261,21 +595,47 @@ export abstract class HeliaIPFS implements IPFSConnection {
       this.heliaCore,
     );
     const cid = await unixfsClient.addBytes(bytes, { signal });
+    const ipfsId = new IPFSId(cid.toString());
 
-    return new IPFSId(cid.toString());
+    this.provideContentInBackground(ipfsId);
+
+    return ipfsId;
   }
 
-  public async dial(multiaddr: string): Promise<void> {
+  public async dial(multiaddr: string, signal?: AbortSignal): Promise<void> {
     await this.heliaCore.libp2p.dial(
       await heliaRuntimeAdapter.createMultiaddr(multiaddr),
+      { signal },
     );
+  }
+
+  public async listen(multiaddr: string): Promise<void> {
+    const libp2p = this.heliaCore.libp2p as unknown as {
+      components?: {
+        transportManager?: {
+          listen(addrs: unknown[]): Promise<void>;
+        };
+      };
+    };
+    const transportManager = libp2p.components?.transportManager;
+
+    if (!transportManager) {
+      throw new Error('IPFS network does not expose a transport manager.');
+    }
+
+    await transportManager.listen([
+      await heliaRuntimeAdapter.createMultiaddr(multiaddr),
+    ]);
   }
 
   public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
     const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
       cid.valueOf(),
     );
-    const retrievalOptions = this.createBlockRetrievalOptions(signal);
+    const retrievalOptions = await this.createContentRetrievalOptions(
+      cid,
+      signal,
+    );
     const chunks: Uint8Array[] = [];
 
     if (IPFSCidCodec.isRaw(parsedCid)) {
@@ -283,20 +643,28 @@ export abstract class HeliaIPFS implements IPFSConnection {
         ...(await this.collectRawBlockBytes(parsedCid, retrievalOptions)),
       );
       this.pinReadThroughContent(parsedCid, signal);
+      this.provideContentInBackground(cid);
 
       return Buffer.concat(chunks);
     }
 
-    const catOptions = this.createUnixfsCatOptions(signal);
+    const catOptions = await this.createUnixfsContentRetrievalOptions(
+      cid,
+      signal,
+    );
     const unixfsClient = await heliaRuntimeAdapter.createUnixfsClient(
       this.heliaCore,
     );
 
-    for await (const chunk of unixfsClient.cat(parsedCid, catOptions)) {
+    for await (const chunk of unixfsClient.cat(
+      parsedCid,
+      catOptions as never,
+    )) {
       chunks.push(chunk);
     }
 
     this.pinReadThroughContent(parsedCid, signal);
+    this.provideContentInBackground(cid);
 
     return Buffer.concat(chunks);
   }
@@ -342,7 +710,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
     try {
       await this.heliaCore.blockstore.get(
         parsedCid,
-        this.createBlockRetrievalOptions(signal),
+        (await this.createContentRetrievalOptions(cid, signal)) as NonNullable<
+          Parameters<HeliaInstance['blockstore']['get']>[1]
+        >,
       );
     } catch {
       throw new IPFSBlockNotFoundPublicError(cid.valueOf());
@@ -356,13 +726,26 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
       cid.valueOf(),
     );
-    const json: T = await heliaJSONClient.get(parsedCid, {
-      signal,
-    });
+    const json: T = await heliaJSONClient.get(
+      parsedCid,
+      (await this.createContentRetrievalOptions(cid, signal)) as never,
+    );
 
     this.pinReadThroughContent(parsedCid, signal);
+    this.provideContentInBackground(cid);
 
     return json;
+  }
+
+  public async provideContent(
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+
+    await this.publishContentProvider(parsedCid, cid, signal);
   }
 
   public async putRecord(
@@ -378,15 +761,73 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     });
 
-    if (this.hasPeers()) {
-      this.publishRoutingRecord(key, value, signal).catch(
-        (error: unknown): void => {
-          Kernel.logger.debug?.(
-            `DHT record publication skipped for key: ${key} error=${String(error)}`,
-          );
-        },
+    this.publishRoutingRecord(key, value, signal).catch(
+      (error: unknown): void => {
+        Kernel.logger.debug?.(
+          `DHT record publication skipped for key: ${key} error=${String(error)}`,
+        );
+      },
+    );
+  }
+
+  public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {
+    const cid = await heliaRuntimeAdapter.createRawSha256Cid(key);
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
+          routingAbort.signal,
+        ))
+      ) {
+        throw new Error('No public IPFS peers available for DHT provide.');
+      }
+
+      await this.heliaCore.routing.provide(cid, {
+        signal: routingAbort.signal,
+      });
+    } catch (error: unknown) {
+      Kernel.logger.debug?.(
+        `DHT provider publication skipped for key="${key}": ${String(error)}`,
       );
+    } finally {
+      clearTimeout(routingAbort.timeout);
     }
+  }
+
+  public async findRecordProviderMultiaddrs(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const cid = await heliaRuntimeAdapter.createRawSha256Cid(key);
+    const routingAbort = this.createRoutingAbortSignal(signal);
+    const multiaddrs: string[] = [];
+
+    try {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
+          routingAbort.signal,
+        ))
+      ) {
+        throw new Error('No public IPFS peers available for DHT providers.');
+      }
+
+      for await (const provider of this.heliaCore.routing.findProviders(cid, {
+        signal: routingAbort.signal,
+      })) {
+        multiaddrs.push(...this.providerMultiaddrWithPeerId(provider));
+      }
+    } catch (error: unknown) {
+      Kernel.logger.debug?.(
+        `DHT provider lookup skipped for key="${key}": ${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+
+    return [...new Set(multiaddrs)];
   }
 
   public async getRecord(
@@ -412,6 +853,93 @@ export abstract class HeliaIPFS implements IPFSConnection {
       } catch {
         // Fallback to local datastore.
       }
+    }
+
+    return undefined;
+  }
+
+  public async publishIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    value: string,
+    sequence: number | bigint,
+    lifetimeMs: number,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
+    const routingKey =
+      await heliaRuntimeAdapter.createIPNSRoutingKey(privateKey);
+    const marshalledRecord =
+      await heliaRuntimeAdapter.createMarshalledIPNSRecord(
+        privateKey,
+        value,
+        sequence,
+        lifetimeMs,
+      );
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
+          routingAbort.signal,
+        ))
+      ) {
+        throw new Error('No public IPFS peers available for IPNS publication.');
+      }
+
+      await this.heliaCore.routing.put(routingKey, marshalledRecord, {
+        signal: routingAbort.signal,
+      });
+
+      return heliaRuntimeAdapter.getIPNSName(privateKey);
+    } catch (error: unknown) {
+      Kernel.logger.debug?.(
+        `IPNS record publication skipped name="${heliaRuntimeAdapter.getIPNSName(
+          privateKey,
+        )}" error=${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
+    }
+
+    return undefined;
+  }
+
+  public async resolveIPNSRecord(
+    privateKey: Libp2pPrivateKeyLike,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
+    const routingKey =
+      await heliaRuntimeAdapter.createIPNSRoutingKey(privateKey);
+    const routingAbort = this.createRoutingAbortSignal(signal);
+
+    try {
+      if (
+        !(await this.waitForPeers(
+          HeliaIPFS.getRoutingRecordTimeoutMs(),
+          routingAbort.signal,
+        ))
+      ) {
+        throw new Error('No public IPFS peers available for IPNS resolution.');
+      }
+
+      const marshalledRecord = await this.heliaCore.routing.get(routingKey, {
+        signal: routingAbort.signal,
+      });
+
+      return heliaRuntimeAdapter.readIPNSRecordValue(
+        routingKey,
+        marshalledRecord,
+      );
+    } catch (error: unknown) {
+      Kernel.logger.debug?.(
+        `IPNS record not available in public routing yet: name="${heliaRuntimeAdapter.getIPNSName(
+          privateKey,
+        )}" reason="${this.getIPNSResolutionSkipReason(error)}"` +
+          ` publicPeers=${this.getPeers().length}` +
+          ` details=${String(error)}`,
+      );
+    } finally {
+      clearTimeout(routingAbort.timeout);
     }
 
     return undefined;

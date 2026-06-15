@@ -1,9 +1,9 @@
 import KeychainMetadataRepository from '@app/contexts/keychains/domain/repositories/KeychainMetadataRepository';
 import { KeychainMetadataRecord } from '@app/contexts/keychains/domain/repositories/types/KeychainMetadataRecord';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
-import IpfsKeychainMapper from '@app/contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper';
 import IpfsKeychainRepository from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRepository';
+import IpfsKeychainMapper from '@app/contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -22,6 +22,8 @@ describe('IpfsKeychainRepository', () => {
       new IpfsKeychainMapper(),
       metadataRepository,
     );
+    ipfs.hasConnectedPeers.mockResolvedValue(false);
+    ipfs.getRecordCandidates.mockResolvedValue([]);
   });
 
   it('should use replicated keychain metadata when the IPFS block is not available', async () => {
@@ -49,7 +51,7 @@ describe('IpfsKeychainRepository', () => {
     expect(candidates[0].keychain.toPrimitives()).toEqual(
       keychain.toPrimitives(),
     );
-    expect(ipfs.hasConnectedPeers).not.toHaveBeenCalled();
+    expect(ipfs.hasConnectedPeers).toHaveBeenCalled();
   });
 
   it('should try every local metadata candidate before falling back to remote lookup', async () => {
@@ -69,7 +71,8 @@ describe('IpfsKeychainRepository', () => {
         cid: 'bafy-available-keychain',
         keychain: available,
         ownerIdentityId: mother.ownerIdentityId.valueOf(),
-        previousCid: unavailable.toPrimitives().previousKeychainExternalIdentifier,
+        previousCid:
+          unavailable.toPrimitives().previousKeychainExternalIdentifier,
         receivedAt: 100,
         version: 4,
       },
@@ -88,7 +91,49 @@ describe('IpfsKeychainRepository', () => {
     expect(candidates[0].keychain.toPrimitives()).toEqual(
       available.toPrimitives(),
     );
-    expect(ipfs.hasConnectedPeers).not.toHaveBeenCalled();
+    expect(ipfs.hasConnectedPeers).toHaveBeenCalled();
+  });
+
+  it('should return local metadata without waiting for remote refresh', async () => {
+    const mother = await KeychainMother.create();
+    const local = mother.withVersion(1).build();
+    const remote = mother
+      .withVersion(2)
+      .withPreviousKeychainExternalIdentifier('bafy-keychain-v1')
+      .build();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataRepository.findByOwnerIdentityId.mockResolvedValue([
+      {
+        cid: 'bafy-keychain-v1',
+        keychain: local,
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+    ]);
+    ipfs.hasConnectedPeers.mockResolvedValue(true);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-keychain-v2']);
+    ipfs.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
+      if (cid.valueOf() === 'bafy-keychain-v2') {
+        return Promise.resolve(mapper.toDocument(remote) as T);
+      }
+
+      return Promise.resolve(mapper.toDocument(local) as T);
+    });
+
+    const candidates = await repository.findCandidateReferencesByOwnerId(
+      mother.ownerIdentityId,
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].externalIdentifier.valueOf()).toBe('bafy-keychain-v1');
+    expect(candidates[0].keychain.toPrimitives()).toEqual(local.toPrimitives());
+    await flushBackgroundTasks();
+    expect(ipfs.getRecordCandidates).toHaveBeenCalledWith(
+      `pigeon-swarm_keychain-${mother.ownerIdentityId.valueOf()}`,
+    );
   });
 
   it('should find previous keychains by replicated external identifier without IPFS', async () => {
@@ -136,12 +181,12 @@ describe('IpfsKeychainRepository', () => {
         version: 1,
       },
     ]);
-    ipfs.getJSON.mockImplementation(async <T>(cid: IPFSId): Promise<T> => {
+    ipfs.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
       if (cid.valueOf() === 'identity-cid') {
-        return { networks: ['network-1'] } as T;
+        return Promise.resolve({ networks: ['network-1'] } as T);
       }
 
-      return new IpfsKeychainMapper().toDocument(latest) as T;
+      return Promise.resolve(new IpfsKeychainMapper().toDocument(latest) as T);
     });
     ipfs.getRecordCandidates.mockResolvedValue(['identity-cid']);
     ipfs.addJSONToNetworks.mockResolvedValue(new IPFSId('bafy-republished'));
@@ -159,3 +204,9 @@ describe('IpfsKeychainRepository', () => {
     );
   });
 });
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}

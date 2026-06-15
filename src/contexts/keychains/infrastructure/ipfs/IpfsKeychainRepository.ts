@@ -18,6 +18,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly IDENTITY_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly keychainByCid = new Map<string, Keychain>();
+  private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -179,6 +180,22 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
+  private sortCandidateReferencesByFreshness(
+    candidates: KeychainCandidate[],
+  ): KeychainCandidate[] {
+    return [...candidates].sort((left, right) => {
+      if (left.keychain.isNewerThan(right.keychain)) {
+        return -1;
+      }
+
+      if (right.keychain.isNewerThan(left.keychain)) {
+        return 1;
+      }
+
+      return 0;
+    });
+  }
+
   private async findRemoteCandidateReferences(
     ownerIdentityId: IdentityId,
     knownCids: Set<string>,
@@ -211,6 +228,40 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     return candidates.filter(
       (candidate): candidate is KeychainCandidate => candidate !== undefined,
     );
+  }
+
+  private refreshRemoteCandidateReferencesInBackground(
+    ownerIdentityId: IdentityId,
+    knownCids: Set<string>,
+  ): void {
+    const refreshKey = ownerIdentityId.valueOf();
+
+    if (this.activeRemoteCandidateRefreshes.has(refreshKey)) {
+      return;
+    }
+
+    this.activeRemoteCandidateRefreshes.add(refreshKey);
+    void this.refreshRemoteCandidateReferences(
+      ownerIdentityId,
+      knownCids,
+    ).finally(() => {
+      this.activeRemoteCandidateRefreshes.delete(refreshKey);
+    });
+  }
+
+  private async refreshRemoteCandidateReferences(
+    ownerIdentityId: IdentityId,
+    knownCids: Set<string>,
+  ): Promise<void> {
+    try {
+      if (!(await this.ipfsManager.hasConnectedPeers())) {
+        return;
+      }
+
+      await this.findRemoteCandidateReferences(ownerIdentityId, knownCids);
+    } catch {
+      return;
+    }
   }
 
   public async findByExternalIdentifier(
@@ -246,13 +297,33 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
     if (localCandidates.length > 0) {
-      return localCandidates;
+      this.refreshRemoteCandidateReferencesInBackground(
+        ownerIdentityId,
+        new Set(metadata.map((document) => document.cid)),
+      );
+
+      return this.sortCandidateReferencesByFreshness(localCandidates);
     }
 
-    return this.findRemoteCandidateReferences(
-      ownerIdentityId,
-      new Set(metadata.map((document) => document.cid)),
-    );
+    let remoteCandidates: KeychainCandidate[];
+
+    try {
+      remoteCandidates = await this.findRemoteCandidateReferences(
+        ownerIdentityId,
+        new Set(metadata.map((document) => document.cid)),
+      );
+    } catch (error) {
+      if (localCandidates.length > 0) {
+        return this.sortCandidateReferencesByFreshness(localCandidates);
+      }
+
+      throw error;
+    }
+
+    return this.sortCandidateReferencesByFreshness([
+      ...localCandidates,
+      ...remoteCandidates,
+    ]);
   }
 
   public async save(

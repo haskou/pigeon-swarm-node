@@ -1,18 +1,18 @@
+import { KeyPair } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
 import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
+import IdentityMetadataRepository from '../../../../../../src/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityExternalIdentifier } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
-import IdentityMetadataRepository from '../../../../../../src/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
-import { KeyPair } from '@haskou/value-objects';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IpfsIdentityRepository', () => {
@@ -34,7 +34,7 @@ describe('IpfsIdentityRepository', () => {
     mother = new IdentityMother();
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
     ipfsManager.stat.mockResolvedValue(true);
-    ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+    ipfsManager.hasConnectedPeers.mockResolvedValue(false);
   });
 
   async function createSignedIdentityForNetwork(
@@ -162,7 +162,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should not wait for DHT candidates when metadata has a valid candidate', async () => {
+    it('should not wait for DHT candidates when metadata has a valid candidate without connected peers', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -191,6 +191,48 @@ describe('IpfsIdentityRepository', () => {
         new IPFSId(dhtCidString),
       );
       expect(result).toHaveLength(1);
+    });
+
+    it('should return local metadata without waiting for remote refresh', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafyidentity-v1';
+      const currentCidString = 'bafyidentity-v2';
+      const currentIdentity = await previousIdentity.updateProfile(
+        new Profile(new ProfileName('Jane')),
+        mother.password,
+        new IdentityExternalIdentifier(previousCidString),
+      );
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: previousCidString,
+          identity: previousIdentity,
+          identityId: previousPrimitives.id,
+          previousCid: previousPrimitives.previousIdentityExternalIdentifier,
+          receivedAt: 1,
+          version: previousPrimitives.version,
+        },
+      ]);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+      ipfsManager.getRecordCandidates.mockResolvedValue([currentCidString]);
+      ipfsManager.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
+        if (cid.valueOf() === currentCidString) {
+          return Promise.resolve(mapper.toDocument(currentIdentity) as T);
+        }
+
+        return Promise.resolve(mapper.toDocument(previousIdentity) as T);
+      });
+
+      const result = await repository.findById(
+        new IdentityId(previousPrimitives.id),
+      );
+
+      expect(result.toPrimitives()).toEqual(previousIdentity.toPrimitives());
+      await flushBackgroundTasks();
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + previousPrimitives.id,
+      );
     });
 
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
@@ -241,7 +283,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
-    it('should delete broken mongo metadata and fallback to DHT', async () => {
+    it('should keep temporarily unavailable metadata and fallback to DHT', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const identityId = new IdentityId(primitives.id);
@@ -260,13 +302,14 @@ describe('IpfsIdentityRepository', () => {
       ipfsManager.getJSON
         .mockRejectedValueOnce(new Error('missing block'))
         .mockResolvedValueOnce(mapper.toDocument(identity));
+      ipfsManager.hasConnectedPeers.mockResolvedValue(true);
       ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
 
       const result = await repository.findById(identityId);
 
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).toHaveBeenCalledWith(new IPFSId(brokenCidString));
+      ).not.toHaveBeenCalled();
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
@@ -334,7 +377,7 @@ describe('IpfsIdentityRepository', () => {
       );
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).toHaveBeenCalledWith(new IPFSId(tamperedCidString));
+      ).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
 
@@ -478,7 +521,7 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
       expect(
         metadataRepository.deleteByExternalIdentifier,
-      ).toHaveBeenCalledWith(cid);
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -597,3 +640,9 @@ describe('IpfsIdentityRepository', () => {
     });
   });
 });
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}

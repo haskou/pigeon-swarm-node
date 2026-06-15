@@ -21,11 +21,7 @@ describe('CurrentKeychainFinder', () => {
     validator = mock<KeychainCandidateValidationDomainService>();
     signatureService = mock<KeychainSignatureDomainService>();
     signatureService.isValidSignature.mockReturnValue(true);
-    finder = new CurrentKeychainFinder(
-      repository,
-      validator,
-      signatureService,
-    );
+    finder = new CurrentKeychainFinder(repository, validator, signatureService);
   });
 
   it('should throw keychain not found when the identity has no valid keychain candidates', async () => {

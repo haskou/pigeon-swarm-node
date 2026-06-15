@@ -10,12 +10,12 @@ describe('OrbitDBKeychainMetadataRepository', () => {
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBKeychainMetadataRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     documents.splice(0);
     heads.clear();
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', keychainStores(documents, heads));
+    await registry.register('network-1', keychainStores(documents, heads));
     repository = new OrbitDBKeychainMetadataRepository(registry);
   });
 
@@ -193,12 +193,10 @@ describe('OrbitDBKeychainMetadataRepository', () => {
         version: 2,
       }),
     );
-    expect(records[0].keychain?.toPrimitives()).toEqual(
-      latest.toPrimitives(),
-    );
+    expect(records[0].keychain?.toPrimitives()).toEqual(latest.toPrimitives());
   });
 
-  it('should keep keychain reads on the direct head path', async () => {
+  it('should repair stale keychain owner heads in background', async () => {
     const mother = await KeychainMother.create();
     const ownerIdentityId = mother.ownerIdentityId.valueOf();
 
@@ -227,10 +225,11 @@ describe('OrbitDBKeychainMetadataRepository', () => {
         version: 1,
       }),
     );
+    await flushBackgroundTasks();
     expect(heads.get(`keychain:${ownerIdentityId}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafykeychain-v1',
-        version: 1,
+        cid: 'bafykeychain-v2',
+        version: 2,
       }),
     );
   });
@@ -242,29 +241,31 @@ function keychainStores(
 ) {
   return {
     heads: {
-      all: jest.fn(async () =>
-        [...currentHeads.entries()].map(([key, value]) => ({ key, value })),
+      all: jest.fn(() =>
+        Promise.resolve(
+          [...currentHeads.entries()].map(([key, value]) => ({ key, value })),
+        ),
       ),
-      get: jest.fn(async (key: string) => {
+      get: jest.fn((key: string) => {
         const value = currentHeads.get(key);
 
-        return value ? { key, value } : undefined;
+        return Promise.resolve(value ? { key, value } : undefined);
       }),
-      put: jest.fn(async (key: string, value: Record<string, unknown>) => {
+      put: jest.fn((key: string, value: Record<string, unknown>) => {
         currentHeads.set(key, value);
 
-        return 'ok';
+        return Promise.resolve('ok');
       }),
     },
     keychains: {
-      put: jest.fn(async (document: Record<string, unknown>) => {
+      put: jest.fn((document: Record<string, unknown>) => {
         upsertDocument(currentDocuments, document);
 
-        return 'ok';
+        return Promise.resolve('ok');
       }),
       query: jest.fn(
-        async (matcher: (document: Record<string, unknown>) => boolean) =>
-          currentDocuments.filter(matcher),
+        (matcher: (document: Record<string, unknown>) => boolean) =>
+          Promise.resolve(currentDocuments.filter(matcher)),
       ),
     },
   } as never;
@@ -285,4 +286,10 @@ function upsertDocument(
   }
 
   currentDocuments[existingIndex] = newDocument;
+}
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }

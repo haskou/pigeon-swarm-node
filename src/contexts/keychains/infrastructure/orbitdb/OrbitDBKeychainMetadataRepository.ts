@@ -9,6 +9,8 @@ import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMeta
 
 // eslint-disable-next-line max-len
 export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataRepository {
+  private readonly activeHeadRepairs = new Set<string>();
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -29,6 +31,15 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     const value = document[attribute];
 
     return typeof value === 'number' ? value : undefined;
+  }
+
+  private ownerIdentityIdFrom(
+    document: Record<string, unknown>,
+  ): string | undefined {
+    return (
+      this.stringValue(document, 'ownerIdentityId') ||
+      this.stringValue(document, 'id')
+    );
   }
 
   private keychainFrom(
@@ -60,9 +71,7 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     document: Record<string, unknown>,
   ): KeychainMetadataRecord | undefined {
     const cid = this.stringValue(document, 'cid');
-    const ownerIdentityId =
-      this.stringValue(document, 'ownerIdentityId') ||
-      this.stringValue(document, 'id');
+    const ownerIdentityId = this.ownerIdentityIdFrom(document);
 
     if (!cid || !ownerIdentityId || document.deleted === true) {
       return undefined;
@@ -75,6 +84,25 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
       previousCid: this.stringValue(document, 'previousCid'),
       receivedAt: this.numberValue(document, 'receivedAt') || 0,
       version: this.numberValue(document, 'version') || 0,
+    };
+  }
+
+  private toStorageDocument(
+    record: KeychainMetadataRecord,
+  ): OrbitDBKeychainMetadataDocument {
+    const primitives = record.keychain?.toPrimitives();
+
+    return {
+      cid: record.cid,
+      encryptedPayload: primitives?.encryptedPayload,
+      id: record.cid,
+      ownerIdentityId: record.ownerIdentityId,
+      previousCid:
+        record.previousCid || primitives?.previousKeychainExternalIdentifier,
+      receivedAt: record.receivedAt,
+      signature: primitives?.signature,
+      timestamp: primitives?.timestamp,
+      version: record.version,
     };
   }
 
@@ -101,6 +129,97 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     const document = await this.registry.findHead(key);
 
     return document ? this.toRecord(document) : undefined;
+  }
+
+  private async findStoredRecordsByOwnerIdentityId(
+    ownerIdentityId: string,
+  ): Promise<KeychainMetadataRecord[]> {
+    const documents = await this.registry.queryDocuments(
+      'keychains',
+      (document) =>
+        document.deleted !== true &&
+        Boolean(this.stringValue(document, 'cid')) &&
+        this.ownerIdentityIdFrom(document) === ownerIdentityId,
+      {
+        mode: 'fallback',
+        operation:
+          'OrbitDBKeychainMetadataRepository.findStoredRecordsByOwnerIdentityId',
+      },
+    );
+
+    return documents
+      .map((document) => this.toRecord(document))
+      .filter(
+        (document): document is KeychainMetadataRecord =>
+          document !== undefined,
+      );
+  }
+
+  private async findStoredRecordByCid(
+    cid: string,
+  ): Promise<KeychainMetadataRecord | undefined> {
+    const documents = await this.registry.queryDocuments(
+      'keychains',
+      (document) =>
+        document.deleted !== true && this.stringValue(document, 'cid') === cid,
+      {
+        mode: 'fallback',
+        operation: 'OrbitDBKeychainMetadataRepository.findStoredRecordByCid',
+      },
+    );
+
+    return documents
+      .map((document) => this.toRecord(document))
+      .find(
+        (document): document is KeychainMetadataRecord =>
+          document !== undefined,
+      );
+  }
+
+  private async readRepairHead(
+    head: KeychainMetadataRecord | undefined,
+    latest: KeychainMetadataRecord,
+  ): Promise<void> {
+    if (head?.cid === latest.cid) {
+      return;
+    }
+
+    await this.putHead(this.toStorageDocument(latest));
+  }
+
+  private repairHeadInBackground(
+    repairKey: string,
+    repair: () => Promise<void>,
+  ): void {
+    if (this.activeHeadRepairs.has(repairKey)) {
+      return;
+    }
+
+    this.activeHeadRepairs.add(repairKey);
+    void repair()
+      .catch((): undefined => undefined)
+      .finally(() => {
+        this.activeHeadRepairs.delete(repairKey);
+      });
+  }
+
+  private repairOwnerHeadInBackground(
+    ownerIdentityId: string,
+    head: KeychainMetadataRecord | undefined,
+  ): void {
+    this.repairHeadInBackground(
+      this.ownerHeadKey(ownerIdentityId),
+      async () => {
+        const latest = this.sortByFreshness([
+          ...(head ? [head] : []),
+          ...(await this.findStoredRecordsByOwnerIdentityId(ownerIdentityId)),
+        ])[0];
+
+        if (latest) {
+          await this.readRepairHead(head, latest);
+        }
+      },
+    );
   }
 
   private deduplicate(
@@ -163,10 +282,13 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
       return head;
     }
 
-    return this.registry
-      .findCachedHeadsByPrefix('keychain:')
-      .map((document) => this.toRecord(document))
-      .find((document) => document?.cid === cid);
+    return (
+      (await this.findStoredRecordByCid(cid)) ||
+      this.registry
+        .findCachedHeadsByPrefix('keychain:')
+        .map((document) => this.toRecord(document))
+        .find((document) => document?.cid === cid)
+    );
   }
 
   public async findByOwnerIdentityId(
@@ -175,12 +297,30 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
     const head = await this.findHead(
       this.ownerHeadKey(ownerIdentityId.valueOf()),
     );
-    const records = this.deduplicate([
+    const cachedRecords = this.deduplicate([
       ...(head ? [head] : []),
       ...this.findCachedCidRecordsByOwner(ownerIdentityId),
     ]);
 
-    return this.sortByFreshness(records);
+    if (cachedRecords.length > 0) {
+      this.repairOwnerHeadInBackground(ownerIdentityId.valueOf(), head);
+
+      return this.sortByFreshness(cachedRecords);
+    }
+
+    const records = this.deduplicate([
+      ...(await this.findStoredRecordsByOwnerIdentityId(
+        ownerIdentityId.valueOf(),
+      )),
+    ]);
+    const sortedRecords = this.sortByFreshness(records);
+    const latest = sortedRecords[0];
+
+    if (latest) {
+      await this.readRepairHead(head, latest);
+    }
+
+    return sortedRecords;
   }
 
   public async save(

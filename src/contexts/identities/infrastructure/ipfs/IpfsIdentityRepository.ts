@@ -18,6 +18,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
   private readonly identityByCid = new Map<string, Identity>();
+  private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -155,8 +156,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
       return identity;
     } catch {
-      await this.deleteMetadata(cid);
-
       return undefined;
     }
   }
@@ -186,7 +185,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return candidate;
     } catch {
       this.identityByCid.delete(metadata.cid);
-      await this.deleteMetadata(new IPFSId(metadata.cid));
 
       return undefined;
     }
@@ -215,6 +213,97 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return latestDocument
       ? this.findCandidateReferenceFromMetadata(latestDocument)
       : undefined;
+  }
+
+  private sortCandidateReferencesByFreshness(
+    candidates: IdentityCandidate[],
+  ): IdentityCandidate[] {
+    return [...candidates].sort((left, right) => {
+      if (left.identity.isNewerThan(right.identity)) {
+        return -1;
+      }
+
+      if (right.identity.isNewerThan(left.identity)) {
+        return 1;
+      }
+
+      return 0;
+    });
+  }
+
+  private async findRemoteCandidateReferences(
+    id: IdentityId,
+    knownCids: Set<string>,
+  ): Promise<IdentityCandidate[]> {
+    const cidStrings = await this.ipfsManager.getRecordCandidates(
+      this.ROUTING_KEY_PREFIX + id.valueOf(),
+    );
+
+    return this.findCandidateReferencesFromCids(id, cidStrings, knownCids);
+  }
+
+  private async shouldUseOnlyLocalMetadata(
+    metadata: IdentityMetadataRecord[],
+  ): Promise<boolean> {
+    return metadata.length > 0 && !(await this.ipfsManager.hasConnectedPeers());
+  }
+
+  private localCandidatesOrNotFound(
+    id: IdentityId,
+    candidates: IdentityCandidate[],
+  ): IdentityCandidate[] {
+    if (candidates.length > 0) {
+      return candidates;
+    }
+
+    throw new IdentityNotFoundError(id.valueOf());
+  }
+
+  private async findRemoteCandidateReferencesOrFallback(
+    id: IdentityId,
+    knownCids: Set<string>,
+    localCandidates: IdentityCandidate[],
+  ): Promise<IdentityCandidate[]> {
+    try {
+      return await this.findRemoteCandidateReferences(id, knownCids);
+    } catch (error) {
+      if (localCandidates.length > 0) {
+        return [];
+      }
+
+      throw error;
+    }
+  }
+
+  private refreshRemoteCandidateReferencesInBackground(
+    id: IdentityId,
+    knownCids: Set<string>,
+  ): void {
+    const refreshKey = id.valueOf();
+
+    if (this.activeRemoteCandidateRefreshes.has(refreshKey)) {
+      return;
+    }
+
+    this.activeRemoteCandidateRefreshes.add(refreshKey);
+    void this.refreshRemoteCandidateReferences(id, knownCids).finally(() => {
+      this.activeRemoteCandidateRefreshes.delete(refreshKey);
+    });
+  }
+
+  private async refreshRemoteCandidateReferences(
+    id: IdentityId,
+    knownCids: Set<string>,
+  ): Promise<void> {
+    try {
+      if (!(await this.ipfsManager.hasConnectedPeers())) {
+        return;
+      }
+
+      await this.findRemoteCandidateReferences(id, knownCids);
+    } catch {
+      return;
+    }
   }
 
   private async findCandidateReferencesFromCids(
@@ -307,33 +396,32 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {
     const metadata = await this.findValidMetadata(id);
-    const candidate =
+    const localCandidate =
       await this.findFirstCandidateReferenceFromMetadata(metadata);
-
-    if (candidate) {
-      return [candidate];
-    }
-
+    const localCandidates = localCandidate ? [localCandidate] : [];
     const knownCids = new Set(metadata.map((document) => document.cid));
 
-    if (metadata.length > 0 && !(await this.ipfsManager.hasConnectedPeers())) {
-      throw new IdentityNotFoundError(id.valueOf());
+    if (localCandidates.length > 0) {
+      this.refreshRemoteCandidateReferencesInBackground(id, knownCids);
+
+      return this.sortCandidateReferencesByFreshness(localCandidates);
     }
 
-    const cidStrings = await this.ipfsManager.getRecordCandidates(
-      this.ROUTING_KEY_PREFIX + id.valueOf(),
-    );
-    const candidates = await this.findCandidateReferencesFromCids(
+    if (await this.shouldUseOnlyLocalMetadata(metadata)) {
+      return this.localCandidatesOrNotFound(id, localCandidates);
+    }
+
+    const remoteCandidates = await this.findRemoteCandidateReferencesOrFallback(
       id,
-      cidStrings,
       knownCids,
+      localCandidates,
     );
+    const candidates = this.sortCandidateReferencesByFreshness([
+      ...localCandidates,
+      ...remoteCandidates,
+    ]);
 
-    if (candidates.length === 0) {
-      throw new IdentityNotFoundError(id.valueOf());
-    }
-
-    return candidates;
+    return this.localCandidatesOrNotFound(id, candidates);
   }
 
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {

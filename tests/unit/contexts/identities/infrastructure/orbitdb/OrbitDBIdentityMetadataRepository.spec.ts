@@ -1,5 +1,5 @@
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { Profile } from '@app/contexts/identities/domain/Profile';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
@@ -15,12 +15,12 @@ describe('OrbitDBIdentityMetadataRepository', () => {
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBIdentityMetadataRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     documents.splice(0);
     heads.clear();
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', identityStores(documents, heads));
+    await registry.register('network-1', identityStores(documents, heads));
     repository = new OrbitDBIdentityMetadataRepository(registry);
   });
 
@@ -32,7 +32,10 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
     const identity = mother.withNetworks([networkId]).build();
-    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    await registry.register(
+      networkId.valueOf(),
+      identityStores(documents, heads),
+    );
 
     await repository.save(
       identity,
@@ -77,7 +80,10 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     const networkId = mother.networks[0];
     const identity = mother.build();
 
-    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    await registry.register(
+      networkId.valueOf(),
+      identityStores(documents, heads),
+    );
 
     await repository.save(
       identity,
@@ -95,12 +101,15 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     ]);
   });
 
-  it('should keep identity id reads on the direct head path', async () => {
+  it('should repair stale identity id heads in background', async () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
 
-    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    await registry.register(
+      networkId.valueOf(),
+      identityStores(documents, heads),
+    );
     heads.set(`identity:${identityId}`, {
       cid: 'bafyidentity-v1',
       id: identityId,
@@ -126,10 +135,11 @@ describe('OrbitDBIdentityMetadataRepository', () => {
         version: 1,
       }),
     );
+    await flushBackgroundTasks();
     expect(heads.get(`identity:${identityId}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-v1',
-        version: 1,
+        cid: 'bafyidentity-v2',
+        version: 2,
       }),
     );
   });
@@ -152,7 +162,10 @@ describe('OrbitDBIdentityMetadataRepository', () => {
         new IdentityExternalIdentifier('bafypreviousidentity'),
       );
 
-    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    await registry.register(
+      networkId.valueOf(),
+      identityStores(documents, heads),
+    );
 
     await repository.save(
       identity,
@@ -173,13 +186,16 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     );
   });
 
-  it('should keep identity handle reads on the direct head path', async () => {
+  it('should repair stale identity handle heads in background', async () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother().withVersion(new IdentityVersion(2));
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
 
-    registry.register(networkId.valueOf(), identityStores(documents, heads));
+    await registry.register(
+      networkId.valueOf(),
+      identityStores(documents, heads),
+    );
     heads.set(`identity-handle:${handle.valueOf()}`, {
       cid: 'bafyidentity-handle-v1',
       handle: handle.valueOf(),
@@ -207,10 +223,11 @@ describe('OrbitDBIdentityMetadataRepository', () => {
         version: 1,
       }),
     );
+    await flushBackgroundTasks();
     expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-handle-v1',
-        version: 1,
+        cid: 'bafyidentity-handle-v2',
+        version: 2,
       }),
     );
   });
@@ -222,29 +239,31 @@ function identityStores(
 ) {
   return {
     heads: {
-      all: jest.fn(async () =>
-        [...currentHeads.entries()].map(([key, value]) => ({ key, value })),
+      all: jest.fn(() =>
+        Promise.resolve(
+          [...currentHeads.entries()].map(([key, value]) => ({ key, value })),
+        ),
       ),
-      get: jest.fn(async (key: string) => {
+      get: jest.fn((key: string) => {
         const value = currentHeads.get(key);
 
-        return value ? { key, value } : undefined;
+        return Promise.resolve(value ? { key, value } : undefined);
       }),
-      put: jest.fn(async (key: string, value: Record<string, unknown>) => {
+      put: jest.fn((key: string, value: Record<string, unknown>) => {
         currentHeads.set(key, value);
 
-        return 'ok';
+        return Promise.resolve('ok');
       }),
     },
     identities: {
-      put: jest.fn(async (document: Record<string, unknown>) => {
+      put: jest.fn((document: Record<string, unknown>) => {
         upsertDocument(currentDocuments, document);
 
-        return 'ok';
+        return Promise.resolve('ok');
       }),
       query: jest.fn(
-        async (matcher: (document: Record<string, unknown>) => boolean) =>
-          currentDocuments.filter(matcher),
+        (matcher: (document: Record<string, unknown>) => boolean) =>
+          Promise.resolve(currentDocuments.filter(matcher)),
       ),
     },
   } as never;
@@ -265,4 +284,10 @@ function upsertDocument(
   }
 
   currentDocuments[existingIndex] = newDocument;
+}
+
+async function flushBackgroundTasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }

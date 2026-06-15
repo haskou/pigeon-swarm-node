@@ -131,13 +131,33 @@ jest.mock('@app/Kernel', () => ({
   },
 }));
 
+import { IPFSConnection } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import Kernel from '../../../../../../../src/Kernel';
+import PrivateNetworkRelayRecordDirectory from '../../../../../../../src/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 
 type IPFSNetworkRegistryTestGlobal = typeof globalThis & {
   __pigeonSwarmIPFSNetworkRegistryState?: unknown;
 };
+
+function restoreEnvVariable(
+  name: keyof NodeJS.ProcessEnv,
+  previousValue: string | undefined,
+): void {
+  if (previousValue === undefined) {
+    delete process.env[name];
+
+    return;
+  }
+
+  process.env[name] = previousValue;
+}
+
+function createRegistry(): IPFSNetworkRegistry {
+  return new IPFSNetworkRegistry(mock<PrivateNetworkRelayRecordDirectory>());
+}
 
 describe('IPFSNetworkRegistry', () => {
   const { privateKey } = generateKeyPairSync('ed25519');
@@ -145,23 +165,44 @@ describe('IPFSNetworkRegistry', () => {
     .export({ format: 'pem', type: 'pkcs8' })
     .toString();
   const previousStoragePath = process.env.IPFS_STORAGE_PATH;
+  const previousRelayEnabled = process.env.PIGEON_RELAY_ENABLED;
+  const previousPrivateRelayPortStart =
+    process.env.PIGEON_PRIVATE_RELAY_PORT_START;
+  const previousPrivateRelayPortEnd = process.env.PIGEON_PRIVATE_RELAY_PORT_END;
+  const previousPrivateRelayBootstrapMultiaddrs =
+    process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS;
+  const previousLegacyRelayBootstrapMultiaddrs =
+    process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
 
   afterEach(() => {
     delete (globalThis as IPFSNetworkRegistryTestGlobal)
       .__pigeonSwarmIPFSNetworkRegistryState;
 
-    if (previousStoragePath === undefined) {
-      delete process.env.IPFS_STORAGE_PATH;
-    } else {
-      process.env.IPFS_STORAGE_PATH = previousStoragePath;
-    }
+    restoreEnvVariable('IPFS_STORAGE_PATH', previousStoragePath);
+    restoreEnvVariable('PIGEON_RELAY_ENABLED', previousRelayEnabled);
+    restoreEnvVariable(
+      'PIGEON_PRIVATE_RELAY_PORT_START',
+      previousPrivateRelayPortStart,
+    );
+    restoreEnvVariable(
+      'PIGEON_PRIVATE_RELAY_PORT_END',
+      previousPrivateRelayPortEnd,
+    );
+    restoreEnvVariable(
+      'PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS',
+      previousPrivateRelayBootstrapMultiaddrs,
+    );
+    restoreEnvVariable(
+      'PIGEON_BOOTSTRAP_RELAY_MULTIADDRS',
+      previousLegacyRelayBootstrapMultiaddrs,
+    );
 
     jest.restoreAllMocks();
   });
 
   describe('register', () => {
     it('should allow the same peer id in different networks', async () => {
-      const registry = new IPFSNetworkRegistry();
+      const registry = createRegistry();
       const existingNetwork = mock<IPFSNetwork>();
       const duplicatedNetwork = mock<IPFSNetwork>();
 
@@ -216,7 +257,7 @@ describe('IPFSNetworkRegistry', () => {
     });
 
     it('should allow different network ids with the same name', async () => {
-      const registry = new IPFSNetworkRegistry();
+      const registry = createRegistry();
       const existingNetwork = mock<IPFSNetwork>();
       const duplicatedNameNetwork = mock<IPFSNetwork>();
 
@@ -267,7 +308,7 @@ describe('IPFSNetworkRegistry', () => {
     });
 
     it('should notify listeners when a network is registered', async () => {
-      const registry = new IPFSNetworkRegistry();
+      const registry = createRegistry();
       const network = mock<IPFSNetwork>();
       const listener = jest.fn();
 
@@ -303,10 +344,101 @@ describe('IPFSNetworkRegistry', () => {
     });
   });
 
+  describe('private relay bootstrap', () => {
+    it('should disable private relay server when explicitly configured', () => {
+      process.env.PIGEON_RELAY_ENABLED = 'false';
+      process.env.PIGEON_PRIVATE_RELAY_PORT_START = '4100';
+      process.env.PIGEON_PRIVATE_RELAY_PORT_END = '4199';
+      const registry = createRegistry();
+
+      const relayOptions = (
+        registry as unknown as {
+          getPrivateRelayListenAddresses: (networkId: string) =>
+            | {
+                listenAddresses: string[];
+              }
+            | undefined;
+        }
+      ).getPrivateRelayListenAddresses('network-1');
+
+      expect(relayOptions).toBeUndefined();
+    });
+
+    it('should parse configured private relay bootstrap multiaddrs', () => {
+      process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS =
+        '/dns4/relay-1.example.com/tcp/4100/p2p/12D3KooWRelay1,\n' +
+        '/dns4/relay-2.example.com/tcp/4101/p2p/12D3KooWRelay2';
+      const registry = createRegistry();
+
+      const multiaddrs = (
+        registry as unknown as {
+          getPrivateRelayBootstrapMultiaddrs: () => string[];
+        }
+      ).getPrivateRelayBootstrapMultiaddrs();
+
+      expect(multiaddrs).toEqual([
+        '/dns4/relay-1.example.com/tcp/4100/p2p/12D3KooWRelay1',
+        '/dns4/relay-2.example.com/tcp/4101/p2p/12D3KooWRelay2',
+      ]);
+    });
+
+    it('should dial configured private relay bootstrap multiaddrs', async () => {
+      process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS =
+        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay';
+      const registry = createRegistry();
+      const connection = mock<IPFSConnection>();
+
+      connection.dial.mockResolvedValue(undefined);
+      connection.getPeers.mockReturnValue(['12D3KooWRelay']);
+
+      (
+        registry as unknown as {
+          dialPrivateRelayBootstraps: (
+            networkId: string,
+            connection: IPFSConnection,
+          ) => void;
+        }
+      ).dialPrivateRelayBootstraps('network-1', connection);
+
+      await Promise.resolve();
+
+      expect(connection.dial).toHaveBeenCalledWith(
+        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay',
+      );
+    });
+
+    it('should log disabled private relay bootstrap only once per network', () => {
+      const registry = createRegistry();
+      const connection = mock<IPFSConnection>();
+      const infoLogger = Kernel.logger.info as jest.Mock;
+
+      infoLogger.mockClear();
+
+      (
+        registry as unknown as {
+          dialPrivateRelayBootstraps: (
+            networkId: string,
+            connection: IPFSConnection,
+          ) => void;
+        }
+      ).dialPrivateRelayBootstraps('network-1', connection);
+      (
+        registry as unknown as {
+          dialPrivateRelayBootstraps: (
+            networkId: string,
+            connection: IPFSConnection,
+          ) => void;
+        }
+      ).dialPrivateRelayBootstraps('network-1', connection);
+
+      expect(infoLogger).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('deleteNetwork', () => {
     it('should delete IPFS and OrbitDB storage for the network', async () => {
       process.env.IPFS_STORAGE_PATH = '/tmp/pigeon-swarm-ipfs';
-      const registry = new IPFSNetworkRegistry();
+      const registry = createRegistry();
       const network = mock<IPFSNetwork>();
       const removeStorage = fs.rm as jest.MockedFunction<typeof fs.rm>;
       removeStorage.mockResolvedValue(undefined);

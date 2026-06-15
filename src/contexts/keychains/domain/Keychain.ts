@@ -96,6 +96,10 @@ export class Keychain extends AggregateRoot {
     return this.version.isFirst();
   }
 
+  public isNewerThan(other: Keychain): boolean {
+    return this.version.isGreaterThan(other.version);
+  }
+
   public isNextVersionAfter(previous: Keychain): boolean {
     return (
       previous.belongsTo(this.ownerIdentityId) &&

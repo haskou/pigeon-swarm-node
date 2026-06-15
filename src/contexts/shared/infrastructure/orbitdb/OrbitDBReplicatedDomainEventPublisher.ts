@@ -286,12 +286,18 @@ export default class OrbitDBReplicatedDomainEventPublisher {
     for (const event of domainEvents) {
       const targetStores = await this.getTargetStores(event);
 
-      for (const { localPeerId, networkId, stores } of targetStores) {
-        const message = this.toReplicatedMessage(event, networkId, localPeerId);
+      await Promise.all(
+        targetStores.map(async ({ localPeerId, networkId, stores }) => {
+          const message = this.toReplicatedMessage(
+            event,
+            networkId,
+            localPeerId,
+          );
 
-        await stores.events.add?.(message);
-        await this.projector.project(stores, message);
-      }
+          await stores.events.add?.(message);
+          await this.projector.project(stores, message);
+        }),
+      );
     }
   }
 }

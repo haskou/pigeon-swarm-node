@@ -9,6 +9,7 @@ export type OrbitDBDatabase = {
   all?(): Promise<Array<{ key?: string; value: unknown }>>;
   close(): Promise<void>;
   events: {
+    on(event: 'error', handler: (error: unknown) => void): void;
     on(event: 'update', handler: (entry: OrbitDBEntry) => void): void;
   };
   get?(key: string): Promise<{ key?: string; value: unknown } | unknown>;

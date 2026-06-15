@@ -6,6 +6,7 @@ services:
       context: .
     ports:
       - "8080:8080"
+      - "${PIGEON_PRIVATE_RELAY_PORT_START:-4181}-${PIGEON_PRIVATE_RELAY_PORT_END:-4181}:${PIGEON_PRIVATE_RELAY_PORT_START:-4181}-${PIGEON_PRIVATE_RELAY_PORT_END:-4181}"
     volumes:
       - ./:/var/www
       - /var/www/node_modules

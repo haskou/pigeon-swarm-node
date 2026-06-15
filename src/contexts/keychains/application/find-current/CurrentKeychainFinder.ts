@@ -50,10 +50,16 @@ export default class CurrentKeychainFinder {
       throw new KeychainNotFoundError(message.ownerIdentityId);
     }
 
-    return validCandidates.sort(
-      (left, right) =>
-        right.keychain.toPrimitives().version -
-        left.keychain.toPrimitives().version,
-    )[0];
+    return validCandidates.sort((left, right) => {
+      if (left.keychain.isNewerThan(right.keychain)) {
+        return -1;
+      }
+
+      if (right.keychain.isNewerThan(left.keychain)) {
+        return 1;
+      }
+
+      return 0;
+    })[0];
   }
 }

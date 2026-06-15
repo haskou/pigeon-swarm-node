@@ -1,5 +1,6 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
 import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
@@ -13,14 +14,22 @@ import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
 
 export default class OrbitDBReplicatedStateRuntime {
+  private static readonly criticalRepairDelayMs = 1_000;
+
+  private static readonly secondaryRepairDelayMs = 120_000;
+
   private readonly registeredNetworks = new Map<
     string,
     RegisteredOrbitDBNetwork
   >();
 
+  private readonly scheduledCriticalRepairNetworkIds = new Set<string>();
+
   private readonly repairingCriticalNetworkIds = new Set<string>();
 
   private readonly repairingSecondaryNetworkIds = new Set<string>();
+
+  private readonly pendingCriticalRepairNetworkIds = new Set<string>();
 
   constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
@@ -89,6 +98,48 @@ export default class OrbitDBReplicatedStateRuntime {
     });
   }
 
+  private replicatedDocumentStores(
+    stores: OrbitDBReplicatedStateStores,
+  ): Array<{
+    name: string;
+    store: OrbitDBDatabase | undefined;
+  }> {
+    return [
+      { name: 'calls', store: stores.calls },
+      { name: 'communities', store: stores.communities },
+      { name: 'contentReplication', store: stores.contentReplication },
+      { name: 'conversations', store: stores.conversations },
+      { name: 'identities', store: stores.identities },
+      { name: 'keychains', store: stores.keychains },
+      { name: 'messages', store: stores.messages },
+      { name: 'moderationLogs', store: stores.moderationLogs },
+      { name: 'notifications', store: stores.notifications },
+      { name: 'notificationSettings', store: stores.notificationSettings },
+      { name: 'pins', store: stores.pins },
+      { name: 'polls', store: stores.polls },
+      { name: 'presence', store: stores.presence },
+      { name: 'reactions', store: stores.reactions },
+      { name: 'requests', store: stores.requests },
+      { name: 'stickerPacks', store: stores.stickerPacks },
+      { name: 'stickerUserLibraries', store: stores.stickerUserLibraries },
+    ];
+  }
+
+  private subscribeToDocumentUpdates(
+    networkId: string,
+    stores: OrbitDBReplicatedStateStores,
+  ): void {
+    for (const { name, store } of this.replicatedDocumentStores(stores)) {
+      store?.events?.on?.('update', () => {
+        Kernel.logger.debug?.(
+          `OrbitDB replicated document update: networkId=${networkId}` +
+            ` store=${name}`,
+        );
+        this.repairHeads(networkId);
+      });
+    }
+  }
+
   private async registerNetwork(network: IPFSNetwork): Promise<void> {
     const networkId = network.getId();
 
@@ -107,6 +158,7 @@ export default class OrbitDBReplicatedStateRuntime {
     await this.registry.register(networkId, stores);
     this.publisher.registerNetworkStores(networkId, localPeerId, stores);
     this.subscribeToEvents(networkId, stores);
+    this.subscribeToDocumentUpdates(networkId, stores);
     this.repairHeads(networkId);
     Kernel.logger.info(
       `OrbitDB replicated state stores registered: networkId=${networkId}` +
@@ -115,20 +167,23 @@ export default class OrbitDBReplicatedStateRuntime {
   }
 
   private repairHeads(networkId: string): void {
-    if (this.repairingCriticalNetworkIds.has(networkId)) {
+    if (
+      this.scheduledCriticalRepairNetworkIds.has(networkId) ||
+      this.repairingCriticalNetworkIds.has(networkId)
+    ) {
+      this.pendingCriticalRepairNetworkIds.add(networkId);
+
       return;
     }
 
+    this.scheduledCriticalRepairNetworkIds.add(networkId);
     const timeout = setTimeout(() => {
-      if (this.repairingCriticalNetworkIds.has(networkId)) {
-        return;
-      }
-
+      this.scheduledCriticalRepairNetworkIds.delete(networkId);
       this.repairingCriticalNetworkIds.add(networkId);
       this.headRepairer
         .repairCritical()
         .then((result) => {
-          Kernel.logger.info(
+          Kernel.logger.debug(
             `OrbitDB critical read indexes repaired: networkId=${networkId}` +
               ` identities=${result.identities}` +
               ` keychains=${result.keychains}` +
@@ -146,8 +201,12 @@ export default class OrbitDBReplicatedStateRuntime {
         })
         .finally(() => {
           this.repairingCriticalNetworkIds.delete(networkId);
+
+          if (this.pendingCriticalRepairNetworkIds.delete(networkId)) {
+            this.repairHeads(networkId);
+          }
         });
-    }, 1_000);
+    }, OrbitDBReplicatedStateRuntime.criticalRepairDelayMs);
     timeout.unref?.();
   }
 
@@ -161,7 +220,7 @@ export default class OrbitDBReplicatedStateRuntime {
       this.headRepairer
         .repairSecondary()
         .then((result) => {
-          Kernel.logger.info(
+          Kernel.logger.debug(
             `OrbitDB secondary read indexes repaired: networkId=${networkId}` +
               ` conversationMessageIndexes=${result.conversationMessageIndexes}` +
               ` communityChannelMessageIndexes=${result.communityChannelMessageIndexes}` +
@@ -178,7 +237,7 @@ export default class OrbitDBReplicatedStateRuntime {
         .finally(() => {
           this.repairingSecondaryNetworkIds.delete(networkId);
         });
-    }, 120_000);
+    }, OrbitDBReplicatedStateRuntime.secondaryRepairDelayMs);
     timeout.unref?.();
   }
 
