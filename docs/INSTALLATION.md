@@ -210,11 +210,23 @@ Expose the TURN listening port over UDP/TCP and the relay media range over UDP
 on the coturn service. Do not map those UDP ports to the backend container unless
 coturn is actually running there.
 
-When a public IPFS network is registered, nodes with `CALLS_TURN_SHARED_SECRET`
-and at least one local TURN URL publish signed call relay records on the public
-pubsub network. Other nodes cache active records and include their TURN URLs in
-`GET /calls/ice-servers`, using temporary credentials generated from the same
-shared secret. Set `CALLS_TURN_DISCOVERY_ENABLED=false` to disable this behavior.
+Call relay discovery is negotiated between backend nodes before a WebRTC call
+starts:
+
+- when a public IPFS network is registered, nodes with
+  `CALLS_TURN_SHARED_SECRET` and at least one local TURN URL publish a signed
+  call relay record through the public IPFS pubsub network;
+- each record contains the announcing node peer id, public key, TURN URLs,
+  issue/expiry timestamps and signature;
+- other nodes accept only non-expired records with valid signatures and `turn:`
+  or `turns:` URLs, then keep them in the local active relay cache;
+- `GET /calls/ice-servers` returns local TURN URLs plus active TURN URLs
+  discovered from other nodes, using temporary credentials generated from the
+  same shared secret;
+- the browser does not negotiate relay servers directly. It receives the ICE
+  server list from its backend and WebRTC ICE selects the working route.
+
+Set `CALLS_TURN_DISCOVERY_ENABLED=false` to disable this behavior.
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
 
