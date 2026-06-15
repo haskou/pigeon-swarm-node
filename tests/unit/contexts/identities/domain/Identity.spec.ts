@@ -119,14 +119,14 @@ describe('Identity', () => {
       const masterKeyDerivation = {
         algorithm: 'scrypt',
         N: 262144,
-        p: 1,
         r: 8,
+        p: 1,
+        salt: 'fixture-recovery-salt',
+        version: 1,
         recoveryKey: {
           algorithm: 'pigeon-recovery-key',
           version: 1,
         },
-        salt: 'fixture-recovery-salt',
-        version: 1,
       };
       const signaturePayload: Omit<PrimitiveOf<Identity>, 'signature'> = {
         encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),

@@ -13,14 +13,14 @@ describe('IdentitySignatureDomainService', () => {
         masterKeyDerivation: {
           algorithm: 'scrypt',
           N: 262144,
-          p: 1,
           r: 8,
+          p: 1,
+          salt: 'base64urlSalt',
+          version: 1,
           recoveryKey: {
             algorithm: 'pigeon-recovery-key',
             version: 1,
           },
-          salt: 'base64urlSalt',
-          version: 1,
         },
         networks: ['network-id'],
         previousIdentityExternalIdentifier: 'previous-identity-cid',
@@ -37,7 +37,7 @@ describe('IdentitySignatureDomainService', () => {
     );
 
     expect(serializedPayload).toBe(
-      '{"encryptedKeyPair":{"encryptedPrivateKey":"encrypted-private-key","publicKey":"public-key"},"encryptedMasterKey":"encrypted-master-key","id":"identity-id","masterKeyDerivation":{"algorithm":"scrypt","N":262144,"p":1,"r":8,"recoveryKey":{"algorithm":"pigeon-recovery-key","version":1},"salt":"base64urlSalt","version":1},"networks":["network-id"],"previousIdentityExternalIdentifier":"previous-identity-cid","profile":{"banner":"banner-cid","biography":"bio","handle":"handle","name":"Name","picture":"picture-cid"},"timestamp":1778536870557,"version":2}',
+      '{"encryptedKeyPair":{"encryptedPrivateKey":"encrypted-private-key","publicKey":"public-key"},"encryptedMasterKey":"encrypted-master-key","id":"identity-id","masterKeyDerivation":{"algorithm":"scrypt","N":262144,"r":8,"p":1,"salt":"base64urlSalt","version":1,"recoveryKey":{"algorithm":"pigeon-recovery-key","version":1}},"networks":["network-id"],"previousIdentityExternalIdentifier":"previous-identity-cid","profile":{"banner":"banner-cid","biography":"bio","handle":"handle","name":"Name","picture":"picture-cid"},"timestamp":1778536870557,"version":2}',
     );
     expect(serializedPayload).toContain('"recoveryKey"');
     expect(serializedPayload).not.toContain('passkeyPrf');

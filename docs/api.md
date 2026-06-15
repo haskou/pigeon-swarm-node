@@ -1164,7 +1164,9 @@ Client-signed identity signatures must cover the canonical identity payload:
 ```
 
 The actual JSON signature payload should omit undefined optional fields; handles
-must already be normalized before signing.
+must already be normalized before signing. The backend preserves
+`masterKeyDerivation` as sent and does not sort nested metadata keys, so clients
+must sign the exact `masterKeyDerivation` object order they send.
 
 ### Update identity
 
