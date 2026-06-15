@@ -119,7 +119,7 @@ components:
         masterKeyDerivation:
           type: object
           additionalProperties: true
-          description: Opaque client-controlled derivation metadata required to decrypt encryptedMasterKey. For passkey PRF identities, passkeyPrf contains version, algorithm, credentialId and salt only.
+          description: Opaque client-controlled metadata required to decrypt encryptedMasterKey. Backend stores and signs the complete object but never interprets or decrypts recovery keys, passkey PRF envelopes, KEKs, MasterKey material or keychains. New identities may omit passkeyPrf.
         networks:
           type: array
           description: Identity networks. Signed updates may add networks but cannot remove existing ones.
@@ -199,13 +199,17 @@ components:
         masterKeyDerivation:
           type: object
           additionalProperties: true
-          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey. Backend does not require or persist passkeyPrf.encryptedPasswordKey or passkeyPrf.keyAlgorithm.
+          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey. Backend stores and signs the complete object, including recoveryKey when present, but never interprets or decrypts recovery keys, passkey PRF envelopes, KEKs, MasterKey material or keychains. passkeyPrf is optional because local WebAuthn PRF envelopes may remain only on the client.
           example:
-            passkeyPrf:
+            algorithm: scrypt
+            N: 262144
+            r: 8
+            p: 1
+            salt: base64urlSalt
+            version: 1
+            recoveryKey:
+              algorithm: pigeon-recovery-key
               version: 1
-              algorithm: webauthn-prf
-              credentialId: base64urlCredentialId
-              salt: base64urlSalt
         networks:
           type: array
           items:

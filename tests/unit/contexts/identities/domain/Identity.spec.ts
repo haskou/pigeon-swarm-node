@@ -115,6 +115,48 @@ describe('Identity', () => {
       );
     });
 
+    it('should preserve recovery key metadata without requiring passkey PRF metadata', async () => {
+      const masterKeyDerivation = {
+        algorithm: 'scrypt',
+        N: 262144,
+        r: 8,
+        p: 1,
+        salt: 'fixture-recovery-salt',
+        version: 1,
+        recoveryKey: {
+          algorithm: 'pigeon-recovery-key',
+          version: 1,
+        },
+      };
+      const signaturePayload: Omit<PrimitiveOf<Identity>, 'signature'> = {
+        encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),
+        encryptedMasterKey: mother.encryptedMasterKey.valueOf(),
+        id: mother.id.valueOf(),
+        masterKeyDerivation,
+        networks: mother.networks.map((network) => network.valueOf()),
+        previousIdentityExternalIdentifier:
+          mother.previousIdentityExternalIdentifier?.valueOf(),
+        profile: mother.profile.toPrimitives(),
+        timestamp: mother.timestamp.valueOf(),
+        version: mother.version.valueOf(),
+      };
+      const signature =
+        await new IdentitySignatureDomainService().generateSignature(
+          signaturePayload,
+          mother.encryptedKeyPair,
+          mother.password,
+        );
+
+      const identity = Identity.fromPrimitives({
+        ...signaturePayload,
+        signature: signature.valueOf(),
+      });
+
+      expect(identity.toPrimitives().masterKeyDerivation).toEqual(
+        masterKeyDerivation,
+      );
+    });
+
     it('should throw InvalidIdentitySignatureError when previousIdentityExternalIdentifier is tampered', () => {
       const identity = mother.build();
       const primitives = identity.toPrimitives();
@@ -143,13 +185,13 @@ describe('Identity', () => {
         encryptedMasterKey: 'v1.test.encrypted-master-key',
         id: victimIdentityId.valueOf(),
         masterKeyDerivation: {
-        passkeyPrf: {
-          algorithm: 'webauthn-prf',
-          credentialId: 'test-credential-id',
-          salt: 'test-salt',
-          version: 1,
+          passkeyPrf: {
+            algorithm: 'webauthn-prf',
+            credentialId: 'test-credential-id',
+            salt: 'test-salt',
+            version: 1,
+          },
         },
-      },
         networks: [new NetworkId(faker.string.uuid()).valueOf()],
         previousIdentityExternalIdentifier,
         profile: new Profile(new ProfileName('Mallory')).toPrimitives(),
