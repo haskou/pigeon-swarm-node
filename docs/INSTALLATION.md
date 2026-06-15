@@ -170,7 +170,7 @@ Operational rules:
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.
 
-### Calls TURN relay discovery
+### Calls TURN/coturn setup
 
 Calls use WebRTC ICE, not the libp2p/IPFS circuit relay. The backend does not
 embed a TURN server; run coturn or an equivalent TURN service separately and let
@@ -210,23 +210,10 @@ Expose the TURN listening port over UDP/TCP and the relay media range over UDP
 on the coturn service. Do not map those UDP ports to the backend container unless
 coturn is actually running there.
 
-Call relay discovery is negotiated between backend nodes before a WebRTC call
-starts:
+The node-to-node discovery protocol is documented in
+[Calls TURN Relay Discovery](calls-turn-relay-discovery.md). Set
+`CALLS_TURN_DISCOVERY_ENABLED=false` to disable it.
 
-- when a public IPFS network is registered, nodes with
-  `CALLS_TURN_SHARED_SECRET` and at least one local TURN URL publish a signed
-  call relay record through the public IPFS pubsub network;
-- each record contains the announcing node peer id, public key, TURN URLs,
-  issue/expiry timestamps and signature;
-- other nodes accept only non-expired records with valid signatures and `turn:`
-  or `turns:` URLs, then keep them in the local active relay cache;
-- `GET /calls/ice-servers` returns local TURN URLs plus active TURN URLs
-  discovered from other nodes, using temporary credentials generated from the
-  same shared secret;
-- the browser does not negotiate relay servers directly. It receives the ICE
-  server list from its backend and WebRTC ICE selects the working route.
-
-Set `CALLS_TURN_DISCOVERY_ENABLED=false` to disable this behavior.
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
 
