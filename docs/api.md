@@ -389,6 +389,8 @@ needs.
 The backend does not embed a TURN server. `CALLS_TURN_PORT` and discovered
 records only describe reachable coturn instances; the coturn process/service
 must be running and must expose its listening port and relay media port range.
+The node-to-node relay discovery protocol is documented in
+[Calls TURN Relay Discovery](calls-turn-relay-discovery.md).
 
 ### Start call
 
