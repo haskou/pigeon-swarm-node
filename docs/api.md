@@ -1041,11 +1041,15 @@ Response:
   },
   "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
   "masterKeyDerivation": {
-    "passkeyPrf": {
-      "version": 1,
-      "algorithm": "webauthn-prf",
-      "credentialId": "<credentialId>",
-      "salt": "<base64urlSalt>"
+    "algorithm": "scrypt",
+    "N": 262144,
+    "r": 8,
+    "p": 1,
+    "salt": "<base64urlSalt>",
+    "version": 1,
+    "recoveryKey": {
+      "algorithm": "pigeon-recovery-key",
+      "version": 1
     }
   },
   "networks": ["<networkId>"],
@@ -1082,11 +1086,15 @@ Request:
   },
   "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
   "masterKeyDerivation": {
-    "passkeyPrf": {
-      "version": 1,
-      "algorithm": "webauthn-prf",
-      "credentialId": "<credentialId>",
-      "salt": "<base64urlSalt>"
+    "algorithm": "scrypt",
+    "N": 262144,
+    "r": 8,
+    "p": 1,
+    "salt": "<base64urlSalt>",
+    "version": 1,
+    "recoveryKey": {
+      "algorithm": "pigeon-recovery-key",
+      "version": 1
     }
   },
   "networks": ["<networkId>"],
@@ -1105,8 +1113,11 @@ Implemented:
 - require client-generated encrypted keypairs and signed identity candidates
 - accept client-generated encrypted master keys and client-controlled master key
   derivation metadata as signed opaque identity fields
-- keep client passwords, passkey PRF material and identity decryption secrets out
-  of the backend
+- keep client passwords, recovery keys, passkey PRF envelopes, KEKs, MasterKey
+  material, keychain plaintext and identity decryption secrets out of the
+  backend
+- accept identities without `passkeyPrf`; local WebAuthn PRF envelopes may
+  remain only on the client
 - store `profile.handle` as part of the signed identity profile
 - normalize handles to lowercase
 - reject handles containing spaces, `@` or any character outside letters,
@@ -1127,11 +1138,15 @@ Client-signed identity signatures must cover the canonical identity payload:
   "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
   "id": "<identityId>",
   "masterKeyDerivation": {
-    "passkeyPrf": {
-      "version": 1,
-      "algorithm": "webauthn-prf",
-      "credentialId": "<credentialId>",
-      "salt": "<base64urlSalt>"
+    "algorithm": "scrypt",
+    "N": 262144,
+    "r": 8,
+    "p": 1,
+    "salt": "<base64urlSalt>",
+    "version": 1,
+    "recoveryKey": {
+      "algorithm": "pigeon-recovery-key",
+      "version": 1
     }
   },
   "networks": ["<networkId>"],
@@ -1168,11 +1183,15 @@ Request:
   },
   "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
   "masterKeyDerivation": {
-    "passkeyPrf": {
-      "version": 1,
-      "algorithm": "webauthn-prf",
-      "credentialId": "<credentialId>",
-      "salt": "<base64urlSalt>"
+    "algorithm": "scrypt",
+    "N": 262144,
+    "r": 8,
+    "p": 1,
+    "salt": "<base64urlSalt>",
+    "version": 1,
+    "recoveryKey": {
+      "algorithm": "pigeon-recovery-key",
+      "version": 1
     }
   },
   "networks": ["<networkId>"],
