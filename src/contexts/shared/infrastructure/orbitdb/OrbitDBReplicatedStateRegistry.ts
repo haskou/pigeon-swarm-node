@@ -751,9 +751,11 @@ export default class OrbitDBReplicatedStateRegistry {
       networkIds,
     );
 
-    for (const stores of this.storesForNetworkIds(targetNetworkIds)) {
-      await this.getStore(stores, storeName)?.put?.(cleanDocument);
-    }
+    await Promise.all(
+      this.storesForNetworkIds(targetNetworkIds).map((stores) =>
+        this.getStore(stores, storeName)?.put?.(cleanDocument),
+      ),
+    );
   }
 
   public async findHead(
@@ -803,14 +805,14 @@ export default class OrbitDBReplicatedStateRegistry {
       networkIds,
     );
 
-    for (const entry of this.networkStoreEntriesForNetworkIds(
-      targetNetworkIds,
-    )) {
-      const { networkId, stores } = entry;
-
-      await stores.heads.put?.(key, cleanValue);
-      this.cacheHead(key, cleanValue);
-      await this.persistHeadCache(networkId, key, cleanValue);
-    }
+    await Promise.all(
+      this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+        async ({ networkId, stores }) => {
+          await stores.heads.put?.(key, cleanValue);
+          this.cacheHead(key, cleanValue);
+          await this.persistHeadCache(networkId, key, cleanValue);
+        },
+      ),
+    );
   }
 }

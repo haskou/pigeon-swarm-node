@@ -42,9 +42,7 @@ export default class ContentReplicationRegistrar {
       ),
     );
 
-    for (const claim of claims) {
-      await this.claimRepository.save(claim);
-    }
+    await Promise.all(claims.map((claim) => this.claimRepository.save(claim)));
 
     return claims;
   }

@@ -125,6 +125,54 @@ describe('ContentReplicationRegistrar', () => {
     ]);
   });
 
+  it('saves local replica claims concurrently', async () => {
+    const delayedSave = deferred<void>();
+    const savedContents: ContentReplication[] = [];
+    let saveCalls = 0;
+    const contentRepository: ContentReplicationRepository = {
+      findAll: async () => [],
+      findByCid: async () => undefined,
+      save: async (content) => {
+        savedContents.push(content);
+      },
+    };
+    const claimRepository: ContentReplicaClaimRepository = {
+      findByCids: async () => [],
+      save: async () => {
+        saveCalls += 1;
+
+        if (saveCalls === 1) {
+          return delayedSave.promise;
+        }
+
+        return undefined;
+      },
+    };
+    const eventPublisher: DomainEventPublisher = {
+      publish: async () => undefined,
+    };
+
+    const registration = new ContentReplicationRegistrar(
+      contentRepository,
+      claimRepository,
+      eventPublisher,
+    ).register({
+      cid,
+      context: 'public_upload',
+      localNodeId,
+      networkIds: [firstNetworkId, secondNetworkId],
+      sizeBytes: 128,
+    });
+
+    await flushPromises();
+
+    expect(saveCalls).toBe(2);
+
+    delayedSave.resolve(undefined);
+    await registration;
+    expect(savedContents).toHaveLength(1);
+  });
+
   it('can defer replicated side effects after saving content and local claims', async () => {
     const savedClaims: ContentReplicaClaim[] = [];
     const savedContents: ContentReplication[] = [];
@@ -177,3 +225,21 @@ describe('ContentReplicationRegistrar', () => {
     expect(summaryRefresher.refresh).toHaveBeenCalledTimes(1);
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}

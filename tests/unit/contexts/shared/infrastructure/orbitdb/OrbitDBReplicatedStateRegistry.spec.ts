@@ -236,6 +236,57 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(secondNetwork.notifications.put).toHaveBeenCalledTimes(1);
   });
 
+  it('writes documents to independent networks concurrently', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const secondNetwork = createStores();
+    const delayedWrite = deferred<string>();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.register('network-2', secondNetwork.stores);
+    firstNetwork.communities.put.mockImplementationOnce(
+      async () => delayedWrite.promise,
+    );
+
+    const write = registry.putDocument('communities', {
+      id: 'community-1',
+    });
+
+    await flushPromises();
+
+    expect(firstNetwork.communities.put).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.communities.put).toHaveBeenCalledTimes(1);
+
+    delayedWrite.resolve('ok');
+    await write;
+  });
+
+  it('writes heads to independent networks concurrently', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const secondNetwork = createStores();
+    const delayedWrite = deferred<string>();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.register('network-2', secondNetwork.stores);
+    firstNetwork.heads.put.mockImplementationOnce(
+      async () => delayedWrite.promise,
+    );
+
+    const write = registry.putHead('community:community-1', {
+      id: 'community-1',
+      updatedAt: 1,
+    });
+
+    await flushPromises();
+
+    expect(firstNetwork.heads.put).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.heads.put).toHaveBeenCalledTimes(1);
+
+    delayedWrite.resolve('ok');
+    await write;
+  });
+
   it('routes keychain metadata through the owner identity networks', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
@@ -699,3 +750,21 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}

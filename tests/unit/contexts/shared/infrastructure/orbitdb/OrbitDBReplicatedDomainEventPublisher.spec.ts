@@ -149,4 +149,60 @@ describe('OrbitDBReplicatedDomainEventPublisher', () => {
     expect(firstNetwork.events.add).toHaveBeenCalledTimes(1);
     expect(secondNetwork.events.add).toHaveBeenCalledTimes(1);
   });
+
+  it('publishes one event to independent networks concurrently', async () => {
+    const firstNetwork = stores();
+    const secondNetwork = stores();
+    const delayedWrite = deferred<string>();
+    const projector = {
+      project: jest.fn().mockResolvedValue(undefined),
+    } as unknown as OrbitDBDomainEventProjector;
+    const publisher = new OrbitDBReplicatedDomainEventPublisher(projector);
+
+    publisher.registerNetworkStores(
+      'network-1',
+      'network-1-peer',
+      firstNetwork.stores,
+    );
+    publisher.registerNetworkStores(
+      'network-2',
+      'network-2-peer',
+      secondNetwork.stores,
+    );
+    firstNetwork.events.add.mockImplementationOnce(
+      async () => delayedWrite.promise,
+    );
+
+    const publish = publisher.publish([
+      new NotificationWasCreatedEvent('notification-1', {
+        notification: { id: 'notification-1' },
+      }),
+    ]);
+
+    await flushPromises();
+
+    expect(firstNetwork.events.add).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.events.add).toHaveBeenCalledTimes(1);
+
+    delayedWrite.resolve('ok');
+    await publish;
+  });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
