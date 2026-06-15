@@ -92,6 +92,16 @@ describe('PublicRelayRecordRegistry', () => {
     );
   });
 
+  it('should not save public relay records without multiaddrs', () => {
+    registry.save({
+      ...publicRelayRecord('peer-empty', 2_000),
+      multiaddrs: [],
+    });
+
+    expect(registry.all(1_000)).toEqual([]);
+    expect(registry.fallbackAll(1_000)).toEqual([]);
+  });
+
   it('should not report its own public relay record as a discovered relay', () => {
     const localRecord = publicRelayRecord('peer-local', Date.now() + 60_000);
     const externalRecord = publicRelayRecord(

@@ -157,7 +157,13 @@ export default class PublicRelayRuntime {
       return;
     }
 
-    void this.discovery.publish(this.state.node, this.state.relayRecord);
+    try {
+      await this.discovery.publish(this.state.node, this.state.relayRecord);
+    } catch (error: unknown) {
+      Kernel.logger.warn(
+        `Public relay record publication failed: ${String(error)}`,
+      );
+    }
   }
 
   private startRecordRefresh(): void {

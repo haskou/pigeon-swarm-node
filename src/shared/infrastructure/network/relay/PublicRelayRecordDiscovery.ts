@@ -74,6 +74,7 @@ export class PublicRelayRecordDiscovery {
   private hasRelayRecordMultiaddrs(record: Record<string, unknown>): boolean {
     return (
       Array.isArray(record.multiaddrs) &&
+      record.multiaddrs.length > 0 &&
       record.multiaddrs.every((address) => typeof address === 'string')
     );
   }

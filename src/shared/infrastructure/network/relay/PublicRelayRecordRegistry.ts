@@ -102,6 +102,7 @@ export class PublicRelayRecordRegistry {
   ): boolean {
     return (
       Array.isArray(value.multiaddrs) &&
+      value.multiaddrs.length > 0 &&
       value.multiaddrs.every((address) => typeof address === 'string')
     );
   }
@@ -189,6 +190,10 @@ export class PublicRelayRecordRegistry {
   }
 
   public save(record: PublicRelayRecordPrimitives): void {
+    if (record.multiaddrs.length === 0) {
+      return;
+    }
+
     this.loadPersistedRecords();
     const now = Date.now();
     const existing = this.records.get(record.peerId);
