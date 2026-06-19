@@ -1,4 +1,4 @@
-import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
+import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import IpfsMessageMapper from '@app/contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';

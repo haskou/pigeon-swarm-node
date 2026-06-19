@@ -1,4 +1,4 @@
-import { Message } from '../../Message';
+import { Message } from '../../entities/messages/Message';
 
 export interface ConversationMessagesAround {
   messages: Message[];

@@ -1,8 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { ConversationId } from './value-objects/ConversationId';
-import { MessageId } from './value-objects/MessageId';
+import { ConversationId } from '../../value-objects/ConversationId';
+import { MessageId } from '../../value-objects/MessageId';
 
 export class MessageMetadata {
   constructor(

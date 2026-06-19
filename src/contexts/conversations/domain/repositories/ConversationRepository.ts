@@ -2,7 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { Conversation } from '../Conversation';
-import { Message } from '../Message';
+import { Message } from '../entities/messages/Message';
 import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';

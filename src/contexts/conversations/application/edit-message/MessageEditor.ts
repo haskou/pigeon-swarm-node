@@ -1,5 +1,5 @@
+import { MessageEdited } from '@app/contexts/conversations/domain/entities/messages/MessageEdited';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { MessageEdited } from '@app/contexts/conversations/domain/MessageEdited';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';

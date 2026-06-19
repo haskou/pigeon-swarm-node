@@ -1,11 +1,11 @@
 import { assert, Timestamp } from '@haskou/value-objects';
 
 import DomainEventPublisher from '../../../../shared/domain/events/DomainEventPublisher';
+import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import { ConversationMessageReactionWasRemovedEvent } from '../../domain/events/ConversationMessageReactionWasRemovedEvent';
-import { MessageReaction } from '../../domain/MessageReaction';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import MessageReactionRepository from '../../domain/repositories/MessageReactionRepository';
 import { MessageReactionRemoveMessage } from './messages/MessageReactionRemoveMessage';

@@ -1,5 +1,5 @@
-import { Message } from '../../../domain/Message';
-import { MessageFactory } from '../../../domain/MessageFactory';
+import { Message } from '../../../domain/entities/messages/Message';
+import { MessageFactory } from '../../../domain/entities/messages/MessageFactory';
 import { IpfsMessageDocument } from '../documents/IpfsMessageDocument';
 
 export default class IpfsMessageMapper {

@@ -1,9 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
-import { ConversationId } from './value-objects/ConversationId';
-import { MessageId } from './value-objects/MessageId';
-import { MessageReactionEmoji } from './value-objects/MessageReactionEmoji';
+import { ConversationId } from '../../value-objects/ConversationId';
+import { MessageId } from '../../value-objects/MessageId';
+import { MessageReactionEmoji } from '../../value-objects/MessageReactionEmoji';
 
 export class MessageReaction {
   public static create(

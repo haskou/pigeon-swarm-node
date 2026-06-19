@@ -1,17 +1,19 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
+import { MessageEditedCreateData } from '../../types/MessageEditedCreateData';
+import { MessageSignaturePayload } from '../../types/MessageSignaturePayload';
+import { ConversationId } from '../../value-objects/ConversationId';
+import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePayload';
+import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
-import { ConversationId } from './value-objects/ConversationId';
-import { MessageId } from './value-objects/MessageId';
 
-export { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
+export { MessageEditedCreateData } from '../../types/MessageEditedCreateData';
 
-export class MessageDeleted extends Message {
-  public static create(data: MessageDeletedCreateData): MessageDeleted {
-    return new MessageDeleted(
+export class MessageEdited extends Message {
+  public static create(data: MessageEditedCreateData): MessageEdited {
+    return new MessageEdited(
       new MessageMetadata(
         data.id ?? MessageId.generate(),
         data.conversationId,
@@ -21,13 +23,14 @@ export class MessageDeleted extends Message {
         data.signature,
       ),
       data.targetMessageId,
+      data.encryptedPayload,
     );
   }
 
   public static fromPrimitives(
-    primitives: PrimitiveOf<Message>,
-  ): MessageDeleted {
-    return new MessageDeleted(
+    primitives: PrimitiveOf<MessageEdited>,
+  ): MessageEdited {
+    return new MessageEdited(
       new MessageMetadata(
         new MessageId(primitives.id),
         new ConversationId(primitives.conversationId),
@@ -39,21 +42,37 @@ export class MessageDeleted extends Message {
         new Signature(primitives.signature),
       ),
       new MessageId(primitives.targetMessageId),
+      new EncryptedMessagePayload(primitives.encryptedPayload),
     );
   }
 
   constructor(
     metadata: MessageMetadata,
     private readonly targetMessageId: MessageId,
+    private readonly encryptedPayload: EncryptedMessagePayload,
   ) {
     super(metadata);
   }
 
   public getType(): MessageType {
-    return MessageType.DELETED;
+    return MessageType.EDITED;
   }
 
   public getTargetMessageId(): MessageId {
     return this.targetMessageId;
+  }
+
+  public toPrimitives() {
+    return {
+      ...super.toPrimitives(),
+      encryptedPayload: this.encryptedPayload.valueOf(),
+    };
+  }
+
+  public toSignaturePayload(): MessageSignaturePayload {
+    return {
+      ...super.toSignaturePayload(),
+      encryptedPayload: this.encryptedPayload.valueOf(),
+    };
   }
 }

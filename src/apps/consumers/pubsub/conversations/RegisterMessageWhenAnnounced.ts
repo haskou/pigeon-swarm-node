@@ -1,8 +1,8 @@
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
+import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
+import { MessageFactory } from '@app/contexts/conversations/domain/entities/messages/MessageFactory';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { Message } from '@app/contexts/conversations/domain/Message';
-import { MessageFactory } from '@app/contexts/conversations/domain/MessageFactory';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';

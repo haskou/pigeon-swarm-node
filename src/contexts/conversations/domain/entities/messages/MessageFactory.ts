@@ -1,11 +1,11 @@
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { MessageType } from '../../value-objects/MessageType';
 import { Message } from './Message';
 import { MessageDeleted } from './MessageDeleted';
 import { MessageEdited } from './MessageEdited';
 import { MessagePoll } from './MessagePoll';
 import { MessageSent } from './MessageSent';
-import { MessageType } from './value-objects/MessageType';
 
 export class MessageFactory {
   private static isEdited(

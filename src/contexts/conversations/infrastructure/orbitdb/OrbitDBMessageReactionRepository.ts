@@ -1,4 +1,4 @@
-import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
+import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';

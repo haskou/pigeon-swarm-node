@@ -3,7 +3,7 @@ import { RegisterConversationMessage } from '@app/contexts/conversations/applica
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { InvalidMessageSignatureError } from '@app/contexts/conversations/domain/errors/InvalidMessageSignatureError';
 import { RemoteMessageCandidateMismatchError } from '@app/contexts/conversations/domain/errors/RemoteMessageCandidateMismatchError';
-import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
+import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';

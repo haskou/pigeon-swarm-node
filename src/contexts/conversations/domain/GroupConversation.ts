@@ -3,10 +3,10 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
+import { Message } from './entities/messages/Message';
+import { MessageFactory } from './entities/messages/MessageFactory';
 import { GroupConversationMustHaveTwoParticipantsError } from './errors/GroupConversationMustHaveAtLeastTwoParticipantsError';
 import { ConversationWasCreatedEvent } from './events/ConversationWasCreatedEvent';
-import { Message } from './Message';
-import { MessageFactory } from './MessageFactory';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { GroupConversationName } from './value-objects/GroupConversationName';

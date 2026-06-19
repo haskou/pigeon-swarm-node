@@ -9,6 +9,12 @@ import {
   Timestamp,
 } from '@haskou/value-objects';
 
+import { Message } from './entities/messages/Message';
+import { MessageDeleted } from './entities/messages/MessageDeleted';
+import { MessageEdited } from './entities/messages/MessageEdited';
+import { MessageFactory } from './entities/messages/MessageFactory';
+import { MessagePoll } from './entities/messages/MessagePoll';
+import { MessageSent } from './entities/messages/MessageSent';
 import { ConversationParticipantNotFoundError } from './errors/ConversationParticipantNotFoundError';
 import { MessageTargetAlreadyDeletedError } from './errors/MessageTargetAlreadyDeletedError';
 import { MessageTargetAuthorMismatchError } from './errors/MessageTargetAuthorMismatchError';
@@ -16,12 +22,6 @@ import { MessageTargetNotFoundError } from './errors/MessageTargetNotFoundError'
 import { ConversationMessageWasDeletedEvent } from './events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from './events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from './events/ConversationMessageWasSentEvent';
-import { Message } from './Message';
-import { MessageDeleted } from './MessageDeleted';
-import { MessageEdited } from './MessageEdited';
-import { MessageFactory } from './MessageFactory';
-import { MessagePoll } from './MessagePoll';
-import { MessageSent } from './MessageSent';
 import { MessageEditOptions } from './types/MessageEditOptions';
 import { MessagePollOptions } from './types/MessagePollOptions';
 import { MessageSendOptions } from './types/MessageSendOptions';

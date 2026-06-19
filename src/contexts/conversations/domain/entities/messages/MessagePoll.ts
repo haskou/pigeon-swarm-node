@@ -2,13 +2,13 @@ import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
+import { MessagePollCreateData } from '../../types/MessagePollCreateData';
+import { ConversationId } from '../../value-objects/ConversationId';
+import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessagePollCreateData } from './types/MessagePollCreateData';
-import { ConversationId } from './value-objects/ConversationId';
-import { MessageId } from './value-objects/MessageId';
 
-export { MessagePollCreateData } from './types/MessagePollCreateData';
+export { MessagePollCreateData } from '../../types/MessagePollCreateData';
 
 export class MessagePoll extends Message {
   public static create(data: MessagePollCreateData): MessagePoll {

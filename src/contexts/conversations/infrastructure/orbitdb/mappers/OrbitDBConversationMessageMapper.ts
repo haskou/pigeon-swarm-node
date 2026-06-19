@@ -1,6 +1,6 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import { Message } from '@app/contexts/conversations/domain/Message';
-import { MessageFactory } from '@app/contexts/conversations/domain/MessageFactory';
+import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
+import { MessageFactory } from '@app/contexts/conversations/domain/entities/messages/MessageFactory';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
