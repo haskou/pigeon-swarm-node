@@ -32,25 +32,45 @@ package "communities/domain" {
     - settings: CommunitySettings
     + create(ownerIdentityId, networkId, profile, settings): Community
     + joinWithInvite(member): void
+    + createInvite(actor, expiresAt?, maxUses?, encryptedCommunityKey?): CommunityInvite
+    + inviteMember(actor, invitedIdentityId): CommunityMembershipRequest
+    + acceptMembershipRequest(actor, membershipRequest): void
+    + declineMembershipRequest(actor, membershipRequest): void
     + isAutoJoinEnabled(): boolean
     + leave(member): void
     + banMember(actor, member): void
     + unbanMember(actor, member): void
-    + assertCanCreateInvite(identityId): void
-    + assertCanManageChannels(identityId): void
-    + assertCanManageRoles(identityId): void
     + sendChannelMessage(metadata, payload, signature, attachments, mentions): CommunityChannelMessage
     + acceptSentChannelMessage(message, payload): CommunityChannelMessage
     + editChannelMessage(actor, targetMessage, channelId, payload, signature, editedAt, attachments, mentions): CommunityChannelMessage
-    + assertCanDeleteMessage(actor, targetAuthor, channelId): void
-    + assertIsNotBanned(identityId): void
+    + reactWithSticker(identityId, channelId, messageId, emoji): CommunityChannelMessageReaction
+    + deleteChannelMessage(actor, targetMessage, channelId): void
+    + viewTextChannel(identityId, channelId): void
+    + manageChannelMessages(identityId, channelId): void
+    + searchTextChannelMessages(identityId, channelId): void
+    + viewModerationLog(identityId): void
     + addTextChannel(actor, name): CommunityTextChannel
     + addRole(actor, name, permissions): CommunityRole
     + assignRoles(actor, member, roleIds): void
     + updateChannelPermissions(actor, channelId, permissions): void
     + renameChannel(actor, channelId, name): void
     + updateProfile(actor, name, description, banner?): void
-    + assertIsMember(identityId): void
+    + viewAsMember(identityId): void
+    + requestMembership(identityId): void
+  }
+
+  class CommunityAccessValidator {
+    - ownerIdentityId: IdentityId
+    - membership: CommunityMembership
+    - channels: CommunityChannels
+    - settings: CommunitySettings
+    + assertCanViewTextChannel(identityId, channelId): void
+    + assertCanSendChannelMessage(identityId, channelId, payload, mentions): void
+    + assertCanEditMessage(actor, targetMessage, channelId, payload, mentions): void
+    + assertCanDeleteMessage(actor, targetMessage, channelId): void
+    + visibleChannelsFor(identityId): object
+    + visibleTextChannelIdsFor(identityId): CommunityChannelId[]
+    + visibleMembersForTextChannel(channelId): IdentityId[]
   }
 
   class CommunityMembership {
@@ -269,6 +289,10 @@ package "communities/domain" {
   Community *-- CommunityMembership
   Community *-- CommunityChannels
   Community *-- CommunityProfile
+  Community ..> CommunityAccessValidator
+  CommunityAccessValidator --> CommunityMembership
+  CommunityAccessValidator --> CommunityChannels
+  CommunityAccessValidator --> CommunitySettings
   Community --> CommunityId
   CommunityProfile --> CommunityName
   CommunityProfile --> CommunityDescription

@@ -95,6 +95,10 @@ export class CommunityChannelMessage {
     return this.metadata.getAuthorIdentityId();
   }
 
+  public wasAuthoredBy(identityId: IdentityId): boolean {
+    return this.metadata.getAuthorIdentityId().isEqual(identityId);
+  }
+
   public getChannelId(): CommunityChannelId {
     return this.metadata.getChannelId();
   }
