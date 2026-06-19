@@ -1,4 +1,3 @@
-import { CommunityPermissionValue } from '@app/contexts/communities/domain/value-objects/CommunityPermission';
 import { ArrayUnique, IsArray, IsString } from 'class-validator';
 
 export class CommunityRoleBody {
@@ -8,5 +7,5 @@ export class CommunityRoleBody {
   @ArrayUnique()
   @IsArray()
   @IsString({ each: true })
-  public readonly permissions: CommunityPermissionValue[];
+  public readonly permissions: string[];
 }

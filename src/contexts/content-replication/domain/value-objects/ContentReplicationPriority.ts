@@ -1,15 +1,14 @@
 import { Enum } from '@haskou/value-objects';
 
 import { InvalidContentReplicationPriorityError } from '../errors/InvalidContentReplicationPriorityError';
-import { PriorityValue } from './types/PriorityValue';
 
-const priorities: Record<string, PriorityValue> = {
+const priorities = {
   COLD: 'cold',
   CRITICAL: 'critical',
   NORMAL: 'normal',
-};
+} as const;
 
-export class ContentReplicationPriority extends Enum<PriorityValue> {
+export class ContentReplicationPriority extends Enum<string> {
   public static readonly COLD = new ContentReplicationPriority(priorities.COLD);
 
   public static readonly CRITICAL = new ContentReplicationPriority(
@@ -33,7 +32,7 @@ export class ContentReplicationPriority extends Enum<PriorityValue> {
     }
   }
 
-  public getValues(): PriorityValue[] {
+  public getValues(): string[] {
     return Object.values(priorities);
   }
 }

@@ -3,9 +3,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { GroupConversationName } from '../../../domain/value-objects/GroupConversationName';
-import { GroupConversationCreatePayload } from './types/GroupConversationCreatePayload';
-
-export { GroupConversationCreatePayload } from './types/GroupConversationCreatePayload';
 
 export class GroupConversationCreateMessage {
   public readonly keychainExternalIdentifier: KeychainExternalIdentifier;
@@ -20,7 +17,12 @@ export class GroupConversationCreateMessage {
 
   constructor(
     ownerIdentityId: string,
-    payload: GroupConversationCreatePayload,
+    payload: {
+      keychainExternalIdentifier: string;
+      name: string;
+      networkId: string;
+      participantIds: string[];
+    },
   ) {
     this.ownerIdentityId = new IdentityId(ownerIdentityId);
     this.keychainExternalIdentifier = new KeychainExternalIdentifier(

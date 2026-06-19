@@ -5,12 +5,16 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { NotificationSettingScope } from '../../../domain/value-objects/NotificationSettingScope';
 import { NotificationSettingScopeType } from '../../../domain/value-objects/NotificationSettingScopeType';
-import { NotificationScopePrimitives } from './types/NotificationScopePrimitives';
 
 export class NotificationScopeSettingsResetMessage {
   constructor(
     private readonly identityId: string,
-    private readonly scope: NotificationScopePrimitives,
+    private readonly scope: {
+      channelId?: string;
+      communityId?: string;
+      conversationId?: string;
+      type: string;
+    },
   ) {}
 
   private scopeType(): NotificationSettingScopeType {

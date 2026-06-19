@@ -1,5 +1,3 @@
-import { MessageTypeValue } from '../../../domain/value-objects/types/MessageTypeValue';
-
 export interface OrbitDBConversationMessageDocument extends Record<
   string,
   unknown
@@ -22,6 +20,6 @@ export interface OrbitDBConversationMessageDocument extends Record<
   scopeType: 'conversation';
   signature: string;
   targetMessageId?: string;
-  type: MessageTypeValue;
+  type: string;
   valid?: boolean;
 }

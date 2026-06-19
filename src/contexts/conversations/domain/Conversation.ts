@@ -22,7 +22,9 @@ import { MessageTargetAuthorMismatchError } from './errors/MessageTargetAuthorMi
 import { MessageTargetNotFoundError } from './errors/MessageTargetNotFoundError';
 import { ConversationMessageWasDeletedEvent } from './events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from './events/ConversationMessageWasEditedEvent';
+import { ConversationMessageWasPinnedEvent } from './events/ConversationMessageWasPinnedEvent';
 import { ConversationMessageWasSentEvent } from './events/ConversationMessageWasSentEvent';
+import { ConversationMessageWasUnpinnedEvent } from './events/ConversationMessageWasUnpinnedEvent';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
@@ -299,6 +301,30 @@ export class Conversation extends AggregateRoot {
     );
 
     return message;
+  }
+
+  public pinMessage(actorId: IdentityId, messageId: MessageId): void {
+    this.assertIsParticipant(actorId);
+    this.record(
+      new ConversationMessageWasPinnedEvent(this.id.valueOf(), {
+        messageId: messageId.valueOf(),
+        networkId: this.networkId.valueOf(),
+        participantIds: this.participantIdValues(),
+        pinnedByIdentityId: actorId.valueOf(),
+      }),
+    );
+  }
+
+  public unpinMessage(actorId: IdentityId, messageId: MessageId): void {
+    this.assertIsParticipant(actorId);
+    this.record(
+      new ConversationMessageWasUnpinnedEvent(this.id.valueOf(), {
+        messageId: messageId.valueOf(),
+        networkId: this.networkId.valueOf(),
+        participantIds: this.participantIdValues(),
+        unpinnedByIdentityId: actorId.valueOf(),
+      }),
+    );
   }
 
   public findMessageById(messageId: MessageId): Message | undefined {

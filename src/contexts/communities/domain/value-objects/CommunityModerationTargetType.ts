@@ -1,9 +1,16 @@
 import { Enum } from '@haskou/value-objects';
 
-import { communityModerationTargetTypes } from './types/CommunityModerationTargetTypes';
-import { CommunityModerationTargetTypeValue as TargetTypeValue } from './types/CommunityModerationTargetTypeValue';
+const communityModerationTargetTypes = {
+  CHANNEL: 'channel',
+  COMMUNITY: 'community',
+  INVITE: 'invite',
+  MEMBER: 'member',
+  MEMBERSHIP_REQUEST: 'membership_request',
+  MESSAGE: 'message',
+  ROLE: 'role',
+} as const;
 
-export class CommunityModerationTargetType extends Enum<TargetTypeValue> {
+export class CommunityModerationTargetType extends Enum<string> {
   public static readonly CHANNEL = new CommunityModerationTargetType(
     communityModerationTargetTypes.CHANNEL,
   );
@@ -32,7 +39,7 @@ export class CommunityModerationTargetType extends Enum<TargetTypeValue> {
     communityModerationTargetTypes.ROLE,
   );
 
-  public getValues(): TargetTypeValue[] {
+  public getValues(): string[] {
     return Object.values(communityModerationTargetTypes);
   }
 }

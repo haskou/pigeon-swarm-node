@@ -20,7 +20,6 @@ import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
 import { IdentitySignaturePayload } from './IdentitySignaturePayload';
 import { Profile } from './Profile';
-import { PreviousIdentityReference as PreviousReference } from './types/PreviousIdentityReference';
 import { EncryptedMasterKey } from './value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from './value-objects/IdentityVersion';
@@ -28,7 +27,8 @@ import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class Identity extends AggregateRoot {
-  private readonly previousIdentityExternalIdentifier?: PreviousReference;
+  // eslint-disable-next-line max-len
+  private readonly previousIdentityExternalIdentifier?: IdentityExternalIdentifier;
 
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
@@ -79,7 +79,7 @@ export class Identity extends AggregateRoot {
     private timestamp: Timestamp,
     private signature: Signature,
     private readonly version: IdentityVersion,
-    previousReference?: PreviousReference,
+    previousReference?: IdentityExternalIdentifier,
   ) {
     super();
     this.previousIdentityExternalIdentifier = previousReference;

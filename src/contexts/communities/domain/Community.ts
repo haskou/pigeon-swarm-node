@@ -343,6 +343,7 @@ export class Community extends AggregateRoot {
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
     emoji: CommunityChannelMessageReactionEmoji,
+    createdAt: Timestamp = Timestamp.now(),
   ): CommunityChannelMessageReaction {
     this.createAccessValidator().assertCanReactWithSticker(
       identityId,
@@ -355,6 +356,7 @@ export class Community extends AggregateRoot {
       messageId,
       identityId,
       emoji,
+      createdAt,
     );
   }
 

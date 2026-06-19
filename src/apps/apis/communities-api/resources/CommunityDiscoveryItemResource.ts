@@ -13,5 +13,5 @@ export interface CommunityDiscoveryItemResource {
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  visibility: 'private' | 'public';
+  visibility: string;
 }

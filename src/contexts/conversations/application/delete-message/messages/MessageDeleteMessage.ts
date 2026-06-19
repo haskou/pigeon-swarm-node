@@ -3,9 +3,6 @@ import { Signature, Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { MessageId } from '../../../domain/value-objects/MessageId';
-import { MessageDeletePayload } from './types/MessageDeletePayload';
-
-export { MessageDeletePayload } from './types/MessageDeletePayload';
 
 export class MessageDeleteMessage {
   public readonly authorIdentityId: IdentityId;
@@ -19,7 +16,11 @@ export class MessageDeleteMessage {
     conversationId: string,
     targetMessageId: string,
     authorIdentityId: string,
-    payload: MessageDeletePayload,
+    payload: {
+      createdAt: number;
+      id: string;
+      signature: string;
+    },
   ) {
     this.authorIdentityId = new IdentityId(authorIdentityId);
     this.conversationId = new ConversationId(conversationId);

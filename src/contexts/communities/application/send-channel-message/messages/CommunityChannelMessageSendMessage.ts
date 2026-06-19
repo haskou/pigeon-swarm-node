@@ -10,7 +10,6 @@ import { CommunityChannelMessageId } from '../../../domain/value-objects/Communi
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityMentionTargetId } from '../../../domain/value-objects/CommunityMentionTargetId';
 import { CommunityMentionType } from '../../../domain/value-objects/CommunityMentionType';
-import { CommunityChannelMessageSendInput } from './CommunityChannelMessageSendInput';
 
 export class CommunityChannelMessageSendMessage {
   public readonly attachmentExternalIdentifiers: CommunityChannelAttachmentId[];
@@ -23,7 +22,19 @@ export class CommunityChannelMessageSendMessage {
   public readonly replyToMessageId?: CommunityChannelMessageId;
   public readonly signature: Signature;
 
-  constructor(input: CommunityChannelMessageSendInput) {
+  constructor(input: {
+    attachmentExternalIdentifiers?: string[];
+    authorIdentityId: string;
+    channelId: string;
+    communityId: string;
+    createdAt: number;
+    encryptedPayload?: string;
+    mentions?: Array<{ targetId?: string; type: string }>;
+    messageId: string;
+    plaintextPayload?: string;
+    replyToMessageId?: string;
+    signature: string;
+  }) {
     this.authorIdentityId = new IdentityId(input.authorIdentityId);
     this.communityId = new CommunityId(input.communityId);
     this.channelId = new CommunityChannelId(input.channelId);

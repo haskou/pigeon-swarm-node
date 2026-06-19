@@ -1,4 +1,3 @@
-import { CommunityVisibilityValue } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
 import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class PostCommunityBody {
@@ -29,5 +28,5 @@ export class PostCommunityBody {
 
   @IsOptional()
   @IsIn(['private', 'public'])
-  public readonly visibility?: CommunityVisibilityValue;
+  public readonly visibility?: string;
 }

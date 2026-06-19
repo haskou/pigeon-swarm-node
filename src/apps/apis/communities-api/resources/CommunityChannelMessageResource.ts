@@ -1,5 +1,3 @@
-import { CommunityMentionTypeValue } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
-
 export interface CommunityChannelMessageResource {
   attachmentExternalIdentifiers: string[];
   authorIdentityId: string;
@@ -11,7 +9,7 @@ export interface CommunityChannelMessageResource {
   id: string;
   mentions: {
     targetId: string | undefined;
-    type: CommunityMentionTypeValue;
+    type: string;
   }[];
   plaintextPayload?: string;
   reactions: {

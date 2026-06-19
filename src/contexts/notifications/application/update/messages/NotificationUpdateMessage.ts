@@ -1,10 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
-import {
-  NotificationState,
-  NotificationStateValue,
-} from '../../../domain/value-objects/NotificationState';
+import { NotificationState } from '../../../domain/value-objects/NotificationState';
 
 export class NotificationUpdateMessage {
   public readonly notificationId: NotificationId;
@@ -14,7 +11,7 @@ export class NotificationUpdateMessage {
   constructor(
     notificationId: string,
     recipientIdentityId: string,
-    state: NotificationStateValue,
+    state: string,
   ) {
     this.notificationId = new NotificationId(notificationId);
     this.recipientIdentityId = new IdentityId(recipientIdentityId);

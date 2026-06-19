@@ -1,11 +1,13 @@
 import { Enum } from '@haskou/value-objects';
 
-import { communityMentionTypes } from './types/CommunityMentionTypes';
-import { CommunityMentionTypeValue } from './types/CommunityMentionTypeValue';
+const communityMentionTypes = {
+  EVERYONE: 'everyone',
+  HERE: 'here',
+  IDENTITY: 'identity',
+  ROLE: 'role',
+} as const;
 
-export { CommunityMentionTypeValue } from './types/CommunityMentionTypeValue';
-
-export class CommunityMentionType extends Enum<CommunityMentionTypeValue> {
+export class CommunityMentionType extends Enum<string> {
   public static readonly EVERYONE = new CommunityMentionType(
     communityMentionTypes.EVERYONE,
   );
@@ -22,7 +24,7 @@ export class CommunityMentionType extends Enum<CommunityMentionTypeValue> {
     communityMentionTypes.ROLE,
   );
 
-  public getValues(): CommunityMentionTypeValue[] {
+  public getValues(): string[] {
     return Object.values(communityMentionTypes);
   }
 

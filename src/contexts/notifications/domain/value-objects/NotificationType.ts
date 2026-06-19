@@ -1,11 +1,13 @@
 import { Enum } from '@haskou/value-objects';
 
-import { notificationTypes } from './types/NotificationTypes';
-import { NotificationTypeValue } from './types/NotificationTypeValue';
+const notificationTypes = {
+  COMMUNITY_INVITATION: 'community_invitation',
+  CONVERSATION_INVITATION: 'conversation_invitation',
+  GROUP_CONVERSATION_INVITATION: 'group_conversation_invitation',
+  MISSED_CALL: 'missed_call',
+} as const;
 
-export { NotificationTypeValue } from './types/NotificationTypeValue';
-
-export class NotificationType extends Enum<NotificationTypeValue> {
+export class NotificationType extends Enum<string> {
   public static readonly COMMUNITY_INVITATION = new NotificationType(
     notificationTypes.COMMUNITY_INVITATION,
   );
@@ -22,7 +24,7 @@ export class NotificationType extends Enum<NotificationTypeValue> {
     notificationTypes.MISSED_CALL,
   );
 
-  public getValues(): NotificationTypeValue[] {
+  public getValues(): string[] {
     return Object.values(notificationTypes);
   }
 }

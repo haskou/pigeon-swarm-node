@@ -1,5 +1,3 @@
-import { StickerTypeValue } from '../../../domain/value-objects/StickerType';
-
 export interface OrbitDBStickerDocument {
   assetCid: string;
   contentType: string;
@@ -9,5 +7,5 @@ export interface OrbitDBStickerDocument {
   };
   id: string;
   sizeBytes: number;
-  type: StickerTypeValue;
+  type: string;
 }

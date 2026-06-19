@@ -10,10 +10,7 @@ import { CommunityChannelId } from '../../../domain/value-objects/CommunityChann
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityMentionTargetId } from '../../../domain/value-objects/CommunityMentionTargetId';
-import {
-  CommunityMentionType,
-  CommunityMentionTypeValue,
-} from '../../../domain/value-objects/CommunityMentionType';
+import { CommunityMentionType } from '../../../domain/value-objects/CommunityMentionType';
 
 export class CommunityChannelMessageEditMessage {
   public readonly actorIdentityId: IdentityId;
@@ -31,7 +28,7 @@ export class CommunityChannelMessageEditMessage {
     communityId: string;
     createdAt: number;
     encryptedPayload?: string;
-    mentions?: Array<{ targetId?: string; type: CommunityMentionTypeValue }>;
+    mentions?: Array<{ targetId?: string; type: string }>;
     messageId: string;
     plaintextPayload?: string;
     signature: string;

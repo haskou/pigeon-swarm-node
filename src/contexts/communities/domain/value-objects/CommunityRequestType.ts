@@ -1,11 +1,11 @@
 import { Enum } from '@haskou/value-objects';
 
-import { communityRequestTypes } from './types/CommunityRequestTypes';
-import { CommunityRequestTypeValue } from './types/CommunityRequestTypeValue';
+const communityRequestTypes = {
+  INVITATION: 'invitation',
+  REQUEST: 'request',
+} as const;
 
-export { CommunityRequestTypeValue } from './types/CommunityRequestTypeValue';
-
-export class CommunityRequestType extends Enum<CommunityRequestTypeValue> {
+export class CommunityRequestType extends Enum<string> {
   public static readonly INVITATION = new CommunityRequestType(
     communityRequestTypes.INVITATION,
   );
@@ -14,7 +14,7 @@ export class CommunityRequestType extends Enum<CommunityRequestTypeValue> {
     communityRequestTypes.REQUEST,
   );
 
-  public getValues(): CommunityRequestTypeValue[] {
+  public getValues(): string[] {
     return Object.values(communityRequestTypes);
   }
 

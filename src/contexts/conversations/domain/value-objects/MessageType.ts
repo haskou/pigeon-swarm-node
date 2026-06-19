@@ -1,17 +1,19 @@
 import { Enum } from '@haskou/value-objects';
 
-import { messageTypes } from './types/MessageTypes';
-import { MessageTypeValue } from './types/MessageTypeValue';
+const messageTypes = {
+  DELETED: 'deleted',
+  EDITED: 'edited',
+  POLL: 'poll',
+  SENT: 'sent',
+} as const;
 
-export { MessageTypeValue } from './types/MessageTypeValue';
-
-export class MessageType extends Enum<MessageTypeValue> {
+export class MessageType extends Enum<string> {
   public static readonly DELETED = new MessageType(messageTypes.DELETED);
   public static readonly EDITED = new MessageType(messageTypes.EDITED);
   public static readonly POLL = new MessageType(messageTypes.POLL);
   public static readonly SENT = new MessageType(messageTypes.SENT);
 
-  public getValues(): MessageTypeValue[] {
+  public getValues(): string[] {
     return Object.values(messageTypes);
   }
 }

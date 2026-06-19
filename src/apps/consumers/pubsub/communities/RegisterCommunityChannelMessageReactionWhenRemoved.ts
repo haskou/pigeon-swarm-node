@@ -12,7 +12,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
-import { assert } from '@haskou/value-objects';
+import { assert, Timestamp } from '@haskou/value-objects';
 
 import { isCommunityChannelMessageReactionPrimitive } from './isCommunityChannelMessageReactionPrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
@@ -75,6 +75,7 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
       channelId,
       messageId,
       new CommunityChannelMessageReactionEmoji(event.attributes.emoji),
+      new Timestamp(event.attributes.createdAt),
     );
 
     await this.reactionRepository.delete(reaction);

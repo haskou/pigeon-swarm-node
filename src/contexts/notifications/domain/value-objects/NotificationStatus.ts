@@ -1,11 +1,11 @@
 import { Enum } from '@haskou/value-objects';
 
-import { notificationStatuses } from './types/NotificationStatuses';
-import { NotificationStatusValue } from './types/NotificationStatusValue';
+const notificationStatuses = {
+  READ: 'read',
+  UNREAD: 'unread',
+} as const;
 
-export { NotificationStatusValue } from './types/NotificationStatusValue';
-
-export class NotificationStatus extends Enum<NotificationStatusValue> {
+export class NotificationStatus extends Enum<string> {
   public static readonly READ = new NotificationStatus(
     notificationStatuses.READ,
   );
@@ -14,7 +14,7 @@ export class NotificationStatus extends Enum<NotificationStatusValue> {
     notificationStatuses.UNREAD,
   );
 
-  public getValues(): NotificationStatusValue[] {
+  public getValues(): string[] {
     return Object.values(notificationStatuses);
   }
 }

@@ -9,7 +9,6 @@ import {
 
 import { KeychainWasPublishedEvent } from './events/KeychainWasPublishedEvent';
 import { KeychainSignaturePayload } from './KeychainSignaturePayload';
-import { PreviousKeychainReference as PreviousReference } from './types/PreviousKeychainReference';
 import { EncryptedKeychainPayload } from './value-objects/EncryptedKeychainPayload';
 import { KeychainExternalIdentifier } from './value-objects/KeychainExternalIdentifier';
 import { KeychainVersion } from './value-objects/KeychainVersion';
@@ -46,7 +45,8 @@ export class Keychain extends AggregateRoot {
     private readonly timestamp: Timestamp,
     private readonly signature: Signature,
     private readonly version: KeychainVersion,
-    private readonly previousKeychainExternalIdentifier?: PreviousReference,
+    // eslint-disable-next-line max-len
+    private readonly previousKeychainExternalIdentifier?: KeychainExternalIdentifier,
   ) {
     super();
   }
@@ -71,6 +71,10 @@ export class Keychain extends AggregateRoot {
     | KeychainExternalIdentifier
     | undefined {
     return this.previousKeychainExternalIdentifier;
+  }
+
+  public getOwnerIdentityId(): IdentityId {
+    return this.ownerIdentityId;
   }
 
   public getSignature(): Signature {

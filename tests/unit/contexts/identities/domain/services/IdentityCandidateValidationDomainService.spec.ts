@@ -1,5 +1,6 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
@@ -59,7 +60,7 @@ describe('IdentityCandidateValidationDomainService', () => {
   it('should reject a versioned candidate that removes a previous network', async () => {
     const previousIdentity = mother.build();
     const previousPrimitives = previousIdentity.toPrimitives();
-    const candidatePrimitives = {
+    const { signature: _, ...candidatePrimitives } = {
       ...previousPrimitives,
       networks: [new NetworkId(faker.string.uuid()).valueOf()],
       previousIdentityExternalIdentifier: 'bafypreviousidentity',
@@ -69,7 +70,7 @@ describe('IdentityCandidateValidationDomainService', () => {
     };
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
-        candidatePrimitives,
+        IdentitySignaturePayload.fromPrimitives(candidatePrimitives),
         EncryptedKeyPair.fromPrimitives(previousPrimitives.encryptedKeyPair),
         mother.password,
       );

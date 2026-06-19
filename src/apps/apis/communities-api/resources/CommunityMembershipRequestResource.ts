@@ -4,8 +4,8 @@ export interface CommunityMembershipRequestResource {
   creatorIdentityId: string;
   id: string;
   identityId: string;
-  status: 'accepted' | 'declined' | 'pending';
-  type: 'invitation' | 'request';
+  status: string;
+  type: string;
   updatedAt: number;
 }
 
