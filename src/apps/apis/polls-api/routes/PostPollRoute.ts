@@ -40,7 +40,7 @@ export class PostPollRoute extends PollRouteSupport {
         body.question,
         body.options,
         body.allowsMultipleVotes,
-        scopeAccess.recipients,
+        scopeAccess.audience,
         body.expiresAt,
       ),
     );

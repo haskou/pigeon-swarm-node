@@ -23,7 +23,7 @@ export class PollCloser {
     await this.repository.save(poll);
     await this.eventPublisher.publish([
       new PollWasClosedEvent(poll.getScope().aggregateId(), {
-        ...message.recipients,
+        ...message.audience.toPrimitives(),
         actorIdentityId: message.actorIdentityId.valueOf(),
         poll: poll.toPrimitives(),
         pollId: poll.getId().valueOf(),

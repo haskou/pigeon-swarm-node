@@ -6,21 +6,22 @@ import { InvalidPollScopeError } from '@app/contexts/polls/domain/errors/Invalid
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Poll } from '../../domain/Poll';
+import { PollAudience } from '../../domain/PollAudience';
 import { PollScope } from '../../domain/PollScope';
-import { CommunityChannelPollScopeResolveMessage } from './messages/CommunityChannelPollScopeResolveMessage';
-import { GroupConversationPollScopeResolveMessage } from './messages/GroupConversationPollScopeResolveMessage';
-import { PollScopeAccess } from './types/PollScopeAccess';
+import { CommunityChannelPollScopeAuthorizeMessage } from './messages/CommunityChannelPollScopeAuthorizeMessage';
+import { GroupConversationPollScopeAuthorizeMessage } from './messages/GroupConversationPollScopeAuthorizeMessage';
+import { PollScopeResolution } from './PollScopeResolution';
 
-export default class PollScopeAccessResolver {
+export default class PollScopeAuthorizer {
   constructor(
     private readonly communityRepository: CommunityRepository,
     private readonly conversationRepository: ConversationRepository,
   ) {}
 
-  private async communityChannelScopeAccess(
-    message: CommunityChannelPollScopeResolveMessage,
+  private async authorizeCommunityChannel(
+    message: CommunityChannelPollScopeAuthorizeMessage,
     action: 'create' | 'vote',
-  ): Promise<PollScopeAccess> {
+  ): Promise<PollScopeResolution> {
     const community = await this.communityRepository.findById(
       message.communityId,
     );
@@ -40,43 +41,41 @@ export default class PollScopeAccessResolver {
             message.channelId,
           );
 
-    return {
-      recipients: {
-        memberIds: visibleMembers.map((member) => member.valueOf()),
-      },
-      scope: PollScope.communityChannel(
+    return new PollScopeResolution(
+      PollAudience.communityMembers(visibleMembers),
+      PollScope.communityChannel(
         community.getId(),
         message.channelId,
         community.getNetworkId(),
       ),
-    };
+    );
   }
 
-  private async resolvePollScope(
+  private async authorizePollScope(
     actorIdentityId: IdentityId,
     poll: Poll,
     action: 'create' | 'vote',
-  ): Promise<PollScopeAccess> {
+  ): Promise<PollScopeResolution> {
     const scope = poll.getScope();
     const communityId = scope.getCommunityId();
     const channelId = scope.getChannelId();
     const conversationId = scope.getConversationId();
 
     if (scope.isCommunityChannel() && communityId && channelId) {
-      const message = new CommunityChannelPollScopeResolveMessage(
+      const message = new CommunityChannelPollScopeAuthorizeMessage(
         actorIdentityId.valueOf(),
         communityId.valueOf(),
         channelId.valueOf(),
       );
 
       return action === 'create'
-        ? this.resolveCommunityChannelCreation(message)
-        : this.resolveCommunityChannelVote(message);
+        ? this.authorizeCommunityChannelCreation(message)
+        : this.authorizeCommunityChannelVote(message);
     }
 
     if (conversationId) {
-      return this.resolveGroupConversation(
-        new GroupConversationPollScopeResolveMessage(
+      return this.authorizeGroupConversation(
+        new GroupConversationPollScopeAuthorizeMessage(
           actorIdentityId.valueOf(),
           conversationId.valueOf(),
         ),
@@ -86,21 +85,21 @@ export default class PollScopeAccessResolver {
     throw new InvalidPollScopeError();
   }
 
-  public resolveCommunityChannelCreation(
-    message: CommunityChannelPollScopeResolveMessage,
-  ): Promise<PollScopeAccess> {
-    return this.communityChannelScopeAccess(message, 'create');
+  public authorizeCommunityChannelCreation(
+    message: CommunityChannelPollScopeAuthorizeMessage,
+  ): Promise<PollScopeResolution> {
+    return this.authorizeCommunityChannel(message, 'create');
   }
 
-  public resolveCommunityChannelVote(
-    message: CommunityChannelPollScopeResolveMessage,
-  ): Promise<PollScopeAccess> {
-    return this.communityChannelScopeAccess(message, 'vote');
+  public authorizeCommunityChannelVote(
+    message: CommunityChannelPollScopeAuthorizeMessage,
+  ): Promise<PollScopeResolution> {
+    return this.authorizeCommunityChannel(message, 'vote');
   }
 
-  public async resolveGroupConversation(
-    message: GroupConversationPollScopeResolveMessage,
-  ): Promise<PollScopeAccess> {
+  public async authorizeGroupConversation(
+    message: GroupConversationPollScopeAuthorizeMessage,
+  ): Promise<PollScopeResolution> {
     const conversation = await this.conversationRepository.findById(
       message.conversationId,
     );
@@ -116,30 +115,26 @@ export default class PollScopeAccessResolver {
       throw new InvalidPollScopeError();
     }
 
-    return {
-      recipients: {
-        participantIds: conversation
-          .getParticipantIds()
-          .map((participantId) => participantId.valueOf()),
-      },
-      scope: PollScope.groupConversation(
+    return new PollScopeResolution(
+      PollAudience.conversationParticipants(conversation.getParticipantIds()),
+      PollScope.groupConversation(
         conversation.getId(),
         conversation.getNetworkId(),
       ),
-    };
+    );
   }
 
-  public resolvePollManagement(
+  public authorizePollManagement(
     actorIdentityId: IdentityId,
     poll: Poll,
-  ): Promise<PollScopeAccess> {
-    return this.resolvePollScope(actorIdentityId, poll, 'create');
+  ): Promise<PollScopeResolution> {
+    return this.authorizePollScope(actorIdentityId, poll, 'create');
   }
 
-  public resolvePollVote(
+  public authorizePollVote(
     actorIdentityId: IdentityId,
     poll: Poll,
-  ): Promise<PollScopeAccess> {
-    return this.resolvePollScope(actorIdentityId, poll, 'vote');
+  ): Promise<PollScopeResolution> {
+    return this.authorizePollScope(actorIdentityId, poll, 'vote');
   }
 }

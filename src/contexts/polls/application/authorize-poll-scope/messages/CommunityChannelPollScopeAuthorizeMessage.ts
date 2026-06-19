@@ -2,7 +2,7 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-export class CommunityChannelPollScopeResolveMessage {
+export class CommunityChannelPollScopeAuthorizeMessage {
   public readonly actorIdentityId: IdentityId;
   public readonly channelId: CommunityChannelId;
   public readonly communityId: CommunityId;

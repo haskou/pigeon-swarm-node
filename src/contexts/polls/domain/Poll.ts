@@ -7,12 +7,12 @@ import { PollDuplicateOptionVoteError } from './errors/PollDuplicateOptionVoteEr
 import { PollMultipleVotesNotAllowedError } from './errors/PollMultipleVotesNotAllowedError';
 import { PollOptionNotFoundError } from './errors/PollOptionNotFoundError';
 import { PollWasCreatedEvent } from './events/PollWasCreatedEvent';
+import { PollAudience } from './PollAudience';
 import { PollContent } from './PollContent';
 import { PollLifecycle } from './PollLifecycle';
 import { PollOption } from './PollOption';
 import { PollScope } from './PollScope';
 import { PollVote } from './PollVote';
-import { PollCreationRecipients } from './types/PollCreationRecipients';
 import { PollId } from './value-objects/PollId';
 import { PollOptionId } from './value-objects/PollOptionId';
 import { PollQuestion } from './value-objects/PollQuestion';
@@ -25,7 +25,7 @@ export class Poll extends AggregateRoot {
     options: PollOption[],
     allowsMultipleVotes: boolean,
     expiresAt?: Timestamp,
-    recipients: PollCreationRecipients = {},
+    audience: PollAudience = PollAudience.empty(),
   ): Poll {
     const poll = new Poll(
       PollId.generate(),
@@ -40,7 +40,7 @@ export class Poll extends AggregateRoot {
 
     poll.record(
       new PollWasCreatedEvent(scope.aggregateId(), {
-        ...recipients,
+        ...audience.toPrimitives(),
         poll: primitives,
         pollId: primitives.id,
       }),

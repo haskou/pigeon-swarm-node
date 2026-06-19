@@ -1,7 +1,7 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-export class GroupConversationPollScopeResolveMessage {
+export class GroupConversationPollScopeAuthorizeMessage {
   public readonly actorIdentityId: IdentityId;
   public readonly conversationId: ConversationId;
 

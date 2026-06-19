@@ -21,7 +21,7 @@ export class PostPollCloseRoute extends PollRouteSupport {
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.managePollScope(actor, poll);
     const updatedPoll = await this.closer.close(
-      new PollCloseMessage(pollId, actor.valueOf(), scopeAccess.recipients),
+      new PollCloseMessage(pollId, actor.valueOf(), scopeAccess.audience),
     );
 
     return response

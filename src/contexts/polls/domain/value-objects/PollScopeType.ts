@@ -1,20 +1,25 @@
 import { Enum } from '@haskou/value-objects';
 
-import { pollScopeTypes } from './types/PollScopeTypes';
-import { PollScopeTypeValue } from './types/PollScopeTypeValue';
+enum PollScopeTypePrimitive {
+  COMMUNITY_CHANNEL = 'community_channel',
+  GROUP_CONVERSATION = 'group_conversation',
+}
 
-export { PollScopeTypeValue } from './types/PollScopeTypeValue';
+const pollScopeTypes = {
+  COMMUNITY_CHANNEL: 'community_channel',
+  GROUP_CONVERSATION: 'group_conversation',
+} as const;
 
-export class PollScopeType extends Enum<PollScopeTypeValue> {
+export class PollScopeType extends Enum<string> {
   public static readonly COMMUNITY_CHANNEL = new PollScopeType(
-    pollScopeTypes.COMMUNITY_CHANNEL,
+    PollScopeTypePrimitive.COMMUNITY_CHANNEL,
   );
 
   public static readonly GROUP_CONVERSATION = new PollScopeType(
-    pollScopeTypes.GROUP_CONVERSATION,
+    PollScopeTypePrimitive.GROUP_CONVERSATION,
   );
 
-  public getValues(): PollScopeTypeValue[] {
+  public getValues(): string[] {
     return Object.values(pollScopeTypes);
   }
 

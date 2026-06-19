@@ -4,6 +4,7 @@ import { PollDuplicateOptionVoteError } from '@app/contexts/polls/domain/errors/
 import { PollAlreadyClosedError } from '@app/contexts/polls/domain/errors/PollAlreadyClosedError';
 import { PollMultipleVotesNotAllowedError } from '@app/contexts/polls/domain/errors/PollMultipleVotesNotAllowedError';
 import { Poll } from '@app/contexts/polls/domain/Poll';
+import { PollAudience } from '@app/contexts/polls/domain/PollAudience';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
 import { PollScope } from '@app/contexts/polls/domain/PollScope';
 import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptionId';
@@ -74,7 +75,7 @@ describe('Poll', () => {
       options,
       false,
       undefined,
-      { memberIds: [creator.valueOf(), voter.valueOf()] },
+      PollAudience.communityMembers([creator, voter]),
     );
     const events = poll.pullDomainEvents();
 

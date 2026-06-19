@@ -18,7 +18,7 @@ export class PollCreator {
       message.options,
       message.allowsMultipleVotes,
       message.expiresAt,
-      message.recipients,
+      message.audience,
     );
 
     await this.repository.save(poll);

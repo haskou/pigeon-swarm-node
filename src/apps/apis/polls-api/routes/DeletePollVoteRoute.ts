@@ -21,11 +21,7 @@ export class DeletePollVoteRoute extends PollRouteSupport {
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.accessPollScope(actor, poll);
     const updatedPoll = await this.remover.remove(
-      new PollVoteRemoveMessage(
-        pollId,
-        actor.valueOf(),
-        scopeAccess.recipients,
-      ),
+      new PollVoteRemoveMessage(pollId, actor.valueOf(), scopeAccess.audience),
     );
 
     return response
