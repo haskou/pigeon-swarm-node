@@ -1,10 +1,10 @@
 import CommunityChannelMessageCandidateRegistrar from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/services/types/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -75,7 +75,26 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
   }
 
   async function signedMessagePrimitives(): Promise<CommunityChannelMessagePrimitives> {
-    const signaturePayload: CommunityChannelMessageSignaturePayload = {
+    const signaturePayload =
+      CommunityChannelMessageSignaturePayload.fromPrimitives({
+        attachmentExternalIdentifiers: [],
+        authorIdentityId: identityMother.id.valueOf(),
+        channelId,
+        communityId,
+        createdAt,
+        encryptedPayload: 'encrypted-payload',
+        id: messageId,
+        mentions: [],
+        plaintextPayload: undefined,
+        replyToMessageId: undefined,
+        type: 'sent',
+      });
+    const signature = await identityMother.encryptedKeyPair.sign(
+      signatureService.getCanonicalSigningContent(signaturePayload),
+      identityMother.password,
+    );
+
+    return {
       attachmentExternalIdentifiers: [],
       authorIdentityId: identityMother.id.valueOf(),
       channelId,
@@ -86,19 +105,11 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
       mentions: [],
       plaintextPayload: undefined,
       replyToMessageId: undefined,
-      type: 'sent' as const,
-    };
-    const signature = await identityMother.encryptedKeyPair.sign(
-      signatureService.serializePayload(signaturePayload),
-      identityMother.password,
-    );
-
-    return {
-      ...signaturePayload,
       editedAt: undefined,
       pollId: undefined,
       signature: signature.valueOf(),
-    } as CommunityChannelMessagePrimitives;
+      type: 'sent',
+    };
   }
 
   it('persists signed community channel message candidates', async () => {

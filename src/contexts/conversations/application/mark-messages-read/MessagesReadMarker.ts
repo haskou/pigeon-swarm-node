@@ -32,7 +32,9 @@ export default class MessagesReadMarker {
       new ConversationMessagesWereReadEvent(message.conversationId.valueOf(), {
         messageId: message.messageId.valueOf(),
         networkId: conversation.getNetworkId().valueOf(),
-        participantIds: conversation.toPrimitives().participantIds,
+        participantIds: conversation
+          .getParticipantIds()
+          .map((participantId) => participantId.valueOf()),
         readerIdentityId: message.readerIdentityId.valueOf(),
       }),
     ]);

@@ -55,12 +55,16 @@ export class CommunityChannels {
     return channel;
   }
 
-  public assertHasText(channelId: CommunityChannelId): void {
-    this.findText(channelId);
+  public hasText(channelId: CommunityChannelId): boolean {
+    return this.textChannels.some((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
   }
 
-  public assertHasVoice(channelId: CommunityChannelId): void {
-    this.findVoice(channelId);
+  public hasVoice(channelId: CommunityChannelId): boolean {
+    return this.voiceChannels.some((candidate) =>
+      candidate.getId().isEqual(channelId),
+    );
   }
 
   public textChannelPermissions(

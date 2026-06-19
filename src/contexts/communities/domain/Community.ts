@@ -20,6 +20,7 @@ import { CommunityMembershipRequest } from './entities/membership/CommunityMembe
 import { CommunityRole } from './entities/membership/CommunityRole';
 import { CommunityRoles } from './entities/membership/CommunityRoles';
 import { CommunityChannelMessage } from './entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageDeletion } from './entities/messages/CommunityChannelMessageDeletion';
 import { CommunityChannelMessageEdition } from './entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMetadata } from './entities/messages/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from './entities/messages/CommunityChannelMessagePayload';
@@ -29,6 +30,9 @@ import { CommunitySettings } from './entities/profile/CommunitySettings';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityChannelMessageWasDeletedEvent } from './events/CommunityChannelMessageWasDeletedEvent';
+import { CommunityChannelMessageWasEditedEvent } from './events/CommunityChannelMessageWasEditedEvent';
+import { CommunityChannelMessageWasSentEvent } from './events/CommunityChannelMessageWasSentEvent';
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
@@ -263,13 +267,28 @@ export class Community extends AggregateRoot {
       mentions,
     );
 
-    return CommunityChannelMessage.create(
+    const message = CommunityChannelMessage.create(
       metadata,
       payload,
       signature,
       attachmentExternalIdentifiers,
       mentions,
     );
+
+    const primitives = message.toPrimitives();
+
+    this.record(
+      new CommunityChannelMessageWasSentEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        authorIdentityId: authorIdentityId.valueOf(),
+        channelId: channelId.valueOf(),
+        community: this.toPrimitives(),
+        message: primitives,
+        messageId: primitives.id,
+      }),
+    );
+
+    return message;
   }
 
   public acceptSentChannelMessage(
@@ -302,7 +321,21 @@ export class Community extends AggregateRoot {
       edition.getMentions(),
     );
 
-    return edition.applyTo(targetMessage);
+    const message = edition.applyTo(targetMessage);
+    const primitives = message.toPrimitives();
+
+    this.record(
+      new CommunityChannelMessageWasEditedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        authorIdentityId: actor.valueOf(),
+        channelId: channelId.valueOf(),
+        community: this.toPrimitives(),
+        message: primitives,
+        messageId: primitives.id,
+      }),
+    );
+
+    return message;
   }
 
   public reactWithSticker(
@@ -338,11 +371,26 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     targetMessage: CommunityChannelMessage,
     channelId: CommunityChannelId,
+    deletion: CommunityChannelMessageDeletion,
   ): void {
     this.createAccessValidator().assertCanDeleteMessage(
       actor,
       targetMessage,
       channelId,
+    );
+
+    this.record(
+      new CommunityChannelMessageWasDeletedEvent(this.id.valueOf(), {
+        ...this.eventAttributes(),
+        channelId: channelId.valueOf(),
+        community: this.toPrimitives(),
+        createdAt: deletion.getCreatedAt().valueOf(),
+        deletedByIdentityId: actor.valueOf(),
+        messageId: deletion.getId().valueOf(),
+        signature: deletion.getSignature().valueOf(),
+        targetMessageAuthorId: targetMessage.getAuthorIdentityId().valueOf(),
+        targetMessageId: targetMessage.getId().valueOf(),
+      }),
     );
   }
 

@@ -122,6 +122,10 @@ export class Conversation extends AggregateRoot {
     return lastMessage ? [lastMessage.getId()] : [];
   }
 
+  private participantIdValues(): string[] {
+    return this.participants.map((participant) => participant.valueOf());
+  }
+
   private isDeleted(messageId: MessageId): boolean {
     return this.messages.some(
       (message) =>
@@ -164,7 +168,7 @@ export class Conversation extends AggregateRoot {
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: this.networkId.valueOf(),
-        participantIds: this.toPrimitives().participantIds,
+        participantIds: this.participantIdValues(),
       }),
     );
 
@@ -254,7 +258,7 @@ export class Conversation extends AggregateRoot {
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: this.networkId.valueOf(),
-        participantIds: this.toPrimitives().participantIds,
+        participantIds: this.participantIdValues(),
         targetMessageId: targetMessageId.valueOf(),
       }),
     );
@@ -289,7 +293,7 @@ export class Conversation extends AggregateRoot {
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         networkId: this.networkId.valueOf(),
-        participantIds: this.toPrimitives().participantIds,
+        participantIds: this.participantIdValues(),
         targetMessageId: targetMessageId.valueOf(),
       }),
     );
@@ -329,9 +333,7 @@ export class Conversation extends AggregateRoot {
       messages: this.messages.map((message) => message.toPrimitives()),
       name: this.name?.valueOf(),
       networkId: this.networkId.valueOf(),
-      participantIds: this.participants.map((participant) =>
-        participant.valueOf(),
-      ),
+      participantIds: this.participantIdValues(),
       type: this.type.valueOf(),
     };
   }

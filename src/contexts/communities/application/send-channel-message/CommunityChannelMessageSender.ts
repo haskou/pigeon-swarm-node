@@ -1,6 +1,5 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
-import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
@@ -52,30 +51,14 @@ export default class CommunityChannelMessageSender {
       message.attachmentExternalIdentifiers,
       message.mentions,
     );
-    const messagePrimitives = channelMessage.toPrimitives();
-
     this.signatureService.assertValidSignature(
       message.authorIdentityId,
-      messagePrimitives,
+      channelMessage.toSignaturePayload(),
       message.signature,
     );
 
     await this.messageRepository.save(channelMessage);
-
-    const communityPrimitives = community.toPrimitives();
-
-    await this.eventPublisher.publish([
-      new CommunityChannelMessageWasSentEvent(message.communityId.valueOf(), {
-        authorIdentityId: message.authorIdentityId.valueOf(),
-        channelId: message.channelId.valueOf(),
-        community: communityPrimitives,
-        communityId: message.communityId.valueOf(),
-        memberIds: communityPrimitives.memberIds,
-        message: messagePrimitives,
-        messageId: messagePrimitives.id,
-        networkId: communityPrimitives.networkId,
-      }),
-    ]);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return channelMessage;
   }

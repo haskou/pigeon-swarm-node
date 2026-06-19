@@ -1,18 +1,7 @@
 import { PutCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/PutCommunityChannelMessageBody';
-import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
-import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
-import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
-import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
-import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
-import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
+import CommunityChannelMessageEditor from '@app/contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor';
+import { CommunityChannelMessageEditMessage } from '@app/contexts/communities/application/edit-channel-message/messages/CommunityChannelMessageEditMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { assert, Signature, Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -28,10 +17,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
-  private readonly signatureService =
-    this.get<CommunityChannelMessageSignatureDomainService>(
-      CommunityChannelMessageSignatureDomainService,
-    );
+  private readonly editor = this.get<CommunityChannelMessageEditor>(
+    CommunityChannelMessageEditor,
+  );
 
   @Put('/:communityId/channels/:channelId/messages/:messageId')
   public async editMessage(
@@ -43,81 +31,20 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const authorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const communityChannelId = new CommunityChannelId(channelId);
-    const targetMessageId = new CommunityChannelMessageId(messageId);
-    const payload = CommunityChannelMessagePayload.fromPrimitives({
-      encryptedPayload: body.encryptedPayload,
-      plaintextPayload: body.plaintextPayload,
-    });
-    const targetMessage = await this.messageRepository().findById(
-      new CommunityId(communityId),
-      communityChannelId,
-      targetMessageId,
-    );
-
-    assert(targetMessage, new CommunityChannelMessageNotFoundError());
-
-    const mentions = (body.mentions ?? []).map(
-      (mention) =>
-        new CommunityChannelMessageMention(
-          new CommunityMentionType(mention.type),
-          mention.targetId
-            ? new CommunityMentionTargetId(mention.targetId)
-            : undefined,
-        ),
-    );
-
-    const message = community.editChannelMessage(
-      authorIdentityId,
-      targetMessage,
-      communityChannelId,
-      new CommunityChannelMessageEdition(
-        payload,
-        new Signature(body.signature),
-        new Timestamp(body.createdAt),
-        (body.attachmentExternalIdentifiers ?? []).map(
-          (externalIdentifier) =>
-            new CommunityChannelAttachmentId(externalIdentifier),
-        ),
-        mentions,
-      ),
-    );
-    const mentionPrimitives = mentions.map((mention) => mention.toPrimitives());
-
-    this.signatureService.assertValidSignature(
-      authorIdentityId,
-      {
+    const message = await this.editor.edit(
+      new CommunityChannelMessageEditMessage({
+        actorIdentityId: authorIdentityId.valueOf(),
         attachmentExternalIdentifiers: body.attachmentExternalIdentifiers ?? [],
-        authorIdentityId: authorIdentityId.valueOf(),
         channelId,
         communityId,
         createdAt: body.createdAt,
         encryptedPayload: body.encryptedPayload,
-        id: messageId,
-        mentions: mentionPrimitives,
-        plaintextPayload: body.plaintextPayload,
-        type: 'edited',
-      },
-      new Signature(body.signature),
-    );
-
-    await this.messageRepository().save(message);
-    const communityPrimitives = community.toPrimitives();
-    const messagePrimitives = message.toPrimitives();
-
-    await this.eventPublisher.publish([
-      new CommunityChannelMessageWasEditedEvent(communityId, {
-        authorIdentityId: authorIdentityId.valueOf(),
-        channelId,
-        community: communityPrimitives,
-        communityId,
-        memberIds: communityPrimitives.memberIds,
-        message: messagePrimitives,
+        mentions: body.mentions,
         messageId,
-        networkId: communityPrimitives.networkId,
+        plaintextPayload: body.plaintextPayload,
+        signature: body.signature,
       }),
-    ]);
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

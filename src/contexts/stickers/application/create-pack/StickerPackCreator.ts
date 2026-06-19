@@ -4,8 +4,8 @@ import StickerPackRepository from '../../domain/repositories/StickerPackReposito
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
+import { StickerUserLibraryLookup } from '../StickerUserLibraryLookup';
 import { StickerPackCreateMessage } from './messages/StickerPackCreateMessage';
-import { StickerUserLibraryLookup } from './types/StickerUserLibraryLookup';
 
 export default class StickerPackCreator {
   constructor(
@@ -22,11 +22,10 @@ export default class StickerPackCreator {
     );
 
     return library
-      ? { created: false, library }
-      : {
-          created: true,
-          library: StickerUserLibrary.create(message.ownerIdentityId),
-        };
+      ? StickerUserLibraryLookup.existing(library)
+      : StickerUserLibraryLookup.created(
+          StickerUserLibrary.create(message.ownerIdentityId),
+        );
   }
 
   public async create(message: StickerPackCreateMessage): Promise<StickerPack> {

@@ -3,6 +3,7 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
+import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
@@ -119,7 +120,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
     );
     this.signatureService.assertValidSignature(
       authorIdentityId,
-      message.toPrimitives(),
+      message.toSignaturePayload(),
       new Signature(primitives.signature),
     );
 
@@ -175,7 +176,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
 
     this.signatureService.assertValidSignature(
       authorIdentityId,
-      {
+      CommunityChannelMessageSignaturePayload.fromPrimitives({
         attachmentExternalIdentifiers: primitives.attachmentExternalIdentifiers,
         authorIdentityId: authorIdentityId.valueOf(),
         channelId: primitives.channelId,
@@ -187,7 +188,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
         plaintextPayload: primitives.plaintextPayload,
         replyToMessageId: undefined,
         type: 'edited',
-      },
+      }),
       new Signature(primitives.signature),
     );
 

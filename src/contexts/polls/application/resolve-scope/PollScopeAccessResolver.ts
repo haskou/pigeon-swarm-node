@@ -118,7 +118,9 @@ export default class PollScopeAccessResolver {
 
     return {
       recipients: {
-        participantIds: conversation.toPrimitives().participantIds,
+        participantIds: conversation
+          .getParticipantIds()
+          .map((participantId) => participantId.valueOf()),
       },
       scope: PollScope.groupConversation(
         conversation.getId(),

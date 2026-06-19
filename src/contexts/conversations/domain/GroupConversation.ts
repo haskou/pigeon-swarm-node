@@ -37,12 +37,16 @@ export class GroupConversation extends Conversation {
       participants,
     );
 
+    const primitives = conversation.toPrimitives();
+
     conversation.record(
-      new ConversationWasCreatedEvent(conversation.toPrimitives().id, {
-        name: conversation.toPrimitives().name,
-        networkId: conversation.toPrimitives().networkId,
-        participantIds: conversation.toPrimitives().participantIds,
-        type: conversation.toPrimitives().type,
+      new ConversationWasCreatedEvent(primitives.id, {
+        name: primitives.name,
+        networkId: primitives.networkId,
+        participantIds: conversation
+          .getParticipantIds()
+          .map((participantId) => participantId.valueOf()),
+        type: primitives.type,
       }),
     );
 

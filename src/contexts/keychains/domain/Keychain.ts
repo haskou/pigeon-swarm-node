@@ -8,13 +8,13 @@ import {
 } from '@haskou/value-objects';
 
 import { KeychainWasPublishedEvent } from './events/KeychainWasPublishedEvent';
-import { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
+import { KeychainSignaturePayload } from './KeychainSignaturePayload';
 import { PreviousKeychainReference as PreviousReference } from './types/PreviousKeychainReference';
 import { EncryptedKeychainPayload } from './value-objects/EncryptedKeychainPayload';
 import { KeychainExternalIdentifier } from './value-objects/KeychainExternalIdentifier';
 import { KeychainVersion } from './value-objects/KeychainVersion';
 
-export { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
+export { KeychainSignaturePayload } from './KeychainSignaturePayload';
 
 export class Keychain extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Keychain>): Keychain {
@@ -78,14 +78,14 @@ export class Keychain extends AggregateRoot {
   }
 
   public getSignaturePayload(): KeychainSignaturePayload {
-    return {
+    return KeychainSignaturePayload.fromPrimitives({
       encryptedPayload: this.encryptedPayload.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),
       previousKeychainExternalIdentifier:
         this.previousKeychainExternalIdentifier?.valueOf(),
       timestamp: this.timestamp.valueOf(),
       version: this.version.valueOf(),
-    };
+    });
   }
 
   public getOwnerPublicKey(): PublicKey {

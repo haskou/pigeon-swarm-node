@@ -18,6 +18,7 @@ import { IdentityMustHaveAtLeastOneNetworkError } from './errors/IdentityMustHav
 import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignatureError';
 import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
+import { IdentitySignaturePayload } from './IdentitySignaturePayload';
 import { Profile } from './Profile';
 import { PreviousIdentityReference as PreviousReference } from './types/PreviousIdentityReference';
 import { EncryptedMasterKey } from './value-objects/EncryptedMasterKey';
@@ -90,7 +91,7 @@ export class Identity extends AggregateRoot {
     assert(
       new IdentitySignatureDomainService().isValidSignature(
         this.id,
-        this.toPrimitives(),
+        IdentitySignaturePayload.fromPrimitives(this.toPrimitives()),
         this.signature,
       ),
       new InvalidIdentitySignatureError(),
@@ -119,7 +120,7 @@ export class Identity extends AggregateRoot {
     };
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
-        nextPrimitives,
+        IdentitySignaturePayload.fromPrimitives(nextPrimitives),
         this.encryptedKeyPair,
         password,
       );

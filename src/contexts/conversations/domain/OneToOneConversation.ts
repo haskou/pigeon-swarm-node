@@ -27,11 +27,15 @@ export class OneToOneConversation extends Conversation {
       [firstParticipant, secondParticipant],
     );
 
+    const primitives = conversation.toPrimitives();
+
     conversation.record(
-      new ConversationWasCreatedEvent(conversation.toPrimitives().id, {
-        networkId: conversation.toPrimitives().networkId,
-        participantIds: conversation.toPrimitives().participantIds,
-        type: conversation.toPrimitives().type,
+      new ConversationWasCreatedEvent(primitives.id, {
+        networkId: primitives.networkId,
+        participantIds: conversation
+          .getParticipantIds()
+          .map((participantId) => participantId.valueOf()),
+        type: primitives.type,
       }),
     );
 

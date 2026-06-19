@@ -7,6 +7,7 @@ import { CommunityChannelMessage } from '../entities/messages/CommunityChannelMe
 import { CommunityChannelMessagePayload } from '../entities/messages/CommunityChannelMessagePayload';
 import { CommunitySettings } from '../entities/profile/CommunitySettings';
 import { CommunityChannelMessageAuthorMismatchError } from '../errors/CommunityChannelMessageAuthorMismatchError';
+import { CommunityChannelNotFoundError } from '../errors/CommunityChannelNotFoundError';
 import { CommunityMemberBannedError } from '../errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from '../errors/CommunityMemberNotFoundError';
 import { CommunityChannelMessageMentions } from '../types/CommunityChannelMessageMentions';
@@ -40,6 +41,20 @@ export class CommunityAccessValidator {
 
   private isMember(identityId: IdentityId): boolean {
     return this.membership.isMember(identityId);
+  }
+
+  private ensureTextChannelExists(channelId: CommunityChannelId): void {
+    assert(
+      this.channels.hasText(channelId),
+      new CommunityChannelNotFoundError(),
+    );
+  }
+
+  private ensureVoiceChannelExists(channelId: CommunityChannelId): void {
+    assert(
+      this.channels.hasVoice(channelId),
+      new CommunityChannelNotFoundError(),
+    );
   }
 
   public assertIsMember(identityId: IdentityId): void {
@@ -87,7 +102,7 @@ export class CommunityAccessValidator {
     channelId: CommunityChannelId,
   ): void {
     this.assertIsMember(identityId);
-    this.channels.assertHasText(channelId);
+    this.ensureTextChannelExists(channelId);
     CommunityPermissionValidator.assertCanAccessChannel(
       this.ownerIdentityId,
       this.membership,
@@ -113,7 +128,7 @@ export class CommunityAccessValidator {
     channelId: CommunityChannelId,
   ): void {
     this.assertIsMember(identityId);
-    this.channels.assertHasVoice(channelId);
+    this.ensureVoiceChannelExists(channelId);
     CommunityPermissionValidator.assertCanAccessChannel(
       this.ownerIdentityId,
       this.membership,
@@ -129,7 +144,7 @@ export class CommunityAccessValidator {
     channelId: CommunityChannelId,
   ): void {
     this.assertIsMember(actor);
-    this.channels.assertHasText(channelId);
+    this.ensureTextChannelExists(channelId);
 
     if (targetMessage.wasAuthoredBy(actor)) {
       return;
@@ -240,7 +255,7 @@ export class CommunityAccessValidator {
   public visibleMembersForTextChannel(
     channelId: CommunityChannelId,
   ): IdentityId[] {
-    this.channels.assertHasText(channelId);
+    this.ensureTextChannelExists(channelId);
 
     return this.membership.membersWithAnyRole(
       this.channels.textChannelPermissions(channelId).getVisibleRoleIds(),

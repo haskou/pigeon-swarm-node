@@ -51,7 +51,9 @@ export default class MessageReactionAdder {
         {
           ...reaction.toPrimitives(),
           networkId: conversation.getNetworkId().valueOf(),
-          participantIds: conversation.toPrimitives().participantIds,
+          participantIds: conversation
+            .getParticipantIds()
+            .map((participantId) => participantId.valueOf()),
         },
       ),
     ]);

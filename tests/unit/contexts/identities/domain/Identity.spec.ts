@@ -6,6 +6,7 @@ import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
@@ -142,7 +143,7 @@ describe('Identity', () => {
       };
       const signature =
         await new IdentitySignatureDomainService().generateSignature(
-          signaturePayload,
+          IdentitySignaturePayload.fromPrimitives(signaturePayload),
           mother.encryptedKeyPair,
           mother.password,
         );
@@ -203,8 +204,8 @@ describe('Identity', () => {
         signature: '',
       };
       const spoofedSignature = attackerKeyPair.sign(
-        new IdentitySignatureDomainService().serializePayload(
-          spoofedPrimitives,
+        new IdentitySignatureDomainService().getCanonicalSigningContent(
+          IdentitySignaturePayload.fromPrimitives(spoofedPrimitives),
         ),
       );
 
