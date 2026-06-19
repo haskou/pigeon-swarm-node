@@ -13,24 +13,14 @@ export default class NotificationCreator {
   public async create(
     message: NotificationCreateMessage,
   ): Promise<Notification> {
-    let notification: Notification;
-
-    if (message.isCommunityInvitation() && message.communityPayload) {
-      notification = Notification.communityInvitation(message.communityPayload);
-    } else if (
-      message.isGroupConversationInvitation() &&
-      message.conversationPayload
-    ) {
-      notification = Notification.groupConversationInvitation(
-        message.conversationPayload,
-      );
-    } else if (message.conversationPayload) {
-      notification = Notification.conversationInvitation(
-        message.conversationPayload,
-      );
-    } else {
-      throw new Error('Invalid notification creation message.');
-    }
+    const notification = message.match({
+      communityInvitation: (payload) =>
+        Notification.communityInvitation(payload),
+      conversationInvitation: (payload) =>
+        Notification.conversationInvitation(payload),
+      groupConversationInvitation: (payload) =>
+        Notification.groupConversationInvitation(payload),
+    });
 
     await this.repository.save(notification);
     await this.eventPublisher.publish(notification.pullDomainEvents());

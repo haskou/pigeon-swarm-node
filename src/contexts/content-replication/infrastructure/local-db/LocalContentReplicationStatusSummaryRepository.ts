@@ -56,7 +56,7 @@ export default class LocalContentReplicationStatusSummaryRepository extends Cont
 
   public async findByLocalNodeId(
     localNodeId: NodeId,
-  ): Promise<ContentReplicationStatusSummary | undefined> {
+  ): Promise<ContentReplicationStatusSummary> {
     const document = await this.database.findOne(
       LocalContentReplicationStatusSummaryRepository.NAMESPACE,
       localNodeId.valueOf(),
@@ -64,7 +64,7 @@ export default class LocalContentReplicationStatusSummaryRepository extends Cont
 
     return document && this.isDocument(document)
       ? this.toDomain(document)
-      : undefined;
+      : ContentReplicationStatusSummary.empty(localNodeId);
   }
 
   public async save(summary: ContentReplicationStatusSummary): Promise<void> {

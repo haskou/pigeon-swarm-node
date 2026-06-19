@@ -39,7 +39,7 @@ export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
     const domainCommunityId = new CommunityId(communityId);
     const domainChannelId = new CommunityChannelId(channelId);
 
-    community.assertCanViewTextChannel(actorIdentityId, domainChannelId);
+    community.viewTextChannel(actorIdentityId, domainChannelId);
 
     const pins = await this.pinRepository.findByChannel(
       domainCommunityId,
@@ -85,7 +85,7 @@ export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
     const domainChannelId = new CommunityChannelId(channelId);
     const domainMessageId = new CommunityChannelMessageId(messageId);
 
-    community.assertCanManageMessages(actorIdentityId, domainChannelId);
+    community.manageChannelMessages(actorIdentityId, domainChannelId);
 
     const message = await this.messageRepository().findById(
       domainCommunityId,
@@ -138,7 +138,7 @@ export class CommunityChannelMessagePinsRoute extends CommunityRouteSupport {
     const domainChannelId = new CommunityChannelId(channelId);
     const domainMessageId = new CommunityChannelMessageId(messageId);
 
-    community.assertCanManageMessages(actorIdentityId, domainChannelId);
+    community.manageChannelMessages(actorIdentityId, domainChannelId);
     await this.pinRepository.unpin(
       domainCommunityId,
       domainChannelId,

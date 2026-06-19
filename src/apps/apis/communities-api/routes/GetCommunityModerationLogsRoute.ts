@@ -26,7 +26,7 @@ export class GetCommunityModerationLogsRoute extends CommunityRouteSupport {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
-    community.assertCanViewModerationLog(actorIdentityId);
+    community.viewModerationLog(actorIdentityId);
 
     const normalizedLimit = Math.min(Math.max(limit || 50, 1), 100);
     const logs = await this.moderationLogs().findByCommunity(

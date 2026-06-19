@@ -80,11 +80,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     }
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
-    community.assertCanDeleteMessage(
-      actorIdentityId,
-      targetMessage.getAuthorIdentityId(),
-      channelId,
-    );
+    community.deleteChannelMessage(actorIdentityId, targetMessage, channelId);
     this.signatureService.assertValidSignature(
       actorIdentityId,
       {

@@ -19,7 +19,7 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
     const requests = this.membershipRequests();
 
-    community.assertIsNotBanned(actorIdentityId);
+    community.requestMembership(actorIdentityId);
     const existingRequests = await requests.findByCommunityAndIdentity(
       new CommunityId(communityId),
       actorIdentityId,

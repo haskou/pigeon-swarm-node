@@ -1,4 +1,3 @@
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -30,8 +29,6 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
     const invitedIdentityId = new IdentityId(body.identityId);
 
-    community.assertCanCreateInvite(actorIdentityId);
-
     const requests = this.membershipRequests();
     const existingRequests = await requests.findByCommunityAndIdentity(
       community.getId(),
@@ -49,11 +46,9 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
         );
     }
 
-    const membershipRequest = CommunityMembershipRequest.invitation(
-      community.getId(),
+    const membershipRequest = community.inviteMember(
       actorIdentityId,
       invitedIdentityId,
-      community.getOwnerIdentityId(),
     );
 
     await requests.save(membershipRequest);

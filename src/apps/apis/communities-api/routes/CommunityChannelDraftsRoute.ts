@@ -58,7 +58,7 @@ export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
       ? new Timestamp(body.updatedAt)
       : Timestamp.now();
 
-    community.assertCanViewTextChannel(actorIdentityId, domainChannelId);
+    community.viewTextChannel(actorIdentityId, domainChannelId);
     await this.draftRepository.save(
       actorIdentityId,
       domainCommunityId,
@@ -87,7 +87,7 @@ export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
     const domainCommunityId = new CommunityId(communityId);
     const domainChannelId = new CommunityChannelId(channelId);
 
-    community.assertCanViewTextChannel(actorIdentityId, domainChannelId);
+    community.viewTextChannel(actorIdentityId, domainChannelId);
     await this.draftRepository.delete(
       actorIdentityId,
       domainCommunityId,

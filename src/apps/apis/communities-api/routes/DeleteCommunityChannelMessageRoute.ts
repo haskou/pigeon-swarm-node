@@ -49,9 +49,9 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
     );
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
-    community.assertCanDeleteMessage(
+    community.deleteChannelMessage(
       actorIdentityId,
-      targetMessage.getAuthorIdentityId(),
+      targetMessage,
       communityChannelId,
     );
 

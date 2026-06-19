@@ -1,25 +1,37 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
-import { assert, PrimitiveOf } from '@haskou/value-objects';
+import {
+  assert,
+  PrimitiveOf,
+  Signature,
+  Timestamp,
+} from '@haskou/value-objects';
 
+import { CommunityOwnerValidator } from './asserts/CommunityOwnerValidator';
+import { CommunityPermissionValidator } from './asserts/CommunityPermissionValidator';
 import { CommunityChannelPermissions } from './entities/channels/CommunityChannelPermissions';
 import { CommunityChannels } from './entities/channels/CommunityChannels';
 import { CommunityTextChannel } from './entities/channels/CommunityTextChannel';
 import { CommunityVoiceChannel } from './entities/channels/CommunityVoiceChannel';
+import { CommunityInvite } from './entities/invites/CommunityInvite';
 import { CommunityMembership } from './entities/membership/CommunityMembership';
+import { CommunityMembershipRequest } from './entities/membership/CommunityMembershipRequest';
 import { CommunityRole } from './entities/membership/CommunityRole';
 import { CommunityRoles } from './entities/membership/CommunityRoles';
-import { CommunityChannelMessageMention } from './entities/messages/CommunityChannelMessageMention';
+import { CommunityChannelMessage } from './entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageEdition } from './entities/messages/CommunityChannelMessageEdition';
+import { CommunityChannelMessageMetadata } from './entities/messages/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from './entities/messages/CommunityChannelMessagePayload';
+import { CommunityChannelMessageReaction } from './entities/messages/CommunityChannelMessageReaction';
 import { CommunityProfile } from './entities/profile/CommunityProfile';
 import { CommunitySettings } from './entities/profile/CommunitySettings';
+import { CommunityChannelMessageAuthorMismatchError } from './errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityMemberBannedError } from './errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
-import { CommunityPermissionDeniedError } from './errors/CommunityPermissionDeniedError';
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
@@ -27,16 +39,22 @@ import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEv
 import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
 import { CommunityWasCreatedEvent } from './events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from './events/CommunityWasUpdatedEvent';
+import { CommunityChannelMessageAttachments } from './types/CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions } from './types/CommunityChannelMessageMentions';
 import { CommunityAvatar } from './value-objects/CommunityAvatar';
 import { CommunityBanner } from './value-objects/CommunityBanner';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
+import { CommunityChannelMessageId } from './value-objects/CommunityChannelMessageId';
+import { CommunityChannelMessageReactionEmoji } from './value-objects/CommunityChannelMessageReactionEmoji';
 import { CommunityChannelName } from './value-objects/CommunityChannelName';
 import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
+import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
 import { CommunityName } from './value-objects/CommunityName';
 import { CommunityPermission } from './value-objects/CommunityPermission';
 import { CommunityRoleId } from './value-objects/CommunityRoleId';
 import { CommunityRoleName } from './value-objects/CommunityRoleName';
+import { EncryptedCommunityInviteKey } from './value-objects/EncryptedCommunityInviteKey';
 
 export class Community extends AggregateRoot {
   public static create(
@@ -115,48 +133,57 @@ export class Community extends AggregateRoot {
     super();
   }
 
-  private assertOwner(identityId: IdentityId): void {
-    assert(
-      this.ownerIdentityId.isEqual(identityId),
-      new CommunityOwnerMismatchError(),
-    );
-  }
-
-  private hasPermission(
+  private assertCanMention(
     identityId: IdentityId,
-    permission: CommunityPermission,
-  ): boolean {
-    return (
-      this.isOwner(identityId) ||
-      (this.isMember(identityId) &&
-        this.membership.memberHasPermission(identityId, permission))
-    );
-  }
-
-  private assertPermission(
-    identityId: IdentityId,
-    permission: CommunityPermission,
+    mentions: CommunityChannelMessageMentions,
   ): void {
-    assert(
-      this.hasPermission(identityId, permission),
-      new CommunityPermissionDeniedError(permission.valueOf()),
-    );
-  }
-
-  private assertCanAccessChannel(
-    identityId: IdentityId,
-    permissions: CommunityChannelPermissions,
-  ): void {
-    assert(
-      this.isOwner(identityId) ||
-        this.membership.memberHasAnyRole(
+    for (const mention of mentions) {
+      if (mention.isEveryone()) {
+        CommunityPermissionValidator.assertHasPermission(
+          this.ownerIdentityId,
+          this.membership,
           identityId,
-          permissions.getVisibleRoleIds(),
-        ),
-      new CommunityPermissionDeniedError(
-        CommunityPermission.VIEW_CHANNELS.valueOf(),
-      ),
+          CommunityPermission.MENTION_EVERYONE,
+        );
+      }
+
+      if (mention.isHere()) {
+        CommunityPermissionValidator.assertHasPermission(
+          this.ownerIdentityId,
+          this.membership,
+          identityId,
+          CommunityPermission.MENTION_HERE,
+        );
+      }
+
+      if (mention.isRole()) {
+        CommunityPermissionValidator.assertHasPermission(
+          this.ownerIdentityId,
+          this.membership,
+          identityId,
+          CommunityPermission.MENTION_ROLES,
+        );
+      }
+    }
+  }
+
+  private assertCanSendMessage(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.SEND_MESSAGES,
     );
+  }
+
+  private assertCanUseMessagePayload(
+    payload: CommunityChannelMessagePayload,
+  ): void {
+    this.settings.assertCanUseMessagePayload(payload);
   }
 
   private eventAttributes() {
@@ -197,133 +224,144 @@ export class Community extends AggregateRoot {
     );
   }
 
-  public addMember(actor: IdentityId, member: IdentityId): void {
-    this.assertCanManageMembers(actor);
-    this.join(member);
+  private assertIsMember(identityId: IdentityId): void {
+    assert(this.isMember(identityId), new CommunityMemberNotFoundError());
   }
 
-  public joinWithInvite(member: IdentityId): void {
-    this.join(member);
+  private assertIsNotBanned(identityId: IdentityId): void {
+    assert(
+      !this.membership.isBanned(identityId),
+      new CommunityMemberBannedError(),
+    );
   }
 
-  public assertCanCreateInvite(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.CREATE_INVITES);
+  private assertCanCreateInvite(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.CREATE_INVITES,
+    );
   }
 
-  public assertCanApproveMembers(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.APPROVE_MEMBERS);
+  private assertCanApproveMembers(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.APPROVE_MEMBERS,
+    );
   }
 
-  public assertCanRejectMembers(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.REJECT_MEMBERS);
+  private assertCanRejectMembers(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.REJECT_MEMBERS,
+    );
   }
 
-  public assertCanManageMembers(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.MANAGE_MEMBERS);
+  private assertCanManageMembers(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.MANAGE_MEMBERS,
+    );
   }
 
-  public assertCanViewModerationLog(identityId: IdentityId): void {
+  private assertCanViewModerationLog(identityId: IdentityId): void {
     this.assertCanManageMembers(identityId);
   }
 
-  public assertCanManageChannels(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.MANAGE_CHANNELS);
+  private assertCanManageChannels(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.MANAGE_CHANNELS,
+    );
   }
 
-  public assertCanManageRoles(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.MANAGE_ROLES);
+  private assertCanManageRoles(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.MANAGE_ROLES,
+    );
   }
 
-  public assertCanCreatePoll(
-    identityId: IdentityId,
-    channelId: CommunityChannelId,
-  ): void {
-    this.assertCanViewTextChannel(identityId, channelId);
-    this.assertPermission(identityId, CommunityPermission.CREATE_POLLS);
+  private assertCanBanMembers(identityId: IdentityId): void {
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.BAN_MEMBERS,
+    );
   }
 
-  public assertCanVotePoll(
-    identityId: IdentityId,
-    channelId: CommunityChannelId,
-  ): void {
-    this.assertCanViewTextChannel(identityId, channelId);
+  private assertHasTextChannel(channelId: CommunityChannelId): void {
+    this.channels.assertHasText(channelId);
   }
 
-  public assertCanBanMembers(identityId: IdentityId): void {
-    this.assertPermission(identityId, CommunityPermission.BAN_MEMBERS);
+  private assertHasVoiceChannel(channelId: CommunityChannelId): void {
+    this.channels.assertHasVoice(channelId);
   }
 
-  public assertCanSendMessage(
-    identityId: IdentityId,
-    channelId: CommunityChannelId,
-  ): void {
-    this.assertCanViewTextChannel(identityId, channelId);
-    this.assertPermission(identityId, CommunityPermission.SEND_MESSAGES);
-  }
-
-  public assertCanViewTextChannel(
+  private assertCanViewTextChannel(
     identityId: IdentityId,
     channelId: CommunityChannelId,
   ): void {
     this.assertIsMember(identityId);
     this.assertHasTextChannel(channelId);
-    this.assertCanAccessChannel(
+    CommunityPermissionValidator.assertCanAccessChannel(
+      this.ownerIdentityId,
+      this.membership,
       identityId,
       this.channels.textChannelPermissions(channelId),
     );
   }
 
-  public assertCanReactWithSticker(
+  private assertCanReactWithSticker(
     identityId: IdentityId,
     channelId: CommunityChannelId,
   ): void {
     this.assertCanSendMessage(identityId, channelId);
-    this.assertPermission(identityId, CommunityPermission.SEND_STICKERS);
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.SEND_STICKERS,
+    );
   }
 
-  public assertCanMention(
-    identityId: IdentityId,
-    mentions: CommunityChannelMessageMention[],
-  ): void {
-    for (const mention of mentions) {
-      if (mention.isEveryone()) {
-        this.assertPermission(identityId, CommunityPermission.MENTION_EVERYONE);
-      }
-
-      if (mention.isHere()) {
-        this.assertPermission(identityId, CommunityPermission.MENTION_HERE);
-      }
-
-      if (mention.isRole()) {
-        this.assertPermission(identityId, CommunityPermission.MENTION_ROLES);
-      }
-    }
-  }
-
-  public assertCanUseMessagePayload(
-    payload: CommunityChannelMessagePayload,
-  ): void {
-    this.settings.assertCanUseMessagePayload(payload);
-  }
-
-  public assertCanSearchMessages(): void {
+  private assertCanSearchMessages(): void {
     this.settings.assertCanSearchMessages();
   }
 
-  public assertCanConnectVoice(
+  private assertCanConnectVoice(
     identityId: IdentityId,
     channelId: CommunityChannelId,
   ): void {
     this.assertIsMember(identityId);
     this.assertHasVoiceChannel(channelId);
-    this.assertCanAccessChannel(
+    CommunityPermissionValidator.assertCanAccessChannel(
+      this.ownerIdentityId,
+      this.membership,
       identityId,
       this.channels.voiceChannelPermissions(channelId),
     );
-    this.assertPermission(identityId, CommunityPermission.CONNECT_VOICE);
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.CONNECT_VOICE,
+    );
   }
 
-  public assertCanDeleteMessage(
+  private assertCanDeleteMessage(
     actor: IdentityId,
     targetAuthor: IdentityId,
     channelId: CommunityChannelId,
@@ -335,15 +373,216 @@ export class Community extends AggregateRoot {
       return;
     }
 
-    this.assertPermission(actor, CommunityPermission.MANAGE_MESSAGES);
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      actor,
+      CommunityPermission.MANAGE_MESSAGES,
+    );
   }
 
-  public assertCanManageMessages(
+  private assertCanManageMessages(
     identityId: IdentityId,
     channelId: CommunityChannelId,
   ): void {
     this.assertCanViewTextChannel(identityId, channelId);
-    this.assertPermission(identityId, CommunityPermission.MANAGE_MESSAGES);
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.MANAGE_MESSAGES,
+    );
+  }
+
+  public addMember(actor: IdentityId, member: IdentityId): void {
+    this.assertCanManageMembers(actor);
+    this.join(member);
+  }
+
+  public joinWithInvite(member: IdentityId): void {
+    this.join(member);
+  }
+
+  public createInvite(
+    actor: IdentityId,
+    expiresAt?: Timestamp,
+    maxUses?: CommunityInviteMaxUses,
+    encryptedCommunityKey?: EncryptedCommunityInviteKey,
+  ): CommunityInvite {
+    this.assertCanCreateInvite(actor);
+
+    return CommunityInvite.create(
+      this.id,
+      actor,
+      expiresAt,
+      maxUses,
+      encryptedCommunityKey,
+    );
+  }
+
+  public inviteMember(
+    actor: IdentityId,
+    invitedIdentityId: IdentityId,
+  ): CommunityMembershipRequest {
+    this.assertCanCreateInvite(actor);
+
+    return CommunityMembershipRequest.invitation(
+      this.id,
+      actor,
+      invitedIdentityId,
+      this.ownerIdentityId,
+    );
+  }
+
+  public acceptMembershipRequest(
+    actor: IdentityId,
+    membershipRequest: CommunityMembershipRequest,
+  ): void {
+    if (membershipRequest.isRequest()) {
+      this.assertCanApproveMembers(actor);
+    }
+
+    membershipRequest.accept(
+      actor,
+      membershipRequest.isRequest() ? actor : this.ownerIdentityId,
+    );
+    this.join(membershipRequest.getIdentityId());
+  }
+
+  public declineMembershipRequest(
+    actor: IdentityId,
+    membershipRequest: CommunityMembershipRequest,
+  ): void {
+    if (membershipRequest.isRequest()) {
+      this.assertCanRejectMembers(actor);
+    }
+
+    membershipRequest.decline(
+      actor,
+      membershipRequest.isRequest() ? actor : this.ownerIdentityId,
+    );
+  }
+
+  public sendChannelMessage(
+    metadata: CommunityChannelMessageMetadata,
+    payload: CommunityChannelMessagePayload,
+    signature: Signature,
+    attachmentExternalIdentifiers: CommunityChannelMessageAttachments,
+    mentions: CommunityChannelMessageMentions,
+  ): CommunityChannelMessage {
+    const authorIdentityId = metadata.getAuthorIdentityId();
+    const channelId = metadata.getChannelId();
+
+    this.assertCanSendMessage(authorIdentityId, channelId);
+    this.assertCanUseMessagePayload(payload);
+    this.assertCanMention(authorIdentityId, mentions);
+
+    return CommunityChannelMessage.create(
+      metadata,
+      payload,
+      signature,
+      attachmentExternalIdentifiers,
+      mentions,
+    );
+  }
+
+  public acceptSentChannelMessage(
+    message: CommunityChannelMessage,
+    payload: CommunityChannelMessagePayload,
+  ): CommunityChannelMessage {
+    const authorIdentityId = message.getAuthorIdentityId();
+
+    this.assertCanSendMessage(authorIdentityId, message.getChannelId());
+    this.assertCanUseMessagePayload(payload);
+    this.assertCanMention(authorIdentityId, message.getMentions());
+
+    return message;
+  }
+
+  public editChannelMessage(
+    actor: IdentityId,
+    targetMessage: CommunityChannelMessage,
+    channelId: CommunityChannelId,
+    edition: CommunityChannelMessageEdition,
+  ): CommunityChannelMessage {
+    assert(
+      targetMessage.getAuthorIdentityId().isEqual(actor),
+      new CommunityChannelMessageAuthorMismatchError(),
+    );
+
+    this.assertCanSendMessage(actor, channelId);
+    this.assertCanUseMessagePayload(edition.getPayload());
+    this.assertCanMention(actor, edition.getMentions());
+
+    return edition.applyTo(targetMessage);
+  }
+
+  public reactWithSticker(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+    messageId: CommunityChannelMessageId,
+    emoji: CommunityChannelMessageReactionEmoji,
+  ): CommunityChannelMessageReaction {
+    this.assertCanReactWithSticker(identityId, channelId);
+
+    return CommunityChannelMessageReaction.create(
+      this.id,
+      channelId,
+      messageId,
+      identityId,
+      emoji,
+    );
+  }
+
+  public membersForVoiceChannelCall(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): IdentityId[] {
+    this.assertCanConnectVoice(identityId, channelId);
+
+    return this.getMemberIds();
+  }
+
+  public deleteChannelMessage(
+    actor: IdentityId,
+    targetMessage: CommunityChannelMessage,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanDeleteMessage(
+      actor,
+      targetMessage.getAuthorIdentityId(),
+      channelId,
+    );
+  }
+
+  public viewTextChannel(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+  }
+
+  public manageChannelMessages(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanManageMessages(identityId, channelId);
+  }
+
+  public searchMessages(): void {
+    this.assertCanSearchMessages();
+  }
+
+  public searchTextChannelMessages(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertCanViewTextChannel(identityId, channelId);
+    this.assertCanSearchMessages();
+  }
+
+  public viewModerationLog(identityId: IdentityId): void {
+    this.assertCanViewModerationLog(identityId);
   }
 
   public leave(member: IdentityId): void {
@@ -450,14 +689,6 @@ export class Community extends AggregateRoot {
     );
 
     return channelType;
-  }
-
-  public assertHasTextChannel(channelId: CommunityChannelId): void {
-    this.channels.assertHasText(channelId);
-  }
-
-  public assertHasVoiceChannel(channelId: CommunityChannelId): void {
-    this.channels.assertHasVoice(channelId);
   }
 
   public updateChannelPermissions(
@@ -572,7 +803,7 @@ export class Community extends AggregateRoot {
     discoverable?: boolean,
     autoJoinEnabled?: boolean,
   ): void {
-    this.assertOwner(actor);
+    CommunityOwnerValidator.assertIsOwner(this.ownerIdentityId, actor);
     this.profile = new CommunityProfile(name, description, avatar, banner);
 
     if (discoverable !== undefined) {
@@ -631,15 +862,12 @@ export class Community extends AggregateRoot {
     return this.membership.hasMembers();
   }
 
-  public assertIsMember(identityId: IdentityId): void {
-    assert(this.isMember(identityId), new CommunityMemberNotFoundError());
+  public viewAsMember(identityId: IdentityId): void {
+    this.assertIsMember(identityId);
   }
 
-  public assertIsNotBanned(identityId: IdentityId): void {
-    assert(
-      !this.membership.isBanned(identityId),
-      new CommunityMemberBannedError(),
-    );
+  public requestMembership(identityId: IdentityId): void {
+    this.assertIsNotBanned(identityId);
   }
 
   public visibleChannelsFor(
@@ -683,6 +911,30 @@ export class Community extends AggregateRoot {
       this.channels.textChannelPermissions(channelId).getVisibleRoleIds(),
       this.ownerIdentityId,
     );
+  }
+
+  public visibleMembersForTextChannelPollCreation(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): IdentityId[] {
+    this.assertCanViewTextChannel(identityId, channelId);
+    CommunityPermissionValidator.assertHasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      CommunityPermission.CREATE_POLLS,
+    );
+
+    return this.visibleMembersForTextChannel(channelId);
+  }
+
+  public visibleMembersForTextChannelPollVote(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): IdentityId[] {
+    this.assertCanViewTextChannel(identityId, channelId);
+
+    return this.visibleMembersForTextChannel(channelId);
   }
 
   public toPrimitives() {

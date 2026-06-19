@@ -25,7 +25,7 @@ export class PostNotificationRoute extends Route {
   ): void {
     const id = this.signedRequestAuthenticator.authenticate(request);
 
-    if (message.inviterIdentityId.isNotEqual(id)) {
+    if (message.getInviterIdentityId().isNotEqual(id)) {
       throw new AuthenticatedIdentityIsNotInviterError();
     }
   }

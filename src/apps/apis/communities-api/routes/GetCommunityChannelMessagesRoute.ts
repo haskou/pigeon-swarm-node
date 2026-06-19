@@ -34,7 +34,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
     const communityChannelId = new CommunityChannelId(channelId);
     const safeLimit = Math.min(Math.max(limit ?? 50, 1), 100);
 
-    community.assertCanViewTextChannel(actorIdentityId, communityChannelId);
+    community.viewTextChannel(actorIdentityId, communityChannelId);
 
     const messages = await this.messageRepository().findByChannel(
       new CommunityId(communityId),
@@ -90,7 +90,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
     const communityChannelId = new CommunityChannelId(channelId);
     const safeLimit = Math.min(Math.max(limit ?? 50, 1), 100);
 
-    community.assertCanViewTextChannel(actorIdentityId, communityChannelId);
+    community.viewTextChannel(actorIdentityId, communityChannelId);
 
     const messages = await this.messageRepository().findThreadMessages(
       new CommunityId(communityId),

@@ -29,17 +29,20 @@ export default class PollScopeAccessResolver {
       throw new CommunityNotFoundError();
     }
 
-    if (action === 'create') {
-      community.assertCanCreatePoll(message.actorIdentityId, message.channelId);
-    } else {
-      community.assertCanVotePoll(message.actorIdentityId, message.channelId);
-    }
+    const visibleMembers =
+      action === 'create'
+        ? community.visibleMembersForTextChannelPollCreation(
+            message.actorIdentityId,
+            message.channelId,
+          )
+        : community.visibleMembersForTextChannelPollVote(
+            message.actorIdentityId,
+            message.channelId,
+          );
 
     return {
       recipients: {
-        memberIds: community
-          .visibleMembersForTextChannel(message.channelId)
-          .map((member) => member.valueOf()),
+        memberIds: visibleMembers.map((member) => member.valueOf()),
       },
       scope: PollScope.communityChannel(
         community.getId(),

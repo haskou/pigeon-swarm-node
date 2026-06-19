@@ -1,7 +1,7 @@
 import { PutCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/PutCommunityChannelMessageBody';
+import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
-import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
@@ -57,12 +57,6 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
     );
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
-    community.assertCanSendMessage(authorIdentityId, communityChannelId);
-    community.assertCanUseMessagePayload(payload);
-    assert(
-      targetMessage.getAuthorIdentityId().isEqual(authorIdentityId),
-      new CommunityChannelMessageAuthorMismatchError(),
-    );
 
     const mentions = (body.mentions ?? []).map(
       (mention) =>
@@ -74,7 +68,21 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
         ),
     );
 
-    community.assertCanMention(authorIdentityId, mentions);
+    const message = community.editChannelMessage(
+      authorIdentityId,
+      targetMessage,
+      communityChannelId,
+      new CommunityChannelMessageEdition(
+        payload,
+        new Signature(body.signature),
+        new Timestamp(body.createdAt),
+        (body.attachmentExternalIdentifiers ?? []).map(
+          (externalIdentifier) =>
+            new CommunityChannelAttachmentId(externalIdentifier),
+        ),
+        mentions,
+      ),
+    );
     const mentionPrimitives = mentions.map((mention) => mention.toPrimitives());
 
     this.signatureService.assertValidSignature(
@@ -92,17 +100,6 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
         type: 'edited',
       },
       new Signature(body.signature),
-    );
-
-    const message = targetMessage.edit(
-      payload,
-      new Signature(body.signature),
-      new Timestamp(body.createdAt),
-      (body.attachmentExternalIdentifiers ?? []).map(
-        (externalIdentifier) =>
-          new CommunityChannelAttachmentId(externalIdentifier),
-      ),
-      mentions,
     );
 
     await this.messageRepository().save(message);

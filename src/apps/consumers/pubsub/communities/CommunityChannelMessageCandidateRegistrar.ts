@@ -1,8 +1,8 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
-import { CommunityChannelMessageAuthorMismatchError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageAuthorMismatchError';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
@@ -110,9 +110,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
 
     const message = CommunityChannelMessage.fromPrimitives(primitives);
 
-    community.assertCanSendMessage(authorIdentityId, channelId);
-    community.assertCanUseMessagePayload(payload);
-    community.assertCanMention(authorIdentityId, message.getMentions());
+    community.acceptSentChannelMessage(message, payload);
     await this.assertReplyTargetExists(
       communityId,
       channelId,
@@ -160,16 +158,21 @@ export default class CommunityChannelMessageCandidateRegistrar {
     );
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
-    assert(
-      targetMessage.getAuthorIdentityId().isEqual(authorIdentityId),
-      new CommunityChannelMessageAuthorMismatchError(),
-    );
-
     const mentions = this.mentionsFrom(primitives);
 
-    community.assertCanSendMessage(authorIdentityId, channelId);
-    community.assertCanUseMessagePayload(payload);
-    community.assertCanMention(authorIdentityId, mentions);
+    const editedMessage = community.editChannelMessage(
+      authorIdentityId,
+      targetMessage,
+      channelId,
+      new CommunityChannelMessageEdition(
+        payload,
+        new Signature(primitives.signature),
+        new Timestamp(primitives.editedAt),
+        this.attachmentIdsFrom(primitives),
+        mentions,
+      ),
+    );
+
     this.signatureService.assertValidSignature(
       authorIdentityId,
       {
@@ -186,14 +189,6 @@ export default class CommunityChannelMessageCandidateRegistrar {
         type: 'edited',
       },
       new Signature(primitives.signature),
-    );
-
-    const editedMessage = targetMessage.edit(
-      payload,
-      new Signature(primitives.signature),
-      new Timestamp(primitives.editedAt),
-      this.attachmentIdsFrom(primitives),
-      mentions,
     );
 
     await this.messageRepository.save(editedMessage);

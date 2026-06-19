@@ -1,4 +1,3 @@
-import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
@@ -32,10 +31,7 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
-    community.assertCanCreateInvite(actorIdentityId);
-
-    const invite = CommunityInvite.create(
-      community.getId(),
+    const invite = community.createInvite(
       actorIdentityId,
       body?.expiresAt ? new Timestamp(body.expiresAt) : undefined,
       body?.maxUses ? new CommunityInviteMaxUses(body.maxUses) : undefined,

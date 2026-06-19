@@ -32,7 +32,7 @@ export class SearchCommunityChannelMessagesRoute extends CommunityRouteSupport {
     const visibleTextChannelIds =
       community.visibleTextChannelIdsFor(actorIdentityId);
 
-    community.assertCanSearchMessages();
+    community.searchMessages();
 
     const messages = await this.messageRepository().searchPublicByChannels(
       new CommunityId(communityId),
@@ -73,8 +73,7 @@ export class SearchCommunityChannelMessagesRoute extends CommunityRouteSupport {
     const communityChannelId = new CommunityChannelId(channelId);
     const safeLimit = Math.min(Math.max(limit ?? 20, 1), 50);
 
-    community.assertCanViewTextChannel(actorIdentityId, communityChannelId);
-    community.assertCanSearchMessages();
+    community.searchTextChannelMessages(actorIdentityId, communityChannelId);
 
     const messages = await this.messageRepository().searchPublicByChannel(
       new CommunityId(communityId),

@@ -57,7 +57,6 @@ export class CommunityMessageReactionRoute extends CommunityRouteSupport {
     const communityChannelId = new CommunityChannelId(channelId);
     const communityMessageId = new CommunityChannelMessageId(messageId);
 
-    community.assertCanReactWithSticker(authorIdentityId, communityChannelId);
     assert(
       await this.messageRepository().findById(
         new CommunityId(communityId),
@@ -67,11 +66,10 @@ export class CommunityMessageReactionRoute extends CommunityRouteSupport {
       new CommunityChannelMessageNotFoundError(),
     );
 
-    return CommunityChannelMessageReaction.create(
-      new CommunityId(communityId),
+    return community.reactWithSticker(
+      authorIdentityId,
       communityChannelId,
       communityMessageId,
-      authorIdentityId,
       new CommunityChannelMessageReactionEmoji(body.emoji),
     );
   }

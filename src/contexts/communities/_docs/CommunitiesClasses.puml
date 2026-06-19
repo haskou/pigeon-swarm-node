@@ -11,8 +11,14 @@ package "communities/application" {
     + find(message): Community
   }
 
+  class CommunityChannelMessageSender {
+    + send(message): CommunityChannelMessage
+  }
+
   CommunityCreator ..> CommunityRepository
   CommunityFinder ..> CommunityRepository
+  CommunityChannelMessageSender ..> CommunityFinder
+  CommunityChannelMessageSender ..> CommunityChannelMessageRepository
 }
 
 package "communities/domain" {
@@ -33,7 +39,9 @@ package "communities/domain" {
     + assertCanCreateInvite(identityId): void
     + assertCanManageChannels(identityId): void
     + assertCanManageRoles(identityId): void
-    + assertCanSendMessage(identityId, channelId): void
+    + sendChannelMessage(metadata, payload, signature, attachments, mentions): CommunityChannelMessage
+    + acceptSentChannelMessage(message, payload): CommunityChannelMessage
+    + editChannelMessage(actor, targetMessage, channelId, payload, signature, editedAt, attachments, mentions): CommunityChannelMessage
     + assertCanDeleteMessage(actor, targetAuthor, channelId): void
     + assertIsNotBanned(identityId): void
     + addTextChannel(actor, name): CommunityTextChannel

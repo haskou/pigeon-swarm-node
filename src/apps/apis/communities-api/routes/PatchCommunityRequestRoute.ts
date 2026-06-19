@@ -27,17 +27,7 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
     community: Community,
     actorIdentityId: IdentityId,
   ): Promise<void> {
-    if (membershipRequest.isRequest()) {
-      community.assertCanApproveMembers(actorIdentityId);
-    }
-
-    membershipRequest.accept(
-      actorIdentityId,
-      membershipRequest.isRequest()
-        ? actorIdentityId
-        : community.getOwnerIdentityId(),
-    );
-    community.joinWithInvite(membershipRequest.getIdentityId());
+    community.acceptMembershipRequest(actorIdentityId, membershipRequest);
     await this.repository().save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
   }
@@ -47,16 +37,7 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
     community: Community,
     actorIdentityId: IdentityId,
   ): void {
-    if (membershipRequest.isRequest()) {
-      community.assertCanRejectMembers(actorIdentityId);
-    }
-
-    membershipRequest.decline(
-      actorIdentityId,
-      membershipRequest.isRequest()
-        ? actorIdentityId
-        : community.getOwnerIdentityId(),
-    );
+    community.declineMembershipRequest(actorIdentityId, membershipRequest);
   }
 
   @Patch('/membership-requests/:requestId')

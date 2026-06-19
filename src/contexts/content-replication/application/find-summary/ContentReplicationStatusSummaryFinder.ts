@@ -16,8 +16,7 @@ export default class ContentReplicationStatusSummaryFinder {
 
   public async find(): Promise<ContentReplicationStatusSummary> {
     const localNodeId = await this.localNodeId();
-    const summary = await this.repository.findByLocalNodeId(localNodeId);
 
-    return summary ?? ContentReplicationStatusSummary.empty(localNodeId);
+    return this.repository.findByLocalNodeId(localNodeId);
   }
 }

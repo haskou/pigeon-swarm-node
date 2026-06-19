@@ -55,7 +55,7 @@ export class GetCommunityChannelsRoute extends CommunityRouteSupport {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
-    community.assertIsMember(actorIdentityId);
+    community.viewAsMember(actorIdentityId);
     const connectedIdentityIdsByChannelId =
       await this.findConnectedIdentityIdsByChannelId(communityId);
     const visibleTextChannelIds = community

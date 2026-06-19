@@ -214,10 +214,12 @@ describe('Community', () => {
 
     community.addMember(owner, member);
 
-    expect(() => community.assertCanVotePoll(member, channel.getId())).not.toThrow();
-    expect(() => community.assertCanCreatePoll(member, channel.getId())).toThrow(
-      'Community permission denied: create_polls',
-    );
+    expect(
+      community.visibleMembersForTextChannelPollVote(member, channel.getId()),
+    ).toEqual([owner, member]);
+    expect(() =>
+      community.visibleMembersForTextChannelPollCreation(member, channel.getId()),
+    ).toThrow('Community permission denied: create_polls');
   });
 
   it('keeps community visibility as immutable settings', () => {
