@@ -3,6 +3,7 @@ import MessageSender from '@app/contexts/conversations/application/send-message/
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessagePollOptions } from '@app/contexts/conversations/domain/value-objects/MessagePollOptions';
 import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -62,10 +63,7 @@ export class PostConversationMessageRoute extends Route {
       poll.getCreatorIdentityId(),
       poll.getId(),
       new Signature(request.header('X-Signature') || ''),
-      {
-        createdAt: poll.getCreatedAt(),
-        previousMessageIds: [],
-      },
+      new MessagePollOptions(poll.getCreatedAt(), undefined, []),
     );
 
     return true;

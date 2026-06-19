@@ -7,25 +7,18 @@ import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePay
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessageSentCreateData } from './types/MessageSentCreateData';
-import { MessageSignaturePayload } from './types/MessageSignaturePayload';
-
-export { MessageSentCreateData } from './types/MessageSentCreateData';
+import { MessageSignaturePayload } from './MessageSignaturePayload';
 
 export class MessageSent extends Message {
-  public static create(data: MessageSentCreateData): MessageSent {
+  public static create(
+    metadata: MessageMetadata,
+    encryptedPayload: EncryptedMessagePayload,
+    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
+  ): MessageSent {
     return new MessageSent(
-      new MessageMetadata(
-        data.id ?? MessageId.generate(),
-        data.conversationId,
-        data.authorId,
-        data.previousMessageIds ?? [],
-        data.createdAt ?? Timestamp.now(),
-        data.signature,
-        data.replyToMessageId,
-      ),
-      data.encryptedPayload,
-      data.attachmentExternalIdentifiers,
+      metadata,
+      encryptedPayload,
+      attachmentExternalIdentifiers,
     );
   }
 
@@ -74,9 +67,6 @@ export class MessageSent extends Message {
   }
 
   public toSignaturePayload(): MessageSignaturePayload {
-    return {
-      ...super.toSignaturePayload(),
-      encryptedPayload: this.encryptedPayload.valueOf(),
-    };
+    return this.buildSignaturePayload(this.encryptedPayload);
   }
 }

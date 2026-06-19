@@ -3,6 +3,7 @@ import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domai
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { MessagePollOptions } from '@app/contexts/conversations/domain/value-objects/MessagePollOptions';
 
 import { PollTimelineMessageRegisterMessage } from './messages/PollTimelineMessageRegisterMessage';
 
@@ -32,9 +33,7 @@ export default class PollTimelineMessageRegistrar {
       message.actorIdentityId,
       message.poll.getId(),
       message.signature,
-      {
-        createdAt: message.poll.getCreatedAt(),
-      },
+      new MessagePollOptions(message.poll.getCreatedAt()),
     );
     await this.conversationRepository.save(conversation);
   }

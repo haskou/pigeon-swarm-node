@@ -13,11 +13,9 @@ import { Message } from './entities/messages/Message';
 import { MessageDeleted } from './entities/messages/MessageDeleted';
 import { MessageEdited } from './entities/messages/MessageEdited';
 import { MessageFactory } from './entities/messages/MessageFactory';
+import { MessageMetadata } from './entities/messages/MessageMetadata';
 import { MessagePoll } from './entities/messages/MessagePoll';
 import { MessageSent } from './entities/messages/MessageSent';
-import { MessageEditOptions } from './entities/messages/types/MessageEditOptions';
-import { MessagePollOptions } from './entities/messages/types/MessagePollOptions';
-import { MessageSendOptions } from './entities/messages/types/MessageSendOptions';
 import { ConversationParticipantNotFoundError } from './errors/ConversationParticipantNotFoundError';
 import { MessageTargetAlreadyDeletedError } from './errors/MessageTargetAlreadyDeletedError';
 import { MessageTargetAuthorMismatchError } from './errors/MessageTargetAuthorMismatchError';
@@ -29,7 +27,10 @@ import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 import { GroupConversationName } from './value-objects/GroupConversationName';
+import { MessageEditOptions } from './value-objects/MessageEditOptions';
 import { MessageId } from './value-objects/MessageId';
+import { MessagePollOptions } from './value-objects/MessagePollOptions';
+import { MessageSendOptions } from './value-objects/MessageSendOptions';
 import { MessageType } from './value-objects/MessageType';
 
 export class Conversation extends AggregateRoot {
@@ -133,24 +134,26 @@ export class Conversation extends AggregateRoot {
     authorId: IdentityId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
-    options: MessageSendOptions = {},
+    options: MessageSendOptions = MessageSendOptions.empty(),
   ): MessageSent {
     this.assertIsParticipant(authorId);
-    this.assertCanReplyToMessage(options.replyToMessageId);
-    const messagePreviousMessageIds = options.previousMessageIds ?? [];
+    this.assertCanReplyToMessage(options.getReplyToMessageId());
+    const messagePreviousMessageIds = options.getPreviousMessageIds();
     this.assertPreviousMessagesExist(messagePreviousMessageIds);
 
-    const message = MessageSent.create({
-      attachmentExternalIdentifiers: options.attachmentExternalIdentifiers,
-      authorId,
-      conversationId: this.id,
-      createdAt: options.createdAt,
+    const message = MessageSent.create(
+      new MessageMetadata(
+        options.getId(),
+        this.id,
+        authorId,
+        messagePreviousMessageIds,
+        options.getCreatedAt(),
+        signature,
+        options.getReplyToMessageId(),
+      ),
       encryptedPayload,
-      id: options.id,
-      previousMessageIds: messagePreviousMessageIds,
-      replyToMessageId: options.replyToMessageId,
-      signature,
-    });
+      options.getAttachments(),
+    );
 
     this.messages.push(message);
     this.record(
@@ -194,23 +197,26 @@ export class Conversation extends AggregateRoot {
     authorId: IdentityId,
     pollId: PollId,
     signature: Signature,
-    options: MessagePollOptions = {},
+    options: MessagePollOptions = MessagePollOptions.empty(),
   ): MessagePoll {
     this.assertIsParticipant(authorId);
-    const previousMessageIds =
-      options.previousMessageIds ?? this.getLastMessageIds();
+    const previousMessageIds = options.getPreviousMessageIds(
+      this.getLastMessageIds(),
+    );
 
     this.assertPreviousMessagesExist(previousMessageIds);
 
-    const message = MessagePoll.create({
-      authorId,
-      conversationId: this.id,
-      createdAt: options.createdAt,
-      id: options.id,
+    const message = MessagePoll.create(
+      new MessageMetadata(
+        options.getId(new MessageId(pollId.valueOf())),
+        this.id,
+        authorId,
+        previousMessageIds,
+        options.getCreatedAt(),
+        signature,
+      ),
       pollId,
-      previousMessageIds,
-      signature,
-    });
+    );
 
     this.messages.push(message);
 
@@ -222,23 +228,25 @@ export class Conversation extends AggregateRoot {
     targetMessageId: MessageId,
     encryptedPayload: EncryptedMessagePayload,
     signature: Signature,
-    options: MessageEditOptions = {},
+    options: MessageEditOptions = MessageEditOptions.empty(),
   ): MessageEdited {
     this.assertCanChangeMessage(authorId, targetMessageId);
-    const previousMessageIds = options.previousMessageIds ?? [targetMessageId];
+    const previousMessageIds = options.getPreviousMessageIds(targetMessageId);
 
     this.assertPreviousMessagesExist(previousMessageIds);
 
-    const message = MessageEdited.create({
-      authorId,
-      conversationId: this.id,
-      createdAt: options.createdAt,
-      encryptedPayload,
-      id: options.id,
-      previousMessageIds,
-      signature,
+    const message = MessageEdited.create(
+      new MessageMetadata(
+        options.getId(),
+        this.id,
+        authorId,
+        previousMessageIds,
+        options.getCreatedAt(),
+        signature,
+      ),
       targetMessageId,
-    });
+      encryptedPayload,
+    );
 
     this.messages.push(message);
     this.record(
@@ -263,15 +271,17 @@ export class Conversation extends AggregateRoot {
   ): MessageDeleted {
     this.assertCanChangeMessage(authorId, targetMessageId);
 
-    const message = MessageDeleted.create({
-      authorId,
-      conversationId: this.id,
-      createdAt,
-      id,
-      previousMessageIds: [targetMessageId],
-      signature,
+    const message = MessageDeleted.create(
+      new MessageMetadata(
+        id,
+        this.id,
+        authorId,
+        [targetMessageId],
+        createdAt,
+        signature,
+      ),
       targetMessageId,
-    });
+    );
 
     this.messages.push(message);
     this.record(

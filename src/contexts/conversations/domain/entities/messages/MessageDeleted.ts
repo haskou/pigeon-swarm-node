@@ -5,23 +5,13 @@ import { ConversationId } from '../../value-objects/ConversationId';
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
-
-export { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
 
 export class MessageDeleted extends Message {
-  public static create(data: MessageDeletedCreateData): MessageDeleted {
-    return new MessageDeleted(
-      new MessageMetadata(
-        data.id ?? MessageId.generate(),
-        data.conversationId,
-        data.authorId,
-        data.previousMessageIds ?? [],
-        data.createdAt ?? Timestamp.now(),
-        data.signature,
-      ),
-      data.targetMessageId,
-    );
+  public static create(
+    metadata: MessageMetadata,
+    targetMessageId: MessageId,
+  ): MessageDeleted {
+    return new MessageDeleted(metadata, targetMessageId);
   }
 
   public static fromPrimitives(

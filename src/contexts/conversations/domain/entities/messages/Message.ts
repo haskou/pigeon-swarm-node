@@ -1,27 +1,36 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature } from '@haskou/value-objects';
 
+import { AttachmentExternalIdentifier } from '../../value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from '../../value-objects/ConversationId';
+import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../value-objects/MessageId';
 import { MessageType } from '../../value-objects/MessageType';
 import { MessageMetadata } from './MessageMetadata';
-import { AttachmentExternalIdentifiers } from './types/AttachmentExternalIdentifiers';
-import { MessageBasePrimitives } from './types/MessageBasePrimitives';
-import { MessageSignaturePayload } from './types/MessageSignaturePayload';
+import { MessageSignaturePayload } from './MessageSignaturePayload';
 
 export abstract class Message {
-  private readonly attachmentExternalIdentifiers: AttachmentExternalIdentifiers;
+  private readonly attachments: AttachmentExternalIdentifier[];
 
   protected constructor(
     private readonly metadata: MessageMetadata,
-    attachmentExternalIdentifiers: AttachmentExternalIdentifiers = [],
+    attachmentExternalIdentifiers: Array<AttachmentExternalIdentifier> = [],
   ) {
-    this.attachmentExternalIdentifiers = attachmentExternalIdentifiers;
+    this.attachments = attachmentExternalIdentifiers;
   }
 
-  protected basePrimitives(): MessageBasePrimitives {
+  protected basePrimitives(): {
+    attachmentExternalIdentifiers: string[];
+    authorId: string;
+    conversationId: string;
+    createdAt: number;
+    id: string;
+    previousMessageIds: string[];
+    replyToMessageId?: string;
+    signature: string;
+  } {
     return {
-      attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
+      attachmentExternalIdentifiers: this.attachments.map(
         (externalIdentifier) => externalIdentifier.valueOf(),
       ),
       authorId: this.metadata.getAuthorId().valueOf(),
@@ -36,23 +45,16 @@ export abstract class Message {
     };
   }
 
-  protected baseSignaturePayload(): Omit<
-    MessageSignaturePayload,
-    'encryptedPayload' | 'targetMessageId' | 'type'
-  > {
-    return {
-      attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
-        (externalIdentifier) => externalIdentifier.valueOf(),
-      ),
-      authorId: this.metadata.getAuthorId().valueOf(),
-      conversationId: this.metadata.getConversationId().valueOf(),
-      createdAt: this.metadata.getCreatedAt().valueOf(),
-      id: this.metadata.getId().valueOf(),
-      previousMessageIds: this.metadata
-        .getPreviousMessageIds()
-        .map((messageId) => messageId.valueOf()),
-      replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
-    };
+  protected buildSignaturePayload(
+    encryptedPayload?: EncryptedMessagePayload,
+  ): MessageSignaturePayload {
+    return new MessageSignaturePayload(
+      this.metadata,
+      this.getType(),
+      this.attachments,
+      encryptedPayload,
+      this.getTargetMessageId(),
+    );
   }
 
   public getId(): MessageId {
@@ -94,11 +96,7 @@ export abstract class Message {
   }
 
   public toSignaturePayload(): MessageSignaturePayload {
-    return {
-      ...this.baseSignaturePayload(),
-      targetMessageId: this.getTargetMessageId()?.valueOf(),
-      type: this.getType().valueOf(),
-    };
+    return this.buildSignaturePayload();
   }
 }
 

@@ -2,6 +2,7 @@ import { MessageSent } from '@app/contexts/conversations/domain/entities/message
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
+import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessageSendMessage } from './messages/MessageSendMessage';
@@ -26,13 +27,13 @@ export default class MessageSender {
       message.authorIdentityId,
       message.encryptedPayload,
       message.signature,
-      {
-        attachmentExternalIdentifiers: message.attachmentExternalIdentifiers,
-        createdAt: message.createdAt,
-        id: message.id,
-        previousMessageIds: message.previousMessageIds,
-        replyToMessageId: message.replyToMessageId,
-      },
+      new MessageSendOptions(
+        message.attachmentExternalIdentifiers,
+        message.createdAt,
+        message.id,
+        message.previousMessageIds,
+        message.replyToMessageId,
+      ),
     );
 
     this.signatureService.assertValidMessageSignature(sentMessage);

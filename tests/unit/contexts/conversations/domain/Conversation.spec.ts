@@ -10,7 +10,9 @@ import { MessageSent } from '@app/contexts/conversations/domain/entities/message
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { AttachmentExternalIdentifier } from '@app/contexts/conversations/domain/value-objects/AttachmentExternalIdentifier';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
+import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -41,13 +43,11 @@ describe('Conversation', () => {
         author,
         new EncryptedMessagePayload('encrypted-payload'),
         signature(),
-        {
-          attachmentExternalIdentifiers: [
+        new MessageSendOptions([
             new AttachmentExternalIdentifier(
               'bafybeigdyrzt5sfp7udm7hu76t5dp5whztr3v3gvl6wv4x7q5v2fi6c5mm',
             ),
-          ],
-        },
+          ]),
       );
 
       expect(message).toBeInstanceOf(MessageSent);
@@ -99,10 +99,13 @@ describe('Conversation', () => {
         recipient,
         new EncryptedMessagePayload('reply-payload'),
         signature(),
-        {
-          previousMessageIds: [newer.getId()],
-          replyToMessageId: target.getId(),
-        },
+        new MessageSendOptions(
+          [],
+          undefined,
+          undefined,
+          [newer.getId()],
+          target.getId(),
+        ),
       );
 
       expect(reply.getReplyToMessageId()?.valueOf()).toBe(
@@ -124,10 +127,13 @@ describe('Conversation', () => {
           author,
           new EncryptedMessagePayload('reply-payload'),
           signature(),
-          {
-            previousMessageIds: [],
-            replyToMessageId: MessageId.generate(),
-          },
+          new MessageSendOptions(
+            [],
+            undefined,
+            undefined,
+            [],
+            MessageId.generate(),
+          ),
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -138,9 +144,12 @@ describe('Conversation', () => {
           author,
           new EncryptedMessagePayload('message-payload'),
           signature(),
-          {
-            previousMessageIds: [MessageId.generate()],
-          },
+          new MessageSendOptions(
+            [],
+            undefined,
+            undefined,
+            [MessageId.generate()],
+          ),
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -158,10 +167,13 @@ describe('Conversation', () => {
           recipient,
           new EncryptedMessagePayload('reply-payload'),
           signature(),
-          {
-            previousMessageIds: [],
-            replyToMessageId: target.getId(),
-          },
+          new MessageSendOptions(
+            [],
+            undefined,
+            undefined,
+            [],
+            target.getId(),
+          ),
         ),
       ).toThrow(MessageTargetAlreadyDeletedError);
     });
@@ -248,9 +260,11 @@ describe('Conversation', () => {
           sent.getId(),
           new EncryptedMessagePayload('edited-payload'),
           signature(),
-          {
-            previousMessageIds: [MessageId.generate()],
-          },
+          new MessageEditOptions(
+            undefined,
+            undefined,
+            [MessageId.generate()],
+          ),
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -268,9 +282,7 @@ describe('Conversation', () => {
         author,
         new EncryptedMessagePayload('message-after-poll'),
         signature(),
-        {
-          previousMessageIds: [poll.getId()],
-        },
+        new MessageSendOptions([], undefined, undefined, [poll.getId()]),
       );
 
       expect(conversation.toPrimitives().messages[0]).toEqual(

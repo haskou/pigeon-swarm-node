@@ -6,23 +6,10 @@ import { ConversationId } from '../../value-objects/ConversationId';
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessagePollCreateData } from './types/MessagePollCreateData';
-
-export { MessagePollCreateData } from './types/MessagePollCreateData';
 
 export class MessagePoll extends Message {
-  public static create(data: MessagePollCreateData): MessagePoll {
-    return new MessagePoll(
-      new MessageMetadata(
-        data.id ?? new MessageId(data.pollId.valueOf()),
-        data.conversationId,
-        data.authorId,
-        data.previousMessageIds ?? [],
-        data.createdAt ?? Timestamp.now(),
-        data.signature,
-      ),
-      data.pollId,
-    );
+  public static create(metadata: MessageMetadata, pollId: PollId): MessagePoll {
+    return new MessagePoll(metadata, pollId);
   }
 
   public static fromPrimitives(

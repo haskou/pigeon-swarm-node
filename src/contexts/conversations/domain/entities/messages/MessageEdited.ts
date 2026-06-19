@@ -6,25 +6,15 @@ import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePay
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessageEditedCreateData } from './types/MessageEditedCreateData';
-import { MessageSignaturePayload } from './types/MessageSignaturePayload';
-
-export { MessageEditedCreateData } from './types/MessageEditedCreateData';
+import { MessageSignaturePayload } from './MessageSignaturePayload';
 
 export class MessageEdited extends Message {
-  public static create(data: MessageEditedCreateData): MessageEdited {
-    return new MessageEdited(
-      new MessageMetadata(
-        data.id ?? MessageId.generate(),
-        data.conversationId,
-        data.authorId,
-        data.previousMessageIds ?? [],
-        data.createdAt ?? Timestamp.now(),
-        data.signature,
-      ),
-      data.targetMessageId,
-      data.encryptedPayload,
-    );
+  public static create(
+    metadata: MessageMetadata,
+    targetMessageId: MessageId,
+    encryptedPayload: EncryptedMessagePayload,
+  ): MessageEdited {
+    return new MessageEdited(metadata, targetMessageId, encryptedPayload);
   }
 
   public static fromPrimitives(
@@ -70,9 +60,6 @@ export class MessageEdited extends Message {
   }
 
   public toSignaturePayload(): MessageSignaturePayload {
-    return {
-      ...super.toSignaturePayload(),
-      encryptedPayload: this.encryptedPayload.valueOf(),
-    };
+    return this.buildSignaturePayload(this.encryptedPayload);
   }
 }
