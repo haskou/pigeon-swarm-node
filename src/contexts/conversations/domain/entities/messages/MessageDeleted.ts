@@ -1,13 +1,13 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { MessageDeletedCreateData } from '../../types/MessageDeletedCreateData';
 import { ConversationId } from '../../value-objects/ConversationId';
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
+import { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
 
-export { MessageDeletedCreateData } from '../../types/MessageDeletedCreateData';
+export { MessageDeletedCreateData } from './types/MessageDeletedCreateData';
 
 export class MessageDeleted extends Message {
   public static create(data: MessageDeletedCreateData): MessageDeleted {

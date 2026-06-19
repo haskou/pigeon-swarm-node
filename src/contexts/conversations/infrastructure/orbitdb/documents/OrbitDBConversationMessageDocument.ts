@@ -1,4 +1,4 @@
-import { MessageBasePrimitives as Base } from '../../../domain/types/MessageBasePrimitives';
+import { MessageBasePrimitives as Base } from '../../../domain/entities/messages/types/MessageBasePrimitives';
 import { MessageTypeValue } from '../../../domain/value-objects/types/MessageTypeValue';
 
 export interface OrbitDBConversationMessageDocument extends Base {

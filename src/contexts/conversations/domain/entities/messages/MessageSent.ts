@@ -1,16 +1,16 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { MessageSentCreateData } from '../../types/MessageSentCreateData';
-import { MessageSignaturePayload } from '../../types/MessageSignaturePayload';
 import { AttachmentExternalIdentifier } from '../../value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from '../../value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
+import { MessageSentCreateData } from './types/MessageSentCreateData';
+import { MessageSignaturePayload } from './types/MessageSignaturePayload';
 
-export { MessageSentCreateData } from '../../types/MessageSentCreateData';
+export { MessageSentCreateData } from './types/MessageSentCreateData';
 
 export class MessageSent extends Message {
   public static create(data: MessageSentCreateData): MessageSent {

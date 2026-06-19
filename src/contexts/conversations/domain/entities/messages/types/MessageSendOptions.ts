@@ -1,7 +1,7 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { AttachmentExternalIdentifier } from '../value-objects/AttachmentExternalIdentifier';
-import { MessageId } from '../value-objects/MessageId';
+import { AttachmentExternalIdentifier } from '../../../value-objects/AttachmentExternalIdentifier';
+import { MessageId } from '../../../value-objects/MessageId';
 
 export type MessageSendOptions = {
   attachmentExternalIdentifiers?: AttachmentExternalIdentifier[];

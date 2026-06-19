@@ -29,7 +29,7 @@ export default class StickerFavoriter {
       throw new StickerPackNotFoundError();
     }
 
-    pack.assertHasSticker(message.stickerId);
+    pack.useSticker(message.stickerId);
 
     const library = await this.findLibrary(message);
 

@@ -7,8 +7,8 @@ import {
 } from '@haskou/value-objects';
 
 import { Message } from '../entities/messages/Message';
+import { MessageSignaturePayload } from '../entities/messages/types/MessageSignaturePayload';
 import { InvalidMessageSignatureError } from '../errors/InvalidMessageSignatureError';
-import { MessageSignaturePayload } from '../types/MessageSignaturePayload';
 
 export default class MessageSignatureDomainService {
   private getCanonicalPayload(
