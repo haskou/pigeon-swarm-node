@@ -6,8 +6,6 @@ import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
-  Delete,
-  Get,
   JsonController,
   Param,
   Put,
@@ -19,28 +17,10 @@ import { PutCommunityChannelDraftBody } from '../bodies/PutCommunityChannelDraft
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
+export class PutCommunityChannelDraftRoute extends CommunityRouteSupport {
   private readonly draftRepository = this.get<CommunityChannelDraftRepository>(
     CommunityChannelDraftRepository,
   );
-
-  @Get('/me/drafts')
-  public async listDrafts(
-    @Req() request: Request,
-    @Res() response: Response,
-  ): Promise<Response> {
-    const identityId = await this.authenticate(request);
-    const drafts = await this.draftRepository.findByIdentity(identityId);
-
-    return response.status(HttpRouteStatusEnum.OK).send({
-      drafts: drafts.map((draft) => ({
-        channelId: draft.channelId,
-        communityId: draft.communityId,
-        encryptedPayload: draft.encryptedPayload,
-        updatedAt: draft.updatedAt,
-      })),
-    });
-  }
 
   @Put('/:communityId/channels/:channelId/draft')
   public async saveDraft(
@@ -72,31 +52,6 @@ export class CommunityChannelDraftsRoute extends CommunityRouteSupport {
       communityId,
       encryptedPayload: body.encryptedPayload,
       updatedAt: updatedAt.valueOf(),
-    });
-  }
-
-  @Delete('/:communityId/channels/:channelId/draft')
-  public async deleteDraft(
-    @Param('communityId') communityId: string,
-    @Param('channelId') channelId: string,
-    @Req() request: Request,
-    @Res() response: Response,
-  ): Promise<Response> {
-    const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const domainCommunityId = new CommunityId(communityId);
-    const domainChannelId = new CommunityChannelId(channelId);
-
-    community.viewTextChannel(actorIdentityId, domainChannelId);
-    await this.draftRepository.delete(
-      actorIdentityId,
-      domainCommunityId,
-      domainChannelId,
-    );
-
-    return response.status(HttpRouteStatusEnum.OK).send({
-      channelId,
-      communityId,
     });
   }
 }

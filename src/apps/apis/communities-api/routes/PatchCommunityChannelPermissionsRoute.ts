@@ -19,7 +19,8 @@ import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-export class CommunityChannelPermissionsRoute extends CommunityRouteSupport {
+// eslint-disable-next-line max-len
+export class PatchCommunityChannelPermissionsRoute extends CommunityRouteSupport {
   @Patch('/:communityId/channels/:channelId/permissions')
   public async updateChannelPermissions(
     @Param('communityId') communityId: string,

@@ -1,4 +1,3 @@
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
@@ -12,16 +11,14 @@ import {
   Res,
 } from 'routing-controllers';
 
-import { CommunityChannelMessagesViewModel } from '../view-model/CommunityChannelMessagesViewModel';
+import { CommunityMessageSearchViewModel } from '../view-model/CommunityMessageSearchViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-// eslint-disable-next-line max-len
-export class GetCommunityChannelMessageSearchRoute extends CommunityRouteSupport {
-  @Get('/:communityId/channels/:channelId/messages/search')
-  public async searchMessages(
+export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
+  @Get('/:communityId/messages/search')
+  public async searchCommunityMessages(
     @Param('communityId') communityId: string,
-    @Param('channelId') channelId: string,
     @QueryParam('query') query: string | undefined,
     @QueryParam('limit') limit: number | undefined,
     @Req() request: Request,
@@ -29,20 +26,21 @@ export class GetCommunityChannelMessageSearchRoute extends CommunityRouteSupport
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
-    const communityChannelId = new CommunityChannelId(channelId);
     const safeLimit = Math.min(Math.max(limit ?? 20, 1), 50);
+    const visibleTextChannelIds =
+      community.visibleTextChannelIdsFor(actorIdentityId);
 
-    community.searchTextChannelMessages(actorIdentityId, communityChannelId);
+    community.searchMessages();
 
-    const messages = await this.messageRepository().searchPublicByChannel(
+    const messages = await this.messageRepository().searchPublicByChannels(
       new CommunityId(communityId),
-      communityChannelId,
+      visibleTextChannelIds,
       query ?? '',
       safeLimit,
     );
-    const reactions = await this.reactions().findByMessageIds(
+    const reactions = await this.reactions().findByMessageIdsInChannels(
       new CommunityId(communityId),
-      communityChannelId,
+      visibleTextChannelIds,
       messages.map(
         (message) => new CommunityChannelMessageId(message.toPrimitives().id),
       ),
@@ -51,13 +49,10 @@ export class GetCommunityChannelMessageSearchRoute extends CommunityRouteSupport
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
-        new CommunityChannelMessagesViewModel(
+        new CommunityMessageSearchViewModel(
           communityId,
-          channelId,
           messages,
           reactions,
-          [],
-          safeLimit,
         ).toResource(),
       );
   }
