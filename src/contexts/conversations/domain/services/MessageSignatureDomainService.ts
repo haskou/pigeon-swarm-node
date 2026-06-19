@@ -12,24 +12,7 @@ import { InvalidMessageSignatureError } from '../errors/InvalidMessageSignatureE
 
 export default class MessageSignatureDomainService {
   public getCanonicalSigningContent(payload: MessageSignaturePayload): string {
-    const metadata = payload.getMetadata();
-
-    return JSON.stringify({
-      attachmentExternalIdentifiers: payload
-        .getAttachments()
-        .map((attachment) => attachment.valueOf()),
-      authorId: metadata.getAuthorId().valueOf(),
-      conversationId: metadata.getConversationId().valueOf(),
-      createdAt: metadata.getCreatedAt().valueOf(),
-      encryptedPayload: payload.getEncryptedPayload()?.valueOf(),
-      id: metadata.getId().valueOf(),
-      previousMessageIds: metadata
-        .getPreviousMessageIds()
-        .map((messageId) => messageId.valueOf()),
-      replyToMessageId: metadata.getReplyToMessageId()?.valueOf(),
-      targetMessageId: payload.getTargetMessageId()?.valueOf(),
-      type: payload.getType().valueOf(),
-    });
+    return JSON.stringify(payload.toPrimitives());
   }
 
   public async generateSignature(

@@ -1,3 +1,4 @@
+import { StickerNotFoundError } from '../../domain/errors/StickerNotFoundError';
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
@@ -29,7 +30,9 @@ export default class StickerUseRecorder {
       throw new StickerPackNotFoundError();
     }
 
-    pack.useSticker(message.stickerId);
+    if (!pack.hasSticker(message.stickerId)) {
+      throw new StickerNotFoundError();
+    }
 
     const library = await this.findLibrary(message);
 

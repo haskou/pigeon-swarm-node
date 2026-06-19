@@ -13,23 +13,33 @@ export class MessageSignaturePayload {
     private readonly targetMessageId?: MessageId,
   ) {}
 
-  public getMetadata(): MessageMetadata {
-    return this.metadata;
-  }
-
-  public getType(): MessageType {
-    return this.type;
-  }
-
-  public getAttachments(): AttachmentExternalIdentifier[] {
-    return [...this.attachments];
-  }
-
-  public getEncryptedPayload(): EncryptedMessagePayload | undefined {
-    return this.encryptedPayload;
-  }
-
-  public getTargetMessageId(): MessageId | undefined {
-    return this.targetMessageId;
+  public toPrimitives(): {
+    attachmentExternalIdentifiers: string[];
+    authorId: string;
+    conversationId: string;
+    createdAt: number;
+    encryptedPayload?: string;
+    id: string;
+    previousMessageIds: string[];
+    replyToMessageId?: string;
+    targetMessageId?: string;
+    type: string;
+  } {
+    return {
+      attachmentExternalIdentifiers: this.attachments.map((attachment) =>
+        attachment.valueOf(),
+      ),
+      authorId: this.metadata.getAuthorId().valueOf(),
+      conversationId: this.metadata.getConversationId().valueOf(),
+      createdAt: this.metadata.getCreatedAt().valueOf(),
+      encryptedPayload: this.encryptedPayload?.valueOf(),
+      id: this.metadata.getId().valueOf(),
+      previousMessageIds: this.metadata
+        .getPreviousMessageIds()
+        .map((messageId) => messageId.valueOf()),
+      replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
+      targetMessageId: this.targetMessageId?.valueOf(),
+      type: this.type.valueOf(),
+    };
   }
 }
