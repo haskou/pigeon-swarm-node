@@ -1,0 +1,82 @@
+import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+
+import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
+import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
+import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import CommunityFinder from '../find-community/CommunityFinder';
+import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
+import { CommunityMembershipRequestCreateMessage } from './messages/CommunityMembershipRequestCreateMessage';
+
+export default class CommunityMembershipRequester {
+  constructor(
+    private readonly communityFinder: CommunityFinder,
+    private readonly communityRepository: CommunityRepository,
+    private readonly requestRepository: CommunityMembershipRequestRepository,
+    private readonly eventPublisher: DomainEventPublisher,
+  ) {}
+
+  private async acceptAutomatically(
+    community: Awaited<ReturnType<CommunityFinder['find']>>,
+    membershipRequest: CommunityMembershipRequest,
+    message: CommunityMembershipRequestCreateMessage,
+  ): Promise<void> {
+    membershipRequest.acceptAutomatically(community.getOwnerIdentityId());
+    community.joinWithInvite(message.actorIdentityId);
+    await this.communityRepository.save(community);
+    await this.requestRepository.save(membershipRequest);
+    await this.eventPublisher.publish(community.pullDomainEvents());
+    await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
+  }
+
+  public async request(
+    message: CommunityMembershipRequestCreateMessage,
+  ): Promise<CommunityMembershipRequest> {
+    const community = await this.communityFinder.find(
+      new CommunityFindMessage(message.communityId.valueOf()),
+    );
+    const existingRequests =
+      await this.requestRepository.findByCommunityAndIdentity(
+        community.getId(),
+        message.actorIdentityId,
+      );
+    const pendingRequest = existingRequests.find((existingRequest) =>
+      existingRequest.isPending(),
+    );
+    const acceptedRequest = existingRequests.find((existingRequest) =>
+      existingRequest.isAccepted(),
+    );
+
+    community.requestMembership(message.actorIdentityId);
+
+    if (pendingRequest && community.isAutoJoinEnabled()) {
+      await this.acceptAutomatically(community, pendingRequest, message);
+
+      return pendingRequest;
+    }
+
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    if (community.isMember(message.actorIdentityId) && acceptedRequest) {
+      return acceptedRequest;
+    }
+
+    const membershipRequest = CommunityMembershipRequest.request(
+      community.getId(),
+      message.actorIdentityId,
+      community.getOwnerIdentityId(),
+    );
+
+    if (community.isAutoJoinEnabled()) {
+      await this.acceptAutomatically(community, membershipRequest, message);
+
+      return membershipRequest;
+    }
+
+    await this.requestRepository.save(membershipRequest);
+    await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
+
+    return membershipRequest;
+  }
+}

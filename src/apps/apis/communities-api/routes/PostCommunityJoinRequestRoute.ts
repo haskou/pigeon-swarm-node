@@ -1,5 +1,5 @@
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityMembershipRequester from '@app/contexts/communities/application/request-membership/CommunityMembershipRequester';
+import { CommunityMembershipRequestCreateMessage } from '@app/contexts/communities/application/request-membership/messages/CommunityMembershipRequestCreateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
@@ -9,6 +9,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
+  private readonly requester = this.get<CommunityMembershipRequester>(
+    CommunityMembershipRequester,
+  );
+
   @Post('/:communityId/join-requests')
   public async requestJoin(
     @Param('communityId') communityId: string,
@@ -16,77 +20,12 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const requests = this.membershipRequests();
-
-    community.requestMembership(actorIdentityId);
-    const existingRequests = await requests.findByCommunityAndIdentity(
-      new CommunityId(communityId),
-      actorIdentityId,
+    const membershipRequest = await this.requester.request(
+      new CommunityMembershipRequestCreateMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+      ),
     );
-    const pendingRequest = existingRequests.find((existingRequest) =>
-      existingRequest.isPending(),
-    );
-    const acceptedRequest = existingRequests.find((existingRequest) =>
-      existingRequest.isAccepted(),
-    );
-
-    if (pendingRequest && community.isAutoJoinEnabled()) {
-      pendingRequest.acceptAutomatically(community.getOwnerIdentityId());
-      community.joinWithInvite(actorIdentityId);
-      await this.repository().save(community);
-      await requests.save(pendingRequest);
-      await this.eventPublisher.publish(community.pullDomainEvents());
-      await this.eventPublisher.publish(pendingRequest.pullDomainEvents());
-
-      return response
-        .status(HttpRouteStatusEnum.OK)
-        .send(
-          new CommunityMembershipRequestViewModel(pendingRequest).toResource(),
-        );
-    }
-
-    if (pendingRequest) {
-      return response
-        .status(HttpRouteStatusEnum.OK)
-        .send(
-          new CommunityMembershipRequestViewModel(pendingRequest).toResource(),
-        );
-    }
-
-    if (community.isMember(actorIdentityId) && acceptedRequest) {
-      return response
-        .status(HttpRouteStatusEnum.OK)
-        .send(
-          new CommunityMembershipRequestViewModel(acceptedRequest).toResource(),
-        );
-    }
-
-    const membershipRequest = CommunityMembershipRequest.request(
-      community.getId(),
-      actorIdentityId,
-      community.getOwnerIdentityId(),
-    );
-
-    if (community.isAutoJoinEnabled()) {
-      membershipRequest.acceptAutomatically(community.getOwnerIdentityId());
-      community.joinWithInvite(actorIdentityId);
-      await this.repository().save(community);
-      await requests.save(membershipRequest);
-      await this.eventPublisher.publish(community.pullDomainEvents());
-      await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
-
-      return response
-        .status(HttpRouteStatusEnum.OK)
-        .send(
-          new CommunityMembershipRequestViewModel(
-            membershipRequest,
-          ).toResource(),
-        );
-    }
-
-    await requests.save(membershipRequest);
-    await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
 
     return response
       .status(HttpRouteStatusEnum.OK)

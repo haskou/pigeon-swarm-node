@@ -1,3 +1,5 @@
+import CommunityMembershipRequestsFinder from '@app/contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder';
+import { CommunityMembershipRequestsFindMessage } from '@app/contexts/communities/application/find-membership-requests/messages/CommunityMembershipRequestsFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';
@@ -7,31 +9,26 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityMembershipRequestsRoute extends CommunityRouteSupport {
+  private readonly finder = this.get<CommunityMembershipRequestsFinder>(
+    CommunityMembershipRequestsFinder,
+  );
+
   @Get('/membership-requests')
   public async getMembershipRequests(
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const [identityRequests, ownedCommunityRequests] = await Promise.all([
-      this.membershipRequests().findByIdentity(identityId),
-      this.membershipRequests().findByOwnedCommunities(identityId),
-    ]);
-    const requestsById = new Map(
-      [...identityRequests, ...ownedCommunityRequests].map(
-        (membershipRequest) => [
-          membershipRequest.getId().valueOf(),
-          membershipRequest,
-        ],
-      ),
+    const membershipRequests = await this.finder.find(
+      new CommunityMembershipRequestsFindMessage(identityId.valueOf()),
     );
 
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
-        new CommunityMembershipRequestsViewModel([
-          ...requestsById.values(),
-        ]).toResource(),
+        new CommunityMembershipRequestsViewModel(
+          membershipRequests,
+        ).toResource(),
       );
   }
 }

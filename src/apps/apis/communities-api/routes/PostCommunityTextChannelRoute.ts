@@ -1,6 +1,5 @@
-import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
+import CommunityTextChannelCreator from '@app/contexts/communities/application/create-channel/CommunityTextChannelCreator';
+import { CommunityChannelCreateMessage } from '@app/contexts/communities/application/create-channel/messages/CommunityChannelCreateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -18,6 +17,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PostCommunityTextChannelRoute extends CommunityRouteSupport {
+  private readonly creator = this.get<CommunityTextChannelCreator>(
+    CommunityTextChannelCreator,
+  );
+
   @Post('/:communityId/channels/text')
   public async addTextChannel(
     @Param('communityId') communityId: string,
@@ -26,23 +29,12 @@ export class PostCommunityTextChannelRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const channel = community.addTextChannel(
-      actorIdentityId,
-      new CommunityChannelName(body.name),
-    );
-
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.CHANNEL_CREATED,
-      this.moderationTarget(
-        CommunityModerationTargetType.CHANNEL,
-        channel.getId(),
+    const channel = await this.creator.create(
+      new CommunityChannelCreateMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        body.name,
       ),
-      { name: body.name, type: 'text' },
     );
 
     return response

@@ -4,6 +4,7 @@ import { IdentitySignaturePayload } from '@app/contexts/identities/domain/Identi
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
@@ -71,7 +72,7 @@ describe('IdentityCandidateValidationDomainService', () => {
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
         IdentitySignaturePayload.fromPrimitives(candidatePrimitives),
-        EncryptedKeyPair.fromPrimitives(previousPrimitives.encryptedKeyPair),
+        IdentitySigningKey.fromPrimitives(previousPrimitives.encryptedKeyPair),
         mother.password,
       );
     const candidate = Identity.fromPrimitives({

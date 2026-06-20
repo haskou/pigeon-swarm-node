@@ -1,6 +1,5 @@
 import CommunityProfileUpdater from '@app/contexts/communities/application/update-profile/CommunityProfileUpdater';
 import { CommunityProfileUpdateMessage } from '@app/contexts/communities/application/update-profile/messages/CommunityProfileUpdateMessage';
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -30,11 +29,9 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    await this.updater.update(
-      community,
+    const community = await this.updater.update(
       new CommunityProfileUpdateMessage(
+        communityId,
         actorIdentityId.valueOf(),
         body.name,
         body.description,
@@ -43,20 +40,6 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
         body.discoverable,
         body.autoJoinEnabled,
       ),
-    );
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.COMMUNITY_UPDATED,
-      this.communityTarget(community),
-      {
-        autoJoinEnabled: body.autoJoinEnabled,
-        avatar: body.avatar,
-        banner: body.banner,
-        description: body.description,
-        discoverable: body.discoverable,
-        name: body.name,
-      },
     );
 
     return response

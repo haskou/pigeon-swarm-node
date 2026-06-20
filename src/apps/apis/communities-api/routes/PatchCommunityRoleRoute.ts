@@ -1,8 +1,5 @@
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { CommunityPermission } from '@app/contexts/communities/domain/value-objects/CommunityPermission';
-import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
-import { CommunityRoleName } from '@app/contexts/communities/domain/value-objects/CommunityRoleName';
+import CommunityRoleUpdater from '@app/contexts/communities/application/update-role/CommunityRoleUpdater';
+import { CommunityRoleUpdateMessage } from '@app/contexts/communities/application/update-role/messages/CommunityRoleUpdateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -20,6 +17,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PatchCommunityRoleRoute extends CommunityRouteSupport {
+  private readonly updater =
+    this.get<CommunityRoleUpdater>(CommunityRoleUpdater);
+
   @Patch('/:communityId/roles/:roleId')
   public async updateRole(
     @Param('communityId') communityId: string,
@@ -29,25 +29,14 @@ export class PatchCommunityRoleRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.updateRole(
-      actorIdentityId,
-      new CommunityRoleId(roleId),
-      new CommunityRoleName(body.name),
-      body.permissions.map((permission) => new CommunityPermission(permission)),
-    );
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.ROLE_UPDATED,
-      this.moderationTarget(
-        CommunityModerationTargetType.ROLE,
-        new CommunityRoleId(roleId),
+    const community = await this.updater.update(
+      new CommunityRoleUpdateMessage(
+        communityId,
+        roleId,
+        actorIdentityId.valueOf(),
+        body.name,
+        body.permissions,
       ),
-      { name: body.name, permissions: body.permissions },
     );
 
     return response

@@ -9,6 +9,7 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -144,7 +145,7 @@ describe('Identity', () => {
       const signature =
         await new IdentitySignatureDomainService().generateSignature(
           IdentitySignaturePayload.fromPrimitives(signaturePayload),
-          mother.encryptedKeyPair,
+          new IdentitySigningKey(mother.encryptedKeyPair),
           mother.password,
         );
 

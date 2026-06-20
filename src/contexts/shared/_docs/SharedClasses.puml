@@ -28,6 +28,7 @@ package "shared/infrastructure/local-db" {
 
 package "shared/infrastructure/orbitdb" {
   class OrbitDBReplicatedStateRegistry
+  class LocalOrbitDBReplicatedHeadCache
   class OrbitDBReplicatedStateStores
   class OrbitDBReplicatedDomainEventPublisher
 }
@@ -40,6 +41,11 @@ package "shared/infrastructure/ipfs" {
   class IPFSConnection
   class IPFSContentRacer
   class IPFSNetwork
+}
+
+package "shared/infrastructure/network/relay" {
+  class PrivateNetworkRelayRecordDirectory
+  class PrivateNetworkRelayRecord
 }
 
 package "shared/infrastructure/messaging" {
@@ -66,6 +72,8 @@ BaseRequester ..> HttpClient
 LocalProcessedDomainEventRepository ..> EmbeddedLocalDatabase
 OrbitDBReplicatedDomainEventPublisher ..> OrbitDBReplicatedStateStores
 OrbitDBReplicatedStateRegistry ..> OrbitDBReplicatedStateStores
+OrbitDBReplicatedStateRegistry ..> LocalOrbitDBReplicatedHeadCache
+LocalOrbitDBReplicatedHeadCache ..> EmbeddedLocalDatabase
 
 HeliaIPFS ..|> IPFS
 HeliaIPFS ..> HeliaIPFSParser
@@ -73,6 +81,8 @@ HeliaIPFS ..> HeliaPinningStrategy
 HeliaIPFS ..> IPFSConnection
 HeliaIPFS ..> IPFSContentRacer
 IPFSConnection ..> IPFSNetwork
+PrivateNetworkRelayRecordDirectory ..> EmbeddedLocalDatabase
+PrivateNetworkRelayRecordDirectory ..> PrivateNetworkRelayRecord
 
 DomainEventPublisher ..> MessageBus
 Libp2pGossipsubMessageBusAdapter ..|> MessageBus

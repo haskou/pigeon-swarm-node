@@ -2,6 +2,7 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { EncryptedMasterKey } from '@app/contexts/identities/domain/value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { MasterKeyDerivation } from '@app/contexts/identities/domain/value-objects/MasterKeyDerivation';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
@@ -132,7 +133,7 @@ export class IdentityMother {
   public build(): Identity {
     return new Identity(
       this.id,
-      this.encryptedKeyPair,
+      new IdentitySigningKey(this.encryptedKeyPair),
       this.encryptedMasterKey,
       this.masterKeyDerivation,
       UniqueObjectArray.fromArray(this.networks),

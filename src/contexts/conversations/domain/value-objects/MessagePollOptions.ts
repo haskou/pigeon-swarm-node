@@ -22,6 +22,8 @@ export class MessagePollOptions {
   }
 
   public getPreviousMessageIds(fallback: MessageId[]): MessageId[] {
-    return this.previousMessageIds ?? fallback;
+    return this.previousMessageIds
+      ? [...this.previousMessageIds]
+      : [...fallback];
   }
 }

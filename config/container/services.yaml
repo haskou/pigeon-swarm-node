@@ -140,8 +140,8 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19LZXljaGFpbk1ldGFkYXRhUmVwb3NpdG9yeV9fS2V5Y2hhaW5NZXRhZGF0YVJlcG9zaXRvcnk=: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YVJlcG9zaXRvcnlfX09yYml0REJLZXljaGFpbk1ldGFkYXRhUmVwb3NpdG9yeQ==
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX0lkZW50aXR5TWV0YWRhdGFJbmRleF9fSWRlbnRpdHlNZXRhZGF0YUluZGV4: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFJbmRleF9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFJbmRleA==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19LZXljaGFpblJlcG9zaXRvcnlfX0tleWNoYWluUmVwb3NpdG9yeQ==: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5SZXBvc2l0b3J5X19JcGZzS2V5Y2hhaW5SZXBvc2l0b3J5
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2RvbWFpbl9fc2VydmljZXNfX0tleWNoYWluU2lnbmF0dXJlRG9tYWluU2VydmljZV9fS2V5Y2hhaW5TaWduYXR1cmVEb21haW5TZXJ2aWNl:
@@ -154,6 +154,8 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19tZXRhZGF0YV9fS2V5Y2hhaW5NZXRhZGF0YUluZGV4X19LZXljaGFpbk1ldGFkYXRhSW5kZXg=: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YUluZGV4X19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YUluZGV4
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVQZWVyUmVwb3NpdG9yeV9fTm9kZVBlZXJSZXBvc2l0b3J5: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19Mb2NhbE5vZGVQZWVyUmVwb3NpdG9yeV9fTG9jYWxOb2RlUGVlclJlcG9zaXRvcnk=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==: >-
@@ -209,6 +211,8 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZEhlYWRDYWNoZV9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkQ2FjaGU=: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19Mb2NhbE9yYml0REJSZXBsaWNhdGVkSGVhZENhY2hlX19Mb2NhbE9yYml0REJSZXBsaWNhdGVkSGVhZENhY2hl
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==:
     class: /contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry
     arguments: []
@@ -269,11 +273,6 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkQ29kZWNfX1ByaXZhdGVOZXR3b3JrUmVsYXlSZWNvcmRDb2RlYw==:
     class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec
-    arguments: []
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5:
-    class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory
     arguments: []
     abstract: false
     parent: null
@@ -368,11 +367,42 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXRpZXNfX0NvbW11bml0aWVzRmluZGVyX19Db21tdW5pdGllc0ZpbmRlcg==:
+    class: /contexts/communities/application/find-communities/CommunitiesFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==:
     class: /contexts/communities/application/find-community/CommunityFinder
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtbWVtYmVyc2hpcC1yZXF1ZXN0c19fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RzRmluZGVyX19Db21tdW5pdHlNZW1iZXJzaGlwUmVxdWVzdHNGaW5kZXI=:
+    class: >-
+      /contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0UmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX21hbmFnZS1jaGFubmVsLWRyYWZ0X19Db21tdW5pdHlDaGFubmVsRHJhZnRzRmluZGVyX19Db21tdW5pdHlDaGFubmVsRHJhZnRzRmluZGVy:
+    class: >-
+      /contexts/communities/application/manage-channel-draft/CommunityChannelDraftsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=:
+    class: >-
+      /contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1vZGVyYXRpb25Mb2dSZXBvc2l0b3J5X19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19hcHBsaWNhdGlvbl9fdXBkYXRlLXN0YXR1cy1zdW1tYXJ5X19Db250ZW50UmVwbGljYXRpb25TdGF0dXNTdW1tYXJ5VXBkYXRlcl9fQ29udGVudFJlcGxpY2F0aW9uU3RhdHVzU3VtbWFyeVVwZGF0ZXI=:
@@ -712,6 +742,13 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5:
+    class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19QdWJsaWNSZWxheVJ1bnRpbWVfX1B1YmxpY1JlbGF5UnVudGltZQ==:
     class: /shared/infrastructure/network/relay/PublicRelayRuntime
     arguments:
@@ -829,13 +866,53 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3VwZGF0ZS1wcm9maWxlX19Db21tdW5pdHlQcm9maWxlVXBkYXRlcl9fQ29tbXVuaXR5UHJvZmlsZVVwZGF0ZXI=:
-    class: /contexts/communities/application/update-profile/CommunityProfileUpdater
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2Rpc2NvdmVyLWNvbW11bml0aWVzX19Db21tdW5pdGllc0Rpc2NvdmVyZXJfX0NvbW11bml0aWVzRGlzY292ZXJlcg==:
+    class: >-
+      /contexts/communities/application/discover-communities/CommunitiesDiscoverer
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0UmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtaW52aXRlX19Db21tdW5pdHlJbnZpdGVEZXRhaWxzRmluZGVyX19Db21tdW5pdHlJbnZpdGVEZXRhaWxzRmluZGVy:
+    class: /contexts/communities/application/find-invite/CommunityInviteDetailsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnlfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtbW9kZXJhdGlvbi1sb2dzX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nc0ZpbmRlcl9fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ3NGaW5kZXI=:
+    class: >-
+      /contexts/communities/application/find-moderation-logs/CommunityModerationLogsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1vZGVyYXRpb25Mb2dSZXBvc2l0b3J5X19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX21hbmFnZS1jaGFubmVsLWRyYWZ0X19Db21tdW5pdHlDaGFubmVsRHJhZnREZWxldGVyX19Db21tdW5pdHlDaGFubmVsRHJhZnREZWxldGVy:
+    class: >-
+      /contexts/communities/application/manage-channel-draft/CommunityChannelDraftDeleter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX21hbmFnZS1jaGFubmVsLWRyYWZ0X19Db21tdW5pdHlDaGFubmVsRHJhZnRTYXZlcl9fQ29tbXVuaXR5Q2hhbm5lbERyYWZ0U2F2ZXI=:
+    class: >-
+      /contexts/communities/application/manage-channel-draft/CommunityChannelDraftSaver
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnk=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19Mb2NhbENvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0xvY2FsQ29tbXVuaXR5Q2hhbm5lbERyYWZ0UmVwb3NpdG9yeQ==:
@@ -923,16 +1000,6 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udGVudFJlcGxpY2F0aW9uU3RhdHVzU3VtbWFyeVJlcG9zaXRvcnlfX0NvbnRlbnRSZXBsaWNhdGlvblN0YXR1c1N1bW1hcnlSZXBvc2l0b3J5
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fZmluZC1sYXRlc3QtbWVzc2FnZXNfX0xhdGVzdE1lc3NhZ2VzRmluZGVyX19MYXRlc3RNZXNzYWdlc0ZpbmRlcg==:
-    class: >-
-      /contexts/conversations/application/find-latest-messages/LatestMessagesFinder
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeV9fTWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeQ==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fbWFuYWdlLWRyYWZ0X19Db252ZXJzYXRpb25EcmFmdERlbGV0ZXJfX0NvbnZlcnNhdGlvbkRyYWZ0RGVsZXRlcg==:
     class: /contexts/conversations/application/manage-draft/ConversationDraftDeleter
     arguments:
@@ -1017,8 +1084,7 @@ services:
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFJbmRleF9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFJbmRleA==:
-    class: >-
-      /contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex
+    class: /contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
@@ -1036,8 +1102,7 @@ services:
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YUluZGV4X19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YUluZGV4:
-    class: >-
-      /contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex
+    class: /contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
@@ -1126,6 +1191,15 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fYXBwbGljYXRpb25fX2F1dGhvcml6ZS1wb2xsLXNjb3BlX19Qb2xsU2NvcGVBdXRob3JpemVyX19Qb2xsU2NvcGVBdXRob3JpemVy:
+    class: /contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fYXBwbGljYXRpb25fX3JlZ2lzdGVyLXRpbWVsaW5lLW1lc3NhZ2VfX1BvbGxUaW1lbGluZU1lc3NhZ2VSZWdpc3RyYXJfX1BvbGxUaW1lbGluZU1lc3NhZ2VSZWdpc3RyYXI=:
     class: >-
       /contexts/polls/application/register-timeline-message/PollTimelineMessageRegistrar
@@ -1134,15 +1208,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fYXBwbGljYXRpb25fX2F1dGhvcml6ZS1wb2xsLXNjb3BlX19Qb2xsU2NvcGVBdXRob3JpemVyX19Qb2xsU2NvcGVBdXRob3JpemVy:
-    class: /contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJQb2xsUmVwb3NpdG9yeV9fT3JiaXREQlBvbGxSZXBvc2l0b3J5:
@@ -1198,6 +1263,14 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19oZWxpYV9fSVBGU0NvbnRlbnRSYWNlcl9fSVBGU0NvbnRlbnRSYWNlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19Mb2NhbE9yYml0REJSZXBsaWNhdGVkSGVhZENhY2hlX19Mb2NhbE9yYml0REJSZXBsaWNhdGVkSGVhZENhY2hl:
+    class: /contexts/shared/infrastructure/orbitdb/LocalOrbitDBReplicatedHeadCache
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
+    abstract: false
+    parent: >-
+      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZEhlYWRDYWNoZV9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkQ2FjaGU=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2Zhdm9yaXRlLXN0aWNrZXJfX1N0aWNrZXJGYXZvcml0ZXJfX1N0aWNrZXJGYXZvcml0ZXI=:
     class: /contexts/stickers/application/favorite-sticker/StickerFavoriter
     arguments:
@@ -1464,6 +1537,76 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY2hhbm5lbHNfX0NvbW11bml0eUNoYW5uZWxzRmluZGVyX19Db21tdW5pdHlDaGFubmVsc0ZpbmRlcg==:
+    class: /contexts/communities/application/find-channels/CommunityChannelsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2tpY2stbWVtYmVyX19Db21tdW5pdHlNZW1iZXJLaWNrZXJfX0NvbW11bml0eU1lbWJlcktpY2tlcg==:
+    class: /contexts/communities/application/kick-member/CommunityMemberKicker
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX21hbmFnZS1jaGFubmVsLW1lc3NhZ2UtcGluX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVBpbnNGaW5kZXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUGluc0ZpbmRlcg==:
+    class: >-
+      /contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinsFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUGluUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VQaW5SZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX21hbmFnZS1jaGFubmVsLW1lc3NhZ2UtcGluX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVVucGlubmVyX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVVucGlubmVy:
+    class: >-
+      /contexts/communities/application/manage-channel-message-pin/CommunityChannelMessageUnpinner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUGluUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VQaW5SZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3NlYXJjaC1jaGFubmVsLW1lc3NhZ2VzX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNlYXJjaGVyX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNlYXJjaGVy:
+    class: >-
+      /contexts/communities/application/search-channel-messages/CommunityChannelMessageSearcher
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3NlYXJjaC1tZXNzYWdlc19fQ29tbXVuaXR5TWVzc2FnZXNTZWFyY2hlcl9fQ29tbXVuaXR5TWVzc2FnZXNTZWFyY2hlcg==:
+    class: >-
+      /contexts/communities/application/search-messages/CommunityMessagesSearcher
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDb21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnlfX09yYml0REJDb21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnk=:
     class: >-
       /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository
@@ -1605,17 +1748,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeV9fTWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeQ==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fc2VuZC1tZXNzYWdlX19NZXNzYWdlU2VuZGVyX19NZXNzYWdlU2VuZGVy:
-    class: /contexts/conversations/application/send-message/MessageSender
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3NlcnZpY2VzX19NZXNzYWdlU2lnbmF0dXJlRG9tYWluU2VydmljZV9fTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNvbnZlcnNhdGlvblJlcG9zaXRvcnlfX09yYml0REJDb252ZXJzYXRpb25SZXBvc2l0b3J5:
@@ -1800,34 +1932,124 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fU2NoZWR1bGVyX19TY2hlZHVsZXI=
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3NlbmQtY2hhbm5lbC1tZXNzYWdlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNlbmRlcl9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTZW5kZXI=:
-    class: >-
-      /contexts/communities/application/send-channel-message/CommunityChannelMessageSender
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2FjY2VwdC1pbnZpdGVfX0NvbW11bml0eUludml0ZUFjY2VwdGVyX19Db21tdW5pdHlJbnZpdGVBY2NlcHRlcg==:
+    class: /contexts/communities/application/accept-invite/CommunityInviteAccepter
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnlfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnk=
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1jaGFubmVsLW1lc3NhZ2VfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlRGVsZXRlcl9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VEZWxldGVy:
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2Fzc2lnbi1tZW1iZXItcm9sZXNfX0NvbW11bml0eU1lbWJlclJvbGVzQXNzaWduZXJfX0NvbW11bml0eU1lbWJlclJvbGVzQXNzaWduZXI=:
     class: >-
-      /contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter
+      /contexts/communities/application/assign-member-roles/CommunityMemberRolesAssigner
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1vZGVyYXRpb25Mb2dSZXBvc2l0b3J5X19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2Jhbi1tZW1iZXJfX0NvbW11bml0eU1lbWJlckJhbm5lcl9fQ29tbXVuaXR5TWVtYmVyQmFubmVy:
+    class: /contexts/communities/application/ban-member/CommunityMemberBanner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2Jhbi1tZW1iZXJfX0NvbW11bml0eU1lbWJlclVuYmFubmVyX19Db21tdW5pdHlNZW1iZXJVbmJhbm5lcg==:
+    class: /contexts/communities/application/ban-member/CommunityMemberUnbanner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZS1jaGFubmVsX19Db21tdW5pdHlUZXh0Q2hhbm5lbENyZWF0b3JfX0NvbW11bml0eVRleHRDaGFubmVsQ3JlYXRvcg==:
+    class: >-
+      /contexts/communities/application/create-channel/CommunityTextChannelCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZS1jaGFubmVsX19Db21tdW5pdHlWb2ljZUNoYW5uZWxDcmVhdG9yX19Db21tdW5pdHlWb2ljZUNoYW5uZWxDcmVhdG9y:
+    class: >-
+      /contexts/communities/application/create-channel/CommunityVoiceChannelCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZS1pbnZpdGVfX0NvbW11bml0eUludml0ZUNyZWF0b3JfX0NvbW11bml0eUludml0ZUNyZWF0b3I=:
+    class: /contexts/communities/application/create-invite/CommunityInviteCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnlfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZS1yb2xlX19Db21tdW5pdHlSb2xlQ3JlYXRvcl9fQ29tbXVuaXR5Um9sZUNyZWF0b3I=:
+    class: /contexts/communities/application/create-role/CommunityRoleCreator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1yb2xlX19Db21tdW5pdHlSb2xlRGVsZXRlcl9fQ29tbXVuaXR5Um9sZURlbGV0ZXI=:
+    class: /contexts/communities/application/delete-role/CommunityRoleDeleter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2VkaXQtY2hhbm5lbC1tZXNzYWdlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZUVkaXRvcl9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VFZGl0b3I=:
@@ -1842,6 +2064,169 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY2hhbm5lbC1tZXNzYWdlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VzRmluZGVyX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZXNGaW5kZXI=:
+    class: >-
+      /contexts/communities/application/find-channel-messages/CommunityChannelMessagesFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1BvbGxSZXBvc2l0b3J5X19Qb2xsUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ludml0ZS1tZW1iZXJfX0NvbW11bml0eU1lbWJlckludml0ZXJfX0NvbW11bml0eU1lbWJlckludml0ZXI=:
+    class: /contexts/communities/application/invite-member/CommunityMemberInviter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0UmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2xlYXZlLWNvbW11bml0eV9fQ29tbXVuaXR5TGVhdmVyX19Db21tdW5pdHlMZWF2ZXI=:
+    class: /contexts/communities/application/leave-community/CommunityLeaver
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1lbXB0eS1jb21tdW5pdHlfX0VtcHR5Q29tbXVuaXR5RGVsZXRlcl9fRW1wdHlDb21tdW5pdHlEZWxldGVy
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX21hbmFnZS1jaGFubmVsLW1lc3NhZ2UtcGluX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVBpbm5lcl9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VQaW5uZXI=:
+    class: >-
+      /contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinner
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUGluUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VQaW5SZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlYWN0LWNoYW5uZWwtbWVzc2FnZV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZWFjdGlvbkFkZGVyX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVJlYWN0aW9uQWRkZXI=:
+    class: >-
+      /contexts/communities/application/react-channel-message/CommunityChannelMessageReactionAdder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlYWN0LWNoYW5uZWwtbWVzc2FnZV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZWFjdGlvblJlbW92ZXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVhY3Rpb25SZW1vdmVy:
+    class: >-
+      /contexts/communities/application/react-channel-message/CommunityChannelMessageReactionRemover
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlbmFtZS1jaGFubmVsX19Db21tdW5pdHlDaGFubmVsUmVuYW1lcl9fQ29tbXVuaXR5Q2hhbm5lbFJlbmFtZXI=:
+    class: /contexts/communities/application/rename-channel/CommunityChannelRenamer
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlcXVlc3QtbWVtYmVyc2hpcF9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3Rlcl9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3Rlcg==:
+    class: >-
+      /contexts/communities/application/request-membership/CommunityMembershipRequester
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0UmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3NlbmQtY2hhbm5lbC1tZXNzYWdlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNlbmRlcl9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTZW5kZXI=:
+    class: >-
+      /contexts/communities/application/send-channel-message/CommunityChannelMessageSender
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3VwZGF0ZS1jaGFubmVsLXBlcm1pc3Npb25zX19Db21tdW5pdHlDaGFubmVsUGVybWlzc2lvbnNVcGRhdGVyX19Db21tdW5pdHlDaGFubmVsUGVybWlzc2lvbnNVcGRhdGVy:
+    class: >-
+      /contexts/communities/application/update-channel-permissions/CommunityChannelPermissionsUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3VwZGF0ZS1wcm9maWxlX19Db21tdW5pdHlQcm9maWxlVXBkYXRlcl9fQ29tbXVuaXR5UHJvZmlsZVVwZGF0ZXI=:
+    class: /contexts/communities/application/update-profile/CommunityProfileUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3VwZGF0ZS1yb2xlX19Db21tdW5pdHlSb2xlVXBkYXRlcl9fQ29tbXVuaXR5Um9sZVVwZGF0ZXI=:
+    class: /contexts/communities/application/update-role/CommunityRoleUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19hcHBsaWNhdGlvbl9fcHVibGlzaC1jb250ZW50X19Db250ZW50UHVibGlzaGVyX19Db250ZW50UHVibGlzaGVy:
@@ -1898,6 +2283,20 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fZmluZC1sYXRlc3QtbWVzc2FnZXNfX0xhdGVzdE1lc3NhZ2VzRmluZGVyX19MYXRlc3RNZXNzYWdlc0ZpbmRlcg==:
+    class: >-
+      /contexts/conversations/application/find-latest-messages/LatestMessagesFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1BvbGxSZXBvc2l0b3J5X19Qb2xsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeV9fTWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fbWFuYWdlLXBpbl9fQ29udmVyc2F0aW9uTWVzc2FnZVBpbm5lcl9fQ29udmVyc2F0aW9uTWVzc2FnZVBpbm5lcg==:
     class: /contexts/conversations/application/manage-pin/ConversationMessagePinner
     arguments:
@@ -1909,6 +2308,19 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fbWFuYWdlLXBpbl9fQ29udmVyc2F0aW9uTWVzc2FnZVBpbkFjY2Vzc19fQ29udmVyc2F0aW9uTWVzc2FnZVBpbkFjY2Vzcw==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fc2VuZC1tZXNzYWdlX19NZXNzYWdlU2VuZGVyX19NZXNzYWdlU2VuZGVy:
+    class: /contexts/conversations/application/send-message/MessageSender
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1BvbGxSZXBvc2l0b3J5X19Qb2xsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3NlcnZpY2VzX19NZXNzYWdlU2lnbmF0dXJlRG9tYWluU2VydmljZV9fTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcHVibGlzaF9fSWRlbnRpdHlQdWJsaXNoZXJfX0lkZW50aXR5UHVibGlzaGVy:
@@ -2031,6 +2443,38 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3VpX19jb25zdW1lcnNfX0NvbnN1bWVyX19Db25zdW1lcg==
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1jaGFubmVsLW1lc3NhZ2VfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlRGVsZXRlcl9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VEZWxldGVy:
+    class: >-
+      /contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1vZGVyYXRpb25Mb2dSZXBvc2l0b3J5X19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3VwZGF0ZS1tZW1iZXJzaGlwLXJlcXVlc3RfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0VXBkYXRlcl9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RVcGRhdGVy:
+    class: >-
+      /contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0UmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19hcHBsaWNhdGlvbl9fZmluZC1zdGF0dXNfX0NvbnRlbnRSZXBsaWNhdGlvblN0YXR1c0ZpbmRlcl9fQ29udGVudFJlcGxpY2F0aW9uU3RhdHVzRmluZGVy:
     class: >-
       /contexts/content-replication/application/find-status/ContentReplicationStatusFinder
@@ -2108,6 +2552,41 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCRG9tYWluRXZlbnRQcm9qZWN0b3JfX09yYml0REJEb21haW5FdmVudFByb2plY3Rvcg==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCTWV0YWRhdGFIZWFkUmVwYWlyZXJfX09yYml0REJNZXRhZGF0YUhlYWRSZXBhaXJlcg==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1jaGFubmVsX19Db21tdW5pdHlDaGFubmVsRGVsZXRlcl9fQ29tbXVuaXR5Q2hhbm5lbERlbGV0ZXI=:
+    class: /contexts/communities/application/delete-channel/CommunityChannelDeleter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2ZpbmQtY29tbXVuaXR5X19Db21tdW5pdHlGaW5kZXJfX0NvbW11bml0eUZpbmRlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9fZG9tYWluX19ldmVudHNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX3JlY29yZC1tb2RlcmF0aW9uLWxvZ19fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVyX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVjb3JkZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1lbXB0eS1jb21tdW5pdHlfX0VtcHR5Q29tbXVuaXR5RGVsZXRlcl9fRW1wdHlDb21tdW5pdHlEZWxldGVy:
+    class: >-
+      /contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnlfX0NvbW11bml0eUludml0ZVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lbWJlcnNoaXBSZXF1ZXN0UmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVtYmVyc2hpcFJlcXVlc3RSZXBvc2l0b3J5
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnlfX0NvbW11bml0eU1lc3NhZ2VSZWFjdGlvblJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eU1vZGVyYXRpb25Mb2dSZXBvc2l0b3J5X19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNBZGFwdGVyX19NZXNzYWdlQnVzQWRhcHRlcg==: >-

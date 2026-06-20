@@ -3,6 +3,7 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import IdentityResolutionDomainService from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -28,7 +29,7 @@ describe('IdentityResolutionDomainService', () => {
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
         IdentitySignaturePayload.fromPrimitives(nextPrimitives),
-        mother.encryptedKeyPair,
+        new IdentitySigningKey(mother.encryptedKeyPair),
         mother.password,
       );
 

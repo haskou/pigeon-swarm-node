@@ -15,10 +15,186 @@ package "communities/application" {
     + send(message): CommunityChannelMessage
   }
 
+  class CommunityProfileUpdater {
+    + update(message): Community
+  }
+
+  class CommunityModerationLogRecorder {
+    + record(...): CommunityModerationLogEntry
+  }
+
+  class CommunityMemberBanner {
+    + ban(message): Community
+  }
+
+  class CommunityMemberUnbanner {
+    + unban(message): Community
+  }
+
+  class CommunityTextChannelCreator {
+    + create(message): Community
+  }
+
+  class CommunityVoiceChannelCreator {
+    + create(message): Community
+  }
+
+  class CommunityChannelRenamer {
+    + rename(message): Community
+  }
+
+  class CommunityChannelPermissionsUpdater {
+    + update(message): Community
+  }
+
+  class CommunityChannelDeleter {
+    + delete(message): Community
+  }
+
+  class CommunityRoleCreator {
+    + create(message): Community
+  }
+
+  class CommunityRoleUpdater {
+    + update(message): Community
+  }
+
+  class CommunityRoleDeleter {
+    + delete(message): Community
+  }
+
+  class CommunityMemberRolesAssigner {
+    + assign(message): Community
+  }
+
+  class CommunityMemberKicker {
+    + kick(message): Community
+  }
+
+  class CommunityLeaver {
+    + leave(message): Community
+  }
+
+  class EmptyCommunityDeleter {
+    + delete(message): void
+  }
+
+  class CommunityInviteCreator {
+    + create(message): CommunityInvite
+  }
+
+  class CommunityInviteAccepter {
+    + accept(message): Community
+  }
+
+  class CommunityMembershipRequester {
+    + request(message): CommunityMembershipRequest
+  }
+
+  class CommunityMembershipRequestUpdater {
+    + update(message): CommunityMembershipRequest
+  }
+
+  class CommunityMemberInviter {
+    + invite(message): CommunityMembershipRequest
+  }
+
+  class CommunityChannelMessagesFinder {
+    + find(message): CommunityChannelMessagesPage
+  }
+
+  class CommunityChannelMessageSearcher {
+    + search(message): CommunityChannelMessagesPage
+  }
+
+  class CommunityMessagesSearcher {
+    + search(message): CommunityMessagesSearchResult
+  }
+
+  class CommunityChannelMessageReactionAdder {
+    + add(message): CommunityChannelMessageReaction
+  }
+
+  class CommunityChannelMessageReactionRemover {
+    + remove(message): CommunityChannelMessageReaction
+  }
+
+  class CommunityInviteDetailsFinder {
+    + find(message): CommunityInviteDetails
+  }
+
+  class CommunityMembershipRequestsFinder {
+    + find(message): CommunityMembershipRequest[]
+  }
+
+  class CommunityModerationLogsFinder {
+    + find(message): CommunityModerationLogsPage
+  }
+
+  class CommunitiesFinder {
+    + find(message): Community[]
+  }
+
+  class CommunitiesDiscoverer {
+    + discover(message): CommunitiesDiscovery
+  }
+
+  class CommunityChannelsFinder {
+    + find(message): CommunityChannelsDetails
+  }
+
   CommunityCreator ..> CommunityRepository
   CommunityFinder ..> CommunityRepository
   CommunityChannelMessageSender ..> CommunityFinder
   CommunityChannelMessageSender ..> CommunityChannelMessageRepository
+  CommunityProfileUpdater ..> CommunityFinder
+  CommunityProfileUpdater ..> CommunityRepository
+  CommunityProfileUpdater ..> CommunityModerationLogRecorder
+  CommunityModerationLogRecorder ..> CommunityModerationLogRepository
+  CommunityMemberBanner ..> CommunityRepository
+  CommunityMemberBanner ..> CommunityModerationLogRecorder
+  CommunityMemberUnbanner ..> CommunityRepository
+  CommunityTextChannelCreator ..> CommunityRepository
+  CommunityVoiceChannelCreator ..> CommunityRepository
+  CommunityChannelRenamer ..> CommunityRepository
+  CommunityChannelPermissionsUpdater ..> CommunityRepository
+  CommunityChannelDeleter ..> CommunityRepository
+  CommunityRoleCreator ..> CommunityRepository
+  CommunityRoleUpdater ..> CommunityRepository
+  CommunityRoleDeleter ..> CommunityRepository
+  CommunityMemberRolesAssigner ..> CommunityRepository
+  CommunityMemberKicker ..> CommunityRepository
+  CommunityLeaver ..> CommunityRepository
+  EmptyCommunityDeleter ..> CommunityRepository
+  CommunityInviteCreator ..> CommunityRepository
+  CommunityInviteCreator ..> CommunityInviteRepository
+  CommunityInviteAccepter ..> CommunityRepository
+  CommunityInviteAccepter ..> CommunityInviteRepository
+  CommunityMembershipRequester ..> CommunityRepository
+  CommunityMembershipRequester ..> CommunityMembershipRequestRepository
+  CommunityMembershipRequestUpdater ..> CommunityRepository
+  CommunityMembershipRequestUpdater ..> CommunityMembershipRequestRepository
+  CommunityMemberInviter ..> CommunityRepository
+  CommunityMemberInviter ..> CommunityMembershipRequestRepository
+  CommunityChannelMessagesFinder ..> CommunityRepository
+  CommunityChannelMessagesFinder ..> CommunityChannelMessageRepository
+  CommunityChannelMessagesFinder ..> CommunityChannelMessageReactionRepository
+  CommunityChannelMessageSearcher ..> CommunityRepository
+  CommunityChannelMessageSearcher ..> CommunityChannelMessageRepository
+  CommunityMessagesSearcher ..> CommunityRepository
+  CommunityMessagesSearcher ..> CommunityChannelMessageRepository
+  CommunityChannelMessageReactionAdder ..> CommunityRepository
+  CommunityChannelMessageReactionAdder ..> CommunityChannelMessageReactionRepository
+  CommunityChannelMessageReactionRemover ..> CommunityRepository
+  CommunityChannelMessageReactionRemover ..> CommunityChannelMessageReactionRepository
+  CommunityInviteDetailsFinder ..> CommunityRepository
+  CommunityInviteDetailsFinder ..> CommunityInviteRepository
+  CommunityMembershipRequestsFinder ..> CommunityMembershipRequestRepository
+  CommunityModerationLogsFinder ..> CommunityModerationLogRepository
+  CommunitiesFinder ..> CommunityRepository
+  CommunitiesDiscoverer ..> CommunityRepository
+  CommunitiesDiscoverer ..> CommunityMembershipRequestRepository
+  CommunityChannelsFinder ..> CommunityRepository
 }
 
 package "communities/domain" {
@@ -409,7 +585,7 @@ package "communities/infrastructure" {
   OrbitDBCommunityRepository --> OrbitDBCommunityDocument
   OrbitDBCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
   OrbitDBCommunityChannelMessageRepository --> OrbitDBCommunityChannelMessageDocument
-  OrbitDBCommunityMessageReactionRepository ..|> CommunityMessageReactionRepository
+  OrbitDBCommunityMessageReactionRepository ..|> CommunityChannelMessageReactionRepository
   OrbitDBCommunityMessageReactionRepository --> OrbitDBCommunityChannelMessageReactionDocument
   OrbitDBCommunityInviteRepository ..|> CommunityInviteRepository
   OrbitDBCommunityInviteRepository --> OrbitDBCommunityInviteDocument
@@ -452,45 +628,35 @@ package "communities-api" {
   class DeleteCommunityChannelMessageReactionRoute
 
   PostCommunityRoute ..> CommunityCreator
-  GetCommunitiesRoute ..> CommunityRepository
-  GetCommunityDiscoveryRoute ..> CommunityRepository
-  GetCommunityDiscoveryRoute ..> CommunityMembershipRequestRepository
+  GetCommunitiesRoute ..> CommunitiesFinder
+  GetCommunityDiscoveryRoute ..> CommunitiesDiscoverer
   GetCommunityRoute ..> CommunityFinder
-  PatchCommunityRoute ..> Community
+  PatchCommunityRoute ..> CommunityProfileUpdater
   GetCommunityMembersRoute ..> Community
-  GetCommunityMembershipRequestsRoute ..> CommunityMembershipRequestRepository
-  PostCommunityMemberRoute ..> CommunityMembershipRequest
-  PostCommunityJoinRequestRoute ..> CommunityMembershipRequest
-  PatchCommunityRequestRoute ..> CommunityMembershipRequest
-  PatchCommunityRequestRoute ..> Community
-  DeleteCommunityMemberRoute ..> Community
-  PostCommunityInviteRoute ..> CommunityInvite
-  GetCommunityInviteRoute ..> CommunityInviteRepository
-  GetCommunityInviteRoute ..> Community
-  PostCommunityInviteAcceptRoute ..> CommunityInviteRepository
-  PostCommunityInviteAcceptRoute ..> Community
-  GetCommunityChannelsRoute ..> Community
-  PostCommunityTextChannelRoute ..> Community
-  PostCommunityVoiceChannelRoute ..> Community
-  PatchCommunityChannelRoute ..> Community
-  PatchCommunityChannelPermissionsRoute ..> Community
-  DeleteCommunityChannelRoute ..> Community
+  GetCommunityMembershipRequestsRoute ..> CommunityMembershipRequestsFinder
+  PostCommunityMemberRoute ..> CommunityMemberInviter
+  PostCommunityJoinRequestRoute ..> CommunityMembershipRequester
+  PatchCommunityRequestRoute ..> CommunityMembershipRequestUpdater
+  DeleteCommunityMemberRoute ..> CommunityLeaver
+  PostCommunityInviteRoute ..> CommunityInviteCreator
+  GetCommunityInviteRoute ..> CommunityInviteDetailsFinder
+  PostCommunityInviteAcceptRoute ..> CommunityInviteAccepter
+  GetCommunityChannelsRoute ..> CommunityChannelsFinder
+  PostCommunityTextChannelRoute ..> CommunityTextChannelCreator
+  PostCommunityVoiceChannelRoute ..> CommunityVoiceChannelCreator
+  PatchCommunityChannelRoute ..> CommunityChannelRenamer
+  PatchCommunityChannelPermissionsRoute ..> CommunityChannelPermissionsUpdater
+  DeleteCommunityChannelRoute ..> CommunityChannelDeleter
   GetCommunityRolesRoute ..> Community
-  GetCommunityModerationLogsRoute ..> CommunityModerationLogRepository
-  PostCommunityRoleRoute ..> Community
-  PatchCommunityRoleRoute ..> Community
-  DeleteCommunityRoleRoute ..> Community
-  PutCommunityMemberRolesRoute ..> Community
-  DeleteCommunityChannelRoute ..> CommunityChannelMessageRepository
-  PostCommunityChannelMessageRoute ..> Community
-  PostCommunityChannelMessageRoute ..> CommunityChannelMessage
-  GetCommunityChannelMessagesRoute ..> Community
-  GetCommunityChannelMessagesRoute ..> CommunityChannelMessageRepository
-  GetCommunityChannelMessagesRoute ..> CommunityChannelMessageReactionRepository
-  PostCommunityChannelMessageReactionRoute ..> Community
-  PostCommunityChannelMessageReactionRoute ..> CommunityChannelMessageReaction
-  DeleteCommunityChannelMessageReactionRoute ..> Community
-  DeleteCommunityChannelMessageReactionRoute ..> CommunityChannelMessageReaction
+  GetCommunityModerationLogsRoute ..> CommunityModerationLogsFinder
+  PostCommunityRoleRoute ..> CommunityRoleCreator
+  PatchCommunityRoleRoute ..> CommunityRoleUpdater
+  DeleteCommunityRoleRoute ..> CommunityRoleDeleter
+  PutCommunityMemberRolesRoute ..> CommunityMemberRolesAssigner
+  PostCommunityChannelMessageRoute ..> CommunityChannelMessageSender
+  GetCommunityChannelMessagesRoute ..> CommunityChannelMessagesFinder
+  PostCommunityChannelMessageReactionRoute ..> CommunityChannelMessageReactionAdder
+  DeleteCommunityChannelMessageReactionRoute ..> CommunityChannelMessageReactionRemover
 }
 
 note right of Community

@@ -75,7 +75,7 @@ export class ContentReplication {
   }
 
   public getNetworkIds(): NetworkId[] {
-    return this.networkIds;
+    return [...this.networkIds];
   }
 
   public addNetworkIds(networkIds: NetworkId[]): void {

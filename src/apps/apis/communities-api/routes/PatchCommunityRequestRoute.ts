@@ -1,10 +1,5 @@
-import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
-import { CommunityRequestNotFoundError } from '@app/contexts/communities/domain/errors/CommunityRequestNotFoundError';
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import CommunityMembershipRequestUpdater from '@app/contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater';
+import { CommunityMembershipRequestUpdateMessage } from '@app/contexts/communities/application/update-membership-request/messages/CommunityMembershipRequestUpdateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -22,23 +17,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PatchCommunityRequestRoute extends CommunityRouteSupport {
-  private async acceptRequest(
-    membershipRequest: CommunityMembershipRequest,
-    community: Community,
-    actorIdentityId: IdentityId,
-  ): Promise<void> {
-    community.acceptMembershipRequest(actorIdentityId, membershipRequest);
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-  }
-
-  private declineRequest(
-    membershipRequest: CommunityMembershipRequest,
-    community: Community,
-    actorIdentityId: IdentityId,
-  ): void {
-    community.declineMembershipRequest(actorIdentityId, membershipRequest);
-  }
+  private readonly updater = this.get<CommunityMembershipRequestUpdater>(
+    CommunityMembershipRequestUpdater,
+  );
 
   @Patch('/membership-requests/:requestId')
   public async updateMembershipRequest(
@@ -48,40 +29,12 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const membershipRequest = await this.membershipRequests().findById(
-      new CommunityRequestId(requestId),
-    );
-
-    if (!membershipRequest) {
-      throw new CommunityRequestNotFoundError();
-    }
-
-    const community = await this.findCommunity(
-      membershipRequest.getCommunityId().valueOf(),
-    );
-
-    if (body.status === 'accepted') {
-      await this.acceptRequest(membershipRequest, community, actorIdentityId);
-    } else {
-      this.declineRequest(membershipRequest, community, actorIdentityId);
-    }
-
-    await this.membershipRequests().save(membershipRequest);
-    await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      body.status === 'accepted'
-        ? CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED
-        : CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED,
-      this.moderationTarget(
-        CommunityModerationTargetType.MEMBERSHIP_REQUEST,
-        membershipRequest.getId(),
+    const membershipRequest = await this.updater.update(
+      new CommunityMembershipRequestUpdateMessage(
+        requestId,
+        actorIdentityId.valueOf(),
+        body.status,
       ),
-      {
-        identityId: membershipRequest.getIdentityId().valueOf(),
-        type: membershipRequest.toPrimitives().type,
-      },
     );
 
     return response

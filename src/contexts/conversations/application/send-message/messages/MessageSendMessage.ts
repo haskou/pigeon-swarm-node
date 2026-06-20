@@ -3,6 +3,7 @@ import { Signature } from '@haskou/value-objects';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
+import { MessageId } from '../../../domain/value-objects/MessageId';
 import { MessageSendOptions } from '../../../domain/value-objects/MessageSendOptions';
 import { MessageSendPayload } from './MessageSendPayload';
 
@@ -35,6 +36,10 @@ export class MessageSendMessage {
 
   public getOptions(): MessageSendOptions {
     return this.payload.getOptions();
+  }
+
+  public getPreviousMessageIds(): MessageId[] {
+    return this.payload.getPreviousMessageIds();
   }
 
   public getSignature(): Signature {

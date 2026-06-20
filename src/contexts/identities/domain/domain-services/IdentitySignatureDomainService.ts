@@ -1,8 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import { EncryptedKeyPair, Signature } from '@haskou/value-objects';
+import { Signature } from '@haskou/value-objects';
 
 import { IdentitySignaturePayload } from '../IdentitySignaturePayload';
+import { IdentitySigningKey } from '../value-objects/IdentitySigningKey';
 
 export class IdentitySignatureDomainService {
   public getCanonicalSigningContent(payload: IdentitySignaturePayload): string {
@@ -11,13 +12,10 @@ export class IdentitySignatureDomainService {
 
   public async generateSignature(
     payload: IdentitySignaturePayload,
-    encryptedKeyPair: EncryptedKeyPair,
+    signingKey: IdentitySigningKey,
     password: Password,
   ): Promise<Signature> {
-    return encryptedKeyPair.sign(
-      this.getCanonicalSigningContent(payload),
-      password,
-    );
+    return signingKey.sign(this.getCanonicalSigningContent(payload), password);
   }
 
   public isValidSignature(

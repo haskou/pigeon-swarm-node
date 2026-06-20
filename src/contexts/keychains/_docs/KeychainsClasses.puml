@@ -142,7 +142,7 @@ package "keychains.infrastructure" {
   }
 
   class OrbitDBKeychainMetadataIndex {
-    +save(keychain: Keychain, cid: IPFSId): Promise<void>
+    +save(keychain: Keychain, externalIdentifier: KeychainExternalIdentifier): Promise<void>
     +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<KeychainMetadataRecord[]>
   }
 

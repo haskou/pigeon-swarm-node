@@ -1,6 +1,5 @@
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import CommunityMemberUnbanner from '@app/contexts/communities/application/ban-member/CommunityMemberUnbanner';
+import { CommunityMemberUnbanMessage } from '@app/contexts/communities/application/ban-member/messages/CommunityMemberUnbanMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -10,6 +9,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class DeleteCommunityBanRoute extends CommunityRouteSupport {
+  private readonly unbanner = this.get<CommunityMemberUnbanner>(
+    CommunityMemberUnbanner,
+  );
+
   @Delete('/:communityId/bans/:identityId')
   public async unbanMember(
     @Param('communityId') communityId: string,
@@ -18,18 +21,11 @@ export class DeleteCommunityBanRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.unbanMember(actorIdentityId, new IdentityId(identityId));
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.MEMBER_UNBANNED,
-      this.moderationTarget(
-        CommunityModerationTargetType.MEMBER,
-        new IdentityId(identityId),
+    const community = await this.unbanner.unban(
+      new CommunityMemberUnbanMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        identityId,
       ),
     );
 

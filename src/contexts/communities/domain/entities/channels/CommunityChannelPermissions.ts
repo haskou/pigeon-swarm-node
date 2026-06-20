@@ -25,7 +25,7 @@ export class CommunityChannelPermissions {
   }
 
   public getVisibleRoleIds(): CommunityRoleId[] {
-    return this.visibleRoleIds;
+    return [...this.visibleRoleIds];
   }
 
   public toPrimitives() {

@@ -179,6 +179,14 @@ package "conversations.application" {
 
   class LatestMessagesFinder {
     +find(query): Promise<Message[]>
+    +findTimeline(query): Promise<ConversationMessagesTimeline>
+  }
+
+  class ConversationMessagesTimeline {
+    +messages(): Message[]
+    +reactions(): MessageReaction[]
+    +calls(): Call[]
+    +polls(): Poll[]
   }
 
   class MessageEditor {
@@ -223,10 +231,13 @@ package "conversations.application" {
   GroupConversationCreator --> ConversationRepository
   GroupConversationCreator --> DomainEventPublisher
   MessageSender --> ConversationRepository
+  MessageSender --> PollRepository
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository
   LatestMessagesFinder --> ConversationRepository
   LatestMessagesFinder --> MessageReactionRepository
+  LatestMessagesFinder --> CallRepository
+  LatestMessagesFinder --> PollRepository
   MessageEditor --> ConversationRepository
   MessageEditor --> DomainEventPublisher
   MessageDeleter --> ConversationRepository

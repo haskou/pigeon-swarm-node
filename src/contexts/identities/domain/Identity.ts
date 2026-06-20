@@ -5,7 +5,6 @@ import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import AggregateRoot from '@app/shared/domain/AggregateRoot';
 import {
   assert,
-  EncryptedKeyPair,
   PrimitiveOf,
   Signature,
   Timestamp,
@@ -22,6 +21,7 @@ import { IdentitySignaturePayload } from './IdentitySignaturePayload';
 import { Profile } from './Profile';
 import { EncryptedMasterKey } from './value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
+import { IdentitySigningKey } from './value-objects/IdentitySigningKey';
 import { IdentityVersion } from './value-objects/IdentityVersion';
 import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
@@ -33,7 +33,7 @@ export class Identity extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
       new IdentityId(primitives.id),
-      EncryptedKeyPair.fromPrimitives(primitives.encryptedKeyPair),
+      IdentitySigningKey.fromPrimitives(primitives.encryptedKeyPair),
       new EncryptedMasterKey(primitives.encryptedMasterKey),
       MasterKeyDerivation.fromPrimitives(primitives.masterKeyDerivation),
       UniqueObjectArray.fromArray(
@@ -71,7 +71,7 @@ export class Identity extends AggregateRoot {
 
   constructor(
     private readonly id: IdentityId,
-    private readonly encryptedKeyPair: EncryptedKeyPair,
+    private readonly signingKey: IdentitySigningKey,
     private readonly encryptedMasterKey: EncryptedMasterKey,
     private readonly masterKeyDerivation: MasterKeyDerivation,
     private readonly networks: UniqueObjectArray<NetworkId>,
@@ -85,7 +85,7 @@ export class Identity extends AggregateRoot {
     this.previousIdentityExternalIdentifier = previousReference;
 
     assert(
-      this.hasIdentityIdBoundToSigningKey(),
+      this.signingKey.identifies(this.id),
       new InvalidIdentitySignatureError(),
     );
     assert(
@@ -102,14 +102,6 @@ export class Identity extends AggregateRoot {
     );
   }
 
-  private getSigningIdentityId(): IdentityId {
-    return new IdentityId(this.encryptedKeyPair.toPrimitives().publicKey);
-  }
-
-  private hasIdentityIdBoundToSigningKey(): boolean {
-    return this.id.isEqual(this.getSigningIdentityId());
-  }
-
   private async signNextPrimitives(
     primitives: PrimitiveOf<Identity>,
     password: Password,
@@ -121,7 +113,7 @@ export class Identity extends AggregateRoot {
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
         IdentitySignaturePayload.fromPrimitives(nextPrimitives),
-        this.encryptedKeyPair,
+        this.signingKey,
         password,
       );
 
@@ -179,7 +171,7 @@ export class Identity extends AggregateRoot {
   }
 
   public usesSameSigningKeyAs(previous: Identity): boolean {
-    return this.getSigningIdentityId().isEqual(previous.getSigningIdentityId());
+    return this.signingKey.signsSameIdentityAs(previous.signingKey);
   }
 
   public keepsNetworksFrom(previous: Identity): boolean {
@@ -194,7 +186,7 @@ export class Identity extends AggregateRoot {
 
   public toPrimitives() {
     return {
-      encryptedKeyPair: this.encryptedKeyPair.toPrimitives(),
+      encryptedKeyPair: this.signingKey.toPrimitives(),
       encryptedMasterKey: this.encryptedMasterKey.valueOf(),
       id: this.id.valueOf(),
       masterKeyDerivation: this.masterKeyDerivation.toPrimitives(),

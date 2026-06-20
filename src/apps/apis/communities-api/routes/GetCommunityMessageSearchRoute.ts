@@ -1,5 +1,5 @@
-import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityMessagesSearcher from '@app/contexts/communities/application/search-messages/CommunityMessagesSearcher';
+import { CommunityMessagesSearchMessage } from '@app/contexts/communities/application/search-messages/messages/CommunityMessagesSearchMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -16,6 +16,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
+  private readonly searcher = this.get<CommunityMessagesSearcher>(
+    CommunityMessagesSearcher,
+  );
+
   @Get('/:communityId/messages/search')
   public async searchCommunityMessages(
     @Param('communityId') communityId: string,
@@ -25,24 +29,12 @@ export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const safeLimit = Math.min(Math.max(limit ?? 20, 1), 50);
-    const visibleTextChannelIds =
-      community.visibleTextChannelIdsFor(actorIdentityId);
-
-    community.searchMessages();
-
-    const messages = await this.messageRepository().searchPublicByChannels(
-      new CommunityId(communityId),
-      visibleTextChannelIds,
-      query ?? '',
-      safeLimit,
-    );
-    const reactions = await this.reactions().findByMessageIdsInChannels(
-      new CommunityId(communityId),
-      visibleTextChannelIds,
-      messages.map(
-        (message) => new CommunityChannelMessageId(message.toPrimitives().id),
+    const result = await this.searcher.search(
+      new CommunityMessagesSearchMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        query,
+        limit,
       ),
     );
 
@@ -51,8 +43,8 @@ export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
       .send(
         new CommunityMessageSearchViewModel(
           communityId,
-          messages,
-          reactions,
+          result.getMessages(),
+          result.getReactions(),
         ).toResource(),
       );
   }

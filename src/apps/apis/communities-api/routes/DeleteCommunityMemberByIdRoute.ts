@@ -1,4 +1,5 @@
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import CommunityMemberKicker from '@app/contexts/communities/application/kick-member/CommunityMemberKicker';
+import { CommunityMemberKickMessage } from '@app/contexts/communities/application/kick-member/messages/CommunityMemberKickMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -8,6 +9,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class DeleteCommunityMemberByIdRoute extends CommunityRouteSupport {
+  private readonly kicker = this.get<CommunityMemberKicker>(
+    CommunityMemberKicker,
+  );
+
   @Delete('/:communityId/members/:identityId/kick')
   public async kickMember(
     @Param('communityId') communityId: string,
@@ -16,11 +21,13 @@ export class DeleteCommunityMemberByIdRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.kickMember(actorIdentityId, new IdentityId(identityId));
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
+    const community = await this.kicker.kick(
+      new CommunityMemberKickMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        identityId,
+      ),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

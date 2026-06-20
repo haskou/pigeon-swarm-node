@@ -56,4 +56,8 @@ export class MessageSendPayload {
       this.replyToMessageId,
     );
   }
+
+  public getPreviousMessageIds(): MessageId[] {
+    return [...this.previousMessageIds];
+  }
 }

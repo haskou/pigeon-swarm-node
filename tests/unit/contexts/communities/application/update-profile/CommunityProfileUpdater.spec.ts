@@ -1,25 +1,38 @@
 import CommunityProfileUpdater from '@app/contexts/communities/application/update-profile/CommunityProfileUpdater';
 import { CommunityProfileUpdateMessage } from '@app/contexts/communities/application/update-profile/messages/CommunityProfileUpdateMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
+import CommunityFinder from '@app/contexts/communities/application/find-community/CommunityFinder';
+import CommunityModerationLogRecorder from '@app/contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('CommunityProfileUpdater', () => {
   let community: MockProxy<Community>;
+  let communityFinder: MockProxy<CommunityFinder>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
+  let moderationLogRecorder: MockProxy<CommunityModerationLogRecorder>;
   let repository: MockProxy<CommunityRepository>;
   let updater: CommunityProfileUpdater;
 
   beforeEach(() => {
     community = mock<Community>();
+    communityFinder = mock<CommunityFinder>();
     eventPublisher = mock<DomainEventPublisher>();
+    moderationLogRecorder = mock<CommunityModerationLogRecorder>();
     repository = mock<CommunityRepository>();
-    updater = new CommunityProfileUpdater(repository, eventPublisher);
+    updater = new CommunityProfileUpdater(
+      communityFinder,
+      repository,
+      eventPublisher,
+      moderationLogRecorder,
+    );
+    communityFinder.find.mockResolvedValue(community);
   });
 
   it('updates only profile metadata and saves the community', async () => {
     const message = new CommunityProfileUpdateMessage(
+      'community-id',
       'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
       'Updated community',
       'Updated description',
@@ -29,7 +42,7 @@ describe('CommunityProfileUpdater', () => {
       true,
     );
 
-    const result = await updater.update(community, message);
+    const result = await updater.update(message);
 
     expect(community.updateProfile).toHaveBeenCalledWith(
       message.actorIdentityId,

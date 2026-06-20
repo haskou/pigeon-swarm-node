@@ -1,13 +1,14 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
-import MetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
+import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMetadataDocument';
 
-export default class OrbitDBKeychainMetadataIndex extends MetadataIndex {
+// eslint-disable-next-line max-len
+export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex {
   private readonly activeHeadRepairs = new Set<string>();
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {

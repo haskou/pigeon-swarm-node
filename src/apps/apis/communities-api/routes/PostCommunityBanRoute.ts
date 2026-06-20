@@ -1,6 +1,5 @@
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import CommunityMemberBanner from '@app/contexts/communities/application/ban-member/CommunityMemberBanner';
+import { CommunityMemberBanMessage } from '@app/contexts/communities/application/ban-member/messages/CommunityMemberBanMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -18,6 +17,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PostCommunityBanRoute extends CommunityRouteSupport {
+  private readonly banner = this.get<CommunityMemberBanner>(
+    CommunityMemberBanner,
+  );
+
   @Post('/:communityId/bans')
   public async banMember(
     @Param('communityId') communityId: string,
@@ -26,20 +29,13 @@ export class PostCommunityBanRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.banMember(actorIdentityId, new IdentityId(body.identityId));
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.MEMBER_BANNED,
-      this.moderationTarget(
-        CommunityModerationTargetType.MEMBER,
-        new IdentityId(body.identityId),
+    const community = await this.banner.ban(
+      new CommunityMemberBanMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        body.identityId,
+        body.reason,
       ),
-      { reason: body.reason },
     );
 
     return response

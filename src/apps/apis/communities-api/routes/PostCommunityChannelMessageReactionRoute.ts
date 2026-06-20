@@ -1,5 +1,6 @@
 import { CommunityChannelMessageReactionBody } from '@app/apps/apis/communities-api/bodies/CommunityChannelMessageReactionBody';
-import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
+import CommunityChannelMessageReactionAdder from '@app/contexts/communities/application/react-channel-message/CommunityChannelMessageReactionAdder';
+import { CommunityChannelMessageReactionChangeMessage } from '@app/contexts/communities/application/react-channel-message/messages/CommunityChannelMessageReactionChangeMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -12,11 +13,15 @@ import {
 } from 'routing-controllers';
 
 import { CommunityChannelMessageReactionViewModel } from '../view-model/CommunityChannelMessageReactionViewModel';
-import { CommunityChannelMessageReactionRouteSupport } from './CommunityChannelMessageReactionRouteSupport';
+import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 // eslint-disable-next-line max-len
-export class PostCommunityChannelMessageReactionRoute extends CommunityChannelMessageReactionRouteSupport {
+export class PostCommunityChannelMessageReactionRoute extends CommunityRouteSupport {
+  private readonly adder = this.get<CommunityChannelMessageReactionAdder>(
+    CommunityChannelMessageReactionAdder,
+  );
+
   @Post('/:communityId/channels/:channelId/messages/:messageId/reactions')
   public async addReaction(
     @Param('communityId') communityId: string,
@@ -26,24 +31,16 @@ export class PostCommunityChannelMessageReactionRoute extends CommunityChannelMe
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const reaction = await this.persistReaction(
-      communityId,
-      channelId,
-      messageId,
-      body,
-      request,
+    const actorIdentityId = await this.authenticate(request);
+    const reaction = await this.adder.add(
+      new CommunityChannelMessageReactionChangeMessage(
+        communityId,
+        channelId,
+        messageId,
+        actorIdentityId.valueOf(),
+        body.emoji,
+      ),
     );
-    const community = await this.findCommunity(communityId);
-    const communityPrimitives = community.toPrimitives();
-
-    await this.eventPublisher.publish([
-      new CommunityChannelMessageReactionWasAddedEvent(communityId, {
-        ...reaction.toPrimitives(),
-        community: communityPrimitives,
-        memberIds: communityPrimitives.memberIds,
-        networkId: communityPrimitives.networkId,
-      }),
-    ]);
 
     return response
       .status(HttpRouteStatusEnum.OK)

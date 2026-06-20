@@ -1,3 +1,4 @@
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
@@ -5,7 +6,9 @@ import { ConversationNotFoundError } from '@app/contexts/conversations/domain/er
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
+import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
 
+import { ConversationMessagesTimeline } from './ConversationMessagesTimeline';
 import { LatestMessagesFindMessage } from './messages/LatestMessagesFindMessage';
 import { MessageFindMessage } from './messages/MessageFindMessage';
 import { MessagesAroundFindMessage } from './messages/MessagesAroundFindMessage';
@@ -13,7 +16,9 @@ import { ThreadMessagesFindMessage } from './messages/ThreadMessagesFindMessage'
 
 export default class LatestMessagesFinder {
   constructor(
+    private readonly callRepository: CallRepository,
     private readonly conversationRepository: ConversationRepository,
+    private readonly pollRepository: PollRepository,
     private readonly reactionRepository: MessageReactionRepository,
   ) {}
 
@@ -40,6 +45,37 @@ export default class LatestMessagesFinder {
       message.conversationId,
       message.limit,
       message.beforeMessageId,
+    );
+  }
+
+  public async findTimeline(
+    message: LatestMessagesFindMessage,
+  ): Promise<ConversationMessagesTimeline> {
+    const messages = await this.find(message);
+    const calls = await this.callRepository.findByConversationId(
+      message.conversationId,
+    );
+    const polls =
+      message.beforeMessageId && messages.length === 0
+        ? []
+        : await this.pollRepository.findByGroupConversation(
+            message.conversationId,
+            message.limit,
+            message.beforeMessageId
+              ? messages.at(-1)?.toPrimitives().createdAt
+              : undefined,
+          );
+    const reactions = await this.findReactionsFor(
+      message.conversationId,
+      messages,
+    );
+
+    return new ConversationMessagesTimeline(
+      messages,
+      message.beforeMessageId && messages.length === 0 ? [] : calls,
+      polls,
+      reactions,
+      message.limit,
     );
   }
 

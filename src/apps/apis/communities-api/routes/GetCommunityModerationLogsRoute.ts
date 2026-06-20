@@ -1,4 +1,5 @@
-import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
+import CommunityModerationLogsFinder from '@app/contexts/communities/application/find-moderation-logs/CommunityModerationLogsFinder';
+import { CommunityModerationLogsFindMessage } from '@app/contexts/communities/application/find-moderation-logs/messages/CommunityModerationLogsFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -15,6 +16,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityModerationLogsRoute extends CommunityRouteSupport {
+  private readonly finder = this.get<CommunityModerationLogsFinder>(
+    CommunityModerationLogsFinder,
+  );
+
   @Get('/:communityId/moderation-logs')
   public async getModerationLogs(
     @Param('communityId') communityId: string,
@@ -24,22 +29,17 @@ export class GetCommunityModerationLogsRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.viewModerationLog(actorIdentityId);
-
-    const normalizedLimit = Math.min(Math.max(limit || 50, 1), 100);
-    const logs = await this.moderationLogs().findByCommunity(
-      community.getId(),
-      normalizedLimit,
-      beforeLogId ? new CommunityModerationLogId(beforeLogId) : undefined,
+    const page = await this.finder.find(
+      new CommunityModerationLogsFindMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        limit,
+        beforeLogId,
+      ),
     );
     const resource: CommunityModerationLogsResource = {
-      logs: logs.map((entry) => entry.toPrimitives()),
-      nextBeforeLogId:
-        logs.length === normalizedLimit
-          ? logs[logs.length - 1].getId().valueOf()
-          : undefined,
+      logs: page.getLogs().map((entry) => entry.toPrimitives()),
+      nextBeforeLogId: page.getNextBeforeLogId(),
     };
 
     return response.status(HttpRouteStatusEnum.OK).send(resource);

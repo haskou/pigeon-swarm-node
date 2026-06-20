@@ -1,6 +1,5 @@
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
+import CommunityRoleDeleter from '@app/contexts/communities/application/delete-role/CommunityRoleDeleter';
+import { CommunityRoleDeleteMessage } from '@app/contexts/communities/application/delete-role/messages/CommunityRoleDeleteMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -10,6 +9,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class DeleteCommunityRoleRoute extends CommunityRouteSupport {
+  private readonly deleter =
+    this.get<CommunityRoleDeleter>(CommunityRoleDeleter);
+
   @Delete('/:communityId/roles/:roleId')
   public async deleteRole(
     @Param('communityId') communityId: string,
@@ -18,18 +20,11 @@ export class DeleteCommunityRoleRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.deleteRole(actorIdentityId, new CommunityRoleId(roleId));
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.ROLE_DELETED,
-      this.moderationTarget(
-        CommunityModerationTargetType.ROLE,
-        new CommunityRoleId(roleId),
+    const community = await this.deleter.delete(
+      new CommunityRoleDeleteMessage(
+        communityId,
+        roleId,
+        actorIdentityId.valueOf(),
       ),
     );
 

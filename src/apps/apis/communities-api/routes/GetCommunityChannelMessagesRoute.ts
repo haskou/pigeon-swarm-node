@@ -1,7 +1,6 @@
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
+import CommunityChannelMessagesFinder from '@app/contexts/communities/application/find-channel-messages/CommunityChannelMessagesFinder';
+import { CommunityChannelMessagesFindMessage } from '@app/contexts/communities/application/find-channel-messages/messages/CommunityChannelMessagesFindMessage';
+import { CommunityChannelThreadMessagesFindMessage } from '@app/contexts/communities/application/find-channel-messages/messages/CommunityChannelThreadMessagesFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -18,7 +17,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
-  private readonly polls = this.get<PollRepository>(PollRepository);
+  private readonly finder = this.get<CommunityChannelMessagesFinder>(
+    CommunityChannelMessagesFinder,
+  );
 
   @Get('/:communityId/channels/:channelId/messages')
   public async getMessages(
@@ -30,37 +31,15 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const communityChannelId = new CommunityChannelId(channelId);
-    const safeLimit = Math.min(Math.max(limit ?? 50, 1), 100);
-
-    community.viewTextChannel(actorIdentityId, communityChannelId);
-
-    const messages = await this.messageRepository().findByChannel(
-      new CommunityId(communityId),
-      communityChannelId,
-      safeLimit,
-      beforeMessageId
-        ? new CommunityChannelMessageId(beforeMessageId)
-        : undefined,
-    );
-    const reactions = await this.reactions().findByMessageIds(
-      new CommunityId(communityId),
-      communityChannelId,
-      messages.map(
-        (message) => new CommunityChannelMessageId(message.toPrimitives().id),
+    const page = await this.finder.find(
+      new CommunityChannelMessagesFindMessage(
+        communityId,
+        channelId,
+        actorIdentityId.valueOf(),
+        limit,
+        beforeMessageId,
       ),
     );
-    const upperBound = messages.at(-1)?.toPrimitives().createdAt;
-    const polls =
-      beforeMessageId && messages.length === 0
-        ? []
-        : await this.polls.findByCommunityChannel(
-            new CommunityId(communityId),
-            communityChannelId,
-            safeLimit,
-            beforeMessageId ? upperBound : undefined,
-          );
 
     return response
       .status(HttpRouteStatusEnum.OK)
@@ -68,10 +47,10 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
         new CommunityChannelMessagesViewModel(
           communityId,
           channelId,
-          messages,
-          reactions,
-          polls,
-          safeLimit,
+          page.getMessages(),
+          page.getReactions(),
+          page.getPolls(),
+          page.getLimit(),
         ).toResource(),
       );
   }
@@ -86,23 +65,13 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const communityChannelId = new CommunityChannelId(channelId);
-    const safeLimit = Math.min(Math.max(limit ?? 50, 1), 100);
-
-    community.viewTextChannel(actorIdentityId, communityChannelId);
-
-    const messages = await this.messageRepository().findThreadMessages(
-      new CommunityId(communityId),
-      communityChannelId,
-      new CommunityChannelMessageId(messageId),
-      safeLimit,
-    );
-    const reactions = await this.reactions().findByMessageIds(
-      new CommunityId(communityId),
-      communityChannelId,
-      messages.map(
-        (message) => new CommunityChannelMessageId(message.toPrimitives().id),
+    const page = await this.finder.findThread(
+      new CommunityChannelThreadMessagesFindMessage(
+        communityId,
+        channelId,
+        messageId,
+        actorIdentityId.valueOf(),
+        limit,
       ),
     );
 
@@ -112,10 +81,10 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
         new CommunityChannelMessagesViewModel(
           communityId,
           channelId,
-          messages,
-          reactions,
-          [],
-          safeLimit,
+          page.getMessages(),
+          page.getReactions(),
+          page.getPolls(),
+          page.getLimit(),
         ).toResource(),
       );
   }

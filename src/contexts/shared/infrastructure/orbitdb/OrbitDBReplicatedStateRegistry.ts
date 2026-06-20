@@ -27,7 +27,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly cachedHeads = new Map<string, Record<string, unknown>>();
 
-  private readonly headCache?: OrbitDBReplicatedHeadCache;
+  private headCache?: OrbitDBReplicatedHeadCache;
 
   private static defaultHeadCache(): OrbitDBReplicatedHeadCache | undefined {
     if (process.env.JEST_WORKER_ID || process.env.NODE_ENV === 'test') {
@@ -37,9 +37,17 @@ export default class OrbitDBReplicatedStateRegistry {
     return new LocalOrbitDBReplicatedHeadCache(new EmbeddedLocalDatabase());
   }
 
-  constructor(headCache?: OrbitDBReplicatedHeadCache) {
-    this.headCache =
-      headCache || OrbitDBReplicatedStateRegistry.defaultHeadCache();
+  public static withHeadCache(
+    headCache: OrbitDBReplicatedHeadCache,
+  ): OrbitDBReplicatedStateRegistry {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    registry.headCache = headCache;
+
+    return registry;
+  }
+
+  constructor() {
+    this.headCache = OrbitDBReplicatedStateRegistry.defaultHeadCache();
   }
 
   private assertReady(): void {

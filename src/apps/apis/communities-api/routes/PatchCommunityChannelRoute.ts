@@ -1,7 +1,5 @@
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
+import CommunityChannelRenamer from '@app/contexts/communities/application/rename-channel/CommunityChannelRenamer';
+import { CommunityChannelRenameMessage } from '@app/contexts/communities/application/rename-channel/messages/CommunityChannelRenameMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -19,6 +17,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PatchCommunityChannelRoute extends CommunityRouteSupport {
+  private readonly renamer = this.get<CommunityChannelRenamer>(
+    CommunityChannelRenamer,
+  );
+
   @Patch('/:communityId/channels/:channelId')
   public async renameChannel(
     @Param('communityId') communityId: string,
@@ -28,24 +30,13 @@ export class PatchCommunityChannelRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.renameChannel(
-      actorIdentityId,
-      new CommunityChannelId(channelId),
-      new CommunityChannelName(body.name),
-    );
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.CHANNEL_RENAMED,
-      this.moderationTarget(
-        CommunityModerationTargetType.CHANNEL,
-        new CommunityChannelId(channelId),
+    const community = await this.renamer.rename(
+      new CommunityChannelRenameMessage(
+        communityId,
+        channelId,
+        actorIdentityId.valueOf(),
+        body.name,
       ),
-      { name: body.name },
     );
 
     return response
