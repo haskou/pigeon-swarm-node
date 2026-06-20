@@ -1,6 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelMessageAttachments as Attachments } from '../../../domain/CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions as Mentions } from '../../../domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessageMention } from '../../../domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from '../../../domain/entities/messages/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from '../../../domain/entities/messages/CommunityChannelMessagePayload';
@@ -12,11 +14,11 @@ import { CommunityMentionTargetId } from '../../../domain/value-objects/Communit
 import { CommunityMentionType } from '../../../domain/value-objects/CommunityMentionType';
 
 export class CommunityChannelMessageSendMessage {
-  public readonly attachmentExternalIdentifiers: CommunityChannelAttachmentId[];
+  public readonly attachmentExternalIdentifiers: Attachments;
   public readonly authorIdentityId: IdentityId;
   public readonly channelId: CommunityChannelId;
   public readonly communityId: CommunityId;
-  public readonly mentions: CommunityChannelMessageMention[];
+  public readonly mentions: Mentions;
   public readonly metadata: CommunityChannelMessageMetadata;
   public readonly payload: CommunityChannelMessagePayload;
   public readonly replyToMessageId?: CommunityChannelMessageId;
@@ -54,20 +56,22 @@ export class CommunityChannelMessageSendMessage {
       plaintextPayload: input.plaintextPayload,
     });
     this.signature = new Signature(input.signature);
-    this.attachmentExternalIdentifiers = (
-      input.attachmentExternalIdentifiers ?? []
-    ).map(
-      (externalIdentifier) =>
-        new CommunityChannelAttachmentId(externalIdentifier),
+    this.attachmentExternalIdentifiers = Attachments.from(
+      (input.attachmentExternalIdentifiers ?? []).map(
+        (externalIdentifier) =>
+          new CommunityChannelAttachmentId(externalIdentifier),
+      ),
     );
-    this.mentions = (input.mentions ?? []).map(
-      (mention) =>
-        new CommunityChannelMessageMention(
-          new CommunityMentionType(mention.type),
-          mention.targetId
-            ? new CommunityMentionTargetId(mention.targetId)
-            : undefined,
-        ),
+    this.mentions = Mentions.from(
+      (input.mentions ?? []).map(
+        (mention) =>
+          new CommunityChannelMessageMention(
+            new CommunityMentionType(mention.type),
+            mention.targetId
+              ? new CommunityMentionTargetId(mention.targetId)
+              : undefined,
+          ),
+      ),
     );
   }
 }

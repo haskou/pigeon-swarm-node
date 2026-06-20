@@ -1,6 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelMessageAttachments } from '../../../domain/CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions } from '../../../domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessageEdition } from '../../../domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '../../../domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessagePayload } from '../../../domain/entities/messages/CommunityChannelMessagePayload';
@@ -43,21 +45,24 @@ export class CommunityChannelMessageEditMessage {
       encryptedPayload: input.encryptedPayload,
       plaintextPayload: input.plaintextPayload,
     });
-    const mentions = (input.mentions ?? []).map(
-      (mention) =>
-        new CommunityChannelMessageMention(
-          new CommunityMentionType(mention.type),
-          mention.targetId
-            ? new CommunityMentionTargetId(mention.targetId)
-            : undefined,
+    const mentions = CommunityChannelMessageMentions.from(
+      (input.mentions ?? []).map(
+        (mention) =>
+          new CommunityChannelMessageMention(
+            new CommunityMentionType(mention.type),
+            mention.targetId
+              ? new CommunityMentionTargetId(mention.targetId)
+              : undefined,
+          ),
+      ),
+    );
+    const attachmentExternalIdentifiers =
+      CommunityChannelMessageAttachments.from(
+        (input.attachmentExternalIdentifiers ?? []).map(
+          (externalIdentifier) =>
+            new CommunityChannelAttachmentId(externalIdentifier),
         ),
-    );
-    const attachmentExternalIdentifiers = (
-      input.attachmentExternalIdentifiers ?? []
-    ).map(
-      (externalIdentifier) =>
-        new CommunityChannelAttachmentId(externalIdentifier),
-    );
+      );
 
     this.edition = new CommunityChannelMessageEdition(
       payload,
@@ -76,7 +81,7 @@ export class CommunityChannelMessageEditMessage {
         createdAt: input.createdAt,
         encryptedPayload: input.encryptedPayload,
         id: input.messageId,
-        mentions: mentions.map((mention) => mention.toPrimitives()),
+        mentions: mentions.toPrimitives(),
         plaintextPayload: input.plaintextPayload,
         type: 'edited',
       });

@@ -10,6 +10,8 @@ import {
 
 import { CommunityAccessValidator } from './asserts/CommunityAccessValidator';
 import { CommunityOwnerValidator } from './asserts/CommunityOwnerValidator';
+import { CommunityChannelMessageAttachments } from './CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions } from './CommunityChannelMessageMentions';
 import { CommunityChannelPermissions } from './entities/channels/CommunityChannelPermissions';
 import { CommunityChannels } from './entities/channels/CommunityChannels';
 import { CommunityTextChannel } from './entities/channels/CommunityTextChannel';
@@ -40,8 +42,6 @@ import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEv
 import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
 import { CommunityWasCreatedEvent } from './events/CommunityWasCreatedEvent';
 import { CommunityWasUpdatedEvent } from './events/CommunityWasUpdatedEvent';
-import { CommunityChannelMessageAttachments } from './types/CommunityChannelMessageAttachments';
-import { CommunityChannelMessageMentions } from './types/CommunityChannelMessageMentions';
 import { CommunityAvatar } from './value-objects/CommunityAvatar';
 import { CommunityBanner } from './value-objects/CommunityBanner';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';

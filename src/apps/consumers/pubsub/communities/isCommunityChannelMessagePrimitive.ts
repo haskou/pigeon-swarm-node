@@ -1,4 +1,4 @@
-import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
+import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandidate';
 
 const communityChannelMessagePrimitiveKeys = [
   'attachmentExternalIdentifiers',
@@ -14,7 +14,7 @@ const communityChannelMessagePrimitiveKeys = [
 
 export function isCommunityChannelMessagePrimitive(
   message: unknown,
-): message is CommunityChannelMessagePrimitives {
+): message is CommunityChannelMessageCandidate {
   return (
     typeof message === 'object' &&
     message !== null &&

@@ -1,5 +1,5 @@
+import { CommunityChannelThreadSummary } from '../CommunityChannelThreadSummary';
 import { CommunityChannelMessage } from '../entities/messages/CommunityChannelMessage';
-import { CommunityChannelThreadSummary } from '../types/CommunityChannelThreadSummary';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../value-objects/CommunityId';

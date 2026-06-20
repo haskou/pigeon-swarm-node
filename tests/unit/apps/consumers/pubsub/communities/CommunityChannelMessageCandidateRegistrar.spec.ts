@@ -1,8 +1,8 @@
+import { CommunityChannelMessageCandidate } from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidate';
 import CommunityChannelMessageCandidateRegistrar from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
-import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -74,7 +74,7 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
     });
   }
 
-  async function signedMessagePrimitives(): Promise<CommunityChannelMessagePrimitives> {
+  async function signedCandidate(): Promise<CommunityChannelMessageCandidate> {
     const signaturePayload =
       CommunityChannelMessageSignaturePayload.fromPrimitives({
         attachmentExternalIdentifiers: [],
@@ -100,20 +100,20 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
       channelId,
       communityId,
       createdAt,
+      editedAt: undefined,
       encryptedPayload: 'encrypted-payload',
       id: messageId,
       mentions: [],
       plaintextPayload: undefined,
-      replyToMessageId: undefined,
-      editedAt: undefined,
       pollId: undefined,
+      replyToMessageId: undefined,
       signature: signature.valueOf(),
       type: 'sent',
     };
   }
 
   it('persists signed community channel message candidates', async () => {
-    const primitives = await signedMessagePrimitives();
+    const primitives = await signedCandidate();
 
     await registrar.registerSent(community(), primitives);
 
@@ -129,7 +129,7 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
   });
 
   it('rejects forged community channel message candidates', async () => {
-    const primitives = await signedMessagePrimitives();
+    const primitives = await signedCandidate();
 
     await expect(
       registrar.registerSent(community(), {

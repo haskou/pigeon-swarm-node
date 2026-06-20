@@ -1,6 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { assert } from '@haskou/value-objects';
 
+import { CommunityChannelMessageMentions } from '../CommunityChannelMessageMentions';
 import { CommunityChannels } from '../entities/channels/CommunityChannels';
 import { CommunityMembership } from '../entities/membership/CommunityMembership';
 import { CommunityChannelMessage } from '../entities/messages/CommunityChannelMessage';
@@ -10,7 +11,6 @@ import { CommunityChannelMessageAuthorMismatchError } from '../errors/CommunityC
 import { CommunityChannelNotFoundError } from '../errors/CommunityChannelNotFoundError';
 import { CommunityMemberBannedError } from '../errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from '../errors/CommunityMemberNotFoundError';
-import { CommunityChannelMessageMentions } from '../types/CommunityChannelMessageMentions';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
 import { CommunityPermission } from '../value-objects/CommunityPermission';
 import { CommunityPermissionValidator } from './CommunityPermissionValidator';

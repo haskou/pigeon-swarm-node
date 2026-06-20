@@ -1,4 +1,6 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelMessageAttachments } from '@app/contexts/communities/domain/CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions } from '@app/contexts/communities/domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
@@ -7,7 +9,6 @@ import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communiti
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import { CommunityChannelMessagePrimitives } from '@app/contexts/communities/domain/types/CommunityChannelMessagePrimitives';
 import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
@@ -16,6 +17,8 @@ import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value
 import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { assert, Signature, Timestamp } from '@haskou/value-objects';
+
+import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandidate';
 
 export default class CommunityChannelMessageCandidateRegistrar {
   constructor(
@@ -32,7 +35,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
   }
 
   private payloadFrom(
-    primitives: CommunityChannelMessagePrimitives,
+    primitives: CommunityChannelMessageCandidate,
   ): CommunityChannelMessagePayload | undefined {
     if (!primitives.encryptedPayload && !primitives.plaintextPayload) {
       return undefined;
@@ -45,25 +48,29 @@ export default class CommunityChannelMessageCandidateRegistrar {
   }
 
   private mentionsFrom(
-    primitives: CommunityChannelMessagePrimitives,
-  ): CommunityChannelMessageMention[] {
-    return (primitives.mentions || []).map(
-      (mention) =>
-        new CommunityChannelMessageMention(
-          new CommunityMentionType(mention.type),
-          mention.targetId
-            ? new CommunityMentionTargetId(mention.targetId)
-            : undefined,
-        ),
+    primitives: CommunityChannelMessageCandidate,
+  ): CommunityChannelMessageMentions {
+    return CommunityChannelMessageMentions.from(
+      (primitives.mentions || []).map(
+        (mention) =>
+          new CommunityChannelMessageMention(
+            new CommunityMentionType(mention.type),
+            mention.targetId
+              ? new CommunityMentionTargetId(mention.targetId)
+              : undefined,
+          ),
+      ),
     );
   }
 
   private attachmentIdsFrom(
-    primitives: CommunityChannelMessagePrimitives,
-  ): CommunityChannelAttachmentId[] {
-    return primitives.attachmentExternalIdentifiers.map(
-      (externalIdentifier) =>
-        new CommunityChannelAttachmentId(externalIdentifier),
+    primitives: CommunityChannelMessageCandidate,
+  ): CommunityChannelMessageAttachments {
+    return CommunityChannelMessageAttachments.from(
+      primitives.attachmentExternalIdentifiers.map(
+        (externalIdentifier) =>
+          new CommunityChannelAttachmentId(externalIdentifier),
+      ),
     );
   }
 
@@ -88,7 +95,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
 
   public async registerSent(
     community: Community,
-    primitives: CommunityChannelMessagePrimitives,
+    primitives: CommunityChannelMessageCandidate,
     acceptedMessageIds: ReadonlySet<string> = new Set(),
   ): Promise<CommunityChannelMessage | undefined> {
     if (primitives.type !== 'sent' || primitives.editedAt) {
@@ -131,7 +138,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
 
   public async registerEdition(
     community: Community,
-    primitives: CommunityChannelMessagePrimitives,
+    primitives: CommunityChannelMessageCandidate,
   ): Promise<CommunityChannelMessage | undefined> {
     if (!primitives.editedAt || !primitives.signature) {
       return undefined;
@@ -184,7 +191,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
         createdAt: primitives.editedAt,
         encryptedPayload: primitives.encryptedPayload,
         id: primitives.id,
-        mentions: mentions.map((mention) => mention.toPrimitives()),
+        mentions: mentions.toPrimitives(),
         plaintextPayload: primitives.plaintextPayload,
         replyToMessageId: undefined,
         type: 'edited',

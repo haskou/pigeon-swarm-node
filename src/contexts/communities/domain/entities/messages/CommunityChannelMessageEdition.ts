@@ -1,7 +1,7 @@
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { CommunityChannelMessageAttachments as Attachments } from '../../types/CommunityChannelMessageAttachments';
-import { CommunityChannelMessageMentions as Mentions } from '../../types/CommunityChannelMessageMentions';
+import { CommunityChannelMessageAttachments as Attachments } from '../../CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
 import { CommunityChannelMessage } from './CommunityChannelMessage';
 import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
 

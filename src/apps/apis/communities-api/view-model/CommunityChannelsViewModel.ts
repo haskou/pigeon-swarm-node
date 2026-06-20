@@ -1,5 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/types/CommunityChannelThreadSummary';
+import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/CommunityChannelThreadSummary';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { CommunityChannelsResource } from '../resources/CommunityChannelsResource';
@@ -26,7 +26,12 @@ export class CommunityChannelsViewModel {
         ...primitives.textChannels.map((channel) => {
           const threads = this.threadSummariesByChannelId.get(channel.id) || [];
 
-          return threads.length > 0 ? { ...channel, threads } : channel;
+          return threads.length > 0
+            ? {
+                ...channel,
+                threads: threads.map((thread) => thread.toPrimitives()),
+              }
+            : channel;
         }),
         ...primitives.voiceChannels.map((channel) => ({
           ...channel,
