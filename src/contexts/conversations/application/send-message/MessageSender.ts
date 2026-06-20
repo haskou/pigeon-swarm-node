@@ -2,7 +2,6 @@ import { MessageSent } from '@app/contexts/conversations/domain/entities/message
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
-import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessageSendMessage } from './messages/MessageSendMessage';
@@ -16,24 +15,18 @@ export default class MessageSender {
 
   public async send(message: MessageSendMessage): Promise<MessageSent> {
     const conversation = await this.conversationRepository.findById(
-      message.conversationId,
+      message.getConversationId(),
     );
 
     if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId);
+      throw new ConversationNotFoundError(message.getConversationId());
     }
 
     const sentMessage = conversation.sendMessage(
-      message.authorIdentityId,
-      message.encryptedPayload,
-      message.signature,
-      new MessageSendOptions(
-        message.attachmentExternalIdentifiers,
-        message.createdAt,
-        message.id,
-        message.previousMessageIds,
-        message.replyToMessageId,
-      ),
+      message.getAuthorIdentityId(),
+      message.getEncryptedPayload(),
+      message.getSignature(),
+      message.getOptions(),
     );
 
     this.signatureService.assertValidMessageSignature(sentMessage);
