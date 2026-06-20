@@ -1,6 +1,5 @@
-import CommunityChannelDraftRepository from '@app/contexts/communities/domain/repositories/CommunityChannelDraftRepository';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityChannelDraftDeleter from '@app/contexts/communities/application/manage-channel-draft/CommunityChannelDraftDeleter';
+import { CommunityChannelDraftDeleteMessage } from '@app/contexts/communities/application/manage-channel-draft/messages/CommunityChannelDraftDeleteMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -9,8 +8,8 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class DeleteCommunityChannelDraftRoute extends CommunityRouteSupport {
-  private readonly draftRepository = this.get<CommunityChannelDraftRepository>(
-    CommunityChannelDraftRepository,
+  private readonly deleter = this.get<CommunityChannelDraftDeleter>(
+    CommunityChannelDraftDeleter,
   );
 
   @Delete('/:communityId/channels/:channelId/draft')
@@ -21,15 +20,12 @@ export class DeleteCommunityChannelDraftRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const domainCommunityId = new CommunityId(communityId);
-    const domainChannelId = new CommunityChannelId(channelId);
-
-    community.viewTextChannel(actorIdentityId, domainChannelId);
-    await this.draftRepository.delete(
-      actorIdentityId,
-      domainCommunityId,
-      domainChannelId,
+    await this.deleter.delete(
+      new CommunityChannelDraftDeleteMessage(
+        actorIdentityId.valueOf(),
+        communityId,
+        channelId,
+      ),
     );
 
     return response.status(HttpRouteStatusEnum.OK).send({

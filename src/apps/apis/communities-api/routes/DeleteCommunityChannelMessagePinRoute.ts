@@ -1,8 +1,5 @@
-import { CommunityChannelMessageWasUnpinnedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasUnpinnedEvent';
-import CommunityChannelMessagePinRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessagePinRepository';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityChannelMessageUnpinner from '@app/contexts/communities/application/manage-channel-message-pin/CommunityChannelMessageUnpinner';
+import { CommunityChannelMessagePinDeleteMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinDeleteMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -12,10 +9,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 @JsonController('/communities')
 // eslint-disable-next-line max-len
 export class DeleteCommunityChannelMessagePinRoute extends CommunityRouteSupport {
-  private readonly pinRepository =
-    this.get<CommunityChannelMessagePinRepository>(
-      CommunityChannelMessagePinRepository,
-    );
+  private readonly unpinner = this.get<CommunityChannelMessageUnpinner>(
+    CommunityChannelMessageUnpinner,
+  );
 
   @Delete('/:communityId/channels/:channelId/messages/:messageId/pin')
   public async unpinMessage(
@@ -26,29 +22,14 @@ export class DeleteCommunityChannelMessagePinRoute extends CommunityRouteSupport
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const domainCommunityId = new CommunityId(communityId);
-    const domainChannelId = new CommunityChannelId(channelId);
-    const domainMessageId = new CommunityChannelMessageId(messageId);
-
-    community.manageChannelMessages(actorIdentityId, domainChannelId);
-    await this.pinRepository.unpin(
-      domainCommunityId,
-      domainChannelId,
-      domainMessageId,
-    );
-    const communityPrimitives = community.toPrimitives();
-
-    await this.eventPublisher.publish([
-      new CommunityChannelMessageWasUnpinnedEvent(communityId, {
-        channelId,
+    await this.unpinner.unpin(
+      new CommunityChannelMessagePinDeleteMessage(
+        actorIdentityId.valueOf(),
         communityId,
-        memberIds: communityPrimitives.memberIds,
+        channelId,
         messageId,
-        networkId: communityPrimitives.networkId,
-        unpinnedByIdentityId: actorIdentityId.valueOf(),
-      }),
-    ]);
+      ),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({
       channelId,

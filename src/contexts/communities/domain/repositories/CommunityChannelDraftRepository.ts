@@ -1,9 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelDraft } from '../CommunityChannelDraft';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
+import { CommunityChannelMessageEncryptedPayload } from '../value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityId } from '../value-objects/CommunityId';
-import { CommunityChannelDraft } from './types/CommunityChannelDraft';
 
 export default abstract class CommunityChannelDraftRepository {
   public abstract delete(
@@ -20,7 +21,7 @@ export default abstract class CommunityChannelDraftRepository {
     identityId: IdentityId,
     communityId: CommunityId,
     channelId: CommunityChannelId,
-    encryptedPayload: string,
+    encryptedPayload: CommunityChannelMessageEncryptedPayload,
     updatedAt: Timestamp,
   ): Promise<void>;
 }

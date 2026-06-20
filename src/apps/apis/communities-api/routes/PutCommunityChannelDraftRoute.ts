@@ -1,8 +1,6 @@
-import CommunityChannelDraftRepository from '@app/contexts/communities/domain/repositories/CommunityChannelDraftRepository';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityChannelDraftSaver from '@app/contexts/communities/application/manage-channel-draft/CommunityChannelDraftSaver';
+import { CommunityChannelDraftSaveMessage } from '@app/contexts/communities/application/manage-channel-draft/messages/CommunityChannelDraftSaveMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -18,8 +16,8 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PutCommunityChannelDraftRoute extends CommunityRouteSupport {
-  private readonly draftRepository = this.get<CommunityChannelDraftRepository>(
-    CommunityChannelDraftRepository,
+  private readonly saver = this.get<CommunityChannelDraftSaver>(
+    CommunityChannelDraftSaver,
   );
 
   @Put('/:communityId/channels/:channelId/draft')
@@ -31,27 +29,21 @@ export class PutCommunityChannelDraftRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const domainCommunityId = new CommunityId(communityId);
-    const domainChannelId = new CommunityChannelId(channelId);
-    const updatedAt = body.updatedAt
-      ? new Timestamp(body.updatedAt)
-      : Timestamp.now();
-
-    community.viewTextChannel(actorIdentityId, domainChannelId);
-    await this.draftRepository.save(
-      actorIdentityId,
-      domainCommunityId,
-      domainChannelId,
+    const message = new CommunityChannelDraftSaveMessage(
+      actorIdentityId.valueOf(),
+      communityId,
+      channelId,
       body.encryptedPayload,
-      updatedAt,
+      body.updatedAt,
     );
+
+    await this.saver.save(message);
 
     return response.status(HttpRouteStatusEnum.OK).send({
       channelId,
       communityId,
       encryptedPayload: body.encryptedPayload,
-      updatedAt: updatedAt.valueOf(),
+      updatedAt: message.updatedAt.valueOf(),
     });
   }
 }

@@ -1,7 +1,5 @@
-import CommunityChannelMessagePinRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessagePinRepository';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityChannelMessagePinsFinder from '@app/contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinsFinder';
+import { CommunityChannelMessagePinsFindMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinsFindMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -11,10 +9,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityChannelMessagePinsRoute extends CommunityRouteSupport {
-  private readonly pinRepository =
-    this.get<CommunityChannelMessagePinRepository>(
-      CommunityChannelMessagePinRepository,
-    );
+  private readonly finder = this.get<CommunityChannelMessagePinsFinder>(
+    CommunityChannelMessagePinsFinder,
+  );
 
   @Get('/:communityId/channels/:channelId/pins')
   public async listPins(
@@ -24,39 +21,25 @@ export class GetCommunityChannelMessagePinsRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const domainCommunityId = new CommunityId(communityId);
-    const domainChannelId = new CommunityChannelId(channelId);
-
-    community.viewTextChannel(actorIdentityId, domainChannelId);
-
-    const pins = await this.pinRepository.findByChannel(
-      domainCommunityId,
-      domainChannelId,
+    const pins = await this.finder.find(
+      new CommunityChannelMessagePinsFindMessage(
+        actorIdentityId.valueOf(),
+        communityId,
+        channelId,
+      ),
     );
-    const resources = [];
-
-    for (const pin of pins) {
-      const message = await this.messageRepository().findById(
-        domainCommunityId,
-        domainChannelId,
-        new CommunityChannelMessageId(pin.messageId),
-      );
-
-      if (message) {
-        resources.push({
-          createdAt: pin.createdAt,
-          message: new CommunityChannelMessageViewModel(message).toResource(),
-          messageId: pin.messageId,
-          pinnedByIdentityId: pin.pinnedByIdentityId,
-        });
-      }
-    }
 
     return response.status(HttpRouteStatusEnum.OK).send({
       channelId,
       communityId,
-      pins: resources,
+      pins: pins.map((details) => ({
+        createdAt: details.getPin().getCreatedAt().valueOf(),
+        message: new CommunityChannelMessageViewModel(
+          details.getMessage(),
+        ).toResource(),
+        messageId: details.getPin().getMessageId().valueOf(),
+        pinnedByIdentityId: details.getPin().getPinnedByIdentityId().valueOf(),
+      })),
     });
   }
 }

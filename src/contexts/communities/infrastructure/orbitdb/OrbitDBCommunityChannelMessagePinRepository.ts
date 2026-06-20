@@ -2,8 +2,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelMessagePin } from '../../domain/CommunityChannelMessagePin';
 import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
-import { CommunityChannelMessagePin } from '../../domain/repositories/types/CommunityChannelMessagePin';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
@@ -129,11 +129,11 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
   private toPin(
     document: OrbitDBCommunityChannelMessagePinDocument,
   ): CommunityChannelMessagePin {
-    return {
-      createdAt: document.createdAt,
-      messageId: document.messageId,
-      pinnedByIdentityId: document.pinnedByIdentityId,
-    };
+    return new CommunityChannelMessagePin(
+      new CommunityChannelMessageId(document.messageId),
+      new IdentityId(document.pinnedByIdentityId),
+      new Timestamp(document.createdAt),
+    );
   }
 
   public async pin(
