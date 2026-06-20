@@ -4,8 +4,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { ConversationMessagePin } from '../../domain/ConversationMessagePin';
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
-import { ConversationMessagePin } from '../../domain/repositories/types/ConversationMessagePin';
 import { OrbitDBConversationMessagePinDocument } from './documents/OrbitDBConversationMessagePinDocument';
 
 // eslint-disable-next-line max-len
@@ -117,11 +117,11 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
   private toPin(
     document: OrbitDBConversationMessagePinDocument,
   ): ConversationMessagePin {
-    return {
-      createdAt: document.createdAt,
-      messageId: document.messageId,
-      pinnedByIdentityId: document.pinnedByIdentityId,
-    };
+    return new ConversationMessagePin(
+      new MessageId(document.messageId),
+      new IdentityId(document.pinnedByIdentityId),
+      new Timestamp(document.createdAt),
+    );
   }
 
   public async pin(

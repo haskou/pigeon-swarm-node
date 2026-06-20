@@ -166,7 +166,7 @@ export class GetConversationMessagesRoute extends Route {
         before,
         after,
       ).getMessage().conversationId,
-      messages.messages,
+      messages.getMessages(),
     );
 
     return response

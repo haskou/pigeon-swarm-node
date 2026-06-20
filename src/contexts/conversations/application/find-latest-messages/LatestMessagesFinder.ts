@@ -1,10 +1,10 @@
+import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
-import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 
 import { LatestMessagesFindMessage } from './messages/LatestMessagesFindMessage';
 import { MessageFindMessage } from './messages/MessageFindMessage';

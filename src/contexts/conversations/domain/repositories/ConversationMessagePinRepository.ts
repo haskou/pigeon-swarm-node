@@ -1,9 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
+import { ConversationMessagePin } from '../ConversationMessagePin';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
-import { ConversationMessagePin } from './types/ConversationMessagePin';
 
 export default abstract class ConversationMessagePinRepository {
   public abstract findByConversation(

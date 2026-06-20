@@ -1,6 +1,6 @@
+import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
-import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 
 import { MessagesAroundResource } from '../resources/MessagesResource';
 import { MessageViewModel } from './MessageViewModel';
@@ -19,11 +19,16 @@ export class MessagesAroundViewModel {
 
   public toResource(): MessagesAroundResource {
     return {
-      messages: this.around.messages.map((message) =>
-        new MessageViewModel(message, this.reactionsFor(message)).toResource(),
-      ),
-      nextCursor: this.around.nextCursor,
-      previousCursor: this.around.previousCursor,
+      messages: this.around
+        .getMessages()
+        .map((message) =>
+          new MessageViewModel(
+            message,
+            this.reactionsFor(message),
+          ).toResource(),
+        ),
+      nextCursor: this.around.getNextCursor()?.valueOf(),
+      previousCursor: this.around.getPreviousCursor()?.valueOf(),
     };
   }
 }

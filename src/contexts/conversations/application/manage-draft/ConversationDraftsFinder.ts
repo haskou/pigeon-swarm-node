@@ -1,5 +1,5 @@
+import { ConversationDraft } from '../../domain/ConversationDraft';
 import ConversationDraftRepository from '../../domain/repositories/ConversationDraftRepository';
-import { ConversationDraft } from '../../domain/repositories/types/ConversationDraft';
 import { ConversationDraftsFindMessage } from './messages/ConversationDraftsFindMessage';
 
 export default class ConversationDraftsFinder {

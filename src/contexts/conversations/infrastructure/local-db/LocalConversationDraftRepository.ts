@@ -1,10 +1,11 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Timestamp } from '@haskou/value-objects';
 
+import { ConversationDraft } from '../../domain/ConversationDraft';
 import ConversationDraftRepository from '../../domain/repositories/ConversationDraftRepository';
-import { ConversationDraft } from '../../domain/repositories/types/ConversationDraft';
 import { LocalConversationDraftDocument } from './documents/LocalConversationDraftDocument';
 
 // eslint-disable-next-line max-len
@@ -35,23 +36,23 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
   }
 
   private toDraft(document: LocalConversationDraftDocument): ConversationDraft {
-    return {
-      conversationId: document.conversationId,
-      encryptedPayload: document.encryptedPayload,
-      updatedAt: document.updatedAt,
-    };
+    return new ConversationDraft(
+      new ConversationId(document.conversationId),
+      new EncryptedMessagePayload(document.encryptedPayload),
+      new Timestamp(document.updatedAt),
+    );
   }
 
   public async save(
     identityId: IdentityId,
     conversationId: ConversationId,
-    encryptedPayload: string,
+    encryptedPayload: EncryptedMessagePayload,
     updatedAt: Timestamp = Timestamp.now(),
   ): Promise<void> {
     const document: LocalConversationDraftDocument = {
       _id: this.draftId(identityId, conversationId),
       conversationId: conversationId.valueOf(),
-      encryptedPayload,
+      encryptedPayload: encryptedPayload.valueOf(),
       identityId: identityId.valueOf(),
       updatedAt: updatedAt.valueOf(),
     };

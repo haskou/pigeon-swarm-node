@@ -28,9 +28,9 @@ export class GetConversationDraftsRoute extends Route {
 
     return response.status(HttpRouteStatusEnum.OK).send({
       drafts: drafts.map((draft) => ({
-        conversationId: draft.conversationId,
-        encryptedPayload: draft.encryptedPayload,
-        updatedAt: draft.updatedAt,
+        conversationId: draft.getConversationId().valueOf(),
+        encryptedPayload: draft.getEncryptedPayload().valueOf(),
+        updatedAt: draft.getUpdatedAt().valueOf(),
       })),
     });
   }

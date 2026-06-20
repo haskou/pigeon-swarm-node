@@ -1,8 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
+import { ConversationDraft } from '../ConversationDraft';
 import { ConversationId } from '../value-objects/ConversationId';
-import { ConversationDraft } from './types/ConversationDraft';
+import { EncryptedMessagePayload } from '../value-objects/EncryptedMessagePayload';
 
 export default abstract class ConversationDraftRepository {
   public abstract delete(
@@ -17,7 +18,7 @@ export default abstract class ConversationDraftRepository {
   public abstract save(
     identityId: IdentityId,
     conversationId: ConversationId,
-    encryptedPayload: string,
+    encryptedPayload: EncryptedMessagePayload,
     updatedAt: Timestamp,
   ): Promise<void>;
 }
