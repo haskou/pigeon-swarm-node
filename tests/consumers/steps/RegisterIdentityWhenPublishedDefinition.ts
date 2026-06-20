@@ -4,8 +4,8 @@ import IdentityPublisher from '@app/contexts/identities/application/publish/Iden
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
-import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -75,13 +75,12 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
 
     const deadline = Date.now() + 5000;
-    const metadataRepository = Kernel.di.getService<IdentityMetadataRepository>(
-      IdentityMetadataRepository,
-    );
+    const metadataIndex =
+      Kernel.di.getService<IdentityMetadataIndex>(IdentityMetadataIndex);
     const identityId = new IdentityId(this.identity.toPrimitives().id);
 
     while (Date.now() < deadline) {
-      const metadata = await metadataRepository.findByIdentityId(identityId);
+      const metadata = await metadataIndex.findByIdentityId(identityId);
 
       if (metadata.length > 0) {
         return;
@@ -201,9 +200,8 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
 
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
-    const metadataRepository = Kernel.di.getService<IdentityMetadataRepository>(
-      IdentityMetadataRepository,
-    );
+    const metadataIndex =
+      Kernel.di.getService<IdentityMetadataIndex>(IdentityMetadataIndex);
     const [externalIdentifier] = await ipfs.getRecordCandidates(
       `pigeon-swarm_identity-${this.identity.toPrimitives().id}`,
     );
@@ -212,7 +210,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
       throw new Error('Identity external identifier was not published.');
     }
 
-    await metadataRepository.deleteByExternalIdentifier(
+    await metadataIndex.deleteByExternalIdentifier(
       new IdentityExternalIdentifier(externalIdentifier),
     );
   }

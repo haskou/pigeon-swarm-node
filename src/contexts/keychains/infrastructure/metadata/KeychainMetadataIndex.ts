@@ -1,10 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-import { Keychain } from '../Keychain';
-import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
-import { KeychainMetadataRecord } from './types/KeychainMetadataRecord';
+import { Keychain } from '../../domain/Keychain';
+import { KeychainExternalIdentifier } from '../../domain/value-objects/KeychainExternalIdentifier';
+import { KeychainMetadataRecord } from './KeychainMetadataRecord';
 
-export default abstract class KeychainMetadataRepository {
+export default abstract class KeychainMetadataIndex {
   public abstract findAll(): Promise<KeychainMetadataRecord[]>;
 
   public abstract findByExternalIdentifier(

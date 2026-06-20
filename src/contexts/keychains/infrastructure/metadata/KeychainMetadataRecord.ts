@@ -1,4 +1,4 @@
-import { Keychain } from '../../Keychain';
+import { Keychain } from '../../domain/Keychain';
 
 export interface KeychainMetadataRecord {
   cid: string;

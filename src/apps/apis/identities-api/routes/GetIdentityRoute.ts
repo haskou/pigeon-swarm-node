@@ -25,8 +25,8 @@ export class GetIdentityRoute extends Route {
       .status(HttpRouteStatusEnum.OK)
       .send(
         new IdentityViewModel(
-          candidate.identity,
-          candidate.externalIdentifier,
+          candidate.getIdentity(),
+          candidate.getExternalIdentifier(),
         ).toResource(),
       );
   }

@@ -1,5 +1,5 @@
+import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/types/KeychainCandidate';
 import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 
@@ -17,16 +17,16 @@ export default class CurrentKeychainFinder {
     message: CurrentKeychainFindMessage,
     candidate: KeychainCandidate,
   ): Promise<boolean> {
-    if (candidate.source === 'local') {
+    if (candidate.isLocal()) {
       return (
-        candidate.keychain.belongsTo(message.ownerIdentityId) &&
-        this.signatureService.isValidSignature(candidate.keychain)
+        candidate.belongsTo(message.ownerIdentityId) &&
+        this.signatureService.isValidSignature(candidate.getKeychain())
       );
     }
 
     return this.validator.isValidChainFor(
       message.ownerIdentityId,
-      candidate.keychain,
+      candidate.getKeychain(),
       (externalIdentifier) =>
         this.repository.findByExternalIdentifier(externalIdentifier),
     );
@@ -51,11 +51,11 @@ export default class CurrentKeychainFinder {
     }
 
     return validCandidates.sort((left, right) => {
-      if (left.keychain.isNewerThan(right.keychain)) {
+      if (left.isNewerThan(right)) {
         return -1;
       }
 
-      if (right.keychain.isNewerThan(left.keychain)) {
+      if (right.isNewerThan(left)) {
         return 1;
       }
 

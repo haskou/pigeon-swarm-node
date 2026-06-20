@@ -1,14 +1,14 @@
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
-import OrbitDBKeychainMetadataRepository from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataRepository';
+import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
 
-describe('OrbitDBKeychainMetadataRepository', () => {
+describe('OrbitDBKeychainMetadataIndex', () => {
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
   let registry: OrbitDBReplicatedStateRegistry;
-  let repository: OrbitDBKeychainMetadataRepository;
+  let repository: OrbitDBKeychainMetadataIndex;
 
   beforeEach(async () => {
     documents.splice(0);
@@ -16,7 +16,7 @@ describe('OrbitDBKeychainMetadataRepository', () => {
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     await registry.register('network-1', keychainStores(documents, heads));
-    repository = new OrbitDBKeychainMetadataRepository(registry);
+    repository = new OrbitDBKeychainMetadataIndex(registry);
   });
 
   afterEach(() => {

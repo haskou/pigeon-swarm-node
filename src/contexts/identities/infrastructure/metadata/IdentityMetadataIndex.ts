@@ -1,12 +1,12 @@
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { IdentityId } from '../../../shared/domain/value-objects/IdentityId';
-import { Identity } from '../Identity';
-import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
-import { ProfileHandle } from '../value-objects/ProfileHandle';
-import { IdentityMetadataRecord } from './types/IdentityMetadataRecord';
+import { Identity } from '../../domain/Identity';
+import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
+import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
+import { IdentityMetadataRecord } from './IdentityMetadataRecord';
 
-export default abstract class IdentityMetadataRepository {
+export default abstract class IdentityMetadataIndex {
   public abstract deleteByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<void>;

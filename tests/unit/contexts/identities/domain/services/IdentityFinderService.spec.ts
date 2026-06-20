@@ -1,3 +1,4 @@
+import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import IdentityFinderService from '@app/contexts/identities/domain/services/IdentityFinderService';
 import IdentityResolutionDomainService from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
@@ -53,7 +54,7 @@ describe('IdentityFinderService', () => {
       );
 
       repository.findCandidateReferencesById.mockResolvedValue([
-        { externalIdentifier, identity },
+        new IdentityCandidate(externalIdentifier, identity),
       ]);
 
       const result = await service.findCandidateById(identityId);
@@ -61,8 +62,8 @@ describe('IdentityFinderService', () => {
       expect(repository.findCandidateReferencesById).toHaveBeenCalledWith(
         identityId,
       );
-      expect(result.externalIdentifier).toEqual(externalIdentifier);
-      expect(result.identity).toEqual(identity);
+      expect(result.getExternalIdentifier()).toEqual(externalIdentifier);
+      expect(result.getIdentity()).toEqual(identity);
     });
   });
 
@@ -75,7 +76,7 @@ describe('IdentityFinderService', () => {
       );
 
       repository.findCandidateByHandle.mockResolvedValue(
-        { externalIdentifier, identity },
+        new IdentityCandidate(externalIdentifier, identity),
       );
 
       const result = await service.findCandidateByHandle(handle);
@@ -83,7 +84,7 @@ describe('IdentityFinderService', () => {
       expect(repository.findCandidateByHandle).toHaveBeenCalledWith(handle);
       expect(repository.findByHandle).not.toHaveBeenCalled();
       expect(repository.findCandidateReferencesById).not.toHaveBeenCalled();
-      expect(result.externalIdentifier).toEqual(externalIdentifier);
+      expect(result.getExternalIdentifier()).toEqual(externalIdentifier);
     });
   });
 });

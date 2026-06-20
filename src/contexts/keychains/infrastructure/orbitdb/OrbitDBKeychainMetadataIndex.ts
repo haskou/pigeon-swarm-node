@@ -1,14 +1,13 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import KeychainMetadataRepository from '@app/contexts/keychains/domain/repositories/KeychainMetadataRepository';
-import { KeychainMetadataRecord } from '@app/contexts/keychains/domain/repositories/types/KeychainMetadataRecord';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
+import MetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
+import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMetadataDocument';
 
-// eslint-disable-next-line max-len
-export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataRepository {
+export default class OrbitDBKeychainMetadataIndex extends MetadataIndex {
   private readonly activeHeadRepairs = new Set<string>();
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
@@ -143,7 +142,7 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
       {
         mode: 'fallback',
         operation:
-          'OrbitDBKeychainMetadataRepository.findStoredRecordsByOwnerIdentityId',
+          'OrbitDBKeychainMetadataIndex.findStoredRecordsByOwnerIdentityId',
       },
     );
 
@@ -164,7 +163,7 @@ export default class OrbitDBKeychainMetadataRepository extends KeychainMetadataR
         document.deleted !== true && this.stringValue(document, 'cid') === cid,
       {
         mode: 'fallback',
-        operation: 'OrbitDBKeychainMetadataRepository.findStoredRecordByCid',
+        operation: 'OrbitDBKeychainMetadataIndex.findStoredRecordByCid',
       },
     );
 

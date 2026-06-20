@@ -1,8 +1,8 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
-import IdentityMetadataRepository from '@app/contexts/identities/domain/repositories/IdentityMetadataRepository';
-import { IdentityMetadataRecord } from '@app/contexts/identities/domain/repositories/types/IdentityMetadataRecord';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
+import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
+import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -11,7 +11,7 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
 
 // eslint-disable-next-line max-len
-export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataRepository {
+export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex {
   private readonly activeHeadRepairs = new Set<string>();
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
@@ -236,8 +236,7 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
         this.identityIdFrom(document) === identityId,
       {
         mode: 'fallback',
-        operation:
-          'OrbitDBIdentityMetadataRepository.findStoredRecordsByIdentityId',
+        operation: 'IdentityMetadataIndex.findByIdentityId',
       },
     );
 
@@ -260,8 +259,7 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
         this.stringValue(document, 'handle') === handle,
       {
         mode: 'fallback',
-        operation:
-          'OrbitDBIdentityMetadataRepository.findStoredRecordsByHandle',
+        operation: 'OrbitDBIdentityMetadataIndex.findStoredRecordsByHandle',
       },
     );
 
@@ -285,8 +283,7 @@ export default class OrbitDBIdentityMetadataRepository extends IdentityMetadataR
           this.stringValue(document, 'networkId') === networkId),
       {
         mode: 'fallback',
-        operation:
-          'OrbitDBIdentityMetadataRepository.findStoredRecordsByNetworkId',
+        operation: 'IdentityMetadataIndex.findByNetworkId',
       },
     );
 

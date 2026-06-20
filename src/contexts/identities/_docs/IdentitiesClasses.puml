@@ -32,6 +32,15 @@ package "identities.domain" {
   class ProfileBanner <<ValueObject>>
   class IdentityExternalIdentifier <<ValueObject>>
 
+  class IdentityCandidate {
+    -externalIdentifier: IdentityExternalIdentifier
+    -identity: Identity
+    +getExternalIdentifier(): IdentityExternalIdentifier
+    +getIdentity(): Identity
+    +isIdentifiedBy(identityId): boolean
+    +isNewerThan(other): boolean
+  }
+
   note right of ProfileHandle
     Stored lowercase without @.
     Allowed characters: letters,
@@ -63,6 +72,8 @@ package "identities.domain" {
     +findById(id: IdentityId): Promise<Identity>
     +findByHandle(handle: ProfileHandle): Promise<Identity>
     +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
+    +findCandidateReferencesById(id): Promise<IdentityCandidate[]>
+    +findCandidateByHandle(handle): Promise<IdentityCandidate>
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 
@@ -88,6 +99,8 @@ package "identities.domain" {
   Identity *--> Profile
   Identity o--> NetworkId
   Identity --> IdentityExternalIdentifier
+  IdentityCandidate --> Identity
+  IdentityCandidate --> IdentityExternalIdentifier
   Profile *--> ProfileName
   Profile --> ProfileHandle
   Profile --> ProfileBiography
@@ -103,12 +116,9 @@ package "identities.domain" {
 }
 
 package "identities.application" {
-  class IdentityUpdater {
-    +update(message: IdentityUpdateMessage): Promise<Identity>
-  }
-
   class IdentityFinder {
     +find(message: IdentityFinderMessage): Promise<Identity>
+    +findCandidate(message): Promise<IdentityCandidate>
   }
 
   class IdentityPublisher {
@@ -121,8 +131,6 @@ package "identities.application" {
 
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
-  IdentityUpdater --> IdentityFinderService
-  IdentityUpdater --> IdentitySaverService
   IdentityFinder --> IdentityFinderService
   RegisterPublishedIdentity --> IdentityRegistrarService
 }
@@ -150,6 +158,20 @@ package "identities.infrastructure" {
     -receivedAt: number
   }
 
+  interface IdentityMetadataIndex {
+    +save(identity, externalIdentifier): Promise<void>
+    +deleteByExternalIdentifier(externalIdentifier): Promise<void>
+    +findByIdentityId(identityId): Promise<IdentityMetadataRecord[]>
+    +findByHandle(handle): Promise<IdentityMetadataRecord[]>
+    +findLatestByNetworkId(networkId): Promise<IdentityMetadataRecord[]>
+  }
+
+  class OrbitDBIdentityMetadataIndex {
+    +save(identity, externalIdentifier): Promise<void>
+    +findByIdentityId(identityId): Promise<IdentityMetadataRecord[]>
+    +findByHandle(handle): Promise<IdentityMetadataRecord[]>
+  }
+
   class IpfsIdentityRepository {
     +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
@@ -159,14 +181,16 @@ package "identities.infrastructure" {
   }
 
   note right of IpfsIdentityRepository
-    Encapsulates IPFS documents, OrbitDB metadata,
-    DHT head hints and PubSub announcements.
-    The domain only receives Identity objects.
+    Encapsulates IPFS documents and DHT
+    head hints. Uses the metadata index
+    as infrastructure cache/read model.
   end note
 
   IpfsIdentityRepository ..|> IdentityRepository
+  OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
   IpfsIdentityRepository --> IpfsIdentityDocument
-  IpfsIdentityRepository --> OrbitDBIdentityMetadataDocument
+  IpfsIdentityRepository --> IdentityMetadataIndex
+  OrbitDBIdentityMetadataIndex --> OrbitDBIdentityMetadataDocument
 }
 
 @enduml

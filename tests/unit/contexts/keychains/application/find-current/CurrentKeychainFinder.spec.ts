@@ -1,6 +1,7 @@
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
 import { KeychainNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainNotFoundError';
+import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
@@ -42,18 +43,17 @@ describe('CurrentKeychainFinder', () => {
       .build();
 
     repository.findCandidateReferencesByOwnerId.mockResolvedValue([
-      {
-        externalIdentifier: new KeychainExternalIdentifier('bafy-current'),
+      KeychainCandidate.localCandidate(
+        new KeychainExternalIdentifier('bafy-current'),
         keychain,
-        source: 'local',
-      },
+      ),
     ]);
 
     const result = await finder.find(
       new CurrentKeychainFindMessage(mother.ownerIdentityId.valueOf()),
     );
 
-    expect(result.keychain).toEqual(keychain);
+    expect(result.getKeychain()).toEqual(keychain);
     expect(validator.isValidChainFor).not.toHaveBeenCalled();
     expect(repository.findByExternalIdentifier).not.toHaveBeenCalled();
   });

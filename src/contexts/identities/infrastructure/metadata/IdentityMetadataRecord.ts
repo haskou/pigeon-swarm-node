@@ -1,4 +1,4 @@
-import { Identity } from '../../Identity';
+import { Identity } from '../../domain/Identity';
 
 export interface IdentityMetadataRecord {
   cid: string;

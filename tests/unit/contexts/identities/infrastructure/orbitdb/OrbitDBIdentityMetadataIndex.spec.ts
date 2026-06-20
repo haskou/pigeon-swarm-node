@@ -3,17 +3,17 @@ import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/valu
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
-import OrbitDBIdentityMetadataRepository from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataRepository';
+import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
-describe('OrbitDBIdentityMetadataRepository', () => {
+describe('OrbitDBIdentityMetadataIndex', () => {
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
   let registry: OrbitDBReplicatedStateRegistry;
-  let repository: OrbitDBIdentityMetadataRepository;
+  let repository: OrbitDBIdentityMetadataIndex;
 
   beforeEach(async () => {
     documents.splice(0);
@@ -21,7 +21,7 @@ describe('OrbitDBIdentityMetadataRepository', () => {
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     await registry.register('network-1', identityStores(documents, heads));
-    repository = new OrbitDBIdentityMetadataRepository(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry);
   });
 
   afterEach(() => {

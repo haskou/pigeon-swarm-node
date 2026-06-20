@@ -1,8 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Identity } from '../Identity';
+import { IdentityCandidate } from '../IdentityCandidate';
 import IdentityRepository from '../repositories/IdentityRepository';
-import { IdentityCandidate } from '../repositories/types/IdentityCandidate';
 import { ProfileHandle } from '../value-objects/ProfileHandle';
 import IdentityResolutionDomainService from './IdentityResolutionDomainService';
 

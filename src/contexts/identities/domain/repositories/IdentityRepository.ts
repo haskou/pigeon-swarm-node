@@ -1,9 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Identity } from '../Identity';
+import { IdentityCandidate } from '../IdentityCandidate';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../value-objects/ProfileHandle';
-import { IdentityCandidate } from './types/IdentityCandidate';
 
 export default abstract class IdentityRepository {
   public abstract save(identity: Identity): Promise<IdentityExternalIdentifier>;
