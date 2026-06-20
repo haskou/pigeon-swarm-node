@@ -22,7 +22,7 @@ export class PollVoteRemover {
     poll.removeVote(message.voterIdentityId);
     await this.repository.save(poll);
     await this.eventPublisher.publish([
-      new PollVoteWasRemovedEvent(poll.getScope().aggregateId(), {
+      new PollVoteWasRemovedEvent(poll.getScope().selectEventStreamId(), {
         ...message.audience.toPrimitives(),
         poll: poll.toPrimitives(),
         pollId: poll.getId().valueOf(),

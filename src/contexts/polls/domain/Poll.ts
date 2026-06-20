@@ -39,7 +39,7 @@ export class Poll extends AggregateRoot {
     const primitives = poll.toPrimitives();
 
     poll.record(
-      new PollWasCreatedEvent(scope.aggregateId(), {
+      new PollWasCreatedEvent(scope.selectEventStreamId(), {
         ...audience.toPrimitives(),
         poll: primitives,
         pollId: primitives.id,

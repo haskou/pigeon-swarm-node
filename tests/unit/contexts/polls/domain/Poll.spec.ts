@@ -82,7 +82,7 @@ describe('Poll', () => {
     expect(events).toHaveLength(1);
     expect(events[0].eventName()).toBe('polls.v1.poll.was_created');
     expect(JSON.parse(events[0].decode())).toMatchObject({
-      aggregate_id: scope.aggregateId(),
+      aggregate_id: scope.selectEventStreamId(),
       attributes: {
         memberIds: [creator.valueOf(), voter.valueOf()],
         poll: {
