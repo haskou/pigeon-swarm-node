@@ -23,9 +23,14 @@ package "content-replication/application" {
   class ContentReplicaClaimRegistrar
   class ContentReplicationMaintainer
   class ContentReplicationStatusFinder
+  class ContentReplicationStatus
+  class ReplicatedContentStatus
+  class NetworkReplicationStatus
   class ContentReplicationStatusSummaryFinder
   class ContentReplicationSummaryRefresher
   class ContentReplicationStatusSummaryUpdater
+  class ContentReplicationMaintenanceResult
+  class ContentNetworkReplicationStatus
 }
 
 package "content-replication/infrastructure" {
@@ -46,9 +51,14 @@ ContentReplicaClaimRegistrar ..> ContentReplicationRepository
 ContentReplicationMaintainer ..> ContentReplicationPolicy
 ContentReplicationMaintainer ..> ContentReplicationRepository
 ContentReplicationStatusFinder ..> ContentReplicationRepository
+ContentReplicationStatusFinder ..> ContentReplicationStatus
+ContentReplicationStatus *-- ReplicatedContentStatus
+ReplicatedContentStatus *-- NetworkReplicationStatus
 ContentReplicationStatusSummaryFinder ..> ContentReplicationStatusSummaryRepository
 ContentReplicationSummaryRefresher ..> ContentReplicationStatusSummaryRepository
 ContentReplicationStatusSummaryUpdater ..> ContentReplicationStatusSummaryRepository
+ContentReplicationMaintainer ..> ContentReplicationMaintenanceResult
+ContentReplicationMaintainer ..> ContentNetworkReplicationStatus
 
 OrbitDBContentReplicationRepository ..|> ContentReplicationRepository
 LocalContentReplicationStatusSummaryRepository ..|> ContentReplicationStatusSummaryRepository

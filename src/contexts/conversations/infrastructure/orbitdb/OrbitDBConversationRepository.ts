@@ -406,9 +406,9 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       .filter(
         (record): record is Record<string, unknown> => record !== undefined,
       )
-      .reduce(
+      .reduce<Record<string, unknown>[]>(
         (merged, record) => this.mergeIndexedMessageRecord(merged, record),
-        [] as Record<string, unknown>[],
+        [],
       );
     const networkIds = [
       ...new Set(

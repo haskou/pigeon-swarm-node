@@ -27,6 +27,8 @@ package "conversations.domain" {
 
   class ConversationType <<ValueObject>>
   class GroupConversationName <<ValueObject>>
+  class MessageSendOptions <<ValueObject>>
+  class MessageEditOptions <<ValueObject>>
 
   class ConversationWasCreatedEvent {
     +eventName(): string
@@ -139,6 +141,8 @@ package "conversations.domain" {
   MessageSent o--> AttachmentExternalIdentifier
   MessageEdited --> MessageId
   MessageDeleted --> MessageId
+  Conversation ..> MessageSendOptions
+  Conversation ..> MessageEditOptions
   MessageSignatureDomainService ..> Message
   MessageReaction --> ConversationId
   MessageReaction --> MessageId

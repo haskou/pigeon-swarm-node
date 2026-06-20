@@ -22,6 +22,8 @@ export class MessageEditOptions {
   }
 
   public getPreviousMessageIds(targetMessageId: MessageId): MessageId[] {
-    return this.previousMessageIds ?? [targetMessageId];
+    return this.previousMessageIds
+      ? [...this.previousMessageIds]
+      : [targetMessageId];
   }
 }

@@ -17,7 +17,7 @@ export class MessageSendOptions {
   ) {}
 
   public getAttachments(): AttachmentExternalIdentifier[] {
-    return this.attachments;
+    return [...this.attachments];
   }
 
   public getCreatedAt(): Timestamp {
@@ -29,7 +29,7 @@ export class MessageSendOptions {
   }
 
   public getPreviousMessageIds(): MessageId[] {
-    return this.previousMessageIds;
+    return [...this.previousMessageIds];
   }
 
   public getReplyToMessageId(): MessageId | undefined {

@@ -88,9 +88,13 @@ export abstract class Message {
   }
 
   public toPrimitives() {
+    const targetMessageId = this.getTargetMessageId();
+
     return {
       ...this.basePrimitives(),
-      targetMessageId: this.getTargetMessageId()?.valueOf(),
+      ...(targetMessageId
+        ? { targetMessageId: targetMessageId.valueOf() }
+        : {}),
       type: this.getType().valueOf(),
     };
   }

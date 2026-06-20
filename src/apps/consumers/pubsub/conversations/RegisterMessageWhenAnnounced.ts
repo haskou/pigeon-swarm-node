@@ -9,6 +9,14 @@ import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 export default class RegisterMessageWhenAnnounced extends Consumer {
+  private static readonly REQUIRED_MESSAGE_STRING_FIELDS = [
+    'authorId',
+    'conversationId',
+    'id',
+    'signature',
+    'type',
+  ];
+
   public static QUEUE_NAME = 'pigeon-swarm.register-message-when-announced';
 
   constructor(
@@ -34,19 +42,44 @@ export default class RegisterMessageWhenAnnounced extends Consumer {
     return process.env.SERVICE_NAME || 'pigeon-swarm';
   }
 
+  private isStringArray(value: unknown): value is string[] {
+    return (
+      Array.isArray(value) && value.every((item) => typeof item === 'string')
+    );
+  }
+
+  private hasRequiredStringFields(value: object): boolean {
+    return RegisterMessageWhenAnnounced.REQUIRED_MESSAGE_STRING_FIELDS.every(
+      (field) => typeof Reflect.get(value, field) === 'string',
+    );
+  }
+
+  private isMessageCandidate(value: unknown): value is PrimitiveOf<Message> {
+    if (
+      value === undefined ||
+      value === null ||
+      typeof value !== 'object' ||
+      Array.isArray(value)
+    ) {
+      return false;
+    }
+
+    return (
+      this.hasRequiredStringFields(value) &&
+      typeof Reflect.get(value, 'createdAt') === 'number' &&
+      this.isStringArray(Reflect.get(value, 'attachmentExternalIdentifiers')) &&
+      this.isStringArray(Reflect.get(value, 'previousMessageIds'))
+    );
+  }
+
   private messageCandidateFrom(event: DomainEvent): Message | undefined {
     const candidate = event.attributes.message;
 
-    if (
-      candidate === undefined ||
-      candidate === null ||
-      typeof candidate !== 'object' ||
-      Array.isArray(candidate)
-    ) {
+    if (!this.isMessageCandidate(candidate)) {
       return undefined;
     }
 
-    return MessageFactory.fromPrimitives(candidate as PrimitiveOf<Message>);
+    return MessageFactory.fromPrimitives(candidate);
   }
 
   private async registerMessage(

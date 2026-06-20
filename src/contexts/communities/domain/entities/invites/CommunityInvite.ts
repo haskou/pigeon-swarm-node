@@ -82,9 +82,13 @@ export class CommunityInvite {
     this.encryptedCommunityKey = encryptedCommunityKey;
   }
 
-  public assertCanBeAccepted(now: Timestamp = Timestamp.now()): void {
+  private assertCanBeAccepted(now: Timestamp = Timestamp.now()): void {
     assert(!this.isExpired(now), new CommunityInviteExpiredError());
     assert(this.hasUsesAvailable(), new CommunityInviteUsesExceededError());
+  }
+
+  public checkAcceptanceAvailability(now: Timestamp = Timestamp.now()): void {
+    this.assertCanBeAccepted(now);
   }
 
   public accept(now: Timestamp = Timestamp.now()): void {

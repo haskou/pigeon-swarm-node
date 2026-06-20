@@ -147,8 +147,27 @@ package "communities/domain" {
     - payload: CommunityChannelMessagePayload
     - signature: Signature
     - createdAt: Timestamp
-    - attachmentExternalIdentifiers: CommunityChannelAttachmentId[]
+    - attachmentExternalIdentifiers: CommunityChannelMessageAttachments
+    - mentions: CommunityChannelMessageMentions
     + create(...): CommunityChannelMessage
+  }
+
+  class CommunityChannelMessageAttachments {
+    - attachments: CommunityChannelAttachmentId[]
+    + toArray(): CommunityChannelAttachmentId[]
+  }
+
+  class CommunityChannelMessageMentions {
+    - mentions: CommunityChannelMessageMention[]
+    + toArray(): CommunityChannelMessageMention[]
+  }
+
+  class CommunityChannelThreadSummary {
+    - rootMessageId: CommunityChannelMessageId
+    - lastReplyMessageId: CommunityChannelMessageId
+    - replyCount: number
+    - lastReplyAt: Timestamp
+    + withReply(replyMessageId, repliedAt): CommunityChannelThreadSummary
   }
 
   class CommunityChannelMessageReaction {
@@ -190,6 +209,8 @@ package "communities/domain" {
     - discoverable: boolean
     - visibility: CommunityVisibility
     - autoJoinEnabled: boolean
+    + ensureMessagePayloadAllowed(payload): void
+    + ensureMessageSearchAvailable(): void
   }
 
   class CommunityInvite {
@@ -202,6 +223,7 @@ package "communities/domain" {
     - uses: CommunityInviteUses
     - encryptedCommunityKey: EncryptedCommunityInviteKey?
     + create(communityId, creatorIdentityId, expiresAt?, maxUses?, encryptedCommunityKey?): CommunityInvite
+    + checkAcceptanceAvailability(now?): void
     + accept(now?): void
   }
 
@@ -231,6 +253,7 @@ package "communities/domain" {
   class CommunityRoleName
   class CommunityChannelMessageId
   class CommunityChannelMessagePayload
+  class CommunityChannelMessageMention
   class CommunityChannelMessageEncryptedPayload
   class CommunityChannelMessagePlaintextPayload
   class CommunityChannelAttachmentId
@@ -257,6 +280,7 @@ package "communities/domain" {
   interface CommunityChannelMessageRepository {
     + findById(communityId, channelId, messageId): CommunityChannelMessage?
     + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
+    + findThreadSummariesByChannel(communityId, channelIds, limitPerChannel): Map<string, CommunityChannelThreadSummary[]>
     + searchPublicByChannel(communityId, channelId, query, limit): CommunityChannelMessage[]
     + save(message): void
   }
@@ -414,7 +438,7 @@ package "communities-api" {
   class PostCommunityTextChannelRoute
   class PostCommunityVoiceChannelRoute
   class PatchCommunityChannelRoute
-  class CommunityChannelPermissionsRoute
+  class PatchCommunityChannelPermissionsRoute
   class DeleteCommunityChannelRoute
   class GetCommunityRolesRoute
   class GetCommunityModerationLogsRoute
@@ -424,7 +448,8 @@ package "communities-api" {
   class PutCommunityMemberRolesRoute
   class PostCommunityChannelMessageRoute
   class GetCommunityChannelMessagesRoute
-  class CommunityChannelMessageReactionRoute
+  class PostCommunityChannelMessageReactionRoute
+  class DeleteCommunityChannelMessageReactionRoute
 
   PostCommunityRoute ..> CommunityCreator
   GetCommunitiesRoute ..> CommunityRepository
@@ -448,7 +473,7 @@ package "communities-api" {
   PostCommunityTextChannelRoute ..> Community
   PostCommunityVoiceChannelRoute ..> Community
   PatchCommunityChannelRoute ..> Community
-  CommunityChannelPermissionsRoute ..> Community
+  PatchCommunityChannelPermissionsRoute ..> Community
   DeleteCommunityChannelRoute ..> Community
   GetCommunityRolesRoute ..> Community
   GetCommunityModerationLogsRoute ..> CommunityModerationLogRepository
@@ -462,8 +487,10 @@ package "communities-api" {
   GetCommunityChannelMessagesRoute ..> Community
   GetCommunityChannelMessagesRoute ..> CommunityChannelMessageRepository
   GetCommunityChannelMessagesRoute ..> CommunityChannelMessageReactionRepository
-  CommunityChannelMessageReactionRoute ..> Community
-  CommunityChannelMessageReactionRoute ..> CommunityChannelMessageReaction
+  PostCommunityChannelMessageReactionRoute ..> Community
+  PostCommunityChannelMessageReactionRoute ..> CommunityChannelMessageReaction
+  DeleteCommunityChannelMessageReactionRoute ..> Community
+  DeleteCommunityChannelMessageReactionRoute ..> CommunityChannelMessageReaction
 }
 
 note right of Community

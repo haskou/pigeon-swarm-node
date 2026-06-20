@@ -19,7 +19,7 @@ export default class OrbitDBConversationMapper {
       name: primitives.name,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
-      type: primitives.type as 'group' | 'one-to-one',
+      type: primitives.type,
       updatedAt: Date.now(),
     };
   }

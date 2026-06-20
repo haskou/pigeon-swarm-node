@@ -18,6 +18,9 @@ package "push-notifications/application" {
   class PushNotificationDispatcher
   class PushNotificationDelivery <<Port>>
   class PushNotificationPayload
+  class PushNotificationIntent
+  class PushNotificationScope
+  class PushNotificationDeliveryResult
   class PushTestNotificationSender
 }
 
@@ -36,7 +39,10 @@ PushSubscriptionRemover ..> PushSubscriptionRepository
 PushNotificationDispatcher ..> PushSubscriptionRepository
 PushNotificationDispatcher ..> PushNotificationDelivery
 PushNotificationDispatcher ..> PushNotificationPayload
+PushNotificationDispatcher ..> PushNotificationIntent
+PushNotificationIntent *-- PushNotificationScope
 PushTestNotificationSender ..> PushNotificationDelivery
+PushNotificationDelivery ..> PushNotificationDeliveryResult
 
 LocalPushSubscriptionRepository ..|> PushSubscriptionRepository
 LocalPushSubscriptionRepository ..> LocalPushSubscriptionDocument

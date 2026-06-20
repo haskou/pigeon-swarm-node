@@ -45,7 +45,7 @@ export class RegisterConversationMessage {
       participantIds: this.participantIds.map((participantId) =>
         participantId.valueOf(),
       ),
-      type: this.type.valueOf(),
+      type: this.type.toPrimitives(),
     };
   }
 }

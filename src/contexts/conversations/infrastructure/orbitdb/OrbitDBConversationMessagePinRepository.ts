@@ -89,9 +89,9 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     documents: Record<string, unknown>[],
   ): Promise<void> {
     const key = this.indexHeadKey(conversationId);
-    const pins = documents.reduce(
+    const pins = documents.reduce<Record<string, unknown>[]>(
       (merged, document) => this.mergeDocuments(merged, document),
-      [] as Record<string, unknown>[],
+      [],
     );
 
     await this.registry.putHead(key, {

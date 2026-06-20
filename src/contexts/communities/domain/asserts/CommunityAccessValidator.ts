@@ -120,7 +120,7 @@ export class CommunityAccessValidator {
   }
 
   public assertCanSearchMessages(): void {
-    this.settings.assertCanSearchMessages();
+    this.settings.ensureMessageSearchAvailable();
   }
 
   public assertCanConnectVoice(
@@ -172,7 +172,7 @@ export class CommunityAccessValidator {
   public assertCanUseMessagePayload(
     payload: CommunityChannelMessagePayload,
   ): void {
-    this.settings.assertCanUseMessagePayload(payload);
+    this.settings.ensureMessagePayloadAllowed(payload);
   }
 
   public assertCanUseMessageMentions(

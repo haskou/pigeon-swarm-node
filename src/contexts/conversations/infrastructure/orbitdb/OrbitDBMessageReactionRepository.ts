@@ -100,9 +100,9 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
     documents: Record<string, unknown>[],
   ): Promise<void> {
     const key = this.indexHeadKey(conversationId);
-    const reactions = documents.reduce(
+    const reactions = documents.reduce<Record<string, unknown>[]>(
       (merged, document) => this.mergeDocuments(merged, document),
-      [] as Record<string, unknown>[],
+      [],
     );
 
     await this.registry.putHead(key, {

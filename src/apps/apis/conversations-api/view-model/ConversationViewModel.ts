@@ -16,7 +16,7 @@ export class ConversationViewModel {
       name: primitives.name,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
-      type: primitives.type as 'group' | 'one-to-one',
+      type: primitives.type,
       unreadCount: this.unreadCount,
     };
   }

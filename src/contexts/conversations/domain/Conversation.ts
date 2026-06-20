@@ -360,7 +360,7 @@ export class Conversation extends AggregateRoot {
       name: this.name?.valueOf(),
       networkId: this.networkId.valueOf(),
       participantIds: this.participantIdValues(),
-      type: this.type.valueOf(),
+      type: this.type.toPrimitives(),
     };
   }
 }

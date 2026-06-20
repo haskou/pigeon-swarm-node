@@ -19,7 +19,7 @@ export class CommunityChannelMessageMentions {
     return [...this.mentions];
   }
 
-  public toPrimitives(): ReturnType<Mention['toPrimitives']>[] {
+  public toPrimitives() {
     return this.mentions.map((mention) => mention.toPrimitives());
   }
 }
