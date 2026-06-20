@@ -10,10 +10,10 @@ import { ContentReplicationWasClaimedEvent } from '../../domain/events/ContentRe
 import ContentReplicaClaimRepository from '../../domain/repositories/ContentReplicaClaimRepository';
 import { ContentReplicationContext } from '../../domain/value-objects/ContentReplicationContext';
 import ContentReplicationStatusFinder from '../find-status/ContentReplicationStatusFinder';
-import { ReplicatedContentStatus } from '../find-status/types/ReplicatedContentStatus';
+import { ReplicatedContentStatus } from '../find-status/ReplicatedContentStatus';
 import ContentReplicationStatusSummaryUpdater from '../update-status-summary/ContentReplicationStatusSummaryUpdater';
-import { ContentNetworkReplicationStatus } from './types/ContentNetworkReplicationStatus';
-import { ContentReplicationMaintenanceResult } from './types/ContentReplicationMaintenanceResult';
+import { ContentNetworkReplicationStatus } from './ContentNetworkReplicationStatus';
+import { ContentReplicationMaintenanceResult } from './ContentReplicationMaintenanceResult';
 
 export default class ContentReplicationMaintainer {
   constructor(

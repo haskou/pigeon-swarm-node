@@ -2,8 +2,8 @@ import Kernel from '@app/Kernel';
 import { createRequire } from 'module';
 
 import PushNotificationDelivery from '../../application/send/PushNotificationDelivery';
+import { PushNotificationDeliveryResult } from '../../application/send/PushNotificationDeliveryResult';
 import { PushNotificationPayload } from '../../application/send/PushNotificationPayload';
-import { PushNotificationDeliveryResult } from '../../application/send/types/PushNotificationDeliveryResult';
 import { PushSubscription } from '../../domain/PushSubscription';
 import PushVapidConfiguration from './PushVapidConfiguration';
 import { WebPushError } from './types/WebPushError';

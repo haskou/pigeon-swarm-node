@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { StickerUserLibraryWasCreatedAttributes } from './types/StickerUserLibraryWasCreatedAttributes';
+import { StickerUserLibraryWasCreatedAttributes } from './StickerUserLibraryWasCreatedAttributes';
 
 export class StickerUserLibraryWasCreatedEvent extends DomainEvent {
   public static EVENT_NAME = 'stickers.v1.user_library.was_created';

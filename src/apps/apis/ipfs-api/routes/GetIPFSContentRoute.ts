@@ -26,20 +26,24 @@ export class GetIPFSContentRoute extends Route {
     try {
       const content = await this.getter.get(new ContentGetMessage(cid));
 
-      if (content.kind === 'binary') {
-        response.status(HttpRouteStatusEnum.OK).type(content.contentType);
+      if (content.isBinary()) {
+        const binary = content.getBinaryResponse();
 
-        if (content.filename) {
+        response.status(HttpRouteStatusEnum.OK).type(binary.contentType);
+
+        if (binary.filename) {
           response.setHeader(
             'Content-Disposition',
-            this.contentDisposition(content.filename),
+            this.contentDisposition(binary.filename),
           );
         }
 
-        return response.send(content.bytes);
+        return response.send(binary.bytes);
       }
 
-      return response.status(HttpRouteStatusEnum.OK).json(content.content);
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .json(content.getJsonResponse());
     } catch (error: unknown) {
       if (error instanceof IPFSContentNotFoundError) {
         return response

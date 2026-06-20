@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { NodeHeartbeatAttributes } from './types/NodeHeartbeatAttributes';
+import { NodeHeartbeatAttributes } from './NodeHeartbeatAttributes';
 
 export class NodeHeartbeatWasSent extends DomainEvent {
   public static EVENT_NAME = 'nodes.v1.node.heartbeat.was_sent';

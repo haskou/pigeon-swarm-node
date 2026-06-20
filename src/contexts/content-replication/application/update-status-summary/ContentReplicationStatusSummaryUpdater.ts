@@ -4,7 +4,7 @@ import { Integer, Timestamp } from '@haskou/value-objects';
 import { ContentReplicationStatusSummary } from '../../domain/ContentReplicationStatusSummary';
 import ContentReplicationStatusSummaryRepository from '../../domain/repositories/ContentReplicationStatusSummaryRepository';
 import { ContentSize } from '../../domain/value-objects/ContentSize';
-import { ContentReplicationStatus } from '../find-status/types/ContentReplicationStatus';
+import { ContentReplicationStatus } from '../find-status/ContentReplicationStatus';
 
 export default class ContentReplicationStatusSummaryUpdater {
   constructor(

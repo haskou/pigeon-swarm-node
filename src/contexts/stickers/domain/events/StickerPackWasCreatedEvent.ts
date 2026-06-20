@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { StickerPackWasCreatedAttributes } from './types/StickerPackWasCreatedAttributes';
+import { StickerPackWasCreatedAttributes } from './StickerPackWasCreatedAttributes';
 
 export class StickerPackWasCreatedEvent extends DomainEvent {
   public static EVENT_NAME = 'stickers.v1.pack.was_created';

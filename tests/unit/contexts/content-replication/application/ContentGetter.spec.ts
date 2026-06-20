@@ -64,11 +64,14 @@ describe('ContentGetter', () => {
 
     resolveBytes(Buffer.from('data'));
 
-    await expect(result).resolves.toEqual({
+    await expect(result).resolves.toMatchObject({
+      getBinaryResponse: expect.any(Function),
+      isBinary: expect.any(Function),
+    });
+    expect((await result).getBinaryResponse()).toEqual({
       bytes: Buffer.from('data'),
       contentType: 'image/png',
       filename: 'avatar.png',
-      kind: 'binary',
     });
     expect(calls).toEqual(['bytes', 'metadata']);
     expect(ipfs.getJSON).not.toHaveBeenCalled();

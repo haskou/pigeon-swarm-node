@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { NotificationSettingsWereUpdatedAttributes } from './types/NotificationSettingsWereUpdatedAttributes';
+import { NotificationSettingsWereUpdatedAttributes } from './NotificationSettingsWereUpdatedAttributes';
 
 export class NotificationSettingsWereUpdatedEvent extends DomainEvent {
   public static EVENT_NAME =

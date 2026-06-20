@@ -3,22 +3,19 @@ import { ConversationInvitationPayload } from '@app/contexts/notifications/domai
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-export type NotificationCreateMessagePayload =
-  | {
-      inviterIdentityId: IdentityId;
-      kind: 'community_invitation';
-      payload: CommunityInvitationPayload;
-      type: typeof NotificationType.COMMUNITY_INVITATION;
-    }
-  | {
-      inviterIdentityId: IdentityId;
-      kind: 'conversation_invitation';
-      payload: ConversationInvitationPayload;
-      type: typeof NotificationType.CONVERSATION_INVITATION;
-    }
-  | {
-      inviterIdentityId: IdentityId;
-      kind: 'group_conversation_invitation';
-      payload: ConversationInvitationPayload;
-      type: typeof NotificationType.GROUP_CONVERSATION_INVITATION;
-    };
+export class NotificationCreateMessagePayload {
+  public readonly inviterIdentityId!: IdentityId;
+  public readonly kind!:
+    | 'community_invitation'
+    | 'conversation_invitation'
+    | 'group_conversation_invitation';
+
+  public readonly payload!:
+    | CommunityInvitationPayload
+    | ConversationInvitationPayload;
+
+  public readonly type!:
+    | typeof NotificationType.COMMUNITY_INVITATION
+    | typeof NotificationType.CONVERSATION_INVITATION
+    | typeof NotificationType.GROUP_CONVERSATION_INVITATION;
+}

@@ -1,8 +1,8 @@
 import { Message } from '../../domain/entities/messages/Message';
 
-export type ConversationMessagePinResource = {
-  createdAt: number;
-  message: Message;
-  messageId: string;
-  pinnedByIdentityId: string;
-};
+export class ConversationMessagePinResource {
+  public readonly createdAt!: number;
+  public readonly message!: Message;
+  public readonly messageId!: string;
+  public readonly pinnedByIdentityId!: string;
+}

@@ -91,11 +91,22 @@ export class NotificationCreateMessage {
   public match<T>(handlers: NotificationCreateMessageHandlers<T>): T {
     switch (this.payload.kind) {
       case 'community_invitation':
-        return handlers.communityInvitation(this.payload.payload);
+        if (this.payload.payload instanceof CommunityInvitationPayload) {
+          return handlers.communityInvitation(this.payload.payload);
+        }
+        break;
       case 'conversation_invitation':
-        return handlers.conversationInvitation(this.payload.payload);
+        if (this.payload.payload instanceof ConversationInvitationPayload) {
+          return handlers.conversationInvitation(this.payload.payload);
+        }
+        break;
       case 'group_conversation_invitation':
-        return handlers.groupConversationInvitation(this.payload.payload);
+        if (this.payload.payload instanceof ConversationInvitationPayload) {
+          return handlers.groupConversationInvitation(this.payload.payload);
+        }
+        break;
     }
+
+    throw new Error('Unsupported notification payload.');
   }
 }

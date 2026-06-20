@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { NotificationSettingsWereResetAttributes } from './types/NotificationSettingsWereResetAttributes';
+import { NotificationSettingsWereResetAttributes } from './NotificationSettingsWereResetAttributes';
 
 export class NotificationSettingsWereResetEvent extends DomainEvent {
   public static EVENT_NAME =

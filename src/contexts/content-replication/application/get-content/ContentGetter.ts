@@ -54,11 +54,10 @@ export default class ContentGetter {
     const bytes = await this.getPublicBytes(message.cid);
 
     if (bytes !== undefined) {
-      return {
-        ...(await this.metadata(message.cid)),
+      return ContentGetResult.binary({
         bytes,
-        kind: 'binary',
-      };
+        ...(await this.metadata(message.cid)),
+      });
     }
 
     if (isRawCid) {
@@ -68,10 +67,7 @@ export default class ContentGetter {
     const content = await this.getPublicJSON(message.cid);
 
     if (content !== undefined) {
-      return {
-        content,
-        kind: 'json',
-      };
+      return ContentGetResult.json(content);
     }
 
     throw new IPFSContentNotFoundError(message.cid.valueOf());

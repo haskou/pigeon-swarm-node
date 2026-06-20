@@ -2,7 +2,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { Identity } from '../Identity';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
-import { PreviousIdentityResolver } from './types/PreviousIdentityResolver';
 
 export default class IdentityCandidateValidationDomainService {
   private isValidPreviousLink(
@@ -23,7 +22,9 @@ export default class IdentityCandidateValidationDomainService {
   public async isValidChainFor(
     identityId: IdentityId,
     candidate: Identity,
-    resolvePrevious: PreviousIdentityResolver,
+    resolvePrevious: (
+      externalIdentifier: IdentityExternalIdentifier,
+    ) => Promise<Identity | undefined>,
     visitedExternalIdentifiers: IdentityExternalIdentifier[] = [],
   ): Promise<boolean> {
     if (!this.isValidFor(identityId, candidate)) {

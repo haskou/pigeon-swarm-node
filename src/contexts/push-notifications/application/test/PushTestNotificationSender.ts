@@ -1,8 +1,8 @@
 import { PushSubscription } from '../../domain/PushSubscription';
 import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import PushNotificationDelivery from '../send/PushNotificationDelivery';
+import { PushNotificationDeliveryResult } from '../send/PushNotificationDeliveryResult';
 import { PushNotificationPayload } from '../send/PushNotificationPayload';
-import { PushNotificationDeliveryResult } from '../send/types/PushNotificationDeliveryResult';
 import { PushNotificationTestMessage } from './messages/PushNotificationTestMessage';
 
 export default class PushTestNotificationSender {
