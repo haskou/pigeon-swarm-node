@@ -103,12 +103,12 @@ package "communities/application" {
     + find(message): CommunityChannelMessagesPage
   }
 
-  class CommunityChannelMessageSearcher {
-    + search(message): CommunityChannelMessagesPage
+  class CommunityChannelMessageSearchFinder {
+    + find(message): CommunityChannelMessagesPage
   }
 
-  class CommunityMessagesSearcher {
-    + search(message): CommunityMessagesSearchResult
+  class CommunityMessagesSearchFinder {
+    + find(message): CommunityMessagesSearchResult
   }
 
   class CommunityChannelMessageReactionAdder {
@@ -179,10 +179,10 @@ package "communities/application" {
   CommunityChannelMessagesFinder ..> CommunityRepository
   CommunityChannelMessagesFinder ..> CommunityChannelMessageRepository
   CommunityChannelMessagesFinder ..> CommunityChannelMessageReactionRepository
-  CommunityChannelMessageSearcher ..> CommunityRepository
-  CommunityChannelMessageSearcher ..> CommunityChannelMessageRepository
-  CommunityMessagesSearcher ..> CommunityRepository
-  CommunityMessagesSearcher ..> CommunityChannelMessageRepository
+  CommunityChannelMessageSearchFinder ..> CommunityRepository
+  CommunityChannelMessageSearchFinder ..> CommunityChannelMessageRepository
+  CommunityMessagesSearchFinder ..> CommunityRepository
+  CommunityMessagesSearchFinder ..> CommunityChannelMessageRepository
   CommunityChannelMessageReactionAdder ..> CommunityRepository
   CommunityChannelMessageReactionAdder ..> CommunityChannelMessageReactionRepository
   CommunityChannelMessageReactionRemover ..> CommunityRepository

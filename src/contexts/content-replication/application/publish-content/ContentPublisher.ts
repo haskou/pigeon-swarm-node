@@ -1,3 +1,4 @@
+import { ContentReplicaUploadCompletion } from '@app/contexts/content-replication/domain/ContentReplicaUploadCompletion';
 import { ContentReplicationContext } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationContext';
 import { ContentReplicationPriority } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationPriority';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
@@ -35,18 +36,16 @@ export default class ContentPublisher {
     };
   }
 
-  private async networkIds(): Promise<string[]> {
-    const networks = await this.contentStorage.findNetworkIds();
-
-    return networks.map((networkId) => networkId.valueOf());
+  private async networkIds(): Promise<NetworkId[]> {
+    return this.contentStorage.findNetworkIds();
   }
 
   private async ownerNetworkIds(
     ownerIdentityId: IdentityId,
-  ): Promise<string[]> {
+  ): Promise<NetworkId[]> {
     const identity = await this.identityRepository.findById(ownerIdentityId);
 
-    return identity.getNetworkIds().map((networkId) => networkId.valueOf());
+    return identity.getNetworkIds();
   }
 
   private async localNodeId(): Promise<string> {
@@ -61,7 +60,7 @@ export default class ContentPublisher {
     deferSideEffects?: boolean;
     filename?: string;
     message: ContentPublishMessage;
-    networkIds: string[];
+    networkIds: NetworkId[];
   }): Promise<void> {
     await this.replicationRegistrar.register({
       cid: params.cid,
@@ -71,7 +70,7 @@ export default class ContentPublisher {
       filename: params.filename,
       localNodeId: await this.localNodeId(),
       localReplicaNetworkIds: params.claimedNetworkIds,
-      networkIds: params.networkIds,
+      networkIds: params.networkIds.map((networkId) => networkId.valueOf()),
       ownerIdentityId: params.message.ownerIdentityId.valueOf(),
       priority: ContentReplicationPriority.NORMAL,
       sizeBytes: params.message.body.length,
@@ -81,12 +80,12 @@ export default class ContentPublisher {
   private async registerUploadedBytesReplication(params: {
     cid: string;
     claimedNetworkIds: string[];
-    completedNetworkIds: Promise<string[]>;
+    completedNetworkIds: Promise<NetworkId[]>;
     contentType: string;
     context: string;
     filename?: string;
     message: ContentPublishMessage;
-    networkIds: string[];
+    networkIds: NetworkId[];
   }): Promise<void> {
     const firstRegistration = this.registerReplication({
       ...params,
@@ -96,17 +95,20 @@ export default class ContentPublisher {
     await firstRegistration;
     params.completedNetworkIds
       .then(async (completedNetworkIds) => {
-        const pendingClaimedNetworkIds = completedNetworkIds.filter(
-          (networkId) => !params.claimedNetworkIds.includes(networkId),
+        const completion = new ContentReplicaUploadCompletion(
+          params.claimedNetworkIds.map((networkId) => new NetworkId(networkId)),
+          completedNetworkIds,
         );
 
-        if (pendingClaimedNetworkIds.length === 0) {
+        if (!completion.hasPendingClaims()) {
           return;
         }
 
         await this.registerReplication({
           ...params,
-          claimedNetworkIds: pendingClaimedNetworkIds,
+          claimedNetworkIds: completion
+            .pendingClaimedNetworkIds()
+            .map((networkId) => networkId.valueOf()),
           deferSideEffects: true,
         });
       })
@@ -149,15 +151,13 @@ export default class ContentPublisher {
     const { completedNetworkIds, contentId, networkId } =
       await this.contentStorage.publishBytesToNetworks(
         message.body,
-        networkIds.map((id) => new NetworkId(id)),
+        networkIds,
       );
 
     await this.registerUploadedBytesReplication({
       cid: contentId.valueOf(),
       claimedNetworkIds: [networkId.valueOf()],
-      completedNetworkIds: completedNetworkIds.then((ids) =>
-        ids.map((id) => id.valueOf()),
-      ),
+      completedNetworkIds,
       contentType,
       context,
       filename: message.filename,

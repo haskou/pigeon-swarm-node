@@ -1,4 +1,4 @@
-import CommunityMessagesSearcher from '@app/contexts/communities/application/search-messages/CommunityMessagesSearcher';
+import CommunityMessagesSearchFinder from '@app/contexts/communities/application/search-messages/CommunityMessagesSearchFinder';
 import { CommunityMessagesSearchMessage } from '@app/contexts/communities/application/search-messages/messages/CommunityMessagesSearchMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -16,8 +16,8 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
-  private readonly searcher = this.get<CommunityMessagesSearcher>(
-    CommunityMessagesSearcher,
+  private readonly finder = this.get<CommunityMessagesSearchFinder>(
+    CommunityMessagesSearchFinder,
   );
 
   @Get('/:communityId/messages/search')
@@ -29,7 +29,7 @@ export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const result = await this.searcher.search(
+    const result = await this.finder.find(
       new CommunityMessagesSearchMessage(
         communityId,
         actorIdentityId.valueOf(),

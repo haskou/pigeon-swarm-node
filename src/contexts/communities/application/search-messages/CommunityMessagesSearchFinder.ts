@@ -1,42 +1,37 @@
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '../../domain/repositories/CommunityMessageReactionRepository';
-import { CommunityChannelMessagesPage } from '../find-channel-messages/CommunityChannelMessagesPage';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityChannelMessageSearchMessage } from './messages/CommunityChannelMessageSearchMessage';
+import { CommunityMessagesSearchResult } from './CommunityMessagesSearchResult';
+import { CommunityMessagesSearchMessage } from './messages/CommunityMessagesSearchMessage';
 
-export default class CommunityChannelMessageSearcher {
+export default class CommunityMessagesSearchFinder {
   constructor(
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly reactionRepository: CommunityMessageReactionRepository,
   ) {}
 
-  public async search(
-    message: CommunityChannelMessageSearchMessage,
-  ): Promise<CommunityChannelMessagesPage> {
+  public async find(
+    message: CommunityMessagesSearchMessage,
+  ): Promise<CommunityMessagesSearchResult> {
     const community = await this.communityFinder.findById(message.communityId);
-
-    community.searchTextChannelMessages(
+    const visibleTextChannelIds = community.visibleTextChannelIdsFor(
       message.actorIdentityId,
-      message.channelId,
     );
-    const messages = await this.messageRepository.searchPublicByChannel(
+
+    community.searchMessages();
+    const messages = await this.messageRepository.searchPublicByChannels(
       message.communityId,
-      message.channelId,
+      visibleTextChannelIds,
       message.query,
       message.limit,
     );
-    const reactions = await this.reactionRepository.findByMessageIds(
+    const reactions = await this.reactionRepository.findByMessageIdsInChannels(
       message.communityId,
-      message.channelId,
+      visibleTextChannelIds,
       messages.map((channelMessage) => channelMessage.getId()),
     );
 
-    return new CommunityChannelMessagesPage(
-      messages,
-      reactions,
-      [],
-      message.limit,
-    );
+    return new CommunityMessagesSearchResult(messages, reactions);
   }
 }
