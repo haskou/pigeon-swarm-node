@@ -77,6 +77,10 @@ package "identities.domain" {
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 
+  interface IdentityNetworkRepository {
+    +findByIdentityId(identityId: IdentityId): Promise<NetworkId[]>
+  }
+
   class IdentitySaverService {
     +save(identity): Promise<IdentityExternalIdentifier>
   }
@@ -129,10 +133,15 @@ package "identities.application" {
     +register(message: RegisterPublishedIdentityMessage): Promise<Identity>
   }
 
+  class IdentityNetworksFinder {
+    +find(identityId: IdentityId): Promise<NetworkId[]>
+  }
+
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
   IdentityFinder --> IdentityFinderService
   RegisterPublishedIdentity --> IdentityRegistrarService
+  IdentityNetworksFinder --> IdentityNetworkRepository
 }
 
 package "identities.infrastructure" {
@@ -172,6 +181,10 @@ package "identities.infrastructure" {
     +findByHandle(handle): Promise<IdentityMetadataRecord[]>
   }
 
+  class MetadataIdentityNetworkRepository {
+    +findByIdentityId(identityId): Promise<NetworkId[]>
+  }
+
   class IpfsIdentityRepository {
     +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
@@ -187,9 +200,11 @@ package "identities.infrastructure" {
   end note
 
   IpfsIdentityRepository ..|> IdentityRepository
+  MetadataIdentityNetworkRepository ..|> IdentityNetworkRepository
   OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
   IpfsIdentityRepository --> IpfsIdentityDocument
   IpfsIdentityRepository --> IdentityMetadataIndex
+  MetadataIdentityNetworkRepository --> IdentityMetadataIndex
   OrbitDBIdentityMetadataIndex --> OrbitDBIdentityMetadataDocument
 }
 

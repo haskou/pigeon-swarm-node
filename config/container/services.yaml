@@ -122,6 +122,8 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeV9fSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeQ==: >-
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX01ldGFkYXRhSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeV9fTWV0YWRhdGFJZGVudGl0eU5ldHdvcmtSZXBvc2l0b3J5
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlSZXBvc2l0b3J5X19JZGVudGl0eVJlcG9zaXRvcnk=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5UmVwb3NpdG9yeV9fSXBmc0lkZW50aXR5UmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eUNhbmRpZGF0ZVZhbGlkYXRpb25Eb21haW5TZXJ2aWNlX19JZGVudGl0eUNhbmRpZGF0ZVZhbGlkYXRpb25Eb21haW5TZXJ2aWNl:
@@ -465,6 +467,13 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eUZpbmRlclNlcnZpY2VfX0lkZW50aXR5RmluZGVyU2VydmljZQ==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fZmluZC1uZXR3b3Jrc19fSWRlbnRpdHlOZXR3b3Jrc0ZpbmRlcl9fSWRlbnRpdHlOZXR3b3Jrc0ZpbmRlcg==:
+    class: /contexts/identities/application/find-networks/IdentityNetworksFinder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeV9fSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItY2FuZGlkYXRlX19JZGVudGl0eUNhbmRpZGF0ZVJlZ2lzdHJhcl9fSWRlbnRpdHlDYW5kaWRhdGVSZWdpc3RyYXI=:
     class: >-
       /contexts/identities/application/register-candidate/IdentityCandidateRegistrar
@@ -565,7 +574,7 @@ services:
     class: /contexts/presence/application/IdentityPresenceNetworkResolver
     arguments:
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX0lkZW50aXR5TWV0YWRhdGFJbmRleF9fSWRlbnRpdHlNZXRhZGF0YUluZGV4
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fZmluZC1uZXR3b3Jrc19fSWRlbnRpdHlOZXR3b3Jrc0ZpbmRlcl9fSWRlbnRpdHlOZXR3b3Jrc0ZpbmRlcg==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX2ZpbmRfX0lkZW50aXR5UHJlc2VuY2VGaW5kZXJfX0lkZW50aXR5UHJlc2VuY2VGaW5kZXI=:
@@ -1083,6 +1092,15 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVJlc29sdXRpb25Eb21haW5TZXJ2aWNlX19JZGVudGl0eVJlc29sdXRpb25Eb21haW5TZXJ2aWNl
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX01ldGFkYXRhSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeV9fTWV0YWRhdGFJZGVudGl0eU5ldHdvcmtSZXBvc2l0b3J5:
+    class: >-
+      /contexts/identities/infrastructure/metadata/MetadataIdentityNetworkRepository
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX0lkZW50aXR5TWV0YWRhdGFJbmRleF9fSWRlbnRpdHlNZXRhZGF0YUluZGV4
+    abstract: false
+    parent: >-
+      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeV9fSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFJbmRleF9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFJbmRleA==:
     class: /contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex
     arguments:
