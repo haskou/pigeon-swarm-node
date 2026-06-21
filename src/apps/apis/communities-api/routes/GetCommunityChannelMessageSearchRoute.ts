@@ -1,4 +1,4 @@
-import CommunityChannelMessageSearcher from '@app/contexts/communities/application/search-channel-messages/CommunityChannelMessageSearcher';
+import CommunityChannelMessageSearchFinder from '@app/contexts/communities/application/search-channel-messages/CommunityChannelMessageSearchFinder';
 import { CommunityChannelMessageSearchMessage } from '@app/contexts/communities/application/search-channel-messages/messages/CommunityChannelMessageSearchMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
@@ -17,8 +17,8 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 @JsonController('/communities')
 // eslint-disable-next-line max-len
 export class GetCommunityChannelMessageSearchRoute extends CommunityRouteSupport {
-  private readonly searcher = this.get<CommunityChannelMessageSearcher>(
-    CommunityChannelMessageSearcher,
+  private readonly finder = this.get<CommunityChannelMessageSearchFinder>(
+    CommunityChannelMessageSearchFinder,
   );
 
   @Get('/:communityId/channels/:channelId/messages/search')
@@ -31,7 +31,7 @@ export class GetCommunityChannelMessageSearchRoute extends CommunityRouteSupport
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const page = await this.searcher.search(
+    const page = await this.finder.find(
       new CommunityChannelMessageSearchMessage(
         communityId,
         channelId,

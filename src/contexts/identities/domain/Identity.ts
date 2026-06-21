@@ -102,25 +102,15 @@ export class Identity extends AggregateRoot {
     );
   }
 
-  private async signNextPrimitives(
-    primitives: PrimitiveOf<Identity>,
+  private async signPublication(
+    payload: IdentitySignaturePayload,
     password: Password,
-  ): Promise<PrimitiveOf<Identity>> {
-    const nextPrimitives = {
-      ...primitives,
-      signature: '',
-    };
-    const signature =
-      await new IdentitySignatureDomainService().generateSignature(
-        IdentitySignaturePayload.fromPrimitives(nextPrimitives),
-        this.signingKey,
-        password,
-      );
-
-    return {
-      ...nextPrimitives,
-      signature: signature.valueOf(),
-    };
+  ): Promise<Signature> {
+    return new IdentitySignatureDomainService().generateSignature(
+      payload,
+      this.signingKey,
+      password,
+    );
   }
 
   private ensureKeepsCurrentNetworks(networks: NetworkId[]): void {
@@ -136,10 +126,6 @@ export class Identity extends AggregateRoot {
 
   public hasHandle(handle: ProfileHandle): boolean {
     return this.profile.hasHandle(handle);
-  }
-
-  public getId(): IdentityId {
-    return this.id;
   }
 
   public getNetworkIds(): NetworkId[] {
@@ -207,17 +193,23 @@ export class Identity extends AggregateRoot {
   ): Promise<Identity> {
     this.ensureKeepsCurrentNetworks(networks);
 
-    const primitives = await this.signNextPrimitives(
-      {
-        ...this.toPrimitives(),
-        networks: networks.map((networkId) => networkId.valueOf()),
-        previousIdentityExternalIdentifier:
-          previousIdentityExternalIdentifier.valueOf(),
-        timestamp: Timestamp.now().valueOf(),
-        version: this.version.next().valueOf(),
-      },
+    const unsignedPublication = {
+      ...this.toPrimitives(),
+      networks: networks.map((networkId) => networkId.valueOf()),
+      previousIdentityExternalIdentifier:
+        previousIdentityExternalIdentifier.valueOf(),
+      signature: '',
+      timestamp: Timestamp.now().valueOf(),
+      version: this.version.next().valueOf(),
+    };
+    const signature = await this.signPublication(
+      IdentitySignaturePayload.fromPrimitives(unsignedPublication),
       password,
     );
+    const primitives = {
+      ...unsignedPublication,
+      signature: signature.valueOf(),
+    };
     const identity = Identity.fromPrimitives(primitives);
 
     identity.record(
@@ -234,17 +226,23 @@ export class Identity extends AggregateRoot {
     password: Password,
     previousIdentityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity> {
-    const primitives = await this.signNextPrimitives(
-      {
-        ...this.toPrimitives(),
-        previousIdentityExternalIdentifier:
-          previousIdentityExternalIdentifier.valueOf(),
-        profile: profile.toPrimitives(),
-        timestamp: Timestamp.now().valueOf(),
-        version: this.version.next().valueOf(),
-      },
+    const unsignedPublication = {
+      ...this.toPrimitives(),
+      previousIdentityExternalIdentifier:
+        previousIdentityExternalIdentifier.valueOf(),
+      profile: profile.toPrimitives(),
+      signature: '',
+      timestamp: Timestamp.now().valueOf(),
+      version: this.version.next().valueOf(),
+    };
+    const signature = await this.signPublication(
+      IdentitySignaturePayload.fromPrimitives(unsignedPublication),
       password,
     );
+    const primitives = {
+      ...unsignedPublication,
+      signature: signature.valueOf(),
+    };
     const identity = Identity.fromPrimitives(primitives);
 
     identity.record(
