@@ -27,6 +27,8 @@ package "conversations.domain" {
 
   class ConversationType <<ValueObject>>
   class GroupConversationName <<ValueObject>>
+  class MessageSendOptions <<ValueObject>>
+  class MessageEditOptions <<ValueObject>>
 
   class ConversationWasCreatedEvent {
     +eventName(): string
@@ -139,6 +141,8 @@ package "conversations.domain" {
   MessageSent o--> AttachmentExternalIdentifier
   MessageEdited --> MessageId
   MessageDeleted --> MessageId
+  Conversation ..> MessageSendOptions
+  Conversation ..> MessageEditOptions
   MessageSignatureDomainService ..> Message
   MessageReaction --> ConversationId
   MessageReaction --> MessageId
@@ -175,6 +179,14 @@ package "conversations.application" {
 
   class LatestMessagesFinder {
     +find(query): Promise<Message[]>
+    +findTimeline(query): Promise<ConversationMessagesTimeline>
+  }
+
+  class ConversationMessagesTimeline {
+    +messages(): Message[]
+    +reactions(): MessageReaction[]
+    +calls(): Call[]
+    +polls(): Poll[]
   }
 
   class MessageEditor {
@@ -219,10 +231,13 @@ package "conversations.application" {
   GroupConversationCreator --> ConversationRepository
   GroupConversationCreator --> DomainEventPublisher
   MessageSender --> ConversationRepository
+  MessageSender --> PollRepository
   MessageSender --> DomainEventPublisher
   MessageReceiver --> ConversationRepository
   LatestMessagesFinder --> ConversationRepository
   LatestMessagesFinder --> MessageReactionRepository
+  LatestMessagesFinder --> CallRepository
+  LatestMessagesFinder --> PollRepository
   MessageEditor --> ConversationRepository
   MessageEditor --> DomainEventPublisher
   MessageDeleter --> ConversationRepository

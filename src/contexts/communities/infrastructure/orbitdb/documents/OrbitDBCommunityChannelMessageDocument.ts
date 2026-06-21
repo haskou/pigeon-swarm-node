@@ -1,5 +1,3 @@
-import { CommunityMentionTypeValue } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
-
 export interface OrbitDBCommunityChannelMessageDocument extends Record<
   string,
   unknown
@@ -16,7 +14,7 @@ export interface OrbitDBCommunityChannelMessageDocument extends Record<
   id: string;
   mentions?: {
     targetId: string | undefined;
-    type: CommunityMentionTypeValue;
+    type: string;
   }[];
   messageId?: string;
   plaintextPayload?: string;

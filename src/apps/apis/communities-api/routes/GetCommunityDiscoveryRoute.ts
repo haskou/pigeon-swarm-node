@@ -1,3 +1,5 @@
+import CommunitiesDiscoverer from '@app/contexts/communities/application/discover-communities/CommunitiesDiscoverer';
+import { CommunitiesDiscoverMessage } from '@app/contexts/communities/application/discover-communities/messages/CommunitiesDiscoverMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import { Get, JsonController, QueryParam, Req, Res } from 'routing-controllers';
@@ -7,6 +9,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class GetCommunityDiscoveryRoute extends CommunityRouteSupport {
+  private readonly discoverer = this.get<CommunitiesDiscoverer>(
+    CommunitiesDiscoverer,
+  );
+
   @Get('/discover')
   public async discoverCommunities(
     @QueryParam('query') query: string | undefined,
@@ -15,18 +21,17 @@ export class GetCommunityDiscoveryRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const [communities, membershipRequests] = await Promise.all([
-      this.repository().findDiscoverable({ networkId, query }),
-      this.membershipRequests().findByIdentity(identityId),
-    ]);
+    const discovery = await this.discoverer.discover(
+      new CommunitiesDiscoverMessage(identityId.valueOf(), networkId, query),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
         new CommunityDiscoveryViewModel(
-          communities,
+          discovery.getCommunities(),
           identityId,
-          membershipRequests,
+          discovery.getMembershipRequests(),
         ).toResource(),
       );
   }

@@ -23,11 +23,12 @@ export default class CallScopeResolver {
       throw new InvalidCallScopeError();
     }
 
-    community.assertCanConnectVoice(message.requesterIdentityId, channelId);
-
     return new ResolvedCallScope(
       community.getNetworkId(),
-      community.getMemberIds(),
+      community.membersForVoiceChannelCall(
+        message.requesterIdentityId,
+        channelId,
+      ),
       CallScope.communityChannel(communityId, channelId),
     );
   }

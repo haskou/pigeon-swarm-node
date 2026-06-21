@@ -1,10 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Timestamp } from '@haskou/value-objects';
 
 import { ContentReplication } from '../../domain/ContentReplication';
 import ContentReplicationRepository from '../../domain/repositories/ContentReplicationRepository';
+import { ContentId } from '../../domain/value-objects/ContentId';
 import { ContentReplicationContext } from '../../domain/value-objects/ContentReplicationContext';
 import { ContentReplicationMetadata } from '../../domain/value-objects/ContentReplicationMetadata';
 import { ContentReplicationPriority } from '../../domain/value-objects/ContentReplicationPriority';
@@ -28,7 +28,7 @@ export default class ContentReplicationMetadataRegistrar {
     sizeBytes: number;
     updatedAt?: number;
   }): Promise<ContentReplication> {
-    const cid = new IPFSId(params.cid);
+    const cid = new ContentId(params.cid);
     const existing = await this.repository.findByCid(cid);
     const networkIds = params.networkIds.map(
       (networkId) => new NetworkId(networkId),

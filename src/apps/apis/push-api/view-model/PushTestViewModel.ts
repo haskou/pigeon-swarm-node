@@ -1,4 +1,4 @@
-import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/types/PushNotificationDeliveryResult';
+import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/PushNotificationDeliveryResult';
 
 import { PushTestResource } from '../resources/PushTestResource';
 

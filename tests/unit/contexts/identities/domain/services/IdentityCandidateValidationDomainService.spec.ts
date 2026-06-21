@@ -1,8 +1,10 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
@@ -59,7 +61,7 @@ describe('IdentityCandidateValidationDomainService', () => {
   it('should reject a versioned candidate that removes a previous network', async () => {
     const previousIdentity = mother.build();
     const previousPrimitives = previousIdentity.toPrimitives();
-    const candidatePrimitives = {
+    const { signature: _, ...candidatePrimitives } = {
       ...previousPrimitives,
       networks: [new NetworkId(faker.string.uuid()).valueOf()],
       previousIdentityExternalIdentifier: 'bafypreviousidentity',
@@ -69,8 +71,8 @@ describe('IdentityCandidateValidationDomainService', () => {
     };
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
-        candidatePrimitives,
-        EncryptedKeyPair.fromPrimitives(previousPrimitives.encryptedKeyPair),
+        IdentitySignaturePayload.fromPrimitives(candidatePrimitives),
+        IdentitySigningKey.fromPrimitives(previousPrimitives.encryptedKeyPair),
         mother.password,
       );
     const candidate = Identity.fromPrimitives({

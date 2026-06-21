@@ -1,6 +1,5 @@
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
-import { MessageId } from '../../domain/value-objects/MessageId';
 import ConversationMessagePinAccess from './ConversationMessagePinAccess';
 import { ConversationMessagePinResource } from './ConversationMessagePinResource';
 import { ConversationMessagePinsFindMessage } from './messages/ConversationMessagePinsFindMessage';
@@ -28,15 +27,15 @@ export default class ConversationMessagePinsFinder {
     for (const pin of pins) {
       const pinnedMessage = await this.conversationRepository.findMessageById(
         message.conversationId,
-        new MessageId(pin.messageId),
+        pin.getMessageId(),
       );
 
       if (pinnedMessage) {
         resources.push({
-          createdAt: pin.createdAt,
+          createdAt: pin.getCreatedAt().valueOf(),
           message: pinnedMessage,
-          messageId: pin.messageId,
-          pinnedByIdentityId: pin.pinnedByIdentityId,
+          messageId: pin.getMessageId().valueOf(),
+          pinnedByIdentityId: pin.getPinnedByIdentityId().valueOf(),
         });
       }
     }

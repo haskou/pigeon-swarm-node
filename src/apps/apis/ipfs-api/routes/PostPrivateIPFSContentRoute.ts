@@ -12,10 +12,10 @@ import {
   UseBefore,
 } from 'routing-controllers';
 
-import { IPFSContentUploadRoute } from './IPFSContentUploadRoute';
+import { IPFSContentUploadRouteSupport } from './IPFSContentUploadRouteSupport';
 
 @JsonController('/ipfs')
-export class PostPrivateIPFSContentRoute extends IPFSContentUploadRoute {
+export class PostPrivateIPFSContentRoute extends IPFSContentUploadRouteSupport {
   @Post('/private')
   @Post('/secure')
   @UseBefore(

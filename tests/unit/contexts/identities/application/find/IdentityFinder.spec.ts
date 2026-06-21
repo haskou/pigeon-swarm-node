@@ -1,5 +1,6 @@
 import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
 import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
+import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import IdentityFinderService from '@app/contexts/identities/domain/services/IdentityFinderService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -52,18 +53,17 @@ describe('IdentityFinder', () => {
         'bafyidentitycid',
       );
 
-      finderService.findCandidateById.mockResolvedValue({
-        externalIdentifier,
-        identity,
-      });
+      finderService.findCandidateById.mockResolvedValue(
+        new IdentityCandidate(externalIdentifier, identity),
+      );
 
       const result = await finder.findCandidate(message);
 
       expect(finderService.findCandidateById).toHaveBeenCalledWith(
         message.identityId,
       );
-      expect(result.externalIdentifier).toEqual(externalIdentifier);
-      expect(result.identity).toEqual(identity);
+      expect(result.getExternalIdentifier()).toEqual(externalIdentifier);
+      expect(result.getIdentity()).toEqual(identity);
     });
   });
 });

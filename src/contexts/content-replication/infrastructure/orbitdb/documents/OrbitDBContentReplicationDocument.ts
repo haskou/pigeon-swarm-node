@@ -1,5 +1,3 @@
-import { PriorityValue } from '../../../domain/value-objects/types/PriorityValue';
-
 export interface OrbitDBContentReplicationDocument {
   cid: string;
   contentType?: string;
@@ -9,7 +7,7 @@ export interface OrbitDBContentReplicationDocument {
   id: string;
   networkIds: string[];
   ownerIdentityId?: string;
-  priority: PriorityValue;
+  priority: string;
   sizeBytes: number;
   updatedAt: number;
 }

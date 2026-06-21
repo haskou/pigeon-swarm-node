@@ -1,7 +1,6 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
-import { ConversationMessageWasPinnedEvent } from '../../domain/events/ConversationMessageWasPinnedEvent';
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import ConversationMessagePinAccess from './ConversationMessagePinAccess';
@@ -37,15 +36,8 @@ export default class ConversationMessagePinner {
       message.identityId,
     );
 
-    const conversationPrimitives = conversation.toPrimitives();
+    conversation.pinMessage(message.identityId, message.messageId);
 
-    await this.eventPublisher.publish([
-      new ConversationMessageWasPinnedEvent(message.conversationId.valueOf(), {
-        messageId: message.messageId.valueOf(),
-        networkId: conversationPrimitives.networkId,
-        participantIds: conversationPrimitives.participantIds,
-        pinnedByIdentityId: message.identityId.valueOf(),
-      }),
-    ]);
+    await this.eventPublisher.publish(conversation.pullDomainEvents());
   }
 }

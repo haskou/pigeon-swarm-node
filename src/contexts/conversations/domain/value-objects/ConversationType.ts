@@ -20,4 +20,8 @@ export class ConversationType extends StringValueObject {
   public isGroup(): boolean {
     return this.isEqual(ConversationType.GROUP);
   }
+
+  public toPrimitives(): 'group' | 'one-to-one' {
+    return this.isGroup() ? 'group' : 'one-to-one';
+  }
 }

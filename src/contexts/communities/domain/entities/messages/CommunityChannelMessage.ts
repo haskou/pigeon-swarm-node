@@ -2,8 +2,8 @@ import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { CommunityChannelMessageAttachments as Attachments } from '../../types/CommunityChannelMessageAttachments';
-import { CommunityChannelMessageMentions as Mentions } from '../../types/CommunityChannelMessageMentions';
+import { CommunityChannelMessageAttachments as Attachments } from '../../CommunityChannelMessageAttachments';
+import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
 import { CommunityChannelAttachmentId } from '../../value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '../../value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../value-objects/CommunityChannelMessageId';
@@ -11,14 +11,15 @@ import { CommunityId } from '../../value-objects/CommunityId';
 import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from './CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
+import { CommunityChannelMessageSignaturePayload } from './CommunityChannelMessageSignaturePayload';
 
 export class CommunityChannelMessage {
   public static create(
     metadata: CommunityChannelMessageMetadata,
     payload: CommunityChannelMessagePayload,
     signature: Signature,
-    attachmentExternalIdentifiers: Attachments = [],
-    mentions: Mentions = [],
+    attachmentExternalIdentifiers: Attachments = Attachments.empty(),
+    mentions: Mentions = Mentions.empty(),
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       metadata,
@@ -37,8 +38,8 @@ export class CommunityChannelMessage {
       metadata,
       undefined,
       undefined,
-      [],
-      [],
+      Attachments.empty(),
+      Mentions.empty(),
       undefined,
       pollId,
     );
@@ -65,12 +66,16 @@ export class CommunityChannelMessage {
           })
         : undefined,
       primitives.signature ? new Signature(primitives.signature) : undefined,
-      primitives.attachmentExternalIdentifiers.map(
-        (externalIdentifier) =>
-          new CommunityChannelAttachmentId(externalIdentifier),
+      Attachments.from(
+        primitives.attachmentExternalIdentifiers.map(
+          (externalIdentifier) =>
+            new CommunityChannelAttachmentId(externalIdentifier),
+        ),
       ),
-      (primitives.mentions || []).map((mention) =>
-        CommunityChannelMessageMention.fromPrimitives(mention),
+      Mentions.from(
+        (primitives.mentions || []).map((mention) =>
+          CommunityChannelMessageMention.fromPrimitives(mention),
+        ),
       ),
       primitives.editedAt ? new Timestamp(primitives.editedAt) : undefined,
       primitives.pollId ? new PollId(primitives.pollId) : undefined,
@@ -95,6 +100,18 @@ export class CommunityChannelMessage {
     return this.metadata.getAuthorIdentityId();
   }
 
+  public getId(): CommunityChannelMessageId {
+    return this.metadata.getId();
+  }
+
+  public wasAuthoredBy(identityId: IdentityId): boolean {
+    return this.metadata.getAuthorIdentityId().isEqual(identityId);
+  }
+
+  public getChannelId(): CommunityChannelId {
+    return this.metadata.getChannelId();
+  }
+
   public isIdentifiedBy(messageId: CommunityChannelMessageId): boolean {
     return this.metadata.getId().isEqual(messageId);
   }
@@ -103,7 +120,25 @@ export class CommunityChannelMessage {
     return this.payload?.isPlaintext() ?? false;
   }
 
-  public getMentions(): CommunityChannelMessageMention[] {
+  public toSignaturePayload(): CommunityChannelMessageSignaturePayload {
+    const primitives = this.toPrimitives();
+
+    return CommunityChannelMessageSignaturePayload.fromPrimitives({
+      attachmentExternalIdentifiers: primitives.attachmentExternalIdentifiers,
+      authorIdentityId: primitives.authorIdentityId,
+      channelId: primitives.channelId,
+      communityId: primitives.communityId,
+      createdAt: primitives.createdAt,
+      encryptedPayload: primitives.encryptedPayload,
+      id: primitives.id,
+      mentions: primitives.mentions,
+      plaintextPayload: primitives.plaintextPayload,
+      replyToMessageId: primitives.replyToMessageId,
+      type: primitives.type,
+    });
+  }
+
+  public getMentions(): Mentions {
     return this.mentions;
   }
 
@@ -128,9 +163,8 @@ export class CommunityChannelMessage {
     const payload = this.payload?.toPrimitives();
 
     return {
-      attachmentExternalIdentifiers: this.attachmentExternalIdentifiers.map(
-        (externalIdentifier) => externalIdentifier.valueOf(),
-      ),
+      attachmentExternalIdentifiers:
+        this.attachmentExternalIdentifiers.toPrimitives(),
       authorIdentityId: this.metadata.getAuthorIdentityId().valueOf(),
       channelId: this.metadata.getChannelId().valueOf(),
       communityId: this.metadata.getCommunityId().valueOf(),
@@ -138,7 +172,7 @@ export class CommunityChannelMessage {
       editedAt: this.editedAt?.valueOf(),
       encryptedPayload: payload?.encryptedPayload,
       id: this.metadata.getId().valueOf(),
-      mentions: this.mentions.map((mention) => mention.toPrimitives()),
+      mentions: this.mentions.toPrimitives(),
       plaintextPayload: payload?.plaintextPayload,
       pollId: this.pollId?.valueOf(),
       replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),

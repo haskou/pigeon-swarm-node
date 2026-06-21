@@ -1,4 +1,4 @@
-import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
+import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
 
 import { OrbitDBMessageReactionDocument } from '../documents/OrbitDBMessageReactionDocument';
 

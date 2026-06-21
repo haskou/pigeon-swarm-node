@@ -57,7 +57,7 @@ package "stickers/domain" {
     + updateSticker(actor, stickerId, details): Sticker
     + removeSticker(actor, stickerId): void
     + updateProfile(actor, name): void
-    + assertHasSticker(stickerId): void
+    + hasSticker(stickerId): boolean
   }
 
   class Sticker {

@@ -1,8 +1,8 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import { Message } from '@app/contexts/conversations/domain/Message';
+import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
+import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationMessagesAround } from '@app/contexts/conversations/domain/repositories/types/ConversationMessagesAround';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -406,9 +406,9 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       .filter(
         (record): record is Record<string, unknown> => record !== undefined,
       )
-      .reduce(
+      .reduce<Record<string, unknown>[]>(
         (merged, record) => this.mergeIndexedMessageRecord(merged, record),
-        [] as Record<string, unknown>[],
+        [],
       );
     const networkIds = [
       ...new Set(
@@ -877,19 +877,23 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
 
     if (targetIndex === -1) {
-      return { messages: [] };
+      return new ConversationMessagesAround([]);
     }
 
     const start = Math.max(0, targetIndex - before);
     const end = Math.min(documents.length, targetIndex + after + 1);
 
-    return {
-      messages: documents
+    return new ConversationMessagesAround(
+      documents
         .slice(start, end)
         .map((document) => this.messageMapper.toDomain(document)),
-      nextCursor: documents[targetIndex + after + 1]?.id,
-      previousCursor: documents[targetIndex - before - 1]?.id,
-    };
+      documents[targetIndex + after + 1]?.id
+        ? new MessageId(documents[targetIndex + after + 1].id)
+        : undefined,
+      documents[targetIndex - before - 1]?.id
+        ? new MessageId(documents[targetIndex - before - 1].id)
+        : undefined,
+    );
   }
 
   public async findThreadMessages(

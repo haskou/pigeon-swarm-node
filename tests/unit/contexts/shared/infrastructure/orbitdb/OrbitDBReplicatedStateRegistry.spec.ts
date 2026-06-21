@@ -562,7 +562,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
   it('restores heads from the local cache before rebuilding OrbitDB heads', async () => {
     const headCache = new InMemoryOrbitDBReplicatedHeadCache();
-    const registry = new OrbitDBReplicatedStateRegistry(headCache);
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
     const firstNetwork = createStores();
     let releaseHeadScan = (): void => undefined;
     let headScanResolved = false;
@@ -611,7 +611,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
   it('waits for OrbitDB heads when the local cache is not marked warm', async () => {
     const headCache = new InMemoryOrbitDBReplicatedHeadCache();
-    const registry = new OrbitDBReplicatedStateRegistry(headCache);
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
     const firstNetwork = createStores();
     let headScanResolved = false;
 
@@ -654,7 +654,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
   it('persists written heads in the local cache for the next startup', async () => {
     const headCache = new InMemoryOrbitDBReplicatedHeadCache();
-    const registry = new OrbitDBReplicatedStateRegistry(headCache);
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
     const firstNetwork = createStores();
 
     await registry.register('network-1', firstNetwork.stores);

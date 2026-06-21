@@ -7,9 +7,13 @@ import {
 } from '@haskou/value-objects';
 
 import { InvalidEncryptedCommunityInviteKeyError } from '../errors/InvalidEncryptedCommunityInviteKeyError';
-import { EncryptedCommunityInviteKeyValue as KeyValue } from './types/EncryptedCommunityInviteKeyValue';
 
-export class EncryptedCommunityInviteKey extends ValueObject<KeyValue> {
+export class EncryptedCommunityInviteKey extends ValueObject<{
+  algorithm: string;
+  ciphertext: string;
+  nonce: string;
+  version: number;
+}> {
   private static readonly CURRENT_VERSION = 1;
   private static readonly SUPPORTED_ALGORITHM = 'AES-GCM';
   private static readonly BASE64URL = /^[A-Za-z0-9_-]+$/;

@@ -73,7 +73,11 @@ export class PollScope {
     return this.type.isCommunityChannel();
   }
 
-  public aggregateId(): string {
+  public belongsToConversation(conversationId: ConversationId): boolean {
+    return this.conversationId?.isEqual(conversationId) ?? false;
+  }
+
+  public selectEventStreamId(): string {
     return (
       this.conversationId?.valueOf() ||
       this.communityId?.valueOf() ||

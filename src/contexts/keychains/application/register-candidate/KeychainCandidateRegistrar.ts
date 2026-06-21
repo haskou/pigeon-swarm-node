@@ -1,5 +1,3 @@
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-
 import { InvalidKeychainCandidateError } from '../../domain/errors/InvalidKeychainCandidateError';
 import KeychainRepository from '../../domain/repositories/KeychainRepository';
 import KeychainCandidateValidationDomainService from '../../domain/services/KeychainCandidateValidationDomainService';
@@ -23,7 +21,7 @@ export default class KeychainCandidateRegistrar {
     }
 
     const isValid = await this.validator.isValidChainFor(
-      new IdentityId(candidate.toPrimitives().ownerIdentityId),
+      candidate.getOwnerIdentityId(),
       candidate,
       (externalIdentifier) =>
         this.repository.findByExternalIdentifier(externalIdentifier),

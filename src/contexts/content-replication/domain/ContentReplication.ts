@@ -2,8 +2,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
-import { IPFSId } from '../../shared/infrastructure/ipfs/helia/IPFSId';
 import { ContentFilename } from './value-objects/ContentFilename';
+import { ContentId } from './value-objects/ContentId';
 import { ContentReplicationContext } from './value-objects/ContentReplicationContext';
 import { ContentReplicationMetadata } from './value-objects/ContentReplicationMetadata';
 import { ContentReplicationPriority } from './value-objects/ContentReplicationPriority';
@@ -13,7 +13,7 @@ export class ContentReplication {
   private updatedAt: Timestamp;
 
   public static create(
-    cid: IPFSId,
+    cid: ContentId,
     context: ContentReplicationContext,
     networkIds: NetworkId[],
     metadata: ContentReplicationMetadata,
@@ -36,7 +36,7 @@ export class ContentReplication {
     primitives: PrimitiveOf<ContentReplication>,
   ): ContentReplication {
     return new ContentReplication(
-      new IPFSId(primitives.cid),
+      new ContentId(primitives.cid),
       new ContentReplicationContext(primitives.context),
       primitives.networkIds.map((networkId) => new NetworkId(networkId)),
       ContentReplicationMetadata.fromPrimitives(
@@ -53,7 +53,7 @@ export class ContentReplication {
   }
 
   constructor(
-    private readonly cid: IPFSId,
+    private readonly cid: ContentId,
     private readonly context: ContentReplicationContext,
     private readonly networkIds: NetworkId[],
     private metadata: ContentReplicationMetadata,
@@ -70,12 +70,12 @@ export class ContentReplication {
     return this;
   }
 
-  public getCid(): IPFSId {
+  public getCid(): ContentId {
     return this.cid;
   }
 
   public getNetworkIds(): NetworkId[] {
-    return this.networkIds;
+    return [...this.networkIds];
   }
 
   public addNetworkIds(networkIds: NetworkId[]): void {

@@ -1,7 +1,5 @@
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { CommunityPermission } from '@app/contexts/communities/domain/value-objects/CommunityPermission';
-import { CommunityRoleName } from '@app/contexts/communities/domain/value-objects/CommunityRoleName';
+import CommunityRoleCreator from '@app/contexts/communities/application/create-role/CommunityRoleCreator';
+import { CommunityRoleCreateMessage } from '@app/contexts/communities/application/create-role/messages/CommunityRoleCreateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -18,6 +16,9 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PostCommunityRoleRoute extends CommunityRouteSupport {
+  private readonly creator =
+    this.get<CommunityRoleCreator>(CommunityRoleCreator);
+
   @Post('/:communityId/roles')
   public async addRole(
     @Param('communityId') communityId: string,
@@ -26,21 +27,13 @@ export class PostCommunityRoleRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-    const role = community.addRole(
-      actorIdentityId,
-      new CommunityRoleName(body.name),
-      body.permissions.map((permission) => new CommunityPermission(permission)),
-    );
-
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.ROLE_CREATED,
-      this.moderationTarget(CommunityModerationTargetType.ROLE, role.getId()),
-      { name: body.name, permissions: body.permissions },
+    const role = await this.creator.create(
+      new CommunityRoleCreateMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        body.name,
+        body.permissions,
+      ),
     );
 
     return response.status(HttpRouteStatusEnum.OK).send(role.toPrimitives());

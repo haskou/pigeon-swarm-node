@@ -1,11 +1,12 @@
 import { Enum } from '@haskou/value-objects';
 
-import { communityRequestStatuses } from './types/CommunityRequestStatuses';
-import { CommunityRequestStatusValue } from './types/CommunityRequestStatusValue';
+const communityRequestStatuses = {
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  PENDING: 'pending',
+} as const;
 
-export { CommunityRequestStatusValue } from './types/CommunityRequestStatusValue';
-
-export class CommunityRequestStatus extends Enum<CommunityRequestStatusValue> {
+export class CommunityRequestStatus extends Enum<string> {
   public static readonly ACCEPTED = new CommunityRequestStatus(
     communityRequestStatuses.ACCEPTED,
   );
@@ -18,7 +19,7 @@ export class CommunityRequestStatus extends Enum<CommunityRequestStatusValue> {
     communityRequestStatuses.PENDING,
   );
 
-  public getValues(): CommunityRequestStatusValue[] {
+  public getValues(): string[] {
     return Object.values(communityRequestStatuses);
   }
 

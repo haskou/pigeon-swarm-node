@@ -30,13 +30,11 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
           return value ? { key, value } : undefined;
         }),
-        put: jest.fn(
-          async (key: string, value: Record<string, unknown>) => {
-            heads.set(key, value);
+        put: jest.fn(async (key: string, value: Record<string, unknown>) => {
+          heads.set(key, value);
 
-            return 'ok';
-          },
-        ),
+          return 'ok';
+        }),
       },
       messages: {
         put: jest.fn(async (document) => {
@@ -284,12 +282,17 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
     const summaries = await repository.findThreadSummariesByChannel(
       new CommunityId('community-1'),
-      [new CommunityChannelId('channel-1'), new CommunityChannelId('channel-2')],
+      [
+        new CommunityChannelId('channel-1'),
+        new CommunityChannelId('channel-2'),
+      ],
       2,
     );
 
     expect(query).not.toHaveBeenCalled();
-    expect(summaries.get('channel-1')).toEqual([
+    expect(
+      summaries.get('channel-1')?.map((summary) => summary.toPrimitives()),
+    ).toEqual([
       {
         lastReplyAt: 2,
         lastReplyMessageId: 'reply-1',
@@ -297,7 +300,9 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         rootMessageId: 'root-1',
       },
     ]);
-    expect(summaries.get('channel-2')).toEqual([
+    expect(
+      summaries.get('channel-2')?.map((summary) => summary.toPrimitives()),
+    ).toEqual([
       {
         lastReplyAt: 4,
         lastReplyMessageId: 'reply-2',
@@ -309,13 +314,20 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     query.mockClear();
     const cachedSummaries = await repository.findThreadSummariesByChannel(
       new CommunityId('community-1'),
-      [new CommunityChannelId('channel-1'), new CommunityChannelId('channel-2')],
+      [
+        new CommunityChannelId('channel-1'),
+        new CommunityChannelId('channel-2'),
+      ],
       2,
     );
 
     expect(query).not.toHaveBeenCalled();
-    expect(cachedSummaries.get('channel-1')).toEqual(summaries.get('channel-1'));
-    expect(cachedSummaries.get('channel-2')).toEqual(summaries.get('channel-2'));
+    expect(cachedSummaries.get('channel-1')).toEqual(
+      summaries.get('channel-1'),
+    );
+    expect(cachedSummaries.get('channel-2')).toEqual(
+      summaries.get('channel-2'),
+    );
   });
 
   it('should refresh thread summaries when saving a reply', async () => {
@@ -352,7 +364,9 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     );
 
     expect(query).not.toHaveBeenCalled();
-    expect(summaries.get('channel-1')).toEqual([
+    expect(
+      summaries.get('channel-1')?.map((summary) => summary.toPrimitives()),
+    ).toEqual([
       {
         lastReplyAt: 2,
         lastReplyMessageId: 'reply-1',

@@ -3,10 +3,10 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
+import { Message } from './entities/messages/Message';
+import { MessageFactory } from './entities/messages/MessageFactory';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
 import { ConversationWasCreatedEvent } from './events/ConversationWasCreatedEvent';
-import { Message } from './Message';
-import { MessageFactory } from './MessageFactory';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 
@@ -27,11 +27,15 @@ export class OneToOneConversation extends Conversation {
       [firstParticipant, secondParticipant],
     );
 
+    const primitives = conversation.toPrimitives();
+
     conversation.record(
-      new ConversationWasCreatedEvent(conversation.toPrimitives().id, {
-        networkId: conversation.toPrimitives().networkId,
-        participantIds: conversation.toPrimitives().participantIds,
-        type: conversation.toPrimitives().type,
+      new ConversationWasCreatedEvent(primitives.id, {
+        networkId: primitives.networkId,
+        participantIds: conversation
+          .getParticipantIds()
+          .map((participantId) => participantId.valueOf()),
+        type: primitives.type,
       }),
     );
 

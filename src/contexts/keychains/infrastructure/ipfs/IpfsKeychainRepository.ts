@@ -1,11 +1,11 @@
 import { IpfsIdentityDocument } from '@app/contexts/identities/infrastructure/ipfs/documents/IpfsIdentityDocument';
 import { KeychainOwnerNetworksNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainOwnerNetworksNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import KeychainMetadataRepository from '@app/contexts/keychains/domain/repositories/KeychainMetadataRepository';
+import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
-import { KeychainCandidate } from '@app/contexts/keychains/domain/repositories/types/KeychainCandidate';
-import { KeychainMetadataRecord } from '@app/contexts/keychains/domain/repositories/types/KeychainMetadataRecord';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
+import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
+import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -23,7 +23,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsKeychainMapper,
-    private readonly metadataRepository: KeychainMetadataRepository,
+    private readonly metadataIndex: KeychainMetadataIndex,
   ) {
     super();
   }
@@ -63,7 +63,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       const keychain = await this.getKeychainFromCid(cid);
 
       if (shouldSaveMetadata) {
-        await this.metadataRepository.save(
+        await this.metadataIndex.save(
           keychain,
           new KeychainExternalIdentifier(cid.valueOf()),
         );
@@ -141,11 +141,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const keychain = candidate || metadata.keychain;
 
     return keychain
-      ? {
-          externalIdentifier: new KeychainExternalIdentifier(metadata.cid),
+      ? KeychainCandidate.localCandidate(
+          new KeychainExternalIdentifier(metadata.cid),
           keychain,
-          source: 'local',
-        }
+        )
       : undefined;
   }
 
@@ -184,11 +183,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     candidates: KeychainCandidate[],
   ): KeychainCandidate[] {
     return [...candidates].sort((left, right) => {
-      if (left.keychain.isNewerThan(right.keychain)) {
+      if (left.isNewerThan(right)) {
         return -1;
       }
 
-      if (right.keychain.isNewerThan(left.keychain)) {
+      if (right.isNewerThan(left)) {
         return 1;
       }
 
@@ -215,13 +214,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
             return undefined;
           }
 
-          const candidateReference: KeychainCandidate = {
-            externalIdentifier: new KeychainExternalIdentifier(cidString),
-            keychain: candidate,
-            source: 'remote',
-          };
-
-          return candidateReference;
+          return KeychainCandidate.remoteCandidate(
+            new KeychainExternalIdentifier(cidString),
+            candidate,
+          );
         }),
     );
 
@@ -268,9 +264,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
     const metadata =
-      await this.metadataRepository.findByExternalIdentifier(
-        externalIdentifier,
-      );
+      await this.metadataIndex.findByExternalIdentifier(externalIdentifier);
 
     if (metadata?.keychain) {
       return metadata.keychain;
@@ -285,14 +279,14 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const candidates =
       await this.findCandidateReferencesByOwnerId(ownerIdentityId);
 
-    return candidates.map((candidate) => candidate.keychain);
+    return candidates.map((candidate) => candidate.getKeychain());
   }
 
   public async findCandidateReferencesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]> {
     const metadata = this.deduplicateMetadata(
-      await this.metadataRepository.findByOwnerIdentityId(ownerIdentityId),
+      await this.metadataIndex.findByOwnerIdentityId(ownerIdentityId),
     );
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
@@ -339,7 +333,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       primitiveNetworkIds,
     );
 
-    await this.metadataRepository.save(
+    await this.metadataIndex.save(
       keychain,
       new KeychainExternalIdentifier(cid.valueOf()),
     );
@@ -354,7 +348,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {
-    const metadata = await this.metadataRepository.findAll();
+    const metadata = await this.metadataIndex.findAll();
     const latestDocumentsByOwner = new Map<string, KeychainMetadataRecord>();
 
     for (const document of metadata) {

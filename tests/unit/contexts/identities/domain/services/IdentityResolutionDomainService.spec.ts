@@ -1,7 +1,9 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import IdentityResolutionDomainService from '@app/contexts/identities/domain/services/IdentityResolutionDomainService';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -19,15 +21,15 @@ describe('IdentityResolutionDomainService', () => {
     version: IdentityVersion,
   ): Promise<Identity> {
     const primitives = mother.build().toPrimitives();
-    const nextPrimitives = {
+    const { signature: _, ...nextPrimitives } = {
       ...primitives,
       signature: '',
       version: version.valueOf(),
     };
     const signature =
       await new IdentitySignatureDomainService().generateSignature(
-        nextPrimitives,
-        mother.encryptedKeyPair,
+        IdentitySignaturePayload.fromPrimitives(nextPrimitives),
+        new IdentitySigningKey(mother.encryptedKeyPair),
         mother.password,
       );
 

@@ -5,7 +5,7 @@ import { ContentReplicationStatusSummary } from '../ContentReplicationStatusSumm
 export default abstract class ContentReplicationStatusSummaryRepository {
   public abstract findByLocalNodeId(
     localNodeId: NodeId,
-  ): Promise<ContentReplicationStatusSummary | undefined>;
+  ): Promise<ContentReplicationStatusSummary>;
 
   public abstract save(summary: ContentReplicationStatusSummary): Promise<void>;
 }

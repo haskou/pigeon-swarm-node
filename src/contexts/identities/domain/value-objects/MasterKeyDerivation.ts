@@ -5,6 +5,10 @@ import { InvalidMasterKeyDerivationError } from '../errors/InvalidMasterKeyDeriv
 export class MasterKeyDerivation extends ValueObject<Record<string, unknown>> {
   private static readonly MAX_SERIALIZED_LENGTH = 16_384;
 
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
   private static normalize(
     value: Record<string, unknown>,
   ): Record<string, unknown> {
@@ -27,7 +31,13 @@ export class MasterKeyDerivation extends ValueObject<Record<string, unknown>> {
       new InvalidMasterKeyDerivationError(),
     );
 
-    return JSON.parse(serialized) as Record<string, unknown>;
+    const normalized: unknown = JSON.parse(serialized);
+
+    if (!MasterKeyDerivation.isRecord(normalized)) {
+      throw new InvalidMasterKeyDerivationError();
+    }
+
+    return normalized;
   }
 
   public static fromPrimitives(

@@ -1,4 +1,3 @@
-import { CommunityMentionTypeValue } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CommunityMessageMentionBody {
@@ -8,5 +7,5 @@ export class CommunityMessageMentionBody {
 
   @IsString()
   @IsNotEmpty()
-  public readonly type: CommunityMentionTypeValue;
+  public readonly type: string;
 }

@@ -1,6 +1,6 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
-import { Message } from '@app/contexts/conversations/domain/Message';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -19,7 +19,7 @@ export default class OrbitDBConversationMapper {
       name: primitives.name,
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
-      type: primitives.type as 'group' | 'one-to-one',
+      type: primitives.type,
       updatedAt: Date.now(),
     };
   }

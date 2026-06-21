@@ -44,13 +44,13 @@ export class CommunitySettings {
     this.autoJoinEnabled = autoJoinEnabled;
   }
 
-  public assertCanUseMessagePayload(
+  public ensureMessagePayloadAllowed(
     payload: CommunityChannelMessagePayload,
   ): void {
-    payload.assertMatchesVisibility(this.visibility);
+    payload.ensureMatchesVisibility(this.visibility);
   }
 
-  public assertCanSearchMessages(): void {
+  public ensureMessageSearchAvailable(): void {
     assert(
       this.visibility.isPublic(),
       new CommunityMessageSearchUnavailableError(),

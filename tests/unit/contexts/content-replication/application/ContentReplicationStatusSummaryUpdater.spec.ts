@@ -9,13 +9,16 @@ describe('ContentReplicationStatusSummaryUpdater', () => {
   it('stores aggregated replication status without exposing CID details', async () => {
     let savedSummary: ContentReplicationStatusSummary | undefined;
     const repository: ContentReplicationStatusSummaryRepository = {
-      findByLocalNodeId: async () => undefined,
+      findByLocalNodeId: async (nodeId) =>
+        ContentReplicationStatusSummary.empty(nodeId),
       save: async (summary) => {
         savedSummary = summary;
       },
     };
 
-    await new ContentReplicationStatusSummaryUpdater(repository).updateFromStatus({
+    await new ContentReplicationStatusSummaryUpdater(
+      repository,
+    ).updateFromStatus({
       contents: [
         {
           cid: 'bafy-one',
@@ -75,7 +78,9 @@ describe('ContentReplicationStatusSummaryUpdater', () => {
   });
 
   it('returns an empty summary when none has been projected yet', () => {
-    const summary = ContentReplicationStatusSummary.empty(new NodeId(localNodeId));
+    const summary = ContentReplicationStatusSummary.empty(
+      new NodeId(localNodeId),
+    );
 
     expect(summary.toPrimitives()).toMatchObject({
       contentCount: 0,

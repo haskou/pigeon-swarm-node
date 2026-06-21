@@ -1,13 +1,13 @@
+import ReplicatedContentStorage from '@app/contexts/content-replication/application/content-storage/ReplicatedContentStorage';
 import ContentReplicationRegistrar from '@app/contexts/content-replication/application/register-content/ContentReplicationRegistrar';
 import ContentPublisher from '@app/contexts/content-replication/application/publish-content/ContentPublisher';
 import { ContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/ContentPublishMessage';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
-import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ContentPublisher', () => {
@@ -15,19 +15,19 @@ describe('ContentPublisher', () => {
     'MCowBQYDK2VwAyEApAwGtBC3JZkif9nhnXVZ7WG+cHIqmAgRfjnHdxr67u0=';
   const firstNetworkId = '550e8400-e29b-41d4-a716-446655440001';
   const secondNetworkId = '550e8400-e29b-41d4-a716-446655440002';
-  let ipfs: MockProxy<IPFS>;
+  let contentStorage: MockProxy<ReplicatedContentStorage>;
   let identityRepository: MockProxy<IdentityRepository>;
   let nodeRepository: MockProxy<NodeRepository>;
   let registrar: MockProxy<ContentReplicationRegistrar>;
   let publisher: ContentPublisher;
 
   beforeEach(() => {
-    ipfs = mock<IPFS>();
+    contentStorage = mock<ReplicatedContentStorage>();
     identityRepository = mock<IdentityRepository>();
     nodeRepository = mock<NodeRepository>();
     registrar = mock<ContentReplicationRegistrar>();
     publisher = new ContentPublisher(
-      ipfs,
+      contentStorage,
       nodeRepository,
       registrar,
       identityRepository,
@@ -39,10 +39,10 @@ describe('ContentPublisher', () => {
       new NetworkId(secondNetworkId),
     ]);
     identityRepository.findById.mockResolvedValue(identity);
-    ipfs.addBytesToNetworksReturningFirst.mockResolvedValue({
-      cid: new IPFSId('bafy-public'),
-      completedNetworkIds: Promise.resolve([secondNetworkId]),
-      networkId: secondNetworkId,
+    contentStorage.publishBytesToNetworks.mockResolvedValue({
+      contentId: new ContentId('bafy-public'),
+      completedNetworkIds: Promise.resolve([new NetworkId(secondNetworkId)]),
+      networkId: new NetworkId(secondNetworkId),
     });
     nodeRepository.loadLocalNodeId.mockResolvedValue(
       new NodeId('550e8400-e29b-41d4-a716-446655440010'),
@@ -50,10 +50,10 @@ describe('ContentPublisher', () => {
   });
 
   it('returns public content without waiting for remaining network uploads', async () => {
-    ipfs.addBytesToNetworksReturningFirst.mockResolvedValue({
-      cid: new IPFSId('bafy-public'),
+    contentStorage.publishBytesToNetworks.mockResolvedValue({
+      contentId: new ContentId('bafy-public'),
       completedNetworkIds: new Promise<never>(() => undefined),
-      networkId: secondNetworkId,
+      networkId: new NetworkId(secondNetworkId),
     });
     registrar.register.mockResolvedValue(undefined);
 
@@ -78,9 +78,9 @@ describe('ContentPublisher', () => {
     });
 
     expect(result).toBe('bafy-public');
-    expect(ipfs.addBytesToNetworksReturningFirst).toHaveBeenCalledWith(
+    expect(contentStorage.publishBytesToNetworks).toHaveBeenCalledWith(
       Buffer.from('content'),
-      [firstNetworkId, secondNetworkId],
+      [new NetworkId(firstNetworkId), new NetworkId(secondNetworkId)],
     );
     expect(registrar.register).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -93,10 +93,13 @@ describe('ContentPublisher', () => {
   });
 
   it('registers additional local replica claims when owner network uploads complete', async () => {
-    ipfs.addBytesToNetworksReturningFirst.mockResolvedValue({
-      cid: new IPFSId('bafy-public'),
-      completedNetworkIds: Promise.resolve([firstNetworkId, secondNetworkId]),
-      networkId: secondNetworkId,
+    contentStorage.publishBytesToNetworks.mockResolvedValue({
+      contentId: new ContentId('bafy-public'),
+      completedNetworkIds: Promise.resolve([
+        new NetworkId(firstNetworkId),
+        new NetworkId(secondNetworkId),
+      ]),
+      networkId: new NetworkId(secondNetworkId),
     });
     registrar.register.mockResolvedValue(undefined);
 

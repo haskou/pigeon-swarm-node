@@ -1,4 +1,4 @@
-export type PushVapidPublicKey = {
-  enabled: boolean;
-  publicKey: string | null;
-};
+export class PushVapidPublicKey {
+  public readonly enabled!: boolean;
+  public readonly publicKey!: string | null;
+}

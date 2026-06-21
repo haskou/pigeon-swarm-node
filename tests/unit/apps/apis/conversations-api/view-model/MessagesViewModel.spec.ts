@@ -1,5 +1,5 @@
 import { MessagesViewModel } from '@app/apps/apis/conversations-api/view-model/MessagesViewModel';
-import { Message } from '@app/contexts/conversations/domain/Message';
+import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 

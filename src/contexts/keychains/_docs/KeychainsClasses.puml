@@ -21,13 +21,22 @@ package "keychains.domain" {
   class EncryptedKeychainPayload <<ValueObject>>
   class KeychainExternalIdentifier <<ValueObject>>
   class KeychainVersion <<ValueObject>>
+  class KeychainCandidate <<Entity>> {
+    +localCandidate(externalIdentifier, keychain): KeychainCandidate
+    +remoteCandidate(externalIdentifier, keychain): KeychainCandidate
+    +getExternalIdentifier(): KeychainExternalIdentifier
+    +getKeychain(): Keychain
+    +isLocal(): boolean
+    +belongsTo(ownerIdentityId: IdentityId): boolean
+    +isNewerThan(other: KeychainCandidate): boolean
+  }
 
   class KeychainWasPublishedEvent <<DomainEvent>>
 
   interface KeychainRepository {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
+    +findCandidateReferencesByOwnerId(ownerIdentityId: IdentityId): Promise<KeychainCandidate[]>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
-    +republishLocalRoutingRecords(): Promise<number>
   }
 
   class KeychainSignatureDomainService {
@@ -40,9 +49,12 @@ package "keychains.domain" {
 
   Keychain --> IdentityId
   KeychainRepository --> NetworkId
+  KeychainRepository --> KeychainCandidate
   Keychain --> EncryptedKeychainPayload
   Keychain --> KeychainVersion
   Keychain --> KeychainExternalIdentifier
+  KeychainCandidate --> Keychain
+  KeychainCandidate --> KeychainExternalIdentifier
   Keychain --> Signature
   Keychain --> Timestamp
   Keychain ..> KeychainWasPublishedEvent
@@ -63,6 +75,10 @@ package "keychains.application" {
 
   class KeychainCandidateRegistrar {
     +register(message): Promise<void>
+  }
+
+  interface KeychainRoutingRepublisher {
+    +republish(): Promise<number>
   }
 
   class KeychainSaverService {
@@ -105,7 +121,10 @@ package "keychains.infrastructure" {
   class IpfsKeychainRepository {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
-    +republishLocalRoutingRecords(): Promise<number>
+  }
+
+  class IpfsKeychainRouting {
+    +republish(): Promise<number>
   }
 
   class IpfsKeychainMapper {
@@ -113,13 +132,28 @@ package "keychains.infrastructure" {
     +toDomain(document: IpfsKeychainDocument): Keychain
   }
 
-  class OrbitDBKeychainMetadataRepository {
-    +save(keychain: Keychain, cid: IPFSId): Promise<void>
-    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<OrbitDBKeychainMetadataDocument[]>
+  interface KeychainMetadataIndex {
+    +save(keychain: Keychain, externalIdentifier: KeychainExternalIdentifier): Promise<void>
+    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<KeychainMetadataRecord[]>
+    +findByExternalIdentifier(externalIdentifier: KeychainExternalIdentifier): Promise<KeychainMetadataRecord>
+    +findAll(): Promise<KeychainMetadataRecord[]>
+  }
+
+  class KeychainMetadataRecord {
+    -cid: string
+    -ownerIdentityId: string
+    -previousCid?: string
+    -receivedAt: number
+    -version: number
+  }
+
+  class OrbitDBKeychainMetadataIndex {
+    +save(keychain: Keychain, externalIdentifier: KeychainExternalIdentifier): Promise<void>
+    +findByOwnerIdentityId(ownerIdentityId: IdentityId): Promise<KeychainMetadataRecord[]>
   }
 
   note right of IpfsKeychainRepository
-    Encapsulates IPFS documents, OrbitDB metadata,
+    Encapsulates IPFS documents, metadata indexes,
     DHT record candidates and content addressing.
     New keychain versions are published only in
     the owner's identity networks.
@@ -128,10 +162,14 @@ package "keychains.infrastructure" {
   end note
 
   IpfsKeychainRepository ..|> KeychainRepository
+  IpfsKeychainRouting ..|> KeychainRoutingRepublisher
+  IpfsKeychainRouting --> IpfsKeychainRepository
   IpfsKeychainRepository --> IpfsKeychainMapper
-  IpfsKeychainRepository --> OrbitDBKeychainMetadataRepository
+  IpfsKeychainRepository --> KeychainMetadataIndex
   IpfsKeychainRepository --> IpfsKeychainDocument
-  OrbitDBKeychainMetadataRepository --> OrbitDBKeychainMetadataDocument
+  OrbitDBKeychainMetadataIndex ..|> KeychainMetadataIndex
+  OrbitDBKeychainMetadataIndex --> OrbitDBKeychainMetadataDocument
+  OrbitDBKeychainMetadataIndex --> KeychainMetadataRecord
 }
 
 @enduml

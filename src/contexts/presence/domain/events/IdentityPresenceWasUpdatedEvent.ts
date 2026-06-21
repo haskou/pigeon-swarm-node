@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { IdentityPresenceWasUpdatedAttributes } from './types/IdentityPresenceWasUpdatedAttributes';
+import { IdentityPresenceWasUpdatedAttributes } from './IdentityPresenceWasUpdatedAttributes';
 
 export class IdentityPresenceWasUpdatedEvent extends DomainEvent {
   public static EVENT_NAME = 'presence.v1.identity_presence.was_updated';

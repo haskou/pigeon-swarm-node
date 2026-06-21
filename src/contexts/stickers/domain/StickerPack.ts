@@ -88,8 +88,8 @@ export class StickerPack extends AggregateRoot {
     return sticker;
   }
 
-  public assertHasSticker(stickerId: StickerId): void {
-    assert(this.findSticker(stickerId), new StickerNotFoundError());
+  public hasSticker(stickerId: StickerId): boolean {
+    return this.findSticker(stickerId) !== undefined;
   }
 
   public removeSticker(actor: IdentityId, stickerId: StickerId): void {

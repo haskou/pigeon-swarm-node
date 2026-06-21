@@ -1,5 +1,4 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
@@ -7,12 +6,13 @@ import CommunityMessageReactionRepository from '@app/contexts/communities/domain
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
+import { CommunityChannelMessageReactionEmoji } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageReactionEmoji';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
-import { assert } from '@haskou/value-objects';
+import { assert, Timestamp } from '@haskou/value-objects';
 
 import { isCommunityChannelMessageReactionPrimitive } from './isCommunityChannelMessageReactionPrimitive';
 import { isCommunityPrimitive } from './isCommunityPrimitive';
@@ -57,9 +57,6 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
     }
 
     const community = Community.fromPrimitives(communityAttributes);
-    const reaction = CommunityChannelMessageReaction.fromPrimitives(
-      event.attributes,
-    );
     const communityId = new CommunityId(event.attributes.communityId);
     const channelId = new CommunityChannelId(event.attributes.channelId);
     const messageId = new CommunityChannelMessageId(event.attributes.messageId);
@@ -69,10 +66,16 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
       return;
     }
 
-    community.assertCanReactWithSticker(authorIdentityId, channelId);
     assert(
       await this.messageRepository.findById(communityId, channelId, messageId),
       new CommunityChannelMessageNotFoundError(),
+    );
+    const reaction = community.reactWithSticker(
+      authorIdentityId,
+      channelId,
+      messageId,
+      new CommunityChannelMessageReactionEmoji(event.attributes.emoji),
+      new Timestamp(event.attributes.createdAt),
     );
 
     await this.reactionRepository.delete(reaction);

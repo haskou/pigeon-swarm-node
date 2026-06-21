@@ -8,8 +8,8 @@ import { ContentReplication } from '../../domain/ContentReplication';
 import ContentReplicationPolicy from '../../domain/ContentReplicationPolicy';
 import ContentReplicaClaimRepository from '../../domain/repositories/ContentReplicaClaimRepository';
 import ContentReplicationRepository from '../../domain/repositories/ContentReplicationRepository';
-import { ContentReplicationStatus } from './types/ContentReplicationStatus';
-import { ReplicatedContentStatus } from './types/ReplicatedContentStatus';
+import { ContentReplicationStatus } from './ContentReplicationStatus';
+import { ReplicatedContentStatus } from './ReplicatedContentStatus';
 
 export default class ContentReplicationStatusFinder {
   private static readonly ACTIVE_PEER_WINDOW_MS = 15 * 60 * 1000;

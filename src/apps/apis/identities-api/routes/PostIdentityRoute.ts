@@ -32,8 +32,8 @@ export class PostIdentityRoute extends Route {
     );
 
     const viewModel = new IdentityViewModel(
-      candidate.identity,
-      candidate.externalIdentifier,
+      candidate.getIdentity(),
+      candidate.getExternalIdentifier(),
     );
 
     return response.status(HttpRouteStatusEnum.OK).send(viewModel.toResource());

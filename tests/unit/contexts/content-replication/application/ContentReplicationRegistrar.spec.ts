@@ -9,7 +9,7 @@ import { ContentReplicationMetadata } from '@app/contexts/content-replication/do
 import { ContentReplicationPriority } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationPriority';
 import ContentReplicationSummaryRefresher from '@app/contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
@@ -26,7 +26,7 @@ describe('ContentReplicationRegistrar', () => {
     const savedClaims: unknown[] = [];
     const publishedEvents: DomainEvent[][] = [];
     const existing = ContentReplication.create(
-      new IPFSId(cid),
+      new ContentId(cid),
       new ContentReplicationContext('ipfs_private_upload'),
       [new NetworkId(firstNetworkId)],
       ContentReplicationMetadata.fromPrimitives(128),

@@ -9,32 +9,37 @@ import { PostCallParticipantHeartbeatRoute } from '@app/apps/apis/calls-api/rout
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
 import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
-import { CommunityChannelDraftsRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelDraftsRoute';
-import { CommunityChannelMessagePinsRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelMessagePinsRoute';
-import { CommunityMessageReactionRoute } from '@app/apps/apis/communities-api/routes/CommunityChannelMessageReactionRoute';
 import { DeleteCommunityBanRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityBanRoute';
+import { DeleteCommunityChannelDraftRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelDraftRoute';
+import { DeleteCommunityChannelMessagePinRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessagePinRoute';
+import { DeleteCommunityChannelMessageReactionRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageReactionRoute';
 import { DeleteCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelMessageRoute';
 import { DeleteCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityChannelRoute';
 import { DeleteCommunityMemberByIdRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberByIdRoute';
 import { DeleteCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityMemberRoute';
 import { DeleteCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/DeleteCommunityRoleRoute';
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
-import { SearchCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessageSearchRoute';
+import { GetCommunityChannelDraftsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelDraftsRoute';
+import { GetCommunityChannelMessagePinsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagePinsRoute';
+import { GetCommunityChannelMessageSearchRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessageSearchRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
 import { GetCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/GetCommunityInviteRoute';
 import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembershipRequestsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
+import { GetCommunityMessageSearchRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMessageSearchRoute';
 import { GetCommunityModerationLogsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityModerationLogsRoute';
 import { GetCommunityRolesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRolesRoute';
 import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
-import { CommunityChannelPermissionsRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelPermissionsRoute';
+import { PatchCommunityChannelPermissionsRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelPermissionsRoute';
 import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelRoute';
 import { PatchCommunityRequestRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRequestRoute';
 import { PatchCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoleRoute';
 import { PatchCommunityRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRoute';
 import { PostCommunityBanRoute } from '@app/apps/apis/communities-api/routes/PostCommunityBanRoute';
+import { PostCommunityChannelMessagePinRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessagePinRoute';
+import { PostCommunityChannelMessageReactionRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageReactionRoute';
 import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
 import { PostCommunityInviteAcceptRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteAcceptRoute';
 import { PostCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteRoute';
@@ -44,16 +49,22 @@ import { PostCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/Po
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
 import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
+import { PutCommunityChannelDraftRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelDraftRoute';
 import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
-import { ConversationDraftsRoute } from '@app/apps/apis/conversations-api/routes/ConversationDraftsRoute';
-import { ConversationMessagePinsRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessagePinsRoute';
-import { ConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/ConversationMessageReactionRoute';
+import { DeleteConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationDraftRoute';
+import { DeleteConversationMessagePinRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessagePinRoute';
+import { DeleteConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageReactionRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
+import { GetConversationDraftsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationDraftsRoute';
+import { GetConversationMessagePinsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagePinsRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
+import { PostConversationMessagePinRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessagePinRoute';
+import { PostConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageReactionRoute';
 import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageRoute';
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
+import { PutConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/PutConversationDraftRoute';
 import { PutConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessageRoute';
 import { PutConversationMessagesReadUntilRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessagesReadUntilRoute';
 import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdentityRoute';
@@ -239,9 +250,14 @@ export default class Server {
           PostConversationRoute,
           GetConversationsRoute,
           PostConversationMessageRoute,
-          ConversationDraftsRoute,
-          ConversationMessagePinsRoute,
-          ConversationMessageReactionRoute,
+          GetConversationDraftsRoute,
+          PutConversationDraftRoute,
+          DeleteConversationDraftRoute,
+          GetConversationMessagePinsRoute,
+          PostConversationMessagePinRoute,
+          DeleteConversationMessagePinRoute,
+          PostConversationMessageReactionRoute,
+          DeleteConversationMessageReactionRoute,
           DeleteConversationMessageRoute,
           PutConversationMessagesReadUntilRoute,
           PutConversationMessageRoute,
@@ -312,18 +328,24 @@ export default class Server {
           PostCommunityInviteRoute,
           PostCommunityInviteAcceptRoute,
           GetCommunityChannelsRoute,
-          SearchCommunityChannelMessagesRoute,
+          GetCommunityMessageSearchRoute,
+          GetCommunityChannelMessageSearchRoute,
           PostCommunityTextChannelRoute,
           PostCommunityVoiceChannelRoute,
           PatchCommunityChannelRoute,
-          CommunityChannelPermissionsRoute,
+          PatchCommunityChannelPermissionsRoute,
           DeleteCommunityChannelRoute,
           GetCommunityChannelMessagesRoute,
-          CommunityChannelDraftsRoute,
-          CommunityChannelMessagePinsRoute,
+          GetCommunityChannelDraftsRoute,
+          PutCommunityChannelDraftRoute,
+          DeleteCommunityChannelDraftRoute,
+          GetCommunityChannelMessagePinsRoute,
+          PostCommunityChannelMessagePinRoute,
+          DeleteCommunityChannelMessagePinRoute,
           PostCommunityChannelMessageRoute,
           PutCommunityChannelMessageRoute,
-          CommunityMessageReactionRoute,
+          PostCommunityChannelMessageReactionRoute,
+          DeleteCommunityChannelMessageReactionRoute,
           DeleteCommunityChannelMessageRoute,
         ],
         cors: true,

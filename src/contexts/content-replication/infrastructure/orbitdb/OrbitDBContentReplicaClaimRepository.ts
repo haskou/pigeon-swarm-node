@@ -1,6 +1,6 @@
 import { ContentReplicaClaim } from '@app/contexts/content-replication/domain/ContentReplicaClaim';
 import ContentReplicaClaimRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicaClaimRepository';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBContentReplicaClaimDocument } from './documents/OrbitDBContentReplicaClaimDocument';
@@ -50,11 +50,11 @@ export default class OrbitDBContentReplicaClaimRepository extends ContentReplica
     return `content-replica-claim:${document.cid}:${document.networkId}:${document.nodeId}`;
   }
 
-  private cidIndexPrefix(cid: IPFSId): string {
+  private cidIndexPrefix(cid: ContentId): string {
     return `content-replica-claim:${cid.valueOf()}:`;
   }
 
-  public async findByCids(cids: IPFSId[]): Promise<ContentReplicaClaim[]> {
+  public async findByCids(cids: ContentId[]): Promise<ContentReplicaClaim[]> {
     if (cids.length === 0) {
       return [];
     }

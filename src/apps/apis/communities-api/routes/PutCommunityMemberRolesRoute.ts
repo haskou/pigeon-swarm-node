@@ -1,7 +1,5 @@
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import CommunityMemberRolesAssigner from '@app/contexts/communities/application/assign-member-roles/CommunityMemberRolesAssigner';
+import { CommunityMemberRolesAssignMessage } from '@app/contexts/communities/application/assign-member-roles/messages/CommunityMemberRolesAssignMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import { Request, Response } from 'express';
 import {
@@ -19,6 +17,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PutCommunityMemberRolesRoute extends CommunityRouteSupport {
+  private readonly assigner = this.get<CommunityMemberRolesAssigner>(
+    CommunityMemberRolesAssigner,
+  );
+
   @Put('/:communityId/members/:identityId/roles')
   public async assignRoles(
     @Param('communityId') communityId: string,
@@ -28,24 +30,13 @@ export class PutCommunityMemberRolesRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.assignRoles(
-      actorIdentityId,
-      new IdentityId(identityId),
-      body.roleIds.map((roleId) => new CommunityRoleId(roleId)),
-    );
-    await this.repository().save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.MEMBER_ROLES_UPDATED,
-      this.moderationTarget(
-        CommunityModerationTargetType.MEMBER,
-        new IdentityId(identityId),
+    const community = await this.assigner.assign(
+      new CommunityMemberRolesAssignMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        identityId,
+        body.roleIds,
       ),
-      { roleIds: body.roleIds },
     );
 
     return response

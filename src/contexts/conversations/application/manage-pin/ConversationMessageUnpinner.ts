@@ -1,6 +1,5 @@
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
-import { ConversationMessageWasUnpinnedEvent } from '../../domain/events/ConversationMessageWasUnpinnedEvent';
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
 import ConversationMessagePinAccess from './ConversationMessagePinAccess';
 import { ConversationMessagePinDeleteMessage } from './messages/ConversationMessagePinDeleteMessage';
@@ -22,18 +21,8 @@ export default class ConversationMessageUnpinner {
 
     await this.pinRepository.unpin(message.conversationId, message.messageId);
 
-    const conversationPrimitives = conversation.toPrimitives();
+    conversation.unpinMessage(message.identityId, message.messageId);
 
-    await this.eventPublisher.publish([
-      new ConversationMessageWasUnpinnedEvent(
-        message.conversationId.valueOf(),
-        {
-          messageId: message.messageId.valueOf(),
-          networkId: conversationPrimitives.networkId,
-          participantIds: conversationPrimitives.participantIds,
-          unpinnedByIdentityId: message.identityId.valueOf(),
-        },
-      ),
-    ]);
+    await this.eventPublisher.publish(conversation.pullDomainEvents());
   }
 }

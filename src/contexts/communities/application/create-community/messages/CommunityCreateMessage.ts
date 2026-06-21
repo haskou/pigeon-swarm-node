@@ -7,10 +7,7 @@ import { CommunityAvatar } from '../../../domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '../../../domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '../../../domain/value-objects/CommunityDescription';
 import { CommunityName } from '../../../domain/value-objects/CommunityName';
-import {
-  CommunityVisibility,
-  CommunityVisibilityValue,
-} from '../../../domain/value-objects/CommunityVisibility';
+import { CommunityVisibility } from '../../../domain/value-objects/CommunityVisibility';
 
 export class CommunityCreateMessage {
   public readonly networkId: NetworkId;
@@ -28,7 +25,7 @@ export class CommunityCreateMessage {
     options: {
       autoJoinEnabled?: boolean;
       discoverable?: boolean;
-      visibility?: CommunityVisibilityValue;
+      visibility?: string;
     } = {},
   ) {
     this.ownerIdentityId = new IdentityId(ownerIdentityId);

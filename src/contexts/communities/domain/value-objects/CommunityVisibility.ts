@@ -1,11 +1,11 @@
 import { Enum } from '@haskou/value-objects';
 
-import { communityVisibilities } from './types/CommunityVisibilities';
-import { CommunityVisibilityValue } from './types/CommunityVisibilityValue';
+const communityVisibilities = {
+  PRIVATE: 'private',
+  PUBLIC: 'public',
+} as const;
 
-export { CommunityVisibilityValue } from './types/CommunityVisibilityValue';
-
-export class CommunityVisibility extends Enum<CommunityVisibilityValue> {
+export class CommunityVisibility extends Enum<string> {
   public static readonly PRIVATE = new CommunityVisibility(
     communityVisibilities.PRIVATE,
   );
@@ -14,7 +14,7 @@ export class CommunityVisibility extends Enum<CommunityVisibilityValue> {
     communityVisibilities.PUBLIC,
   );
 
-  public getValues(): CommunityVisibilityValue[] {
+  public getValues(): string[] {
     return Object.values(communityVisibilities);
   }
 

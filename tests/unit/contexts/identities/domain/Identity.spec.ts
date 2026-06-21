@@ -6,8 +6,10 @@ import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -142,8 +144,8 @@ describe('Identity', () => {
       };
       const signature =
         await new IdentitySignatureDomainService().generateSignature(
-          signaturePayload,
-          mother.encryptedKeyPair,
+          IdentitySignaturePayload.fromPrimitives(signaturePayload),
+          new IdentitySigningKey(mother.encryptedKeyPair),
           mother.password,
         );
 
@@ -203,8 +205,8 @@ describe('Identity', () => {
         signature: '',
       };
       const spoofedSignature = attackerKeyPair.sign(
-        new IdentitySignatureDomainService().serializePayload(
-          spoofedPrimitives,
+        new IdentitySignatureDomainService().getCanonicalSigningContent(
+          IdentitySignaturePayload.fromPrimitives(spoofedPrimitives),
         ),
       );
 

@@ -32,6 +32,7 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 
 - Work in the language the user uses.
 - Prefer a small complete slice over broad half-finished architecture.
+- Apply YAGNI as a hard rule. Do not add abstractions, methods, parameters, helpers, folders, or extension points until a real current use case requires them.
 - Do not revert user changes. If the worktree is dirty, inspect it and keep unrelated edits intact.
 - Make incremental commits when a coherent slice is finished, following the repository's commit convention.
 - Treat PR comments as actionable engineering feedback unless they are clearly informational.
@@ -64,6 +65,8 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - Constructors should express the domain model. If a constructor grows unwieldy, introduce a cohesive domain concept or factory only when it removes real complexity.
 - A domain constructor with many parameters is a smell, but a generic `props` bag is not the automatic fix. Prefer naming the missing concept: metadata, scope, payload, permissions, participants, window, period, etc.
 - Aggregates should expose intent-revealing behavior. Prefer `message.markAsDeleted(byIdentity)` or `community.canManageChannels(identity)` over external code mutating fields or comparing raw ids.
+- Aggregate roots must not expose public assertion methods. Public `assertCan...`, `assertIs...`, or `assertHas...` methods on an aggregate root are a design smell; assertions are internal guards, not part of the aggregate's public language.
+- If an aggregate collects too many private assertion helpers, extract a cohesive validation class, policy, or domain service named by the concept. For example, move admin checks into `UserValidator.assertIsAdmin(userId)`, and keep `isAdmin(userId)` there too when a boolean question is needed.
 - Do not create an anemic domain model wrapped by procedural services.
 - Do not use casts in domain or application code unless there is no sane alternative.
 - Do not introduce magic strings. Put named domain values behind value objects, constants, or existing enum-style domain values.
@@ -73,14 +76,18 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 ## Encapsulation, getters, and setters
 
 - Do not add getters or setters to domain/application objects just to make tests easier or to let callers inspect internals.
+- Do not add any production method whose only consumer is a test. Tests must exercise real public behavior, persisted state, emitted events, or boundary serialization; they must not force test-only APIs into the model.
 - Public getters are allowed only when they expose a genuine boundary value or a stable domain concept that callers are meant to know. They are not a license to pull primitives out and make decisions elsewhere.
+- If a method is a getter, name it with a `get` prefix. Use `getAddress()` instead of `address()` when the method only returns the address.
+- If a method is a setter, name it with a `set` prefix. Use `setAddress(address)` instead of `address(address)` when the method only replaces the address.
+- Do not hide getters or setters behind noun-only method names to avoid an apparent code smell. The smell is unnecessary state exposure or mutation, not the `get` or `set` word itself.
 - Setters are almost always wrong in domain code. Prefer intent-revealing behavior:
   - `message.edit(payload, editedBy, editedAt)` instead of `message.setPayload(payload)`.
   - `community.renameChannel(channelId, name, actor)` instead of `channel.setName(name)`.
   - `identity.updateProfile(profile, timestamp)` instead of `identity.setProfile(profile)`.
 - If a test needs to inspect state after behavior, prefer testing observable domain behavior, recorded domain events, repository persistence, or serialized shape at a boundary.
 - If application code needs a getter to compare, filter, authorize, or branch, move that question into the aggregate, entity, value object, collection, or policy.
-- Avoid JavaBean-style `getX()` / `setX()` APIs in domain/application. Use ubiquitous-language methods:
+- Domain behavior is different from getters and setters. Keep ubiquitous-language methods for questions and commands that express behavior:
   - `belongsTo(identityId)`.
   - `wasCreatedBy(identityId)`.
   - `canBeEditedBy(identityId)`.
@@ -155,6 +162,8 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 ## Infrastructure and boundaries
 
 - Persistence models, API DTOs, OpenAPI schemas, pub/sub payloads, websocket payloads, and external SDK payloads must stay out of the domain.
+- Infrastructure must not contain business logic or domain decisions. Repositories, adapters, mappers, controllers, consumers, and SDK clients move data across boundaries; they do not decide permissions, lifecycle transitions, invariants, eligibility, pricing, status changes, or ownership rules.
+- If infrastructure code needs a business decision to persist, map, publish, or call an external service, move that decision into the aggregate, entity, value object, policy, domain service, or application use case and pass infrastructure only the result.
 - Repositories hydrate and serialize aggregates. They may call serialization methods; domain code should not need to.
 - API routes/controllers should be thin: parse request, build boundary message, call use case, return resource.
 - Resource/mapper classes are responsible for presentation shape, not domain decisions.

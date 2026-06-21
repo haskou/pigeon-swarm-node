@@ -22,8 +22,8 @@ export class PollVoteCaster {
     poll.castVote(message.voterIdentityId, message.optionIds);
     await this.repository.save(poll);
     await this.eventPublisher.publish([
-      new PollVoteWasCastEvent(poll.getScope().aggregateId(), {
-        ...message.recipients,
+      new PollVoteWasCastEvent(poll.getScope().selectEventStreamId(), {
+        ...message.audience.toPrimitives(),
         optionIds: message.optionIds.map((optionId) => optionId.valueOf()),
         poll: poll.toPrimitives(),
         pollId: poll.getId().valueOf(),

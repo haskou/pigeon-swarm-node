@@ -1,8 +1,8 @@
 import { assert } from '@haskou/value-objects';
 
+import { Message } from '../../domain/entities/messages/Message';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { RemoteMessageCandidateMismatchError } from '../../domain/errors/RemoteMessageCandidateMismatchError';
-import { Message } from '../../domain/Message';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '../../domain/services/MessageSignatureDomainService';
 import { RegisterConversationMessage } from './messages/RegisterConversationMessage';

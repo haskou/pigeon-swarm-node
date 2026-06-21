@@ -1,9 +1,9 @@
 import { assert } from '@haskou/value-objects';
 
+import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
-import { MessageReaction } from '../../domain/MessageReaction';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import MessageReactionRepository from '../../domain/repositories/MessageReactionRepository';
 import { RegisterMessageReaction } from './messages/RegisterMessageReaction';

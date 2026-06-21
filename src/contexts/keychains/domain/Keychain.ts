@@ -8,13 +8,12 @@ import {
 } from '@haskou/value-objects';
 
 import { KeychainWasPublishedEvent } from './events/KeychainWasPublishedEvent';
-import { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
-import { PreviousKeychainReference as PreviousReference } from './types/PreviousKeychainReference';
+import { KeychainSignaturePayload } from './KeychainSignaturePayload';
 import { EncryptedKeychainPayload } from './value-objects/EncryptedKeychainPayload';
 import { KeychainExternalIdentifier } from './value-objects/KeychainExternalIdentifier';
 import { KeychainVersion } from './value-objects/KeychainVersion';
 
-export { KeychainSignaturePayload } from './types/KeychainSignaturePayload';
+export { KeychainSignaturePayload } from './KeychainSignaturePayload';
 
 export class Keychain extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Keychain>): Keychain {
@@ -46,7 +45,8 @@ export class Keychain extends AggregateRoot {
     private readonly timestamp: Timestamp,
     private readonly signature: Signature,
     private readonly version: KeychainVersion,
-    private readonly previousKeychainExternalIdentifier?: PreviousReference,
+    // eslint-disable-next-line max-len
+    private readonly previousKeychainExternalIdentifier?: KeychainExternalIdentifier,
   ) {
     super();
   }
@@ -73,19 +73,23 @@ export class Keychain extends AggregateRoot {
     return this.previousKeychainExternalIdentifier;
   }
 
+  public getOwnerIdentityId(): IdentityId {
+    return this.ownerIdentityId;
+  }
+
   public getSignature(): Signature {
     return this.signature;
   }
 
   public getSignaturePayload(): KeychainSignaturePayload {
-    return {
+    return KeychainSignaturePayload.fromPrimitives({
       encryptedPayload: this.encryptedPayload.valueOf(),
       ownerIdentityId: this.ownerIdentityId.valueOf(),
       previousKeychainExternalIdentifier:
         this.previousKeychainExternalIdentifier?.valueOf(),
       timestamp: this.timestamp.valueOf(),
       version: this.version.valueOf(),
-    };
+    });
   }
 
   public getOwnerPublicKey(): PublicKey {

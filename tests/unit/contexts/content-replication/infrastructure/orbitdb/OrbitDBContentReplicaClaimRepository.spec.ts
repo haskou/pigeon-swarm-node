@@ -4,7 +4,7 @@ import OrbitDBContentReplicaClaimMapper from '@app/contexts/content-replication/
 import OrbitDBContentReplicaClaimRepository from '@app/contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -55,7 +55,7 @@ describe('OrbitDBContentReplicaClaimRepository', () => {
   });
 
   it('should find replica claims by CID from OrbitDB', async () => {
-    const result = await repository.findByCids([new IPFSId(cid)]);
+    const result = await repository.findByCids([new ContentId(cid)]);
 
     expect(result.map((claim) => claim.toPrimitives())).toEqual([
       {
@@ -69,7 +69,7 @@ describe('OrbitDBContentReplicaClaimRepository', () => {
 
   it('should save replica claims into the replicated store', async () => {
     const claim = ContentReplicaClaim.create(
-      new IPFSId(cid),
+      new ContentId(cid),
       new NetworkId(networkId),
       new NodeId(nodeId),
       new Timestamp(document.claimedAt),

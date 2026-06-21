@@ -1,11 +1,6 @@
-import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
-import { CommunityInviteWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityInviteWasCreatedEvent';
-import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
-import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { EncryptedCommunityInviteKey } from '@app/contexts/communities/domain/value-objects/EncryptedCommunityInviteKey';
+import CommunityInviteCreator from '@app/contexts/communities/application/create-invite/CommunityInviteCreator';
+import { CommunityInviteCreateMessage } from '@app/contexts/communities/application/create-invite/messages/CommunityInviteCreateMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import { Timestamp } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -22,6 +17,10 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
 export class PostCommunityInviteRoute extends CommunityRouteSupport {
+  private readonly creator = this.get<CommunityInviteCreator>(
+    CommunityInviteCreator,
+  );
+
   @Post('/:communityId/invites')
   public async createInvite(
     @Param('communityId') communityId: string,
@@ -30,41 +29,14 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
-
-    community.assertCanCreateInvite(actorIdentityId);
-
-    const invite = CommunityInvite.create(
-      community.getId(),
-      actorIdentityId,
-      body?.expiresAt ? new Timestamp(body.expiresAt) : undefined,
-      body?.maxUses ? new CommunityInviteMaxUses(body.maxUses) : undefined,
-      body?.encryptedCommunityKey
-        ? EncryptedCommunityInviteKey.fromPrimitives(body.encryptedCommunityKey)
-        : undefined,
-    );
-
-    await this.inviteRepository().save(invite);
-    await this.eventPublisher.publish([
-      new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {
-        communityId: community.getId().valueOf(),
-        invite: invite.toPrimitives(),
-        networkId: community.getNetworkId().valueOf(),
-      }),
-    ]);
-    await this.recordModerationLog(
-      community,
-      actorIdentityId,
-      CommunityModerationAction.INVITE_LINK_CREATED,
-      this.moderationTarget(
-        CommunityModerationTargetType.INVITE,
-        invite.getToken(),
+    const invite = await this.creator.create(
+      new CommunityInviteCreateMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        body?.expiresAt,
+        body?.maxUses,
+        body?.encryptedCommunityKey,
       ),
-      {
-        encryptedCommunityKeyStored: invite.hasEncryptedCommunityKey(),
-        expiresAt: body?.expiresAt,
-        maxUses: body?.maxUses,
-      },
     );
 
     return response

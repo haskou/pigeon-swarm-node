@@ -1,7 +1,7 @@
-export type PublishedContent = {
-  cid: string;
-  contentType: string;
-  encrypted?: true;
-  filename?: string;
-  size: number;
-};
+export class PublishedContent {
+  public readonly cid!: string;
+  public readonly contentType!: string;
+  public readonly encrypted?: true;
+  public readonly filename?: string;
+  public readonly size!: number;
+}

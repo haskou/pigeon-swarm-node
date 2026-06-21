@@ -3,6 +3,9 @@ import { ConversationInvitationPayload } from '@app/contexts/notifications/domai
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
+import { NotificationCreateMessageHandlers } from './NotificationCreateMessageHandlers';
+import { NotificationCreateMessagePayload } from './NotificationCreateMessagePayload';
+
 export class NotificationCreateMessage {
   public static communityInvitation(
     communityId: string,
@@ -11,18 +14,18 @@ export class NotificationCreateMessage {
     encryptedCommunityKey: string,
     inviterSignature: string,
   ): NotificationCreateMessage {
-    return new NotificationCreateMessage(
-      NotificationType.COMMUNITY_INVITATION,
-      new IdentityId(inviterIdentityId),
-      undefined,
-      CommunityInvitationPayload.fromPrimitives({
+    return new NotificationCreateMessage({
+      inviterIdentityId: new IdentityId(inviterIdentityId),
+      kind: 'community_invitation',
+      payload: CommunityInvitationPayload.fromPrimitives({
         communityId,
         encryptedCommunityKey,
         inviterIdentityId,
         inviterSignature,
         recipientIdentityId,
       }),
-    );
+      type: NotificationType.COMMUNITY_INVITATION,
+    });
   }
 
   public static conversationInvitation(
@@ -32,18 +35,18 @@ export class NotificationCreateMessage {
     encryptedConversationKey: string,
     inviterSignature: string,
   ): NotificationCreateMessage {
-    return new NotificationCreateMessage(
-      NotificationType.CONVERSATION_INVITATION,
-      new IdentityId(inviterIdentityId),
-      ConversationInvitationPayload.fromPrimitives({
+    return new NotificationCreateMessage({
+      inviterIdentityId: new IdentityId(inviterIdentityId),
+      kind: 'conversation_invitation',
+      payload: ConversationInvitationPayload.fromPrimitives({
         conversationId,
         encryptedConversationKey,
         inviterIdentityId,
         inviterSignature,
         recipientIdentityId,
       }),
-      undefined,
-    );
+      type: NotificationType.CONVERSATION_INVITATION,
+    });
   }
 
   public static groupConversationInvitation(
@@ -53,34 +56,57 @@ export class NotificationCreateMessage {
     encryptedConversationKey: string,
     inviterSignature: string,
   ): NotificationCreateMessage {
-    return new NotificationCreateMessage(
-      NotificationType.GROUP_CONVERSATION_INVITATION,
-      new IdentityId(inviterIdentityId),
-      ConversationInvitationPayload.fromPrimitives({
+    return new NotificationCreateMessage({
+      inviterIdentityId: new IdentityId(inviterIdentityId),
+      kind: 'group_conversation_invitation',
+      payload: ConversationInvitationPayload.fromPrimitives({
         conversationId,
         encryptedConversationKey,
         inviterIdentityId,
         inviterSignature,
         recipientIdentityId,
       }),
-      undefined,
-    );
+      type: NotificationType.GROUP_CONVERSATION_INVITATION,
+    });
   }
 
-  constructor(
-    public readonly type: NotificationType,
-    public readonly inviterIdentityId: IdentityId,
-    public readonly conversationPayload:
-      | ConversationInvitationPayload
-      | undefined,
-    public readonly communityPayload: CommunityInvitationPayload | undefined,
+  private constructor(
+    private readonly payload: NotificationCreateMessagePayload,
   ) {}
 
+  public getInviterIdentityId(): IdentityId {
+    return this.payload.inviterIdentityId;
+  }
+
   public isCommunityInvitation(): boolean {
-    return this.type.isEqual(NotificationType.COMMUNITY_INVITATION);
+    return this.payload.type.isEqual(NotificationType.COMMUNITY_INVITATION);
   }
 
   public isGroupConversationInvitation(): boolean {
-    return this.type.isEqual(NotificationType.GROUP_CONVERSATION_INVITATION);
+    return this.payload.type.isEqual(
+      NotificationType.GROUP_CONVERSATION_INVITATION,
+    );
+  }
+
+  public match<T>(handlers: NotificationCreateMessageHandlers<T>): T {
+    switch (this.payload.kind) {
+      case 'community_invitation':
+        if (this.payload.payload instanceof CommunityInvitationPayload) {
+          return handlers.communityInvitation(this.payload.payload);
+        }
+        break;
+      case 'conversation_invitation':
+        if (this.payload.payload instanceof ConversationInvitationPayload) {
+          return handlers.conversationInvitation(this.payload.payload);
+        }
+        break;
+      case 'group_conversation_invitation':
+        if (this.payload.payload instanceof ConversationInvitationPayload) {
+          return handlers.groupConversationInvitation(this.payload.payload);
+        }
+        break;
+    }
+
+    throw new Error('Unsupported notification payload.');
   }
 }

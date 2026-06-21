@@ -10,8 +10,8 @@ import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
 import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import PushNotificationDelivery from './PushNotificationDelivery';
-import { PushNotificationIntent } from './types/PushNotificationIntent';
-import { PushNotificationScope } from './types/PushNotificationScope';
+import { PushNotificationIntent } from './PushNotificationIntent';
+import { PushNotificationScope } from './PushNotificationScope';
 
 export default class PushNotificationDispatcher {
   private static identityIdsFrom(value: unknown): IdentityId[] {

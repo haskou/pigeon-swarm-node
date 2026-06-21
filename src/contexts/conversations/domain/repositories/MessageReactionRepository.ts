@@ -1,4 +1,4 @@
-import { MessageReaction } from '../MessageReaction';
+import { MessageReaction } from '../entities/messages/MessageReaction';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 

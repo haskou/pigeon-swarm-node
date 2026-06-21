@@ -4,8 +4,8 @@ import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoun
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
+import { StickerUserLibraryLookup } from '../StickerUserLibraryLookup';
 import { StickerPackSaveMessage } from './messages/StickerPackSaveMessage';
-import { StickerUserLibraryLookup } from './types/StickerUserLibraryLookup';
 
 export default class StickerPackSaver {
   constructor(
@@ -22,11 +22,10 @@ export default class StickerPackSaver {
     );
 
     return library
-      ? { created: false, library }
-      : {
-          created: true,
-          library: StickerUserLibrary.create(message.identityId),
-        };
+      ? StickerUserLibraryLookup.existing(library)
+      : StickerUserLibraryLookup.created(
+          StickerUserLibrary.create(message.identityId),
+        );
   }
 
   public async save(

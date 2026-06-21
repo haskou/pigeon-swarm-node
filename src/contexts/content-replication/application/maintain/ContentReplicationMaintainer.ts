@@ -1,25 +1,25 @@
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
-import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 
 import { ContentReplicaClaim } from '../../domain/ContentReplicaClaim';
 import { ContentReplicationWasClaimedEvent } from '../../domain/events/ContentReplicationWasClaimedEvent';
 import ContentReplicaClaimRepository from '../../domain/repositories/ContentReplicaClaimRepository';
+import { ContentId } from '../../domain/value-objects/ContentId';
 import { ContentReplicationContext } from '../../domain/value-objects/ContentReplicationContext';
+import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import ContentReplicationStatusFinder from '../find-status/ContentReplicationStatusFinder';
-import { ReplicatedContentStatus } from '../find-status/types/ReplicatedContentStatus';
+import { ReplicatedContentStatus } from '../find-status/ReplicatedContentStatus';
 import ContentReplicationStatusSummaryUpdater from '../update-status-summary/ContentReplicationStatusSummaryUpdater';
-import { ContentNetworkReplicationStatus } from './types/ContentNetworkReplicationStatus';
-import { ContentReplicationMaintenanceResult } from './types/ContentReplicationMaintenanceResult';
+import { ContentNetworkReplicationStatus } from './ContentNetworkReplicationStatus';
+import { ContentReplicationMaintenanceResult } from './ContentReplicationMaintenanceResult';
 
 export default class ContentReplicationMaintainer {
   constructor(
     private readonly finder: ContentReplicationStatusFinder,
     private readonly claimRepository: ContentReplicaClaimRepository,
-    private readonly ipfs: IPFS,
+    private readonly contentStorage: ReplicatedContentStorage,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly summaryUpdater?: ContentReplicationStatusSummaryUpdater,
   ) {}
@@ -31,7 +31,7 @@ export default class ContentReplicationMaintainer {
   }): Promise<void> {
     const claimedAt = Timestamp.now();
     const claim = ContentReplicaClaim.create(
-      new IPFSId(params.cid),
+      new ContentId(params.cid),
       new NetworkId(params.networkId),
       new NodeId(params.localNodeId),
       claimedAt,
@@ -81,13 +81,14 @@ export default class ContentReplicationMaintainer {
     network: ContentNetworkReplicationStatus,
     localNodeId: string,
   ): Promise<number> {
-    const cid = new IPFSId(content.cid);
+    const cid = new ContentId(content.cid);
     const context = new ContentReplicationContext(content.context);
+    const networkId = new NetworkId(network.networkId);
 
     if (context.isPublicUpload()) {
-      await this.ipfs.getBytesFromNetwork(cid, network.networkId);
+      await this.contentStorage.findBytesInNetwork(cid, networkId);
     } else {
-      await this.ipfs.getJSONFromNetwork<unknown>(cid, network.networkId);
+      await this.contentStorage.findJSONInNetwork<unknown>(cid, networkId);
     }
 
     if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
@@ -111,9 +112,9 @@ export default class ContentReplicationMaintainer {
       return 0;
     }
 
-    await this.ipfs.removeJSONFromNetwork(
-      new IPFSId(content.cid),
-      network.networkId,
+    await this.contentStorage.removeFromNetwork(
+      new ContentId(content.cid),
+      new NetworkId(network.networkId),
     );
 
     return 1;

@@ -24,6 +24,6 @@ export interface CommunityResource {
   ownerIdentityId: string;
   roles: CommunityRoleResource[];
   textChannels: CommunityTextChannelResource[];
-  visibility: 'private' | 'public';
+  visibility: string;
   voiceChannels: CommunityVoiceChannelResource[];
 }

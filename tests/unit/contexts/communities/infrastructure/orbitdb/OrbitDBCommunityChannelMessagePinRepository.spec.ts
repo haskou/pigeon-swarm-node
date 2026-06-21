@@ -95,13 +95,10 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
 
     const result = await repository.findByChannel(communityId, channelId);
 
-    expect(result).toEqual([
-      {
-        createdAt: 1780000000000,
-        messageId: 'message-1',
-        pinnedByIdentityId: identityId.valueOf(),
-      },
-    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].getCreatedAt().valueOf()).toBe(1780000000000);
+    expect(result[0].getMessageId().valueOf()).toBe('message-1');
+    expect(result[0].getPinnedByIdentityId().isEqual(identityId)).toBe(true);
     expect(pins.query).not.toHaveBeenCalled();
   });
 

@@ -4,12 +4,12 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
 import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
-import IdentityMetadataRepository from '../../../../../../src/contexts/identities/domain/repositories/IdentityMetadataRepository';
 import { IdentityExternalIdentifier } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityRepository from '../../../../../../src/contexts/identities/infrastructure/ipfs/IpfsIdentityRepository';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
+import IdentityMetadataIndex from '../../../../../../src/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
@@ -18,14 +18,14 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 describe('IpfsIdentityRepository', () => {
   let ipfsManager: MockProxy<IPFS>;
   let mapper: IpfsIdentityMapper;
-  let metadataRepository: MockProxy<IdentityMetadataRepository>;
+  let metadataRepository: MockProxy<IdentityMetadataIndex>;
   let repository: IpfsIdentityRepository;
   let mother: IdentityMother;
 
   beforeEach(() => {
     ipfsManager = mock<IPFS>();
     mapper = new IpfsIdentityMapper();
-    metadataRepository = mock<IdentityMetadataRepository>();
+    metadataRepository = mock<IdentityMetadataIndex>();
     repository = new IpfsIdentityRepository(
       ipfsManager,
       mapper,
@@ -556,10 +556,10 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
-      expect(result.externalIdentifier).toEqual(
+      expect(result.getExternalIdentifier()).toEqual(
         new IdentityExternalIdentifier(cidString),
       );
-      expect(result.identity.toPrimitives()).toEqual(primitives);
+      expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
 
     it('should not fetch older handle metadata when the latest candidate is valid', async () => {
@@ -602,7 +602,7 @@ describe('IpfsIdentityRepository', () => {
         new IPFSId(olderCidString),
       );
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
-      expect(result.identity.toPrimitives()).toEqual(primitives);
+      expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
 
     it('should read handle metadata from the known identity networks', async () => {
@@ -636,7 +636,7 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.getBytesFromNetworks).not.toHaveBeenCalled();
-      expect(result.identity.toPrimitives()).toEqual(primitives);
+      expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
   });
 });

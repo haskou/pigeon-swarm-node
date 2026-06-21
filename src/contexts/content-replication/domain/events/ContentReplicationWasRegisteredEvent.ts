@@ -1,6 +1,6 @@
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 
-import { ContentReplicationWasRegisteredAttributes } from './types/ContentReplicationWasRegisteredAttributes';
+import { ContentReplicationWasRegisteredAttributes } from './ContentReplicationWasRegisteredAttributes';
 
 export class ContentReplicationWasRegisteredEvent extends DomainEvent {
   public static EVENT_NAME = 'content_replication.v1.content.was_registered';

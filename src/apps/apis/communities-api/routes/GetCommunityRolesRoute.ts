@@ -16,7 +16,7 @@ export class GetCommunityRolesRoute extends CommunityRouteSupport {
     const community = await this.findCommunity(communityId);
     const primitives = community.toPrimitives();
 
-    community.assertIsMember(actorIdentityId);
+    community.viewAsMember(actorIdentityId);
 
     return response.status(HttpRouteStatusEnum.OK).send({
       memberRoles: primitives.memberRoles,

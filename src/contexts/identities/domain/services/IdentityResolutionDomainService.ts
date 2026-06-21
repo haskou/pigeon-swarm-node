@@ -2,7 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { IdentityNotFoundError } from '../errors/IdentityNotFoundError';
 import { Identity } from '../Identity';
-import { IdentityCandidate } from '../repositories/types/IdentityCandidate';
+import { IdentityCandidate } from '../IdentityCandidate';
 
 export default class IdentityResolutionDomainService {
   public resolve(identityId: IdentityId, candidates: Identity[]): Identity {
@@ -32,7 +32,7 @@ export default class IdentityResolutionDomainService {
     candidates: IdentityCandidate[],
   ): IdentityCandidate {
     const matchingCandidates = candidates.filter((candidate) =>
-      candidate.identity.isIdentifiedBy(identityId),
+      candidate.isIdentifiedBy(identityId),
     );
 
     if (matchingCandidates.length === 0) {
@@ -40,11 +40,11 @@ export default class IdentityResolutionDomainService {
     }
 
     return matchingCandidates.sort((left, right) => {
-      if (right.identity.isNewerThan(left.identity)) {
+      if (right.isNewerThan(left)) {
         return 1;
       }
 
-      if (left.identity.isNewerThan(right.identity)) {
+      if (left.isNewerThan(right)) {
         return -1;
       }
 

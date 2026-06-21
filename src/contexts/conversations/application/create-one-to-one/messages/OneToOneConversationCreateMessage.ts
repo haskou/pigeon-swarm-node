@@ -2,10 +2,6 @@ import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
-import { OneToOneConversationCreatePayload } from './types/OneToOneConversationCreatePayload';
-
-export { OneToOneConversationCreatePayload } from './types/OneToOneConversationCreatePayload';
-
 export class OneToOneConversationCreateMessage {
   public readonly keychainExternalIdentifier: KeychainExternalIdentifier;
 
@@ -17,7 +13,11 @@ export class OneToOneConversationCreateMessage {
 
   constructor(
     ownerIdentityId: string,
-    payload: OneToOneConversationCreatePayload,
+    payload: {
+      keychainExternalIdentifier: string;
+      networkId: string;
+      participantIds: string[];
+    },
   ) {
     const participantId = payload.participantIds.find(
       (id) => id !== ownerIdentityId,

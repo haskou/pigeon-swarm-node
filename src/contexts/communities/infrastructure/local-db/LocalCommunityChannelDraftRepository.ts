@@ -2,9 +2,10 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Timestamp } from '@haskou/value-objects';
 
+import { CommunityChannelDraft } from '../../domain/CommunityChannelDraft';
 import CommunityChannelDraftRepository from '../../domain/repositories/CommunityChannelDraftRepository';
-import { CommunityChannelDraft } from '../../domain/repositories/types/CommunityChannelDraft';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
+import { CommunityChannelMessageEncryptedPayload } from '../../domain/value-objects/CommunityChannelMessageEncryptedPayload';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { LocalCommunityChannelDraftDocument } from './documents/LocalCommunityChannelDraftDocument';
 
@@ -40,26 +41,26 @@ export default class LocalCommunityChannelDraftRepository extends CommunityChann
   private toDraft(
     document: LocalCommunityChannelDraftDocument,
   ): CommunityChannelDraft {
-    return {
-      channelId: document.channelId,
-      communityId: document.communityId,
-      encryptedPayload: document.encryptedPayload,
-      updatedAt: document.updatedAt,
-    };
+    return new CommunityChannelDraft(
+      new CommunityId(document.communityId),
+      new CommunityChannelId(document.channelId),
+      new CommunityChannelMessageEncryptedPayload(document.encryptedPayload),
+      new Timestamp(document.updatedAt),
+    );
   }
 
   public async save(
     identityId: IdentityId,
     communityId: CommunityId,
     channelId: CommunityChannelId,
-    encryptedPayload: string,
+    encryptedPayload: CommunityChannelMessageEncryptedPayload,
     updatedAt: Timestamp = Timestamp.now(),
   ): Promise<void> {
     const document: LocalCommunityChannelDraftDocument = {
       _id: this.draftId(identityId, communityId, channelId),
       channelId: channelId.valueOf(),
       communityId: communityId.valueOf(),
-      encryptedPayload,
+      encryptedPayload: encryptedPayload.valueOf(),
       identityId: identityId.valueOf(),
       updatedAt: updatedAt.valueOf(),
     };

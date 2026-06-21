@@ -1,10 +1,10 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import { CommunityChannelPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/CommunityChannelPollScopeAuthorizeMessage';
+import { GroupConversationPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/GroupConversationPollScopeAuthorizeMessage';
+import PollScopeAuthorizer from '@app/contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer';
+import { PollScopeResolution } from '@app/contexts/polls/application/authorize-poll-scope/PollScopeResolution';
 import { PollFindMessage } from '@app/contexts/polls/application/find/messages/PollFindMessage';
 import PollFinder from '@app/contexts/polls/application/find/PollFinder';
-import { CommunityChannelPollScopeResolveMessage } from '@app/contexts/polls/application/resolve-scope/messages/CommunityChannelPollScopeResolveMessage';
-import { GroupConversationPollScopeResolveMessage } from '@app/contexts/polls/application/resolve-scope/messages/GroupConversationPollScopeResolveMessage';
-import PollScopeAccessResolver from '@app/contexts/polls/application/resolve-scope/PollScopeAccessResolver';
-import { PollScopeAccess } from '@app/contexts/polls/application/resolve-scope/types/PollScopeAccess';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
@@ -16,9 +16,8 @@ export abstract class PollRouteSupport extends Route {
 
   private readonly finder = this.get<PollFinder>(PollFinder);
 
-  private readonly scopeResolver = this.get<PollScopeAccessResolver>(
-    PollScopeAccessResolver,
-  );
+  private readonly scopeAuthorizer =
+    this.get<PollScopeAuthorizer>(PollScopeAuthorizer);
 
   protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);
@@ -32,9 +31,9 @@ export abstract class PollRouteSupport extends Route {
     actor: IdentityId,
     communityId: string,
     channelId: string,
-  ): Promise<PollScopeAccess> {
-    return this.scopeResolver.resolveCommunityChannelCreation(
-      new CommunityChannelPollScopeResolveMessage(
+  ): Promise<PollScopeResolution> {
+    return this.scopeAuthorizer.authorizeCommunityChannelCreation(
+      new CommunityChannelPollScopeAuthorizeMessage(
         actor.valueOf(),
         communityId,
         channelId,
@@ -46,9 +45,9 @@ export abstract class PollRouteSupport extends Route {
     actor: IdentityId,
     communityId: string,
     channelId: string,
-  ): Promise<PollScopeAccess> {
-    return this.scopeResolver.resolveCommunityChannelVote(
-      new CommunityChannelPollScopeResolveMessage(
+  ): Promise<PollScopeResolution> {
+    return this.scopeAuthorizer.authorizeCommunityChannelVote(
+      new CommunityChannelPollScopeAuthorizeMessage(
         actor.valueOf(),
         communityId,
         channelId,
@@ -59,9 +58,9 @@ export abstract class PollRouteSupport extends Route {
   protected async groupConversationScope(
     actor: IdentityId,
     conversationId: string,
-  ): Promise<PollScopeAccess> {
-    return this.scopeResolver.resolveGroupConversation(
-      new GroupConversationPollScopeResolveMessage(
+  ): Promise<PollScopeResolution> {
+    return this.scopeAuthorizer.authorizeGroupConversation(
+      new GroupConversationPollScopeAuthorizeMessage(
         actor.valueOf(),
         conversationId,
       ),
@@ -71,14 +70,14 @@ export abstract class PollRouteSupport extends Route {
   protected async accessPollScope(
     actor: IdentityId,
     poll: Poll,
-  ): Promise<PollScopeAccess> {
-    return this.scopeResolver.resolvePollVote(actor, poll);
+  ): Promise<PollScopeResolution> {
+    return this.scopeAuthorizer.authorizePollVote(actor, poll);
   }
 
   protected async managePollScope(
     actor: IdentityId,
     poll: Poll,
-  ): Promise<PollScopeAccess> {
-    return this.scopeResolver.resolvePollManagement(actor, poll);
+  ): Promise<PollScopeResolution> {
+    return this.scopeAuthorizer.authorizePollManagement(actor, poll);
   }
 }

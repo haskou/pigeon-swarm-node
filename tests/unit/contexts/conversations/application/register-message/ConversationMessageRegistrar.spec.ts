@@ -3,13 +3,14 @@ import { RegisterConversationMessage } from '@app/contexts/conversations/applica
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { InvalidMessageSignatureError } from '@app/contexts/conversations/domain/errors/InvalidMessageSignatureError';
 import { RemoteMessageCandidateMismatchError } from '@app/contexts/conversations/domain/errors/RemoteMessageCandidateMismatchError';
-import { MessageSent } from '@app/contexts/conversations/domain/MessageSent';
+import { MessageMetadata } from '@app/contexts/conversations/domain/entities/messages/MessageMetadata';
+import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { Signature } from '@haskou/value-objects';
+import { Signature, Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { ConversationMother } from '../../../../mothers/ConversationMother';
@@ -31,15 +32,21 @@ describe('ConversationMessageRegistrar', () => {
     conversationId: ConversationId,
     messageId: MessageId,
   ): MessageSent {
-    return MessageSent.create({
-      authorId: mother.author,
-      conversationId,
-      encryptedPayload: new EncryptedMessagePayload('encrypted-payload'),
-      id: messageId,
-      signature: new Signature(
-        'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+    const signature = new Signature(
+      'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+    );
+
+    return MessageSent.create(
+      new MessageMetadata(
+        messageId,
+        conversationId,
+        mother.author,
+        [],
+        Timestamp.now(),
+        signature,
       ),
-    });
+      new EncryptedMessagePayload('encrypted-payload'),
+    );
   }
 
   it('registers a remote candidate that matches the announced message', async () => {
@@ -165,15 +172,20 @@ describe('ConversationMessageRegistrar', () => {
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const outsider = await ConversationMother.generateIdentityId();
-    const candidate = MessageSent.create({
-      authorId: outsider,
-      conversationId,
-      encryptedPayload: new EncryptedMessagePayload('encrypted-payload'),
-      id: messageId,
-      signature: new Signature(
-        'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+    const signature = new Signature(
+      'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
+    );
+    const candidate = MessageSent.create(
+      new MessageMetadata(
+        messageId,
+        conversationId,
+        outsider,
+        [],
+        Timestamp.now(),
+        signature,
       ),
-    });
+      new EncryptedMessagePayload('encrypted-payload'),
+    );
 
     repository.findById.mockResolvedValue(conversation);
     repository.findCandidateMessageById.mockResolvedValue(candidate);

@@ -1,4 +1,4 @@
-import { MessageReaction } from '@app/contexts/conversations/domain/MessageReaction';
+import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
@@ -100,9 +100,9 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
     documents: Record<string, unknown>[],
   ): Promise<void> {
     const key = this.indexHeadKey(conversationId);
-    const reactions = documents.reduce(
+    const reactions = documents.reduce<Record<string, unknown>[]>(
       (merged, document) => this.mergeDocuments(merged, document),
-      [] as Record<string, unknown>[],
+      [],
     );
 
     await this.registry.putHead(key, {

@@ -1,6 +1,6 @@
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
 import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBContentReplicationDocument } from './documents/OrbitDBContentReplicationDocument';
@@ -129,7 +129,9 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
     );
   }
 
-  public async findByCid(cid: IPFSId): Promise<ContentReplication | undefined> {
+  public async findByCid(
+    cid: ContentId,
+  ): Promise<ContentReplication | undefined> {
     const cidValue = cid.valueOf();
     const head = this.documentFromRecord(
       (await this.registry.findHead(this.headKey(cidValue))) || {},

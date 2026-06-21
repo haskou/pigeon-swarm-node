@@ -1,7 +1,7 @@
+import ReplicatedContentStorage from '@app/contexts/content-replication/application/content-storage/ReplicatedContentStorage';
 import ContentReplicationStatusFinder from '@app/contexts/content-replication/application/find-status/ContentReplicationStatusFinder';
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
 import ContentReplicaClaimRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicaClaimRepository';
-import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
@@ -68,16 +68,16 @@ describe('ContentReplicationMaintainer', () => {
         savedClaims.push(claim);
       },
     };
-    const ipfs = {
-      getJSONFromNetwork: async (_cid: { valueOf(): string }) => {
+    const contentStorage = {
+      findJSONInNetwork: async (_cid: { valueOf(): string }) => {
         if (_cid.valueOf() === 'bafy-failure') {
           throw new Error('CID not available');
         }
 
         return {};
       },
-      getBytesFromNetwork: async () => Buffer.from([]),
-      removeJSONFromNetwork: async (): Promise<void> => undefined,
+      findBytesInNetwork: async () => Buffer.from([]),
+      removeFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
       publish: async (events) => {
@@ -88,7 +88,7 @@ describe('ContentReplicationMaintainer', () => {
     const result = await new ContentReplicationMaintainer(
       finderWithTwoResponsibleContents as unknown as ContentReplicationStatusFinder,
       claimRepository,
-      ipfs as unknown as IPFS,
+      contentStorage as unknown as ReplicatedContentStorage,
       eventPublisher,
     ).maintain();
 
@@ -108,16 +108,16 @@ describe('ContentReplicationMaintainer', () => {
       findByCids: async () => [],
       save: async () => undefined,
     };
-    const ipfs = {
-      getBytesFromNetwork: async (_cid: { valueOf(): string }) => {
+    const contentStorage = {
+      findBytesInNetwork: async (_cid: { valueOf(): string }) => {
         fetchedBytes.push(_cid.valueOf());
 
         return Buffer.from('public');
       },
-      getJSONFromNetwork: async () => {
+      findJSONInNetwork: async () => {
         throw new Error('Public uploads must not be fetched as JSON.');
       },
-      removeJSONFromNetwork: async (): Promise<void> => undefined,
+      removeFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
       publish: async () => undefined,
@@ -154,7 +154,7 @@ describe('ContentReplicationMaintainer', () => {
         }),
       } as unknown as ContentReplicationStatusFinder,
       claimRepository,
-      ipfs as unknown as IPFS,
+      contentStorage as unknown as ReplicatedContentStorage,
       eventPublisher,
     ).maintain();
 

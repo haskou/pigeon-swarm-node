@@ -16,6 +16,10 @@ External code should not mutate child entities directly. It should call intent-r
 
 Use cases coordinate aggregate roots; they should not reach through the root to enforce child-entity rules.
 
+Aggregate roots should not expose public assertion methods. A public `assertCan...`, `assertIs...`, or `assertHas...` method makes callers orchestrate preconditions instead of asking the aggregate to perform behavior or answer a domain question.
+
+Assertion helpers on an aggregate root should be private implementation details. If there are too many of them, extract a cohesive validation class, policy, or domain service with a clear concept name, such as `UserValidator.assertIsAdmin(userId)`. If callers need the boolean form too, keep `isAdmin(userId)` with that same validator/policy instead of duplicating the rule elsewhere.
+
 Repositories should normally be organized around aggregate roots, not every entity. Avoid repositories for child entities unless the existing codebase has a deliberate exception.
 
 ## Invariants and transactions
@@ -57,6 +61,8 @@ Keep integration payload mapping at the boundary. The domain event may later be 
 - Controllers deciding lifecycle transitions.
 - Domain events named after transport actions rather than facts.
 - Aggregates that expose setters for every field.
+- Aggregate roots exposing public assertion methods.
+- Large clusters of private assertions that should be a named validator, policy, or domain service.
 - Aggregate roots that need many unrelated services to enforce behavior.
 - A large aggregate used to avoid eventual consistency where a process or event would be clearer.
 - Empty aggregate folders created before any aggregate code exists.

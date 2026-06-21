@@ -6,30 +6,13 @@ import {
   Signature,
 } from '@haskou/value-objects';
 
+import { Message } from '../entities/messages/Message';
+import { MessageSignaturePayload } from '../entities/messages/MessageSignaturePayload';
 import { InvalidMessageSignatureError } from '../errors/InvalidMessageSignatureError';
-import { Message } from '../Message';
-import { MessageSignaturePayload } from '../types/MessageSignaturePayload';
 
 export default class MessageSignatureDomainService {
-  private getCanonicalPayload(
-    payload: MessageSignaturePayload,
-  ): MessageSignaturePayload {
-    return {
-      attachmentExternalIdentifiers: payload.attachmentExternalIdentifiers,
-      authorId: payload.authorId,
-      conversationId: payload.conversationId,
-      createdAt: payload.createdAt,
-      encryptedPayload: payload.encryptedPayload,
-      id: payload.id,
-      previousMessageIds: payload.previousMessageIds,
-      replyToMessageId: payload.replyToMessageId,
-      targetMessageId: payload.targetMessageId,
-      type: payload.type,
-    };
-  }
-
-  public serializePayload(payload: MessageSignaturePayload): string {
-    return JSON.stringify(this.getCanonicalPayload(payload));
+  public getCanonicalSigningContent(payload: MessageSignaturePayload): string {
+    return JSON.stringify(payload.toPrimitives());
   }
 
   public async generateSignature(
@@ -37,7 +20,10 @@ export default class MessageSignatureDomainService {
     encryptedKeyPair: EncryptedKeyPair,
     password: Password,
   ): Promise<Signature> {
-    return encryptedKeyPair.sign(this.serializePayload(payload), password);
+    return encryptedKeyPair.sign(
+      this.getCanonicalSigningContent(payload),
+      password,
+    );
   }
 
   public isValidSignature(
@@ -46,7 +32,7 @@ export default class MessageSignatureDomainService {
     signature: Signature,
   ): boolean {
     return publicKey.isValidSignature(
-      this.serializePayload(payload),
+      this.getCanonicalSigningContent(payload),
       signature,
     );
   }

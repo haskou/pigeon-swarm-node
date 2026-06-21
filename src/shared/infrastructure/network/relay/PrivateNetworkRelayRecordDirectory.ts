@@ -86,11 +86,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private publicConnection?: Promise<IPFSConnection>;
 
-  private readonly localDatabase: EmbeddedLocalDatabase;
-
-  constructor(localDatabase?: EmbeddedLocalDatabase) {
-    this.localDatabase = localDatabase || new EmbeddedLocalDatabase();
-  }
+  constructor(private readonly localDatabase: EmbeddedLocalDatabase) {}
 
   private getPublicRelayDirectoryStorageLocation(): string {
     return `${this.storagePath}/public-relay-record-directory`;

@@ -18,6 +18,35 @@ describe('NotificationCreator', () => {
     creator = new NotificationCreator(repository, eventPublisher);
   });
 
+  it('should create a community invitation notification', async () => {
+    const inviterIdentityId = new IdentityMother().id;
+    const recipientIdentityId = new IdentityId(
+      'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
+    );
+
+    const notification = await creator.create(
+      NotificationCreateMessage.communityInvitation(
+        '550e8400-e29b-41d4-a716-446655440020',
+        inviterIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+        'encrypted-community-key',
+        'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
+      ),
+    );
+
+    expect(repository.save).toHaveBeenCalledWith(notification);
+    expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
+    expect(notification.toPrimitives()).toMatchObject({
+      payload: {
+        encryptedCommunityKey: 'encrypted-community-key',
+      },
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      state: 'pending',
+      status: 'unread',
+      type: 'community_invitation',
+    });
+  });
+
   it('should create a conversation invitation notification', async () => {
     const inviterIdentityId = new IdentityMother().id;
     const recipientIdentityId = new IdentityId(

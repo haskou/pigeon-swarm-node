@@ -12,10 +12,10 @@ import {
   UseBefore,
 } from 'routing-controllers';
 
-import { IPFSContentUploadRoute } from './IPFSContentUploadRoute';
+import { IPFSContentUploadRouteSupport } from './IPFSContentUploadRouteSupport';
 
 @JsonController('/ipfs')
-export class PostPublicIPFSContentRoute extends IPFSContentUploadRoute {
+export class PostPublicIPFSContentRoute extends IPFSContentUploadRouteSupport {
   @Post('/public')
   @UseBefore(
     express.raw({

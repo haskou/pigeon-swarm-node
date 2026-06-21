@@ -9,8 +9,10 @@ package "content-replication/domain" {
   class ContentReplicaClaim <<Entity>>
   class ContentReplicationPolicy <<DomainService>>
   class ContentReplicationStatusSummary <<ReadModel>>
+  class ContentId <<ValueObject>>
 
   interface ContentReplicationRepository
+  interface ContentReplicaClaimRepository
   interface ContentReplicationStatusSummaryRepository
 
   class ContentReplicationWasRegisteredEvent <<DomainEvent>>
@@ -23,34 +25,54 @@ package "content-replication/application" {
   class ContentReplicaClaimRegistrar
   class ContentReplicationMaintainer
   class ContentReplicationStatusFinder
+  class ContentReplicationStatus
+  class ReplicatedContentStatus
+  class NetworkReplicationStatus
   class ContentReplicationStatusSummaryFinder
   class ContentReplicationSummaryRefresher
   class ContentReplicationStatusSummaryUpdater
+  class ContentReplicationMaintenanceResult
+  class ContentNetworkReplicationStatus
+  interface ReplicatedContentStorage
 }
 
 package "content-replication/infrastructure" {
+  class IpfsContentStorage
   class OrbitDBContentReplicationRepository
+  class OrbitDBContentReplicaClaimRepository
   class LocalContentReplicationStatusSummaryRepository
   class LocalContentReplicationStatusSummaryDocument
 }
 
 ContentReplication *-- ContentReplicaClaim
+ContentReplication --> ContentId
+ContentReplicaClaim --> ContentId
 ContentReplicationPolicy ..> ContentReplication
 
 ContentReplication ..> ContentReplicationWasRegisteredEvent
 ContentReplication ..> ContentReplicationWasClaimedEvent
 
 ContentReplicationRegistrar ..> ContentReplicationRepository
+ContentReplicationRegistrar ..> ContentReplicaClaimRepository
 ContentReplicationMetadataRegistrar ..> ContentReplicationRepository
-ContentReplicaClaimRegistrar ..> ContentReplicationRepository
+ContentReplicaClaimRegistrar ..> ContentReplicaClaimRepository
 ContentReplicationMaintainer ..> ContentReplicationPolicy
-ContentReplicationMaintainer ..> ContentReplicationRepository
+ContentReplicationMaintainer ..> ContentReplicaClaimRepository
+ContentReplicationMaintainer ..> ReplicatedContentStorage
 ContentReplicationStatusFinder ..> ContentReplicationRepository
+ContentReplicationStatusFinder ..> ContentReplicaClaimRepository
+ContentReplicationStatusFinder ..> ContentReplicationStatus
+ContentReplicationStatus *-- ReplicatedContentStatus
+ReplicatedContentStatus *-- NetworkReplicationStatus
 ContentReplicationStatusSummaryFinder ..> ContentReplicationStatusSummaryRepository
 ContentReplicationSummaryRefresher ..> ContentReplicationStatusSummaryRepository
 ContentReplicationStatusSummaryUpdater ..> ContentReplicationStatusSummaryRepository
+ContentReplicationMaintainer ..> ContentReplicationMaintenanceResult
+ContentReplicationMaintainer ..> ContentNetworkReplicationStatus
 
+IpfsContentStorage ..|> ReplicatedContentStorage
 OrbitDBContentReplicationRepository ..|> ContentReplicationRepository
+OrbitDBContentReplicaClaimRepository ..|> ContentReplicaClaimRepository
 LocalContentReplicationStatusSummaryRepository ..|> ContentReplicationStatusSummaryRepository
 LocalContentReplicationStatusSummaryRepository ..> LocalContentReplicationStatusSummaryDocument
 

@@ -4,13 +4,13 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { Identity } from '../../domain/Identity';
-import IdentityMetadataRepository from '../../domain/repositories/IdentityMetadataRepository';
+import { IdentityCandidate } from '../../domain/IdentityCandidate';
 import IdentityRepository from '../../domain/repositories/IdentityRepository';
-import { IdentityCandidate } from '../../domain/repositories/types/IdentityCandidate';
-import { IdentityMetadataRecord } from '../../domain/repositories/types/IdentityMetadataRecord';
 import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
+import IdentityMetadataIndex from '../metadata/IdentityMetadataIndex';
+import { IdentityMetadataRecord } from '../metadata/IdentityMetadataRecord';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
@@ -23,7 +23,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   constructor(
     private readonly ipfsManager: IPFS,
     private readonly mapper: IpfsIdentityMapper,
-    private readonly metadataRepository: IdentityMetadataRepository,
+    private readonly metadataIndex: IdentityMetadataIndex,
   ) {
     super();
   }
@@ -33,7 +33,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   ): Promise<IdentityMetadataRecord[]> {
     try {
       return this.deduplicateMetadata(
-        await this.metadataRepository.findByIdentityId(id),
+        await this.metadataIndex.findByIdentityId(id),
       );
     } catch {
       return [];
@@ -57,7 +57,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private async deleteMetadata(cid: IPFSId): Promise<void> {
     try {
-      await this.metadataRepository.deleteByExternalIdentifier(
+      await this.metadataIndex.deleteByExternalIdentifier(
         new IdentityExternalIdentifier(cid.valueOf()),
       );
     } catch {
@@ -67,7 +67,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
     try {
-      await this.metadataRepository.save(
+      await this.metadataIndex.save(
         identity,
         new IdentityExternalIdentifier(cid.valueOf()),
       );
@@ -199,10 +199,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return undefined;
     }
 
-    return {
-      externalIdentifier: new IdentityExternalIdentifier(metadata.cid),
+    return new IdentityCandidate(
+      new IdentityExternalIdentifier(metadata.cid),
       identity,
-    };
+    );
   }
 
   private async findFirstCandidateReferenceFromMetadata(
@@ -219,11 +219,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     candidates: IdentityCandidate[],
   ): IdentityCandidate[] {
     return [...candidates].sort((left, right) => {
-      if (left.identity.isNewerThan(right.identity)) {
+      if (left.isNewerThan(right)) {
         return -1;
       }
 
-      if (right.identity.isNewerThan(left.identity)) {
+      if (right.isNewerThan(left)) {
         return 1;
       }
 
@@ -324,10 +324,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
             return undefined;
           }
 
-          return {
-            externalIdentifier: new IdentityExternalIdentifier(cidString),
-            identity: candidate,
-          };
+          return new IdentityCandidate(
+            new IdentityExternalIdentifier(cidString),
+            candidate,
+          );
         }),
     );
 
@@ -343,7 +343,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     for (const document of metadata) {
       const candidate = await this.findCandidateReferenceFromMetadata(document);
 
-      if (candidate?.identity.hasHandle(handle)) {
+      if (candidate?.hasHandle(handle)) {
         return candidate;
       }
     }
@@ -358,13 +358,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   }
 
   public async findByHandle(handle: ProfileHandle): Promise<Identity> {
-    return (await this.findCandidateByHandle(handle)).identity;
+    return (await this.findCandidateByHandle(handle)).getIdentity();
   }
 
   public async findCandidateByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityCandidate> {
-    const metadata = await this.metadataRepository.findByHandle(handle);
+    const metadata = await this.metadataIndex.findByHandle(handle);
     const candidate = await this.findFirstHandleCandidateFromMetadata(
       handle,
       metadata,
@@ -427,7 +427,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
     const candidates = await this.findCandidateReferencesById(id);
 
-    return candidates.map((candidate) => candidate.identity);
+    return candidates.map((candidate) => candidate.getIdentity());
   }
 
   public async save(identity: Identity): Promise<IdentityExternalIdentifier> {
@@ -448,7 +448,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {
-    const metadata = await this.metadataRepository.findAll();
+    const metadata = await this.metadataIndex.findAll();
     const uniqueDocuments = new Map<string, IdentityMetadataRecord>();
 
     for (const document of metadata) {

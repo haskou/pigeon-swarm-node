@@ -1,4 +1,6 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelMessageDeletion } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageDeletion';
+import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
@@ -11,7 +13,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
-import { assert, Signature } from '@haskou/value-objects';
+import { assert, Signature, Timestamp } from '@haskou/value-objects';
 
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
@@ -80,14 +82,19 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     }
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
-    community.assertCanDeleteMessage(
+    community.deleteChannelMessage(
       actorIdentityId,
-      targetMessage.getAuthorIdentityId(),
+      targetMessage,
       channelId,
+      new CommunityChannelMessageDeletion(
+        new CommunityChannelMessageId(String(event.attributes.messageId)),
+        new Signature(signature),
+        new Timestamp(createdAt),
+      ),
     );
     this.signatureService.assertValidSignature(
       actorIdentityId,
-      {
+      CommunityChannelMessageSignaturePayload.fromPrimitives({
         actorIdentityId: actorIdentityId.valueOf(),
         channelId: channelId.valueOf(),
         communityId: communityId.valueOf(),
@@ -95,7 +102,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
         id: String(event.attributes.messageId),
         targetMessageId: targetMessageId.valueOf(),
         type: 'deleted',
-      },
+      }),
       new Signature(signature),
     );
 

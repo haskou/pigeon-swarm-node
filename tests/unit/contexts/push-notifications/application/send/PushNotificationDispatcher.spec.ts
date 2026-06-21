@@ -6,7 +6,7 @@ import { NotificationScopeSettings } from '@app/contexts/notification-settings/d
 import NotificationScopeSettingsRepository from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import PushNotificationDelivery from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
-import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/types/PushNotificationDeliveryResult';
+import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/PushNotificationDeliveryResult';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { PushSubscription } from '@app/contexts/push-notifications/domain/PushSubscription';
 import PushSubscriptionRepository from '@app/contexts/push-notifications/domain/repositories/PushSubscriptionRepository';

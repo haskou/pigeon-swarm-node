@@ -44,6 +44,10 @@ package "presence/application" {
   class IdentityPresenceNetworkResolver
 }
 
+package "identities/application" {
+  class IdentityNetworksFinder
+}
+
 package "presence/infrastructure" {
   class OrbitDBIdentityPresenceRepository
 }
@@ -58,5 +62,6 @@ IdentityPresenceHeartbeatRecorder --> OrbitDBIdentityPresenceRepository
 IdentityPresenceHeartbeatRecorder --> IdentityPresenceNetworkResolver
 IdentityPresenceExpirationRegistrar --> OrbitDBIdentityPresenceRepository
 IdentityPresenceExpirationRegistrar --> IdentityPresenceNetworkResolver
+IdentityPresenceNetworkResolver --> IdentityNetworksFinder
 
 @enduml

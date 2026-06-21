@@ -1,6 +1,3 @@
-import { PollScopeTypeValue } from '../../../domain/value-objects/PollScopeType';
-import { PollStatusValue } from '../../../domain/value-objects/PollStatus';
-
 export interface OrbitDBPollDocument extends Record<string, unknown> {
   allowsMultipleVotes: boolean;
   createdAt: number;
@@ -18,9 +15,9 @@ export interface OrbitDBPollDocument extends Record<string, unknown> {
     communityId: string | undefined;
     conversationId: string | undefined;
     networkId: string;
-    type: PollScopeTypeValue;
+    type: string;
   };
-  status: PollStatusValue;
+  status: string;
   updatedAt?: number;
   votes: {
     createdAt: number;

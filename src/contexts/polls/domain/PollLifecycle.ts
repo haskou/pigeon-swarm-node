@@ -1,6 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { PollStatus, PollStatusValue } from './value-objects/PollStatus';
+import { PollStatus } from './value-objects/PollStatus';
 
 export class PollLifecycle {
   public static open(expiresAt?: Timestamp): PollLifecycle {
@@ -10,7 +10,7 @@ export class PollLifecycle {
   public static fromPrimitives(primitives: {
     createdAt: number;
     expiresAt?: number;
-    status: PollStatusValue;
+    status: string;
   }): PollLifecycle {
     return new PollLifecycle(
       new PollStatus(primitives.status),

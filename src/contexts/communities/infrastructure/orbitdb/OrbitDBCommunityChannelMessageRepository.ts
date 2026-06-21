@@ -1,13 +1,21 @@
+import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/CommunityChannelThreadSummary';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
-import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/types/CommunityChannelThreadSummary';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBCommunityChannelMessageDocument } from './documents/OrbitDBCommunityChannelMessageDocument';
 import OrbitDBCommunityChannelMessageMapper from './mappers/OrbitDBCommunityChannelMessageMapper';
+
+interface OrbitDBCommunityChannelThreadSummaryDocument {
+  lastReplyAt: number;
+  lastReplyMessageId: string;
+  replyCount: number;
+  rootMessageId: string;
+}
 
 // eslint-disable-next-line max-len
 export default class OrbitDBCommunityChannelMessageRepository extends CommunityChannelMessageRepository {
@@ -246,9 +254,9 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     return [];
   }
 
-  private isThreadSummary(
+  private isThreadSummaryDocument(
     value: unknown,
-  ): value is CommunityChannelThreadSummary {
+  ): value is OrbitDBCommunityChannelThreadSummaryDocument {
     if (typeof value !== 'object' || value === null) {
       return false;
     }
@@ -276,7 +284,9 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       return [];
     }
 
-    return summaries.filter((summary) => this.isThreadSummary(summary));
+    return summaries
+      .filter((summary) => this.isThreadSummaryDocument(summary))
+      .map((summary) => CommunityChannelThreadSummary.fromPrimitives(summary));
   }
 
   private async findThreadSummaryHead(
@@ -304,7 +314,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
           communityId.valueOf(),
           channelId.valueOf(),
         ),
-        summaries,
+        summaries: summaries.map((summary) => summary.toPrimitives()),
         updatedAt: Date.now(),
       },
     );
@@ -394,15 +404,22 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const key = `${document.channelId}:${rootMessageId}`;
     const current = grouped.get(key);
 
-    grouped.set(key, {
-      lastReplyAt: Math.max(current?.lastReplyAt || 0, document.createdAt),
-      lastReplyMessageId:
-        !current || current.lastReplyAt <= document.createdAt
-          ? this.getMessageId(document)
-          : current.lastReplyMessageId,
-      replyCount: (current?.replyCount || 0) + 1,
-      rootMessageId,
-    });
+    const replyMessageId = new CommunityChannelMessageId(
+      this.getMessageId(document),
+    );
+    const repliedAt = new Timestamp(document.createdAt);
+
+    grouped.set(
+      key,
+      current
+        ? current.withReply(replyMessageId, repliedAt)
+        : new CommunityChannelThreadSummary(
+            new CommunityChannelMessageId(rootMessageId),
+            replyMessageId,
+            1,
+            repliedAt,
+          ),
+    );
   }
 
   private groupThreadSummaries(
@@ -436,7 +453,10 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       const summaries = summariesByChannelId.get(channelId) || [];
 
       summaries.push(summary);
-      summaries.sort((left, right) => right.lastReplyAt - left.lastReplyAt);
+      summaries.sort(
+        (left, right) =>
+          right.getLastReplyAt().valueOf() - left.getLastReplyAt().valueOf(),
+      );
       summariesByChannelId.set(channelId, summaries.slice(0, limitPerChannel));
     }
 
@@ -638,7 +658,11 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       summariesByChannelId.set(
         channelId.valueOf(),
         [...summaries]
-          .sort((left, right) => right.lastReplyAt - left.lastReplyAt)
+          .sort(
+            (left, right) =>
+              right.getLastReplyAt().valueOf() -
+              left.getLastReplyAt().valueOf(),
+          )
           .slice(0, limitPerChannel),
       );
     }

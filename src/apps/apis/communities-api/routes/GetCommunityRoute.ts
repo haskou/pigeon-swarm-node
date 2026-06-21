@@ -16,7 +16,7 @@ export class GetCommunityRoute extends CommunityRouteSupport {
     const identityId = await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
-    community.assertIsMember(identityId);
+    community.viewAsMember(identityId);
 
     return response
       .status(HttpRouteStatusEnum.OK)

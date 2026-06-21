@@ -1,5 +1,3 @@
-import { CommunityVisibilityValue } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
-
 import { OrbitDBCommunityMemberRoleDocument } from './OrbitDBCommunityMemberRoleDocument';
 import { OrbitDBCommunityRoleDocument } from './OrbitDBCommunityRoleDocument';
 import { OrbitDBCommunityTextChannelDocument } from './OrbitDBCommunityTextChannelDocument';
@@ -24,6 +22,6 @@ export interface OrbitDBCommunityDocument extends Record<string, unknown> {
   roles?: OrbitDBCommunityRoleDocument[];
   textChannels: OrbitDBCommunityTextChannelDocument[];
   updatedAt?: number;
-  visibility: CommunityVisibilityValue;
+  visibility: string;
   voiceChannels?: OrbitDBCommunityVoiceChannelDocument[];
 }

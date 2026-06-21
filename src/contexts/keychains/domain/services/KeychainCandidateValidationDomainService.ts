@@ -1,8 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Keychain } from '../Keychain';
+import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
 import KeychainSignatureDomainService from './KeychainSignatureDomainService';
-import { PreviousKeychainFinder } from './types/PreviousKeychainFinder';
 
 export default class KeychainCandidateValidationDomainService {
   constructor(
@@ -12,7 +12,9 @@ export default class KeychainCandidateValidationDomainService {
   private async hasValidPrevious(
     ownerIdentityId: IdentityId,
     keychain: Keychain,
-    findPrevious: PreviousKeychainFinder,
+    findPrevious: (
+      externalIdentifier: KeychainExternalIdentifier,
+    ) => Promise<Keychain | undefined>,
   ): Promise<boolean> {
     if (keychain.isFirstVersion()) {
       return !keychain.getPreviousKeychainExternalIdentifier();
@@ -36,7 +38,9 @@ export default class KeychainCandidateValidationDomainService {
   public async isValidChainFor(
     ownerIdentityId: IdentityId,
     keychain: Keychain,
-    findPrevious: PreviousKeychainFinder,
+    findPrevious: (
+      externalIdentifier: KeychainExternalIdentifier,
+    ) => Promise<Keychain | undefined>,
   ): Promise<boolean> {
     if (!keychain.belongsTo(ownerIdentityId)) {
       return false;

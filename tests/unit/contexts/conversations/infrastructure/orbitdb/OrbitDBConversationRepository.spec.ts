@@ -1,5 +1,6 @@
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMapper';
@@ -81,13 +82,13 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('first'),
       signature(),
-      { createdAt: new Timestamp(1780000000000) },
+      new MessageSendOptions([], new Timestamp(1780000000000)),
     );
     conversation.sendMessage(
       mother.recipient,
       new EncryptedMessagePayload('second'),
       signature(),
-      { createdAt: new Timestamp(1780000000001) },
+      new MessageSendOptions([], new Timestamp(1780000000001)),
     );
 
     await repository.save(conversation);
@@ -138,13 +139,13 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('first'),
       signature(),
-      { createdAt: new Timestamp(1780000000000) },
+      new MessageSendOptions([], new Timestamp(1780000000000)),
     );
     conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('second'),
       signature(),
-      { createdAt: new Timestamp(1780000000001) },
+      new MessageSendOptions([], new Timestamp(1780000000001)),
     );
     await repository.save(conversation);
 
@@ -207,13 +208,13 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('first'),
       signature(),
-      { createdAt: new Timestamp(1780000000000) },
+      new MessageSendOptions([], new Timestamp(1780000000000)),
     );
     secondConversation.sendMessage(
       secondAuthor,
       new EncryptedMessagePayload('second'),
       signature(),
-      { createdAt: new Timestamp(1780000000001) },
+      new MessageSendOptions([], new Timestamp(1780000000001)),
     );
     await repository.save(firstConversation);
     await repository.save(secondConversation);
@@ -250,7 +251,7 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('target'),
       signature(),
-      { createdAt: new Timestamp(1780000000000) },
+      new MessageSendOptions([], new Timestamp(1780000000000)),
     );
     await repository.save(conversation);
 

@@ -51,7 +51,7 @@ export class CommunityChannelMessagePayload {
     );
   }
 
-  public assertMatchesVisibility(visibility: CommunityVisibility): void {
+  public ensureMatchesVisibility(visibility: CommunityVisibility): void {
     assert(
       (visibility.isPrivate() && this.isEncrypted()) ||
         (visibility.isPublic() && this.isPlaintext()),

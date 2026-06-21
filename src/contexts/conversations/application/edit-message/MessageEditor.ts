@@ -1,7 +1,8 @@
+import { MessageEdited } from '@app/contexts/conversations/domain/entities/messages/MessageEdited';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { MessageEdited } from '@app/contexts/conversations/domain/MessageEdited';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
+import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import { MessageEditMessage } from './messages/MessageEditMessage';
@@ -27,11 +28,11 @@ export default class MessageEditor {
       message.targetMessageId,
       message.encryptedPayload,
       message.signature,
-      {
-        createdAt: message.createdAt,
-        id: message.id,
-        previousMessageIds: message.previousMessageIds,
-      },
+      new MessageEditOptions(
+        message.createdAt,
+        message.id,
+        message.previousMessageIds,
+      ),
     );
 
     this.signatureService.assertValidMessageSignature(editedMessage);

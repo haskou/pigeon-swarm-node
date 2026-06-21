@@ -1,10 +1,8 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { ThreadMessagesFindMessage } from '@app/contexts/conversations/application/find-latest-messages/messages/ThreadMessagesFindMessage';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Request, Response } from 'express';
@@ -36,10 +34,6 @@ export class GetConversationMessagesRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private readonly calls = this.get<CallRepository>(CallRepository);
-
-  private readonly polls = this.get<PollRepository>(PollRepository);
-
   @Get('/:conversationId/messages')
   public async getMessages(
     @Param('conversationId') conversationId: string,
@@ -50,7 +44,7 @@ export class GetConversationMessagesRoute extends Route {
   ): Promise<Response> {
     const requesterIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const messages = await this.finder.find(
+    const timeline = await this.finder.findTimeline(
       new GetConversationMessagesRequest(
         conversationId,
         requesterIdentityId,
@@ -58,48 +52,20 @@ export class GetConversationMessagesRoute extends Route {
         beforeMessageId,
       ).getMessage(),
     );
-    const safeLimit = Math.min(
-      Math.max(Number(limit) || GetConversationMessagesRoute.DEFAULT_LIMIT, 1),
-      GetConversationMessagesRoute.MAX_LIMIT,
-    );
-    const calls = await this.calls.findByConversationId(
-      new ConversationId(conversationId),
-    );
-    const callEvents =
-      beforeMessageId && messages.length === 0
-        ? []
-        : calls.flatMap((call) =>
-            ConversationCallEventViewModel.fromCall(call),
-          );
-    const upperBound = messages.at(-1)?.toPrimitives().createdAt;
-    const polls =
-      beforeMessageId && messages.length === 0
-        ? []
-        : await this.polls.findByGroupConversation(
-            new ConversationId(conversationId),
-            safeLimit,
-            beforeMessageId ? upperBound : undefined,
-          );
-    const reactions = await this.finder.findReactionsFor(
-      new GetConversationMessagesRequest(
-        conversationId,
-        requesterIdentityId,
-        limit,
-        beforeMessageId,
-      ).getMessage().conversationId,
-      messages,
-    );
+    const callEvents = timeline
+      .getCalls()
+      .flatMap((call) => ConversationCallEventViewModel.fromCall(call));
 
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
         new MessagesViewModel(
           conversationId,
-          messages,
+          timeline.getMessages(),
           callEvents,
-          polls,
-          safeLimit,
-          reactions,
+          timeline.getPolls(),
+          timeline.getLimit(),
+          timeline.getReactions(),
         ).toResource(),
       );
   }
@@ -166,7 +132,7 @@ export class GetConversationMessagesRoute extends Route {
         before,
         after,
       ).getMessage().conversationId,
-      messages.messages,
+      messages.getMessages(),
     );
 
     return response
