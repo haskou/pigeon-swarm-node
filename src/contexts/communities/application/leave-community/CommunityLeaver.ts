@@ -4,7 +4,6 @@ import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import EmptyCommunityDeleter from '../delete-empty-community/EmptyCommunityDeleter';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityLeaveMessage } from './messages/CommunityLeaveMessage';
 
 export default class CommunityLeaver {
@@ -16,9 +15,7 @@ export default class CommunityLeaver {
   ) {}
 
   public async leave(message: CommunityLeaveMessage): Promise<Community> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.leave(message.actorIdentityId);
 

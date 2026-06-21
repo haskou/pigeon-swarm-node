@@ -1,9 +1,9 @@
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '../../../domain/value-objects/ContentId';
 
 export class ContentGetMessage {
-  public readonly cid: IPFSId;
+  public readonly cid: ContentId;
 
   constructor(cid: string) {
-    this.cid = new IPFSId(cid);
+    this.cid = new ContentId(cid);
   }
 }

@@ -1,22 +1,22 @@
 import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
-import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
-import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
+import { ReplicatedContentNotFoundError } from '../../domain/errors/ReplicatedContentNotFoundError';
+import { ContentId } from '../../domain/value-objects/ContentId';
+import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import { ContentGetResult } from './ContentGetResult';
 import { ContentGetMessage } from './messages/ContentGetMessage';
 
 export default class ContentGetter {
   constructor(
-    private readonly ipfs: IPFS,
+    private readonly contentStorage: ReplicatedContentStorage,
     private readonly contentRepository: ContentReplicationRepository,
   ) {}
 
-  private async getPublicBytes(cid: IPFSId): Promise<Buffer | undefined> {
+  private async getPublicBytes(cid: ContentId): Promise<Buffer | undefined> {
     try {
-      return await this.ipfs.getBytes(cid);
+      return await this.contentStorage.findBytes(cid);
     } catch (error: unknown) {
-      if (error instanceof IPFSContentNotFoundError) {
+      if (error instanceof ReplicatedContentNotFoundError) {
         return undefined;
       }
 
@@ -24,11 +24,11 @@ export default class ContentGetter {
     }
   }
 
-  private async getPublicJSON(cid: IPFSId): Promise<unknown | undefined> {
+  private async getPublicJSON(cid: ContentId): Promise<unknown | undefined> {
     try {
-      return await this.ipfs.getJSON(cid);
+      return await this.contentStorage.findJSON(cid);
     } catch (error: unknown) {
-      if (error instanceof IPFSContentNotFoundError) {
+      if (error instanceof ReplicatedContentNotFoundError) {
         return undefined;
       }
 
@@ -36,7 +36,7 @@ export default class ContentGetter {
     }
   }
 
-  private async metadata(cid: IPFSId): Promise<{
+  private async metadata(cid: ContentId): Promise<{
     contentType: string;
     filename?: string;
   }> {
@@ -50,7 +50,7 @@ export default class ContentGetter {
   }
 
   public async get(message: ContentGetMessage): Promise<ContentGetResult> {
-    const isRawCid = await this.ipfs.isRawCid(message.cid);
+    const isRawCid = await this.contentStorage.isRawContent(message.cid);
     const bytes = await this.getPublicBytes(message.cid);
 
     if (bytes !== undefined) {
@@ -61,7 +61,7 @@ export default class ContentGetter {
     }
 
     if (isRawCid) {
-      throw new IPFSContentNotFoundError(message.cid.valueOf());
+      throw new ReplicatedContentNotFoundError(message.cid);
     }
 
     const content = await this.getPublicJSON(message.cid);
@@ -70,6 +70,6 @@ export default class ContentGetter {
       return ContentGetResult.json(content);
     }
 
-    throw new IPFSContentNotFoundError(message.cid.valueOf());
+    throw new ReplicatedContentNotFoundError(message.cid);
   }
 }

@@ -6,7 +6,6 @@ import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityChannelRenameMessage } from './messages/CommunityChannelRenameMessage';
 
@@ -21,9 +20,7 @@ export default class CommunityChannelRenamer {
   public async rename(
     message: CommunityChannelRenameMessage,
   ): Promise<Community> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.renameChannel(
       message.actorIdentityId,

@@ -27,7 +27,7 @@ describe('CommunityProfileUpdater', () => {
       eventPublisher,
       moderationLogRecorder,
     );
-    communityFinder.find.mockResolvedValue(community);
+    communityFinder.findById.mockResolvedValue(community);
   });
 
   it('updates only profile metadata and saves the community', async () => {

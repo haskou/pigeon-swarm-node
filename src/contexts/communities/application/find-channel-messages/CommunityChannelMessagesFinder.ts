@@ -4,7 +4,6 @@ import { CommunityChannelMessage } from '../../domain/entities/messages/Communit
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '../../domain/repositories/CommunityMessageReactionRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityChannelMessagesPage } from './CommunityChannelMessagesPage';
 import { CommunityChannelMessagesFindMessage } from './messages/CommunityChannelMessagesFindMessage';
 import { CommunityChannelThreadMessagesFindMessage } from './messages/CommunityChannelThreadMessagesFindMessage';
@@ -26,9 +25,7 @@ export default class CommunityChannelMessagesFinder {
   public async find(
     message: CommunityChannelMessagesFindMessage,
   ): Promise<CommunityChannelMessagesPage> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.viewTextChannel(message.actorIdentityId, message.channelId);
     const messages = await this.messageRepository.findByChannel(
@@ -64,9 +61,7 @@ export default class CommunityChannelMessagesFinder {
   public async findThread(
     message: CommunityChannelThreadMessagesFindMessage,
   ): Promise<CommunityChannelMessagesPage> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.viewTextChannel(message.actorIdentityId, message.channelId);
     const messages = await this.messageRepository.findThreadMessages(

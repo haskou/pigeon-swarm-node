@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -12,6 +11,7 @@ import { ContentReplicationWasRegisteredEvent } from '../../domain/events/Conten
 import ContentReplicaClaimRepository from '../../domain/repositories/ContentReplicaClaimRepository';
 import ContentReplicationRepository from '../../domain/repositories/ContentReplicationRepository';
 import { ContentFilename } from '../../domain/value-objects/ContentFilename';
+import { ContentId } from '../../domain/value-objects/ContentId';
 import { ContentReplicationContext } from '../../domain/value-objects/ContentReplicationContext';
 import { ContentReplicationMetadata } from '../../domain/value-objects/ContentReplicationMetadata';
 import { ContentReplicationPriority } from '../../domain/value-objects/ContentReplicationPriority';
@@ -28,7 +28,7 @@ export default class ContentReplicationRegistrar {
   ) {}
 
   private async claimLocalReplicas(
-    cid: IPFSId,
+    cid: ContentId,
     networkIds: string[],
     nodeId: string,
   ): Promise<ContentReplicaClaim[]> {
@@ -120,7 +120,7 @@ export default class ContentReplicationRegistrar {
   }
 
   private createContent(params: {
-    cid: IPFSId;
+    cid: ContentId;
     context: string;
     metadata: ContentReplicationMetadata;
     networkIds: NetworkId[];
@@ -140,7 +140,7 @@ export default class ContentReplicationRegistrar {
   }
 
   private async completeRegistration(params: {
-    cid: IPFSId;
+    cid: ContentId;
     content: ContentReplication;
     deferSideEffects?: boolean;
     localNodeId: string;
@@ -177,7 +177,7 @@ export default class ContentReplicationRegistrar {
     priority?: ContentReplicationPriority;
     sizeBytes: number;
   }): Promise<ContentReplication> {
-    const cid = new IPFSId(params.cid);
+    const cid = new ContentId(params.cid);
     const existing = await this.repository.findByCid(cid);
     const networkIds = params.networkIds.map(
       (networkId) => new NetworkId(networkId),

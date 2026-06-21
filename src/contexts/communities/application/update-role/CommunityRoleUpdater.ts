@@ -6,7 +6,6 @@ import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityRoleUpdateMessage } from './messages/CommunityRoleUpdateMessage';
 
@@ -19,9 +18,7 @@ export default class CommunityRoleUpdater {
   ) {}
 
   public async update(message: CommunityRoleUpdateMessage): Promise<Community> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.updateRole(
       message.actorIdentityId,

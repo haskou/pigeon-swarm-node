@@ -8,6 +8,9 @@ import {
   recurringSchedulers,
   startupSchedulers,
 } from '@app/apps/ApplicationSchedulers';
+import '@app/contexts/content-replication/infrastructure/ipfs/IpfsContentStorage';
+import '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
+import '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
 import { orbitDBReplicatedEventTypes } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedEventTypes';
 import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';

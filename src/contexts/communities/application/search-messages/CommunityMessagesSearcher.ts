@@ -1,7 +1,6 @@
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '../../domain/repositories/CommunityMessageReactionRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityMessagesSearchResult } from './CommunityMessagesSearchResult';
 import { CommunityMessagesSearchMessage } from './messages/CommunityMessagesSearchMessage';
 
@@ -15,9 +14,7 @@ export default class CommunityMessagesSearcher {
   public async search(
     message: CommunityMessagesSearchMessage,
   ): Promise<CommunityMessagesSearchResult> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
     const visibleTextChannelIds = community.visibleTextChannelIdsFor(
       message.actorIdentityId,
     );

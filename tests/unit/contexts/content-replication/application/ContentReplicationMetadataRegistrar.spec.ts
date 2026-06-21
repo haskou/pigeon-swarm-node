@@ -5,7 +5,7 @@ import { ContentReplicationContext } from '@app/contexts/content-replication/dom
 import { ContentReplicationMetadata } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationMetadata';
 import { ContentReplicationPriority } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationPriority';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('ContentReplicationMetadataRegistrar', () => {
@@ -50,7 +50,7 @@ describe('ContentReplicationMetadataRegistrar', () => {
   it('adds announced networks to existing content metadata', async () => {
     const savedContents: ContentReplication[] = [];
     const existing = ContentReplication.create(
-      new IPFSId(cid),
+      new ContentId(cid),
       new ContentReplicationContext('ipfs_private_upload'),
       [new NetworkId(firstNetworkId)],
       ContentReplicationMetadata.fromPrimitives(128),

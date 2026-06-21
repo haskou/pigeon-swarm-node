@@ -3,7 +3,6 @@ import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher
 import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityMemberKickMessage } from './messages/CommunityMemberKickMessage';
 
 export default class CommunityMemberKicker {
@@ -14,9 +13,7 @@ export default class CommunityMemberKicker {
   ) {}
 
   public async kick(message: CommunityMemberKickMessage): Promise<Community> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.kickMember(message.actorIdentityId, message.targetIdentityId);
     await this.communityRepository.save(community);

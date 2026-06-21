@@ -37,7 +37,6 @@ package "keychains.domain" {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidateReferencesByOwnerId(ownerIdentityId: IdentityId): Promise<KeychainCandidate[]>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
-    +republishLocalRoutingRecords(): Promise<number>
   }
 
   class KeychainSignatureDomainService {
@@ -76,6 +75,10 @@ package "keychains.application" {
 
   class KeychainCandidateRegistrar {
     +register(message): Promise<void>
+  }
+
+  interface KeychainRoutingRepublisher {
+    +republish(): Promise<number>
   }
 
   class KeychainSaverService {
@@ -118,7 +121,10 @@ package "keychains.infrastructure" {
   class IpfsKeychainRepository {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
-    +republishLocalRoutingRecords(): Promise<number>
+  }
+
+  class IpfsKeychainRouting {
+    +republish(): Promise<number>
   }
 
   class IpfsKeychainMapper {
@@ -156,6 +162,8 @@ package "keychains.infrastructure" {
   end note
 
   IpfsKeychainRepository ..|> KeychainRepository
+  IpfsKeychainRouting ..|> KeychainRoutingRepublisher
+  IpfsKeychainRouting --> IpfsKeychainRepository
   IpfsKeychainRepository --> IpfsKeychainMapper
   IpfsKeychainRepository --> KeychainMetadataIndex
   IpfsKeychainRepository --> IpfsKeychainDocument

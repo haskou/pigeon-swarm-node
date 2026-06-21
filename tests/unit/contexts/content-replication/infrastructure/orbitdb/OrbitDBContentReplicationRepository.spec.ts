@@ -7,7 +7,7 @@ import OrbitDBContentReplicationMapper from '@app/contexts/content-replication/i
 import OrbitDBContentReplicationRepository from '@app/contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -104,7 +104,7 @@ describe('OrbitDBContentReplicationRepository', () => {
   it('should find IPFS content replication metadata by CID from the direct head', async () => {
     heads.set(`content-replication:${cid}`, { ...baseDocument });
 
-    const result = await repository.findByCid(new IPFSId(cid));
+    const result = await repository.findByCid(new ContentId(cid));
 
     expect(result?.toPrimitives()).toEqual(
       expect.objectContaining({
@@ -118,7 +118,7 @@ describe('OrbitDBContentReplicationRepository', () => {
   });
 
   it('should not scan OrbitDB content replication documents when CID head is missing', async () => {
-    const result = await repository.findByCid(new IPFSId(cid));
+    const result = await repository.findByCid(new ContentId(cid));
 
     expect(result).toBeUndefined();
     expect(query).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe('OrbitDBContentReplicationRepository', () => {
 
   it('should save IPFS content replication metadata into the replicated store', async () => {
     const content = ContentReplication.create(
-      new IPFSId(cid),
+      new ContentId(cid),
       new ContentReplicationContext(baseDocument.context),
       [new NetworkId(networkId)],
       ContentReplicationMetadata.fromPrimitives(

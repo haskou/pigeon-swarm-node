@@ -11,7 +11,6 @@ import CommunityChannelMessageSignatureDomainService from '../../domain/services
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityChannelMessageDeleteMessage } from './messages/CommunityChannelMessageDeleteMessage';
 
 export default class CommunityChannelMessageDeleter {
@@ -27,9 +26,7 @@ export default class CommunityChannelMessageDeleter {
   public async delete(
     message: CommunityChannelMessageDeleteMessage,
   ): Promise<CommunityChannelMessageDeletion> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
     const targetMessage = await this.messageRepository.findById(
       message.communityId,
       message.channelId,

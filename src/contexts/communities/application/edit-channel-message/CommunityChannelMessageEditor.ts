@@ -5,7 +5,6 @@ import { CommunityChannelMessageNotFoundError } from '../../domain/errors/Commun
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '../../domain/services/CommunityChannelMessageSignatureDomainService';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityChannelMessageEditMessage } from './messages/CommunityChannelMessageEditMessage';
 
 export default class CommunityChannelMessageEditor {
@@ -20,9 +19,7 @@ export default class CommunityChannelMessageEditor {
   public async edit(
     message: CommunityChannelMessageEditMessage,
   ): Promise<CommunityChannelMessage> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
     const targetMessage = await this.messageRepository.findById(
       message.communityId,
       message.channelId,

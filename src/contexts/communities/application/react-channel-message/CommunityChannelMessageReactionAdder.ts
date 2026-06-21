@@ -7,7 +7,6 @@ import { CommunityChannelMessageReactionWasAddedEvent } from '../../domain/event
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '../../domain/repositories/CommunityMessageReactionRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityChannelMessageReactionChangeMessage } from './messages/CommunityChannelMessageReactionChangeMessage';
 
 export default class CommunityChannelMessageReactionAdder {
@@ -21,9 +20,7 @@ export default class CommunityChannelMessageReactionAdder {
   public async add(
     message: CommunityChannelMessageReactionChangeMessage,
   ): Promise<CommunityChannelMessageReaction> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     assert(
       await this.messageRepository.findById(

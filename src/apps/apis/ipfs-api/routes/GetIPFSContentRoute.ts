@@ -1,6 +1,6 @@
 import ContentGetter from '@app/contexts/content-replication/application/get-content/ContentGetter';
 import { ContentGetMessage } from '@app/contexts/content-replication/application/get-content/messages/ContentGetMessage';
-import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
+import { ReplicatedContentNotFoundError } from '@app/contexts/content-replication/domain/errors/ReplicatedContentNotFoundError';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import Route from '@app/shared/infrastructure/ui/routes/Route';
 import { Response } from 'express';
@@ -45,7 +45,7 @@ export class GetIPFSContentRoute extends Route {
         .status(HttpRouteStatusEnum.OK)
         .json(content.getJsonResponse());
     } catch (error: unknown) {
-      if (error instanceof IPFSContentNotFoundError) {
+      if (error instanceof ReplicatedContentNotFoundError) {
         return response
           .status(HttpRouteStatusEnum.NOT_FOUND)
           .json({ error: 'CID not found in any network' });

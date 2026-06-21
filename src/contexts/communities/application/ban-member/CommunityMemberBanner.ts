@@ -6,7 +6,6 @@ import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityMemberBanMessage } from './messages/CommunityMemberBanMessage';
 
@@ -19,9 +18,7 @@ export default class CommunityMemberBanner {
   ) {}
 
   public async ban(message: CommunityMemberBanMessage): Promise<Community> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.banMember(message.actorIdentityId, message.targetIdentityId);
     await this.communityRepository.save(community);

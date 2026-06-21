@@ -1,7 +1,6 @@
 import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityInviteDetails } from './CommunityInviteDetails';
 import { CommunityInviteFindMessage } from './messages/CommunityInviteFindMessage';
 
@@ -20,8 +19,8 @@ export default class CommunityInviteDetailsFinder {
       throw new CommunityInviteNotFoundError();
     }
     invite.checkAcceptanceAvailability();
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(invite.getCommunityId().valueOf()),
+    const community = await this.communityFinder.findById(
+      invite.getCommunityId(),
     );
 
     return new CommunityInviteDetails(invite, community);

@@ -8,7 +8,6 @@ import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityMembershipRequestUpdateMessage } from './messages/CommunityMembershipRequestUpdateMessage';
 
@@ -25,8 +24,8 @@ export default class CommunityMembershipRequestUpdater {
     membershipRequest: CommunityMembershipRequest,
     message: CommunityMembershipRequestUpdateMessage,
   ): Promise<void> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(membershipRequest.getCommunityId().valueOf()),
+    const community = await this.communityFinder.findById(
+      membershipRequest.getCommunityId(),
     );
 
     community.acceptMembershipRequest(
@@ -42,8 +41,8 @@ export default class CommunityMembershipRequestUpdater {
     membershipRequest: CommunityMembershipRequest,
     message: CommunityMembershipRequestUpdateMessage,
   ): Promise<void> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(membershipRequest.getCommunityId().valueOf()),
+    const community = await this.communityFinder.findById(
+      membershipRequest.getCommunityId(),
     );
 
     community.declineMembershipRequest(

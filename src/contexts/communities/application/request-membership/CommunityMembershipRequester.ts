@@ -4,7 +4,6 @@ import { CommunityMembershipRequest } from '../../domain/entities/membership/Com
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityMembershipRequestCreateMessage } from './messages/CommunityMembershipRequestCreateMessage';
 
 export default class CommunityMembershipRequester {
@@ -31,9 +30,7 @@ export default class CommunityMembershipRequester {
   public async request(
     message: CommunityMembershipRequestCreateMessage,
   ): Promise<CommunityMembershipRequest> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
     const existingRequests =
       await this.requestRepository.findByCommunityAndIdentity(
         community.getId(),

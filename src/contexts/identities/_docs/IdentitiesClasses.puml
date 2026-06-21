@@ -137,6 +137,10 @@ package "identities.application" {
     +find(identityId: IdentityId): Promise<NetworkId[]>
   }
 
+  interface IdentityRoutingRepublisher {
+    +republish(): Promise<number>
+  }
+
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
   IdentityFinder --> IdentityFinderService
@@ -193,6 +197,10 @@ package "identities.infrastructure" {
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 
+  class IpfsIdentityRouting {
+    +republish(): Promise<number>
+  }
+
   note right of IpfsIdentityRepository
     Encapsulates IPFS documents and DHT
     head hints. Uses the metadata index
@@ -200,6 +208,8 @@ package "identities.infrastructure" {
   end note
 
   IpfsIdentityRepository ..|> IdentityRepository
+  IpfsIdentityRouting ..|> IdentityRoutingRepublisher
+  IpfsIdentityRouting --> IpfsIdentityRepository
   MetadataIdentityNetworkRepository ..|> IdentityNetworkRepository
   OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
   IpfsIdentityRepository --> IpfsIdentityDocument

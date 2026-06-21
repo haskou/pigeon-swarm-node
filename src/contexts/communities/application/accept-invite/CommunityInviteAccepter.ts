@@ -6,7 +6,6 @@ import { CommunityInviteWasAcceptedEvent } from '../../domain/events/CommunityIn
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityInviteAcceptMessage } from './messages/CommunityInviteAcceptMessage';
 
 export default class CommunityInviteAccepter {
@@ -25,8 +24,8 @@ export default class CommunityInviteAccepter {
     if (!invite) {
       throw new CommunityInviteNotFoundError();
     }
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(invite.getCommunityId().valueOf()),
+    const community = await this.communityFinder.findById(
+      invite.getCommunityId(),
     );
 
     community.requestMembership(message.actorIdentityId);

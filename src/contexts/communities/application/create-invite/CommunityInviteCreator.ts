@@ -7,7 +7,6 @@ import CommunityInviteRepository from '../../domain/repositories/CommunityInvite
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityInviteCreateMessage } from './messages/CommunityInviteCreateMessage';
 
@@ -22,9 +21,7 @@ export default class CommunityInviteCreator {
   public async create(
     message: CommunityInviteCreateMessage,
   ): Promise<CommunityInvite> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
     const invite = community.createInvite(
       message.actorIdentityId,
       message.expiresAt,

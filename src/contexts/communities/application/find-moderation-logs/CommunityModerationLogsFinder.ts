@@ -1,6 +1,5 @@
 import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityModerationLogsPage } from './CommunityModerationLogsPage';
 import { CommunityModerationLogsFindMessage } from './messages/CommunityModerationLogsFindMessage';
 
@@ -13,9 +12,7 @@ export default class CommunityModerationLogsFinder {
   public async find(
     message: CommunityModerationLogsFindMessage,
   ): Promise<CommunityModerationLogsPage> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.viewModerationLog(message.actorIdentityId);
     const logs = await this.moderationLogRepository.findByCommunity(

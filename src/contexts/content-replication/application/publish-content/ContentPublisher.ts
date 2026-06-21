@@ -3,8 +3,9 @@ import { ContentReplicationPriority } from '@app/contexts/content-replication/do
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
+import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import ContentReplicationRegistrar from '../register-content/ContentReplicationRegistrar';
 import { ContentDocument } from './ContentDocument';
 import { ContentPublishMessage } from './messages/ContentPublishMessage';
@@ -16,7 +17,7 @@ const publicUploadContext = ContentReplicationContext.PUBLIC_UPLOAD;
 
 export default class ContentPublisher {
   constructor(
-    private readonly ipfs: IPFS,
+    private readonly contentStorage: ReplicatedContentStorage,
     private readonly nodeRepository: NodeRepository,
     private readonly replicationRegistrar: ContentReplicationRegistrar,
     private readonly identityRepository: IdentityRepository,
@@ -35,9 +36,9 @@ export default class ContentPublisher {
   }
 
   private async networkIds(): Promise<string[]> {
-    const networks = await this.ipfs.getNetworks();
+    const networks = await this.contentStorage.findNetworkIds();
 
-    return networks.map((network) => network.getId());
+    return networks.map((networkId) => networkId.valueOf());
   }
 
   private async ownerNetworkIds(
@@ -119,7 +120,7 @@ export default class ContentPublisher {
     document: ContentDocument,
     context: string,
   ): Promise<PublishedContent> {
-    const cid = await this.ipfs.addJSONToAll(document);
+    const cid = await this.contentStorage.publishDocument(document);
 
     await this.registerReplication({
       cid: cid.valueOf(),
@@ -145,16 +146,18 @@ export default class ContentPublisher {
   ): Promise<PublishedContent> {
     const contentType = message.contentType || defaultContentType;
     const networkIds = await this.ownerNetworkIds(message.ownerIdentityId);
-    const { cid, completedNetworkIds, networkId } =
-      await this.ipfs.addBytesToNetworksReturningFirst(
+    const { completedNetworkIds, contentId, networkId } =
+      await this.contentStorage.publishBytesToNetworks(
         message.body,
-        networkIds,
+        networkIds.map((id) => new NetworkId(id)),
       );
 
     await this.registerUploadedBytesReplication({
-      cid: cid.valueOf(),
-      claimedNetworkIds: [networkId],
-      completedNetworkIds,
+      cid: contentId.valueOf(),
+      claimedNetworkIds: [networkId.valueOf()],
+      completedNetworkIds: completedNetworkIds.then((ids) =>
+        ids.map((id) => id.valueOf()),
+      ),
       contentType,
       context,
       filename: message.filename,
@@ -163,7 +166,7 @@ export default class ContentPublisher {
     });
 
     return {
-      cid: cid.valueOf(),
+      cid: contentId.valueOf(),
       contentType,
       filename: message.filename,
       size: message.body.length,

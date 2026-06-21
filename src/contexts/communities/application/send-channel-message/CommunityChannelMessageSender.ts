@@ -5,7 +5,6 @@ import CommunityChannelMessageSignatureDomainService from '@app/contexts/communi
 import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityChannelMessageSendMessage } from './messages/CommunityChannelMessageSendMessage';
 
 export default class CommunityChannelMessageSender {
@@ -38,9 +37,7 @@ export default class CommunityChannelMessageSender {
   public async send(
     message: CommunityChannelMessageSendMessage,
   ): Promise<CommunityChannelMessage> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     await this.assertReplyTargetExists(message);
 

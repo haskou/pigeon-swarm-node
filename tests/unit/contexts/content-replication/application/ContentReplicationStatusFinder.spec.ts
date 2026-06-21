@@ -13,7 +13,7 @@ import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeer
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('ContentReplicationStatusFinder', () => {
@@ -23,7 +23,7 @@ describe('ContentReplicationStatusFinder', () => {
 
   it('should assign every active node while the network is small', async () => {
     const content = ContentReplication.create(
-      new IPFSId('bafy-content'),
+      new ContentId('bafy-content'),
       new ContentReplicationContext('ipfs_private_upload'),
       [new NetworkId(networkId)],
       ContentReplicationMetadata.fromPrimitives(128),
@@ -40,7 +40,7 @@ describe('ContentReplicationStatusFinder', () => {
       findByCids: () =>
         Promise.resolve([
           ContentReplicaClaim.create(
-            new IPFSId('bafy-content'),
+            new ContentId('bafy-content'),
             new NetworkId(networkId),
             new NodeId(localNodeId),
             new Timestamp(1770000000000),

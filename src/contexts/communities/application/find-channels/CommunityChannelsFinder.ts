@@ -3,7 +3,6 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { CommunityFindMessage } from '../find-community/messages/CommunityFindMessage';
 import { CommunityChannelsDetails } from './CommunityChannelsDetails';
 import { CommunityChannelsFindMessage } from './messages/CommunityChannelsFindMessage';
 
@@ -46,9 +45,7 @@ export default class CommunityChannelsFinder {
   public async find(
     message: CommunityChannelsFindMessage,
   ): Promise<CommunityChannelsDetails> {
-    const community = await this.communityFinder.find(
-      new CommunityFindMessage(message.communityId.valueOf()),
-    );
+    const community = await this.communityFinder.findById(message.communityId);
 
     community.viewAsMember(message.actorIdentityId);
     const visibleTextChannelIds = community
