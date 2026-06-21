@@ -365,6 +365,37 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(secondNetwork.communities.query).not.toHaveBeenCalled();
   });
 
+  it('uses the recipient identity head when a notification related document is not cached', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const secondNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.register('network-2', secondNetwork.stores);
+    await registry.putHead(
+      'identity:recipient-1',
+      {
+        id: 'recipient-1',
+        identityId: 'recipient-1',
+        networkIds: ['network-2'],
+      },
+      ['network-2'],
+    );
+    firstNetwork.notifications.put.mockClear();
+    secondNetwork.notifications.put.mockClear();
+
+    await registry.putDocument('notifications', {
+      id: 'notification-1',
+      payload: {
+        communityId: 'community-1',
+      },
+      recipientIdentityId: 'recipient-1',
+    });
+
+    expect(firstNetwork.notifications.put).not.toHaveBeenCalled();
+    expect(secondNetwork.notifications.put).toHaveBeenCalledTimes(1);
+  });
+
   it('does not backfill documents from an unsynchronized local store', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

@@ -570,8 +570,24 @@ export default class OrbitDBReplicatedStateRegistry {
   ): string | undefined {
     return (
       this.stringValue(document, 'ownerIdentityId') ||
-      this.stringValue(document, 'identityId')
+      this.stringValue(document, 'identityId') ||
+      this.stringValue(document, 'recipientIdentityId')
     );
+  }
+
+  private async networkIdsFromRelatedIdentityHead(
+    document: Record<string, unknown>,
+  ): Promise<string[]> {
+    const identityId = this.relatedIdentityId(document);
+
+    if (!identityId) {
+      return [];
+    }
+
+    return this.networkIdsFromRelatedHead({
+      storeName: 'identities',
+      value: identityId,
+    });
   }
 
   private async networkIdsFromRelatedDocument(
@@ -580,19 +596,14 @@ export default class OrbitDBReplicatedStateRegistry {
     const related = this.relatedDocumentId(document);
 
     if (!related) {
-      const identityId = this.relatedIdentityId(document);
-
-      if (!identityId) {
-        return [];
-      }
-
-      return this.networkIdsFromRelatedHead({
-        storeName: 'identities',
-        value: identityId,
-      });
+      return this.networkIdsFromRelatedIdentityHead(document);
     }
 
-    return this.networkIdsFromRelatedHead(related);
+    const relatedNetworkIds = await this.networkIdsFromRelatedHead(related);
+
+    return relatedNetworkIds.length > 0
+      ? relatedNetworkIds
+      : this.networkIdsFromRelatedIdentityHead(document);
   }
 
   private async targetNetworkIdsForDocument(
