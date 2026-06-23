@@ -123,6 +123,56 @@ describe('Libp2pGossipsubAdapter', () => {
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
   });
 
+  it('should publish transport payloads to websockets after consumers accept them', async () => {
+    const handler = jest.fn();
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      await callback(event.decode());
+    });
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+
+    expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(publishSpy).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
+
+    publishSpy.mockRestore();
+  });
+
+  it('should not publish rejected transport payloads to websockets', async () => {
+    const expectedError = new Error('rejected remote event');
+    const handler = jest.fn().mockRejectedValue(expectedError);
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      await expect(callback(event.decode())).rejects.toBe(expectedError);
+    });
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+
+    expect(publishSpy).not.toHaveBeenCalled();
+
+    publishSpy.mockRestore();
+  });
+
   it('should publish domain events to every registered network topic', async () => {
     const publicNetwork = createNetwork({ id: 'public-network-id' });
     const privateNetwork = createNetwork({

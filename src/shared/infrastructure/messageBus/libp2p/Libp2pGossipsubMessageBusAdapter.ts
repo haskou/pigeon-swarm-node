@@ -139,7 +139,11 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
           return;
         }
 
-        await handler(this.instanceDomainEvent(DomainEventInstance, message));
+        const event = this.instanceDomainEvent(DomainEventInstance, message);
+
+        await handler(event);
+
+        webSocketEventHub.publish([event]);
       },
     );
   }
