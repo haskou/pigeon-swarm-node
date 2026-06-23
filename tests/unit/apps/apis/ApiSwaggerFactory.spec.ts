@@ -31,7 +31,7 @@ describe('ApiSwaggerFactory', () => {
       expect(specs['communities-api']).toContain('/communities/:');
       expect(specs['conversations-api']).toContain('/conversations:');
       expect(specs['identities-api']).toContain('/identities/:');
-      expect(specs['ipfs-api']).toContain('/ipfs/{cid}:');
+      expect(specs['ipfs-api']).toContain('/ipfs/{resourceId}:');
       expect(specs['keychains-api']).toContain('/keychains/:');
       expect(specs['link-previews-api']).toContain('/link-previews:');
       expect(specs['nodes-api']).toContain('/node/:');
@@ -60,7 +60,7 @@ describe('ApiSwaggerFactory', () => {
         "$ref: './identities-api/swagger.yaml#/paths/~1identities~1'",
       );
       expect(spec).toContain(
-        "$ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'",
+        "$ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{resourceId}'",
       );
       expect(spec).toContain(
         "$ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'",

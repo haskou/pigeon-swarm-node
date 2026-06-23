@@ -80,6 +80,15 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
     return this.toContentId(await this.ipfs.addJSONToAll(document));
   }
 
+  public async publishDocumentToNetwork(
+    document: unknown,
+    networkId: NetworkId,
+  ): Promise<ContentId> {
+    return this.toContentId(
+      await this.ipfs.addJSON(document, networkId.valueOf()),
+    );
+  }
+
   public async publishBytesToNetworks(
     bytes: Uint8Array,
     networkIds: NetworkId[],

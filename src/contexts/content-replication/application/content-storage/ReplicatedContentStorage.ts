@@ -27,6 +27,11 @@ export default abstract class ReplicatedContentStorage {
 
   public abstract publishDocument(document: unknown): Promise<ContentId>;
 
+  public abstract publishDocumentToNetwork(
+    document: unknown,
+    networkId: NetworkId,
+  ): Promise<ContentId>;
+
   public abstract publishBytesToNetworks(
     bytes: Uint8Array,
     networkIds: NetworkId[],

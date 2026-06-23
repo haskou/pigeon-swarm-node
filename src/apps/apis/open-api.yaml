@@ -190,14 +190,12 @@ paths:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /identities/{reference}:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1{reference}'
-  /ipfs/private:
-    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1private'
+  /ipfs/{resourceId}:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{resourceId}'
   /ipfs/public:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1public'
   /ipfs/replication/status:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1replication~1status'
-  /ipfs/{cid}:
-    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'
   /keychains/:
     $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'
   /keychains/{identityId}:

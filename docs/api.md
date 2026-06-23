@@ -738,15 +738,13 @@ keychains and private upload documents.
 ### Publish private content
 
 ```http
-POST /ipfs/private
+POST /ipfs/{networkId}
 ```
-
-`POST /ipfs/secure` is accepted as a backwards-compatible alias for
-`POST /ipfs/private`. New clients should use `/ipfs/private`.
 
 Requires signed request headers. The backend never encrypts, decrypts or
 inspects the original private file. Clients must encrypt the file bytes locally
-before sending the request.
+before sending the request. `networkId` is the target IPFS network id where the
+encrypted document must be stored.
 
 Request body is the encrypted raw binary content. Send metadata as headers:
 
@@ -769,8 +767,8 @@ Response:
 
 Implemented:
 
-- publish client-encrypted private content to every configured IPFS network
-- register the returned CID in OrbitDB replication metadata
+- publish client-encrypted private content only to the selected IPFS network
+- register the returned CID in OrbitDB replication metadata for that network
 - accept raw encrypted request bytes instead of wrapping the content in
   JSON/base64
 - store content as a JSON IPFS document with `encrypted: true`,
@@ -836,8 +834,7 @@ Response:
 
 Implemented:
 
-- track CIDs created through `POST /ipfs/public`, `POST /ipfs/private` and
-  `POST /ipfs/secure`
+- track CIDs created through `POST /ipfs/public` and `POST /ipfs/{networkId}`
 - track CIDs announced by other nodes, even before this node claims a local
   replica
 - record replica claims when a local or remote node announces that it has a CID
@@ -1672,7 +1669,7 @@ Implemented:
   `networkId` and `participantIds`
 - derive unread state from OrbitDB replicated read markers and message metadata
 - store only attachment CIDs in the message; private attachment bytes must be
-  encrypted by the client and published first with `POST /ipfs/private`
+  encrypted by the client and published first with `POST /ipfs/{networkId}`
 
 ### Edit message
 
@@ -2802,7 +2799,7 @@ Implemented:
   communities
 - store `plaintextPayload` as indexable plain text for public communities
 - store attachment CIDs only; private attachment bytes must be encrypted by the
-  client and published first with `POST /ipfs/private`
+  client and published first with `POST /ipfs/{networkId}`
 - allow threads by sending `replyToMessageId` with the id of an existing
   channel message in the same community channel
 - validate the message signature against this canonical payload:

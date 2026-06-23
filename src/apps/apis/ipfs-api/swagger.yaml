@@ -6,15 +6,21 @@ info:
 tags:
   - name: ipfs
 paths:
-  /ipfs/private:
+  /ipfs/{resourceId}:
     post:
       tags:
         - ipfs
-      summary: Publish encrypted private content to IPFS
-      description: Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document, and returns the CID to reference from encrypted message payloads and attachmentExternalIdentifiers.
+      summary: Publish encrypted private content to a selected IPFS network
+      description: Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document in the selected network, and returns the CID to reference from encrypted message payloads and attachmentExternalIdentifiers.
       security:
         - signedRequest: []
       parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: IPFS network id where the encrypted document must be stored.
         - name: Content-Type
           in: header
           required: false
@@ -43,47 +49,43 @@ paths:
                 $ref: '#/components/schemas/PrivateIPFSContentResource'
         '401':
           description: Invalid signed request.
+        '404':
+          description: IPFS network not found.
         '413':
           description: Private content is too large.
-  /ipfs/secure:
-    post:
+    get:
       tags:
         - ipfs
-      summary: Publish encrypted private content to IPFS
-      description: Deprecated alias for POST /ipfs/private. Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document, and returns the CID to reference from encrypted message payloads and attachmentExternalIdentifiers.
-      security:
-        - signedRequest: []
+      summary: Get IPFS content by CID
       parameters:
-        - name: Content-Type
-          in: header
-          required: false
+        - name: resourceId
+          in: path
+          required: true
           schema:
             type: string
-          example: application/octet-stream
-        - name: X-Filename
-          in: header
-          required: false
-          schema:
-            type: string
-          example: encrypted-photo.bin
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
+          description: CID of the IPFS content.
       responses:
-        '201':
-          description: Private encrypted content stored in IPFS.
+        '200':
+          description: Public binary content or JSON content found. Public binary responses use the uploaded Content-Type when replication metadata is known and include inline Content-Disposition when X-Filename was provided.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: CID not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateIPFSContentResource'
-        '401':
-          description: Invalid signed request.
-        '413':
-          description: Private content is too large.
+                $ref: '#/components/schemas/IpfsContentNotFoundError'
   /ipfs/public:
     post:
       tags:
@@ -140,39 +142,6 @@ paths:
                 $ref: '#/components/schemas/ContentReplicationStatusResource'
         '401':
           description: Invalid signed request.
-  /ipfs/{cid}:
-    get:
-      tags:
-        - ipfs
-      summary: Get IPFS content by CID
-      parameters:
-        - name: cid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Public binary content or JSON content found. Public binary responses use the uploaded Content-Type when replication metadata is known and include inline Content-Disposition when X-Filename was provided.
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-            image/png:
-              schema:
-                type: string
-                format: binary
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '404':
-          description: CID not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IpfsContentNotFoundError'
 components:
   securitySchemes:
     signedRequest:
