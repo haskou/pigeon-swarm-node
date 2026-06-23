@@ -1,13 +1,15 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import PubSubNetworkMessageCodec from '@app/shared/infrastructure/messageBus/libp2p/PubSubNetworkMessageCodec';
 import PubSubTopicResolver from '@app/shared/infrastructure/messageBus/libp2p/PubSubTopicResolver';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
-import { PrivateKey } from '@haskou/value-objects';
+import { KeyPair, PrivateKey } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
+import { WebSocket } from 'ws';
 
 class TestDomainEvent extends DomainEvent {
   public static EVENT_NAME = 'identities.v1.identity.was_created';
@@ -59,10 +61,16 @@ describe('Libp2pGossipsubAdapter', () => {
     );
 
   beforeEach(() => {
+    webSocketEventHub.clear();
     transport = mock<PubSubTransport>();
     networkRegistry = mock<IPFSNetworkRegistry>();
     networkRegistry.getAll.mockReturnValue([]);
     adapter = createAdapter();
+  });
+
+  afterEach(() => {
+    webSocketEventHub.clear();
+    jest.restoreAllMocks();
   });
 
   it('should publish domain events to pubsub topics', async () => {
@@ -146,6 +154,40 @@ describe('Libp2pGossipsubAdapter', () => {
     expect(publishSpy).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
 
     publishSpy.mockRestore();
+  });
+
+  it('should only send transport payloads to addressed websocket clients', async () => {
+    const recipientIdentityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const recipientClient = buildClient();
+    const otherClient = buildClient();
+    const handler = jest.fn();
+    const event = new TestDomainEvent('aggregate-id', {
+      recipientIdentityId: recipientIdentityId.valueOf(),
+    });
+
+    webSocketEventHub.register(recipientIdentityId, recipientClient);
+    webSocketEventHub.register(otherIdentityId, otherClient);
+    jest.clearAllMocks();
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      await callback(event.decode());
+    });
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+
+    expect(recipientClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(otherClient.send).not.toHaveBeenCalled();
   });
 
   it('should not publish rejected transport payloads to websockets', async () => {
@@ -335,3 +377,17 @@ describe('Libp2pGossipsubAdapter', () => {
     expect(secondHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
   });
 });
+
+async function generateIdentityId(): Promise<IdentityId> {
+  const keyPair = await KeyPair.generate();
+
+  return new IdentityId(keyPair.toPrimitives().publicKey);
+}
+
+function buildClient(): WebSocket {
+  return {
+    on: jest.fn(),
+    readyState: WebSocket.OPEN,
+    send: jest.fn(),
+  } as unknown as WebSocket;
+}
