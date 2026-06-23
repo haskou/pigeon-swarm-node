@@ -77,10 +77,6 @@ package "keychains.application" {
     +register(message): Promise<void>
   }
 
-  interface KeychainRoutingRepublisher {
-    +republish(): Promise<number>
-  }
-
   class KeychainSaverService {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
   }
@@ -162,7 +158,6 @@ package "keychains.infrastructure" {
   end note
 
   IpfsKeychainRepository ..|> KeychainRepository
-  IpfsKeychainRouting ..|> KeychainRoutingRepublisher
   IpfsKeychainRouting --> IpfsKeychainRepository
   IpfsKeychainRepository --> IpfsKeychainMapper
   IpfsKeychainRepository --> KeychainMetadataIndex

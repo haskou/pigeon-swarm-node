@@ -51,12 +51,19 @@ package "shared/infrastructure/network/relay" {
 package "shared/infrastructure/messaging" {
   class DomainEventPublisher
   class MessageBus
+  interface MessageBusAdapter
+  class AmqpMessageBusAdapter
+  class MemoryMessageBusAdapter
   class Libp2pGossipsubMessageBusAdapter
   class Libp2pGossipsubRuntimeAdapter
+  class PubSubTopicResolver
+  class PubSubNetworkMessageCodec
+  class PubSubTransport <<Port>>
+  class Libp2pGossipsubTransport
 }
 
 package "shared/infrastructure/websocket" {
-  class WebSocketServer
+  class WebSocketRealtimeServer
   class WebSocketEventHub
 }
 
@@ -85,10 +92,23 @@ PrivateNetworkRelayRecordDirectory ..> EmbeddedLocalDatabase
 PrivateNetworkRelayRecordDirectory ..> PrivateNetworkRelayRecord
 
 DomainEventPublisher ..> MessageBus
-Libp2pGossipsubMessageBusAdapter ..|> MessageBus
+MessageBus ..> MessageBusAdapter
+MessageBus ..> AmqpMessageBusAdapter
+MessageBus ..> MemoryMessageBusAdapter
+MessageBus ..> Libp2pGossipsubMessageBusAdapter
+MessageBus ..> WebSocketEventHub
+AmqpMessageBusAdapter ..|> MessageBusAdapter
+MemoryMessageBusAdapter ..|> MessageBusAdapter
+Libp2pGossipsubMessageBusAdapter ..|> MessageBusAdapter
 Libp2pGossipsubMessageBusAdapter ..> Libp2pGossipsubRuntimeAdapter
+Libp2pGossipsubMessageBusAdapter ..> PubSubTransport
+Libp2pGossipsubMessageBusAdapter ..> PubSubTopicResolver
+Libp2pGossipsubMessageBusAdapter ..> PubSubNetworkMessageCodec
+Libp2pGossipsubMessageBusAdapter ..> WebSocketEventHub
+Libp2pGossipsubTransport ..|> PubSubTransport
+Libp2pGossipsubTransport ..> Libp2pGossipsubRuntimeAdapter
 
-WebSocketEventHub ..> WebSocketServer
+WebSocketEventHub ..> WebSocketRealtimeServer
 DependencyInjection ..> ServiceClass
 
 @enduml
