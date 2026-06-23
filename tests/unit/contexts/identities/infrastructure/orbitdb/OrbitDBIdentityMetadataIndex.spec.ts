@@ -6,6 +6,8 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
+import type { Request } from 'express';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
@@ -231,6 +233,86 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       }),
     );
   });
+
+  it('should not query stored identity records by handle during http requests', async () => {
+    const query = jest.fn(() =>
+      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
+    );
+
+    registry.clear();
+    await registry.register(
+      'network-http',
+      identityStoresWithIdentityQuery(new Map(), query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    const records = await runHttpRequest(() =>
+      repository.findByHandle(new ProfileHandle('hasko')),
+    );
+
+    expect(records).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('should use cached identity records by handle during http requests', async () => {
+    const query = jest.fn(() =>
+      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
+    );
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+    const mother = new IdentityMother();
+    const identityId = mother.id.valueOf();
+
+    cachedHeads.set(`identity:${identityId}`, {
+      cid: 'bafyidentity-cached',
+      handle: 'hasko',
+      id: identityId,
+      identityId,
+      networkIds: [mother.networks[0].valueOf()],
+      receivedAt: 1,
+      version: 1,
+    });
+    registry.clear();
+    await registry.register(
+      'network-http',
+      identityStoresWithIdentityQuery(cachedHeads, query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    const records = await runHttpRequest(() =>
+      repository.findByHandle(new ProfileHandle('hasko')),
+    );
+
+    expect(records).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-cached',
+        handle: 'hasko',
+        identityId,
+      }),
+    ]);
+    await flushBackgroundTasks();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('should not query stored identity records by identity id during http requests', async () => {
+    const query = jest.fn(() =>
+      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
+    );
+    const mother = new IdentityMother();
+
+    registry.clear();
+    await registry.register(
+      'network-http',
+      identityStoresWithIdentityQuery(new Map(), query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    const records = await runHttpRequest(() =>
+      repository.findByIdentityId(mother.id),
+    );
+
+    expect(records).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
 });
 
 function identityStores(
@@ -267,6 +349,47 @@ function identityStores(
       ),
     },
   } as never;
+}
+
+function identityStoresWithIdentityQuery(
+  currentHeads: Map<string, Record<string, unknown>>,
+  query: jest.Mock,
+) {
+  return {
+    heads: {
+      all: jest.fn(() =>
+        Promise.resolve(
+          [...currentHeads.entries()].map(([key, value]) => ({ key, value })),
+        ),
+      ),
+      get: jest.fn((key: string) => {
+        const value = currentHeads.get(key);
+
+        return Promise.resolve(value ? { key, value } : undefined);
+      }),
+      put: jest.fn((key: string, value: Record<string, unknown>) => {
+        currentHeads.set(key, value);
+
+        return Promise.resolve('ok');
+      }),
+    },
+    identities: {
+      put: jest.fn(() => Promise.resolve('ok')),
+      query,
+    },
+  } as never;
+}
+
+function runHttpRequest<T>(callback: () => T): T {
+  return HttpRequestContext.run(
+    {
+      method: 'GET',
+      originalUrl: '/api/identities/hasko',
+      path: '/identities/hasko',
+      url: '/api/identities/hasko',
+    } as Request,
+    callback,
+  );
 }
 
 function upsertDocument(

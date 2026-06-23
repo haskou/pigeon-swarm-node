@@ -6,6 +6,7 @@ import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
@@ -148,6 +149,10 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
   private handleHeadKey(handle: string): string {
     return `identity-handle:${handle}`;
+  }
+
+  private isHttpRequest(): boolean {
+    return HttpRequestContext.current() !== undefined;
   }
 
   private async findHead(
@@ -295,6 +300,16 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       );
   }
 
+  private findCachedRecordsByHandle(handle: string): IdentityMetadataRecord[] {
+    return this.registry
+      .findCachedHeadsByPrefix('identity:')
+      .map((document) => this.toRecord(document))
+      .filter(
+        (document): document is IdentityMetadataRecord =>
+          document !== undefined && document.handle === handle,
+      );
+  }
+
   private networkIdsFor(document: IdentityMetadataRecord): string[] {
     return [
       ...new Set([
@@ -369,14 +384,24 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [head];
     }
 
+    const cachedLatest = this.latestRecordFrom(
+      this.findCachedRecordsByHandle(handle.valueOf()),
+    );
+
+    if (this.isHttpRequest()) {
+      if (cachedLatest) {
+        this.repairHeadInBackground(this.handleHeadKey(handle.valueOf()), () =>
+          this.readRepairHead(head, cachedLatest),
+        );
+
+        return [cachedLatest];
+      }
+
+      return [];
+    }
+
     const latest = this.latestRecordFrom([
-      ...this.registry
-        .findCachedHeadsByPrefix('identity:')
-        .map((document) => this.toRecord(document))
-        .filter(
-          (document): document is IdentityMetadataRecord =>
-            document !== undefined && document.handle === handle.valueOf(),
-        ),
+      ...(cachedLatest ? [cachedLatest] : []),
       ...(await this.findStoredRecordsByHandle(handle.valueOf())),
     ]);
 
@@ -400,6 +425,10 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       this.repairIdentityHeadInBackground(identityId.valueOf(), head);
 
       return [head];
+    }
+
+    if (this.isHttpRequest()) {
+      return [];
     }
 
     const latest = this.latestRecordFrom([
