@@ -31,16 +31,17 @@ describe('CommunityProfileUpdater', () => {
   });
 
   it('updates only profile metadata and saves the community', async () => {
-    const message = new CommunityProfileUpdateMessage(
-      'community-id',
-      'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
-      'Updated community',
-      'Updated description',
-      'bafybeigavatar',
-      'bafybeigbanner',
-      false,
-      true,
-    );
+    const message = new CommunityProfileUpdateMessage({
+      actorIdentityId:
+        'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
+      autoJoinEnabled: true,
+      avatar: 'bafybeigavatar',
+      banner: 'bafybeigbanner',
+      communityId: 'community-id',
+      description: 'Updated description',
+      discoverable: false,
+      name: 'Updated community',
+    });
 
     const result = await updater.update(message);
 

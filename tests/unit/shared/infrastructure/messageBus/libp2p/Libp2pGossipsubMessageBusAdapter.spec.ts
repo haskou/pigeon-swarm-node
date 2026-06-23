@@ -215,6 +215,44 @@ describe('Libp2pGossipsubAdapter', () => {
     publishSpy.mockRestore();
   });
 
+  it('should fan out transport payloads once to websockets after every consumer accepts them', async () => {
+    const firstHandler = jest.fn();
+    const secondHandler = jest.fn();
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+
+    await adapter.consume(
+      'queue-a',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      firstHandler,
+    );
+    await adapter.consume(
+      'queue-b',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      secondHandler,
+    );
+    await subscribedHandler?.(event.decode());
+
+    expect(transport.subscribe).toHaveBeenCalledTimes(1);
+    expect(firstHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(secondHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(publishSpy).toHaveBeenCalledTimes(1);
+    expect(publishSpy).toHaveBeenCalledWith([expect.any(TestDomainEvent)]);
+
+    publishSpy.mockRestore();
+  });
+
   it('should publish domain events to every registered network topic', async () => {
     const publicNetwork = createNetwork({ id: 'public-network-id' });
     const privateNetwork = createNetwork({
