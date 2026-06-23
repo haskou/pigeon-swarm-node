@@ -6,7 +6,7 @@ info:
 tags:
   - name: ipfs
 paths:
-  /ipfs/{networkId}:
+  /ipfs/{resourceId}:
     post:
       tags:
         - ipfs
@@ -15,7 +15,7 @@ paths:
       security:
         - signedRequest: []
       parameters:
-        - name: networkId
+        - name: resourceId
           in: path
           required: true
           schema:
@@ -49,8 +49,43 @@ paths:
                 $ref: '#/components/schemas/PrivateIPFSContentResource'
         '401':
           description: Invalid signed request.
+        '404':
+          description: IPFS network not found.
         '413':
           description: Private content is too large.
+    get:
+      tags:
+        - ipfs
+      summary: Get IPFS content by CID
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: CID of the IPFS content.
+      responses:
+        '200':
+          description: Public binary content or JSON content found. Public binary responses use the uploaded Content-Type when replication metadata is known and include inline Content-Disposition when X-Filename was provided.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: CID not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpfsContentNotFoundError'
   /ipfs/public:
     post:
       tags:
@@ -107,39 +142,6 @@ paths:
                 $ref: '#/components/schemas/ContentReplicationStatusResource'
         '401':
           description: Invalid signed request.
-  /ipfs/{cid}:
-    get:
-      tags:
-        - ipfs
-      summary: Get IPFS content by CID
-      parameters:
-        - name: cid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Public binary content or JSON content found. Public binary responses use the uploaded Content-Type when replication metadata is known and include inline Content-Disposition when X-Filename was provided.
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-            image/png:
-              schema:
-                type: string
-                format: binary
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '404':
-          description: CID not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IpfsContentNotFoundError'
 components:
   securitySchemes:
     signedRequest:

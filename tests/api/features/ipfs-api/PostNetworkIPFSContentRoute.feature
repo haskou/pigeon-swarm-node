@@ -16,3 +16,12 @@ Feature: Post network IPFS content route
       | encrypted   | true                     |
       | filename    | avatar.png               |
       | size        | 19                       |
+
+  Scenario: Reject encrypted private content for an unknown IPFS network
+    Given I am an anonymous user
+    And I use an unknown IPFS network id
+    And I set raw IPFS content with content type "application/octet-stream" and text "encrypted-by-client"
+    And I sign the current network IPFS content request
+    When I POST to the current IPFS network
+    Then response code is equal to 404
+    And response body should contain "NotFoundError"

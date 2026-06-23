@@ -2693,6 +2693,11 @@ export default class Definitions {
       await this.ipfsDefinition.registerInMemoryNetwork(networkName);
   }
 
+  @given('I use an unknown IPFS network id')
+  public iUseAnUnknownIPFSNetworkId(): void {
+    this.currentNetworkId = randomUUID();
+  }
+
   @given(
     'I register an in-memory IPFS network with id {string} and name {string}',
   )
