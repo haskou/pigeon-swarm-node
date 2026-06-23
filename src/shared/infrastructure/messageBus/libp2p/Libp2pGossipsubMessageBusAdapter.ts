@@ -130,18 +130,35 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     DomainEventInstance: Constructor<DomainEvent>,
     handler: SubscriptionHandler,
   ): Promise<void> {
-    await this.transport.subscribe(
-      this.topicResolver.fromRoutingKey(bindingKey),
-      async (payload) => {
-        const message = JSON.parse(payload) as Message;
+    const topic = this.topicResolver.fromRoutingKey(bindingKey);
+    const subscriptionKey = `${topic}:${bindingKey}`;
+    const handlers = this.subscriptionHandlers.get(subscriptionKey);
 
-        if (message.type !== bindingKey) {
-          return;
-        }
+    if (handlers) {
+      handlers.push(handler);
 
-        await handler(this.instanceDomainEvent(DomainEventInstance, message));
-      },
-    );
+      return;
+    }
+
+    this.subscriptionHandlers.set(subscriptionKey, [handler]);
+
+    await this.transport.subscribe(topic, async (payload) => {
+      const message = JSON.parse(payload) as Message;
+
+      if (message.type !== bindingKey) {
+        return;
+      }
+
+      const event = this.instanceDomainEvent(DomainEventInstance, message);
+
+      await Promise.all(
+        (this.subscriptionHandlers.get(subscriptionKey) || []).map(
+          (subscriptionHandler) => subscriptionHandler(event),
+        ),
+      );
+
+      webSocketEventHub.publish([event]);
+    });
   }
 
   public async consume(

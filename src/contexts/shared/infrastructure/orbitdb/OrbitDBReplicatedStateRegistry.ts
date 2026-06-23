@@ -538,6 +538,28 @@ export default class OrbitDBReplicatedStateRegistry {
     Kernel.logger?.info(message);
   }
 
+  private relatedIdentityIds(document: Record<string, unknown>): string[] {
+    const identityIds = [
+      this.stringValue(document, 'ownerIdentityId'),
+      this.stringValue(document, 'identityId'),
+      this.stringValue(document, 'recipientIdentityId'),
+      this.stringValue(document, 'inviterIdentityId'),
+    ];
+    const payload = document.payload;
+
+    if (this.isRecord(payload)) {
+      identityIds.push(...this.relatedIdentityIds(payload));
+    }
+
+    return [
+      ...new Set(
+        identityIds.filter(
+          (identityId): identityId is string => typeof identityId === 'string',
+        ),
+      ),
+    ];
+  }
+
   private relatedDocumentId(document: Record<string, unknown>):
     | {
         storeName: OrbitDBReplicatedDocumentStoreName;
@@ -565,29 +587,21 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.relatedDocumentId(payload);
   }
 
-  private relatedIdentityId(
-    document: Record<string, unknown>,
-  ): string | undefined {
-    return (
-      this.stringValue(document, 'ownerIdentityId') ||
-      this.stringValue(document, 'identityId') ||
-      this.stringValue(document, 'recipientIdentityId')
-    );
-  }
-
   private async networkIdsFromRelatedIdentityHead(
     document: Record<string, unknown>,
   ): Promise<string[]> {
-    const identityId = this.relatedIdentityId(document);
+    for (const identityId of this.relatedIdentityIds(document)) {
+      const networkIds = await this.networkIdsFromRelatedHead({
+        storeName: 'identities',
+        value: identityId,
+      });
 
-    if (!identityId) {
-      return [];
+      if (networkIds.length > 0) {
+        return networkIds;
+      }
     }
 
-    return this.networkIdsFromRelatedHead({
-      storeName: 'identities',
-      value: identityId,
-    });
+    return [];
   }
 
   private async networkIdsFromRelatedDocument(

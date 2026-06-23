@@ -7,9 +7,16 @@ skinparam linetype ortho
 package "content-replication/domain" {
   class ContentReplication <<AggregateRoot>>
   class ContentReplicaClaim <<Entity>>
+  class ContentReplicaUploadCompletion
   class ContentReplicationPolicy <<DomainService>>
   class ContentReplicationStatusSummary <<ReadModel>>
   class ContentId <<ValueObject>>
+  class ContentFilename <<ValueObject>>
+  class ContentReplicationContext <<ValueObject>>
+  class ContentReplicationMetadata <<ValueObject>>
+  class ContentReplicationPriority <<ValueObject>>
+  class ContentSize <<ValueObject>>
+  class ContentType <<ValueObject>>
 
   interface ContentReplicationRepository
   interface ContentReplicaClaimRepository
@@ -29,6 +36,12 @@ package "content-replication/application" {
   class ReplicatedContentStatus
   class NetworkReplicationStatus
   class ContentReplicationStatusSummaryFinder
+  class ContentGetter
+  class ContentGetResult
+  class ContentPublisher
+  class ContentDocument
+  class ContentUploadLimits
+  class PublishedContent
   class ContentReplicationSummaryRefresher
   class ContentReplicationStatusSummaryUpdater
   class ContentReplicationMaintenanceResult
@@ -46,8 +59,12 @@ package "content-replication/infrastructure" {
 
 ContentReplication *-- ContentReplicaClaim
 ContentReplication --> ContentId
+ContentReplication --> ContentReplicationContext
+ContentReplication --> ContentReplicationMetadata
+ContentReplication --> ContentReplicationPriority
 ContentReplicaClaim --> ContentId
 ContentReplicationPolicy ..> ContentReplication
+ContentReplicaUploadCompletion --> NetworkId
 
 ContentReplication ..> ContentReplicationWasRegisteredEvent
 ContentReplication ..> ContentReplicationWasClaimedEvent
@@ -64,6 +81,15 @@ ContentReplicationStatusFinder ..> ContentReplicaClaimRepository
 ContentReplicationStatusFinder ..> ContentReplicationStatus
 ContentReplicationStatus *-- ReplicatedContentStatus
 ReplicatedContentStatus *-- NetworkReplicationStatus
+ContentGetter ..> ReplicatedContentStorage
+ContentGetter ..> ContentReplicationRepository
+ContentGetter ..> ContentGetResult
+ContentPublisher ..> ReplicatedContentStorage
+ContentPublisher ..> ContentReplicationRegistrar
+ContentPublisher ..> ContentReplicaUploadCompletion
+ContentPublisher ..> ContentDocument
+ContentPublisher ..> PublishedContent
+ContentUploadLimits ..> ContentSize
 ContentReplicationStatusSummaryFinder ..> ContentReplicationStatusSummaryRepository
 ContentReplicationSummaryRefresher ..> ContentReplicationStatusSummaryRepository
 ContentReplicationStatusSummaryUpdater ..> ContentReplicationStatusSummaryRepository

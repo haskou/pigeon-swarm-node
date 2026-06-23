@@ -254,6 +254,10 @@
       {
         "selector": "Program > :matches(ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExportNamedDeclaration[declaration.type='ClassDeclaration'], ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration'], ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']) ~ :matches(ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExportNamedDeclaration[declaration.type='ClassDeclaration'], ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration'], ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration'])",
         "message": "Keep one top-level class, type, or interface per file. Move additional declarations to their own file when touching this code."
+      },
+      {
+        "selector": "MethodDefinition[kind='constructor'] > FunctionExpression[params.length>7]",
+        "message": "Constructors with more than 7 parameters hide missing concepts. Group cohesive dependencies or split the class responsibility."
       }
     ]
   },

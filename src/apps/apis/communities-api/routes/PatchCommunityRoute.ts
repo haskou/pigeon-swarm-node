@@ -30,16 +30,16 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.updater.update(
-      new CommunityProfileUpdateMessage(
+      new CommunityProfileUpdateMessage({
+        actorIdentityId: actorIdentityId.valueOf(),
+        autoJoinEnabled: body.autoJoinEnabled,
+        avatar: body.avatar,
+        banner: body.banner,
         communityId,
-        actorIdentityId.valueOf(),
-        body.name,
-        body.description,
-        body.avatar,
-        body.banner,
-        body.discoverable,
-        body.autoJoinEnabled,
-      ),
+        description: body.description,
+        discoverable: body.discoverable,
+        name: body.name,
+      }),
     );
 
     return response

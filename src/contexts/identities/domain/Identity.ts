@@ -69,6 +69,7 @@ export class Identity extends AggregateRoot {
     return identity;
   }
 
+  // eslint-disable-next-line no-restricted-syntax
   constructor(
     private readonly id: IdentityId,
     private readonly signingKey: IdentitySigningKey,

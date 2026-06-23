@@ -16,17 +16,27 @@ export class CommunityProfileUpdateMessage {
   public readonly discoverable?: boolean;
   public readonly name: CommunityName;
 
-  // eslint-disable-next-line max-params
-  constructor(
-    communityId: string,
-    actorIdentityId: string,
-    name: string,
-    description: string,
-    avatar?: string,
-    banner?: string,
-    discoverable?: boolean,
-    autoJoinEnabled?: boolean,
-  ) {
+  constructor(params: {
+    actorIdentityId: string;
+    autoJoinEnabled?: boolean;
+    avatar?: string;
+    banner?: string;
+    communityId: string;
+    description: string;
+    discoverable?: boolean;
+    name: string;
+  }) {
+    const {
+      actorIdentityId,
+      autoJoinEnabled,
+      avatar,
+      banner,
+      communityId,
+      description,
+      discoverable,
+      name,
+    } = params;
+
     this.actorIdentityId = new IdentityId(actorIdentityId);
     this.autoJoinEnabled = autoJoinEnabled;
     this.communityId = new CommunityId(communityId);
