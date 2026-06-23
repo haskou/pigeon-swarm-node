@@ -1995,14 +1995,13 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/ipfs/public');
   }
 
-  @given('I sign the current private IPFS content request')
-  public async iSignTheCurrentPrivateIPFSContentRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/ipfs/private');
-  }
+  @given('I sign the current network IPFS content request')
+  public async iSignTheCurrentNetworkIPFSContentRequest(): Promise<void> {
+    if (!this.currentNetworkId) {
+      throw new Error('IPFS network must be registered first.');
+    }
 
-  @given('I sign the current secure IPFS content request')
-  public async iSignTheCurrentSecureIPFSContentRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/ipfs/secure');
+    await this.signCurrentRequest('POST', `/ipfs/${this.currentNetworkId}`);
   }
 
   @given('I sign the current content replication status request')
@@ -2756,6 +2755,15 @@ export default class Definitions {
     if (this.response?.data?.id) {
       this.createdIdentityId = this.response.data.id;
     }
+  }
+
+  @when('I POST to the current IPFS network')
+  public async iPOSTToTheCurrentIPFSNetwork(): Promise<void> {
+    if (!this.currentNetworkId) {
+      throw new Error('IPFS network must be registered first.');
+    }
+
+    await this.iPOSTTo(`/ipfs/${this.currentNetworkId}`);
   }
 
   @when('I PUT {string}')

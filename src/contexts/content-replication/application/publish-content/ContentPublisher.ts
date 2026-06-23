@@ -10,6 +10,7 @@ import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorag
 import ContentReplicationRegistrar from '../register-content/ContentReplicationRegistrar';
 import { ContentDocument } from './ContentDocument';
 import { ContentPublishMessage } from './messages/ContentPublishMessage';
+import { PrivateContentPublishMessage } from './messages/PrivateContentPublishMessage';
 import { PublishedContent } from './PublishedContent';
 
 const defaultContentType = 'application/octet-stream';
@@ -25,7 +26,7 @@ export default class ContentPublisher {
   ) {}
 
   private commonDocument(
-    message: ContentPublishMessage,
+    message: ContentPublishMessage | PrivateContentPublishMessage,
   ): Omit<ContentDocument, 'encrypted' | 'encryptedData'> {
     return {
       contentType: message.contentType || defaultContentType,
@@ -59,7 +60,7 @@ export default class ContentPublisher {
     context: string;
     deferSideEffects?: boolean;
     filename?: string;
-    message: ContentPublishMessage;
+    message: ContentPublishMessage | PrivateContentPublishMessage;
     networkIds: NetworkId[];
   }): Promise<void> {
     await this.replicationRegistrar.register({
@@ -174,15 +175,35 @@ export default class ContentPublisher {
   }
 
   public async publishPrivate(
-    message: ContentPublishMessage,
+    message: PrivateContentPublishMessage,
   ): Promise<PublishedContent> {
     const document: ContentDocument = {
       ...this.commonDocument(message),
       encrypted: true,
       encryptedData: message.body.toString('base64'),
     };
+    const cid = await this.contentStorage.publishDocumentToNetwork(
+      document,
+      message.networkId,
+    );
 
-    return this.publish(message, document, privateUploadContext);
+    await this.registerReplication({
+      cid: cid.valueOf(),
+      claimedNetworkIds: [message.networkId.valueOf()],
+      contentType: document.contentType,
+      context: privateUploadContext,
+      filename: message.filename,
+      message,
+      networkIds: [message.networkId],
+    });
+
+    return {
+      cid: cid.valueOf(),
+      contentType: document.contentType,
+      encrypted: document.encrypted,
+      filename: message.filename,
+      size: message.body.length,
+    };
   }
 
   public async publishPublic(

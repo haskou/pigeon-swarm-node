@@ -2,6 +2,7 @@ import ReplicatedContentStorage from '@app/contexts/content-replication/applicat
 import ContentReplicationRegistrar from '@app/contexts/content-replication/application/register-content/ContentReplicationRegistrar';
 import ContentPublisher from '@app/contexts/content-replication/application/publish-content/ContentPublisher';
 import { ContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/ContentPublishMessage';
+import { PrivateContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/PrivateContentPublishMessage';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
@@ -44,6 +45,9 @@ describe('ContentPublisher', () => {
       completedNetworkIds: Promise.resolve([new NetworkId(secondNetworkId)]),
       networkId: new NetworkId(secondNetworkId),
     });
+    contentStorage.publishDocumentToNetwork.mockResolvedValue(
+      new ContentId('bafy-private'),
+    );
     nodeRepository.loadLocalNodeId.mockResolvedValue(
       new NodeId('550e8400-e29b-41d4-a716-446655440010'),
     );
@@ -128,6 +132,39 @@ describe('ContentPublisher', () => {
       2,
       expect.objectContaining({
         localReplicaNetworkIds: [firstNetworkId],
+      }),
+    );
+  });
+
+  it('publishes private content only to the selected network', async () => {
+    await publisher.publishPrivate(
+      new PrivateContentPublishMessage({
+        body: Buffer.from('encrypted-content'),
+        contentType: 'application/octet-stream',
+        filename: 'encrypted.bin',
+        networkId: firstNetworkId,
+        ownerIdentityId: identityId,
+      }),
+    );
+
+    expect(contentStorage.publishDocumentToNetwork).toHaveBeenCalledWith(
+      {
+        contentType: 'application/octet-stream',
+        encrypted: true,
+        encryptedData: Buffer.from('encrypted-content').toString('base64'),
+        filename: 'encrypted.bin',
+        size: 17,
+        uploadedAt: expect.any(Number),
+        uploadedByIdentityId: identityId,
+      },
+      new NetworkId(firstNetworkId),
+    );
+    expect(contentStorage.publishDocument).not.toHaveBeenCalled();
+    expect(registrar.register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cid: 'bafy-private',
+        localReplicaNetworkIds: [firstNetworkId],
+        networkIds: [firstNetworkId],
       }),
     );
   });

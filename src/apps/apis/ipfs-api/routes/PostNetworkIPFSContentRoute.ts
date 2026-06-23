@@ -1,11 +1,12 @@
 import { maxContentSizeBytes } from '@app/contexts/content-replication/application/publish-content/ContentUploadLimits';
-import { ContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/ContentPublishMessage';
+import { PrivateContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/PrivateContentPublishMessage';
 import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
 import * as express from 'express';
 import { Request, Response } from 'express';
 import {
   HeaderParam,
   JsonController,
+  Param,
   Post,
   Req,
   Res,
@@ -15,9 +16,8 @@ import {
 import { IPFSContentUploadRouteSupport } from './IPFSContentUploadRouteSupport';
 
 @JsonController('/ipfs')
-export class PostPrivateIPFSContentRoute extends IPFSContentUploadRouteSupport {
-  @Post('/private')
-  @Post('/secure')
+export class PostNetworkIPFSContentRoute extends IPFSContentUploadRouteSupport {
+  @Post('/:networkId([0-9a-fA-F-]{36})')
   @UseBefore(
     express.raw({
       limit: `${maxContentSizeBytes}b`,
@@ -25,6 +25,7 @@ export class PostPrivateIPFSContentRoute extends IPFSContentUploadRouteSupport {
     }),
   )
   public async request(
+    @Param('networkId') networkId: string,
     @HeaderParam('content-type') contentType: string | undefined,
     @HeaderParam('x-filename') filename: string | undefined,
     @Req() request: Request,
@@ -32,10 +33,11 @@ export class PostPrivateIPFSContentRoute extends IPFSContentUploadRouteSupport {
   ): Promise<Response> {
     const ownerIdentityId = await this.authenticate(request);
     const published = await this.publisher().publishPrivate(
-      new ContentPublishMessage({
+      new PrivateContentPublishMessage({
         body: this.bodyFrom(request),
         contentType,
         filename,
+        networkId,
         ownerIdentityId: ownerIdentityId.valueOf(),
       }),
     );
