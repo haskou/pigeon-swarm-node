@@ -1,21 +1,21 @@
-import IdentityRoutingRepublisher from '@app/contexts/identities/application/routing/IdentityRoutingRepublisher';
-import KeychainRoutingRepublisher from '@app/contexts/keychains/application/routing/KeychainRoutingRepublisher';
+import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
+import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
 import Kernel from '@app/Kernel';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
 
 export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
   constructor(
-    private readonly identityRepublisher: IdentityRoutingRepublisher,
-    private readonly keychainRepublisher: KeychainRoutingRepublisher,
+    private readonly identityRouting: IpfsIdentityRouting,
+    private readonly keychainRouting: IpfsKeychainRouting,
   ) {
     super();
   }
 
   public async execute(): Promise<void> {
     const [identities, keychains] = await Promise.all([
-      this.identityRepublisher.republish(),
-      this.keychainRepublisher.republish(),
+      this.identityRouting.republish(),
+      this.keychainRouting.republish(),
     ]);
 
     Kernel.logger.debug?.(
