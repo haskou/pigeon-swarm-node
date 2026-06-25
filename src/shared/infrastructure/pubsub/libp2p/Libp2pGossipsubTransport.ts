@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 
 import PubSubTransport from '../PubSubTransport';
 import Libp2pGossipsubRuntimeAdapter from './Libp2pGossipsubRuntimeAdapter';

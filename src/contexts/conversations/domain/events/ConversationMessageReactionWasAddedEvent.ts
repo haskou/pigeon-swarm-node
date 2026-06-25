@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export class ConversationMessageReactionWasAddedEvent extends DomainEvent {
   public static EVENT_NAME = 'conversations.v1.message.reaction.was_added';

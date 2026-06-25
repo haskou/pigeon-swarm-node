@@ -1,6 +1,6 @@
 import CommunityInviteAccepter from '@app/contexts/communities/application/accept-invite/CommunityInviteAccepter';
 import { CommunityInviteAcceptMessage } from '@app/contexts/communities/application/accept-invite/messages/CommunityInviteAcceptMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
 

@@ -1,11 +1,13 @@
-import { Constructor } from '@app/shared/domain/Constructor';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
+import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
+import { Constructor } from '@haskou/ddd-kernel/domain';
+import { DomainMessageBus } from '@haskou/ddd-kernel/domain';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
 import { webSocketEventHub } from '../websocket/WebSocketEventHub';
-import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
 import Libp2pGossipsubAdapter from './libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
 import { Message } from './Message';
@@ -17,13 +19,14 @@ type LocalSubscriptionHandler = {
 };
 
 export default class MessageBus
-  implements DomainEventConsumer, DomainEventPublisher
+  implements DomainMessageBus, DomainEventConsumer, DomainEventPublisher
 {
   private static sourceEventContext = new Map<string, DomainEvent>();
   private static activeContextIds: string[] = [];
   private static replicatedEventPublisher?: DomainEventPublisher;
   private adapter: MessageBusAdapter;
   private readonly domainEventTypes = new Map<string, typeof DomainEvent>();
+  private readonly publisherHooks = new PublisherHookPipeline();
   private readonly localSubscriptionHandlers = new Map<
     string,
     LocalSubscriptionHandler[]
@@ -68,7 +71,6 @@ export default class MessageBus
   }
 
   constructor(
-    private readonly amqpAdapter: AmqpMessageBusAdapter,
     private readonly memoryAdapter: MemoryMessageBusAdapter,
     private readonly libp2pGossipsubAdapter: Libp2pGossipsubAdapter,
   ) {
@@ -77,10 +79,6 @@ export default class MessageBus
 
   private chooseAdapterFromDsn(dsn: string): MessageBusAdapter {
     this.ensureDSNIsValid(process.env.TRANSPORT_DSN || '');
-
-    if (dsn.startsWith('amqp')) {
-      return this.amqpAdapter;
-    }
 
     if (dsn.startsWith('in-memory')) {
       return this.memoryAdapter;
@@ -94,11 +92,7 @@ export default class MessageBus
   }
 
   private ensureDSNIsValid(dsn: string): void {
-    if (
-      !dsn.startsWith('amqp') &&
-      !dsn.startsWith('in-memory') &&
-      !dsn.startsWith('libp2p-gossipsub')
-    ) {
+    if (!dsn.startsWith('in-memory') && !dsn.startsWith('libp2p-gossipsub')) {
       throw new InvalidMessageBusAdapterError(dsn);
     }
   }
@@ -162,6 +156,23 @@ export default class MessageBus
     this.localSubscriptionHandlers.set(bindingKey, handlers);
   }
 
+  private async runPublisherHooks(domainEvents: DomainEvent[]): Promise<void> {
+    for (const domainEvent of domainEvents) {
+      await this.publisherHooks.run(
+        {
+          domainEvent,
+          message: {
+            name: domainEvent.eventName(),
+            payload: JSON.parse(domainEvent.decode()) as Message,
+          },
+          metadata: {},
+          topic: domainEvent.eventName(),
+        },
+        () => Promise.resolve(),
+      );
+    }
+  }
+
   public registerEventType(
     bindingKey: string,
     DomainEventInstance: typeof DomainEvent,
@@ -169,11 +180,16 @@ export default class MessageBus
     this.domainEventTypes.set(bindingKey, DomainEventInstance);
   }
 
+  public registerPublisherHooks(...hooks: PublisherHook[]): void {
+    this.publisherHooks.register(...hooks);
+  }
+
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
     const enrichedEvents = this.enrichEventsWithContext(domainEvents);
     await this.adapter.publish(enrichedEvents);
     await MessageBus.replicatedEventPublisher?.publish(enrichedEvents);
     webSocketEventHub.publish(enrichedEvents);
+    await this.runPublisherHooks(enrichedEvents);
   }
 
   public async dispatchReplicated(message: Message): Promise<void> {

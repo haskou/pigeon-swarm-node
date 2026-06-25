@@ -3,7 +3,7 @@ import CommunityFinder from '@app/contexts/communities/application/find-communit
 import { CommunityFindMessage } from '@app/contexts/communities/application/find-community/messages/CommunityFindMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 export abstract class CommunityRouteSupport extends Route {

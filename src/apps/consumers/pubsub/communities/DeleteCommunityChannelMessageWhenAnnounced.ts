@@ -10,9 +10,9 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { assert, Signature, Timestamp } from '@haskou/value-objects';
 
 import { isCommunityPrimitive } from './isCommunityPrimitive';
@@ -25,7 +25,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     private readonly eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
-    // eslint-disable-next-line max-len
+
     private readonly signatureService: CommunityChannelMessageSignatureDomainService,
   ) {
     super(eventConsumer);

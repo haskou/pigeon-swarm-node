@@ -6,7 +6,6 @@ import PushSubscriptionRepository from '../../domain/repositories/PushSubscripti
 import { PushSubscriptionEndpoint } from '../../domain/value-objects/PushSubscriptionEndpoint';
 import { LocalPushSubscriptionDocument } from './documents/LocalPushSubscriptionDocument';
 
-// eslint-disable-next-line max-len
 export default class LocalPushSubscriptionRepository extends PushSubscriptionRepository {
   private static readonly NAMESPACE = 'push_subscriptions';
 

@@ -1,5 +1,5 @@
 import CustomHttpError from '@app/shared/infrastructure/errors/CustomHttpError';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 
 export class LinkPreviewFetchError extends CustomHttpError {
   constructor(message: string = 'Could not fetch link preview.') {

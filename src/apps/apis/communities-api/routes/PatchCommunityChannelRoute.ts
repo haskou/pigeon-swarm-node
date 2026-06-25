@@ -1,6 +1,6 @@
 import CommunityChannelRenamer from '@app/contexts/communities/application/rename-channel/CommunityChannelRenamer';
 import { CommunityChannelRenameMessage } from '@app/contexts/communities/application/rename-channel/messages/CommunityChannelRenameMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

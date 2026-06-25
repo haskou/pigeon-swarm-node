@@ -1,6 +1,6 @@
 import CommunityModerationLogsFinder from '@app/contexts/communities/application/find-moderation-logs/CommunityModerationLogsFinder';
 import { CommunityModerationLogsFindMessage } from '@app/contexts/communities/application/find-moderation-logs/messages/CommunityModerationLogsFindMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Get,

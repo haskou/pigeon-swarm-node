@@ -1,9 +1,13 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
+import { HttpApp } from '@haskou/ddd-kernel/adapters/ui';
 import expressWinston from 'express-winston';
 import winston, { Logger, format } from 'winston';
 
-import Server from '../express/Server';
 import Log from './Log';
+
+type HttpAppProvider = {
+  readonly app: HttpApp;
+};
 
 export default class WinstonLogger implements Log {
   private prefix: string = '';
@@ -29,24 +33,26 @@ export default class WinstonLogger implements Log {
     format.json(),
   );
 
-  private readonly opts = {
-    level: process.env.LOG_LEVEL,
-    transports: [
-      new winston.transports.Console({
-        format: this.consoleFormat,
-        level: process.env.LOG_LEVEL,
-      }),
-      new winston.transports.File({
-        filename: this.getLogFileName(),
-        format: this.jsonFormat,
-        level: process.env.LOG_LEVEL,
-      }),
-    ],
-  };
-
   private _logger: Logger;
 
-  constructor(private readonly server?: Server) {}
+  private server?: HttpAppProvider;
+
+  private createLoggerOptions() {
+    return {
+      level: process.env.LOG_LEVEL,
+      transports: [
+        new winston.transports.Console({
+          format: this.consoleFormat,
+          level: process.env.LOG_LEVEL,
+        }),
+        new winston.transports.File({
+          filename: this.getLogFileName(),
+          format: this.jsonFormat,
+          level: process.env.LOG_LEVEL,
+        }),
+      ],
+    };
+  }
 
   private getLogFileName(): string {
     const logDirectory = process.env.LOG_URL || 'logs';
@@ -122,14 +128,18 @@ export default class WinstonLogger implements Log {
 
   public get logger(): Logger {
     if (!this._logger) {
-      this._logger = winston.createLogger(this.opts);
+      this._logger = winston.createLogger(this.createLoggerOptions());
     }
 
     return this._logger;
   }
 
+  public attach(server: HttpAppProvider): void {
+    this.server = server;
+  }
+
   public run(prefix?: string): void {
     this.prefix = prefix || '';
-    this.server?.app.use(expressWinston.logger(this.opts));
+    this.server?.app.use(expressWinston.logger(this.createLoggerOptions()));
   }
 }

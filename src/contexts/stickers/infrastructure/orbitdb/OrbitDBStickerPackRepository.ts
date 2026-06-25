@@ -6,7 +6,6 @@ import { StickerPack } from '../../domain/StickerPack';
 import { StickerPackId } from '../../domain/value-objects/StickerPackId';
 import { OrbitDBStickerPackDocument } from './documents/OrbitDBStickerPackDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBStickerPackRepository extends StickerPackRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

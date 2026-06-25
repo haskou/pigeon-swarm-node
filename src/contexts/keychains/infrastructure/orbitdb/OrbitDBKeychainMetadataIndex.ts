@@ -7,7 +7,6 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 
 import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMetadataDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex {
   private readonly activeHeadRepairs = new Set<string>();
 

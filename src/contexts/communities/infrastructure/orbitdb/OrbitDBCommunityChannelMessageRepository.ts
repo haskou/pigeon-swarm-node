@@ -17,7 +17,6 @@ interface OrbitDBCommunityChannelThreadSummaryDocument {
   rootMessageId: string;
 }
 
-// eslint-disable-next-line max-len
 export default class OrbitDBCommunityChannelMessageRepository extends CommunityChannelMessageRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 

@@ -2,7 +2,7 @@ import libp2pKeyAdapter, {
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 
 import { PublicRelayAddressFactory } from './PublicRelayAddressFactory';
 import { PublicRelayConfiguration } from './PublicRelayConfiguration';
@@ -56,9 +56,14 @@ export default class PublicRelayRuntime {
       };
     };
 
-    globalState[PublicRelayRuntime.globalStateKey] ??= {};
+    let state = globalState[PublicRelayRuntime.globalStateKey];
 
-    return globalState[PublicRelayRuntime.globalStateKey];
+    if (!state) {
+      state = {};
+      globalState[PublicRelayRuntime.globalStateKey] = state;
+    }
+
+    return state;
   }
 
   public constructor(private readonly networkRegistry: IPFSNetworkRegistry) {}

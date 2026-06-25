@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { PrivateIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
 import { PrivateKey } from '@haskou/value-objects';
@@ -109,12 +109,14 @@ async function main(): Promise<void> {
 function configureTestLogger(): void {
   const noop = (): void => undefined;
 
-  (Kernel as unknown as { _logs: TestLogger })._logs = {
-    debug: noop,
-    error: (message: string): void => console.error(message),
-    info: noop,
-    warn: (message: string): void => console.warn(message),
-  };
+  new Kernel({
+    logger: {
+      debug: noop,
+      error: (message: string): void => console.error(message),
+      info: noop,
+      warn: (message: string): void => console.warn(message),
+    },
+  });
 }
 
 async function createNode(

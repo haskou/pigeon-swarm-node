@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export class ConversationMessagesWereReadEvent extends DomainEvent {
   public static EVENT_NAME = 'conversations.v1.messages.were_read';

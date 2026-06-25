@@ -65,9 +65,7 @@ routes resolve to the bundled frontend.
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`amqp://...`, `in-memory...` or `libp2p-gossipsub://`). |
-| `TRANSPORT_MAX_RETRIES` | Adapter default | No | Retry count for AMQP operations. |
-| `TRANSPORT_RETRY_DELAY` | Adapter default | No | Delay between retries (ms). |
+| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`in-memory://` or `libp2p-gossipsub://`). |
 
 ## PWA Web Push Variables
 

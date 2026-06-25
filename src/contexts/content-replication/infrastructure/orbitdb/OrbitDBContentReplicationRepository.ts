@@ -6,7 +6,6 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { OrbitDBContentReplicationDocument } from './documents/OrbitDBContentReplicationDocument';
 import OrbitDBContentReplicationMapper from './mappers/OrbitDBContentReplicationMapper';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBContentReplicationRepository extends ContentReplicationRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

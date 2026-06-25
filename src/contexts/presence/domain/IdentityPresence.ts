@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { DisconnectedPresenceCannotBeSelectedError } from './errors/DisconnectedPresenceCannotBeSelectedError';
@@ -93,6 +93,39 @@ export class IdentityPresence extends AggregateRoot {
     return new Timestamp(now.valueOf() - IdentityPresence.HEARTBEAT_TIMEOUT_MS);
   }
 
+  private applyCustomMessage(
+    customMessage: PresenceCustomMessage | undefined,
+    customMessageWasProvided: boolean,
+  ): void {
+    if (customMessageWasProvided) {
+      this.customMessage = customMessage;
+    }
+  }
+
+  private applySelectedStatus(status: PresenceStatus | undefined): void {
+    if (!status) {
+      return;
+    }
+
+    assert(
+      status.canBeSelected(),
+      new DisconnectedPresenceCannotBeSelectedError(),
+    );
+    this.status = status;
+  }
+
+  private customMessageChangedFrom(
+    previousCustomMessage: PresenceCustomMessage | undefined,
+    customMessage: PresenceCustomMessage | undefined,
+    customMessageWasProvided: boolean,
+  ): boolean {
+    return (
+      customMessageWasProvided &&
+      (previousCustomMessage?.isNotEqual(customMessage) ||
+        previousCustomMessage !== customMessage)
+    );
+  }
+
   public clearCustomMessage(networkIds: string[]): void {
     this.customMessage = undefined;
     this.updatedAt = Timestamp.now();
@@ -160,27 +193,19 @@ export class IdentityPresence extends AggregateRoot {
     const previous = this.status;
     const previousCustomMessage = this.customMessage;
 
-    if (status) {
-      assert(
-        status.canBeSelected(),
-        new DisconnectedPresenceCannotBeSelectedError(),
-      );
-      this.status = status;
-    }
-
-    if (customMessageWasProvided) {
-      this.customMessage = customMessage;
-    }
+    this.applySelectedStatus(status);
+    this.applyCustomMessage(customMessage, customMessageWasProvided);
 
     this.lastHeartbeatAt = now;
     this.lastActivityAt = now;
     this.status = this.derivedStatus(now);
     this.updatedAt = now;
 
-    const customMessageChanged =
-      customMessageWasProvided &&
-      (previousCustomMessage?.isNotEqual(customMessage) ||
-        previousCustomMessage !== customMessage);
+    const customMessageChanged = this.customMessageChangedFrom(
+      previousCustomMessage,
+      customMessage,
+      customMessageWasProvided,
+    );
 
     if (this.changedFrom(previous) || customMessageChanged) {
       this.recordUpdated(networkIds);

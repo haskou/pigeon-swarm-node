@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 
 import { HeliaInstance, ParsedCidLike } from './adapters/HeliaRuntimeAdapter';
 

@@ -20,6 +20,39 @@ export class CallSignalRatePolicy {
 
   constructor(private readonly limit: number) {}
 
+  private consumeNewBucket(now: number): {
+    allowed: boolean;
+    bucket: CallSignalRateBucket;
+  } {
+    return {
+      allowed: true,
+      bucket: {
+        count: 1,
+        resetAt: now + CallSignalRatePolicy.WINDOW_MS,
+      },
+    };
+  }
+
+  private consumeWithoutLimit(
+    bucket: CallSignalRateBucket | undefined,
+    now: number,
+  ): { allowed: boolean; bucket: CallSignalRateBucket } {
+    return {
+      allowed: true,
+      bucket: {
+        count: bucket?.count || 0,
+        resetAt: bucket?.resetAt || now + CallSignalRatePolicy.WINDOW_MS,
+      },
+    };
+  }
+
+  private shouldResetBucket(
+    bucket: CallSignalRateBucket | undefined,
+    now: number,
+  ): boolean {
+    return !bucket || bucket.resetAt <= now;
+  }
+
   public getLimit(): number {
     return this.limit;
   }
@@ -29,23 +62,11 @@ export class CallSignalRatePolicy {
     now: number,
   ): { allowed: boolean; bucket: CallSignalRateBucket } {
     if (this.limit === 0) {
-      return {
-        allowed: true,
-        bucket: {
-          count: bucket?.count || 0,
-          resetAt: bucket?.resetAt || now + CallSignalRatePolicy.WINDOW_MS,
-        },
-      };
+      return this.consumeWithoutLimit(bucket, now);
     }
 
-    if (!bucket || bucket.resetAt <= now) {
-      return {
-        allowed: true,
-        bucket: {
-          count: 1,
-          resetAt: now + CallSignalRatePolicy.WINDOW_MS,
-        },
-      };
+    if (this.shouldResetBucket(bucket, now)) {
+      return this.consumeNewBucket(now);
     }
 
     if (bucket.count >= this.limit) {

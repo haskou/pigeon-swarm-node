@@ -1,5 +1,5 @@
 import CustomHttpError from '@app/shared/infrastructure/errors/CustomHttpError';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 
 export default class ReplicatedStateNotReadyError extends CustomHttpError {
   public static readonly CODE = 503020;

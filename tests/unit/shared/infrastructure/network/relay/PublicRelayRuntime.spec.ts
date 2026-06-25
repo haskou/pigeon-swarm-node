@@ -1,5 +1,5 @@
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { PublicRelayRecordDiscovery } from '@app/shared/infrastructure/network/relay/PublicRelayRecordDiscovery';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';

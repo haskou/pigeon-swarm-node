@@ -1,4 +1,4 @@
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { Community } from '../../domain/Community';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';

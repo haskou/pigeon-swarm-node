@@ -1,7 +1,7 @@
 import { CommunityChannelMessageReactionBody } from '@app/apps/apis/communities-api/bodies/CommunityChannelMessageReactionBody';
 import CommunityChannelMessageReactionAdder from '@app/contexts/communities/application/react-channel-message/CommunityChannelMessageReactionAdder';
 import { CommunityChannelMessageReactionChangeMessage } from '@app/contexts/communities/application/react-channel-message/messages/CommunityChannelMessageReactionChangeMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -16,7 +16,6 @@ import { CommunityChannelMessageReactionViewModel } from '../view-model/Communit
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-// eslint-disable-next-line max-len
 export class PostCommunityChannelMessageReactionRoute extends CommunityRouteSupport {
   private readonly adder = this.get<CommunityChannelMessageReactionAdder>(
     CommunityChannelMessageReactionAdder,

@@ -1,6 +1,6 @@
 import CommunityChannelDraftSaver from '@app/contexts/communities/application/manage-channel-draft/CommunityChannelDraftSaver';
 import { CommunityChannelDraftSaveMessage } from '@app/contexts/communities/application/manage-channel-draft/messages/CommunityChannelDraftSaveMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

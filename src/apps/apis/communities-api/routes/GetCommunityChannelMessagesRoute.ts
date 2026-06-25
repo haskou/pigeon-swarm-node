@@ -1,7 +1,7 @@
 import CommunityChannelMessagesFinder from '@app/contexts/communities/application/find-channel-messages/CommunityChannelMessagesFinder';
 import { CommunityChannelMessagesFindMessage } from '@app/contexts/communities/application/find-channel-messages/messages/CommunityChannelMessagesFindMessage';
 import { CommunityChannelThreadMessagesFindMessage } from '@app/contexts/communities/application/find-channel-messages/messages/CommunityChannelThreadMessagesFindMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Get,

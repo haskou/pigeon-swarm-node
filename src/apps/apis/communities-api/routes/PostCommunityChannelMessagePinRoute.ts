@@ -1,6 +1,6 @@
 import CommunityChannelMessagePinner from '@app/contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinner';
 import { CommunityChannelMessagePinCreateMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinCreateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
 

@@ -1,7 +1,7 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import ContentPublisher from '@app/contexts/content-replication/application/publish-content/ContentPublisher';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 export abstract class IPFSContentUploadRouteSupport extends Route {

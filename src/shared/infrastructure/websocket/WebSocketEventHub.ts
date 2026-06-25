@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import Kernel from '@app/Kernel';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import Kernel from '@haskou/ddd-kernel';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { RawData, WebSocket } from 'ws';
 
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';

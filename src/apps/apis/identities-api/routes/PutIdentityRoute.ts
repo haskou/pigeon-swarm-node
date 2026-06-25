@@ -4,8 +4,8 @@ import { IdentityFinderMessage } from '@app/contexts/identities/application/find
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityUpdateRequesterMismatchError } from '@app/contexts/identities/domain/errors/IdentityUpdateRequesterMismatchError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

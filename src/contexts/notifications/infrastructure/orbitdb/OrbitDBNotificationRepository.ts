@@ -7,7 +7,6 @@ import { NotificationId } from '../../domain/value-objects/NotificationId';
 import { OrbitDBNotificationDocument } from './documents/OrbitDBNotificationDocument';
 import OrbitDBNotificationMapper from './mappers/OrbitDBNotificationMapper';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBNotificationRepository extends NotificationRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

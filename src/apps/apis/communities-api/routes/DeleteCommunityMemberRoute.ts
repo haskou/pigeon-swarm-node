@@ -1,6 +1,6 @@
 import CommunityLeaver from '@app/contexts/communities/application/leave-community/CommunityLeaver';
 import { CommunityLeaveMessage } from '@app/contexts/communities/application/leave-community/messages/CommunityLeaveMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 

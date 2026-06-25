@@ -1,7 +1,7 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { Node } from '@app/contexts/nodes/domain/Node';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 import { AuthenticatedIdentityIsNotNodeOwnerError } from '../errors/AuthenticatedIdentityIsNotNodeOwnerError';

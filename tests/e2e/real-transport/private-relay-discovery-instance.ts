@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -95,12 +95,14 @@ function configureTestLogger(): void {
     process.stderr.write(`[${ROLE}] ${level} ${message}\n`);
   };
 
-  (Kernel as unknown as { _logs: TestLogger })._logs = {
-    debug: (message: string): void => logToStderr('debug', message),
-    error: (message: string): void => logToStderr('error', message),
-    info: (message: string): void => logToStderr('info', message),
-    warn: (message: string): void => logToStderr('warn', message),
-  };
+  new Kernel({
+    logger: {
+      debug: (message: string): void => logToStderr('debug', message),
+      error: (message: string): void => logToStderr('error', message),
+      info: (message: string): void => logToStderr('info', message),
+      warn: (message: string): void => logToStderr('warn', message),
+    },
+  });
 }
 
 async function createPrivateNetwork(): Promise<void> {

@@ -5,7 +5,6 @@ import StickerUserLibraryRepository from '../../domain/repositories/StickerUserL
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { OrbitDBStickerUserLibraryDocument } from './documents/OrbitDBStickerUserLibraryDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibraryRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

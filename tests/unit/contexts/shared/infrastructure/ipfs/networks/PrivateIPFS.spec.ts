@@ -132,7 +132,7 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('@app/Kernel', () => ({
+jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
     logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
@@ -279,7 +279,7 @@ describe('PrivateIPFS', () => {
     });
 
     it('should log the network name and peer id', async () => {
-      const Kernel = (await import('@app/Kernel')).default;
+      const Kernel = (await import('@haskou/ddd-kernel')).default;
 
       await PrivateIPFS.create(defaultOptions);
 

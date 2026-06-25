@@ -1,6 +1,6 @@
 import CommunityMembershipRequester from '@app/contexts/communities/application/request-membership/CommunityMembershipRequester';
 import { CommunityMembershipRequestCreateMessage } from '@app/contexts/communities/application/request-membership/messages/CommunityMembershipRequestCreateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
 

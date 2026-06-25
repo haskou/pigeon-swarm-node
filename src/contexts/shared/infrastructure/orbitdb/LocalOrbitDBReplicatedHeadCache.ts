@@ -12,7 +12,6 @@ type LocalOrbitDBReplicatedHeadCacheDocument = {
   value: Record<string, unknown>;
 };
 
-// eslint-disable-next-line max-len
 export default class LocalOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
   private static readonly NAMESPACE = 'orbitdb_replicated_heads';
   private static readonly WARM_NETWORK_NAMESPACE =

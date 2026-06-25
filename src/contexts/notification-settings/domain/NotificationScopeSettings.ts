@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { NotificationSettingsWereResetEvent } from './events/NotificationSettingsWereResetEvent';

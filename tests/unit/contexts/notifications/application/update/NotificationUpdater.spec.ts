@@ -3,7 +3,7 @@ import NotificationUpdater from '@app/contexts/notifications/application/update/
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { NotificationRecipientMismatchError } from '@app/contexts/notifications/domain/errors/NotificationRecipientMismatchError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';

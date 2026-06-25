@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import { CallEventType } from './CallEventType';
 import { ConversationScope } from './ConversationScope';
@@ -20,6 +20,16 @@ export class ConversationCallEventRealtimeMapper {
 
     const participant = this.callEventParticipant(event, actorIdentityId);
 
+    return (
+      this.participantCallEventCreatedAt(callEventType, participant) ??
+      event.occurredOn.getTime()
+    );
+  }
+
+  private participantCallEventCreatedAt(
+    callEventType: CallEventType,
+    participant: Record<string, unknown> | undefined,
+  ): number | undefined {
     if (callEventType === 'declined' && participant?.declinedAt) {
       return Number(participant.declinedAt);
     }
@@ -28,7 +38,7 @@ export class ConversationCallEventRealtimeMapper {
       return Number(participant.missedAt);
     }
 
-    return event.occurredOn.getTime();
+    return undefined;
   }
 
   private callEventParticipant(

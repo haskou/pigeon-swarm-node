@@ -7,7 +7,6 @@ import IdentityPresenceRepository from '../../domain/repositories/IdentityPresen
 import { PresenceStatus } from '../../domain/value-objects/PresenceStatus';
 import { OrbitDBIdentityPresenceDocument } from './documents/OrbitDBIdentityPresenceDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

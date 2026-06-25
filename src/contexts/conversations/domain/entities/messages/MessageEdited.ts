@@ -9,6 +9,16 @@ import { MessageMetadata } from './MessageMetadata';
 import { MessageSignaturePayload } from './MessageSignaturePayload';
 
 export class MessageEdited extends Message {
+  private static targetMessageIdFromPrimitives(
+    primitives: PrimitiveOf<MessageEdited>,
+  ): MessageId {
+    if (!primitives.targetMessageId) {
+      throw new Error('Edited message targetMessageId is required.');
+    }
+
+    return new MessageId(primitives.targetMessageId);
+  }
+
   public static create(
     metadata: MessageMetadata,
     targetMessageId: MessageId,
@@ -31,7 +41,7 @@ export class MessageEdited extends Message {
         new Timestamp(primitives.createdAt),
         new Signature(primitives.signature),
       ),
-      new MessageId(primitives.targetMessageId),
+      this.targetMessageIdFromPrimitives(primitives),
       new EncryptedMessagePayload(primitives.encryptedPayload),
     );
   }

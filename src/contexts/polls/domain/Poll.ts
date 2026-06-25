@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { PollAlreadyClosedError } from './errors/PollAlreadyClosedError';

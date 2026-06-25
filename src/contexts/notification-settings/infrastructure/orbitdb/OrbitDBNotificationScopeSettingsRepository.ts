@@ -6,7 +6,6 @@ import NotificationScopeSettingsRepository from '../../domain/repositories/Notif
 import { NotificationSettingScope } from '../../domain/value-objects/NotificationSettingScope';
 import { OrbitDBNotificationScopeSettingsDocument } from './documents/OrbitDBNotificationScopeSettingsDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBNotificationScopeSettingsRepository extends NotificationScopeSettingsRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

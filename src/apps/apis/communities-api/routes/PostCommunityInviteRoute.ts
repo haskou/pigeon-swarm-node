@@ -1,6 +1,6 @@
 import CommunityInviteCreator from '@app/contexts/communities/application/create-invite/CommunityInviteCreator';
 import { CommunityInviteCreateMessage } from '@app/contexts/communities/application/create-invite/messages/CommunityInviteCreateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

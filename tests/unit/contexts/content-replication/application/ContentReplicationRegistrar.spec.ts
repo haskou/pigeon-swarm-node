@@ -10,8 +10,8 @@ import { ContentReplicationPriority } from '@app/contexts/content-replication/do
 import ContentReplicationSummaryRefresher from '@app/contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 

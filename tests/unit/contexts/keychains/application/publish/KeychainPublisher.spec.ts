@@ -9,7 +9,7 @@ import KeychainCandidateValidationDomainService from '@app/contexts/keychains/do
 import KeychainSaverService from '@app/contexts/keychains/domain/services/KeychainSaverService';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 

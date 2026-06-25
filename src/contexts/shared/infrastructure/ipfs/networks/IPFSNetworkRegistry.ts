@@ -1,7 +1,7 @@
-import Kernel from '@app/Kernel';
 import PrivateNetworkRelayRecordDirectory, {
   PrivateRelayListenOptions,
 } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import Kernel from '@haskou/ddd-kernel';
 import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
@@ -276,7 +276,6 @@ export default class IPFSNetworkRegistry {
     }
   }
 
-  // eslint-disable-next-line max-len
   private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
     const state = this.getState();
 

@@ -4,7 +4,6 @@ import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedL
 import IPFSNetworkRegistry from '../../../shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import NodeNetworkDataCleaner from '../../domain/services/NodeNetworkDataCleaner';
 
-// eslint-disable-next-line max-len
 export default class LocalNodeNetworkDataCleaner extends NodeNetworkDataCleaner {
   constructor(
     private readonly database: EmbeddedLocalDatabase,

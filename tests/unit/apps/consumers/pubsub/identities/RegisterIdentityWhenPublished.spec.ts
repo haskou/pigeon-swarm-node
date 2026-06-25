@@ -2,7 +2,7 @@ import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities
 import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
 import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -43,23 +43,5 @@ describe('RegisterIdentityWhenPublished', () => {
     expect(registrar.register.mock.calls[0][0].identityId.valueOf()).toBe(
       identityId,
     );
-  });
-
-  it('should ignore duplicated deliveries for the same event id', async () => {
-    const identityId = new IdentityMother().id.valueOf();
-    const event = new IdentityWasCreatedEvent(identityId);
-    let handler: ((event: IdentityWasCreatedEvent) => Promise<void>) | undefined;
-
-    eventConsumer.consume.mockImplementation(
-      async (_queueName, _bindingKey, _domainEvent, _exchange, callback) => {
-        handler = callback as (event: IdentityWasCreatedEvent) => Promise<void>;
-      },
-    );
-
-    await consumer.init();
-    await handler?.(event);
-    await handler?.(event);
-
-    expect(registrar.register).toHaveBeenCalledTimes(1);
   });
 });

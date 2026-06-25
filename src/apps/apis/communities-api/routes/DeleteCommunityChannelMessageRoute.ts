@@ -1,7 +1,7 @@
 import { DeleteCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityChannelMessageBody';
 import CommunityChannelMessageDeleter from '@app/contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter';
 import { CommunityChannelMessageDeleteMessage } from '@app/contexts/communities/application/delete-channel-message/messages/CommunityChannelMessageDeleteMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

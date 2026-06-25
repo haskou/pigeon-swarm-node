@@ -11,7 +11,6 @@ import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex {
   private readonly activeHeadRepairs = new Set<string>();
 

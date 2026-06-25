@@ -1,7 +1,7 @@
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import Log from '@app/shared/infrastructure/logs/Log';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -14,7 +14,7 @@ describe('LocalRoutingRecordRepublisherScheduler', () => {
     identityRouting = mock<IpfsIdentityRouting>();
     keychainRouting = mock<IpfsKeychainRouting>();
     logger = mock<Log>();
-    (Kernel as unknown as { _logs: Log })._logs = logger;
+    new Kernel({ logger });
   });
 
   it('republishes identity and keychain routing records', async () => {

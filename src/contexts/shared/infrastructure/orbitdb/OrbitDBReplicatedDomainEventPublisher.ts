@@ -1,11 +1,10 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import OrbitDBDomainEventProjector from './OrbitDBDomainEventProjector';
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from './ReplicatedDomainEventMessage';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBReplicatedDomainEventPublisher {
   private readonly storesByNetworkId = new Map<
     string,

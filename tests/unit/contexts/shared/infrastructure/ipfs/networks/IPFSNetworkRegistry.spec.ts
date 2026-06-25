@@ -124,18 +124,19 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('@app/Kernel', () => ({
+jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
     logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
   },
 }));
 
+import Kernel from '@haskou/ddd-kernel';
+
 import { IPFSConnection } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '../../../../../../../src/Kernel';
 import PrivateNetworkRelayRecordDirectory from '../../../../../../../src/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 
 type IPFSNetworkRegistryTestGlobal = typeof globalThis & {

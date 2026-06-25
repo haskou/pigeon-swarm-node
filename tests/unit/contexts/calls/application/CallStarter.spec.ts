@@ -9,7 +9,7 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('CallStarter', () => {

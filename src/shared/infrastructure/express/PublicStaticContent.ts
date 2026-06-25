@@ -1,7 +1,6 @@
+import { RoutePrefix } from '@haskou/ddd-kernel/adapters/ui';
 import * as express from 'express';
 import path from 'path';
-
-import { RoutePrefix } from './RoutePrefix';
 
 export class PublicStaticContent {
   private readonly publicPath = path.resolve(process.cwd(), 'public');
@@ -32,7 +31,7 @@ export class PublicStaticContent {
   public register(app: express.Application): void {
     if (this.routePrefix.isEmpty()) {
       app.use(this.staticMiddleware);
-      app.get('*', this.sendIndexIfAvailable);
+      app.get('/{*publicPath}', this.sendIndexIfAvailable);
 
       return;
     }
@@ -47,7 +46,7 @@ export class PublicStaticContent {
       this.staticMiddleware(request, response, next);
     });
 
-    app.get('*', (request, response, next) => {
+    app.get('/{*publicPath}', (request, response, next) => {
       if (this.routePrefix.includes(request.path)) {
         next();
 

@@ -3,9 +3,9 @@ import { RegisterConversationMessage } from '@app/contexts/conversations/applica
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageFactory } from '@app/contexts/conversations/domain/entities/messages/MessageFactory';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 export default class RegisterMessageWhenAnnounced extends Consumer {

@@ -1,6 +1,6 @@
 import CommunityMemberBanner from '@app/contexts/communities/application/ban-member/CommunityMemberBanner';
 import { CommunityMemberBanMessage } from '@app/contexts/communities/application/ban-member/messages/CommunityMemberBanMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

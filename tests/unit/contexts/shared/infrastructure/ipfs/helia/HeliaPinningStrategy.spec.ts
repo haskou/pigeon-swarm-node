@@ -1,11 +1,11 @@
-jest.mock('@app/Kernel', () => ({
+jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
     logger: { debug: jest.fn() },
   },
 }));
 
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 
 import {
   HeliaInstance,

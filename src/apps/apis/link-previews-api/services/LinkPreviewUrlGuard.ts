@@ -160,7 +160,7 @@ export class LinkPreviewUrlGuard {
 
     try {
       url = new URL(rawUrl);
-    } catch (error: unknown) {
+    } catch {
       throw new InvalidLinkPreviewUrlError();
     }
 

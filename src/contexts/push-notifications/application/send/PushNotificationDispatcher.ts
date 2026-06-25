@@ -6,7 +6,7 @@ import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-se
 import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import PushNotificationDelivery from './PushNotificationDelivery';

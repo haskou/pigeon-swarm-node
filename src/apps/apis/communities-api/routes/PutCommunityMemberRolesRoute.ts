@@ -1,6 +1,6 @@
 import CommunityMemberRolesAssigner from '@app/contexts/communities/application/assign-member-roles/CommunityMemberRolesAssigner';
 import { CommunityMemberRolesAssignMessage } from '@app/contexts/communities/application/assign-member-roles/messages/CommunityMemberRolesAssignMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

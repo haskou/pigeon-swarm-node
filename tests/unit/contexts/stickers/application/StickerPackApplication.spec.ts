@@ -12,8 +12,8 @@ import StickerUserLibraryRepository from '@app/contexts/stickers/domain/reposito
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 class InMemoryStickerPackRepository implements StickerPackRepository {
   public readonly savedPacks: StickerPack[] = [];

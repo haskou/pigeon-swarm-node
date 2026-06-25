@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CallLifecycle } from './CallLifecycle';
@@ -154,7 +154,10 @@ export class Call extends AggregateRoot {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
-    assert(participant?.isJoined(), new CallParticipantNotFoundError());
+    assert(
+      participant !== undefined && participant.isJoined(),
+      new CallParticipantNotFoundError(),
+    );
     participant.recordHeartbeat();
   }
 

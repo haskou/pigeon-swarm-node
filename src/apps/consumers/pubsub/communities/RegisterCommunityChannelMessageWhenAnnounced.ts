@@ -1,9 +1,9 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 import CommunityChannelMessageCandidateRegistrar from './CommunityChannelMessageCandidateRegistrar';
 import { isCommunityChannelMessagePrimitive } from './isCommunityChannelMessagePrimitive';
@@ -16,7 +16,7 @@ export default class RegisterCommunityMessageWhenAnnounced extends Consumer {
   constructor(
     private readonly eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
-    // eslint-disable-next-line max-len
+
     private readonly messageRegistrar: CommunityChannelMessageCandidateRegistrar,
   ) {
     super(eventConsumer);

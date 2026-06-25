@@ -1,6 +1,6 @@
 import CommunityMessagesSearchFinder from '@app/contexts/communities/application/search-messages/CommunityMessagesSearchFinder';
 import { CommunityMessagesSearchMessage } from '@app/contexts/communities/application/search-messages/messages/CommunityMessagesSearchMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Get,

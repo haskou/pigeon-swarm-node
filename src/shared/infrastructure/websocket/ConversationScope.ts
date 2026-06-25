@@ -1,4 +1,4 @@
 export type ConversationScope = {
-  conversationId?: string;
-  type?: string;
+  conversationId: string;
+  type: 'conversation';
 };

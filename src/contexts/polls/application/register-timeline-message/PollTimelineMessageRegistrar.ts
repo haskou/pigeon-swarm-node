@@ -10,7 +10,7 @@ import { PollTimelineMessageRegisterMessage } from './messages/PollTimelineMessa
 export default class PollTimelineMessageRegistrar {
   constructor(
     private readonly conversationRepository: ConversationRepository,
-    // eslint-disable-next-line max-len
+
     private readonly communityMessageRepository: CommunityChannelMessageRepository,
   ) {}
 

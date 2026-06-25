@@ -1,4 +1,4 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { BaseError } from '@haskou/ddd-kernel/domain';
 
 export class IPFSPeerIdDuplicatedError extends BaseError {
   constructor(
@@ -8,7 +8,6 @@ export class IPFSPeerIdDuplicatedError extends BaseError {
   ) {
     super(
       `PeerId '${peerId}' is already registered in network '${existingNetwork}' and cannot be reused in network '${duplicatedNetwork}'.`,
-      IPFSPeerIdDuplicatedError.prototype,
     );
   }
 }

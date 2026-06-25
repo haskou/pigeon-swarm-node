@@ -1,7 +1,7 @@
 import { PutCommunityChannelMessageBody } from '@app/apps/apis/communities-api/bodies/PutCommunityChannelMessageBody';
 import CommunityChannelMessageEditor from '@app/contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor';
 import { CommunityChannelMessageEditMessage } from '@app/contexts/communities/application/edit-channel-message/messages/CommunityChannelMessageEditMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

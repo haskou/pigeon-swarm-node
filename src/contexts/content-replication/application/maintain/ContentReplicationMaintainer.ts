@@ -1,6 +1,6 @@
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { Timestamp } from '@haskou/value-objects';
 
 import { ContentReplicaClaim } from '../../domain/ContentReplicaClaim';

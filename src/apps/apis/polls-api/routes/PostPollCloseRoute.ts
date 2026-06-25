@@ -1,6 +1,6 @@
 import { PollCloseMessage } from '@app/contexts/polls/application/close/messages/PollCloseMessage';
 import { PollCloser } from '@app/contexts/polls/application/close/PollCloser';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
 

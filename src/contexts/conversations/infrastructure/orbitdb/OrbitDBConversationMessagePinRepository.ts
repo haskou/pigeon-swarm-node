@@ -8,7 +8,6 @@ import { ConversationMessagePin } from '../../domain/ConversationMessagePin';
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
 import { OrbitDBConversationMessagePinDocument } from './documents/OrbitDBConversationMessagePinDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBConversationMessagePinRepository extends ConversationMessagePinRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

@@ -5,6 +5,10 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "target": "es6",
+    "ignoreDeprecations": "6.0",
+    "strict": false,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
     "noImplicitAny": true,
     "moduleResolution": "node",
     "inlineSourceMap": true,
@@ -37,5 +41,8 @@
   ],
   "exclude": [
     "node_modules"
-  ]
+  ],
+  "ts-node": {
+    "files": true
+  }
 }

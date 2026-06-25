@@ -1,7 +1,7 @@
 import { maxContentSizeBytes } from '@app/contexts/content-replication/application/publish-content/ContentUploadLimits';
 import { PrivateContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/PrivateContentPublishMessage';
 import { IPFSNetworkNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSNetworkNotFoundError';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import * as express from 'express';
 import { Request, Response } from 'express';
 import {
@@ -19,7 +19,7 @@ import { IPFSContentUploadRouteSupport } from './IPFSContentUploadRouteSupport';
 
 @JsonController('/ipfs')
 export class PostNetworkIPFSContentRoute extends IPFSContentUploadRouteSupport {
-  @Post('/:networkId([0-9a-fA-F-]{36})')
+  @Post('/:networkId')
   @UseBefore(
     express.raw({
       limit: `${maxContentSizeBytes}b`,

@@ -1,6 +1,6 @@
 import CommunityChannelMessageSearchFinder from '@app/contexts/communities/application/search-channel-messages/CommunityChannelMessageSearchFinder';
 import { CommunityChannelMessageSearchMessage } from '@app/contexts/communities/application/search-channel-messages/messages/CommunityChannelMessageSearchMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Get,
@@ -15,7 +15,6 @@ import { CommunityChannelMessagesViewModel } from '../view-model/CommunityChanne
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-// eslint-disable-next-line max-len
 export class GetCommunityChannelMessageSearchRoute extends CommunityRouteSupport {
   private readonly finder = this.get<CommunityChannelMessageSearchFinder>(
     CommunityChannelMessageSearchFinder,

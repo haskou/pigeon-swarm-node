@@ -11,7 +11,7 @@ export default class EmptyCommunityDeleter {
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly inviteRepository: CommunityInviteRepository,
-    // eslint-disable-next-line max-len
+
     private readonly membershipRequestRepository: CommunityMembershipRequestRepository,
     private readonly reactionRepository: CommunityMessageReactionRepository,
     private readonly moderationLogRepository: CommunityModerationLogRepository,

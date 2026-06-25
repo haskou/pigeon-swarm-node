@@ -3,7 +3,7 @@ import { ConversationNotFoundError } from '@app/contexts/conversations/domain/er
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { MessageEditMessage } from './messages/MessageEditMessage';
 

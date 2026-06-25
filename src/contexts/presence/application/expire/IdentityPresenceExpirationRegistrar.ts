@@ -1,4 +1,4 @@
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { Timestamp } from '@haskou/value-objects';
 
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';

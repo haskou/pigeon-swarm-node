@@ -1,6 +1,6 @@
 import CallEnder from '@app/contexts/calls/application/end-call/CallEnder';
 import { CallEndMessage } from '@app/contexts/calls/application/end-call/messages/CallEndMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 

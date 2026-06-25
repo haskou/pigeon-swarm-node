@@ -23,7 +23,7 @@ import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandi
 export default class CommunityChannelMessageCandidateRegistrar {
   constructor(
     private readonly messageRepository: CommunityChannelMessageRepository,
-    // eslint-disable-next-line max-len
+
     private readonly signatureService: CommunityChannelMessageSignatureDomainService,
   ) {}
 
