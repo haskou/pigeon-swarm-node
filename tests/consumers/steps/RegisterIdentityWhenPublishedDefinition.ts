@@ -1,4 +1,5 @@
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
+import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
@@ -9,7 +10,7 @@ import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metad
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
-import Kernel from '@haskou/ddd-kernel';
+import { Kernel } from '@haskou/ddd-kernel';
 import { setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
@@ -19,14 +20,7 @@ import path from 'path';
 
 setDefaultTimeout(20_000);
 
-let kernel: Kernel | null = null;
-
-type TestLogger = {
-  debug(message: string): void;
-  error(message: string): void;
-  info(message: string): void;
-  warn(message: string): void;
-};
+let application: PigeonApplication | null = null;
 
 @binding()
 export default class RegisterIdentityWhenPublishedDefinition {
@@ -54,17 +48,6 @@ export default class RegisterIdentityWhenPublishedDefinition {
     if (fsSync.existsSync(resolvedStoragePath)) {
       fsSync.rmSync(resolvedStoragePath, { force: true, recursive: true });
     }
-  }
-
-  private installTestLogger(): void {
-    new Kernel({
-      logger: {
-        debug: () => undefined,
-        error: () => undefined,
-        info: () => undefined,
-        warn: () => undefined,
-      },
-    });
   }
 
   private async waitUntilIdentityIsRegistered(): Promise<void> {
@@ -95,26 +78,24 @@ export default class RegisterIdentityWhenPublishedDefinition {
     this.consumer = undefined;
     this.identity = undefined;
 
-    if (!kernel) {
-      kernel = new Kernel();
-      kernel.environmentVariables('test');
+    if (!application) {
+      application = new PigeonApplication();
+      application.environmentVariables('test');
       this.cleanupStorageFolder();
 
-      await kernel.dependencyInjection();
-      this.installTestLogger();
-      await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
+      await application.dependencyInjection();
+      await application.runRuntimes(OrbitDBReplicatedStateRuntime);
     }
   }
 
   @after()
   public cleanup(): void {
-    kernel?.removeConsumers();
     this.cleanupStorageFolder();
   }
 
   @when('the register identity when published consumer is running')
   public async theConsumerIsRunning(): Promise<void> {
-    if (!kernel) {
+    if (!application) {
       throw new Error('Kernel is not initialized.');
     }
 

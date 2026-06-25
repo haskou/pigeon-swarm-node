@@ -7,7 +7,7 @@ import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipf
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
-import Kernel from '../../../src/Kernel';
+import { Kernel } from '@haskou/ddd-kernel';
 
 type IdentityResponseShape = {
   id?: string;

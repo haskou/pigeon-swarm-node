@@ -8,7 +8,8 @@ import { MessageType } from '@app/contexts/conversations/domain/value-objects/Me
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '@haskou/ddd-kernel';
+import PigeonApplication from '@app/apps/PigeonApplication';
+import { Kernel } from '@haskou/ddd-kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
@@ -26,7 +27,7 @@ chai.use(chaiSubset);
 
 setDefaultTimeout(20_000);
 
-let kernel: Kernel | null = null;
+let application: PigeonApplication | null = null;
 
 @binding()
 export default class Definitions {
@@ -93,15 +94,15 @@ export default class Definitions {
 
   @before()
   public async startKernel(): Promise<void> {
-    if (!kernel) {
-      kernel = new Kernel();
-      kernel.environmentVariables('test');
+    if (!application) {
+      application = new PigeonApplication();
+      application.environmentVariables('test');
       this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
-      await kernel.dependencyInjection();
-      await kernel.runServer();
-      kernel.logs();
-      await kernel.runRuntimes(OrbitDBReplicatedStateRuntime);
+      await application.dependencyInjection();
+      await application.runServer();
+      application.logs();
+      await application.runRuntimes(OrbitDBReplicatedStateRuntime);
     }
   }
 
