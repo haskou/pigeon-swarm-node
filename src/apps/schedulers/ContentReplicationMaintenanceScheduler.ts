@@ -1,7 +1,7 @@
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
-import Kernel from '@app/Kernel';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import Kernel from '@haskou/ddd-kernel';
 
 export default class ContentReplicationMaintenanceScheduler extends Scheduler {
   constructor(private readonly maintainer: ContentReplicationMaintainer) {

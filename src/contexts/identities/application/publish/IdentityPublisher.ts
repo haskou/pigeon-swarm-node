@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
 import { Identity } from '../../domain/Identity';

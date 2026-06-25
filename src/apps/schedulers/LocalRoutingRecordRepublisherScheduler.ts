@@ -1,8 +1,8 @@
 import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
-import Kernel from '@app/Kernel';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import Kernel from '@haskou/ddd-kernel';
 
 export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
   constructor(

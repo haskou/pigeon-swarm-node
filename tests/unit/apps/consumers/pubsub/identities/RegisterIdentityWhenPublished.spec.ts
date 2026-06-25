@@ -2,7 +2,7 @@ import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities
 import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
 import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';

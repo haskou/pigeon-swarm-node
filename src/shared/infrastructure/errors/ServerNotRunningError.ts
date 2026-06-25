@@ -1,7 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { BaseError } from '@haskou/ddd-kernel/domain';
 
 export class ServerNotRunningError extends BaseError {
   constructor() {
-    super('Server is not running', ServerNotRunningError.prototype);
+    super('Server is not running');
   }
 }

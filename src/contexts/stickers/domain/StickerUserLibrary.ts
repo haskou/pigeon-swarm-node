@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { StickerUserLibraryWasCreatedEvent } from './events/StickerUserLibraryWasCreatedEvent';

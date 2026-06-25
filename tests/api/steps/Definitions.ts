@@ -8,7 +8,7 @@ import { MessageType } from '@app/contexts/conversations/domain/value-objects/Me
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';

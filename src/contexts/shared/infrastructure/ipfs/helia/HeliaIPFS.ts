@@ -1,8 +1,8 @@
-import Kernel from '@app/Kernel';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
+import Kernel from '@haskou/ddd-kernel';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fs from 'fs/promises';
 
@@ -23,6 +23,8 @@ import { IPFSConnection } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 import { IPFSOptions } from './IPFSOptions';
 import { ContentRetrievalOptions } from './types/ContentRetrievalOptions';
+import { ContentRetrievalProgressDetail } from './types/ContentRetrievalProgressDetail';
+import { ContentRetrievalProgressEvent } from './types/ContentRetrievalProgressEvent';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {
@@ -137,10 +139,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return;
     }
 
+    const dial = dialer.dial;
+
     await Promise.all(
       multiaddrs.map(async (address) => {
         try {
-          await dialer.dial(await heliaRuntimeAdapter.createMultiaddr(address));
+          await dial(await heliaRuntimeAdapter.createMultiaddr(address));
           const dialKey = `${networkName}:${source}`;
 
           if (!HeliaIPFS.successfulPublicRelayDials.has(dialKey)) {
@@ -394,28 +398,50 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return undefined;
     }
 
-    return (event) => {
-      if (!HeliaIPFS.CONTENT_RETRIEVAL_DEBUG_EVENTS.has(event.type)) {
-        return;
-      }
+    return (event) => this.logContentRetrievalProgress(cid, event);
+  }
 
-      const detail = event.detail as
-        | {
-            provider?: {
-              id?: { toString: () => string };
-              routing?: string;
-            };
-            sender?: { toString: () => string };
-          }
-        | undefined;
-      const providerId = detail?.provider?.id?.toString();
-      const providerRouting = detail?.provider?.routing;
-      const senderId = detail?.sender?.toString();
+  private contentRetrievalProgressDetail(
+    event: ContentRetrievalProgressEvent,
+  ): ContentRetrievalProgressDetail {
+    return event.detail as ContentRetrievalProgressDetail;
+  }
 
-      Kernel.logger.debug(
-        `IPFS content retrieval progress: cid="${cid.valueOf()}" event="${event.type}" provider="${providerId ?? ''}" routing="${providerRouting ?? ''}" sender="${senderId ?? ''}"`,
-      );
-    };
+  private contentRetrievalProgressProviderId(
+    detail: ContentRetrievalProgressDetail,
+  ): string | undefined {
+    return detail.provider?.id?.toString();
+  }
+
+  private contentRetrievalProgressProviderRouting(
+    detail: ContentRetrievalProgressDetail,
+  ): string | undefined {
+    return detail.provider?.routing;
+  }
+
+  private contentRetrievalProgressSenderId(
+    detail: ContentRetrievalProgressDetail,
+  ): string | undefined {
+    return detail.sender?.toString();
+  }
+
+  private logContentRetrievalProgress(
+    cid: IPFSId,
+    event: ContentRetrievalProgressEvent,
+  ): void {
+    if (!HeliaIPFS.CONTENT_RETRIEVAL_DEBUG_EVENTS.has(event.type)) {
+      return;
+    }
+
+    const detail = this.contentRetrievalProgressDetail(event);
+    const providerId = this.contentRetrievalProgressProviderId(detail);
+    const providerRouting =
+      this.contentRetrievalProgressProviderRouting(detail);
+    const senderId = this.contentRetrievalProgressSenderId(detail);
+
+    Kernel.logger.debug(
+      `IPFS content retrieval progress: cid="${cid.valueOf()}" event="${event.type}" provider="${providerId ?? ''}" routing="${providerRouting ?? ''}" sender="${senderId ?? ''}"`,
+    );
   }
 
   private async collectRawBlockBytes(
@@ -442,9 +468,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
   }
 
-  private createBlockRetrievalOptions(
-    signal?: AbortSignal,
-  ): NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]> {
+  private createBlockRetrievalOptions(signal?: AbortSignal): {
+    signal?: AbortSignal;
+  } {
     return {
       signal,
     };
@@ -465,11 +491,25 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private async createUnixfsContentRetrievalOptions(
     cid: IPFSId,
     signal?: AbortSignal,
-  ): Promise<HeliaUnixfsCatOptions & ContentRetrievalOptions> {
-    return {
+  ): Promise<HeliaUnixfsCatOptions> {
+    const retrievalOptions = await this.createContentRetrievalOptions(
+      cid,
+      signal,
+    );
+    const options: HeliaUnixfsCatOptions = {
       ...this.createUnixfsCatOptions(signal),
-      ...(await this.createContentRetrievalOptions(cid, signal)),
     };
+
+    if (retrievalOptions.providers) {
+      options.providers = retrievalOptions.providers;
+    }
+
+    if (retrievalOptions.onProgress) {
+      options.onProgress =
+        retrievalOptions.onProgress as HeliaUnixfsCatOptions['onProgress'];
+    }
+
+    return options;
   }
 
   private usesLimitedConnections(): boolean {

@@ -1,11 +1,10 @@
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 import SendPushNotificationWhenEventReceived from './SendPushNotificationWhenEventReceived';
 
-// eslint-disable-next-line max-len
 export default class SendPushNotificationWhenCommunityMessageSent extends SendPushNotificationWhenEventReceived {
   public static QUEUE_NAME =
     'pigeon-swarm.send-push-when-community-message-sent';

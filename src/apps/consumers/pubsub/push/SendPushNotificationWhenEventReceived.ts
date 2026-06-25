@@ -1,9 +1,8 @@
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
-// eslint-disable-next-line max-len
 export default abstract class SendPushNotificationWhenEventReceived extends Consumer {
   constructor(
     eventConsumer: DomainEventConsumer,

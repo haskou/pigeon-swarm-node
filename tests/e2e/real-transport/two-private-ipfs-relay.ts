@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { PrivateIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
 import { PrivateKey } from '@haskou/value-objects';

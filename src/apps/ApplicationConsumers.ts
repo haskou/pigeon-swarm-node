@@ -23,10 +23,11 @@ import SendPushNotificationWhenCallStarted from '@app/apps/consumers/pubsub/push
 import SendPushNotificationWhenCommunityMessageSent from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent';
 import SendPushNotificationWhenConversationMessageSent from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenConversationMessageSent';
 import SendPushNotificationWhenNotificationCreated from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenNotificationCreated';
-import { ServiceClass } from '@app/shared/infrastructure/dependencyInjection/ServiceClass';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
 
-export const applicationConsumers: ServiceClass<Consumer>[] = [
+import { ApplicationServiceClass } from './ApplicationServiceClass';
+
+export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   RegisterIdentityWhenPublished,
   SynchronizeIdentityWhenUpdated,
   RegisterKeychainWhenPublished,

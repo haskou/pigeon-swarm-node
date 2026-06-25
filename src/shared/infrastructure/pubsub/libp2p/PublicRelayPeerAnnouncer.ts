@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 import { PublicRelayPeerAnnouncement } from './PublicRelayPeerAnnouncement';
@@ -60,7 +60,7 @@ export class PublicRelayPeerAnnouncer {
     return {
       issuedAt: Date.now(),
       multiaddrs: (node.getMultiaddrs?.() || []).map((address) =>
-        address.toString(),
+        String(address),
       ),
       peerId,
       version: 1,

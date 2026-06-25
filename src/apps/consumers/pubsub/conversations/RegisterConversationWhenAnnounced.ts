@@ -1,9 +1,9 @@
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 type ConversationAnnouncementAttributes = {
   name?: string;

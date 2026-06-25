@@ -124,7 +124,7 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('@app/Kernel', () => ({
+jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
     logger: { debug: jest.fn(), error: jest.fn(), info: jest.fn(), warn: jest.fn() },
@@ -179,7 +179,7 @@ describe('PublicIPFS', () => {
     });
 
     it('should log the peer id on creation', async () => {
-      const Kernel = (await import('@app/Kernel')).default;
+      const Kernel = (await import('@haskou/ddd-kernel')).default;
 
       await PublicIPFS.create({ storageLocation: 'memory' });
 
@@ -308,7 +308,7 @@ describe('PublicIPFS', () => {
     });
 
     it('should keep local record when routing publication fails', async () => {
-      const Kernel = (await import('@app/Kernel')).default;
+      const Kernel = (await import('@haskou/ddd-kernel')).default;
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 
       mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);

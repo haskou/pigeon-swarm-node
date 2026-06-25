@@ -1,7 +1,7 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import path from 'path';
 
 import { OrbitDBDatabase } from './OrbitDBDatabase';

@@ -3,16 +3,17 @@ import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/Content
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
-import { ServiceClass } from '@app/shared/infrastructure/dependencyInjection/ServiceClass';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 
-export const recurringSchedulers: ServiceClass<Scheduler>[] = [
+import { ApplicationServiceClass } from './ApplicationServiceClass';
+
+export const recurringSchedulers: ApplicationServiceClass<Scheduler>[] = [
   NodeHeartbeatScheduler,
   IdentityPresenceExpirationScheduler,
   CallTimeoutScheduler,
   ContentReplicationMaintenanceScheduler,
 ];
 
-export const startupSchedulers: ServiceClass<Scheduler>[] = [
+export const startupSchedulers: ApplicationServiceClass<Scheduler>[] = [
   LocalRoutingRecordRepublisherScheduler,
 ];

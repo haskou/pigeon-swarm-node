@@ -5,7 +5,6 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IdentityMetadataIndex from './IdentityMetadataIndex';
 import { IdentityMetadataRecord } from './IdentityMetadataRecord';
 
-// eslint-disable-next-line max-len
 export default class MetadataIdentityNetworkRepository extends IdentityNetworkRepository {
   constructor(private readonly metadataIndex: IdentityMetadataIndex) {
     super();

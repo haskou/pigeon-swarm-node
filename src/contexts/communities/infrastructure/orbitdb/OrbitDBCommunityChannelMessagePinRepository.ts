@@ -9,7 +9,6 @@ import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityC
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { OrbitDBCommunityChannelMessagePinDocument } from './documents/OrbitDBCommunityChannelMessagePinDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBCommunityChannelMessagePinRepository extends CommunityChannelMessagePinRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';

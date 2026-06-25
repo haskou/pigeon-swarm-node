@@ -6,7 +6,6 @@ import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityModerationLogId } from '../../domain/value-objects/CommunityModerationLogId';
 import { OrbitDBCommunityModerationLogDocument } from './documents/OrbitDBCommunityModerationLogDocument';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBCommunityModerationLogRepository extends CommunityModerationLogRepository {
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();

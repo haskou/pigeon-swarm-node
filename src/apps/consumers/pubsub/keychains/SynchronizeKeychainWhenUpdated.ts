@@ -1,9 +1,9 @@
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 export default class SynchronizeKeychainWhenUpdated extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.synchronize-keychain-when-updated';

@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export class CallSignalSentEvent extends DomainEvent {
   public static EVENT_NAME = 'calls.v1.signal.sent';

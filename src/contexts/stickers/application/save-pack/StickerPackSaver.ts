@@ -1,4 +1,4 @@
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';

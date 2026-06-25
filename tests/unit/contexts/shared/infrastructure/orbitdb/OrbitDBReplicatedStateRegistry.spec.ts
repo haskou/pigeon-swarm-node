@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';

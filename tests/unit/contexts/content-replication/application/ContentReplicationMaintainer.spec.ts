@@ -2,8 +2,8 @@ import ReplicatedContentStorage from '@app/contexts/content-replication/applicat
 import ContentReplicationStatusFinder from '@app/contexts/content-replication/application/find-status/ContentReplicationStatusFinder';
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
 import ContentReplicaClaimRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicaClaimRepository';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 describe('ContentReplicationMaintainer', () => {
   const localNodeId = '550e8400-e29b-41d4-a716-446655440010';

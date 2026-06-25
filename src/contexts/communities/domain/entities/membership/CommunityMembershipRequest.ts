@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { CommunityRequestActorMismatchError } from '../../errors/CommunityRequestActorMismatchError';

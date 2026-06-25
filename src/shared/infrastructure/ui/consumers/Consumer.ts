@@ -1,7 +1,7 @@
-import Kernel from '@app/Kernel';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
 import LocalProcessedDomainEventRepository from '@app/shared/infrastructure/messageBus/LocalProcessedDomainEventRepository';
+import Kernel from '@haskou/ddd-kernel';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 export default abstract class Consumer {
   private static processedEventIds = new Set<string>();
@@ -27,7 +27,7 @@ export default abstract class Consumer {
         );
 
       return this.processedEventRepository;
-    } catch (_error) {
+    } catch {
       return undefined;
     }
   }

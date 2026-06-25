@@ -3,7 +3,7 @@ import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/Orb
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
 import orbitDBRuntimeAdapter from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { EventEmitter } from 'events';
 import { mock, MockProxy } from 'jest-mock-extended';

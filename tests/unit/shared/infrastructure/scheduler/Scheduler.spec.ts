@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';

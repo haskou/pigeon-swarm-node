@@ -3,7 +3,7 @@ import { NotificationRecipientMismatchError } from '@app/contexts/notifications/
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { NotificationState } from '@app/contexts/notifications/domain/value-objects/NotificationState';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { NotificationUpdateMessage } from './messages/NotificationUpdateMessage';
 

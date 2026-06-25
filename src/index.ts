@@ -8,27 +8,30 @@ import {
   recurringSchedulers,
   startupSchedulers,
 } from '@app/apps/ApplicationSchedulers';
+import PigeonApplication from '@app/apps/PigeonApplication';
 import '@app/contexts/content-replication/infrastructure/ipfs/IpfsContentStorage';
 import '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
 import { orbitDBReplicatedEventTypes } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedEventTypes';
-import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+import { Kernel } from '@haskou/ddd-kernel';
 
 async function init() {
   console.time('Kernel');
-  const kernel = new Kernel();
+  const application = new PigeonApplication();
   console.timeEnd('Kernel');
 
-  console.time(`Environment ${process.env.NODE_ENV} variables`);
-  kernel.environmentVariables();
-  console.timeEnd(`Environment ${process.env.NODE_ENV} variables`);
+  const environment = process.env.NODE_ENV || 'local';
+
+  console.time(`Environment ${environment} variables`);
+  application.environmentVariables(environment);
+  console.timeEnd(`Environment ${environment} variables`);
 
   console.time('Dependency Injection');
-  await kernel.dependencyInjection();
+  await application.dependencyInjection();
   console.timeEnd('Dependency Injection');
 
-  kernel.configureWebSocketEventHub();
+  application.configureWebSocketEventHub();
 
   const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
 
@@ -37,35 +40,35 @@ async function init() {
   }
 
   console.time('Run server');
-  await kernel.runServer();
+  await application.runServer();
   console.timeEnd('Run server');
 
   console.time('Run consumers');
-  kernel.addConsumers(...applicationConsumers);
-  await kernel.runInitializers(...applicationInitializers);
-  await kernel.runConsumers();
+  application.addConsumers(...applicationConsumers);
+  await application.runInitializers(...applicationInitializers);
+  await application.runConsumers();
   console.timeEnd('Run consumers');
 
   console.time('Run Schedulers');
-  kernel.addSchedulers(...recurringSchedulers);
-  await kernel.runSchedulers();
+  application.addSchedulers(...recurringSchedulers);
+  await application.runSchedulers();
   console.timeEnd('Run Schedulers');
 
   console.time('Logs');
-  kernel.logs();
+  application.logs();
   console.timeEnd('Logs');
 
   console.time('Load local node state');
-  await kernel.loadLocalNodeState();
+  await application.loadLocalNodeState();
   console.timeEnd('Load local node state');
 
   console.time('Run runtimes');
-  await kernel.runRuntimes(...applicationRuntimes);
+  await application.runRuntimes(...applicationRuntimes);
   console.timeEnd('Run runtimes');
 
   console.time('Republish local routing records');
   for (const scheduler of startupSchedulers) {
-    await kernel.runSchedulerNowAndSchedule(scheduler);
+    await application.runSchedulerNowAndSchedule(scheduler);
   }
   console.timeEnd('Republish local routing records');
 

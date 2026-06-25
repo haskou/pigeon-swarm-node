@@ -1,10 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { BaseError } from '@haskou/ddd-kernel/domain';
 
 export class IPFSContentNotFoundError extends BaseError {
   constructor(cid: string) {
-    super(
-      `Content with CID ${cid} not found in any network`,
-      IPFSContentNotFoundError.prototype,
-    );
+    super(`Content with CID ${cid} not found in any network`);
   }
 }

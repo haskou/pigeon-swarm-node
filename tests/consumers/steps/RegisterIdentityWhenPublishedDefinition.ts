@@ -9,7 +9,7 @@ import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metad
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import { setDefaultTimeout } from '@cucumber/cucumber';
 import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';

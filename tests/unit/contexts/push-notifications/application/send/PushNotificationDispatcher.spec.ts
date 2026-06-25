@@ -13,7 +13,7 @@ import PushSubscriptionRepository from '@app/contexts/push-notifications/domain/
 import { PushSubscriptionEndpoint } from '@app/contexts/push-notifications/domain/value-objects/PushSubscriptionEndpoint';
 import { PushSubscriptionKey } from '@app/contexts/push-notifications/domain/value-objects/PushSubscriptionKey';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { KeyPair, Timestamp } from '@haskou/value-objects';
 
 class TestDomainEvent extends DomainEvent {

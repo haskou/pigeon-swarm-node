@@ -5,7 +5,7 @@ import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orb
 import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 
 type FakeStore = {

@@ -1,6 +1,6 @@
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { assert } from '@haskou/value-objects';
 
-import DomainEventPublisher from '../../../../shared/domain/events/DomainEventPublisher';
 import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';

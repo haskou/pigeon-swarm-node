@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export class CallStartedEvent extends DomainEvent {
   public static EVENT_NAME = 'calls.v1.call.started';

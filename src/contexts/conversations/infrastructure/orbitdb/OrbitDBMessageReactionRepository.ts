@@ -7,7 +7,6 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { OrbitDBMessageReactionDocument } from './documents/OrbitDBMessageReactionDocument';
 import OrbitDBMessageReactionMapper from './mappers/OrbitDBMessageReactionMapper';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBMessageReactionRepository extends MessageReactionRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

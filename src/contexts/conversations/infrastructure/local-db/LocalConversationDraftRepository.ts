@@ -8,7 +8,6 @@ import { ConversationDraft } from '../../domain/ConversationDraft';
 import ConversationDraftRepository from '../../domain/repositories/ConversationDraftRepository';
 import { LocalConversationDraftDocument } from './documents/LocalConversationDraftDocument';
 
-// eslint-disable-next-line max-len
 export default class LocalConversationDraftRepository extends ConversationDraftRepository {
   private static readonly NAMESPACE = 'conversation_drafts';
 

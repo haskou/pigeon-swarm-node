@@ -7,8 +7,8 @@ import { Node } from '../../../../../../src/contexts/nodes/domain/Node';
 import NodeNetworkDataCleaner from '../../../../../../src/contexts/nodes/domain/services/NodeNetworkDataCleaner';
 import NodeLoaderService from '../../../../../../src/contexts/nodes/domain/services/NodeLoaderService';
 import NodeSaverService from '../../../../../../src/contexts/nodes/domain/services/NodeSaverService';
-import DomainEvent from '../../../../../../src/shared/domain/events/DomainEvent';
-import DomainEventPublisher from '../../../../../../src/shared/domain/events/DomainEventPublisher';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 describe('NodeNetworkRemover', () => {
   let loader: MockProxy<NodeLoaderService>;

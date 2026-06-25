@@ -8,7 +8,6 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { OrbitDBCommunityChannelMessageReactionDocument } from './documents/OrbitDBCommunityChannelMessageReactionDocument';
 import OrbitDBCommunityChannelMessageReactionMapper from './mappers/OrbitDBCommunityChannelMessageReactionMapper';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBCommunityMessageReactionRepository extends CommunityMessageReactionRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

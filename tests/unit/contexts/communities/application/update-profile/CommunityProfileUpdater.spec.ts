@@ -4,7 +4,7 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityFinder from '@app/contexts/communities/application/find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '@app/contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('CommunityProfileUpdater', () => {

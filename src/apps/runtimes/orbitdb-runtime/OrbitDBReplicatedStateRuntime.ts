@@ -8,8 +8,8 @@ import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastr
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
 import { ReplicatedDomainEventMessage } from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedDomainEventMessage';
-import Kernel from '@app/Kernel';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+import Kernel from '@haskou/ddd-kernel';
 
 import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
 

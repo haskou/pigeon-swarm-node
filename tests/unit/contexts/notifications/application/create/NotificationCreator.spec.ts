@@ -2,7 +2,7 @@ import { NotificationCreateMessage } from '@app/contexts/notifications/applicati
 import NotificationCreator from '@app/contexts/notifications/application/create/NotificationCreator';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';

@@ -1,7 +1,7 @@
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import Log from '@app/shared/infrastructure/logs/Log';
 import { mock, MockProxy } from 'jest-mock-extended';
 

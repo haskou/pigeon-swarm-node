@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { KeyPair } from '@haskou/value-objects';
 
 export type UseCaseCall = {

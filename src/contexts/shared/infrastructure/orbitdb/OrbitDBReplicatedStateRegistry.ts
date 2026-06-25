@@ -1,6 +1,6 @@
-import Kernel from '@app/Kernel';
 import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import Kernel from '@haskou/ddd-kernel';
 
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
@@ -496,6 +496,28 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  private slowQueryRequestLabel(
+    requestContext: ReturnType<typeof HttpRequestContext.current>,
+  ): string {
+    return requestContext
+      ? `${requestContext.method} ${requestContext.originalUrl}`
+      : 'none';
+  }
+
+  private writeSlowQueryLog(
+    message: string,
+    isHttpRequest: boolean,
+    mode: OrbitDBQueryDocumentsMode,
+  ): void {
+    if (this.shouldWarnSlowQuery(isHttpRequest, mode)) {
+      Kernel.logger?.warn(message);
+
+      return;
+    }
+
+    Kernel.logger?.info(message);
+  }
+
   private logSlowQuery(
     storeName: OrbitDBReplicatedDocumentStoreName,
     durationMs: number,
@@ -515,9 +537,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const mode = options.mode || 'read';
     const operation = options.operation || this.queryCaller();
     const scanned = scannedDocuments ?? 'unknown';
-    const request = requestContext
-      ? `${requestContext.method} ${requestContext.originalUrl}`
-      : 'none';
+    const request = this.slowQueryRequestLabel(requestContext);
     const message = this.slowQueryMessage({
       deduplicatedDocuments,
       durationMs,
@@ -529,13 +549,7 @@ export default class OrbitDBReplicatedStateRegistry {
       storeName,
     });
 
-    if (this.shouldWarnSlowQuery(isHttpRequest, mode)) {
-      Kernel.logger?.warn(message);
-
-      return;
-    }
-
-    Kernel.logger?.info(message);
+    this.writeSlowQueryLog(message, isHttpRequest, mode);
   }
 
   private relatedIdentityIds(document: Record<string, unknown>): string[] {

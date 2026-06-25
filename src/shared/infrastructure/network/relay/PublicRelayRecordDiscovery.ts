@@ -1,6 +1,6 @@
-import Kernel from '@app/Kernel';
 import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
+import Kernel from '@haskou/ddd-kernel';
 
 import { PublicRelayPubSubConnection } from './PublicRelayPubSubConnection';
 import { PublicRelayRecordPrimitives } from './PublicRelayRecordPrimitives';

@@ -3,8 +3,8 @@ import libp2pKeyAdapter from '@app/contexts/shared/infrastructure/ipfs/networks/
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
-import Kernel from '@app/Kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import Kernel from '@haskou/ddd-kernel';
 
 import { PrivateNetworkRelayRecord } from './PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from './PrivateNetworkRelayRecordCodec';
@@ -638,11 +638,24 @@ export default class PrivateNetworkRelayRecordDirectory {
       Boolean(candidate) &&
       typeof candidate === 'object' &&
       candidate.version === 1 &&
-      Boolean(candidate.encryptedRelayRecord) &&
-      candidate.encryptedRelayRecord?.algorithm === 'aes-256-gcm' &&
-      typeof candidate.encryptedRelayRecord.authTag === 'string' &&
-      typeof candidate.encryptedRelayRecord.ciphertext === 'string' &&
-      typeof candidate.encryptedRelayRecord.iv === 'string'
+      this.isEncryptedRelayRecordEnvelope(candidate.encryptedRelayRecord)
+    );
+  }
+
+  private isEncryptedRelayRecordEnvelope(
+    value: unknown,
+  ): value is PrivateNetworkRelayRecordEnvelope['encryptedRelayRecord'] {
+    const candidate = value as Partial<
+      PrivateNetworkRelayRecordEnvelope['encryptedRelayRecord']
+    >;
+
+    return (
+      Boolean(candidate) &&
+      typeof candidate === 'object' &&
+      candidate.algorithm === 'aes-256-gcm' &&
+      typeof candidate.authTag === 'string' &&
+      typeof candidate.ciphertext === 'string' &&
+      typeof candidate.iv === 'string'
     );
   }
 

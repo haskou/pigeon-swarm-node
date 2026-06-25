@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import {
   PrimitiveOf,
   PublicKey,
@@ -45,7 +45,7 @@ export class Keychain extends AggregateRoot {
     private readonly timestamp: Timestamp,
     private readonly signature: Signature,
     private readonly version: KeychainVersion,
-    // eslint-disable-next-line max-len
+
     private readonly previousKeychainExternalIdentifier?: KeychainExternalIdentifier,
   ) {
     super();

@@ -2,9 +2,9 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCallPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { Timestamp } from '@haskou/value-objects';
 
 const callRingingTimeoutMs = 60_000;

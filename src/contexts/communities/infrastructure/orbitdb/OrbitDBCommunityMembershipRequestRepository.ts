@@ -8,7 +8,6 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { OrbitDBCommunityMembershipRequestDocument } from './documents/OrbitDBCommunityMembershipRequestDocument';
 import OrbitDBCommunityMembershipRequestMapper from './mappers/OrbitDBCommunityMembershipRequestMapper';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBCommunityMembershipRequestRepository extends CommunityMembershipRequestRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

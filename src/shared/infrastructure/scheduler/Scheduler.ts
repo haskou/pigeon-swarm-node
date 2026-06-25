@@ -1,5 +1,5 @@
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import cron from 'node-cron';
 
 import InvalidParseCronExpressionError from '../errors/scheduler/InvalidParseCronExpressionError';
@@ -30,6 +30,23 @@ export default abstract class Scheduler {
     );
   }
 
+  private handleExecutionError(err: unknown): void {
+    if (this.isReplicatedStateNotReady(err)) {
+      Kernel.logger?.debug?.(
+        `Scheduler: Skipping ${this.getProcessName()}; replicated state is not ready.`,
+      );
+
+      return;
+    }
+
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const error = new ScheduledExecutionError(
+      `Error on ${this.getProcessName()}: ${errorMessage}`,
+    );
+
+    Kernel.logger?.error?.(error.message);
+  }
+
   public abstract execute(): Promise<void>;
   public abstract getProcessName(): string;
   public abstract getCronExpression(): CronExpression;
@@ -39,20 +56,7 @@ export default abstract class Scheduler {
       Kernel.logger?.debug?.(`Scheduler: Executing ${this.getProcessName()}`);
       await this.execute();
     } catch (err: unknown) {
-      if (this.isReplicatedStateNotReady(err)) {
-        Kernel.logger?.debug?.(
-          `Scheduler: Skipping ${this.getProcessName()}; replicated state is not ready.`,
-        );
-
-        return;
-      }
-
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const error = new ScheduledExecutionError(
-        `Error on ${this.getProcessName()}: ${errorMessage}`,
-      );
-
-      Kernel.logger?.error?.(error.message);
+      this.handleExecutionError(err);
     }
   }
 
@@ -64,7 +68,7 @@ export default abstract class Scheduler {
     let parsedCronExpression: string;
     try {
       parsedCronExpression = this.parseCronExpression();
-    } catch (err) {
+    } catch {
       throw new InvalidParseCronExpressionError(this.getProcessName());
     }
     cron.schedule(parsedCronExpression, () => this.runOnce());

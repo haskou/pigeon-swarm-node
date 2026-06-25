@@ -9,7 +9,6 @@ import { CommunityChannelMessageEncryptedPayload } from '../../domain/value-obje
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { LocalCommunityChannelDraftDocument } from './documents/LocalCommunityChannelDraftDocument';
 
-// eslint-disable-next-line max-len
 export default class LocalCommunityChannelDraftRepository extends CommunityChannelDraftRepository {
   private static readonly NAMESPACE = 'community_channel_drafts';
 

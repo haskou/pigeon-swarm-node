@@ -2,7 +2,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import AggregateRoot from '@app/shared/domain/AggregateRoot';
+import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import {
   assert,
   PrimitiveOf,
@@ -27,7 +27,6 @@ import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class Identity extends AggregateRoot {
-  // eslint-disable-next-line max-len
   private readonly previousIdentityExternalIdentifier?: IdentityExternalIdentifier;
 
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {

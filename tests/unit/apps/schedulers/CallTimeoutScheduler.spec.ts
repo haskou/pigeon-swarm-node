@@ -8,7 +8,7 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 describe('CallTimeoutScheduler', () => {
   const creator = new IdentityId(

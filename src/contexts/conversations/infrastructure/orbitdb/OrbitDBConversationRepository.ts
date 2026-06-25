@@ -16,7 +16,6 @@ import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversat
 import OrbitDBConversationMapper from './mappers/OrbitDBConversationMapper';
 import OrbitDBConversationMessageMapper from './mappers/OrbitDBConversationMessageMapper';
 
-// eslint-disable-next-line max-len
 export default class OrbitDBConversationRepository implements ConversationRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

@@ -2,7 +2,7 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import CommunityFinder from '../find-community/CommunityFinder';
 import { CommunityChannelMessageSendMessage } from './messages/CommunityChannelMessageSendMessage';
@@ -11,7 +11,7 @@ export default class CommunityChannelMessageSender {
   constructor(
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
-    // eslint-disable-next-line max-len
+
     private readonly signatureService: CommunityChannelMessageSignatureDomainService,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}

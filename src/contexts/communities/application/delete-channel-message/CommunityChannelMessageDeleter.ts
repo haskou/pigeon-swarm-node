@@ -1,4 +1,4 @@
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { CommunityChannelMessageDeletion } from '../../domain/entities/messages/CommunityChannelMessageDeletion';
 import { CommunityModerationLogDetails } from '../../domain/entities/moderation/CommunityModerationLogDetails';
@@ -18,7 +18,7 @@ export default class CommunityChannelMessageDeleter {
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly moderationLogRepository: CommunityModerationLogRepository,
-    // eslint-disable-next-line max-len
+
     private readonly signatureService: CommunityChannelMessageSignatureDomainService,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}

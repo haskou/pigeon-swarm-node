@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import heliaRuntimeAdapter, {
   HeliaInstance,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';

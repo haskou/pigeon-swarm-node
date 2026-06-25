@@ -7,6 +7,16 @@ import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
 
 export class MessageDeleted extends Message {
+  private static targetMessageIdFromPrimitives(
+    primitives: PrimitiveOf<Message>,
+  ): MessageId {
+    if (!primitives.targetMessageId) {
+      throw new Error('Deleted message targetMessageId is required.');
+    }
+
+    return new MessageId(primitives.targetMessageId);
+  }
+
   public static create(
     metadata: MessageMetadata,
     targetMessageId: MessageId,
@@ -28,7 +38,7 @@ export class MessageDeleted extends Message {
         new Timestamp(primitives.createdAt),
         new Signature(primitives.signature),
       ),
-      new MessageId(primitives.targetMessageId),
+      this.targetMessageIdFromPrimitives(primitives),
     );
   }
 

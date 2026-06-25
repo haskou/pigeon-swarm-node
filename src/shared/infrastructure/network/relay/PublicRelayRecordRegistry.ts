@@ -46,9 +46,14 @@ export class PublicRelayRecordRegistry {
         | undefined;
     };
 
-    globalState[PublicRelayRecordRegistry.globalStateKey] ??= new Map();
+    let records = globalState[PublicRelayRecordRegistry.globalStateKey];
 
-    return globalState[PublicRelayRecordRegistry.globalStateKey];
+    if (!records) {
+      records = new Map();
+      globalState[PublicRelayRecordRegistry.globalStateKey] = records;
+    }
+
+    return records;
   }
 
   private get loaded(): boolean {
@@ -74,9 +79,14 @@ export class PublicRelayRecordRegistry {
         | undefined;
     };
 
-    globalState[PublicRelayRecordRegistry.globalListenersKey] ??= [];
+    let listeners = globalState[PublicRelayRecordRegistry.globalListenersKey];
 
-    return globalState[PublicRelayRecordRegistry.globalListenersKey];
+    if (!listeners) {
+      listeners = [];
+      globalState[PublicRelayRecordRegistry.globalListenersKey] = listeners;
+    }
+
+    return listeners;
   }
 
   private hasRecordStrings(

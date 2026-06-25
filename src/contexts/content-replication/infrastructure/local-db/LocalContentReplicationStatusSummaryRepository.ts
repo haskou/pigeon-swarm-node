@@ -5,7 +5,6 @@ import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedL
 
 import { LocalContentReplicationStatusSummaryDocument } from './documents/LocalContentReplicationStatusSummaryDocument';
 
-// eslint-disable-next-line max-len
 export default class LocalContentReplicationStatusSummaryRepository extends ContentReplicationStatusSummaryRepository {
   private static readonly NAMESPACE = 'content_replication_status_summaries';
 

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';

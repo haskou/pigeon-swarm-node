@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export class CommunityChannelWasCreatedEvent extends DomainEvent {
   public static EVENT_NAME = 'communities.v1.channel.was_created';

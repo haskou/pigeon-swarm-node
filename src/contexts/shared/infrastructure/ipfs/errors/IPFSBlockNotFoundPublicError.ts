@@ -1,10 +1,7 @@
-import BaseError from '@app/shared/domain/errors/BaseError';
+import { BaseError } from '@haskou/ddd-kernel/domain';
 
 export class IPFSBlockNotFoundPublicError extends BaseError {
   constructor(cid: string) {
-    super(
-      `Block not found (public): ${cid}`,
-      IPFSBlockNotFoundPublicError.prototype,
-    );
+    super(`Block not found (public): ${cid}`);
   }
 }

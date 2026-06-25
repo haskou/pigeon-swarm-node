@@ -124,7 +124,7 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('@app/Kernel', () => ({
+jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
     logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },

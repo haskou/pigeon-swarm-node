@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import { createRequire } from 'module';
 
 import PushNotificationDelivery from '../../application/send/PushNotificationDelivery';
@@ -10,7 +10,6 @@ import { WebPushError } from './types/WebPushError';
 import { WebPushModule } from './types/WebPushModule';
 import { WebPushSendResult } from './types/WebPushSendResult';
 
-// eslint-disable-next-line max-len
 export default class WebPushNotificationDelivery extends PushNotificationDelivery {
   private readonly webPush = this.loadWebPush();
   private hasLoggedDisabledDelivery = false;

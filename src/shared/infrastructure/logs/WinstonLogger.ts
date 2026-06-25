@@ -1,4 +1,4 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
 import expressWinston from 'express-winston';
 import winston, { Logger, format } from 'winston';
 
