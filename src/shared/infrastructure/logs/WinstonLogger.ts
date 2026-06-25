@@ -33,24 +33,26 @@ export default class WinstonLogger implements Log {
     format.json(),
   );
 
-  private readonly opts = {
-    level: process.env.LOG_LEVEL,
-    transports: [
-      new winston.transports.Console({
-        format: this.consoleFormat,
-        level: process.env.LOG_LEVEL,
-      }),
-      new winston.transports.File({
-        filename: this.getLogFileName(),
-        format: this.jsonFormat,
-        level: process.env.LOG_LEVEL,
-      }),
-    ],
-  };
-
   private _logger: Logger;
 
   private server?: HttpAppProvider;
+
+  private createLoggerOptions() {
+    return {
+      level: process.env.LOG_LEVEL,
+      transports: [
+        new winston.transports.Console({
+          format: this.consoleFormat,
+          level: process.env.LOG_LEVEL,
+        }),
+        new winston.transports.File({
+          filename: this.getLogFileName(),
+          format: this.jsonFormat,
+          level: process.env.LOG_LEVEL,
+        }),
+      ],
+    };
+  }
 
   private getLogFileName(): string {
     const logDirectory = process.env.LOG_URL || 'logs';
@@ -126,7 +128,7 @@ export default class WinstonLogger implements Log {
 
   public get logger(): Logger {
     if (!this._logger) {
-      this._logger = winston.createLogger(this.opts);
+      this._logger = winston.createLogger(this.createLoggerOptions());
     }
 
     return this._logger;
@@ -138,6 +140,6 @@ export default class WinstonLogger implements Log {
 
   public run(prefix?: string): void {
     this.prefix = prefix || '';
-    this.server?.app.use(expressWinston.logger(this.opts));
+    this.server?.app.use(expressWinston.logger(this.createLoggerOptions()));
   }
 }
