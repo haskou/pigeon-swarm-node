@@ -76,7 +76,14 @@ export default class PigeonApplication {
     ...ClassDefinitions: ApplicationServiceClass<Consumer>[]
   ): void {
     for (const ClassDefinition of ClassDefinitions) {
-      this.consumers.push(this.getConsumerFromClass(ClassDefinition));
+      const consumer = this.getConsumerFromClass(ClassDefinition);
+
+      this.consumers.push(consumer);
+      this.kernel.registerConsumerInstances(
+        consumer as unknown as Parameters<
+          typeof this.kernel.registerConsumerInstances
+        >[0],
+      );
     }
   }
 

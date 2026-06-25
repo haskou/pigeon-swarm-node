@@ -1,8 +1,8 @@
 import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/ContentReplicationMaintenanceScheduler';
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
 import { ContentReplicationMaintenanceResult } from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintenanceResult';
-import Kernel from '@haskou/ddd-kernel';
 import Log from '@app/shared/infrastructure/logs/Log';
+import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ContentReplicationMaintenanceScheduler', () => {
@@ -22,7 +22,7 @@ describe('ContentReplicationMaintenanceScheduler', () => {
   beforeEach(() => {
     logger = mock<Log>();
     maintainer = mock<ContentReplicationMaintainer>();
-    (Kernel as unknown as { _logs: Log })._logs = logger;
+    new Kernel({ logger });
   });
 
   it('logs idle maintenance at debug level', async () => {

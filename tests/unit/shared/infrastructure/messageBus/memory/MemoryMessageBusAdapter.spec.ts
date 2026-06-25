@@ -17,26 +17,18 @@ describe('MemoryMessageBusAdapter', () => {
     process.env.SERVICE_NAME = 'pigeon-swarm';
     MemoryMessageBusAdapter.memoryMessages = {};
     MemoryMessageBusAdapter.errorMemoryMessages = {};
-    (
-      Kernel as unknown as {
-        _consumers: unknown[];
-      }
-    )._consumers = [
+    new Kernel().registerConsumerInstances(
       {
         eventName: TestDomainEvent.EVENT_NAME,
         exchange: 'pigeon-swarm',
         queueName: 'test.queue',
-      },
-    ];
+      } as never,
+    );
   });
 
   afterEach(() => {
     process.env.SERVICE_NAME = originalServiceName;
-    (
-      Kernel as unknown as {
-        _consumers: unknown[];
-      }
-    )._consumers = [];
+    new Kernel().removeConsumers();
   });
 
   it('should publish to consumers on the default service exchange', async () => {

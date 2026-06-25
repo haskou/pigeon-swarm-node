@@ -1,7 +1,7 @@
-import Kernel from '@haskou/ddd-kernel';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
 import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import Kernel from '@haskou/ddd-kernel';
 import cron from 'node-cron';
 
 jest.mock('node-cron', () => ({
@@ -35,11 +35,13 @@ describe('Scheduler', () => {
   const logger = {
     debug: jest.fn(),
     error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (Kernel as unknown as { _logs: typeof logger })._logs = logger;
+    new Kernel({ logger });
   });
 
   it('logs scheduled execution errors without throwing from the cron callback', async () => {
@@ -59,9 +61,7 @@ describe('Scheduler', () => {
     expect(logger.debug).toHaveBeenCalledWith(
       'Scheduler: Executing test-scheduler',
     );
-    expect(logger.error).toHaveBeenCalledWith(
-      'Error on test-scheduler: boom',
-    );
+    expect(logger.error).toHaveBeenCalledWith('Error on test-scheduler: boom');
   });
 
   it('skips replicated state not ready errors without logging execution failures', async () => {

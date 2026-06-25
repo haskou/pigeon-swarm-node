@@ -14,7 +14,7 @@ describe('LocalRoutingRecordRepublisherScheduler', () => {
     identityRouting = mock<IpfsIdentityRouting>();
     keychainRouting = mock<IpfsKeychainRouting>();
     logger = mock<Log>();
-    (Kernel as unknown as { _logs: Log })._logs = logger;
+    new Kernel({ logger });
   });
 
   it('republishes identity and keychain routing records', async () => {

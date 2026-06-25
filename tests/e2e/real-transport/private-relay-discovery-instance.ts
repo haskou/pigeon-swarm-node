@@ -95,12 +95,14 @@ function configureTestLogger(): void {
     process.stderr.write(`[${ROLE}] ${level} ${message}\n`);
   };
 
-  (Kernel as unknown as { _logs: TestLogger })._logs = {
-    debug: (message: string): void => logToStderr('debug', message),
-    error: (message: string): void => logToStderr('error', message),
-    info: (message: string): void => logToStderr('info', message),
-    warn: (message: string): void => logToStderr('warn', message),
-  };
+  new Kernel({
+    logger: {
+      debug: (message: string): void => logToStderr('debug', message),
+      error: (message: string): void => logToStderr('error', message),
+      info: (message: string): void => logToStderr('info', message),
+      warn: (message: string): void => logToStderr('warn', message),
+    },
+  });
 }
 
 async function createPrivateNetwork(): Promise<void> {

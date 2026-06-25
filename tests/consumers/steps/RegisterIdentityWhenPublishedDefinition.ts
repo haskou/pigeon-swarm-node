@@ -57,16 +57,14 @@ export default class RegisterIdentityWhenPublishedDefinition {
   }
 
   private installTestLogger(): void {
-    (
-      Kernel as unknown as {
-        _logs: TestLogger;
-      }
-    )._logs = {
-      debug: () => undefined,
-      error: () => undefined,
-      info: () => undefined,
-      warn: () => undefined,
-    };
+    new Kernel({
+      logger: {
+        debug: () => undefined,
+        error: () => undefined,
+        info: () => undefined,
+        warn: () => undefined,
+      },
+    });
   }
 
   private async waitUntilIdentityIsRegistered(): Promise<void> {

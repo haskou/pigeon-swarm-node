@@ -710,10 +710,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/ddd-kernel@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-0.1.0.tgz#440cde59ca84c722377159a0a51dcc8d995d47a6"
-  integrity sha512-V8H/Zij8MgpMIFPiL72XpWz8rnacR8GcV5NWusFG+x4+iXbD0gxmL7YIWfVhTnvfu8aE9gzhrIyXIqRzIPWk1w==
+"@haskou/ddd-kernel@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-0.1.1.tgz#7210e99729b1da59f02bed36d8f3441e73c1c0f0"
+  integrity sha512-9UbYGZ9RkLKHhgXAU7G7Hc7ML+wUYWBlnBplzhLilPdJM8Lu9Xc02WS8GbnM5IywdQIvIaoNxR66gb4E4b2DkA==
 
 "@haskou/eslint-config@^0.1.1":
   version "0.1.1"
