@@ -1,4 +1,5 @@
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import Kernel from '@haskou/ddd-kernel';
 
 import { CommunityModerationLogEntry } from '../../domain/entities/moderation/CommunityModerationLogEntry';
 import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
@@ -15,7 +16,6 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     document: Record<string, unknown>,
   ): boolean {
     return (
-      document.deleted !== true &&
       typeof document.id === 'string' &&
       typeof document.action === 'string' &&
       typeof document.actorIdentityId === 'string' &&
@@ -40,6 +40,12 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   }
 
   private isDocument(
+    document: Record<string, unknown>,
+  ): document is OrbitDBCommunityModerationLogDocument {
+    return this.isStoredDocument(document) && document.deleted !== true;
+  }
+
+  private isStoredDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCommunityModerationLogDocument {
     return (
@@ -67,6 +73,10 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     return `community-moderation-log-index:${value}`;
   }
 
+  private logHeadKey(logId: string): string {
+    return `community-moderation-log:${logId}`;
+  }
+
   private documentsFromIndex(
     record: Record<string, unknown> | undefined,
   ): OrbitDBCommunityModerationLogDocument[] {
@@ -91,10 +101,56 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     >();
 
     for (const document of documents) {
-      deduplicated.set(document.id, document);
+      const current = deduplicated.get(document.id);
+
+      if (!current || this.isNewerOrEqualDocument(current, document)) {
+        deduplicated.set(document.id, document);
+      }
     }
 
     return [...deduplicated.values()];
+  }
+
+  private freshness(document: OrbitDBCommunityModerationLogDocument): number {
+    return document.deletedAt ?? document.createdAt;
+  }
+
+  private isNewerOrEqualDocument(
+    current: OrbitDBCommunityModerationLogDocument,
+    candidate: OrbitDBCommunityModerationLogDocument,
+  ): boolean {
+    const currentFreshness = this.freshness(current);
+    const candidateFreshness = this.freshness(candidate);
+
+    if (currentFreshness !== candidateFreshness) {
+      return currentFreshness <= candidateFreshness;
+    }
+
+    return current.deleted !== true && candidate.deleted === true;
+  }
+
+  private cachedLogDocuments(
+    communityId: CommunityId,
+  ): OrbitDBCommunityModerationLogDocument[] {
+    return this.registry
+      .findCachedHeadsByPrefix('community-moderation-log:')
+      .filter(
+        (document): document is OrbitDBCommunityModerationLogDocument =>
+          this.isDocument(document) &&
+          document.communityId === communityId.valueOf(),
+      );
+  }
+
+  private cachedStoredLogDocuments(
+    communityId: CommunityId,
+  ): OrbitDBCommunityModerationLogDocument[] {
+    return this.registry
+      .findCachedHeadsByPrefix('community-moderation-log:')
+      .filter(
+        (document): document is OrbitDBCommunityModerationLogDocument =>
+          this.isStoredDocument(document) &&
+          document.communityId === communityId.valueOf(),
+      );
   }
 
   private async putIndex(
@@ -117,15 +173,28 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     });
   }
 
+  private refreshIndexInBackground(
+    document: OrbitDBCommunityModerationLogDocument,
+  ): void {
+    void this.putIndex(document).catch((error) => {
+      Kernel.logger.warn?.(
+        `Community moderation log index refresh failed: logId=${document.id} error=${String(error)}`,
+      );
+    });
+  }
+
   public async findByCommunity(
     communityId: CommunityId,
     limit: number,
     beforeLogId?: CommunityModerationLogId,
   ): Promise<CommunityModerationLogEntry[]> {
-    const documents = this.documentsFromIndex(
+    const indexedDocuments = this.documentsFromIndex(
       await this.registry.findHead(this.communityIndexHeadKey(communityId)),
     );
-    const typedDocuments = documents
+    const typedDocuments = this.deduplicateDocuments([
+      ...indexedDocuments,
+      ...this.cachedStoredLogDocuments(communityId),
+    ])
       .filter((document): document is OrbitDBCommunityModerationLogDocument =>
         this.isDocument(document),
       )
@@ -154,9 +223,12 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    const documents = this.documentsFromIndex(
-      await this.registry.findHead(this.communityIndexHeadKey(communityId)),
-    );
+    const documents = this.deduplicateDocuments([
+      ...this.documentsFromIndex(
+        await this.registry.findHead(this.communityIndexHeadKey(communityId)),
+      ),
+      ...this.cachedLogDocuments(communityId),
+    ]);
 
     await Promise.all(
       documents
@@ -171,6 +243,9 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
           };
 
           await this.registry.putDocument('moderationLogs', tombstone);
+          await this.registry.putHead(this.logHeadKey(document.id), {
+            ...tombstone,
+          });
           await this.putIndex(tombstone);
         }),
     );
@@ -180,6 +255,9 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     const document = this.toDocument(entry);
 
     await this.registry.putDocument('moderationLogs', document);
-    await this.putIndex(document);
+    await this.registry.putHead(this.logHeadKey(document.id), {
+      ...document,
+    });
+    this.refreshIndexInBackground(document);
   }
 }

@@ -51,3 +51,9 @@ Invalid uses:
 If behavior is missing, prefer adding it to the owning value object or domain concept instead of creating a helper that knows its internals.
 
 Avoid generic conversion helpers unless the project already has a boundary-owned mapper pattern and the helper is explicitly about boundary conversion, not domain decision-making.
+
+## Nullish behavior
+
+Do not return `Foo | undefined`, `Foo | null`, or broad optional unions from domain/application code as defensive programming.
+
+If absence is part of the ubiquitous language, model it explicitly with a named domain concept. If the project uses `@haskou/value-objects` and a required value/object is missing, return `NullObject.new(Foo)` instead of widening the return type, and let the appropriate error handler handle that failure path.

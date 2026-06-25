@@ -14,13 +14,21 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     'MCowBQYDK2VwAyEARcVr0970Zu0KPAIPEEvpy9RjsnM05VnDmccfWloMx8k=',
   );
   const communities: Record<string, unknown>[] = [];
+  const heads = new Map<string, Record<string, unknown>>();
   const requests: Record<string, unknown>[] = [];
+  let headsPut: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let store: OrbitDBCommunityMembershipRequestRepository;
 
   beforeEach(() => {
     communities.splice(0);
+    heads.clear();
     requests.splice(0);
+    headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
+      heads.set(key, value);
+
+      return 'ok';
+    });
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register('network-1', {
       communities: {
@@ -32,9 +40,15 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
         query: jest.fn(async (matcher) => communities.filter(matcher)),
       },
       heads: {
-        all: jest.fn(async (): Promise<[]> => []),
-        get: jest.fn(async (): Promise<undefined> => undefined),
-        put: jest.fn(async () => 'ok'),
+        all: jest.fn(async () =>
+          [...heads.entries()].map(([key, value]) => ({ key, value })),
+        ),
+        get: jest.fn(async (key: string) => {
+          const value = heads.get(key);
+
+          return value ? { key, value } : undefined;
+        }),
+        put: headsPut,
       },
       requests: {
         put: jest.fn(async (document) => {
@@ -70,9 +84,11 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
 
     await registry.putHead(`community:${communityId.valueOf()}`, {
       id: communityId.valueOf(),
+      networkId: 'network-1',
       ownerIdentityId: ownerIdentityId.valueOf(),
     });
     await store.save(request);
+    await flushBackgroundTasks();
 
     const byId = await store.findById(request.getId());
     const byIdentity = await store.findByIdentity(invitedIdentityId);
@@ -94,4 +110,131 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     expect(byOwnedCommunity).toHaveLength(1);
     expect(afterDelete).toHaveLength(0);
   });
+
+  it('should not wait for secondary indexes when saving membership requests', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    headsPut.mockImplementation(
+      async (key: string, value: Record<string, unknown>) => {
+        if (!key.startsWith('community-membership-request:')) {
+          return new Promise(() => undefined);
+        }
+
+        heads.set(key, value);
+
+        return 'ok';
+      },
+    );
+
+    const result = await Promise.race([
+      store.save(request).then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    expect(heads.get(`community-membership-request:${request.getId().valueOf()}`))
+      .toEqual(expect.objectContaining({ id: request.getId().valueOf() }));
+  });
+
+  it('should find membership requests from fresh heads when identity indexes lag', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    heads.delete(`community-membership-request-identity-index:${invitedIdentityId.valueOf()}`);
+
+    const byIdentity = await store.findByIdentity(invitedIdentityId);
+
+    expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
+      request.getId().valueOf(),
+    ]);
+  });
+
+  it('should find membership requests from fresh heads by creator when identity indexes lag', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    heads.delete(
+      `community-membership-request-identity-index:${ownerIdentityId.valueOf()}`,
+    );
+
+    const byCreator = await store.findByIdentity(ownerIdentityId);
+
+    expect(byCreator.map((item) => item.getId().valueOf())).toEqual([
+      request.getId().valueOf(),
+    ]);
+  });
+
+  it('should not return deleted membership requests from stale indexes', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+    const communityIndexKey = `community-membership-request-community-index:${communityId.valueOf()}`;
+    const identityIndexKey = `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`;
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    await flushBackgroundTasks();
+    const staleCommunityIndex = heads.get(communityIndexKey);
+    const staleIdentityIndex = heads.get(identityIndexKey);
+
+    await store.deleteByCommunity(communityId);
+
+    if (staleCommunityIndex) {
+      heads.set(communityIndexKey, staleCommunityIndex);
+    }
+
+    if (staleIdentityIndex) {
+      heads.set(identityIndexKey, staleIdentityIndex);
+    }
+
+    const byIdentity = await store.findByIdentity(invitedIdentityId);
+    const byCommunityAndIdentity = await store.findByCommunityAndIdentity(
+      communityId,
+      invitedIdentityId,
+    );
+
+    expect(byIdentity).toEqual([]);
+    expect(byCommunityAndIdentity).toEqual([]);
+  });
 });
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}

@@ -1,4 +1,5 @@
 import { Call } from '@app/contexts/calls/domain/Call';
+import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -68,6 +69,7 @@ describe('OrbitDBCallRepository', () => {
   const communityId = new CommunityId('community-1');
   const channelId = new CommunityChannelId('channel-1');
   let calls: ReturnType<typeof createStore>;
+  let heads: ReturnType<typeof createStore>;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCallRepository;
 
@@ -104,10 +106,11 @@ describe('OrbitDBCallRepository', () => {
 
   beforeEach(() => {
     calls = createStore();
+    heads = createStore();
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register(networkId, {
       calls,
-      heads: createStore(),
+      heads,
     } as never);
     repository = new OrbitDBCallRepository(registry);
   });
@@ -118,6 +121,7 @@ describe('OrbitDBCallRepository', () => {
 
   it('reads active community calls from indexes after saving', async () => {
     await repository.save(communityCall());
+    await flushBackgroundTasks();
     calls.query.mockClear();
 
     const result = await repository.findActiveByCommunity(communityId);
@@ -128,7 +132,9 @@ describe('OrbitDBCallRepository', () => {
 
   it('removes ended calls from active indexes after saving the newer state', async () => {
     await repository.save(communityCall());
+    await flushBackgroundTasks();
     await repository.save(communityCall('ended'));
+    await flushBackgroundTasks();
     calls.query.mockClear();
 
     await expect(repository.findActiveByCommunity(communityId)).resolves.toEqual(
@@ -139,6 +145,7 @@ describe('OrbitDBCallRepository', () => {
 
   it('uses the active index for timeout checks', async () => {
     await repository.save(communityCall());
+    await flushBackgroundTasks();
     calls.query.mockClear();
 
     const timedOut = await repository.findTimedOutRingingCalls(
@@ -148,4 +155,56 @@ describe('OrbitDBCallRepository', () => {
     expect(timedOut.map((call) => call.toPrimitives().id)).toEqual([callId]);
     expect(calls.query).not.toHaveBeenCalled();
   });
+
+  it('does not wait for secondary indexes when saving calls', async () => {
+    const putHead = heads.put.getMockImplementation();
+
+    heads.put.mockImplementation(
+      async (keyOrDocument: string | Record<string, unknown>, value) => {
+        const key =
+          typeof keyOrDocument === 'string'
+            ? keyOrDocument
+            : String(keyOrDocument.id);
+
+        if (key !== `call:${callId}`) {
+          return new Promise(() => undefined);
+        }
+
+        return putHead?.(keyOrDocument, value) ?? key;
+      },
+    );
+
+    const result = await Promise.race([
+      repository.save(communityCall()).then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    await expect(repository.findById(new CallId(callId))).resolves.toBeDefined();
+  });
+
+  it('prefers fresh call heads over stale active indexes', async () => {
+    await repository.save(communityCall());
+    await flushBackgroundTasks();
+    const staleActiveIndex = await heads.get(
+      `call-community-active-index:${communityId.valueOf()}`,
+    );
+
+    await repository.save(communityCall('ended'));
+
+    if (staleActiveIndex) {
+      await registry.putHead(
+        `call-community-active-index:${communityId.valueOf()}`,
+        staleActiveIndex,
+      );
+    }
+
+    await expect(repository.findActiveByCommunity(communityId)).resolves.toEqual(
+      [],
+    );
+  });
 });
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
