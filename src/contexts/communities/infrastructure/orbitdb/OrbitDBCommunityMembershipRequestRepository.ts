@@ -4,6 +4,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import Kernel from '@haskou/ddd-kernel';
 
 import { OrbitDBCommunityMembershipRequestDocument } from './documents/OrbitDBCommunityMembershipRequestDocument';
 import OrbitDBCommunityMembershipRequestMapper from './mappers/OrbitDBCommunityMembershipRequestMapper';
@@ -145,6 +146,12 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     document: OrbitDBCommunityMembershipRequestDocument,
   ): Promise<void> {
     await this.registry.putHead(this.headKey(document.id), { ...document });
+    await this.putIndexes(document);
+  }
+
+  private async putIndexes(
+    document: OrbitDBCommunityMembershipRequestDocument,
+  ): Promise<void> {
     await this.putIndex(
       this.communityIndexHeadKey(document.communityId),
       document,
@@ -161,6 +168,25 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
           }),
       ),
     );
+  }
+
+  private refreshIndexesInBackground(
+    document: OrbitDBCommunityMembershipRequestDocument,
+  ): void {
+    void this.putIndexes(document).catch((error) => {
+      Kernel.logger.warn?.(
+        `Community membership request indexes refresh failed: requestId=${document.id} error=${String(error)}`,
+      );
+    });
+  }
+
+  private cachedRequestDocuments(): Array<OrbitDBCommunityMembershipRequestDocument> {
+    return this.registry
+      .findCachedHeadsByPrefix('community-membership-request:')
+      .filter(
+        (document): document is OrbitDBCommunityMembershipRequestDocument =>
+          this.isDocument(document),
+      );
   }
 
   private toDomain(
@@ -192,10 +218,14 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     communityId: CommunityId,
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]> {
-    const documents = this.documentsFromIndex(
+    const indexedDocuments = this.documentsFromIndex(
       await this.registry.findHead(this.communityIndexHeadKey(communityId)),
-    ).filter((document) =>
-      new IdentityId(document.identityId).isEqual(identityId),
+    );
+    const cachedDocuments = this.cachedRequestDocuments();
+    const documents = [...indexedDocuments, ...cachedDocuments].filter(
+      (document) =>
+        document.communityId === communityId.valueOf() &&
+        new IdentityId(document.identityId).isEqual(identityId),
     );
 
     return this.toDomain(
@@ -218,9 +248,14 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]> {
     return this.toDomain(
-      this.documentsFromIndex(
-        await this.registry.findHead(this.identityIndexHeadKey(identityId)),
-      ),
+      this.deduplicateDocuments([
+        ...this.documentsFromIndex(
+          await this.registry.findHead(this.identityIndexHeadKey(identityId)),
+        ),
+        ...this.cachedRequestDocuments().filter((document) =>
+          new IdentityId(document.identityId).isEqual(identityId),
+        ),
+      ]).sort((left, right) => right.updatedAt - left.updatedAt),
     );
   }
 
@@ -246,21 +281,27 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
       return [];
     }
 
-    const documents = (
+    const indexedDocuments = (
       await Promise.all(
         [...communityIds].map((communityId) =>
           this.registry.findHead(this.communityIndexHeadKey(communityId)),
         ),
       )
     ).flatMap((record) => this.documentsFromIndex(record));
+    const cachedDocuments = this.cachedRequestDocuments().filter((document) =>
+      communityIds.has(document.communityId),
+    );
 
-    return this.toDomain(this.deduplicateDocuments(documents));
+    return this.toDomain(
+      this.deduplicateDocuments([...indexedDocuments, ...cachedDocuments]),
+    );
   }
 
   public async save(request: CommunityMembershipRequest): Promise<void> {
     const document = this.mapper.toDocument(request);
 
     await this.registry.putDocument('requests', document);
-    await this.putHeads(document);
+    await this.registry.putHead(this.headKey(document.id), { ...document });
+    this.refreshIndexesInBackground(document);
   }
 }
