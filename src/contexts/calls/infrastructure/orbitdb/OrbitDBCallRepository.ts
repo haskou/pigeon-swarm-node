@@ -6,6 +6,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
@@ -153,6 +154,24 @@ export default class OrbitDBCallRepository extends CallRepository {
     return this.documentsFromIndex(await this.registry.findHead(key));
   }
 
+  private cachedCallDocuments(): OrbitDBCallDocument[] {
+    return this.registry
+      .findCachedHeadsByPrefix('call:')
+      .filter((document): document is OrbitDBCallDocument =>
+        this.isDocument(document),
+      );
+  }
+
+  private async callDocumentsFromIndexAndCache(
+    key: string,
+    filter: (document: OrbitDBCallDocument) => boolean,
+  ): Promise<OrbitDBCallDocument[]> {
+    return this.deduplicateDocuments([
+      ...((await this.findIndexDocuments(key)) ?? []),
+      ...this.cachedCallDocuments().filter(filter),
+    ]);
+  }
+
   private async putIndex(
     key: string,
     documents: OrbitDBCallDocument[],
@@ -188,13 +207,15 @@ export default class OrbitDBCallRepository extends CallRepository {
     return document.status === 'active';
   }
 
-  private async putHeads(document: OrbitDBCallDocument): Promise<void> {
+  private async putCallHead(document: OrbitDBCallDocument): Promise<void> {
     await this.registry.putHead(
       this.callHeadKey(document.id),
       { ...document },
       [document.networkId],
     );
+  }
 
+  private async putIndexes(document: OrbitDBCallDocument): Promise<void> {
     await this.putIndexDocument(this.activeIndexHeadKey(), document, (call) =>
       this.isActive(call),
     );
@@ -238,6 +259,14 @@ export default class OrbitDBCallRepository extends CallRepository {
     }
   }
 
+  private refreshIndexesInBackground(document: OrbitDBCallDocument): void {
+    void this.putIndexes(document).catch((error) => {
+      Kernel.logger.warn?.(
+        `Call indexes refresh failed: callId=${document.id} error=${String(error)}`,
+      );
+    });
+  }
+
   public async findById(id: CallId): Promise<Call | undefined> {
     const head = await this.registry.findHead(this.callHeadKey(id.valueOf()));
 
@@ -250,7 +279,12 @@ export default class OrbitDBCallRepository extends CallRepository {
     const indexedDocuments = await this.findIndexDocuments(
       this.participantIndexHeadKey(participantId.valueOf()),
     );
-    const documents = indexedDocuments ?? [];
+    const documents = this.deduplicateDocuments([
+      ...(indexedDocuments ?? []),
+      ...this.cachedCallDocuments().filter((document) =>
+        document.participantIds.includes(participantId.valueOf()),
+      ),
+    ]);
 
     return documents
       .filter(
@@ -266,10 +300,10 @@ export default class OrbitDBCallRepository extends CallRepository {
   }
 
   public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
-    const documents =
-      (await this.findIndexDocuments(
-        this.participantIndexHeadKey(participantId.valueOf()),
-      )) ?? [];
+    const documents = await this.callDocumentsFromIndexAndCache(
+      this.participantIndexHeadKey(participantId.valueOf()),
+      (document) => document.participantIds.includes(participantId.valueOf()),
+    );
 
     return documents.map((document) => this.toDomain(document));
   }
@@ -277,10 +311,12 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findByConversationId(
     conversationId: ConversationId,
   ): Promise<Call[]> {
-    const documents =
-      (await this.findIndexDocuments(
-        this.conversationIndexHeadKey(conversationId.valueOf()),
-      )) ?? [];
+    const documents = await this.callDocumentsFromIndexAndCache(
+      this.conversationIndexHeadKey(conversationId.valueOf()),
+      (document) =>
+        document.scope.type === 'conversation' &&
+        document.scope.conversationId === conversationId.valueOf(),
+    );
 
     return documents
       .sort((left, right) => left.createdAt - right.createdAt)
@@ -291,13 +327,16 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call[]> {
-    const documents =
-      (await this.findIndexDocuments(
-        this.communityChannelIndexHeadKey(
-          communityId.valueOf(),
-          channelId.valueOf(),
-        ),
-      )) ?? [];
+    const documents = await this.callDocumentsFromIndexAndCache(
+      this.communityChannelIndexHeadKey(
+        communityId.valueOf(),
+        channelId.valueOf(),
+      ),
+      (document) =>
+        document.scope.type === 'community_channel' &&
+        document.scope.communityId === communityId.valueOf() &&
+        document.scope.channelId === channelId.valueOf(),
+    );
 
     return documents
       .sort((left, right) => left.createdAt - right.createdAt)
@@ -309,12 +348,16 @@ export default class OrbitDBCallRepository extends CallRepository {
     channelId: CommunityChannelId,
   ): Promise<Call | undefined> {
     const [document] = (
-      (await this.findIndexDocuments(
+      await this.callDocumentsFromIndexAndCache(
         this.communityChannelIndexHeadKey(
           communityId.valueOf(),
           channelId.valueOf(),
         ),
-      )) ?? []
+        (candidate) =>
+          candidate.scope.type === 'community_channel' &&
+          candidate.scope.communityId === communityId.valueOf() &&
+          candidate.scope.channelId === channelId.valueOf(),
+      )
     ).filter((candidate) => candidate.status === 'active');
 
     return document ? this.toDomain(document) : undefined;
@@ -323,12 +366,15 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findActiveByCommunity(
     communityId: CommunityId,
   ): Promise<Call[]> {
-    const documents =
-      (await this.findIndexDocuments(
-        this.communityActiveIndexHeadKey(communityId.valueOf()),
-      )) ?? [];
+    const documents = await this.callDocumentsFromIndexAndCache(
+      this.communityActiveIndexHeadKey(communityId.valueOf()),
+      (document) =>
+        document.scope.type === 'community_channel' &&
+        document.scope.communityId === communityId.valueOf(),
+    );
 
     return documents
+      .filter((document) => document.status === 'active')
       .sort((left, right) => left.createdAt - right.createdAt)
       .map((document) => this.toDomain(document));
   }
@@ -336,12 +382,15 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
   ): Promise<Call[]> {
-    const documents =
-      (await this.findIndexDocuments(this.activeIndexHeadKey())) ?? [];
+    const documents = await this.callDocumentsFromIndexAndCache(
+      this.activeIndexHeadKey(),
+      (document) => document.status === 'active',
+    );
 
     return documents
       .filter(
         (document) =>
+          document.status === 'active' &&
           document.createdAt <= timeoutThreshold.valueOf() &&
           document.participants.some(
             (participant) => participant.status === 'ringing',
@@ -353,17 +402,21 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findTimedOutJoinedCalls(
     timeoutThreshold: Timestamp,
   ): Promise<Call[]> {
-    const documents =
-      (await this.findIndexDocuments(this.activeIndexHeadKey())) ?? [];
+    const documents = await this.callDocumentsFromIndexAndCache(
+      this.activeIndexHeadKey(),
+      (document) => document.status === 'active',
+    );
 
     return documents
-      .filter((document) =>
-        document.participants.some(
-          (participant) =>
-            participant.status === 'joined' &&
-            participant.lastSeenAt !== undefined &&
-            participant.lastSeenAt <= timeoutThreshold.valueOf(),
-        ),
+      .filter(
+        (document) =>
+          document.status === 'active' &&
+          document.participants.some(
+            (participant) =>
+              participant.status === 'joined' &&
+              participant.lastSeenAt !== undefined &&
+              participant.lastSeenAt <= timeoutThreshold.valueOf(),
+          ),
       )
       .map((document) => this.toDomain(document));
   }
@@ -372,6 +425,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     const document = this.toDocument(call);
 
     await this.registry.putDocument('calls', document);
-    await this.putHeads(document);
+    await this.putCallHead(document);
+    this.refreshIndexesInBackground(document);
   }
 }
