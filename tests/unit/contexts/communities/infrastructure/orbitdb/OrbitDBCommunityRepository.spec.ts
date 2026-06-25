@@ -202,6 +202,25 @@ describe('OrbitDBCommunityRepository', () => {
     expect(byId).toBeUndefined();
   });
 
+  it('should not return deleted communities from stale member indexes', async () => {
+    const community = Community.fromPrimitives(communityPrimitives());
+    const indexKey = `community-member-index:${identityMother.id.valueOf()}`;
+
+    await repository.save(community);
+    await flushBackgroundTasks();
+    const staleMemberIndex = heads.get(indexKey);
+
+    await repository.delete(community);
+
+    if (staleMemberIndex) {
+      heads.set(indexKey, staleMemberIndex);
+    }
+
+    const byMember = await repository.findByMember(identityMother.id);
+
+    expect(byMember).toEqual([]);
+  });
+
   function communityPrimitives(): PrimitiveOf<Community> {
     return {
       autoJoinEnabled: false,

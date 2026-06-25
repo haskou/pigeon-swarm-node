@@ -5,4 +5,5 @@ import { CommunityModerationLogEntry } from '../../../domain/entities/moderation
 export interface OrbitDBCommunityModerationLogDocument
   extends PrimitiveOf<CommunityModerationLogEntry>, Record<string, unknown> {
   deleted?: boolean;
+  deletedAt?: number;
 }

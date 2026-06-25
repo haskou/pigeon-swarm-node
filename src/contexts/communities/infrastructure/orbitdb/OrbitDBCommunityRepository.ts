@@ -104,7 +104,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     for (const document of documents) {
       const current = deduplicated.get(document.id);
 
-      if (!current || this.freshness(current) <= this.freshness(document)) {
+      if (!current || this.isNewerOrEqualDocument(current, document)) {
         deduplicated.set(document.id, document);
       }
     }
@@ -112,6 +112,20 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return [...deduplicated.values()].sort(
       (left, right) => this.freshness(right) - this.freshness(left),
     );
+  }
+
+  private isNewerOrEqualDocument(
+    current: OrbitDBCommunityDocument,
+    candidate: OrbitDBCommunityDocument,
+  ): boolean {
+    const currentFreshness = this.freshness(current);
+    const candidateFreshness = this.freshness(candidate);
+
+    if (currentFreshness !== candidateFreshness) {
+      return currentFreshness <= candidateFreshness;
+    }
+
+    return current.deleted !== true && candidate.deleted === true;
   }
 
   private freshness(document: OrbitDBCommunityDocument): number {
@@ -135,6 +149,14 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         this.isDocument(document),
       )
       .sort((left, right) => this.freshness(right) - this.freshness(left));
+  }
+
+  private cachedStoredCommunityDocuments(): OrbitDBCommunityDocument[] {
+    return this.registry
+      .findCachedHeadsByPrefix('community:')
+      .filter((document): document is OrbitDBCommunityDocument =>
+        this.isStoredDocument(document),
+      );
   }
 
   private async putMemberIndex(
@@ -258,18 +280,17 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         this.memberIndexHeadKey(identityId.valueOf()),
       ),
     );
-    const cachedDocuments = this.registry
-      .findCachedHeadsByPrefix('community:')
-      .map((candidate) => (this.isDocument(candidate) ? candidate : undefined))
-      .filter(
-        (document): document is OrbitDBCommunityDocument =>
-          document !== undefined &&
-          document.memberIds.includes(identityId.valueOf()),
-      );
+    const cachedDocuments = this.cachedStoredCommunityDocuments().filter(
+      (document) => document.memberIds.includes(identityId.valueOf()),
+    );
     const documents = [...(indexedDocuments || []), ...cachedDocuments];
 
     return this.deduplicateDocuments(documents)
-      .filter((document) => document.memberIds.includes(identityId.valueOf()))
+      .filter(
+        (document) =>
+          this.isDocument(document) &&
+          document.memberIds.includes(identityId.valueOf()),
+      )
       .map((document) => this.mapper.toDomain(document));
   }
 

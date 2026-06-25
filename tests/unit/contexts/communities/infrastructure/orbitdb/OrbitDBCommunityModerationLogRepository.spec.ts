@@ -97,6 +97,27 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     ]);
   });
 
+  it('should not return deleted moderation logs from stale indexes', async () => {
+    const entry = moderationLogEntry();
+    const indexKey = `community-moderation-log-index:${communityId.valueOf()}`;
+
+    await repository.save(entry);
+    await flushBackgroundTasks();
+    const staleIndex = heads.get(indexKey);
+
+    await repository.deleteByCommunity(communityId);
+
+    if (staleIndex) {
+      heads.set(indexKey, staleIndex);
+    }
+
+    const logs = await repository.findByCommunity(communityId, 10);
+
+    expect(logs).toEqual([]);
+    expect(heads.get(`community-moderation-log:${entry.getId().valueOf()}`))
+      .toEqual(expect.objectContaining({ deleted: true }));
+  });
+
   function moderationLogEntry(): CommunityModerationLogEntry {
     return CommunityModerationLogEntry.record(
       communityId,
@@ -109,3 +130,7 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     );
   }
 });
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}

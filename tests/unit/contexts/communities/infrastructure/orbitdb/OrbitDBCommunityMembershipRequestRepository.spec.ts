@@ -168,6 +168,46 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       request.getId().valueOf(),
     ]);
   });
+
+  it('should not return deleted membership requests from stale indexes', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+    const communityIndexKey = `community-membership-request-community-index:${communityId.valueOf()}`;
+    const identityIndexKey = `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`;
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    await flushBackgroundTasks();
+    const staleCommunityIndex = heads.get(communityIndexKey);
+    const staleIdentityIndex = heads.get(identityIndexKey);
+
+    await store.deleteByCommunity(communityId);
+
+    if (staleCommunityIndex) {
+      heads.set(communityIndexKey, staleCommunityIndex);
+    }
+
+    if (staleIdentityIndex) {
+      heads.set(identityIndexKey, staleIdentityIndex);
+    }
+
+    const byIdentity = await store.findByIdentity(invitedIdentityId);
+    const byCommunityAndIdentity = await store.findByCommunityAndIdentity(
+      communityId,
+      invitedIdentityId,
+    );
+
+    expect(byIdentity).toEqual([]);
+    expect(byCommunityAndIdentity).toEqual([]);
+  });
 });
 
 function flushBackgroundTasks(): Promise<void> {
