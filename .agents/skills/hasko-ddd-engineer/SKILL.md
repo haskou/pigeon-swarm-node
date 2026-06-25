@@ -1,5 +1,5 @@
 ---
-name: hasko-ddd-engineer
+name: ddd-engineer
 description: Implement, refactor, review, and document software using practical Domain-Driven Design, SOLID, explicit application boundaries, value objects, tests, and public-contract discipline.
 ---
 
@@ -105,6 +105,8 @@ This is an execution skill, not a theoretical DDD checklist. Read the existing c
 - Do not default to generic method names like `execute` when the codebase expects ubiquitous language.
 - Private methods in use cases are only for orchestration mechanics. If a private method names a business rule, move it into the domain.
 - Do not create pass-through ports. A port must describe a real outbound dependency in ubiquitous language.
+- Do not use defensive programming as a default. Do not return `Foo | undefined`, `Foo | null`, or broad optional unions just to force every caller to guard against missing data.
+- If absence is part of the ubiquitous language, model it explicitly as a domain concept. If the project uses `@haskou/value-objects` and a required value/object is missing, return `NullObject.new(Foo)` instead of widening the return type, and let the appropriate error handler handle that failure path.
 
 ## Messages, commands, and queries
 
