@@ -139,12 +139,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return;
     }
 
-    const dial = dialer.dial;
+    const connectedDialer = dialer as {
+      dial(address: unknown): Promise<unknown>;
+    };
 
     await Promise.all(
       multiaddrs.map(async (address) => {
         try {
-          await dial(await heliaRuntimeAdapter.createMultiaddr(address));
+          await connectedDialer.dial(
+            await heliaRuntimeAdapter.createMultiaddr(address),
+          );
           const dialKey = `${networkName}:${source}`;
 
           if (!HeliaIPFS.successfulPublicRelayDials.has(dialKey)) {
