@@ -170,6 +170,38 @@ describe('OrbitDBCommunityRepository', () => {
     ).toEqual(['general', 'updates']);
   });
 
+  it('should prefer fresh community heads over stale member indexes on timestamp ties', async () => {
+    const stalePrimitives = communityPrimitives();
+    const freshCommunity = Community.fromPrimitives(communityPrimitives());
+
+    freshCommunity.addTextChannel(
+      identityMother.id,
+      new CommunityChannelName('updates'),
+    );
+    await repository.save(freshCommunity);
+    const freshHead = heads.get('community:community-1');
+
+    heads.set(`community-member-index:${identityMother.id.valueOf()}`, {
+      communities: [
+        {
+          ...stalePrimitives,
+          updatedAt: freshHead?.updatedAt,
+        },
+      ],
+      id: `community-member-index:${identityMother.id.valueOf()}`,
+      identityId: identityMother.id.valueOf(),
+      updatedAt: Date.now(),
+    });
+
+    const byMember = await repository.findByMember(identityMother.id);
+
+    expect(
+      byMember
+        .find((community) => community.getId().valueOf() === 'community-1')
+        ?.toPrimitives().textChannels.map((channel) => channel.name),
+    ).toEqual(['general', 'updates']);
+  });
+
   it('should read communities from heads when indexes exist', async () => {
     const primitives = communityPrimitives();
 

@@ -288,8 +288,10 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
         ...this.documentsFromIndex(
           await this.registry.findHead(this.identityIndexHeadKey(identityId)),
         ),
-        ...this.cachedStoredRequestDocuments().filter((document) =>
-          new IdentityId(document.identityId).isEqual(identityId),
+        ...this.cachedStoredRequestDocuments().filter(
+          (document) =>
+            new IdentityId(document.identityId).isEqual(identityId) ||
+            new IdentityId(document.creatorIdentityId).isEqual(identityId),
         ),
       ])
         .filter(

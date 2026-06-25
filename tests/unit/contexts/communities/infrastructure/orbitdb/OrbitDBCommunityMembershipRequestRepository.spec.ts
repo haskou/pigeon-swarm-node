@@ -169,6 +169,31 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     ]);
   });
 
+  it('should find membership requests from fresh heads by creator when identity indexes lag', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    heads.delete(
+      `community-membership-request-identity-index:${ownerIdentityId.valueOf()}`,
+    );
+
+    const byCreator = await store.findByIdentity(ownerIdentityId);
+
+    expect(byCreator.map((item) => item.getId().valueOf())).toEqual([
+      request.getId().valueOf(),
+    ]);
+  });
+
   it('should not return deleted membership requests from stale indexes', async () => {
     const request = CommunityMembershipRequest.invitation(
       communityId,

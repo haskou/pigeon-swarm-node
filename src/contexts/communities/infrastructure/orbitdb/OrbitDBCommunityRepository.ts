@@ -125,7 +125,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       return currentFreshness <= candidateFreshness;
     }
 
-    return current.deleted !== true && candidate.deleted === true;
+    return current.deleted !== true || candidate.deleted === true;
   }
 
   private freshness(document: OrbitDBCommunityDocument): number {
