@@ -1,5 +1,5 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export default class LocalProcessedDomainEventRepository {
   private static readonly NAMESPACE = 'processed_domain_events';

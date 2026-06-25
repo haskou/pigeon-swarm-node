@@ -15,7 +15,6 @@ package "shared/domain" {
 package "shared/infrastructure/http" {
   class HttpApp
   class HttpServer
-  class ExpressRequest
   class HttpClient <<Port>>
   class AxiosHttpClient
   class BaseRequester
@@ -52,7 +51,6 @@ package "shared/infrastructure/messaging" {
   class DomainEventPublisher
   class MessageBus
   interface MessageBusAdapter
-  class AmqpMessageBusAdapter
   class MemoryMessageBusAdapter
   class Libp2pGossipsubMessageBusAdapter
   class Libp2pGossipsubRuntimeAdapter
@@ -65,11 +63,6 @@ package "shared/infrastructure/messaging" {
 package "shared/infrastructure/websocket" {
   class WebSocketRealtimeServer
   class WebSocketEventHub
-}
-
-package "shared/infrastructure/di" {
-  class DependencyInjection
-  class ServiceClass
 }
 
 HttpServer ..> HttpApp
@@ -93,11 +86,9 @@ PrivateNetworkRelayRecordDirectory ..> PrivateNetworkRelayRecord
 
 DomainEventPublisher ..> MessageBus
 MessageBus ..> MessageBusAdapter
-MessageBus ..> AmqpMessageBusAdapter
 MessageBus ..> MemoryMessageBusAdapter
 MessageBus ..> Libp2pGossipsubMessageBusAdapter
 MessageBus ..> WebSocketEventHub
-AmqpMessageBusAdapter ..|> MessageBusAdapter
 MemoryMessageBusAdapter ..|> MessageBusAdapter
 Libp2pGossipsubMessageBusAdapter ..|> MessageBusAdapter
 Libp2pGossipsubMessageBusAdapter ..> Libp2pGossipsubRuntimeAdapter
@@ -109,6 +100,5 @@ Libp2pGossipsubTransport ..|> PubSubTransport
 Libp2pGossipsubTransport ..> Libp2pGossipsubRuntimeAdapter
 
 WebSocketEventHub ..> WebSocketRealtimeServer
-DependencyInjection ..> ServiceClass
 
 @enduml

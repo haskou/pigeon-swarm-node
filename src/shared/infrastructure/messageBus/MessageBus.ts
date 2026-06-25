@@ -1,11 +1,10 @@
-import { Constructor } from '@app/shared/domain/Constructor';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
-import DomainEventConsumer from '@app/shared/domain/events/DomainEventConsumer';
-import DomainEventPublisher from '@app/shared/domain/events/DomainEventPublisher';
+import { Constructor } from '@haskou/ddd-kernel/domain';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
 import { webSocketEventHub } from '../websocket/WebSocketEventHub';
-import AmqpMessageBusAdapter from './amqp/AmqpMessageBusAdapter';
 import Libp2pGossipsubAdapter from './libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
 import { Message } from './Message';
@@ -68,7 +67,6 @@ export default class MessageBus
   }
 
   constructor(
-    private readonly amqpAdapter: AmqpMessageBusAdapter,
     private readonly memoryAdapter: MemoryMessageBusAdapter,
     private readonly libp2pGossipsubAdapter: Libp2pGossipsubAdapter,
   ) {
@@ -77,10 +75,6 @@ export default class MessageBus
 
   private chooseAdapterFromDsn(dsn: string): MessageBusAdapter {
     this.ensureDSNIsValid(process.env.TRANSPORT_DSN || '');
-
-    if (dsn.startsWith('amqp')) {
-      return this.amqpAdapter;
-    }
 
     if (dsn.startsWith('in-memory')) {
       return this.memoryAdapter;
@@ -94,11 +88,7 @@ export default class MessageBus
   }
 
   private ensureDSNIsValid(dsn: string): void {
-    if (
-      !dsn.startsWith('amqp') &&
-      !dsn.startsWith('in-memory') &&
-      !dsn.startsWith('libp2p-gossipsub')
-    ) {
+    if (!dsn.startsWith('in-memory') && !dsn.startsWith('libp2p-gossipsub')) {
       throw new InvalidMessageBusAdapterError(dsn);
     }
   }

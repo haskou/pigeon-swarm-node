@@ -1,9 +1,9 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import { Constructor } from '@app/shared/domain/Constructor';
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
+import { Constructor } from '@haskou/ddd-kernel/domain';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import { Message } from '../Message';
 import MessageBusAdapter from '../MessageBusAdapter';
@@ -199,10 +199,6 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     }
 
     await this.subscribeToTransport(bindingKey, DomainEventInstance, handler);
-  }
-
-  public consumeDlx(): Promise<void> {
-    throw new Error('PubSub dead-letter queues are not supported.');
   }
 
   public async publish(domainEvents: DomainEvent[]): Promise<void> {

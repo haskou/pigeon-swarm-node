@@ -1,4 +1,4 @@
-import DomainEvent from '@app/shared/domain/events/DomainEvent';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 interface MessageBusAdapter {
   consume(
@@ -7,13 +7,6 @@ interface MessageBusAdapter {
     DomainEventInstance: typeof DomainEvent,
     exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
-  ): Promise<void>;
-
-  consumeDlx(
-    queueName: string,
-    DomainEventInstance: typeof DomainEvent,
-    handler: (event: DomainEvent) => Promise<void>,
-    messagesToRetry?: number,
   ): Promise<void>;
 
   publish(domainEvents: DomainEvent[]): Promise<void>;
