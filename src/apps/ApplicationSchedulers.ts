@@ -3,7 +3,7 @@ import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/Content
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
 import LocalRoutingRecordRepublisherScheduler from '@app/apps/schedulers/LocalRoutingRecordRepublisherScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
-import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
+import Scheduler from '@haskou/ddd-kernel/scheduler';
 
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 

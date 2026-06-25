@@ -23,7 +23,7 @@ import SendPushNotificationWhenCallStarted from '@app/apps/consumers/pubsub/push
 import SendPushNotificationWhenCommunityMessageSent from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent';
 import SendPushNotificationWhenConversationMessageSent from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenConversationMessageSent';
 import SendPushNotificationWhenNotificationCreated from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenNotificationCreated';
-import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 

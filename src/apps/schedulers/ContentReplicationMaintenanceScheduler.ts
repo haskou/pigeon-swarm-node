@@ -1,11 +1,12 @@
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
-import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
-import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Kernel from '@haskou/ddd-kernel';
+import Scheduler from '@haskou/ddd-kernel/scheduler';
+import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
 export default class ContentReplicationMaintenanceScheduler extends Scheduler {
   constructor(private readonly maintainer: ContentReplicationMaintainer) {
-    super();
+    super(new ReplicatedStateSchedulerErrorPolicy());
   }
 
   public async execute(): Promise<void> {

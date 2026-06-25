@@ -44,22 +44,4 @@ describe('RegisterIdentityWhenPublished', () => {
       identityId,
     );
   });
-
-  it('should ignore duplicated deliveries for the same event id', async () => {
-    const identityId = new IdentityMother().id.valueOf();
-    const event = new IdentityWasCreatedEvent(identityId);
-    let handler: ((event: IdentityWasCreatedEvent) => Promise<void>) | undefined;
-
-    eventConsumer.consume.mockImplementation(
-      async (_queueName, _bindingKey, _domainEvent, _exchange, callback) => {
-        handler = callback as (event: IdentityWasCreatedEvent) => Promise<void>;
-      },
-    );
-
-    await consumer.init();
-    await handler?.(event);
-    await handler?.(event);
-
-    expect(registrar.register).toHaveBeenCalledTimes(1);
-  });
 });

@@ -1,15 +1,16 @@
 import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
-import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
-import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Kernel from '@haskou/ddd-kernel';
+import Scheduler from '@haskou/ddd-kernel/scheduler';
+import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
 export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
   constructor(
     private readonly identityRouting: IpfsIdentityRouting,
     private readonly keychainRouting: IpfsKeychainRouting,
   ) {
-    super();
+    super(new ReplicatedStateSchedulerErrorPolicy());
   }
 
   public async execute(): Promise<void> {

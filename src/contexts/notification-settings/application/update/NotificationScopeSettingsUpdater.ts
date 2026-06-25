@@ -1,4 +1,4 @@
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
+import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
 import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
@@ -7,7 +7,7 @@ import { NotificationScopeSettingsUpdateMessage } from './messages/NotificationS
 export default class NotificationScopeSettingsUpdater {
   constructor(
     private readonly repository: NotificationScopeSettingsRepository,
-    private readonly messageBus: MessageBus,
+    private readonly messageBus: DomainEventPublisher,
   ) {}
 
   public async update(

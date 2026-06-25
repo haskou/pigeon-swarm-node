@@ -1,7 +1,7 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import Consumer from '@app/shared/infrastructure/ui/consumers/Consumer';
+import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 

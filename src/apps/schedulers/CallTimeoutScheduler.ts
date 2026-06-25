@@ -2,9 +2,10 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCallPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
-import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
-import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import Scheduler from '@haskou/ddd-kernel/scheduler';
+import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 import { Timestamp } from '@haskou/value-objects';
 
 const callRingingTimeoutMs = 60_000;
@@ -16,7 +17,7 @@ export default class CallTimeoutScheduler extends Scheduler {
     private readonly eventPublisher: DomainEventPublisher,
     private readonly notificationRepository: NotificationRepository,
   ) {
-    super();
+    super(new ReplicatedStateSchedulerErrorPolicy());
   }
 
   private async markTimedOutJoinedParticipants(): Promise<void> {

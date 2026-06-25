@@ -1,4 +1,7 @@
+import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
+import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
 import { Constructor } from '@haskou/ddd-kernel/domain';
+import { DomainMessageBus } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
@@ -16,13 +19,14 @@ type LocalSubscriptionHandler = {
 };
 
 export default class MessageBus
-  implements DomainEventConsumer, DomainEventPublisher
+  implements DomainMessageBus, DomainEventConsumer, DomainEventPublisher
 {
   private static sourceEventContext = new Map<string, DomainEvent>();
   private static activeContextIds: string[] = [];
   private static replicatedEventPublisher?: DomainEventPublisher;
   private adapter: MessageBusAdapter;
   private readonly domainEventTypes = new Map<string, typeof DomainEvent>();
+  private readonly publisherHooks = new PublisherHookPipeline();
   private readonly localSubscriptionHandlers = new Map<
     string,
     LocalSubscriptionHandler[]
@@ -152,6 +156,23 @@ export default class MessageBus
     this.localSubscriptionHandlers.set(bindingKey, handlers);
   }
 
+  private async runPublisherHooks(domainEvents: DomainEvent[]): Promise<void> {
+    for (const domainEvent of domainEvents) {
+      await this.publisherHooks.run(
+        {
+          domainEvent,
+          message: {
+            name: domainEvent.eventName(),
+            payload: JSON.parse(domainEvent.decode()) as Message,
+          },
+          metadata: {},
+          topic: domainEvent.eventName(),
+        },
+        () => Promise.resolve(),
+      );
+    }
+  }
+
   public registerEventType(
     bindingKey: string,
     DomainEventInstance: typeof DomainEvent,
@@ -159,11 +180,16 @@ export default class MessageBus
     this.domainEventTypes.set(bindingKey, DomainEventInstance);
   }
 
+  public registerPublisherHooks(...hooks: PublisherHook[]): void {
+    this.publisherHooks.register(...hooks);
+  }
+
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
     const enrichedEvents = this.enrichEventsWithContext(domainEvents);
     await this.adapter.publish(enrichedEvents);
     await MessageBus.replicatedEventPublisher?.publish(enrichedEvents);
     webSocketEventHub.publish(enrichedEvents);
+    await this.runPublisherHooks(enrichedEvents);
   }
 
   public async dispatchReplicated(message: Message): Promise<void> {

@@ -1,12 +1,13 @@
 import IdentityPresenceExpirationRegistrar from '@app/contexts/presence/application/expire/IdentityPresenceExpirationRegistrar';
-import Scheduler from '@app/shared/infrastructure/scheduler/Scheduler';
-import { CronExpression } from '@app/shared/infrastructure/scheduler/SchedulerCronExpression';
+import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
+import Scheduler from '@haskou/ddd-kernel/scheduler';
+import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
 export default class IdentityPresenceExpirationScheduler extends Scheduler {
   constructor(
     private readonly expirationRegistrar: IdentityPresenceExpirationRegistrar,
   ) {
-    super();
+    super(new ReplicatedStateSchedulerErrorPolicy());
   }
 
   public async execute(): Promise<void> {
