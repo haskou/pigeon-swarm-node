@@ -19,7 +19,7 @@ import { IPFSContentUploadRouteSupport } from './IPFSContentUploadRouteSupport';
 
 @JsonController('/ipfs')
 export class PostNetworkIPFSContentRoute extends IPFSContentUploadRouteSupport {
-  @Post('/:networkId([0-9a-fA-F-]{36})')
+  @Post('/:networkId')
   @UseBefore(
     express.raw({
       limit: `${maxContentSizeBytes}b`,

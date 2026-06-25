@@ -1,9 +1,13 @@
 import Kernel from '@haskou/ddd-kernel';
+import { HttpApp } from '@haskou/ddd-kernel/adapters/ui';
 import expressWinston from 'express-winston';
 import winston, { Logger, format } from 'winston';
 
-import Server from '../express/Server';
 import Log from './Log';
+
+type HttpAppProvider = {
+  readonly app: HttpApp;
+};
 
 export default class WinstonLogger implements Log {
   private prefix: string = '';
@@ -46,7 +50,7 @@ export default class WinstonLogger implements Log {
 
   private _logger: Logger;
 
-  constructor(private readonly server?: Server) {}
+  private server?: HttpAppProvider;
 
   private getLogFileName(): string {
     const logDirectory = process.env.LOG_URL || 'logs';
@@ -126,6 +130,10 @@ export default class WinstonLogger implements Log {
     }
 
     return this._logger;
+  }
+
+  public attach(server: HttpAppProvider): void {
+    this.server = server;
   }
 
   public run(prefix?: string): void {

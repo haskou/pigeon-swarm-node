@@ -35,7 +35,7 @@ export class PutConversationMessageRoute extends Route {
     );
   }
 
-  @Put('/:conversationId/messages/:messageId((?!read-until$)[^/]+)')
+  @Put('/:conversationId/messages/:messageId')
   public async editMessage(
     @Param('conversationId') conversationId: string,
     @Body() body: PutConversationMessageBody,
