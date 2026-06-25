@@ -1,8 +1,8 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityPresenceUpdater from '@app/contexts/presence/application/update/IdentityPresenceUpdater';
 import { IdentityPresenceUpdateMessage } from '@app/contexts/presence/application/update/messages/IdentityPresenceUpdateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Req, Res } from 'routing-controllers';
 

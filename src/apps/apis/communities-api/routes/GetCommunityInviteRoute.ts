@@ -1,6 +1,6 @@
 import CommunityInviteDetailsFinder from '@app/contexts/communities/application/find-invite/CommunityInviteDetailsFinder';
 import { CommunityInviteFindMessage } from '@app/contexts/communities/application/find-invite/messages/CommunityInviteFindMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
 import { Get, JsonController, Param, Res } from 'routing-controllers';
 

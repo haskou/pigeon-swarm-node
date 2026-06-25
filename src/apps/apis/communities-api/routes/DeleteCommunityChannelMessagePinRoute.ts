@@ -1,13 +1,12 @@
 import CommunityChannelMessageUnpinner from '@app/contexts/communities/application/manage-channel-message-pin/CommunityChannelMessageUnpinner';
 import { CommunityChannelMessagePinDeleteMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinDeleteMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-// eslint-disable-next-line max-len
 export class DeleteCommunityChannelMessagePinRoute extends CommunityRouteSupport {
   private readonly unpinner = this.get<CommunityChannelMessageUnpinner>(
     CommunityChannelMessageUnpinner,

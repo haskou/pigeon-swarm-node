@@ -1,6 +1,6 @@
 import CommunityMembershipRequestsFinder from '@app/contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder';
 import { CommunityMembershipRequestsFindMessage } from '@app/contexts/communities/application/find-membership-requests/messages/CommunityMembershipRequestsFindMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';
 

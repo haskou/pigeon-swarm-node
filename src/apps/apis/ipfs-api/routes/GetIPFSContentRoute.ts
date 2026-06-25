@@ -1,8 +1,8 @@
 import ContentGetter from '@app/contexts/content-replication/application/get-content/ContentGetter';
 import { ContentGetMessage } from '@app/contexts/content-replication/application/get-content/messages/ContentGetMessage';
 import { ReplicatedContentNotFoundError } from '@app/contexts/content-replication/domain/errors/ReplicatedContentNotFoundError';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
 import { Get, JsonController, Param, Res } from 'routing-controllers';
 

@@ -1,6 +1,6 @@
 import CommunityRoleUpdater from '@app/contexts/communities/application/update-role/CommunityRoleUpdater';
 import { CommunityRoleUpdateMessage } from '@app/contexts/communities/application/update-role/messages/CommunityRoleUpdateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

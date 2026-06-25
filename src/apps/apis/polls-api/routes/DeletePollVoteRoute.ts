@@ -1,6 +1,6 @@
 import { PollVoteRemoveMessage } from '@app/contexts/polls/application/remove-vote/messages/PollVoteRemoveMessage';
 import { PollVoteRemover } from '@app/contexts/polls/application/remove-vote/PollVoteRemover';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 

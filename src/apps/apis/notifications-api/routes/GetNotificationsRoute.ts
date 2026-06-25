@@ -1,7 +1,7 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import NotificationsFinder from '@app/contexts/notifications/application/find/NotificationsFinder';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, QueryParam, Req, Res } from 'routing-controllers';
 

@@ -7,7 +7,7 @@ import { PollFindMessage } from '@app/contexts/polls/application/find/messages/P
 import PollFinder from '@app/contexts/polls/application/find/PollFinder';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 export abstract class PollRouteSupport extends Route {

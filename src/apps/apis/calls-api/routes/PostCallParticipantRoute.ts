@@ -1,6 +1,6 @@
 import CallJoiner from '@app/contexts/calls/application/join-call/CallJoiner';
 import { CallJoinMessage } from '@app/contexts/calls/application/join-call/messages/CallJoinMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
 

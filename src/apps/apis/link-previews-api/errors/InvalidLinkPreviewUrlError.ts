@@ -1,5 +1,5 @@
 import CustomHttpError from '@app/shared/infrastructure/errors/CustomHttpError';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 
 export class InvalidLinkPreviewUrlError extends CustomHttpError {
   constructor(message: string = 'Invalid link preview URL.') {

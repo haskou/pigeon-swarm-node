@@ -3,7 +3,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
 import StickerPacksFinder from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 import { StickerUserLibraryResource } from '../resources/StickerUserLibraryResource';

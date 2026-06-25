@@ -1,6 +1,6 @@
 import CommunitiesDiscoverer from '@app/contexts/communities/application/discover-communities/CommunitiesDiscoverer';
 import { CommunitiesDiscoverMessage } from '@app/contexts/communities/application/discover-communities/messages/CommunitiesDiscoverMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, QueryParam, Req, Res } from 'routing-controllers';
 

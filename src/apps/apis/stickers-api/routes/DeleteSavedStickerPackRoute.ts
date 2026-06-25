@@ -1,6 +1,6 @@
 import { StickerPackForgetMessage } from '@app/contexts/stickers/application/forget-pack/messages/StickerPackForgetMessage';
 import StickerPackForgetter from '@app/contexts/stickers/application/forget-pack/StickerPackForgetter';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 

@@ -1,6 +1,6 @@
 import CommunityVoiceChannelCreator from '@app/contexts/communities/application/create-channel/CommunityVoiceChannelCreator';
 import { CommunityChannelCreateMessage } from '@app/contexts/communities/application/create-channel/messages/CommunityChannelCreateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

@@ -1,6 +1,6 @@
 import { StickerFavoriteMessage } from '@app/contexts/stickers/application/favorite-sticker/messages/StickerFavoriteMessage';
 import StickerFavoriter from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
 

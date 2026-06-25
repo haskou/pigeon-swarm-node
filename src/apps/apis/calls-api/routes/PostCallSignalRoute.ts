@@ -1,7 +1,7 @@
 import CallSignalSender from '@app/contexts/calls/application/send-signal/CallSignalSender';
 import { CallSignalSendMessage } from '@app/contexts/calls/application/send-signal/messages/CallSignalSendMessage';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

@@ -1,4 +1,5 @@
-import Kernel from '@app/Kernel';
+import Kernel from '@haskou/ddd-kernel';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { DomainError } from '@haskou/value-objects';
 import { Request, Response, NextFunction } from 'express';
 import {
@@ -8,7 +9,6 @@ import {
 } from 'routing-controllers';
 
 import CustomHttpError from '../errors/CustomHttpError';
-import { HttpRouteStatusEnum } from '../ui/routes/HttpRouteStatusEnum';
 import { ErrorExplanation } from './ErrorExplanation';
 import { ErrorResponseHandler } from './ErrorResponseHandler';
 import { FormattedValidationError } from './FormattedValidationError';

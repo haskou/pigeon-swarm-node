@@ -1,6 +1,6 @@
 import PushVapidPublicKeyFinder from '@app/contexts/push-notifications/application/find-vapid-public-key/PushVapidPublicKeyFinder';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
-import Route from '@app/shared/infrastructure/ui/routes/Route';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
 import { Get, JsonController, Res } from 'routing-controllers';
 

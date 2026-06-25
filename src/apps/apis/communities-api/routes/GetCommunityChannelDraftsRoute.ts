@@ -1,6 +1,6 @@
 import CommunityChannelDraftsFinder from '@app/contexts/communities/application/manage-channel-draft/CommunityChannelDraftsFinder';
 import { CommunityChannelDraftsFindMessage } from '@app/contexts/communities/application/manage-channel-draft/messages/CommunityChannelDraftsFindMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';
 

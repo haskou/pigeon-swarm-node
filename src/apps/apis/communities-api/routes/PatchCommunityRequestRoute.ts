@@ -1,6 +1,6 @@
 import CommunityMembershipRequestUpdater from '@app/contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater';
 import { CommunityMembershipRequestUpdateMessage } from '@app/contexts/communities/application/update-membership-request/messages/CommunityMembershipRequestUpdateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,

@@ -1,7 +1,6 @@
+import { RoutePrefix } from '@haskou/ddd-kernel/adapters/ui';
 import * as express from 'express';
 import path from 'path';
-
-import { RoutePrefix } from './RoutePrefix';
 
 export class PublicStaticContent {
   private readonly publicPath = path.resolve(process.cwd(), 'public');

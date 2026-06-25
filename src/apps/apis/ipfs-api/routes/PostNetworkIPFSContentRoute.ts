@@ -1,7 +1,7 @@
 import { maxContentSizeBytes } from '@app/contexts/content-replication/application/publish-content/ContentUploadLimits';
 import { PrivateContentPublishMessage } from '@app/contexts/content-replication/application/publish-content/messages/PrivateContentPublishMessage';
 import { IPFSNetworkNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSNetworkNotFoundError';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import * as express from 'express';
 import { Request, Response } from 'express';
 import {

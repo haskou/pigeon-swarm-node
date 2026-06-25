@@ -1,6 +1,6 @@
 import CommunityMemberUnbanner from '@app/contexts/communities/application/ban-member/CommunityMemberUnbanner';
 import { CommunityMemberUnbanMessage } from '@app/contexts/communities/application/ban-member/messages/CommunityMemberUnbanMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 

@@ -1,6 +1,6 @@
 import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
 import StickerPacksFinder from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
 import { Get, JsonController, QueryParam, Res } from 'routing-controllers';
 

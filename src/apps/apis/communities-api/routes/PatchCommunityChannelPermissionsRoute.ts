@@ -1,6 +1,6 @@
 import CommunityChannelPermissionsUpdater from '@app/contexts/communities/application/update-channel-permissions/CommunityChannelPermissionsUpdater';
 import { CommunityChannelPermissionsUpdateMessage } from '@app/contexts/communities/application/update-channel-permissions/messages/CommunityChannelPermissionsUpdateMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -16,7 +16,6 @@ import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-// eslint-disable-next-line max-len
 export class PatchCommunityChannelPermissionsRoute extends CommunityRouteSupport {
   private readonly updater = this.get<CommunityChannelPermissionsUpdater>(
     CommunityChannelPermissionsUpdater,

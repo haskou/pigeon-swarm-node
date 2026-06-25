@@ -1,6 +1,6 @@
 import CommunityChannelDeleter from '@app/contexts/communities/application/delete-channel/CommunityChannelDeleter';
 import { CommunityChannelDeleteMessage } from '@app/contexts/communities/application/delete-channel/messages/CommunityChannelDeleteMessage';
-import { HttpRouteStatusEnum } from '@app/shared/infrastructure/ui/routes/HttpRouteStatusEnum';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 
