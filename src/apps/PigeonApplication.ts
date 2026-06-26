@@ -12,7 +12,6 @@ import {
   DomainEventPublisher,
 } from '@haskou/ddd-kernel/domain';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
-import dotenv from 'dotenv';
 import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
@@ -49,7 +48,7 @@ export default class PigeonApplication {
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
   private getRoutePrefix(): RoutePrefix {
-    return RoutePrefix.fromEnvironment(process.env.ROUTE_PREFIX);
+    return RoutePrefix.fromEnvironment(Kernel.environment.ROUTE_PREFIX);
   }
 
   private buildSwaggerHtml(
@@ -210,7 +209,7 @@ export default class PigeonApplication {
           },
         ],
         kernel: this.kernel,
-        port: Number(process.env.API_PORT ?? 8080),
+        port: Number(Kernel.environment.API_PORT ?? 8080),
         preControllerMiddlewares: [
           (request, _response, next) => {
             HttpRequestContext.run(request, next);
@@ -252,19 +251,15 @@ export default class PigeonApplication {
     return this.kernel.di.getService<Scheduler>(ClassDefinition);
   }
 
-  public environmentVariables(
-    env: string = (process.env.NODE_ENV = 'local'),
-  ): void {
-    dotenv.config({
-      path: path.resolve(Kernel.rootDirectory, env ? '.env.' + env : '.env'),
-    });
+  public loadEnvironmentVariables(environment: string): void {
+    this.kernel.loadEnvironmentVariables(environment);
   }
 
   public async dependencyInjection(): Promise<void> {
     await this.kernel.dependencyInjection({
       containerBuild:
-        process.env.CONTAINER_BUILD === 'true' ||
-        process.env.NODE_ENV !== 'production',
+        Kernel.environment.CONTAINER_BUILD === 'true' ||
+        Kernel.environment.NODE_ENV !== 'production',
       overrides: [
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },

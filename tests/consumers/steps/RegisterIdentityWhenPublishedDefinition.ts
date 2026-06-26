@@ -80,7 +80,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
     if (!application) {
       application = new PigeonApplication();
-      application.environmentVariables('test');
+      application.loadEnvironmentVariables('test');
       this.cleanupStorageFolder();
 
       await application.dependencyInjection();
