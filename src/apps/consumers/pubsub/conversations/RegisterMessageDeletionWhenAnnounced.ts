@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
@@ -29,7 +30,7 @@ export default class RegisterMessageDeletionWhenAnnounced extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

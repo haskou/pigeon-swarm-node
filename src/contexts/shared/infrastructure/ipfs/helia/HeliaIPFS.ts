@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
@@ -42,10 +43,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private readonly pinningStrategy: HeliaPinningStrategy;
 
   private static getRoutingRecordTimeoutMs(): number {
-    const configuredTimeoutMs = Number(
-      process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS ||
-        process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS,
-    );
+    const environment = pigeonEnvironment();
+    const configuredTimeoutMs =
+      environment.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS ||
+      environment.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS;
 
     if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
       return configuredTimeoutMs;
@@ -55,7 +56,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   }
 
   private static configuredBootstrapRelayMultiaddrs(): string[] {
-    return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
+    return (pigeonEnvironment().PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
       .split(',')
       .map((address) => address.trim())
       .filter(Boolean);
@@ -398,7 +399,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private contentRetrievalProgressLogger(
     cid: IPFSId,
   ): ContentRetrievalOptions['onProgress'] | undefined {
-    if (process.env.DEBUG_NETWORK !== 'true') {
+    if (!pigeonEnvironment().DEBUG_NETWORK) {
       return undefined;
     }
 

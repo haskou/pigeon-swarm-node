@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -12,7 +13,7 @@ export default abstract class SendPushNotificationWhenEventReceived extends Cons
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

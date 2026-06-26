@@ -1,3 +1,5 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+
 export { LinkPreviewRateBucket } from './rate-limits/LinkPreviewRateBucket';
 
 export class LinkPreviewRatePolicy {
@@ -5,9 +7,9 @@ export class LinkPreviewRatePolicy {
   public static readonly WINDOW_MS = 60_000;
 
   public static fromEnvironment(
-    environment: NodeJS.ProcessEnv = process.env,
+    environment = pigeonEnvironment(),
   ): LinkPreviewRatePolicy {
-    const parsedLimit = Number(environment.LINK_PREVIEW_RATE_LIMIT_PER_MINUTE);
+    const parsedLimit = environment.LINK_PREVIEW_RATE_LIMIT_PER_MINUTE;
 
     return new LinkPreviewRatePolicy(
       Number.isFinite(parsedLimit) && parsedLimit >= 0

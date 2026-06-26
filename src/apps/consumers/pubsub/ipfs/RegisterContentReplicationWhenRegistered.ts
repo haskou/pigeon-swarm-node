@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import ContentReplicationMetadataRegistrar from '@app/contexts/content-replication/application/register-content/ContentReplicationMetadataRegistrar';
 import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -28,7 +29,7 @@ export default class RegisterContentReplicationWhenRegistered extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

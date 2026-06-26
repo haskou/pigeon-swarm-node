@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import ConversationRegistrar from '@app/contexts/conversations/application/register-conversation/ConversationRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-conversation/messages/RegisterConversationMessage';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
@@ -36,7 +37,7 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   private getAttributes(

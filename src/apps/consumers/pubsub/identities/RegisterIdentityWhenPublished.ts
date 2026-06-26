@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
 import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
@@ -28,7 +29,7 @@ export default class RegisterIdentityWhenPublished extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

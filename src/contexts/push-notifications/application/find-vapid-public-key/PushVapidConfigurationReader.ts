@@ -1,8 +1,11 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+
 export default class PushVapidConfigurationReader {
-  private readonly publicKey: string = process.env.PUSH_VAPID_PUBLIC_KEY || '';
+  private readonly publicKey: string =
+    pigeonEnvironment().PUSH_VAPID_PUBLIC_KEY || '';
 
   private readonly privateKey: string =
-    process.env.PUSH_VAPID_PRIVATE_KEY || '';
+    pigeonEnvironment().PUSH_VAPID_PRIVATE_KEY || '';
 
   public getPublicKey(): string | null {
     return this.publicKey || null;

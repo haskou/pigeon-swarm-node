@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageDeletion } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageDeletion';
 import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
@@ -44,7 +45,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

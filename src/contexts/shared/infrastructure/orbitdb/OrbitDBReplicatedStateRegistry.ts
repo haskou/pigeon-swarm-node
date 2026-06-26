@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
@@ -30,7 +31,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private headCache?: OrbitDBReplicatedHeadCache;
 
   private static defaultHeadCache(): OrbitDBReplicatedHeadCache | undefined {
-    if (process.env.JEST_WORKER_ID || process.env.NODE_ENV === 'test') {
+    if (process.env.JEST_WORKER_ID || pigeonEnvironment().NODE_ENV === 'test') {
       return undefined;
     }
 

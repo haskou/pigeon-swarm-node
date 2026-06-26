@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { Level } from 'level';
 import path from 'path';
@@ -31,7 +32,7 @@ export default class EmbeddedLocalDatabase {
 
   constructor() {
     this.databasePath =
-      process.env.PIGEON_LOCAL_DB_PATH ||
+      pigeonEnvironment().PIGEON_LOCAL_DB_PATH ||
       path.join(Kernel.rootDirectory, 'local_storage');
     this.database = EmbeddedLocalDatabase.getDatabase(this.databasePath);
   }

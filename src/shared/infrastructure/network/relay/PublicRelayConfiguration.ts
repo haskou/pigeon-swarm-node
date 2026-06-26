@@ -1,13 +1,10 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+
 import { PublicRelayConfigurationOptions } from './PublicRelayConfigurationOptions';
 
 export class PublicRelayConfiguration {
-  private static readonly DEFAULT_LIBP2P_PORT = 4001;
-  private static readonly DEFAULT_PRIVATE_RELAY_RECORD_REFRESH_SECONDS = 15;
-  private static readonly DEFAULT_RELAY_PORT = 4011;
-  private static readonly DEFAULT_RELAY_RECORD_TTL_SECONDS = 300;
-
   public static fromEnvironment(
-    environment: NodeJS.ProcessEnv = process.env,
+    environment = pigeonEnvironment(),
   ): PublicRelayConfiguration {
     return new PublicRelayConfiguration({
       bootstrapRelayMultiaddrs: (
@@ -16,27 +13,15 @@ export class PublicRelayConfiguration {
         .split(',')
         .map((address) => address.trim())
         .filter(Boolean),
-      libp2pPort: Number(
-        environment.PIGEON_LIBP2P_PORT ||
-          PublicRelayConfiguration.DEFAULT_LIBP2P_PORT,
-      ),
-      privateRelayRecordRefreshSeconds: Number(
-        environment.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS ||
-          PublicRelayConfiguration.DEFAULT_PRIVATE_RELAY_RECORD_REFRESH_SECONDS,
-      ),
+      libp2pPort: environment.PIGEON_LIBP2P_PORT,
+      privateRelayRecordRefreshSeconds:
+        environment.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS,
       publicHost: environment.PIGEON_PUBLIC_HOST,
-      relayAutoEnabled: environment.PIGEON_RELAY_AUTO_ENABLE === 'true',
-      relayDiscoveryEnabled:
-        environment.PIGEON_RELAY_DISCOVERY_ENABLED !== 'false',
-      relayEnabled: environment.PIGEON_RELAY_ENABLED === 'true',
-      relayPort: Number(
-        environment.PIGEON_RELAY_PORT ||
-          PublicRelayConfiguration.DEFAULT_RELAY_PORT,
-      ),
-      relayRecordTtlSeconds: Number(
-        environment.PIGEON_RELAY_RECORD_TTL_SECONDS ||
-          PublicRelayConfiguration.DEFAULT_RELAY_RECORD_TTL_SECONDS,
-      ),
+      relayAutoEnabled: environment.PIGEON_RELAY_AUTO_ENABLE,
+      relayDiscoveryEnabled: environment.PIGEON_RELAY_DISCOVERY_ENABLED,
+      relayEnabled: environment.PIGEON_RELAY_ENABLED === true,
+      relayPort: environment.PIGEON_RELAY_PORT,
+      relayRecordTtlSeconds: environment.PIGEON_RELAY_RECORD_TTL_SECONDS,
     });
   }
 

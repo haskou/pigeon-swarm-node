@@ -34,19 +34,13 @@ import { WebSocketRealtimeServer } from '../shared/infrastructure/websocket/WebS
 import { ApiSwaggerFactory } from './apis/ApiSwaggerFactory';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
-
-const environmentSchema = {
-  API_PORT: { defaultValue: 8080, type: 'number' },
-  CONTAINER_BUILD: { defaultValue: false, type: 'boolean' },
-  NODE_ENV: { defaultValue: 'local', type: 'string' },
-  ROUTE_PREFIX: { type: 'string' },
-} as const;
+import { pigeonEnvironmentSchema } from './PigeonEnvironment';
 
 export default class PigeonApplication {
   private readonly consumers: Consumer[] = [];
   private readonly logger = new WinstonLogger();
   private readonly kernel = new Kernel({
-    environmentSchema,
+    environmentSchema: pigeonEnvironmentSchema,
     logger: this.logger,
     sourceDirectory: path.resolve(__dirname, '..'),
   });

@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { IdentityPresenceWasUpdatedEvent } from '@app/contexts/presence/domain/events/IdentityPresenceWasUpdatedEvent';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
@@ -30,7 +31,7 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
@@ -36,7 +37,7 @@ export class OrbitDBReplicatedStateStores {
 
   private static getStoragePath(networkId: string): string {
     return path.join(
-      process.env.IPFS_STORAGE_PATH || './ipfs_storage',
+      pigeonEnvironment().IPFS_STORAGE_PATH,
       'orbitdb',
       networkId,
     );
@@ -48,7 +49,7 @@ export class OrbitDBReplicatedStateStores {
 
   private static getLocalStoragePath(): string {
     return path.join(
-      process.env.IPFS_STORAGE_PATH || './ipfs_storage',
+      pigeonEnvironment().IPFS_STORAGE_PATH,
       'orbitdb-local-ipfs',
     );
   }

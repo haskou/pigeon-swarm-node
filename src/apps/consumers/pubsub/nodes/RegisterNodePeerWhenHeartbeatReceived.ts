@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { NodePeerRegisterMessage } from '@app/contexts/nodes/application/register-peer/messages/NodePeerRegisterMessage';
 import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
@@ -34,7 +35,7 @@ export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   private getNetworks(event: DomainEvent): NodeHeartbeatNetwork[] {
