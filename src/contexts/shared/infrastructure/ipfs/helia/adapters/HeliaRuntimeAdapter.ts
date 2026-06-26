@@ -17,6 +17,8 @@ import type { CID as MultiformatsCid } from 'multiformats/cid';
 import type * as MultiformatsDigest from 'multiformats/hashes/digest';
 import type * as Sha2Module from 'multiformats/hashes/sha2';
 
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+
 import type { HeliaBlockBrokers } from './types/HeliaBlockBrokers';
 import type { HeliaInstance } from './types/HeliaInstance';
 import type { HeliaJSONClient } from './types/HeliaJSONClient';
@@ -316,12 +318,14 @@ export class HeliaRuntimeAdapter {
   }
 
   private getPublicBootstrapMultiaddrs(): string[] {
-    if (process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED === 'false') {
+    const environment = pigeonEnvironment();
+
+    if (!environment.PIGEON_PUBLIC_BOOTSTRAP_ENABLED) {
       return [];
     }
 
     return (
-      process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS ||
+      environment.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS ||
       HeliaRuntimeAdapter.DEFAULT_PUBLIC_BOOTSTRAP_MULTIADDRS.join(',')
     )
       .split(',')
@@ -330,7 +334,7 @@ export class HeliaRuntimeAdapter {
   }
 
   private getRelayBootstrapMultiaddrs(): string[] {
-    return (process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
+    return (pigeonEnvironment().PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
       .split(',')
       .map((address) => address.trim())
       .filter(Boolean);

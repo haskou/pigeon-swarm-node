@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import PrivateNetworkRelayRecordDirectory, {
   PrivateRelayListenOptions,
 } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
@@ -28,8 +29,7 @@ type IPFSNetworkRegistryState = {
 const globalRegistryStateKey = '__pigeonSwarmIPFSNetworkRegistryState';
 
 export default class IPFSNetworkRegistry {
-  private readonly storagePath: string =
-    process.env.IPFS_STORAGE_PATH || './ipfs_storage';
+  private readonly storagePath: string = pigeonEnvironment().IPFS_STORAGE_PATH;
 
   constructor(
     private readonly relayRecordDirectory: PrivateNetworkRelayRecordDirectory,
@@ -69,13 +69,13 @@ export default class IPFSNetworkRegistry {
   }
 
   private isPrivateRelayServerDisabledByEnv(): boolean {
-    const relayEnabled = process.env.PIGEON_RELAY_ENABLED;
+    const relayEnabled = pigeonEnvironment().PIGEON_RELAY_ENABLED;
 
-    if (!relayEnabled) {
+    if (relayEnabled === undefined) {
       return false;
     }
 
-    return ['0', 'false', 'no', 'off'].includes(relayEnabled.toLowerCase());
+    return relayEnabled === false;
   }
 
   private getPrivateRelayDisabledReason(): string {
@@ -96,14 +96,13 @@ export default class IPFSNetworkRegistry {
       return undefined;
     }
 
-    const start = Number(
-      process.env.PIGEON_PRIVATE_RELAY_PORT_START ||
-        process.env.PIGEON_RELAY_PORT_START,
-    );
-    const end = Number(
-      process.env.PIGEON_PRIVATE_RELAY_PORT_END ||
-        process.env.PIGEON_RELAY_PORT_END,
-    );
+    const environment = pigeonEnvironment();
+    const start =
+      environment.PIGEON_PRIVATE_RELAY_PORT_START ||
+      environment.PIGEON_RELAY_PORT_START;
+    const end =
+      environment.PIGEON_PRIVATE_RELAY_PORT_END ||
+      environment.PIGEON_RELAY_PORT_END;
 
     if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) {
       return undefined;
@@ -113,15 +112,14 @@ export default class IPFSNetworkRegistry {
   }
 
   private getRelayDataLimitBytes(): number {
-    return Number(
-      process.env.PIGEON_RELAY_DATA_LIMIT_BYTES || 64 * 1024 * 1024,
-    );
+    return pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES;
   }
 
   private getPrivateRelayBootstrapMultiaddrs(): string[] {
+    const environment = pigeonEnvironment();
     const bootstrapMultiaddrs =
-      process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS ||
-      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS ||
+      environment.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS ||
+      environment.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS ||
       '';
 
     return bootstrapMultiaddrs
@@ -173,7 +171,7 @@ export default class IPFSNetworkRegistry {
       return undefined;
     }
 
-    const publicHost = process.env.PIGEON_PUBLIC_HOST;
+    const publicHost = pigeonEnvironment().PIGEON_PUBLIC_HOST;
 
     return {
       ...(publicHost

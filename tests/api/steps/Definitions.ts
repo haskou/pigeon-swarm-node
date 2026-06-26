@@ -96,7 +96,7 @@ export default class Definitions {
   public async startKernel(): Promise<void> {
     if (!application) {
       application = new PigeonApplication();
-      application.environmentVariables('test');
+      application.loadEnvironmentVariables('test');
       this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
       await application.dependencyInjection();

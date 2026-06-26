@@ -3,6 +3,7 @@ import libp2pKeyAdapter from '@app/contexts/shared/infrastructure/ipfs/networks/
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
 
@@ -31,8 +32,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   public static readonly relayRecordCacheNamespace =
     'private_relay_record_cache';
 
-  private readonly storagePath: string =
-    process.env.IPFS_STORAGE_PATH || './ipfs_storage';
+  private readonly storagePath: string = pigeonEnvironment().IPFS_STORAGE_PATH;
 
   private readonly discoveryIntervals: Record<
     string,
@@ -93,20 +93,18 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getRelayRecordTtlMs(): number {
-    return Number(process.env.PIGEON_RELAY_RECORD_TTL_MS || 10 * 60 * 1000);
+    return pigeonEnvironment().PIGEON_RELAY_RECORD_TTL_MS;
   }
 
   private getRelayRecordDiscoveryIntervalMs(): number {
-    return Number(
-      process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS || 15 * 1000,
-    );
+    return pigeonEnvironment().PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS;
   }
 
   private getActiveRelayRecordDiscoveryIntervalMs(): number {
-    const configuredIntervalMs = Number(
-      process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS ||
-        process.env.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS,
-    );
+    const environment = pigeonEnvironment();
+    const configuredIntervalMs =
+      environment.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS ||
+      environment.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
 
     if (Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0) {
       return configuredIntervalMs;
@@ -116,9 +114,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getActiveRelayConnectionGraceMs(): number {
-    const configuredGraceMs = Number(
-      process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS,
-    );
+    const configuredGraceMs =
+      pigeonEnvironment().PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS;
 
     if (Number.isFinite(configuredGraceMs) && configuredGraceMs > 0) {
       return configuredGraceMs;
@@ -128,17 +125,16 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getRelayRecordPublicationIntervalMs(): number {
-    const configuredIntervalMs = Number(
-      process.env.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS,
-    );
+    const environment = pigeonEnvironment();
+    const configuredIntervalMs =
+      environment.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS;
 
     if (Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0) {
       return configuredIntervalMs;
     }
 
-    const configuredRefreshSeconds = Number(
-      process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS,
-    );
+    const configuredRefreshSeconds =
+      environment.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
 
     if (
       Number.isFinite(configuredRefreshSeconds) &&
@@ -154,9 +150,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getPublicPeerWaitMs(): number {
-    const configuredWaitMs = Number(
-      process.env.PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS,
-    );
+    const configuredWaitMs =
+      pigeonEnvironment().PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS;
 
     if (!Number.isFinite(configuredWaitMs) || configuredWaitMs < 0) {
       return 8000;
@@ -166,16 +161,14 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getRelayRecordIPNSWindowMs(): number {
-    return Number(
-      process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS || 10 * 60_000,
-    );
+    return pigeonEnvironment().PIGEON_RELAY_RECORD_IPNS_WINDOW_MS;
   }
 
   private getRoutingRecordTimeoutMs(): number {
-    const configuredTimeoutMs = Number(
-      process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
-        process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS,
-    );
+    const environment = pigeonEnvironment();
+    const configuredTimeoutMs =
+      environment.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
+      environment.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS;
 
     if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
       return configuredTimeoutMs;
@@ -185,11 +178,11 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private getPrivateRelayDialTimeoutMs(): number {
-    const configuredTimeoutMs = Number(
-      process.env.PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS ||
-        process.env.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
-        process.env.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS,
-    );
+    const environment = pigeonEnvironment();
+    const configuredTimeoutMs =
+      environment.PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS ||
+      environment.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
+      environment.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS;
 
     if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
       return configuredTimeoutMs;
@@ -199,13 +192,11 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private isPubSubRecordEnabled(): boolean {
-    return process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED !== 'false';
+    return pigeonEnvironment().PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED;
   }
 
   private isGenericDHTRecordEnabled(): boolean {
-    return (
-      process.env.PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED !== 'false'
-    );
+    return pigeonEnvironment().PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED;
   }
 
   private getCurrentIPNSWindowId(): number {

@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { HttpApp } from '@haskou/ddd-kernel/adapters/ui';
 import expressWinston from 'express-winston';
@@ -38,25 +39,28 @@ export default class WinstonLogger implements Log {
   private server?: HttpAppProvider;
 
   private createLoggerOptions() {
+    const environment = pigeonEnvironment();
+
     return {
-      level: process.env.LOG_LEVEL,
+      level: environment.LOG_LEVEL,
       transports: [
         new winston.transports.Console({
           format: this.consoleFormat,
-          level: process.env.LOG_LEVEL,
+          level: environment.LOG_LEVEL,
         }),
         new winston.transports.File({
           filename: this.getLogFileName(),
           format: this.jsonFormat,
-          level: process.env.LOG_LEVEL,
+          level: environment.LOG_LEVEL,
         }),
       ],
     };
   }
 
   private getLogFileName(): string {
-    const logDirectory = process.env.LOG_URL || 'logs';
-    const serviceName = process.env.SERVICE_NAME || 'service';
+    const environment = pigeonEnvironment();
+    const logDirectory = environment.LOG_URL;
+    const serviceName = environment.SERVICE_NAME || 'service';
 
     return `${Kernel.rootDirectory}/${logDirectory}/${serviceName}.log`;
   }

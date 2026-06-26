@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import fs from 'fs';
 import path from 'path';
 
@@ -13,29 +14,25 @@ export class PublicRelayRecordRegistry {
   private static readonly globalLoadedKey =
     '__pigeonSwarmPublicRelayRecordsLoaded';
 
-  private static readonly defaultFallbackMs = 7 * 24 * 60 * 60 * 1000;
-
   private fallbackMs(): number {
-    return Number(
-      process.env.PIGEON_STORED_RELAY_FALLBACK_MS ||
-        PublicRelayRecordRegistry.defaultFallbackMs,
-    );
+    return pigeonEnvironment().PIGEON_STORED_RELAY_FALLBACK_MS;
   }
 
   private storagePath(): string {
+    const environment = pigeonEnvironment();
+
     return (
-      process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH ||
-      path.join(
-        process.env.IPFS_STORAGE_PATH || './ipfs_storage',
-        'publicRelayRecords.json',
-      )
+      environment.PIGEON_PUBLIC_RELAY_RECORDS_PATH ||
+      path.join(environment.IPFS_STORAGE_PATH, 'publicRelayRecords.json')
     );
   }
 
   private shouldPersist(): boolean {
+    const environment = pigeonEnvironment();
+
     return (
-      process.env.NODE_ENV !== 'test' ||
-      Boolean(process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH)
+      environment.NODE_ENV !== 'test' ||
+      Boolean(environment.PIGEON_PUBLIC_RELAY_RECORDS_PATH)
     );
   }
 

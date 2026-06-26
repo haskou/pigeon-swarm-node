@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
 import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
 import { Constructor } from '@haskou/ddd-kernel/domain';
@@ -74,11 +75,11 @@ export default class MessageBus
     private readonly memoryAdapter: MemoryMessageBusAdapter,
     private readonly libp2pGossipsubAdapter: Libp2pGossipsubAdapter,
   ) {
-    this.adapter = this.chooseAdapterFromDsn(process.env.TRANSPORT_DSN || '');
+    this.adapter = this.chooseAdapterFromDsn(pigeonEnvironment().TRANSPORT_DSN);
   }
 
   private chooseAdapterFromDsn(dsn: string): MessageBusAdapter {
-    this.ensureDSNIsValid(process.env.TRANSPORT_DSN || '');
+    this.ensureDSNIsValid(dsn);
 
     if (dsn.startsWith('in-memory')) {
       return this.memoryAdapter;

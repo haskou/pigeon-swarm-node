@@ -2,6 +2,7 @@ import { IdentityPresenceWasUpdatedEvent } from '@app/contexts/presence/domain/e
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '@app/contexts/presence/domain/value-objects/PresenceStatus';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
@@ -30,7 +31,7 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   public async handler(event: DomainEvent): Promise<void> {

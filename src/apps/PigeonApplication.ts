@@ -12,11 +12,11 @@ import {
   DomainEventPublisher,
 } from '@haskou/ddd-kernel/domain';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
-import dotenv from 'dotenv';
 import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
+import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
   handleCustomHttpError,
@@ -40,6 +40,7 @@ export default class PigeonApplication {
   private readonly consumers: Consumer[] = [];
   private readonly logger = new WinstonLogger();
   private readonly kernel = new Kernel({
+    environmentSchema: pigeonEnvironmentSchema,
     logger: this.logger,
     sourceDirectory: path.resolve(__dirname, '..'),
   });
@@ -49,7 +50,7 @@ export default class PigeonApplication {
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
   private getRoutePrefix(): RoutePrefix {
-    return RoutePrefix.fromEnvironment(process.env.ROUTE_PREFIX);
+    return RoutePrefix.fromEnvironment(this.kernel.environment.ROUTE_PREFIX);
   }
 
   private buildSwaggerHtml(
@@ -210,7 +211,7 @@ export default class PigeonApplication {
           },
         ],
         kernel: this.kernel,
-        port: Number(process.env.API_PORT ?? 8080),
+        port: this.kernel.environment.API_PORT,
         preControllerMiddlewares: [
           (request, _response, next) => {
             HttpRequestContext.run(request, next);
@@ -252,19 +253,15 @@ export default class PigeonApplication {
     return this.kernel.di.getService<Scheduler>(ClassDefinition);
   }
 
-  public environmentVariables(
-    env: string = (process.env.NODE_ENV = 'local'),
-  ): void {
-    dotenv.config({
-      path: path.resolve(Kernel.rootDirectory, env ? '.env.' + env : '.env'),
-    });
+  public loadEnvironmentVariables(environment?: string): void {
+    this.kernel.loadEnvironmentVariables(environment);
   }
 
   public async dependencyInjection(): Promise<void> {
     await this.kernel.dependencyInjection({
       containerBuild:
-        process.env.CONTAINER_BUILD === 'true' ||
-        process.env.NODE_ENV !== 'production',
+        this.kernel.environment.CONTAINER_BUILD ||
+        this.kernel.environment.NODE_ENV !== 'production',
       overrides: [
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },

@@ -1,3 +1,5 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
 import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
@@ -9,13 +11,13 @@ export default class IPFSContentRacer {
   private readonly timeoutMs: number;
 
   constructor() {
+    const environment = pigeonEnvironment();
+
     this.timeoutMs = Math.min(
-      Number(
-        process.env.IPFS_CONTENT_TIMEOUT_MS ??
-          (process.env.NODE_ENV === 'test'
-            ? 500
-            : IPFSContentRacer.DEFAULT_TIMEOUT_MS),
-      ),
+      environment.IPFS_CONTENT_TIMEOUT_MS ??
+        (environment.NODE_ENV === 'test'
+          ? 500
+          : IPFSContentRacer.DEFAULT_TIMEOUT_MS),
       IPFSContentRacer.MAX_TIMEOUT_MS,
     );
   }

@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { createHmac } from 'crypto';
 
 import {
@@ -12,7 +13,9 @@ export class CallIceServerConfig {
   private static readonly DEFAULT_CREDENTIAL_TTL_SECONDS = 3600;
   private static readonly DEFAULT_ICE_TRANSPORT_POLICY = 'relay';
 
-  private static normalizeCredentialTtl(value: string | undefined): number {
+  private static normalizeCredentialTtl(
+    value: number | string | undefined,
+  ): number {
     const parsedValue = Number(value);
 
     return Number.isFinite(parsedValue) && parsedValue > 0
@@ -36,7 +39,7 @@ export class CallIceServerConfig {
   }
 
   public static fromEnvironment(
-    environment: CallIceServerEnvironment = process.env,
+    environment: CallIceServerEnvironment = pigeonEnvironment(),
   ): CallIceServerConfig {
     return new CallIceServerConfig(
       this.splitEnvironmentList(environment.CALLS_TURN_URLS),

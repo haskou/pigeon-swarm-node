@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -114,7 +115,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
   ): Promise<void> {
     return new Promise((resolve) => {
       const targetExchange =
-        exchange || process.env.SERVICE_NAME || 'pigeon-swarm';
+        exchange || pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
 
       for (const domainEvent of domainEvents) {
         const queues = this.getQueueNameFromDomainEvent(

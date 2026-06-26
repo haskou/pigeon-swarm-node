@@ -1,6 +1,8 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+
 export default class PubSubTopicResolver {
   private readonly defaultPrefix = 'pigeon-swarm';
-  private readonly prefix = process.env.PUBSUB_TOPIC_PREFIX;
+  private readonly prefix = pigeonEnvironment().PUBSUB_TOPIC_PREFIX;
 
   private getPrefix(): string {
     return this.prefix || this.defaultPrefix;

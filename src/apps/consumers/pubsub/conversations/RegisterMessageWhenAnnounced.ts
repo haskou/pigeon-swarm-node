@@ -3,6 +3,7 @@ import { RegisterConversationMessage } from '@app/contexts/conversations/applica
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageFactory } from '@app/contexts/conversations/domain/entities/messages/MessageFactory';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
@@ -39,7 +40,7 @@ export default class RegisterMessageWhenAnnounced extends Consumer {
   }
 
   public get exchange(): string {
-    return process.env.SERVICE_NAME || 'pigeon-swarm';
+    return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
   private isStringArray(value: unknown): value is string[] {

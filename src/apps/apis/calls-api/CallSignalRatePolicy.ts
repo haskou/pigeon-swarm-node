@@ -1,3 +1,5 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+
 import { CallSignalRateBucket } from './CallSignalRateBucket';
 
 export { CallSignalRateBucket } from './CallSignalRateBucket';
@@ -7,9 +9,9 @@ export class CallSignalRatePolicy {
   public static readonly WINDOW_MS = 60_000;
 
   public static fromEnvironment(
-    environment: NodeJS.ProcessEnv = process.env,
+    environment = pigeonEnvironment(),
   ): CallSignalRatePolicy {
-    const parsedLimit = Number(environment.CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE);
+    const parsedLimit = environment.CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE;
 
     return new CallSignalRatePolicy(
       Number.isFinite(parsedLimit) && parsedLimit >= 0
