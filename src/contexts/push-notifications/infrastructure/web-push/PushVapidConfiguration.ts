@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 
 import ConfigurationReader from '../../application/find-vapid-public-key/PushVapidConfigurationReader';
 

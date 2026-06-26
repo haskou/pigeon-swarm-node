@@ -1,6 +1,6 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import ContentReplicationMetadataRegistrar from '@app/contexts/content-replication/application/register-content/ContentReplicationMetadataRegistrar';
 import { ContentReplicationWasRegisteredEvent } from '@app/contexts/content-replication/domain/events/ContentReplicationWasRegisteredEvent';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';

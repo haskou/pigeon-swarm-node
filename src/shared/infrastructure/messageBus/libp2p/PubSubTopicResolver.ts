@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 
 export default class PubSubTopicResolver {
   private readonly defaultPrefix = 'pigeon-swarm';

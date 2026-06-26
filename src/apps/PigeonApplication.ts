@@ -16,6 +16,7 @@ import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
+import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
   handleCustomHttpError,
@@ -34,7 +35,6 @@ import { WebSocketRealtimeServer } from '../shared/infrastructure/websocket/WebS
 import { ApiSwaggerFactory } from './apis/ApiSwaggerFactory';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
-import { pigeonEnvironmentSchema } from './PigeonEnvironment';
 
 export default class PigeonApplication {
   private readonly consumers: Consumer[] = [];

@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { HttpApp } from '@haskou/ddd-kernel/adapters/ui';
 import expressWinston from 'express-winston';

@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';

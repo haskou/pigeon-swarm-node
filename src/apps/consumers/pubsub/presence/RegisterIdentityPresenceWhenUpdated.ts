@@ -1,8 +1,8 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { IdentityPresenceWasUpdatedEvent } from '@app/contexts/presence/domain/events/IdentityPresenceWasUpdatedEvent';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '@app/contexts/presence/domain/value-objects/PresenceStatus';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';

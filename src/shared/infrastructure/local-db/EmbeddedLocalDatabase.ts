@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { Level } from 'level';
 import path from 'path';

@@ -1,7 +1,7 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
 import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';

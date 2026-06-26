@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
 import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
 import { Constructor } from '@haskou/ddd-kernel/domain';

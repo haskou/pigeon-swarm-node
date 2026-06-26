@@ -1,4 +1,3 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
@@ -10,6 +9,7 @@ import { CommunityChannelMessageId } from '@app/contexts/communities/domain/valu
 import { CommunityChannelMessageReactionEmoji } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageReactionEmoji';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';

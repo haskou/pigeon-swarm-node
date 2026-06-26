@@ -1,5 +1,5 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';

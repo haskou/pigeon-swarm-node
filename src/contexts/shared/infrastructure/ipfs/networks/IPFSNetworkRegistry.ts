@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import PrivateNetworkRelayRecordDirectory, {
   PrivateRelayListenOptions,
 } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';

@@ -1,4 +1,4 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';

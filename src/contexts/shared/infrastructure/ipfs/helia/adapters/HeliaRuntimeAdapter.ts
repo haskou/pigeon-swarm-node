@@ -17,7 +17,7 @@ import type { CID as MultiformatsCid } from 'multiformats/cid';
 import type * as MultiformatsDigest from 'multiformats/hashes/digest';
 import type * as Sha2Module from 'multiformats/hashes/sha2';
 
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 
 import type { HeliaBlockBrokers } from './types/HeliaBlockBrokers';
 import type { HeliaInstance } from './types/HeliaInstance';

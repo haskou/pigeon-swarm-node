@@ -1,5 +1,5 @@
-import { pigeonEnvironment } from '@app/apps/PigeonEnvironment';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { createHmac } from 'crypto';
 
 import {
