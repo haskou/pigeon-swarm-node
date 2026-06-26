@@ -710,10 +710,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/ddd-kernel@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-1.1.0.tgz#ebd01691df7b840b423315c75be85cce9f074c5f"
-  integrity sha512-g8/KU/QeJ+/CAL+0kdG5+A4kWOW80VzHWWuhJY5PwSqL1th5mBmMhYrJWfy7WVmpkj8gl+rpAgLdLaK4w8a1iA==
+"@haskou/ddd-kernel@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-1.2.0.tgz#523b00d6921feffca6ed7d18543249eb338b41cd"
+  integrity sha512-uHyAKanZ0DRLHUEWELEJAE5dSqweGdzDA/sa5DUYqXNyXeH+YF6oue3pxfwZXR7cBsdm36m2cU9o0e5oa1S5nQ==
   dependencies:
     dotenv "^16.6.1"
     fs-extra "^11.3.5"

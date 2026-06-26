@@ -35,10 +35,18 @@ import { ApiSwaggerFactory } from './apis/ApiSwaggerFactory';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 
+const environmentSchema = {
+  API_PORT: { defaultValue: 8080, type: 'number' },
+  CONTAINER_BUILD: { defaultValue: false, type: 'boolean' },
+  NODE_ENV: { defaultValue: 'local', type: 'string' },
+  ROUTE_PREFIX: { type: 'string' },
+} as const;
+
 export default class PigeonApplication {
   private readonly consumers: Consumer[] = [];
   private readonly logger = new WinstonLogger();
   private readonly kernel = new Kernel({
+    environmentSchema,
     logger: this.logger,
     sourceDirectory: path.resolve(__dirname, '..'),
   });
@@ -48,7 +56,7 @@ export default class PigeonApplication {
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
   private getRoutePrefix(): RoutePrefix {
-    return RoutePrefix.fromEnvironment(Kernel.environment.ROUTE_PREFIX);
+    return RoutePrefix.fromEnvironment(this.kernel.environment.ROUTE_PREFIX);
   }
 
   private buildSwaggerHtml(
@@ -209,7 +217,7 @@ export default class PigeonApplication {
           },
         ],
         kernel: this.kernel,
-        port: Number(Kernel.environment.API_PORT ?? 8080),
+        port: this.kernel.environment.API_PORT,
         preControllerMiddlewares: [
           (request, _response, next) => {
             HttpRequestContext.run(request, next);
@@ -251,15 +259,15 @@ export default class PigeonApplication {
     return this.kernel.di.getService<Scheduler>(ClassDefinition);
   }
 
-  public loadEnvironmentVariables(environment: string): void {
+  public loadEnvironmentVariables(environment?: string): void {
     this.kernel.loadEnvironmentVariables(environment);
   }
 
   public async dependencyInjection(): Promise<void> {
     await this.kernel.dependencyInjection({
       containerBuild:
-        Kernel.environment.CONTAINER_BUILD === 'true' ||
-        Kernel.environment.NODE_ENV !== 'production',
+        this.kernel.environment.CONTAINER_BUILD ||
+        this.kernel.environment.NODE_ENV !== 'production',
       overrides: [
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },

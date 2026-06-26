@@ -21,11 +21,9 @@ async function init() {
   const application = new PigeonApplication();
   console.timeEnd('Kernel');
 
-  const environment = Kernel.environment.NODE_ENV || 'local';
-
-  console.time(`Environment ${environment} variables`);
-  application.loadEnvironmentVariables(environment);
-  console.timeEnd(`Environment ${environment} variables`);
+  console.time('Environment variables');
+  application.loadEnvironmentVariables();
+  console.timeEnd('Environment variables');
 
   console.time('Dependency Injection');
   await application.dependencyInjection();
