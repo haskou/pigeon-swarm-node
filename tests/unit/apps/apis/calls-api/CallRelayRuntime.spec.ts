@@ -5,8 +5,8 @@ import CallRelayRuntime from '@app/apps/apis/calls-api/CallRelayRuntime';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
-import Kernel from '@app/Kernel';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
+import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 function clearCallRelayRuntimeState(): void {

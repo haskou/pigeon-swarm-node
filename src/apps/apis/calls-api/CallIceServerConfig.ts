@@ -9,6 +9,17 @@ import {
 import { CallIceServerEnvironment } from './types/CallIceServerEnvironment';
 import { TurnCredentials } from './types/TurnCredentials';
 
+type CallIceServerConfigValues = {
+  iceTransportPolicy: 'all' | 'relay';
+  stunUrls: string[];
+  turnCredential: string | undefined;
+  turnCredentialTtlSeconds: number;
+  turnDiscoveryEnabled: boolean;
+  turnSharedSecret: string | undefined;
+  turnUrls: string[];
+  turnUsername: string | undefined;
+};
+
 export class CallIceServerConfig {
   private static readonly DEFAULT_CREDENTIAL_TTL_SECONDS = 3600;
   private static readonly DEFAULT_ICE_TRANSPORT_POLICY = 'relay';
@@ -82,44 +93,38 @@ export class CallIceServerConfig {
   public static fromEnvironment(
     environment: CallIceServerEnvironment = pigeonEnvironment(),
   ): CallIceServerConfig {
-    return new CallIceServerConfig(
-      this.getAdvertisedTurnUrls(environment),
-      environment.CALLS_TURN_USERNAME,
-      environment.CALLS_TURN_CREDENTIAL,
-      environment.CALLS_TURN_SHARED_SECRET,
-      this.normalizeCredentialTtl(
+    return new CallIceServerConfig({
+      iceTransportPolicy: this.normalizeIceTransportPolicy(
+        environment.CALLS_ICE_TRANSPORT_POLICY,
+      ),
+      stunUrls: this.splitEnvironmentList(environment.CALLS_STUN_URLS),
+      turnCredential: environment.CALLS_TURN_CREDENTIAL,
+      turnCredentialTtlSeconds: this.normalizeCredentialTtl(
         environment.CALLS_TURN_CREDENTIAL_TTL_SECONDS,
       ),
-      this.splitEnvironmentList(environment.CALLS_STUN_URLS),
-      this.normalizeIceTransportPolicy(environment.CALLS_ICE_TRANSPORT_POLICY),
-      environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
+      turnDiscoveryEnabled:
+        environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
         environment.CALLS_TURN_DISCOVERY_ENABLED !== 'false',
-    );
+      turnSharedSecret: environment.CALLS_TURN_SHARED_SECRET,
+      turnUrls: this.getAdvertisedTurnUrls(environment),
+      turnUsername: environment.CALLS_TURN_USERNAME,
+    });
   }
 
-  constructor(
-    private readonly turnUrls: string[],
-    private readonly turnUsername: string | undefined,
-    private readonly turnCredential: string | undefined,
-    private readonly turnSharedSecret: string | undefined,
-    private readonly turnCredentialTtlSeconds: number,
-    private readonly stunUrls: string[],
-    private readonly iceTransportPolicy: 'all' | 'relay',
-    private readonly turnDiscoveryEnabled: boolean,
-  ) {}
+  public constructor(private readonly values: CallIceServerConfigValues) {}
 
   private createTurnCredentials(identityId: IdentityId): TurnCredentials {
-    if (!this.turnSharedSecret) {
+    if (!this.values.turnSharedSecret) {
       return {
-        credential: this.turnCredential,
-        username: this.turnUsername,
+        credential: this.values.turnCredential,
+        username: this.values.turnUsername,
       };
     }
 
     const expiresAt =
-      Math.floor(Date.now() / 1000) + this.turnCredentialTtlSeconds;
+      Math.floor(Date.now() / 1000) + this.values.turnCredentialTtlSeconds;
     const username = `${expiresAt}:${identityId.valueOf()}`;
-    const credential = createHmac('sha1', this.turnSharedSecret)
+    const credential = createHmac('sha1', this.values.turnSharedSecret)
       .update(username)
       .digest('base64');
 
@@ -135,9 +140,12 @@ export class CallIceServerConfig {
   ): CallIceServersResource {
     const iceServers: CallIceServerResource[] = [];
     const turnUrls =
-      this.turnDiscoveryEnabled && this.turnSharedSecret
-        ? CallIceServerConfig.unique([...this.turnUrls, ...discoveredTurnUrls])
-        : this.turnUrls;
+      this.values.turnDiscoveryEnabled && this.values.turnSharedSecret
+        ? CallIceServerConfig.unique([
+            ...this.values.turnUrls,
+            ...discoveredTurnUrls,
+          ])
+        : this.values.turnUrls;
 
     if (turnUrls.length > 0) {
       const credentials = this.createTurnCredentials(identityId);
@@ -149,15 +157,15 @@ export class CallIceServerConfig {
       });
     }
 
-    if (this.stunUrls.length > 0) {
+    if (this.values.stunUrls.length > 0) {
       iceServers.push({
-        urls: this.stunUrls,
+        urls: this.values.stunUrls,
       });
     }
 
     return {
       iceServers,
-      iceTransportPolicy: this.iceTransportPolicy,
+      iceTransportPolicy: this.values.iceTransportPolicy,
     };
   }
 }

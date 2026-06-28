@@ -1,7 +1,7 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '@app/Kernel';
 import { Runtime } from '@app/shared/infrastructure/lifecycle/Runtime';
+import Kernel from '@haskou/ddd-kernel';
 
 import { CallRelayConfiguration } from './CallRelayConfiguration';
 import CallRelayRecordDiscovery from './CallRelayRecordDiscovery';

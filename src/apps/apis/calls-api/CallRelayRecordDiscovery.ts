@@ -1,5 +1,5 @@
-import Kernel from '@app/Kernel';
 import { PublicRelayPubSubConnection } from '@app/shared/infrastructure/network/relay/PublicRelayPubSubConnection';
+import Kernel from '@haskou/ddd-kernel';
 
 import { CallRelayRecordPrimitives } from './CallRelayRecordPrimitives';
 import CallRelayRecordRegistry from './CallRelayRecordRegistry';
