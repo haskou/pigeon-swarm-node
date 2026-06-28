@@ -12,6 +12,7 @@ import { TurnCredentials } from './types/TurnCredentials';
 export class CallIceServerConfig {
   private static readonly DEFAULT_CREDENTIAL_TTL_SECONDS = 3600;
   private static readonly DEFAULT_ICE_TRANSPORT_POLICY = 'relay';
+  private static readonly DEFAULT_TURN_TRANSPORTS = ['udp', 'tcp'];
 
   private static normalizeCredentialTtl(
     value: number | string | undefined,
@@ -38,11 +39,51 @@ export class CallIceServerConfig {
       .filter((item) => item.length > 0);
   }
 
+  private static unique(values: string[]): string[] {
+    return [...new Set(values)];
+  }
+
+  private static getTurnPublicHost(
+    environment: CallIceServerEnvironment,
+  ): string | undefined {
+    return environment.CALLS_TURN_PUBLIC_HOST || environment.PIGEON_PUBLIC_HOST;
+  }
+
+  private static getTurnTransports(
+    environment: CallIceServerEnvironment,
+  ): string[] {
+    const configuredTransports = this.splitEnvironmentList(
+      environment.CALLS_TURN_TRANSPORTS,
+    );
+
+    return configuredTransports.length > 0
+      ? configuredTransports
+      : CallIceServerConfig.DEFAULT_TURN_TRANSPORTS;
+  }
+
+  private static getAdvertisedTurnUrls(
+    environment: CallIceServerEnvironment,
+  ): string[] {
+    const explicitUrls = this.splitEnvironmentList(environment.CALLS_TURN_URLS);
+    const publicHost = this.getTurnPublicHost(environment);
+    const port = Number(environment.CALLS_TURN_PORT);
+
+    if (!publicHost || !Number.isInteger(port) || port <= 0) {
+      return explicitUrls;
+    }
+
+    const generatedUrls = this.getTurnTransports(environment).map(
+      (transport) => `turn:${publicHost}:${port}?transport=${transport}`,
+    );
+
+    return this.unique([...explicitUrls, ...generatedUrls]);
+  }
+
   public static fromEnvironment(
     environment: CallIceServerEnvironment = pigeonEnvironment(),
   ): CallIceServerConfig {
     return new CallIceServerConfig(
-      this.splitEnvironmentList(environment.CALLS_TURN_URLS),
+      this.getAdvertisedTurnUrls(environment),
       environment.CALLS_TURN_USERNAME,
       environment.CALLS_TURN_CREDENTIAL,
       environment.CALLS_TURN_SHARED_SECRET,
@@ -51,6 +92,8 @@ export class CallIceServerConfig {
       ),
       this.splitEnvironmentList(environment.CALLS_STUN_URLS),
       this.normalizeIceTransportPolicy(environment.CALLS_ICE_TRANSPORT_POLICY),
+      environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
+        environment.CALLS_TURN_DISCOVERY_ENABLED !== 'false',
     );
   }
 
@@ -62,6 +105,7 @@ export class CallIceServerConfig {
     private readonly turnCredentialTtlSeconds: number,
     private readonly stunUrls: string[],
     private readonly iceTransportPolicy: 'all' | 'relay',
+    private readonly turnDiscoveryEnabled: boolean,
   ) {}
 
   private createTurnCredentials(identityId: IdentityId): TurnCredentials {
@@ -85,15 +129,22 @@ export class CallIceServerConfig {
     };
   }
 
-  public toResource(identityId: IdentityId): CallIceServersResource {
+  public toResource(
+    identityId: IdentityId,
+    discoveredTurnUrls: string[] = [],
+  ): CallIceServersResource {
     const iceServers: CallIceServerResource[] = [];
+    const turnUrls =
+      this.turnDiscoveryEnabled && this.turnSharedSecret
+        ? CallIceServerConfig.unique([...this.turnUrls, ...discoveredTurnUrls])
+        : this.turnUrls;
 
-    if (this.turnUrls.length > 0) {
+    if (turnUrls.length > 0) {
       const credentials = this.createTurnCredentials(identityId);
 
       iceServers.push({
         credential: credentials.credential,
-        urls: this.turnUrls,
+        urls: turnUrls,
         username: credentials.username,
       });
     }

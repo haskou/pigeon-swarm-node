@@ -359,10 +359,18 @@ Implemented:
 
 - require signed request auth before exposing relay credentials
 - read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
+- derive local TURN server URLs from `CALLS_TURN_PUBLIC_HOST` or
+  `PIGEON_PUBLIC_HOST` plus `CALLS_TURN_PORT` when `CALLS_TURN_URLS` is not
+  enough
 - when `CALLS_TURN_SHARED_SECRET` is configured, generate temporary coturn REST
   credentials per authenticated identity:
   `username=<expiresAtUnix>:<identityId>` and
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
+- publish signed call relay records through the public IPFS pubsub network when
+  `CALLS_TURN_SHARED_SECRET` and at least one local TURN URL are configured
+- include active TURN URLs discovered from other nodes that publish signed call
+  relay records; all nodes that share those relays must use the same
+  `CALLS_TURN_SHARED_SECRET`
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
   lifetime; it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
@@ -377,6 +385,10 @@ it does not make large group calls cheap. A mesh group call still creates one
 peer connection per participant pair. For large groups, add an SFU/media relay
 later so every client uploads one media stream and receives only the streams it
 needs.
+
+The backend does not embed a TURN server. `CALLS_TURN_PORT` and discovered
+records only describe reachable coturn instances; the coturn process/service
+must be running and must expose its listening port and relay media port range.
 
 ### Start call
 
