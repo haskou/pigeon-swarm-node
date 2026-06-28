@@ -10,6 +10,7 @@ function callRelayRecord(urls: string[]): CallRelayRecordPrimitives {
     expiresAt: Date.now() + 60_000,
     issuedAt: Date.now(),
     peerId: '12D3KooWCallRelay',
+    poolSignature: 'pool-signature',
     publicKey: 'public-key',
     role: 'call-relay',
     signature: 'signature',
@@ -20,13 +21,17 @@ function callRelayRecord(urls: string[]): CallRelayRecordPrimitives {
 
 describe('CallRelayRecordDiscovery', () => {
   let registry: CallRelayRecordRegistry;
+  let previousEnvironment: NodeJS.ProcessEnv;
 
   beforeEach(() => {
+    previousEnvironment = { ...process.env };
+    process.env.CALLS_TURN_SHARED_SECRET = 'turn-shared-secret';
     registry = new CallRelayRecordRegistry();
     registry.clear();
   });
 
   afterEach(() => {
+    process.env = previousEnvironment;
     registry.clear();
   });
 
@@ -49,6 +54,11 @@ describe('CallRelayRecordDiscovery', () => {
     await discovery.startConnection(connection);
     await subscribedHandler?.(JSON.stringify(record));
 
+    expect(signer.verify).toHaveBeenCalledWith(
+      record,
+      record.signature,
+      'turn-shared-secret',
+    );
     expect(registry.all()).toEqual([record]);
   });
 
@@ -68,6 +78,26 @@ describe('CallRelayRecordDiscovery', () => {
     await subscribedHandler?.(
       JSON.stringify(callRelayRecord(['stun:relay.example.test:3478'])),
     );
+
+    expect(signer.verify).not.toHaveBeenCalled();
+    expect(registry.all()).toEqual([]);
+  });
+
+  it('should reject records that do not prove TURN pool membership', async () => {
+    const signer = mock<CallRelayRecordSigner>();
+    const discovery = new CallRelayRecordDiscovery(registry, signer);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+    const connection: PublicRelayPubSubConnection = {
+      publishPubSub: jest.fn(),
+      subscribePubSub: jest.fn(async (_topic, handler) => {
+        subscribedHandler = handler;
+      }),
+    };
+    const { poolSignature: _poolSignature, ...recordWithoutPoolSignature } =
+      callRelayRecord(['turn:relay.example.test:4199?transport=udp']);
+
+    await discovery.startConnection(connection);
+    await subscribedHandler?.(JSON.stringify(recordWithoutPoolSignature));
 
     expect(signer.verify).not.toHaveBeenCalled();
     expect(registry.all()).toEqual([]);

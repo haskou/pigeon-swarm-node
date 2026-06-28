@@ -4,6 +4,7 @@ import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/Or
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/documents/OrbitDBCallDocument';
 import { Timestamp } from '@haskou/value-objects';
 
 type Entry = {
@@ -101,6 +102,26 @@ describe('OrbitDBCallRepository', () => {
       },
       status,
     });
+  }
+
+  function communityCallDocument(
+    status: 'active' | 'ended' = 'active',
+  ): OrbitDBCallDocument {
+    const primitives = communityCall(status).toPrimitives();
+
+    return {
+      createdAt: primitives.createdAt,
+      creatorIdentityId: primitives.creatorIdentityId,
+      endedAt: primitives.endedAt,
+      endedByIdentityId: primitives.endedByIdentityId,
+      id: primitives.id,
+      networkId: primitives.networkId,
+      participantIds: primitives.participantIds,
+      participants: primitives.participants,
+      scope: primitives.scope,
+      status: primitives.status,
+      updatedAt: 1780000000000,
+    };
   }
 
   beforeEach(() => {
@@ -242,6 +263,38 @@ describe('OrbitDBCallRepository', () => {
     );
 
     const activeCall = await repository.findActiveByCommunityChannel(
+      communityId,
+      channelId,
+    );
+
+    expect(activeCall?.toPrimitives().id).toBe(callId);
+    expect(findCachedHeadsByPrefix).not.toHaveBeenCalled();
+  });
+
+  it('finds active community channel calls from the community active index when channel indexes lag on another repository instance', async () => {
+    const document = communityCallDocument();
+    const activeCommunityIndexKey = `call-community-active-index:${communityId.valueOf()}`;
+    const replicatedHeads = createStore();
+    const replicatedRegistry = new OrbitDBReplicatedStateRegistry();
+
+    await replicatedHeads.put(`call:${callId}`, document);
+    await replicatedHeads.put(activeCommunityIndexKey, {
+      calls: [document],
+      id: activeCommunityIndexKey,
+      updatedAt: 1780000000000,
+    });
+    await replicatedRegistry.register(networkId, {
+      calls: createStore(),
+      heads: replicatedHeads,
+    } as never);
+
+    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+    const findCachedHeadsByPrefix = jest.spyOn(
+      replicatedRegistry,
+      'findCachedHeadsByPrefix',
+    );
+
+    const activeCall = await replicatedRepository.findActiveByCommunityChannel(
       communityId,
       channelId,
     );

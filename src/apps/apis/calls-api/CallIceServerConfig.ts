@@ -6,19 +6,9 @@ import {
   CallIceServerResource,
   CallIceServersResource,
 } from './resources/CallIceServersResource';
+import { CallIceServerConfigValues } from './types/CallIceServerConfigValues';
 import { CallIceServerEnvironment } from './types/CallIceServerEnvironment';
 import { TurnCredentials } from './types/TurnCredentials';
-
-type CallIceServerConfigValues = {
-  iceTransportPolicy: 'all' | 'relay';
-  stunUrls: string[];
-  turnCredential: string | undefined;
-  turnCredentialTtlSeconds: number;
-  turnDiscoveryEnabled: boolean;
-  turnSharedSecret: string | undefined;
-  turnUrls: string[];
-  turnUsername: string | undefined;
-};
 
 export class CallIceServerConfig {
   private static readonly DEFAULT_CREDENTIAL_TTL_SECONDS = 3600;

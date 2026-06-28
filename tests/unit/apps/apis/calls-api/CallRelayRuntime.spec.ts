@@ -54,7 +54,7 @@ describe('CallRelayRuntime', () => {
     publicNetwork.isPrivate.mockReturnValue(false);
     networkRegistry.getAll.mockReturnValue([]);
     networkRegistry.getSharedPeerPrivateKey.mockResolvedValue(
-      mock<Libp2pPrivateKeyLike>(),
+      {} as Libp2pPrivateKeyLike,
     );
     jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger);
     signer.sign.mockImplementation(async (payload) => {
@@ -62,6 +62,7 @@ describe('CallRelayRuntime', () => {
         {
           ...payload,
           peerId: '12D3KooWCallRelay',
+          poolSignature: 'pool-signature',
           publicKey: 'public-key',
         },
         'signature',
@@ -89,9 +90,22 @@ describe('CallRelayRuntime', () => {
     await registeredListener?.(publicNetwork);
 
     expect(discovery.startConnection).toHaveBeenCalledWith(publicNetwork);
+    expect(signer.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
+        version: 1,
+      }),
+      expect.anything(),
+      'turn-shared-secret',
+    );
     expect(discovery.publishConnection).toHaveBeenCalledWith(
       publicNetwork,
       expect.objectContaining({
+        poolSignature: 'pool-signature',
         role: 'call-relay',
         signature: 'signature',
         urls: [

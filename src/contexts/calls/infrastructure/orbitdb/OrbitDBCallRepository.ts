@@ -209,6 +209,16 @@ export default class OrbitDBCallRepository extends CallRepository {
     return document ? [document] : [];
   }
 
+  private async activeCommunityDocuments(
+    communityId: CommunityId,
+  ): Promise<OrbitDBCallDocument[]> {
+    return this.freshPrimaryDocuments(
+      (await this.findIndexDocuments(
+        this.communityActiveIndexHeadKey(communityId.valueOf()),
+      )) ?? [],
+    );
+  }
+
   private async putIndex(
     key: string,
     documents: OrbitDBCallDocument[],
@@ -412,6 +422,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
     const [document] = this.deduplicateDocuments([
       ...indexedDocuments,
+      ...(await this.activeCommunityDocuments(communityId)),
       ...this.cachedCommunityChannelCallDocument(communityId, channelId),
     ]).filter(
       (candidate) =>

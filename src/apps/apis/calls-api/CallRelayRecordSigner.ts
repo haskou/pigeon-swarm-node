@@ -1,11 +1,11 @@
 import libp2pKeyAdapter, {
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 import { CallRelayRecord } from './CallRelayRecord';
 import { CallRelayRecordPrimitives } from './CallRelayRecordPrimitives';
-
-type CallRelayRecordPayload = Omit<CallRelayRecordPrimitives, 'signature'>;
+import { CallRelayRecordPayload } from './types/CallRelayRecordPayload';
 
 export default class CallRelayRecordSigner {
   private static readonly encoder = new TextEncoder();
@@ -20,6 +20,31 @@ export default class CallRelayRecordSigner {
       urls: [...payload.urls].sort(),
       version: payload.version,
     });
+  }
+
+  private createPoolSignature(
+    payload: CallRelayRecordPayload,
+    sharedSecret: string,
+  ): string {
+    return createHmac('sha256', sharedSecret)
+      .update(this.canonicalPayload(payload))
+      .digest('base64url');
+  }
+
+  private isPoolSignatureValid(
+    payload: CallRelayRecordPayload &
+      Pick<CallRelayRecordPrimitives, 'poolSignature'>,
+    sharedSecret: string,
+  ): boolean {
+    const expected = Buffer.from(
+      this.createPoolSignature(payload, sharedSecret),
+      'base64url',
+    );
+    const received = Buffer.from(payload.poolSignature, 'base64url');
+
+    return (
+      expected.length === received.length && timingSafeEqual(expected, received)
+    );
   }
 
   private async buildPayload(
@@ -38,6 +63,7 @@ export default class CallRelayRecordSigner {
   public async sign(
     payload: Omit<CallRelayRecordPayload, 'peerId' | 'publicKey'>,
     privateKey: Libp2pPrivateKeyLike,
+    sharedSecret: string,
   ): Promise<CallRelayRecord> {
     const completePayload = await this.buildPayload(payload, privateKey);
     const signature = await privateKey.sign(
@@ -47,17 +73,26 @@ export default class CallRelayRecordSigner {
     );
 
     return new CallRelayRecord(
-      completePayload,
+      {
+        ...completePayload,
+        poolSignature: this.createPoolSignature(completePayload, sharedSecret),
+      },
       Buffer.from(signature).toString('base64url'),
     );
   }
 
   public async verify(
-    payload: CallRelayRecordPayload,
+    payload: CallRelayRecordPayload &
+      Pick<CallRelayRecordPrimitives, 'poolSignature'>,
     signature: string,
+    sharedSecret: string,
     now: number = Date.now(),
   ): Promise<boolean> {
     if (payload.expiresAt <= now) {
+      return false;
+    }
+
+    if (!this.isPoolSignatureValid(payload, sharedSecret)) {
       return false;
     }
 

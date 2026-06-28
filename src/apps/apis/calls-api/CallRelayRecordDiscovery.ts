@@ -1,6 +1,7 @@
 import { PublicRelayPubSubConnection } from '@app/shared/infrastructure/network/relay/PublicRelayPubSubConnection';
 import Kernel from '@haskou/ddd-kernel';
 
+import { CallRelayConfiguration } from './CallRelayConfiguration';
 import { CallRelayRecordPrimitives } from './CallRelayRecordPrimitives';
 import CallRelayRecordRegistry from './CallRelayRecordRegistry';
 import CallRelayRecordSigner from './CallRelayRecordSigner';
@@ -9,6 +10,7 @@ export default class CallRelayRecordDiscovery {
   private static readonly topic = 'pigeon-swarm.call-relays.v1';
 
   private readonly startedConnections = new WeakSet<object>();
+  private readonly configuration = CallRelayConfiguration.fromEnvironment();
 
   public constructor(
     private readonly registry: CallRelayRecordRegistry,
@@ -22,6 +24,7 @@ export default class CallRelayRecordDiscovery {
   private hasRecordStrings(record: Record<string, unknown>): boolean {
     return (
       typeof record.peerId === 'string' &&
+      typeof record.poolSignature === 'string' &&
       typeof record.publicKey === 'string' &&
       typeof record.signature === 'string'
     );
@@ -63,7 +66,13 @@ export default class CallRelayRecordDiscovery {
   private async saveValidRecord(
     record: CallRelayRecordPrimitives,
   ): Promise<void> {
-    if (!(await this.signer.verify(record, record.signature))) {
+    const sharedSecret = this.configuration.getTurnSharedSecret();
+
+    if (!sharedSecret) {
+      return;
+    }
+
+    if (!(await this.signer.verify(record, record.signature, sharedSecret))) {
       return;
     }
 

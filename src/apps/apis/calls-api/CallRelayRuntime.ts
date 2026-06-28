@@ -41,6 +41,12 @@ export default class CallRelayRuntime implements Runtime {
       return;
     }
 
+    const sharedSecret = this.configuration.getTurnSharedSecret();
+
+    if (!sharedSecret) {
+      return;
+    }
+
     const issuedAt = Date.now();
     const record = await this.signer.sign(
       {
@@ -51,6 +57,7 @@ export default class CallRelayRuntime implements Runtime {
         version: 1,
       },
       await this.networkRegistry.getSharedPeerPrivateKey(),
+      sharedSecret,
     );
 
     try {

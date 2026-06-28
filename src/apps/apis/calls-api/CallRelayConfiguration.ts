@@ -67,6 +67,10 @@ export class CallRelayConfiguration {
     ];
   }
 
+  public getTurnSharedSecret(): string | undefined {
+    return this.environment.CALLS_TURN_SHARED_SECRET;
+  }
+
   public canPublishLocalRelay(): boolean {
     return (
       this.isDiscoveryEnabled() &&

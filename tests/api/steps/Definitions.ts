@@ -1690,6 +1690,7 @@ export default class Definitions {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
       peerId: '12D3KooWRemoteCallRelay',
+      poolSignature: 'remote-pool-signature',
       publicKey: 'remote-public-key',
       role: 'call-relay',
       signature: 'remote-signature',
