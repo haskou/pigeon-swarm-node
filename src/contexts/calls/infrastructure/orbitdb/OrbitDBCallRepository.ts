@@ -12,6 +12,11 @@ import { Timestamp } from '@haskou/value-objects';
 import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
 
 export default class OrbitDBCallRepository extends CallRepository {
+  private readonly communityChannelCallCache = new Map<
+    string,
+    OrbitDBCallDocument
+  >();
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -127,6 +132,13 @@ export default class OrbitDBCallRepository extends CallRepository {
     return `call-community-active-index:${communityId}`;
   }
 
+  private communityChannelCacheKey(
+    communityId: string,
+    channelId: string,
+  ): string {
+    return `${communityId}:${channelId}`;
+  }
+
   private documentsFromIndex(
     record: Record<string, unknown> | undefined,
   ): OrbitDBCallDocument[] | undefined {
@@ -170,6 +182,31 @@ export default class OrbitDBCallRepository extends CallRepository {
       ...((await this.findIndexDocuments(key)) ?? []),
       ...this.cachedCallDocuments().filter(filter),
     ]);
+  }
+
+  private async freshPrimaryDocuments(
+    documents: OrbitDBCallDocument[],
+  ): Promise<OrbitDBCallDocument[]> {
+    return Promise.all(
+      documents.map(async (document) => {
+        const head = await this.registry.findHead(
+          this.callHeadKey(document.id),
+        );
+
+        return head && this.isDocument(head) ? head : document;
+      }),
+    );
+  }
+
+  private cachedCommunityChannelCallDocument(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): OrbitDBCallDocument[] {
+    const document = this.communityChannelCallCache.get(
+      this.communityChannelCacheKey(communityId.valueOf(), channelId.valueOf()),
+    );
+
+    return document ? [document] : [];
   }
 
   private async putIndex(
@@ -267,6 +304,24 @@ export default class OrbitDBCallRepository extends CallRepository {
     });
   }
 
+  private cacheCommunityChannelCall(document: OrbitDBCallDocument): void {
+    if (
+      document.scope.type !== 'community_channel' ||
+      !document.scope.communityId ||
+      !document.scope.channelId
+    ) {
+      return;
+    }
+
+    this.communityChannelCallCache.set(
+      this.communityChannelCacheKey(
+        document.scope.communityId,
+        document.scope.channelId,
+      ),
+      document,
+    );
+  }
+
   public async findById(id: CallId): Promise<Call | undefined> {
     const head = await this.registry.findHead(this.callHeadKey(id.valueOf()));
 
@@ -347,18 +402,24 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call | undefined> {
-    const [document] = (
-      await this.callDocumentsFromIndexAndCache(
+    const indexedDocuments = await this.freshPrimaryDocuments(
+      (await this.findIndexDocuments(
         this.communityChannelIndexHeadKey(
           communityId.valueOf(),
           channelId.valueOf(),
         ),
-        (candidate) =>
-          candidate.scope.type === 'community_channel' &&
-          candidate.scope.communityId === communityId.valueOf() &&
-          candidate.scope.channelId === channelId.valueOf(),
-      )
-    ).filter((candidate) => candidate.status === 'active');
+      )) ?? [],
+    );
+    const [document] = this.deduplicateDocuments([
+      ...indexedDocuments,
+      ...this.cachedCommunityChannelCallDocument(communityId, channelId),
+    ]).filter(
+      (candidate) =>
+        candidate.status === 'active' &&
+        candidate.scope.type === 'community_channel' &&
+        candidate.scope.communityId === communityId.valueOf() &&
+        candidate.scope.channelId === channelId.valueOf(),
+    );
 
     return document ? this.toDomain(document) : undefined;
   }
@@ -426,6 +487,7 @@ export default class OrbitDBCallRepository extends CallRepository {
 
     await this.registry.putDocument('calls', document);
     await this.putCallHead(document);
+    this.cacheCommunityChannelCall(document);
     this.refreshIndexesInBackground(document);
   }
 }
