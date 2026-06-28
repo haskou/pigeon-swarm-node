@@ -132,6 +132,13 @@ export default class OrbitDBCallRepository extends CallRepository {
     return `call-community-active-index:${communityId}`;
   }
 
+  private communityChannelHeadKey(
+    communityId: string,
+    channelId: string,
+  ): string {
+    return `call-community-channel-head:${communityId}:${channelId}`;
+  }
+
   private communityChannelCacheKey(
     communityId: string,
     channelId: string,
@@ -217,6 +224,17 @@ export default class OrbitDBCallRepository extends CallRepository {
         this.communityActiveIndexHeadKey(communityId.valueOf()),
       )) ?? [],
     );
+  }
+
+  private async cachedCommunityChannelHeadDocument(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<OrbitDBCallDocument[]> {
+    const document = await this.registry.findHead(
+      this.communityChannelHeadKey(communityId.valueOf(), channelId.valueOf()),
+    );
+
+    return document && this.isDocument(document) ? [document] : [];
   }
 
   private async putIndex(
@@ -423,6 +441,10 @@ export default class OrbitDBCallRepository extends CallRepository {
     const [document] = this.deduplicateDocuments([
       ...indexedDocuments,
       ...(await this.activeCommunityDocuments(communityId)),
+      ...(await this.cachedCommunityChannelHeadDocument(
+        communityId,
+        channelId,
+      )),
       ...this.cachedCommunityChannelCallDocument(communityId, channelId),
     ]).filter(
       (candidate) =>

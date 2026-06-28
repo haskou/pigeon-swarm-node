@@ -302,6 +302,32 @@ describe('OrbitDBCallRepository', () => {
     expect(activeCall?.toPrimitives().id).toBe(callId);
     expect(findCachedHeadsByPrefix).not.toHaveBeenCalled();
   });
+
+  it('finds active community channel calls from a replicated call head when channel indexes are missing', async () => {
+    const document = communityCallDocument();
+    const replicatedHeads = createStore();
+    const replicatedRegistry = new OrbitDBReplicatedStateRegistry();
+
+    await replicatedHeads.put(`call:${callId}`, document);
+    await replicatedRegistry.register(networkId, {
+      calls: createStore(),
+      heads: replicatedHeads,
+    } as never);
+
+    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+    const findCachedHeadsByPrefix = jest.spyOn(
+      replicatedRegistry,
+      'findCachedHeadsByPrefix',
+    );
+
+    const activeCall = await replicatedRepository.findActiveByCommunityChannel(
+      communityId,
+      channelId,
+    );
+
+    expect(activeCall?.toPrimitives().id).toBe(callId);
+    expect(findCachedHeadsByPrefix).not.toHaveBeenCalled();
+  });
 });
 
 function flushBackgroundTasks(): Promise<void> {
