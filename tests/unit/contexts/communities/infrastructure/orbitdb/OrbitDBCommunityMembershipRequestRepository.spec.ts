@@ -169,6 +169,38 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     ]);
   });
 
+  it('should not scan cached membership request heads when identity indexes lag', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    heads.delete(
+      `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`,
+    );
+    const findCachedHeadsByPrefix = jest.spyOn(
+      registry,
+      'findCachedHeadsByPrefix',
+    );
+
+    const byIdentity = await store.findByIdentity(invitedIdentityId);
+
+    expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
+      request.getId().valueOf(),
+    ]);
+    expect(findCachedHeadsByPrefix).not.toHaveBeenCalledWith(
+      'community-membership-request:',
+    );
+  });
+
   it('should find membership requests from fresh heads by creator when identity indexes lag', async () => {
     const request = CommunityMembershipRequest.invitation(
       communityId,
