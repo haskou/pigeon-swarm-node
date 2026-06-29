@@ -205,9 +205,21 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
   }
 
   private cachedStoredRequestDocuments(): OrbitDBCommunityMembershipRequestDocument[] {
-    return [...this.requestCache.values()].filter((document) =>
-      this.isStoredDocument(document),
+    const registryDocuments = this.registry
+      .findCachedHeadsByPrefix('community-membership-request:')
+      .filter(
+        (document): document is OrbitDBCommunityMembershipRequestDocument =>
+          this.isStoredDocument(document),
+      );
+
+    registryDocuments.forEach((document) =>
+      this.cacheRequestDocument(document),
     );
+
+    return this.deduplicateDocuments([
+      ...this.requestCache.values(),
+      ...registryDocuments,
+    ]).filter((document) => this.isStoredDocument(document));
   }
 
   private cacheRequestDocument(
