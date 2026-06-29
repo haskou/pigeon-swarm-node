@@ -78,6 +78,7 @@ export default abstract class ConversationRepository {
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
     messageId: MessageId,
+    networkId?: NetworkId,
   ): Promise<void>;
 
   public abstract save(conversation: Conversation): Promise<void>;

@@ -195,6 +195,41 @@ describe('OrbitDBConversationRepository', () => {
     );
   });
 
+  it('should mark an external timestamped message id as read with known network without reading heads', async () => {
+    const conversation = mother.build();
+    const messageId = new MessageId(
+      `${conversation.getId().valueOf()}:1781121453305:client`,
+    );
+
+    await repository.save(conversation);
+    messagesQuery.mockClear();
+    const findHead = jest.spyOn(registry, 'findHead');
+    findHead.mockClear();
+
+    await repository.markReadUntil(
+      conversation.getId(),
+      mother.recipient,
+      messageId,
+      mother.networkId,
+    );
+
+    const marker = heads.get(
+      `read-marker:${conversation.getId().valueOf()}:${mother.recipient.valueOf()}`,
+    );
+
+    expect(messagesQuery).not.toHaveBeenCalled();
+    expect(findHead).not.toHaveBeenCalled();
+    expect(marker).toEqual(
+      expect.objectContaining({
+        conversationId: conversation.getId().valueOf(),
+        messageCreatedAt: 1781121453305,
+        messageId: messageId.valueOf(),
+        networkId: mother.networkId.valueOf(),
+        recipientIdentityId: mother.recipient.valueOf(),
+      }),
+    );
+  });
+
   it('should count unread messages for several conversations from message indexes', async () => {
     const secondAuthor = await ConversationMother.generateIdentityId();
     const firstConversation = mother.build();
