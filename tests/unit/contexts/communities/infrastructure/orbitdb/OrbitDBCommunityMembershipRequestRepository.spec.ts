@@ -96,9 +96,8 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       communityId,
       invitedIdentityId,
     );
-    const byOwnedCommunity = await store.findByOwnedCommunities(
-      ownerIdentityId,
-    );
+    const byOwnedCommunity =
+      await store.findByOwnedCommunities(ownerIdentityId);
 
     await store.deleteByCommunity(communityId);
 
@@ -142,8 +141,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     ]);
 
     expect(result).toBe('saved');
-    expect(heads.get(`community-membership-request:${request.getId().valueOf()}`))
-      .toEqual(expect.objectContaining({ id: request.getId().valueOf() }));
+    expect(
+      heads.get(`community-membership-request:${request.getId().valueOf()}`),
+    ).toEqual(expect.objectContaining({ id: request.getId().valueOf() }));
   });
 
   it('should find membership requests from fresh heads when identity indexes lag', async () => {
@@ -160,9 +160,40 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       ownerIdentityId: ownerIdentityId.valueOf(),
     });
     await store.save(request);
-    heads.delete(`community-membership-request-identity-index:${invitedIdentityId.valueOf()}`);
+    heads.delete(
+      `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`,
+    );
 
     const byIdentity = await store.findByIdentity(invitedIdentityId);
+
+    expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
+      request.getId().valueOf(),
+    ]);
+  });
+
+  it('should find cached membership request heads from another repository when indexes lag', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+
+    await registry.putHead(`community:${communityId.valueOf()}`, {
+      id: communityId.valueOf(),
+      networkId: 'network-1',
+      ownerIdentityId: ownerIdentityId.valueOf(),
+    });
+    await store.save(request);
+    heads.delete(
+      `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`,
+    );
+    const replicatedStore = new OrbitDBCommunityMembershipRequestRepository(
+      registry,
+      new OrbitDBCommunityMembershipRequestMapper(),
+    );
+
+    const byIdentity = await replicatedStore.findByIdentity(invitedIdentityId);
 
     expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
       request.getId().valueOf(),

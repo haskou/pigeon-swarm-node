@@ -249,6 +249,12 @@ package "communities/domain" {
     + visibleMembersForTextChannel(channelId): IdentityId[]
   }
 
+  note right of CommunityAccessValidator
+    Validator owns permission assertions.
+    Community aggregate exposes intent methods,
+    not public assertCan* methods.
+  end note
+
   class CommunityMembership {
     - members: IdentityId[]
     - bannedMembers: IdentityId[]

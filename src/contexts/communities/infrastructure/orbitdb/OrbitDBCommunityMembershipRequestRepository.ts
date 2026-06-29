@@ -10,6 +10,11 @@ import { OrbitDBCommunityMembershipRequestDocument } from './documents/OrbitDBCo
 import OrbitDBCommunityMembershipRequestMapper from './mappers/OrbitDBCommunityMembershipRequestMapper';
 
 export default class OrbitDBCommunityMembershipRequestRepository extends CommunityMembershipRequestRepository {
+  private readonly requestCache = new Map<
+    string,
+    OrbitDBCommunityMembershipRequestDocument
+  >();
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityMembershipRequestMapper,
@@ -199,22 +204,28 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     });
   }
 
-  private cachedRequestDocuments(): Array<OrbitDBCommunityMembershipRequestDocument> {
-    return this.registry
-      .findCachedHeadsByPrefix('community-membership-request:')
-      .filter(
-        (document): document is OrbitDBCommunityMembershipRequestDocument =>
-          this.isDocument(document),
-      );
-  }
-
-  private cachedStoredRequestDocuments(): Array<OrbitDBCommunityMembershipRequestDocument> {
-    return this.registry
+  private cachedStoredRequestDocuments(): OrbitDBCommunityMembershipRequestDocument[] {
+    const registryDocuments = this.registry
       .findCachedHeadsByPrefix('community-membership-request:')
       .filter(
         (document): document is OrbitDBCommunityMembershipRequestDocument =>
           this.isStoredDocument(document),
       );
+
+    registryDocuments.forEach((document) =>
+      this.cacheRequestDocument(document),
+    );
+
+    return this.deduplicateDocuments([
+      ...this.requestCache.values(),
+      ...registryDocuments,
+    ]).filter((document) => this.isStoredDocument(document));
+  }
+
+  private cacheRequestDocument(
+    document: OrbitDBCommunityMembershipRequestDocument,
+  ): void {
+    this.requestCache.set(document.id, document);
   }
 
   private toDomain(
@@ -228,7 +239,7 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
       ...this.documentsFromIndex(
         await this.registry.findHead(this.communityIndexHeadKey(communityId)),
       ),
-      ...this.cachedRequestDocuments().filter(
+      ...this.cachedStoredRequestDocuments().filter(
         (document) => document.communityId === communityId.valueOf(),
       ),
     ]);
@@ -243,6 +254,7 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
 
         await this.registry.putDocument('requests', tombstone);
         await this.putHeads(tombstone);
+        this.cacheRequestDocument(tombstone);
       }),
     );
   }
@@ -351,6 +363,7 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
 
     await this.registry.putDocument('requests', document);
     await this.registry.putHead(this.headKey(document.id), { ...document });
+    this.cacheRequestDocument(document);
     this.refreshIndexesInBackground(document);
   }
 }

@@ -2,7 +2,7 @@ import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
-import IdentityPresenceNetworkResolver from '../IdentityPresenceNetworkResolver';
+import IdentityPresenceNetworkResolver from '../resolve-network/IdentityPresenceNetworkResolver';
 import { IdentityPresenceUpdateMessage } from './messages/IdentityPresenceUpdateMessage';
 
 export default class IdentityPresenceUpdater {
