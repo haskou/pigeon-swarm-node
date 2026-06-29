@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { assert } from '@haskou/value-objects';
 
 import { MessageReaction } from '../../domain/entities/messages/MessageReaction';

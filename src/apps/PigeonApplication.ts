@@ -7,10 +7,6 @@ import {
   HttpErrorHandler,
   RoutePrefix,
 } from '@haskou/ddd-kernel/adapters/ui';
-import {
-  DomainEventConsumer,
-  DomainEventPublisher,
-} from '@haskou/ddd-kernel/domain';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
 import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
@@ -27,6 +23,8 @@ import { SwaggerRouteMap } from '../shared/infrastructure/express/SwaggerRouteMa
 import { Initializer } from '../shared/infrastructure/lifecycle/Initializer';
 import { Runtime } from '../shared/infrastructure/lifecycle/Runtime';
 import WinstonLogger from '../shared/infrastructure/logs/WinstonLogger';
+import { DomainEventConsumer } from '../shared/infrastructure/messageBus/DomainEventConsumer';
+import { DomainEventPublisher } from '../shared/infrastructure/messageBus/DomainEventPublisher';
 import LocalProcessedDomainEventIdempotencyStore from '../shared/infrastructure/messageBus/LocalProcessedDomainEventIdempotencyStore';
 import MessageBus from '../shared/infrastructure/messageBus/MessageBus';
 import WebSocketClientMessageHandler from '../shared/infrastructure/websocket/WebSocketClientMessageHandler';
@@ -259,9 +257,7 @@ export default class PigeonApplication {
 
   public async dependencyInjection(): Promise<void> {
     await this.kernel.dependencyInjection({
-      containerBuild:
-        this.kernel.environment.CONTAINER_BUILD ||
-        this.kernel.environment.NODE_ENV !== 'production',
+      containerBuild: this.kernel.environment.CONTAINER_BUILD,
       overrides: [
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },

@@ -4,7 +4,7 @@ import ConversationRepository from '@app/contexts/conversations/domain/repositor
 import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { MessagePollOptions } from '@app/contexts/conversations/domain/value-objects/MessagePollOptions';
 import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { MessageSendMessage } from './messages/MessageSendMessage';
 

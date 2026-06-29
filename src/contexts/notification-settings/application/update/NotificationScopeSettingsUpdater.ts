@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
 import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';

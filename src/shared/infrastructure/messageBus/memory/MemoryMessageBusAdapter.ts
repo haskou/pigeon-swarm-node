@@ -13,6 +13,10 @@ type MemoryMessage = {
 };
 
 export default class MemoryMessageBusAdapter implements MessageBusAdapter {
+  private static readonly consumerEventNameProperty = 'eventName';
+
+  private static readonly consumerExchangeProperty = 'exchange';
+
   public static memoryMessages: Record<string, MemoryMessage[]> = {};
 
   public static errorMemoryMessages: Record<string, string[]> = {};
@@ -24,10 +28,33 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     return Kernel.consumers
       .filter(
         (consumer) =>
-          consumer.eventName === domainEvent.eventName() &&
-          consumer.exchange === exchange,
+          this.consumerEventName(consumer) === domainEvent.eventName() &&
+          this.consumerExchange(consumer) === exchange,
       )
       .map((consumer) => consumer.queueName);
+  }
+
+  private consumerEventName(consumer: object): string | undefined {
+    return this.consumerStringProperty(
+      consumer,
+      MemoryMessageBusAdapter.consumerEventNameProperty,
+    );
+  }
+
+  private consumerExchange(consumer: object): string | undefined {
+    return this.consumerStringProperty(
+      consumer,
+      MemoryMessageBusAdapter.consumerExchangeProperty,
+    );
+  }
+
+  private consumerStringProperty(
+    consumer: object,
+    property: string,
+  ): string | undefined {
+    const value: unknown = Reflect.get(consumer, property);
+
+    return typeof value === 'string' ? value : undefined;
   }
 
   private ensureQueue(queueName: string): void {

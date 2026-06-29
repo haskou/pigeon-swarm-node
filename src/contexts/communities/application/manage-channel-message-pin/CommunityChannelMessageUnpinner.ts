@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityChannelMessageWasUnpinnedEvent } from '../../domain/events/CommunityChannelMessageWasUnpinnedEvent';

@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';

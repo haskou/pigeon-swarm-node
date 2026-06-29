@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { NodeHeartbeatWasSent } from '../../domain/events/NodeHeartbeatWasSent';
 import NodeRepository from '../../domain/repositories/NodeRepository';

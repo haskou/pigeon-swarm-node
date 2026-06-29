@@ -1,11 +1,11 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
 import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
 import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainMessageBus } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
 import InvalidMessageBusAdapterError from '../errors/InvalidMessageBusAdapterError';
 import { webSocketEventHub } from '../websocket/WebSocketEventHub';

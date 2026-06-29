@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { PollWasClosedEvent } from '../../domain/events/PollWasClosedEvent';

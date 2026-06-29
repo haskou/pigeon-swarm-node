@@ -3,9 +3,9 @@ import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '@app/contexts/presence/domain/value-objects/PresenceStatus';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
   public static QUEUE_NAME =
