@@ -116,7 +116,7 @@ package "conversations.domain" {
     +findThreadMessages(conversationId: ConversationId, rootMessageId: MessageId, limit: number): Promise<Message[]>
     +countUnreadByRecipient(recipientIdentityId: IdentityId, conversationIds: ConversationId[]): Promise<Map<string, number>>
     +hasUnreadMessageForRecipient(recipientIdentityId: IdentityId, conversationId: ConversationId, messageId: MessageId): Promise<boolean>
-    +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId): Promise<void>
+    +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId, networkId?: NetworkId): Promise<void>
   }
 
   interface MessageReactionRepository {

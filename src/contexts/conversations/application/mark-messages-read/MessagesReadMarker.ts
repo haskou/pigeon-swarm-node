@@ -27,6 +27,7 @@ export default class MessagesReadMarker {
       message.conversationId,
       message.readerIdentityId,
       message.messageId,
+      conversation.getNetworkId(),
     );
     await this.eventPublisher.publish([
       new ConversationMessagesWereReadEvent(message.conversationId.valueOf(), {

@@ -212,7 +212,12 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   private async readMarkerNetworkId(
     conversationId: ConversationId,
     message?: OrbitDBConversationMessageDocument,
+    networkId?: NetworkId,
   ): Promise<string | undefined> {
+    if (networkId) {
+      return networkId.valueOf();
+    }
+
     if (message?.networkId) {
       return message.networkId;
     }
@@ -1028,6 +1033,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
     messageId: MessageId,
+    networkId?: NetworkId,
   ): Promise<void> {
     const externalMessageCreatedAt = this.messageCreatedAtFromExternalId(
       conversationId,
@@ -1043,7 +1049,11 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       return;
     }
 
-    const networkId = await this.readMarkerNetworkId(conversationId, message);
+    const markerNetworkId = await this.readMarkerNetworkId(
+      conversationId,
+      message,
+      networkId,
+    );
 
     await this.registry.putHead(
       `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
@@ -1051,11 +1061,11 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         conversationId: conversationId.valueOf(),
         messageCreatedAt,
         messageId: messageId.valueOf(),
-        networkId,
+        networkId: markerNetworkId,
         readAt: Timestamp.now().valueOf(),
         recipientIdentityId: recipientIdentityId.valueOf(),
       },
-      networkId ? [networkId] : [],
+      markerNetworkId ? [markerNetworkId] : [],
     );
   }
 
