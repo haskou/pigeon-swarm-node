@@ -26,7 +26,7 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Cache MongoDB Memory Server binaries
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-memory-server-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
