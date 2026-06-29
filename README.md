@@ -1,3 +1,4 @@
+[![Renovate](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com/)
 <p align="center">
   <img src="./docs/logo.png" alt="pigeon-swarm logo">
   <br>
