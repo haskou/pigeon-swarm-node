@@ -2,7 +2,7 @@ import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { Timestamp } from '@haskou/value-objects';
 
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
-import IdentityPresenceNetworkResolver from '../IdentityPresenceNetworkResolver';
+import IdentityPresenceNetworkResolver from '../resolve-network/IdentityPresenceNetworkResolver';
 
 export default class IdentityPresenceExpirationRegistrar {
   private static readonly HEARTBEAT_TIMEOUT_MS = 20_000;

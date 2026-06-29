@@ -1,9 +1,9 @@
 import IdentityNetworksFinder from '@app/contexts/identities/application/find-networks/IdentityNetworksFinder';
-import IdentityPresenceNetworkResolver from '@app/contexts/presence/application/IdentityPresenceNetworkResolver';
+import IdentityPresenceNetworkResolver from '@app/contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import { IdentityMother } from '../../../mothers/IdentityMother';
+import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IdentityPresenceNetworkResolver', () => {
   let identityNetworksFinder: MockProxy<IdentityNetworksFinder>;

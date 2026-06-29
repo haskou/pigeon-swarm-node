@@ -41,6 +41,9 @@ package "presence/application" {
   class IdentityPresenceUpdater
   class IdentityPresenceHeartbeatRecorder
   class IdentityPresenceExpirationRegistrar
+}
+
+package "presence/application/resolve-network" {
   class IdentityPresenceNetworkResolver
 }
 
