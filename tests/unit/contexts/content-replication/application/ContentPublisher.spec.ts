@@ -9,6 +9,7 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
+import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ContentPublisher', () => {
@@ -51,6 +52,10 @@ describe('ContentPublisher', () => {
     nodeRepository.loadLocalNodeId.mockResolvedValue(
       new NodeId('550e8400-e29b-41d4-a716-446655440010'),
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('returns public content without waiting for remaining network uploads', async () => {
@@ -133,6 +138,39 @@ describe('ContentPublisher', () => {
       expect.objectContaining({
         localReplicaNetworkIds: [firstNetworkId],
       }),
+    );
+  });
+
+  it('logs failed completion registration without failing the publication', async () => {
+    const logger = {
+      warn: jest.fn(),
+    };
+
+    jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger as never);
+    contentStorage.publishBytesToNetworks.mockResolvedValue({
+      contentId: new ContentId('bafy-public'),
+      completedNetworkIds: Promise.reject(new Error('upload failed')),
+      networkId: new NetworkId(secondNetworkId),
+    });
+    registrar.register.mockResolvedValue(undefined);
+
+    const result = await publisher.publishPublic(
+      new ContentPublishMessage({
+        body: Buffer.from('content'),
+        contentType: 'image/webp',
+        filename: 'image.webp',
+        ownerIdentityId: identityId,
+      }),
+    );
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+
+    expect(result.cid).toBe('bafy-public');
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Content replication upload completion registration failed',
+      ),
     );
   });
 

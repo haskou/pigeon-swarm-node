@@ -5,6 +5,7 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import Kernel from '@haskou/ddd-kernel';
 
 import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import ContentReplicationRegistrar from '../register-content/ContentReplicationRegistrar';
@@ -114,7 +115,9 @@ export default class ContentPublisher {
         });
       })
       .catch((error: unknown): void => {
-        void error;
+        Kernel.logger.warn?.(
+          `Content replication upload completion registration failed: cid=${params.cid} error=${String(error)}`,
+        );
       });
   }
 
