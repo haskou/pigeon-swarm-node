@@ -2,8 +2,8 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCallPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 import { Timestamp } from '@haskou/value-objects';

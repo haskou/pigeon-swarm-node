@@ -1,6 +1,6 @@
 import { HttpError } from 'routing-controllers';
 
-export default class CustomHttpError extends HttpError {
+export default abstract class CustomHttpError extends HttpError {
   private readonly _code: number;
   constructor(httpCode: number, code: number, message: string) {
     super(httpCode, message);

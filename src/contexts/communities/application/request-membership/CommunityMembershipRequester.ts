@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';

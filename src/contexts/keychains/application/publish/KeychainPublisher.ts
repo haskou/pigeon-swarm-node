@@ -8,7 +8,7 @@ import KeychainSaverService from '@app/contexts/keychains/domain/services/Keycha
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { KeychainPublishMessage } from './messages/KeychainPublishMessage';
 

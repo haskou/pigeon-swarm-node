@@ -4,9 +4,9 @@ import { Message } from '@app/contexts/conversations/domain/entities/messages/Me
 import { MessageFactory } from '@app/contexts/conversations/domain/entities/messages/MessageFactory';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 export default class RegisterMessageWhenAnnounced extends Consumer {

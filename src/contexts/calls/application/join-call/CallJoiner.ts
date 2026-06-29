@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';

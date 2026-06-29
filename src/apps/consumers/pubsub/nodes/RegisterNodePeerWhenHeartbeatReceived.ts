@@ -2,9 +2,9 @@ import { NodePeerRegisterMessage } from '@app/contexts/nodes/application/registe
 import NodePeerRegistrar from '@app/contexts/nodes/application/register-peer/NodePeerRegistrar';
 import { NodeHeartbeatWasSent } from '@app/contexts/nodes/domain/events/NodeHeartbeatWasSent';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 type NodeHeartbeatNetwork = {
   id: string;

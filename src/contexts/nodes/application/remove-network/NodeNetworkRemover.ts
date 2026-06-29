@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import NodeLoaderService from '../../domain/services/NodeLoaderService';
 import NodeNetworkDataCleaner from '../../domain/services/NodeNetworkDataCleaner';

@@ -2,9 +2,9 @@ import { MessagesReadMarkMessage } from '@app/contexts/conversations/application
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 export default class MarkMessagesReadWhenAnnounced extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.mark-messages-read-when-announced';

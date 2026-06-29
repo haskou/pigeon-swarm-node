@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';

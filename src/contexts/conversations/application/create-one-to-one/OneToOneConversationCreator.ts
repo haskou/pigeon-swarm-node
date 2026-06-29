@@ -3,7 +3,7 @@ import ConversationRepository from '@app/contexts/conversations/domain/repositor
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { OneToOneConversationCreateMessage } from './messages/OneToOneConversationCreateMessage';
 

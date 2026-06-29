@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { CommunityTextChannel } from '../../domain/entities/channels/CommunityTextChannel';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';

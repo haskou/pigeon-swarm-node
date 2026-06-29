@@ -1,7 +1,7 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { MessagesReadMarkMessage } from './messages/MessagesReadMarkMessage';
 

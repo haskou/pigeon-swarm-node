@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { CommunityChannelMessageDeletion } from '../../domain/entities/messages/CommunityChannelMessageDeletion';
 import { CommunityModerationLogDetails } from '../../domain/entities/moderation/CommunityModerationLogDetails';

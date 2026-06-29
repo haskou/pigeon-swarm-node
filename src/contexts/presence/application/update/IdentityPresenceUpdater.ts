@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';

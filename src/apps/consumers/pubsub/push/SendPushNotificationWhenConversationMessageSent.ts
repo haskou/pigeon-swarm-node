@@ -1,7 +1,7 @@
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 
 import SendPushNotificationWhenEventReceived from './SendPushNotificationWhenEventReceived';
 
