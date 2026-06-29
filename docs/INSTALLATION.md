@@ -167,6 +167,51 @@ Operational rules:
 - CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.
+
+### Calls TURN/coturn setup
+
+Calls use WebRTC ICE, not the libp2p/IPFS circuit relay. The backend does not
+embed a TURN server; run coturn or an equivalent TURN service separately and let
+the backend advertise its reachable URLs.
+
+The same host-level port range can be reused operationally when the protocols do
+not collide. The existing private IPFS relay range is TCP. TURN media relay
+ports should usually reuse that numeric range over UDP in coturn, while the TURN
+listening port is configured separately with `CALLS_TURN_PORT`.
+
+Example:
+
+```dotenv
+PIGEON_PUBLIC_HOST=relay.example.com
+PIGEON_PRIVATE_RELAY_PORT_START=4100
+PIGEON_PRIVATE_RELAY_PORT_END=4199
+
+CALLS_TURN_SHARED_SECRET=shared-coturn-rest-secret
+CALLS_TURN_PORT=3478
+CALLS_TURN_PUBLIC_HOST=relay.example.com
+CALLS_TURN_TRANSPORTS=udp,tcp
+```
+
+Coturn must be configured with the same REST secret and a relay media range that
+matches the opened UDP range, for example:
+
+```text
+use-auth-secret
+static-auth-secret=shared-coturn-rest-secret
+realm=relay.example.com
+listening-port=3478
+min-port=4100
+max-port=4199
+```
+
+Expose the TURN listening port over UDP/TCP and the relay media range over UDP
+on the coturn service. Do not map those UDP ports to the backend container unless
+coturn is actually running there.
+
+The node-to-node discovery protocol is documented in
+[Calls TURN Relay Discovery](calls-turn-relay-discovery.md). Set
+`CALLS_TURN_DISCOVERY_ENABLED=false` to disable it.
+
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
 

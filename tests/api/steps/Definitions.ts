@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable no-case-declarations */
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -110,8 +111,11 @@ export default class Definitions {
   public async cleanupMemoryStorage(): Promise<void> {
     const database =
       Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
+    const callRelayRecordRegistry =
+      Kernel.di.getService<CallRelayRecordRegistry>(CallRelayRecordRegistry);
 
     await database.clear();
+    callRelayRecordRegistry.clear();
     await this.ipfsDefinition.cleanupRegisteredNetworks();
     this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
   }
@@ -1675,6 +1679,24 @@ export default class Definitions {
     process.env.CALLS_TURN_CREDENTIAL_TTL_SECONDS = '600';
     process.env.CALLS_TURN_SHARED_SECRET = 'test-turn-secret';
     process.env.CALLS_TURN_URLS = 'turn:test-turn.local:3478?transport=udp';
+  }
+
+  @given('a remote TURN relay has been discovered for calls')
+  public aRemoteTurnRelayHasBeenDiscoveredForCalls(): void {
+    const callRelayRecordRegistry =
+      Kernel.di.getService<CallRelayRecordRegistry>(CallRelayRecordRegistry);
+
+    callRelayRecordRegistry.save({
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      peerId: '12D3KooWRemoteCallRelay',
+      poolSignature: 'remote-pool-signature',
+      publicKey: 'remote-public-key',
+      role: 'call-relay',
+      signature: 'remote-signature',
+      urls: ['turn:remote-turn.local:3478?transport=udp'],
+      version: 1,
+    });
   }
 
   @given('I sign the current call ICE servers request')

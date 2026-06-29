@@ -161,6 +161,24 @@ export default class OrbitDBReplicatedStateRegistry {
     return [...keys];
   }
 
+  private derivedHeadKeysFromRecord(record: Record<string, unknown>): string[] {
+    const keys = new Set<string>();
+    const scope = record.scope;
+
+    if (
+      this.isRecord(scope) &&
+      scope.type === 'community_channel' &&
+      typeof scope.communityId === 'string' &&
+      typeof scope.channelId === 'string'
+    ) {
+      keys.add(
+        `call-community-channel-head:${scope.communityId}:${scope.channelId}`,
+      );
+    }
+
+    return [...keys];
+  }
+
   private cacheHeadUpdate(
     networkId: string,
     entry: { payload?: { value?: unknown } },
@@ -178,7 +196,9 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
 
-    const keys = explicitKey ? [explicitKey] : this.headKeysFromRecord(record);
+    const keys = explicitKey
+      ? [explicitKey, ...this.derivedHeadKeysFromRecord(record)]
+      : this.headKeysFromRecord(record);
 
     for (const key of keys) {
       if (this.cacheHead(key, record)) {
@@ -199,10 +219,17 @@ export default class OrbitDBReplicatedStateRegistry {
         continue;
       }
 
-      if (this.cacheHead(record.key, record.value)) {
-        persistedAllHeads =
-          (await this.persistHeadCache(networkId, record.key, record.value)) &&
-          persistedAllHeads;
+      const keys = [
+        record.key,
+        ...this.derivedHeadKeysFromRecord(record.value),
+      ];
+
+      for (const key of keys) {
+        if (this.cacheHead(key, record.value)) {
+          persistedAllHeads =
+            (await this.persistHeadCache(networkId, key, record.value)) &&
+            persistedAllHeads;
+        }
       }
     }
 
@@ -859,6 +886,11 @@ export default class OrbitDBReplicatedStateRegistry {
           await stores.heads.put?.(key, cleanValue);
           this.cacheHead(key, cleanValue);
           await this.persistHeadCache(networkId, key, cleanValue);
+
+          for (const derivedKey of this.derivedHeadKeysFromRecord(cleanValue)) {
+            this.cacheHead(derivedKey, cleanValue);
+            await this.persistHeadCache(networkId, derivedKey, cleanValue);
+          }
         },
       ),
     );
