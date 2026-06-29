@@ -5,6 +5,7 @@ import {
   ExpressKernelServer,
   HttpApp,
   HttpErrorHandler,
+  Route,
   RoutePrefix,
 } from '@haskou/ddd-kernel/adapters/ui';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
@@ -45,6 +46,7 @@ export default class PigeonApplication {
 
   private readonly schedulers: Scheduler[] = [];
   private server: ExpressKernelServer | undefined;
+  private routeServicesRegistered = false;
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
   private getRoutePrefix(): RoutePrefix {
@@ -251,6 +253,32 @@ export default class PigeonApplication {
     return this.kernel.di.getService<Scheduler>(ClassDefinition);
   }
 
+  private registerRouteServices(): void {
+    if (this.routeServicesRegistered) {
+      return;
+    }
+
+    const routes = new Set(applicationRoutes);
+    const routeInstances = new Map<ApplicationServiceClass<Route>, Route>();
+    const dependencyInjection = this.kernel.di;
+    const getService: <Service>(service: unknown) => Service =
+      dependencyInjection.getService.bind(dependencyInjection);
+
+    dependencyInjection.getService = <Service>(service: unknown): Service => {
+      if (!routes.has(service as ApplicationServiceClass<Route>)) {
+        return getService<Service>(service);
+      }
+
+      const RouteClass = service as ApplicationServiceClass<Route>;
+      const route = routeInstances.get(RouteClass) ?? new RouteClass();
+
+      routeInstances.set(RouteClass, route);
+
+      return route as Service;
+    };
+    this.routeServicesRegistered = true;
+  }
+
   public loadEnvironmentVariables(environment?: string): void {
     this.kernel.loadEnvironmentVariables(environment);
   }
@@ -263,6 +291,7 @@ export default class PigeonApplication {
         { token: DomainEventPublisher, useClass: MessageBus },
       ],
     });
+    this.registerRouteServices();
     this.kernel.registerConsumerMiddleware(
       new IdempotencyConsumerMiddleware({
         key: (_event, context) => `${context.queueName}:${context.eventId}`,
