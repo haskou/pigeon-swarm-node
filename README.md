@@ -7,6 +7,9 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="License: PolyForm Noncommercial 1.0.0">
   </a>
+  <a href="https://renovatebot.com/">
+    <img src="https://img.shields.io/badge/renovate-enabled-brightgreen.svg" alt="Renovate">
+  </a>
 </p>
 
 # pigeon-swarm-node
