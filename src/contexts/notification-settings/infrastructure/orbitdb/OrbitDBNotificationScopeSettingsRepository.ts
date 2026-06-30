@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
@@ -7,8 +8,19 @@ import { NotificationSettingScope } from '../../domain/value-objects/Notificatio
 import { OrbitDBNotificationScopeSettingsDocument } from './documents/OrbitDBNotificationScopeSettingsDocument';
 
 export default class OrbitDBNotificationScopeSettingsRepository extends NotificationScopeSettingsRepository {
+  private readonly settingsIndex: OrbitDBHeadIndex<OrbitDBNotificationScopeSettingsDocument>;
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
+    this.settingsIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'settings',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        current.updatedAt <= candidate.updatedAt,
+    });
   }
 
   private documentId(identityId: IdentityId, scope: NotificationSettingScope) {
@@ -94,41 +106,10 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     });
   }
 
-  private documentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBNotificationScopeSettingsDocument[] {
-    const settings = record?.settings;
-
-    if (!Array.isArray(settings)) {
-      return [];
-    }
-
-    return settings.filter(
-      (document): document is OrbitDBNotificationScopeSettingsDocument =>
-        typeof document === 'object' &&
-        document !== null &&
-        !Array.isArray(document) &&
-        this.isDocument(document as Record<string, unknown>),
-    );
-  }
-
-  private deduplicateDocuments(
+  private sortByUpdatedAtDescending(
     documents: OrbitDBNotificationScopeSettingsDocument[],
   ): OrbitDBNotificationScopeSettingsDocument[] {
-    const deduplicated = new Map<
-      string,
-      OrbitDBNotificationScopeSettingsDocument
-    >();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || current.updatedAt <= document.updatedAt) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()].sort(
+    return [...documents].sort(
       (left, right) => right.updatedAt - left.updatedAt,
     );
   }
@@ -141,17 +122,19 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     });
 
     const key = `notification-settings-identity-index:${document.identityId}`;
-    const indexedDocuments = this.documentsFromIndex(
-      await this.registry.findHead(key),
-    );
-    const settings = this.deduplicateDocuments([...indexedDocuments, document]);
+    const settings = this.settingsIndex.deduplicate([
+      ...((await this.settingsIndex.find(key)) ?? []),
+      document,
+    ]);
 
-    await this.registry.putHead(key, {
-      id: key,
-      identityId: document.identityId,
-      settings: settings.map((setting) => ({ ...setting })),
-      updatedAt: Date.now(),
-    });
+    await this.settingsIndex.putDocuments(
+      key,
+      {
+        id: key,
+        identityId: document.identityId,
+      },
+      settings,
+    );
   }
 
   public async delete(
@@ -171,23 +154,26 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     await this.registry.putHead(this.headKey(identityId, scope), document);
 
     const key = this.identityIndexHeadKey(identityId);
-    const settings = this.documentsFromIndex(
-      await this.registry.findHead(key),
-    ).filter((setting) => setting.id !== document.id);
+    const settings = ((await this.settingsIndex.find(key)) ?? []).filter(
+      (setting) => setting.id !== document.id,
+    );
 
-    await this.registry.putHead(key, {
-      id: key,
-      identityId: identityId.valueOf(),
-      settings: settings.map((setting) => ({ ...setting })),
-      updatedAt: Date.now(),
-    });
+    await this.settingsIndex.putDocuments(
+      key,
+      {
+        id: key,
+        identityId: identityId.valueOf(),
+      },
+      settings,
+    );
   }
 
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<NotificationScopeSettings[]> {
-    return this.documentsFromIndex(
-      await this.registry.findHead(this.identityIndexHeadKey(identityId)),
+    return this.sortByUpdatedAtDescending(
+      (await this.settingsIndex.find(this.identityIndexHeadKey(identityId))) ??
+        [],
     ).map((document) => this.toDomain(document));
   }
 

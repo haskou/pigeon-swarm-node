@@ -5,6 +5,7 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
@@ -12,6 +13,8 @@ import { Timestamp } from '@haskou/value-objects';
 import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
 
 export default class OrbitDBCallRepository extends CallRepository {
+  private readonly callIndex: OrbitDBHeadIndex<OrbitDBCallDocument>;
+
   private readonly communityChannelCallCache = new Map<
     string,
     OrbitDBCallDocument
@@ -19,6 +22,15 @@ export default class OrbitDBCallRepository extends CallRepository {
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
+    this.callIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'calls',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.freshness(current) <= this.freshness(candidate),
+    });
   }
 
   private hasCallIdentityFields(document: Record<string, unknown>): boolean {
@@ -89,22 +101,6 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
   }
 
-  private deduplicateDocuments(
-    documents: OrbitDBCallDocument[],
-  ): OrbitDBCallDocument[] {
-    const deduplicated = new Map<string, OrbitDBCallDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
-  }
-
   private callHeadKey(callId: string): string {
     return `call:${callId}`;
   }
@@ -146,31 +142,10 @@ export default class OrbitDBCallRepository extends CallRepository {
     return `${communityId}:${channelId}`;
   }
 
-  private documentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBCallDocument[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    const calls = record.calls;
-
-    if (!Array.isArray(calls)) {
-      return [];
-    }
-
-    return calls
-      .filter(
-        (call): call is Record<string, unknown> =>
-          typeof call === 'object' && call !== null && !Array.isArray(call),
-      )
-      .filter((call): call is OrbitDBCallDocument => this.isDocument(call));
-  }
-
   private async findIndexDocuments(
     key: string,
   ): Promise<OrbitDBCallDocument[] | undefined> {
-    return this.documentsFromIndex(await this.registry.findHead(key));
+    return this.callIndex.find(key);
   }
 
   private cachedCallDocuments(): OrbitDBCallDocument[] {
@@ -185,7 +160,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     key: string,
     filter: (document: OrbitDBCallDocument) => boolean,
   ): Promise<OrbitDBCallDocument[]> {
-    return this.deduplicateDocuments([
+    return this.callIndex.deduplicate([
       ...((await this.findIndexDocuments(key)) ?? []),
       ...this.cachedCallDocuments().filter(filter),
     ]);
@@ -242,17 +217,16 @@ export default class OrbitDBCallRepository extends CallRepository {
     documents: OrbitDBCallDocument[],
     filter: (document: OrbitDBCallDocument) => boolean = () => true,
   ): Promise<void> {
-    const calls = this.deduplicateDocuments(documents).filter(filter);
-    const networkIds = [...new Set(calls.map((call) => call.networkId))];
-
-    await this.registry.putHead(
+    await this.callIndex.putDocuments(
       key,
       {
-        calls: calls.map((call) => ({ ...call })),
         id: key,
-        updatedAt: Date.now(),
       },
-      networkIds,
+      documents,
+      {
+        filter,
+        networkIds: [...new Set(documents.map((call) => call.networkId))],
+      },
     );
   }
 
@@ -362,7 +336,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     const indexedDocuments = await this.findIndexDocuments(
       this.participantIndexHeadKey(participantId.valueOf()),
     );
-    const documents = this.deduplicateDocuments([
+    const documents = this.callIndex.deduplicate([
       ...(indexedDocuments ?? []),
       ...this.cachedCallDocuments().filter((document) =>
         document.participantIds.includes(participantId.valueOf()),
@@ -438,21 +412,23 @@ export default class OrbitDBCallRepository extends CallRepository {
         ),
       )) ?? [],
     );
-    const [document] = this.deduplicateDocuments([
-      ...indexedDocuments,
-      ...(await this.activeCommunityDocuments(communityId)),
-      ...(await this.cachedCommunityChannelHeadDocument(
-        communityId,
-        channelId,
-      )),
-      ...this.cachedCommunityChannelCallDocument(communityId, channelId),
-    ]).filter(
-      (candidate) =>
-        candidate.status === 'active' &&
-        candidate.scope.type === 'community_channel' &&
-        candidate.scope.communityId === communityId.valueOf() &&
-        candidate.scope.channelId === channelId.valueOf(),
-    );
+    const [document] = this.callIndex
+      .deduplicate([
+        ...indexedDocuments,
+        ...(await this.activeCommunityDocuments(communityId)),
+        ...(await this.cachedCommunityChannelHeadDocument(
+          communityId,
+          channelId,
+        )),
+        ...this.cachedCommunityChannelCallDocument(communityId, channelId),
+      ])
+      .filter(
+        (candidate) =>
+          candidate.status === 'active' &&
+          candidate.scope.type === 'community_channel' &&
+          candidate.scope.communityId === communityId.valueOf() &&
+          candidate.scope.channelId === channelId.valueOf(),
+      );
 
     return document ? this.toDomain(document) : undefined;
   }

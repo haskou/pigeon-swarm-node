@@ -1,17 +1,26 @@
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
 import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
+import OrbitDBDocumentDeduplicator from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDocumentDeduplicator';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBContentReplicationDocument } from './documents/OrbitDBContentReplicationDocument';
 import OrbitDBContentReplicationMapper from './mappers/OrbitDBContentReplicationMapper';
 
 export default class OrbitDBContentReplicationRepository extends ContentReplicationRepository {
+  private readonly documentDeduplicator: OrbitDBDocumentDeduplicator<OrbitDBContentReplicationDocument>;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBContentReplicationMapper,
   ) {
     super();
+    this.documentDeduplicator =
+      new OrbitDBDocumentDeduplicator<OrbitDBContentReplicationDocument>({
+        recordId: (record) => record.cid,
+        shouldReplace: (current, candidate) =>
+          current.updatedAt < candidate.updatedAt,
+      });
   }
 
   private numberValue(
@@ -92,22 +101,6 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
     return this.isCompleteDocument(document) ? document : undefined;
   }
 
-  private deduplicateDocuments(
-    documents: OrbitDBContentReplicationDocument[],
-  ): OrbitDBContentReplicationDocument[] {
-    const deduplicated = new Map<string, OrbitDBContentReplicationDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.cid);
-
-      if (!current || current.updatedAt < document.updatedAt) {
-        deduplicated.set(document.cid, document);
-      }
-    }
-
-    return [...deduplicated.values()];
-  }
-
   private headKey(cid: string): string {
     return `content-replication:${cid}`;
   }
@@ -122,7 +115,8 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
       );
 
     return Promise.resolve(
-      this.deduplicateDocuments(documents)
+      this.documentDeduplicator
+        .deduplicate(documents)
         .sort((left, right) => right.updatedAt - left.updatedAt)
         .map((document) => this.mapper.toDomain(document)),
     );

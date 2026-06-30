@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import Kernel from '@haskou/ddd-kernel';
 
@@ -10,12 +11,22 @@ import OrbitDBCommunityMapper from './mappers/OrbitDBCommunityMapper';
 
 export default class OrbitDBCommunityRepository extends CommunityRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
+  private readonly communityIndex: OrbitDBHeadIndex<OrbitDBCommunityDocument>;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityMapper,
   ) {
     super();
+    this.communityIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'communities',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.isNewerOrEqualDocument(current, candidate),
+    });
   }
 
   private escapeRegex(value: string): string {
@@ -29,10 +40,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return (
       Array.isArray(value) && value.every((item) => typeof item === 'string')
     );
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private hasStringFields(
@@ -74,44 +81,12 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return `community-member-index:${identityId}`;
   }
 
-  private communityDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBCommunityDocument[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    const communities = record.communities;
-
-    if (!Array.isArray(communities)) {
-      return [];
-    }
-
-    return communities
-      .filter((community): community is Record<string, unknown> =>
-        this.isRecord(community),
-      )
-      .filter((community): community is OrbitDBCommunityDocument =>
-        this.isDocument(community),
-      );
-  }
-
-  private deduplicateDocuments(
+  private freshestDocumentsFirst(
     documents: OrbitDBCommunityDocument[],
   ): OrbitDBCommunityDocument[] {
-    const deduplicated = new Map<string, OrbitDBCommunityDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || this.isNewerOrEqualDocument(current, document)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()].sort(
-      (left, right) => this.freshness(right) - this.freshness(left),
-    );
+    return this.communityIndex
+      .deduplicate(documents)
+      .sort((left, right) => this.freshness(right) - this.freshness(left));
   }
 
   private isNewerOrEqualDocument(
@@ -164,9 +139,8 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     community: OrbitDBCommunityDocument,
   ): Promise<void> {
     const key = this.memberIndexHeadKey(identityId);
-    const indexedCommunities =
-      this.communityDocumentsFromIndex(await this.registry.findHead(key)) || [];
-    const communities = this.deduplicateDocuments([
+    const indexedCommunities = (await this.communityIndex.find(key)) || [];
+    const communities = this.freshestDocumentsFirst([
       ...indexedCommunities,
       community,
     ]).filter(
@@ -174,17 +148,18 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         document.deleted !== true && document.memberIds.includes(identityId),
     );
 
-    await this.registry.putHead(
+    await this.communityIndex.putDocuments(
       key,
       {
-        communities: communities.map((document) => ({ ...document })),
         id: key,
         identityId,
         memberId: identityId,
         networkId: community.networkId,
-        updatedAt: Date.now(),
       },
-      [community.networkId],
+      communities,
+      {
+        networkIds: [community.networkId],
+      },
     );
   }
 
@@ -275,17 +250,15 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
-    const indexedDocuments = this.communityDocumentsFromIndex(
-      await this.registry.findHead(
-        this.memberIndexHeadKey(identityId.valueOf()),
-      ),
+    const indexedDocuments = await this.communityIndex.find(
+      this.memberIndexHeadKey(identityId.valueOf()),
     );
     const cachedDocuments = this.cachedStoredCommunityDocuments().filter(
       (document) => document.memberIds.includes(identityId.valueOf()),
     );
     const documents = [...(indexedDocuments || []), ...cachedDocuments];
 
-    return this.deduplicateDocuments(documents)
+    return this.freshestDocumentsFirst(documents)
       .filter(
         (document) =>
           this.isDocument(document) &&

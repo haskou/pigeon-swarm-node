@@ -4,6 +4,7 @@ import CommunityChannelMessageRepository from '@app/contexts/communities/domain/
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -19,12 +20,21 @@ interface OrbitDBCommunityChannelThreadSummaryDocument {
 
 export default class OrbitDBCommunityChannelMessageRepository extends CommunityChannelMessageRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
+  private readonly messageIndex: OrbitDBHeadIndex<OrbitDBCommunityChannelMessageDocument>;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityChannelMessageMapper,
   ) {
     super();
+    this.messageIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'messages',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) => this.messageRecordId(record),
+      shouldReplace: (current, candidate) =>
+        (current.receivedAt ?? 0) <= (candidate.receivedAt ?? 0),
+    });
   }
 
   private escapeRegex(value: string): string {
@@ -97,34 +107,10 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     return `community-channel-message-index:${communityId}:${channelId}`;
   }
 
-  private rawMessageRecordsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] {
-    const messages = record?.messages;
-
-    if (!Array.isArray(messages)) {
-      return [];
-    }
-
-    return messages.filter(
-      (message): message is Record<string, unknown> =>
-        typeof message === 'object' &&
-        message !== null &&
-        !Array.isArray(message),
-    );
-  }
-
   private messageDocumentsFromIndex(
     record: Record<string, unknown> | undefined,
   ): OrbitDBCommunityChannelMessageDocument[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    return this.rawMessageRecordsFromIndex(record).filter(
-      (message): message is OrbitDBCommunityChannelMessageDocument =>
-        this.isDocument(message),
-    );
+    return this.messageIndex.documentsFromHead(record);
   }
 
   private messageRecordId(record: Record<string, unknown>): string | undefined {
@@ -133,50 +119,6 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       : typeof record.messageId === 'string'
         ? record.messageId
         : undefined;
-  }
-
-  private mergeIndexedMessageRecord(
-    records: Record<string, unknown>[],
-    record: Record<string, unknown>,
-  ): Record<string, unknown>[] {
-    const recordId = this.messageRecordId(record);
-
-    if (!recordId) {
-      return records;
-    }
-
-    const merged = new Map<string, Record<string, unknown>>();
-
-    for (const current of records) {
-      const currentId = this.messageRecordId(current);
-
-      if (currentId) {
-        merged.set(currentId, current);
-      }
-    }
-
-    merged.set(recordId, record);
-
-    return [...merged.values()];
-  }
-
-  private deduplicateMessages(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): OrbitDBCommunityChannelMessageDocument[] {
-    const deduplicated = new Map<
-      string,
-      OrbitDBCommunityChannelMessageDocument
-    >();
-
-    for (const document of documents) {
-      const current = deduplicated.get(this.getMessageId(document));
-
-      if (!current || (current.receivedAt ?? 0) <= (document.receivedAt ?? 0)) {
-        deduplicated.set(this.getMessageId(document), document);
-      }
-    }
-
-    return [...deduplicated.values()];
   }
 
   private async putMessageIndex(
@@ -188,15 +130,16 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       communityId.valueOf(),
       channelId.valueOf(),
     );
-    const messages = this.deduplicateMessages(documents);
 
-    await this.registry.putHead(key, {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      id: key,
-      messages: messages.map((message) => ({ ...message })),
-      updatedAt: Date.now(),
-    });
+    await this.messageIndex.putDocuments(
+      key,
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: key,
+      },
+      documents,
+    );
   }
 
   private async putMessageIndexRecord(
@@ -212,18 +155,16 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     }
 
     const key = this.messageIndexHeadKey(communityId, channelId);
-    const messages = this.mergeIndexedMessageRecord(
-      this.rawMessageRecordsFromIndex(await this.registry.findHead(key)),
+
+    await this.messageIndex.putRecord(
+      key,
+      {
+        channelId,
+        communityId,
+        id: key,
+      },
       record,
     );
-
-    await this.registry.putHead(key, {
-      channelId,
-      communityId,
-      id: key,
-      messages,
-      updatedAt: Date.now(),
-    });
   }
 
   private async findMessageIndexDocuments(
