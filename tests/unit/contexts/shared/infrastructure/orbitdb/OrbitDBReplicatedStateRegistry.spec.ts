@@ -92,8 +92,8 @@ function createStore(): Store {
         updateHandlers.push(handler);
       }),
     },
-    get: jest.fn(async (key: string) =>
-      entries.find((entry) => entry.key === key)?.value,
+    get: jest.fn(
+      async (key: string) => entries.find((entry) => entry.key === key)?.value,
     ),
     put: jest.fn(
       async (
@@ -285,6 +285,33 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     delayedWrite.resolve('ok');
     await write;
+  });
+
+  it('caches heads locally without writing to replicated heads', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+
+    await registry.register('network-1', network.stores);
+
+    registry.cacheHeadLocally(
+      'presence:identity-1',
+      {
+        id: 'identity-1',
+        identityId: 'identity-1',
+        networkIds: ['network-1'],
+        status: 'available',
+        updatedAt: 1780000000000,
+      },
+      ['network-1'],
+    );
+
+    await expect(registry.findHead('presence:identity-1')).resolves.toEqual(
+      expect.objectContaining({
+        identityId: 'identity-1',
+        status: 'available',
+      }),
+    );
+    expect(network.heads.put).not.toHaveBeenCalled();
   });
 
   it('routes keychain metadata through the owner identity networks', async () => {
@@ -481,13 +508,13 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     firstNetwork.heads.get.mockClear();
     firstNetwork.heads.all.mockClear();
 
-    await expect(registry.findHead('conversation:conversation-1')).resolves.toEqual(
-      {
-        id: 'conversation:conversation-1',
-        networkId: 'network-1',
-        updatedAt: 1,
-      },
-    );
+    await expect(
+      registry.findHead('conversation:conversation-1'),
+    ).resolves.toEqual({
+      id: 'conversation:conversation-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
     expect(firstNetwork.heads.get).not.toHaveBeenCalled();
     expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
@@ -547,7 +574,9 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         version: 3,
       }),
     );
-    await expect(registry.findHead('keychain-cid:keychain-v3')).resolves.toEqual(
+    await expect(
+      registry.findHead('keychain-cid:keychain-v3'),
+    ).resolves.toEqual(
       expect.objectContaining({
         cid: 'keychain-v3',
         version: 3,
@@ -771,9 +800,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
 
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'OrbitDB queryDocuments slow: store=communities',
-      ),
+      expect.stringContaining('OrbitDB queryDocuments slow: store=communities'),
     );
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('httpRequest="GET /communities?limit=30"'),

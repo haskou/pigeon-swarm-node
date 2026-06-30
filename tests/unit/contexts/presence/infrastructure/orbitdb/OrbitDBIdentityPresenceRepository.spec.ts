@@ -10,6 +10,8 @@ describe('OrbitDBIdentityPresenceRepository', () => {
   const headRecords = new Map<string, Record<string, unknown>>();
   const documents: Record<string, unknown>[] = [];
   const identityMother = new IdentityMother();
+  let headsPut: jest.Mock;
+  let presencePut: jest.Mock;
   let query: jest.Mock;
   let repository: OrbitDBIdentityPresenceRepository;
   let registry: OrbitDBReplicatedStateRegistry;
@@ -17,6 +19,16 @@ describe('OrbitDBIdentityPresenceRepository', () => {
   beforeEach(() => {
     documents.splice(0);
     headRecords.clear();
+    headsPut = jest.fn(async (key, value) => {
+      headRecords.set(key as string, value as Record<string, unknown>);
+
+      return 'ok';
+    });
+    presencePut = jest.fn(async (document) => {
+      documents.push(document);
+
+      return 'ok';
+    });
     query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
@@ -26,18 +38,10 @@ describe('OrbitDBIdentityPresenceRepository', () => {
           [...headRecords.entries()].map(([key, value]) => ({ key, value })),
         ),
         get: jest.fn(async (key) => ({ key, value: headRecords.get(key) })),
-        put: jest.fn(async (key, value) => {
-          headRecords.set(key as string, value as Record<string, unknown>);
-
-          return 'ok';
-        }),
+        put: headsPut,
       },
       presence: {
-        put: jest.fn(async (document) => {
-          documents.push(document);
-
-          return 'ok';
-        }),
+        put: presencePut,
         query,
       },
     } as never);
@@ -66,7 +70,7 @@ describe('OrbitDBIdentityPresenceRepository', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should save presence into the document store and direct head', async () => {
+  it('should save presence into the document store and local head cache', async () => {
     const identityId = identityMother.id.valueOf();
     const presence = IdentityPresence.fromPrimitives({
       identityId,
@@ -76,12 +80,44 @@ describe('OrbitDBIdentityPresenceRepository', () => {
 
     await repository.save(presence, ['550e8400-e29b-41d4-a716-446655440001']);
 
-    expect(headRecords.get(`presence:${identityId}`)).toEqual(
+    const savedPresence = await repository.findByIdentityId(
+      new IdentityId(identityId),
+    );
+
+    expect(savedPresence?.toPrimitives()).toEqual(
       expect.objectContaining({
         identityId,
         status: 'available',
       }),
     );
+    expect(presencePut).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not wait for the replicated head write when saving presence', async () => {
+    const identityId = identityMother.id.valueOf();
+    const presence = IdentityPresence.fromPrimitives({
+      identityId,
+      status: 'available',
+      updatedAt: 1780000000000,
+    });
+
+    headsPut.mockImplementationOnce(() => new Promise<string>(() => undefined));
+
+    await expect(
+      repository.save(presence, ['550e8400-e29b-41d4-a716-446655440001']),
+    ).resolves.toBeUndefined();
+
+    const savedPresence = await repository.findByIdentityId(
+      new IdentityId(identityId),
+    );
+
+    expect(savedPresence?.toPrimitives()).toEqual(
+      expect.objectContaining({
+        identityId,
+        status: 'available',
+      }),
+    );
+    expect(presencePut).toHaveBeenCalledTimes(1);
   });
 
   it('should fetch a presence list from heads before scanning documents', async () => {

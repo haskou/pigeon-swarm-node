@@ -868,6 +868,31 @@ export default class OrbitDBReplicatedStateRegistry {
       .map(([, value]) => value);
   }
 
+  public cacheHeadLocally(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): void {
+    this.assertReady();
+    const cleanValue = this.cleanDocument(value);
+    const targetNetworkIds = [
+      ...new Set([...networkIds, ...this.networkIdsFromDocument(cleanValue)]),
+    ];
+
+    for (const headKey of [
+      key,
+      ...this.derivedHeadKeysFromRecord(cleanValue),
+    ]) {
+      if (!this.cacheHead(headKey, cleanValue)) {
+        continue;
+      }
+
+      for (const networkId of targetNetworkIds) {
+        void this.persistHeadCache(networkId, headKey, cleanValue);
+      }
+    }
+  }
+
   public async putHead(
     key: string,
     value: Record<string, unknown>,
