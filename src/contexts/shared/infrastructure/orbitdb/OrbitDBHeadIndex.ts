@@ -76,6 +76,35 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     return this.deduplicator.deduplicate(documents);
   }
 
+  private documentsHead(
+    metadata: Record<string, unknown>,
+    documents: TDocument[],
+    options: OrbitDBHeadIndexPutOptions<TDocument> = {},
+  ): Record<string, unknown> {
+    const filteredDocuments = this.deduplicate(documents).filter(
+      options.filter ?? (() => true),
+    );
+
+    return {
+      ...metadata,
+      [this.options.collectionName]: filteredDocuments.map((document) => ({
+        ...document,
+      })),
+      updatedAt: Date.now(),
+    };
+  }
+
+  private recordsHead(
+    metadata: Record<string, unknown>,
+    records: Record<string, unknown>[],
+  ): Record<string, unknown> {
+    return {
+      ...metadata,
+      [this.options.collectionName]: records,
+      updatedAt: Date.now(),
+    };
+  }
+
   public mergeRecords(
     records: Record<string, unknown>[],
     record: Record<string, unknown>,
@@ -107,19 +136,22 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     documents: TDocument[],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
-    const filteredDocuments = this.deduplicate(documents).filter(
-      options.filter ?? (() => true),
-    );
-
     await this.registry.putHead(
       key,
-      {
-        ...metadata,
-        [this.options.collectionName]: filteredDocuments.map((document) => ({
-          ...document,
-        })),
-        updatedAt: Date.now(),
-      },
+      this.documentsHead(metadata, documents, options),
+      options.networkIds ?? [],
+    );
+  }
+
+  public replicateDocumentsInBackground(
+    key: string,
+    metadata: Record<string, unknown>,
+    documents: TDocument[],
+    options: OrbitDBHeadIndexPutOptions<TDocument> = {},
+  ): void {
+    this.registry.replicateHeadInBackground(
+      key,
+      this.documentsHead(metadata, documents, options),
       options.networkIds ?? [],
     );
   }
@@ -137,11 +169,25 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
 
     await this.registry.putHead(
       key,
-      {
-        ...metadata,
-        [this.options.collectionName]: records,
-        updatedAt: Date.now(),
-      },
+      this.recordsHead(metadata, records),
+      networkIds,
+    );
+  }
+
+  public replicateRecordInBackground(
+    key: string,
+    metadata: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): void {
+    const records = this.mergeRecords(
+      this.recordsFromHead(this.registry.findCachedHead(key)),
+      record,
+    );
+
+    this.registry.replicateHeadInBackground(
+      key,
+      this.recordsHead(metadata, records),
       networkIds,
     );
   }

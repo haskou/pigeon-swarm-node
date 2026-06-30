@@ -868,6 +868,10 @@ export default class OrbitDBReplicatedStateRegistry {
       .map(([, value]) => value);
   }
 
+  public findCachedHead(key: string): Record<string, unknown> | undefined {
+    return this.cachedHeads.get(key);
+  }
+
   public cacheHeadLocally(
     key: string,
     value: Record<string, unknown>,
@@ -891,6 +895,19 @@ export default class OrbitDBReplicatedStateRegistry {
         void this.persistHeadCache(networkId, headKey, cleanValue);
       }
     }
+  }
+
+  public replicateHeadInBackground(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): void {
+    this.cacheHeadLocally(key, value, networkIds);
+    void this.putHead(key, value, networkIds).catch((error) => {
+      Kernel.logger.warn?.(
+        `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
+      );
+    });
   }
 
   public async putHead(

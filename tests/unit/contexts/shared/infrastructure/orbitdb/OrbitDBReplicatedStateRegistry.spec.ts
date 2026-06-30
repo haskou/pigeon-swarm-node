@@ -314,6 +314,39 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(network.heads.put).not.toHaveBeenCalled();
   });
 
+  it('replicates cached heads in background', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const delayedWrite = deferred<string>();
+
+    await registry.register('network-1', network.stores);
+    network.heads.put.mockImplementationOnce(async () => delayedWrite.promise);
+
+    registry.replicateHeadInBackground(
+      'presence:identity-1',
+      {
+        id: 'identity-1',
+        identityId: 'identity-1',
+        networkIds: ['network-1'],
+        status: 'available',
+        updatedAt: 1780000000000,
+      },
+      ['network-1'],
+    );
+
+    await expect(registry.findHead('presence:identity-1')).resolves.toEqual(
+      expect.objectContaining({
+        identityId: 'identity-1',
+        status: 'available',
+      }),
+    );
+    await flushPromises();
+
+    expect(network.heads.put).toHaveBeenCalledTimes(1);
+    delayedWrite.resolve('ok');
+    await flushPromises();
+  });
+
   it('routes keychain metadata through the owner identity networks', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
