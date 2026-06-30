@@ -3,7 +3,6 @@ import { IdempotencyConsumerMiddleware } from '@haskou/ddd-kernel/adapters/pubsu
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import {
   ExpressKernelServer,
-  HttpApp,
   HttpErrorHandler,
   RoutePrefix,
 } from '@haskou/ddd-kernel/adapters/ui';
@@ -19,7 +18,6 @@ import {
   handleDomainError,
 } from '../shared/infrastructure/express/PigeonHttpErrorResponseHandlers';
 import { PublicStaticContent } from '../shared/infrastructure/express/PublicStaticContent';
-import { SwaggerRouteMap } from '../shared/infrastructure/express/SwaggerRouteMap';
 import { Initializer } from '../shared/infrastructure/lifecycle/Initializer';
 import { Runtime } from '../shared/infrastructure/lifecycle/Runtime';
 import WinstonLogger from '../shared/infrastructure/logs/WinstonLogger';
@@ -30,7 +28,7 @@ import MessageBus from '../shared/infrastructure/messageBus/MessageBus';
 import WebSocketClientMessageHandler from '../shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { webSocketEventHub } from '../shared/infrastructure/websocket/WebSocketEventHub';
 import { WebSocketRealtimeServer } from '../shared/infrastructure/websocket/WebSocketRealtimeServer';
-import { ApiSwaggerFactory } from './apis/ApiSwaggerFactory';
+import { ApiSwaggerRegistrar } from './apis/ApiSwaggerRegistrar';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 
@@ -43,99 +41,11 @@ export default class PigeonApplication {
   });
 
   private server: ExpressKernelServer | undefined;
+  private readonly swaggerRegistrar = new ApiSwaggerRegistrar();
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
   private getRoutePrefix(): RoutePrefix {
     return RoutePrefix.fromEnvironment(this.kernel.environment.ROUTE_PREFIX);
-  }
-
-  private buildSwaggerHtml(
-    routePrefix: string,
-    swaggerRoutes: SwaggerRouteMap,
-  ): string {
-    const swaggerUrls = [
-      {
-        name: 'all-apis',
-        url: `${routePrefix}/swagger/open-api.yaml`,
-      },
-      ...Object.entries(swaggerRoutes).map(([apiName, url]) => ({
-        name: apiName,
-        url,
-      })),
-    ];
-
-    return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pigeon-swarm Swagger</title>
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"
-    />
-    <style>
-      body {
-        margin: 0;
-        background: #f5f7fb;
-      }
-
-      .topbar {
-        display: none;
-      }
-
-      .swagger-ui .information-container {
-        padding-bottom: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
-    <script>
-      window.ui = SwaggerUIBundle({
-        dom_id: '#swagger-ui',
-        layout: 'StandaloneLayout',
-        presets: [
-          SwaggerUIBundle.presets.apis,
-          SwaggerUIStandalonePreset,
-        ],
-        urls: ${JSON.stringify(swaggerUrls)},
-        "urls.primaryName": 'all-apis',
-        docExpansion: 'list',
-        deepLinking: true,
-        displayRequestDuration: true,
-        tryItOutEnabled: false,
-      });
-    </script>
-  </body>
-</html>`;
-  }
-
-  private registerSwagger(app: HttpApp, routePrefixValue: string): void {
-    const swaggerFactory = new ApiSwaggerFactory();
-    const swaggerByApi = swaggerFactory.createByApi();
-    const aggregatedSwagger = swaggerFactory.createAggregatedSpec();
-    const swaggerRoutes = swaggerFactory.createRouteByApi(routePrefixValue);
-    const swaggerHtml = this.buildSwaggerHtml(routePrefixValue, swaggerRoutes);
-
-    app.get(
-      `${routePrefixValue}/swagger/open-api.yaml`,
-      (_request, response) => {
-        return response.type('application/yaml').send(aggregatedSwagger);
-      },
-    );
-
-    app.get(`${routePrefixValue}/swagger`, (_request, response) => {
-      return response.type('text/html').send(swaggerHtml);
-    });
-
-    for (const [apiName, swaggerSpec] of Object.entries(swaggerByApi)) {
-      app.get(swaggerRoutes[apiName], (_request, response) => {
-        return response.type('application/yaml').send(swaggerSpec);
-      });
-    }
   }
 
   private routeSpecificity(route: string | RegExp | undefined): number {
@@ -200,7 +110,7 @@ export default class PigeonApplication {
         hooks: [
           {
             handle: (app) => {
-              this.registerSwagger(app, routePrefixValue);
+              this.swaggerRegistrar.register(app, routePrefixValue);
               new PublicStaticContent(routePrefix).register(app);
             },
             phase: 'beforeErrors',
