@@ -9,7 +9,6 @@ import { MessageType } from '@app/contexts/conversations/domain/value-objects/Me
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversationMessageDocument';
@@ -98,8 +97,11 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const conversationId = this.stringValue(record, 'conversationId');
 
     if (conversationId) {
-      await this.messageIndex.putRecord(conversationId, record);
-      await this.messageSummaryIndex.putRecord(conversationId, record);
+      this.messageIndex.replicateRecordInBackground(conversationId, record);
+      this.messageSummaryIndex.replicateRecordInBackground(
+        conversationId,
+        record,
+      );
     }
   }
 
@@ -150,18 +152,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     recipientIdentityId: IdentityId,
   ): string {
     return `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`;
-  }
-
-  private refreshReadMarkerInBackground(
-    key: string,
-    marker: Record<string, unknown>,
-    networkIds: string[],
-  ): void {
-    void this.registry.putHead(key, marker, networkIds).catch((error) => {
-      Kernel.logger.warn?.(
-        `Conversation read marker refresh failed: key=${key} error=${String(error)}`,
-      );
-    });
   }
 
   private async findMessageDocumentById(
@@ -498,8 +488,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const markerNetworkIds = markerNetworkId ? [markerNetworkId] : [];
     const key = this.readMarkerHeadKey(conversationId, recipientIdentityId);
 
-    this.registry.cacheHeadLocally(key, marker, markerNetworkIds);
-    this.refreshReadMarkerInBackground(key, marker, markerNetworkIds);
+    this.registry.replicateHeadInBackground(key, marker, markerNetworkIds);
   }
 
   public async save(conversation: Conversation): Promise<void> {
@@ -512,7 +501,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
 
     await this.registry.putDocument('conversations', { ...document });
-    await this.conversationIndex.put(document);
+    this.conversationIndex.replicateInBackground(document);
 
     const existingMessageIds = this.messageDocumentIds(
       await this.findMessageDocumentsByConversationId(conversationId),

@@ -191,6 +191,33 @@ export default class OrbitDBConversationMessageSummaryIndex {
     );
   }
 
+  public replicateRecordInBackground(
+    conversationId: string,
+    record: Record<string, unknown>,
+  ): void {
+    const summary = this.summaryFromRecord(record);
+
+    if (!summary) {
+      return;
+    }
+
+    const key = this.messageSummaryHeadKey(conversationId);
+    const messages = this.index.mergeRecords(
+      this.recordsFromHead(this.registry.findCachedHead(key)) || [],
+      summary,
+    );
+
+    this.index.replicateRecordInBackground(
+      key,
+      {
+        conversationId,
+        id: key,
+      },
+      summary,
+      this.networkIdsFrom(messages),
+    );
+  }
+
   public messageCreatedAtFrom(
     documents: Record<string, unknown>[],
     messageId: string | undefined,

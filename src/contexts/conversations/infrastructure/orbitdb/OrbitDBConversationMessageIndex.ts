@@ -137,6 +137,16 @@ export default class OrbitDBConversationMessageIndex {
     );
   }
 
+  private networkIdsFrom(records: Record<string, unknown>[]): string[] {
+    return [
+      ...new Set(
+        records
+          .map((message) => this.stringValue(message, 'networkId'))
+          .filter((networkId): networkId is string => networkId !== undefined),
+      ),
+    ];
+  }
+
   public recordsFromHead(
     head: Record<string, unknown> | undefined,
   ): Record<string, unknown>[] {
@@ -211,6 +221,27 @@ export default class OrbitDBConversationMessageIndex {
         updatedAt: Date.now(),
       },
       networkIds,
+    );
+  }
+
+  public replicateRecordInBackground(
+    conversationId: string,
+    record: Record<string, unknown>,
+  ): void {
+    const key = this.messageIndexHeadKey(conversationId);
+    const messages = this.index.mergeRecords(
+      this.index.recordsFromHead(this.registry.findCachedHead(key)),
+      record,
+    );
+
+    this.index.replicateRecordInBackground(
+      key,
+      {
+        conversationId,
+        id: key,
+      },
+      record,
+      this.networkIdsFrom(messages),
     );
   }
 

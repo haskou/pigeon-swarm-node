@@ -382,7 +382,7 @@ describe('OrbitDBConversationRepository', () => {
         key === `conversation-message-index:${conversation.getId().valueOf()}`,
     );
 
-    expect(messageIndexReads).toHaveLength(2);
+    expect(messageIndexReads).toHaveLength(1);
   });
 });
 

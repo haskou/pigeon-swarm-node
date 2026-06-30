@@ -110,6 +110,18 @@ export default class OrbitDBConversationIndex {
     );
   }
 
+  private cachedParticipantIndexDocuments(
+    participantId: string,
+  ): OrbitDBConversationDocument[] {
+    return (
+      this.index.documentsFromHead(
+        this.registry.findCachedHead(
+          this.participantIndexHeadKey(participantId),
+        ),
+      ) ?? []
+    );
+  }
+
   private async putParticipantIndex(
     participantId: string,
     documents: OrbitDBConversationDocument[],
@@ -120,6 +132,26 @@ export default class OrbitDBConversationIndex {
     ];
 
     await this.index.putDocuments(
+      this.participantIndexHeadKey(participantId),
+      {
+        id: this.participantIndexHeadKey(participantId),
+        participantId,
+      },
+      conversations,
+      { networkIds },
+    );
+  }
+
+  private replicateParticipantIndexInBackground(
+    participantId: string,
+    documents: OrbitDBConversationDocument[],
+  ): void {
+    const conversations = this.index.deduplicate(documents);
+    const networkIds = [
+      ...new Set(conversations.map((conversation) => conversation.networkId)),
+    ];
+
+    this.index.replicateDocumentsInBackground(
       this.participantIndexHeadKey(participantId),
       {
         id: this.participantIndexHeadKey(participantId),
@@ -180,6 +212,23 @@ export default class OrbitDBConversationIndex {
           document,
         ]),
       ),
+    );
+  }
+
+  public replicateInBackground(document: OrbitDBConversationDocument): void {
+    this.registry.replicateHeadInBackground(
+      this.conversationHeadKey(document.id),
+      {
+        ...document,
+      },
+      [document.networkId],
+    );
+
+    document.participantIds.forEach((participantId) =>
+      this.replicateParticipantIndexInBackground(participantId, [
+        ...this.cachedParticipantIndexDocuments(participantId),
+        document,
+      ]),
     );
   }
 }
