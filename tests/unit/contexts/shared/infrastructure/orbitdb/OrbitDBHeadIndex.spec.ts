@@ -122,6 +122,27 @@ describe('OrbitDBHeadIndex', () => {
     ).toEqual([document('same', 2, 'newer'), document('other', 1)]);
   });
 
+  it('keeps the freshest raw record when merging an older record later', () => {
+    expect(
+      index.mergeRecords(
+        [
+          {
+            ...document('same', 1, 'deleted'),
+            deleted: true,
+            deletedAt: 3,
+          },
+        ],
+        document('same', 1, 'older'),
+      ),
+    ).toEqual([
+      {
+        ...document('same', 1, 'deleted'),
+        deleted: true,
+        deletedAt: 3,
+      },
+    ]);
+  });
+
   it('stores deduplicated documents with metadata and network routing', async () => {
     await index.putDocuments(
       'index:key',
@@ -146,6 +167,47 @@ describe('OrbitDBHeadIndex', () => {
       ownerId: 'owner',
       updatedAt: expect.any(Number),
     });
+  });
+
+  it('updates the cached head immediately when a background record merge is queued', async () => {
+    index.replicateRecordInBackground(
+      'index:key',
+      {
+        id: 'index:key',
+        ownerId: 'owner',
+      },
+      document('queued', 1),
+      [networkId],
+    );
+    registry.cacheHeadLocally(
+      'index:key',
+      {
+        id: 'index:key',
+        items: [document('first', 1)],
+        ownerId: 'owner',
+        updatedAt: 1,
+      },
+      [networkId],
+    );
+
+    index.replicateRecordInBackground(
+      'index:key',
+      {
+        id: 'index:key',
+        ownerId: 'owner',
+      },
+      document('second', 2),
+      [networkId],
+    );
+
+    expect(registry.findCachedHead('index:key')).toEqual({
+      id: 'index:key',
+      items: [document('first', 1), document('second', 2)],
+      ownerId: 'owner',
+      updatedAt: expect.any(Number),
+    });
+
+    await flushBackgroundTasks();
   });
 
   it('preserves persisted records when background merging without a cached head', async () => {

@@ -53,6 +53,54 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     };
   }
 
+  private numberValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): number | undefined {
+    const value = record[attribute];
+
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  private recordFreshness(record: Record<string, unknown>): number {
+    return Math.max(
+      ...['deletedAt', 'receivedAt', 'updatedAt', 'createdAt']
+        .map((attribute) => this.numberValue(record, attribute))
+        .filter((value): value is number => value !== undefined),
+      0,
+    );
+  }
+
+  private shouldReplaceRecord(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): boolean {
+    const currentFreshness = this.recordFreshness(current);
+    const candidateFreshness = this.recordFreshness(candidate);
+
+    if (currentFreshness !== 0 || candidateFreshness !== 0) {
+      return currentFreshness <= candidateFreshness;
+    }
+
+    return true;
+  }
+
+  private cacheRecordHeadLocally(
+    key: string,
+    metadata: Record<string, unknown>,
+    head: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[],
+  ): void {
+    const records = this.mergeRecords(this.recordsFromHead(head), record);
+
+    this.registry.cacheHeadLocally(
+      key,
+      this.recordsHead(metadata, records),
+      networkIds,
+    );
+  }
+
   private replicateRecordHead(
     key: string,
     metadata: Record<string, unknown>,
@@ -192,7 +240,11 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
       }
     }
 
-    merged.set(recordId, record);
+    const current = merged.get(recordId);
+
+    if (!current || this.shouldReplaceRecord(current, record)) {
+      merged.set(recordId, record);
+    }
 
     return [...merged.values()];
   }
@@ -250,7 +302,23 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     const queue = this.recordMergeQueues.get(key);
     const cachedHead = this.registry.findCachedHead(key);
 
-    if (queue || !cachedHead) {
+    if (queue) {
+      if (cachedHead) {
+        this.cacheRecordHeadLocally(
+          key,
+          metadata,
+          cachedHead,
+          record,
+          networkIds,
+        );
+      }
+
+      this.queueRecordHeadReplication(key, metadata, record, networkIds);
+
+      return;
+    }
+
+    if (!cachedHead) {
       this.queueRecordHeadReplication(key, metadata, record, networkIds);
 
       return;
