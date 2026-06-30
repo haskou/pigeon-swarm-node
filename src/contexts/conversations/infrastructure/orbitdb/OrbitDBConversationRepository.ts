@@ -9,6 +9,7 @@ import { MessageType } from '@app/contexts/conversations/domain/value-objects/Me
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversationMessageDocument';
@@ -126,7 +127,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     recipientIdentityId: IdentityId,
   ): Promise<number | undefined> {
     const marker = await this.registry.findHead(
-      `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
+      this.readMarkerHeadKey(conversationId, recipientIdentityId),
     );
     const messageId = marker
       ? this.stringValue(marker, 'messageId')
@@ -142,6 +143,25 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
 
     return message?.createdAt;
+  }
+
+  private readMarkerHeadKey(
+    conversationId: ConversationId,
+    recipientIdentityId: IdentityId,
+  ): string {
+    return `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`;
+  }
+
+  private refreshReadMarkerInBackground(
+    key: string,
+    marker: Record<string, unknown>,
+    networkIds: string[],
+  ): void {
+    void this.registry.putHead(key, marker, networkIds).catch((error) => {
+      Kernel.logger.warn?.(
+        `Conversation read marker refresh failed: key=${key} error=${String(error)}`,
+      );
+    });
   }
 
   private async findMessageDocumentById(
@@ -336,7 +356,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const readMarkers = await Promise.all(
       conversationIds.map(async (conversationId) => {
         const marker = await this.registry.findHead(
-          `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
+          this.readMarkerHeadKey(conversationId, recipientIdentityId),
         );
 
         return {
@@ -467,18 +487,19 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       networkId,
     );
 
-    await this.registry.putHead(
-      `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
-      {
-        conversationId: conversationId.valueOf(),
-        messageCreatedAt,
-        messageId: messageId.valueOf(),
-        networkId: markerNetworkId,
-        readAt: Timestamp.now().valueOf(),
-        recipientIdentityId: recipientIdentityId.valueOf(),
-      },
-      markerNetworkId ? [markerNetworkId] : [],
-    );
+    const marker = {
+      conversationId: conversationId.valueOf(),
+      messageCreatedAt,
+      messageId: messageId.valueOf(),
+      networkId: markerNetworkId,
+      readAt: Timestamp.now().valueOf(),
+      recipientIdentityId: recipientIdentityId.valueOf(),
+    };
+    const markerNetworkIds = markerNetworkId ? [markerNetworkId] : [];
+    const key = this.readMarkerHeadKey(conversationId, recipientIdentityId);
+
+    this.registry.cacheHeadLocally(key, marker, markerNetworkIds);
+    this.refreshReadMarkerInBackground(key, marker, markerNetworkIds);
   }
 
   public async save(conversation: Conversation): Promise<void> {
