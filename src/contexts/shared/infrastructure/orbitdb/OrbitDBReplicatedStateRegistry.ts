@@ -20,6 +20,8 @@ type PersistedHeadCacheHydration = {
 export default class OrbitDBReplicatedStateRegistry {
   private static readonly HTTP_QUERY_WARNING_THRESHOLD_MS = 100;
   private static readonly BACKGROUND_QUERY_LOG_THRESHOLD_MS = 1000;
+  // TODO: Move indexed head merge policy to OrbitDBHeadIndex if more
+  // collection names or record identity fields are needed here.
   private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
     'calls',
     'conversations',
