@@ -100,18 +100,34 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     );
   }
 
-  private async putHeads(document: OrbitDBNotificationDocument): Promise<void> {
-    await this.registry.putHead(this.headKey(document.id), { ...document });
+  private cachedRecipientIndexedDocuments(
+    recipientIdentityId: string,
+  ): OrbitDBNotificationDocument[] {
+    return (
+      this.notificationIndex.documentsFromHead(
+        this.registry.findCachedHead(
+          this.recipientIndexHeadKey(recipientIdentityId),
+        ),
+      ) ?? []
+    );
+  }
 
-    const recipientIdentityId = new IdentityId(document.recipientIdentityId);
-    const recipientDocuments =
-      await this.findRecipientIndexedDocuments(recipientIdentityId);
+  private replicateHeadsInBackground(
+    document: OrbitDBNotificationDocument,
+  ): void {
+    this.registry.replicateHeadInBackground(this.headKey(document.id), {
+      ...document,
+    });
+
+    const recipientDocuments = this.cachedRecipientIndexedDocuments(
+      document.recipientIdentityId,
+    );
     const notifications = this.notificationIndex.deduplicate([
       ...recipientDocuments,
       document,
     ]);
 
-    await this.notificationIndex.putDocuments(
+    this.notificationIndex.replicateDocumentsInBackground(
       this.recipientIndexHeadKey(document.recipientIdentityId),
       {
         id: this.recipientIndexHeadKey(document.recipientIdentityId),
@@ -170,6 +186,6 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     await this.registry.putDocument('notifications', {
       ...document,
     });
-    await this.putHeads(document);
+    this.replicateHeadsInBackground(document);
   }
 }

@@ -143,7 +143,7 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
     await this.registry.putDocument('contentReplication', {
       ...document,
     });
-    await this.registry.putHead(
+    this.registry.replicateHeadInBackground(
       this.headKey(document.cid),
       { ...document },
       document.networkIds,

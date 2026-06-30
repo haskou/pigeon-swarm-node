@@ -1,6 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
@@ -89,28 +88,6 @@ export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceR
     return document && this.isDocument(document) ? document : undefined;
   }
 
-  private async putHead(
-    document: OrbitDBIdentityPresenceDocument,
-    networkIds: string[] = [],
-  ): Promise<void> {
-    await this.registry.putHead(
-      this.headKey(document.identityId),
-      { ...document },
-      networkIds,
-    );
-  }
-
-  private refreshHeadInBackground(
-    document: OrbitDBIdentityPresenceDocument,
-    networkIds: string[],
-  ): void {
-    void this.putHead(document, networkIds).catch((error) => {
-      Kernel.logger.warn?.(
-        `Presence head refresh failed: identityId=${document.identityId} error=${String(error)}`,
-      );
-    });
-  }
-
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityPresence | undefined> {
@@ -176,11 +153,10 @@ export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceR
     const document = this.toDocument(presence);
 
     await this.registry.putDocument('presence', document, networkIds);
-    this.registry.cacheHeadLocally(
+    this.registry.replicateHeadInBackground(
       this.headKey(document.identityId),
       document,
-      [...networkIds],
+      networkIds,
     );
-    this.refreshHeadInBackground(document, networkIds);
   }
 }
