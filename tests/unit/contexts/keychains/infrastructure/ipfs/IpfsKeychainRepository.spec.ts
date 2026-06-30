@@ -195,17 +195,17 @@ describe('IpfsKeychainRepository', () => {
       return Promise.resolve(new IpfsKeychainMapper().toDocument(latest) as T);
     });
     ipfs.getRecordCandidates.mockResolvedValue(['identity-cid']);
-    ipfs.addJSONToNetworks.mockResolvedValue(new IPFSId('bafy-republished'));
     ipfs.putRecordToNetworks.mockResolvedValue(undefined);
 
     const republished = await repository.republishLocalRoutingRecords();
 
     expect(republished).toBe(1);
-    expect(ipfs.getJSON).toHaveBeenCalledWith(new IPFSId('bafy-latest'));
+    expect(ipfs.getJSON).not.toHaveBeenCalledWith(new IPFSId('bafy-latest'));
     expect(ipfs.getJSON).not.toHaveBeenCalledWith(new IPFSId('bafy-older'));
+    expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
     expect(ipfs.putRecordToNetworks).toHaveBeenCalledWith(
       `pigeon-swarm_keychain-${mother.ownerIdentityId.valueOf()}`,
-      'bafy-republished',
+      'bafy-latest',
       ['network-1'],
     );
   });

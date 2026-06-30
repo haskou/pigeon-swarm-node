@@ -103,15 +103,15 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     ]);
   });
 
-  it('should repair stale identity id heads in background', async () => {
+  it('should not scan stored identity records when identity id head exists', async () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
+    const stores = identityStores(documents, heads) as unknown as {
+      identities: { query: jest.Mock };
+    };
 
-    await registry.register(
-      networkId.valueOf(),
-      identityStores(documents, heads),
-    );
+    await registry.register(networkId.valueOf(), stores as never);
     heads.set(`identity:${identityId}`, {
       cid: 'bafyidentity-v1',
       id: identityId,
@@ -140,10 +140,11 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     await flushBackgroundTasks();
     expect(heads.get(`identity:${identityId}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-v2',
-        version: 2,
+        cid: 'bafyidentity-v1',
+        version: 1,
       }),
     );
+    expect(stores.identities.query).not.toHaveBeenCalled();
   });
 
   it('should read identity metadata by handle from the head index', async () => {
@@ -188,16 +189,16 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     );
   });
 
-  it('should repair stale identity handle heads in background', async () => {
+  it('should not scan stored identity records when handle head exists', async () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother().withVersion(new IdentityVersion(2));
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
+    const stores = identityStores(documents, heads) as unknown as {
+      identities: { query: jest.Mock };
+    };
 
-    await registry.register(
-      networkId.valueOf(),
-      identityStores(documents, heads),
-    );
+    await registry.register(networkId.valueOf(), stores as never);
     heads.set(`identity-handle:${handle.valueOf()}`, {
       cid: 'bafyidentity-handle-v1',
       handle: handle.valueOf(),
@@ -228,10 +229,11 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     await flushBackgroundTasks();
     expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafyidentity-handle-v2',
-        version: 2,
+        cid: 'bafyidentity-handle-v1',
+        version: 1,
       }),
     );
+    expect(stores.identities.query).not.toHaveBeenCalled();
   });
 
   it('should not query stored identity records by handle during http requests', async () => {

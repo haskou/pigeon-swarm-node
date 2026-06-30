@@ -106,6 +106,44 @@ describe('IpfsIdentityRepository', () => {
         expectedCid,
       );
     });
+
+    it('should republish only the latest identity routing record without adding content again', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+
+      metadataRepository.findAll.mockResolvedValue([
+        {
+          cid: 'bafy-identity-v2',
+          identityId: primitives.id,
+          networkIds: primitives.networks,
+          previousCid: 'bafy-identity-v1',
+          receivedAt: 2,
+          version: 2,
+        },
+        {
+          cid: 'bafy-identity-v1',
+          identityId: primitives.id,
+          networkIds: primitives.networks,
+          previousCid: undefined,
+          receivedAt: 1,
+          version: 1,
+        },
+      ]);
+      ipfsManager.putRecordToNetworks.mockResolvedValue(undefined);
+
+      const republished = await repository.republishLocalRoutingRecords();
+
+      expect(republished).toBe(1);
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + primitives.id,
+        'bafy-identity-v2',
+        primitives.networks,
+      );
+    });
   });
 
   describe('findById', () => {

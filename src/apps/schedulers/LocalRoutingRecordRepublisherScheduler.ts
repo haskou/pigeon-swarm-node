@@ -14,10 +14,8 @@ export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
   }
 
   public async execute(): Promise<void> {
-    const [identities, keychains] = await Promise.all([
-      this.identityRouting.republish(),
-      this.keychainRouting.republish(),
-    ]);
+    const identities = await this.identityRouting.republish();
+    const keychains = await this.keychainRouting.republish();
 
     Kernel.logger.debug?.(
       `Republished local routing records: identities=${identities}, keychains=${keychains}, messages=0`,
