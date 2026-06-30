@@ -1,3 +1,5 @@
+import Kernel from '@haskou/ddd-kernel';
+
 import OrbitDBDocumentDeduplicator from './OrbitDBDocumentDeduplicator';
 import { OrbitDBHeadIndexOptions } from './OrbitDBHeadIndexOptions';
 import { OrbitDBHeadIndexPutOptions } from './OrbitDBHeadIndexPutOptions';
@@ -163,7 +165,7 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     networkIds: string[] = [],
   ): Promise<void> {
     const records = this.mergeRecords(
-      this.recordsFromHead(await this.registry.findHead(key)),
+      this.recordsFromHead(await this.registry.findPersistedHead(key)),
       record,
     );
 
@@ -180,10 +182,19 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[] = [],
   ): void {
-    const records = this.mergeRecords(
-      this.recordsFromHead(this.registry.findCachedHead(key)),
-      record,
-    );
+    const cachedHead = this.registry.findCachedHead(key);
+
+    if (!cachedHead) {
+      void this.putRecord(key, metadata, record, networkIds).catch((error) => {
+        Kernel.logger.warn?.(
+          `OrbitDB head index record refresh failed: key=${key} error=${String(error)}`,
+        );
+      });
+
+      return;
+    }
+
+    const records = this.mergeRecords(this.recordsFromHead(cachedHead), record);
 
     this.registry.replicateHeadInBackground(
       key,

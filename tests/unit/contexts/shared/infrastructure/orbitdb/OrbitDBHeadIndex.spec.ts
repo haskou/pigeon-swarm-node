@@ -1,5 +1,7 @@
 import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
+import { Request } from 'express';
 
 type Entry = {
   key?: string;
@@ -146,9 +148,51 @@ describe('OrbitDBHeadIndex', () => {
     });
   });
 
+  it('preserves persisted records when background merging without a cached head', async () => {
+    const request = {
+      method: 'POST',
+      originalUrl: '/messages',
+      path: '/messages',
+      url: '/messages',
+    } as Request;
+
+    await heads.put('index:key', {
+      id: 'index:key',
+      items: [document('first', 1)],
+      ownerId: 'owner',
+      updatedAt: 1,
+    });
+
+    expect(registry.findCachedHead('index:key')).toBeUndefined();
+
+    HttpRequestContext.run(request, () =>
+      index.replicateRecordInBackground(
+        'index:key',
+        {
+          id: 'index:key',
+          ownerId: 'owner',
+        },
+        document('second', 2),
+        [networkId],
+      ),
+    );
+    await flushBackgroundTasks();
+
+    await expect(heads.get('index:key')).resolves.toEqual({
+      id: 'index:key',
+      items: [document('first', 1), document('second', 2)],
+      ownerId: 'owner',
+      updatedAt: expect.any(Number),
+    });
+  });
+
   it('returns every configured document id', () => {
     expect(
       index.documentIds([document('primary', 1, 'value', 'secondary')]),
     ).toEqual(new Set(['primary', 'secondary']));
   });
 });
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
