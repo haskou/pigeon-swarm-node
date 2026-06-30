@@ -75,7 +75,7 @@
   },
   "resolutions": {
     "wrap-ansi": "7.0.0",
-    "string-width": "4.1.0"
+    "string-width": "8.2.1"
   },
   "devDependencies": {
     "@cucumber/cucumber": "7.3.2",
