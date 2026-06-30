@@ -68,7 +68,7 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
   ): void {
     const key = this.indexHeadKey(conversationId);
 
-    this.reactionIndex.replicateRecordInBackground(
+    void this.reactionIndex.replicateRecordInBackground(
       key,
       {
         conversationId: conversationId.valueOf(),

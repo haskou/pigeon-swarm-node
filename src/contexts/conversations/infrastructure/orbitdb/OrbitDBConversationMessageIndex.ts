@@ -227,14 +227,14 @@ export default class OrbitDBConversationMessageIndex {
   public replicateRecordInBackground(
     conversationId: string,
     record: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const key = this.messageIndexHeadKey(conversationId);
     const messages = this.index.mergeRecords(
       this.index.recordsFromHead(this.registry.findCachedHead(key)),
       record,
     );
 
-    this.index.replicateRecordInBackground(
+    return this.index.replicateRecordInBackground(
       key,
       {
         conversationId,

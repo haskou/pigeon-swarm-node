@@ -97,11 +97,13 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const conversationId = this.stringValue(record, 'conversationId');
 
     if (conversationId) {
-      this.messageIndex.replicateRecordInBackground(conversationId, record);
-      this.messageSummaryIndex.replicateRecordInBackground(
-        conversationId,
-        record,
-      );
+      await Promise.all([
+        this.messageIndex.replicateRecordInBackground(conversationId, record),
+        this.messageSummaryIndex.replicateRecordInBackground(
+          conversationId,
+          record,
+        ),
+      ]);
     }
   }
 

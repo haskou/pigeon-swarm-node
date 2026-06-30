@@ -321,6 +321,46 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     expect(messages).toEqual([]);
   });
 
+  it('should hide deleted messages across repository instances', async () => {
+    const mapper = new OrbitDBCommunityChannelMessageMapper();
+    const senderRepository = new OrbitDBCommunityChannelMessageRepository(
+      registry,
+      mapper,
+    );
+    const deleterRepository = new OrbitDBCommunityChannelMessageRepository(
+      registry,
+      mapper,
+    );
+    const finderRepository = new OrbitDBCommunityChannelMessageRepository(
+      registry,
+      mapper,
+    );
+
+    await senderRepository.save(
+      CommunityChannelMessage.fromPrimitives(
+        document({
+          channelId: 'channel-1',
+          createdAt: 1,
+          encryptedPayload: 'encrypted-community-channel-message-payload',
+          id: 'message-1',
+        }) as never,
+      ),
+    );
+    await deleterRepository.delete(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      new CommunityChannelMessageId('message-1'),
+    );
+
+    const messages = await finderRepository.findByChannel(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      50,
+    );
+
+    expect(messages).toEqual([]);
+  });
+
   it('should build thread summaries for several channels from indexed messages', async () => {
     await saveDocuments(
       document({

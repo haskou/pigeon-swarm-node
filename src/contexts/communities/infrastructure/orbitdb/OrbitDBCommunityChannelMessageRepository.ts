@@ -75,8 +75,10 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
         this.registry.putDocument('messages', document),
       ),
     );
-    deletedDocuments.forEach((document) =>
-      this.messageIndex.replicateRecordInBackground(document),
+    await Promise.all(
+      deletedDocuments.map((document) =>
+        this.messageIndex.replicateRecordInBackground(document),
+      ),
     );
 
     this.threadSummaryIndex.refreshForDocumentsInBackground(documents);
@@ -227,7 +229,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const document = this.mapper.toDocument(message);
 
     await this.registry.putDocument('messages', document);
-    this.messageIndex.replicateRecordInBackground(document);
+    await this.messageIndex.replicateRecordInBackground(document);
 
     if (document.replyToMessageId) {
       this.threadSummaryIndex.refreshForChannelInBackground(

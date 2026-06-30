@@ -83,7 +83,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
   ): void {
     const key = this.indexHeadKey(communityId);
 
-    this.reactionIndex.replicateRecordInBackground(
+    void this.reactionIndex.replicateRecordInBackground(
       key,
       {
         communityId: communityId.valueOf(),

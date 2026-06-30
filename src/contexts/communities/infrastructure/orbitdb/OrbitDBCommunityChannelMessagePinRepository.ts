@@ -69,7 +69,7 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
   ): void {
     const key = this.indexHeadKey(communityId, channelId);
 
-    this.pinIndex.replicateRecordInBackground(
+    void this.pinIndex.replicateRecordInBackground(
       key,
       {
         channelId: channelId.valueOf(),

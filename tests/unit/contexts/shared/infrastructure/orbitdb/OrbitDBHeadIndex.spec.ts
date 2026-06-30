@@ -169,7 +169,7 @@ describe('OrbitDBHeadIndex', () => {
     });
   });
 
-  it('updates the cached head immediately when a background record merge is queued', async () => {
+  it('updates an available cached head while a background record merge is queued', async () => {
     index.replicateRecordInBackground(
       'index:key',
       {
@@ -202,15 +202,33 @@ describe('OrbitDBHeadIndex', () => {
 
     expect(registry.findCachedHead('index:key')).toEqual({
       id: 'index:key',
-      items: [document('queued', 1), document('second', 2)],
+      items: [document('first', 1), document('second', 2)],
       ownerId: 'owner',
       updatedAt: expect.any(Number),
     });
 
     await flushBackgroundTasks();
+
+    const persistedHead = await heads.get('index:key');
+
+    expect(persistedHead).toEqual(
+      expect.objectContaining({
+        id: 'index:key',
+        ownerId: 'owner',
+        updatedAt: expect.any(Number),
+      }),
+    );
+    expect(persistedHead?.items).toEqual(
+      expect.arrayContaining([
+        document('first', 1),
+        document('queued', 1),
+        document('second', 2),
+      ]),
+    );
+    expect(persistedHead?.items).toHaveLength(3);
   });
 
-  it('preserves persisted records when background merging without a cached head', async () => {
+  it('does not expose partial heads before merging a cold cache with persisted records', async () => {
     const request = {
       method: 'POST',
       originalUrl: '/messages',
@@ -247,12 +265,21 @@ describe('OrbitDBHeadIndex', () => {
         [networkId],
       );
     });
-    expect(registry.findCachedHead('index:key')).toEqual({
-      id: 'index:key',
-      items: [document('second', 2), document('third', 3)],
-      ownerId: 'owner',
-      updatedAt: expect.any(Number),
+    expect(registry.findCachedHead('index:key')).toBeUndefined();
+    await HttpRequestContext.run(request, async () => {
+      await expect(index.find('index:key')).resolves.toEqual([
+        document('first', 1),
+        document('second', 2),
+        document('third', 3),
+      ]);
     });
+    const cachedHead = registry.findCachedHead('index:key');
+
+    if (cachedHead) {
+      expect(cachedHead.items).toEqual(
+        expect.arrayContaining([document('first', 1)]),
+      );
+    }
     await flushBackgroundTasks();
 
     await expect(heads.get('index:key')).resolves.toEqual({

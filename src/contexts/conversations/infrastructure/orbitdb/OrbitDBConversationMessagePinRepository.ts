@@ -59,7 +59,7 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
   ): void {
     const key = this.indexHeadKey(conversationId);
 
-    this.pinIndex.replicateRecordInBackground(
+    void this.pinIndex.replicateRecordInBackground(
       key,
       {
         conversationId: conversationId.valueOf(),
