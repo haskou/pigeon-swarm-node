@@ -261,6 +261,36 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await write;
   });
 
+  it('replicates documents in background without waiting for persistence', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const delayedWrite = deferred<string>();
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.communities.put.mockImplementationOnce(
+      async () => delayedWrite.promise,
+    );
+
+    const result = await Promise.race([
+      registry
+        .replicateDocumentInBackground('communities', {
+          id: 'community-1',
+          networkId: 'network-1',
+        })
+        .then(() => 'written'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('written');
+    expect(firstNetwork.communities.put).toHaveBeenCalledWith({
+      id: 'community-1',
+      networkId: 'network-1',
+    });
+
+    delayedWrite.resolve('ok');
+    await flushPromises();
+  });
+
   it('writes heads to independent networks concurrently', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

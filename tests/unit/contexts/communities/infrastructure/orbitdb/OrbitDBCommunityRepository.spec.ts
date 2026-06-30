@@ -13,6 +13,7 @@ describe('OrbitDBCommunityRepository', () => {
   const networkId = '550e8400-e29b-41d4-a716-446655440000';
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
+  let communitiesPut: jest.Mock;
   let headsPut: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityRepository;
@@ -20,6 +21,11 @@ describe('OrbitDBCommunityRepository', () => {
   beforeEach(() => {
     documents.splice(0);
     heads.clear();
+    communitiesPut = jest.fn(async (document) => {
+      upsertDocument(documents, document);
+
+      return 'ok';
+    });
     headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
       heads.set(key, value);
 
@@ -29,11 +35,7 @@ describe('OrbitDBCommunityRepository', () => {
     registry.clear();
     registry.register(networkId, {
       communities: {
-        put: jest.fn(async (document) => {
-          upsertDocument(documents, document);
-
-          return 'ok';
-        }),
+        put: communitiesPut,
         query: jest.fn(async (matcher) => documents.filter(matcher)),
       },
       heads: {
@@ -143,6 +145,26 @@ describe('OrbitDBCommunityRepository', () => {
     expect(heads.get('community:community-1')).toEqual(
       expect.objectContaining({ id: 'community-1' }),
     );
+  });
+
+  it('should not wait for replicated document persistence when saving communities', async () => {
+    const community = Community.fromPrimitives(communityPrimitives());
+    const delayedWrite = deferred<string>();
+
+    communitiesPut.mockImplementationOnce(async () => delayedWrite.promise);
+
+    const result = await Promise.race([
+      repository.save(community).then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    await expect(
+      repository.findById(new CommunityId('community-1')),
+    ).resolves.toBeDefined();
+
+    delayedWrite.resolve('ok');
+    await flushBackgroundTasks();
   });
 
   it('should prefer fresh community heads over stale member indexes', async () => {
@@ -300,6 +322,18 @@ describe('OrbitDBCommunityRepository', () => {
 
 function flushBackgroundTasks(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
 }
 
 function upsertDocument(

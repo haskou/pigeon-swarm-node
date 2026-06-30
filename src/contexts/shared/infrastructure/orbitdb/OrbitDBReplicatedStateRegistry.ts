@@ -843,10 +843,37 @@ export default class OrbitDBReplicatedStateRegistry {
     );
 
     await Promise.all(
+      this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+        async ({ stores }) => {
+          await this.getStore(stores, storeName)?.put?.(cleanDocument);
+        },
+      ),
+    );
+  }
+
+  public async replicateDocumentInBackground(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    document: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): Promise<void> {
+    this.assertReady();
+    const cleanDocument = this.cleanDocument(document);
+    const targetNetworkIds = await this.targetNetworkIdsForDocument(
+      cleanDocument,
+      networkIds,
+    );
+
+    void Promise.all(
       this.storesForNetworkIds(targetNetworkIds).map((stores) =>
         this.getStore(stores, storeName)?.put?.(cleanDocument),
       ),
-    );
+    ).catch((error) => {
+      Kernel.logger.warn?.(
+        `OrbitDB replicated document refresh failed: store=${storeName}` +
+          ` id=${this.stringValue(cleanDocument, 'id') ?? 'unknown'}` +
+          ` error=${String(error)}`,
+      );
+    });
   }
 
   public async findHead(
