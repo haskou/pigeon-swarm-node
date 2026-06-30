@@ -15,6 +15,7 @@ describe('OrbitDBConversationRepository', () => {
   const conversationDocuments: Record<string, unknown>[] = [];
   const messageDocuments: Record<string, unknown>[] = [];
   let conversationsQuery: jest.Mock;
+  let headsPut: jest.Mock;
   let messagesQuery: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBConversationRepository;
@@ -28,6 +29,11 @@ describe('OrbitDBConversationRepository', () => {
     conversationsQuery = jest.fn(async (matcher) =>
       conversationDocuments.filter(matcher),
     );
+    headsPut = jest.fn(async (key, value) => {
+      heads.set(key as string, value as Record<string, unknown>);
+
+      return 'ok';
+    });
     messagesQuery = jest.fn(async (matcher) =>
       messageDocuments.filter(matcher),
     );
@@ -50,11 +56,7 @@ describe('OrbitDBConversationRepository', () => {
           key,
           value: heads.get(key as string),
         })),
-        put: jest.fn(async (key, value) => {
-          heads.set(key as string, value as Record<string, unknown>);
-
-          return 'ok';
-        }),
+        put: headsPut,
       },
       messages: {
         put: jest.fn(async (document) => {
@@ -179,8 +181,10 @@ describe('OrbitDBConversationRepository', () => {
       new MessageId(`${conversation.getId().valueOf()}:1781121453305:client`),
     );
 
-    const marker = heads.get(
-      `read-marker:${conversation.getId().valueOf()}:${mother.recipient.valueOf()}`,
+    const marker = readMarkerFromCache(
+      registry,
+      conversation.getId().valueOf(),
+      mother.recipient.valueOf(),
     );
 
     expect(messagesQuery).not.toHaveBeenCalled();
@@ -213,8 +217,10 @@ describe('OrbitDBConversationRepository', () => {
       mother.networkId,
     );
 
-    const marker = heads.get(
-      `read-marker:${conversation.getId().valueOf()}:${mother.recipient.valueOf()}`,
+    const marker = readMarkerFromCache(
+      registry,
+      conversation.getId().valueOf(),
+      mother.recipient.valueOf(),
     );
 
     expect(messagesQuery).not.toHaveBeenCalled();
@@ -225,6 +231,42 @@ describe('OrbitDBConversationRepository', () => {
         messageCreatedAt: 1781121453305,
         messageId: messageId.valueOf(),
         networkId: mother.networkId.valueOf(),
+        recipientIdentityId: mother.recipient.valueOf(),
+      }),
+    );
+  });
+
+  it('should not wait for replicated read marker head writes', async () => {
+    const conversation = mother.build();
+    const messageId = new MessageId(
+      `${conversation.getId().valueOf()}:1781121453305:client`,
+    );
+
+    await repository.save(conversation);
+    headsPut.mockClear();
+    headsPut.mockImplementationOnce(() => new Promise<string>(() => undefined));
+
+    await expect(
+      repository.markReadUntil(
+        conversation.getId(),
+        mother.recipient,
+        messageId,
+        mother.networkId,
+      ),
+    ).resolves.toBeUndefined();
+    await flushPromises();
+
+    const marker = readMarkerFromCache(
+      registry,
+      conversation.getId().valueOf(),
+      mother.recipient.valueOf(),
+    );
+
+    expect(headsPut).toHaveBeenCalledTimes(1);
+    expect(marker).toEqual(
+      expect.objectContaining({
+        messageCreatedAt: 1781121453305,
+        messageId: messageId.valueOf(),
         recipientIdentityId: mother.recipient.valueOf(),
       }),
     );
@@ -310,7 +352,59 @@ describe('OrbitDBConversationRepository', () => {
       }),
     ]);
   });
+
+  it('should not read the message index once per existing message when saving', async () => {
+    const conversation = mother.build();
+
+    for (let index = 0; index < 5; index += 1) {
+      conversation.sendMessage(
+        mother.author,
+        new EncryptedMessagePayload(`existing-${index}`),
+        signature(),
+        new MessageSendOptions([], new Timestamp(1780000000000 + index)),
+      );
+    }
+    await repository.save(conversation);
+
+    conversation.sendMessage(
+      mother.recipient,
+      new EncryptedMessagePayload('new'),
+      signature(),
+      new MessageSendOptions([], new Timestamp(1780000000010)),
+    );
+    const findHead = jest.spyOn(registry, 'findHead');
+    findHead.mockClear();
+
+    await repository.save(conversation);
+
+    const messageIndexReads = findHead.mock.calls.filter(
+      ([key]) =>
+        key === `conversation-message-index:${conversation.getId().valueOf()}`,
+    );
+
+    expect(messageIndexReads).toHaveLength(1);
+  });
 });
+
+function readMarkerFromCache(
+  registry: OrbitDBReplicatedStateRegistry,
+  conversationId: string,
+  recipientIdentityId: string,
+): Record<string, unknown> | undefined {
+  return registry
+    .findCachedHeadsByPrefix('read-marker:')
+    .find(
+      (marker) =>
+        marker.conversationId === conversationId &&
+        marker.recipientIdentityId === recipientIdentityId,
+    );
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
 
 function signature(): Signature {
   return new Signature(

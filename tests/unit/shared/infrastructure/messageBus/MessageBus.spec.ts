@@ -46,6 +46,27 @@ describe('MessageBus', () => {
     expect(memoryAdapter.publish).not.toHaveBeenCalled();
   });
 
+  it('should not wait for transport side effects before returning', async () => {
+    process.env.TRANSPORT_DSN = 'libp2p-gossipsub://';
+    const event = new TestDomainEvent('aggregate-id', {});
+    const websocketPublish = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation();
+    const messageBus = new MessageBus(
+      memoryAdapter,
+      libp2pGossipsubAdapter,
+    );
+
+    libp2pGossipsubAdapter.publish.mockReturnValue(
+      new Promise(() => undefined),
+    );
+
+    await expect(messageBus.publish([event])).resolves.toBeUndefined();
+
+    expect(libp2pGossipsubAdapter.publish).toHaveBeenCalledWith([event]);
+    expect(websocketPublish).toHaveBeenCalledWith([event]);
+  });
+
   it('should publish local events to the replicated event publisher', async () => {
     process.env.TRANSPORT_DSN = 'in-memory://';
     const event = new TestDomainEvent('aggregate-id', {
@@ -63,6 +84,31 @@ describe('MessageBus', () => {
     await messageBus.publish([event]);
 
     expect(replicatedEventPublisher.publish).toHaveBeenCalledWith([event]);
+  });
+
+  it('should not wait for replicated event publishing before returning', async () => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+    const event = new TestDomainEvent('aggregate-id', {
+      value: 'payload',
+    });
+    const replicatedEventPublisher = {
+      publish: jest.fn().mockReturnValue(new Promise(() => undefined)),
+    };
+    const websocketPublish = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation();
+    const messageBus = new MessageBus(
+      memoryAdapter,
+      libp2pGossipsubAdapter,
+    );
+
+    MessageBus.setReplicatedEventPublisher(replicatedEventPublisher);
+
+    await expect(messageBus.publish([event])).resolves.toBeUndefined();
+
+    expect(memoryAdapter.publish).toHaveBeenCalledWith([event]);
+    expect(replicatedEventPublisher.publish).toHaveBeenCalledWith([event]);
+    expect(websocketPublish).toHaveBeenCalledWith([event]);
   });
 
   it('should dispatch replicated events through local consumers and websocket projections', async () => {

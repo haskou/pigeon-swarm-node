@@ -730,6 +730,22 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  private async findStoredHead(
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    for (const stores of this.storesByNetworkId.values()) {
+      const directRecord = this.recordValue(await stores.heads.get?.(key));
+
+      if (directRecord) {
+        this.cacheHead(key, directRecord);
+
+        return directRecord;
+      }
+    }
+
+    return undefined;
+  }
+
   public async register(
     networkId: string,
     stores: OrbitDBReplicatedStateStores,
@@ -847,17 +863,16 @@ export default class OrbitDBReplicatedStateRegistry {
       return undefined;
     }
 
-    for (const stores of this.storesByNetworkId.values()) {
-      const directRecord = this.recordValue(await stores.heads.get?.(key));
+    return this.findStoredHead(key);
+  }
 
-      if (directRecord) {
-        this.cacheHead(key, directRecord);
+  public async findPersistedHead(
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    this.assertReady();
+    const cachedHead = this.cachedHeads.get(key);
 
-        return directRecord;
-      }
-    }
-
-    return undefined;
+    return cachedHead ?? this.findStoredHead(key);
   }
 
   public findCachedHeadsByPrefix(
@@ -866,6 +881,48 @@ export default class OrbitDBReplicatedStateRegistry {
     return [...this.cachedHeads.entries()]
       .filter(([key]) => key.startsWith(prefix))
       .map(([, value]) => value);
+  }
+
+  public findCachedHead(key: string): Record<string, unknown> | undefined {
+    return this.cachedHeads.get(key);
+  }
+
+  public cacheHeadLocally(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): void {
+    this.assertReady();
+    const cleanValue = this.cleanDocument(value);
+    const targetNetworkIds = [
+      ...new Set([...networkIds, ...this.networkIdsFromDocument(cleanValue)]),
+    ];
+
+    for (const headKey of [
+      key,
+      ...this.derivedHeadKeysFromRecord(cleanValue),
+    ]) {
+      if (!this.cacheHead(headKey, cleanValue)) {
+        continue;
+      }
+
+      for (const networkId of targetNetworkIds) {
+        void this.persistHeadCache(networkId, headKey, cleanValue);
+      }
+    }
+  }
+
+  public replicateHeadInBackground(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): void {
+    this.cacheHeadLocally(key, value, networkIds);
+    void this.putHead(key, value, networkIds).catch((error) => {
+      Kernel.logger.warn?.(
+        `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
+      );
+    });
   }
 
   public async putHead(

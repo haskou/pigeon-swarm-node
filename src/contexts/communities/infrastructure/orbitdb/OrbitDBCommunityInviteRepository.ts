@@ -3,17 +3,29 @@ import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/e
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBCommunityInviteDocument } from './documents/OrbitDBCommunityInviteDocument';
 import OrbitDBCommunityInviteMapper from './mappers/OrbitDBCommunityInviteMapper';
 
 export default class OrbitDBCommunityInviteRepository extends CommunityInviteRepository {
+  private readonly inviteIndex: OrbitDBHeadIndex<OrbitDBCommunityInviteDocument>;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityInviteMapper,
   ) {
     super();
+    this.inviteIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'invites',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.freshness(current) <= this.freshness(candidate),
+    });
   }
 
   private hasNumberFields(
@@ -28,10 +40,6 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
     fields: string[],
   ): boolean {
     return fields.every((field) => typeof value[field] === 'string');
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private isDocument(
@@ -61,39 +69,8 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
     return `community-invite-community-index:${value}`;
   }
 
-  private documentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBCommunityInviteDocument[] {
-    const invites: unknown = record?.invites;
-
-    if (!Array.isArray(invites)) {
-      return [];
-    }
-
-    return (invites as unknown[]).filter(
-      (document): document is OrbitDBCommunityInviteDocument =>
-        this.isRecord(document) && this.isDocument(document),
-    );
-  }
-
   private freshness(document: OrbitDBCommunityInviteDocument): number {
     return document.deletedAt ?? document.createdAt;
-  }
-
-  private deduplicateDocuments(
-    documents: OrbitDBCommunityInviteDocument[],
-  ): OrbitDBCommunityInviteDocument[] {
-    const deduplicated = new Map<string, OrbitDBCommunityInviteDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
   }
 
   private async putHeads(
@@ -104,20 +81,18 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
     });
 
     const key = this.communityIndexHeadKey(document.communityId);
-    const indexedDocuments = this.documentsFromIndex(
-      await this.registry.findHead(key),
-    );
-    const invites = this.deduplicateDocuments([
-      ...indexedDocuments,
-      document,
-    ]).filter((candidate) => this.isDocument(candidate));
+    const invites = this.inviteIndex
+      .deduplicate([...((await this.inviteIndex.find(key)) ?? []), document])
+      .filter((candidate) => this.isDocument(candidate));
 
-    await this.registry.putHead(key, {
-      communityId: document.communityId,
-      id: key,
-      invites: invites.map((invite) => ({ ...invite })),
-      updatedAt: Date.now(),
-    });
+    await this.inviteIndex.putDocuments(
+      key,
+      {
+        communityId: document.communityId,
+        id: key,
+      },
+      invites,
+    );
   }
 
   public async consume(invite: CommunityInvite): Promise<CommunityInvite> {
@@ -134,9 +109,9 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    const documents = this.documentsFromIndex(
-      await this.registry.findHead(this.communityIndexHeadKey(communityId)),
-    );
+    const documents =
+      (await this.inviteIndex.find(this.communityIndexHeadKey(communityId))) ??
+      [];
 
     await Promise.all(
       documents.map(async (document) => {

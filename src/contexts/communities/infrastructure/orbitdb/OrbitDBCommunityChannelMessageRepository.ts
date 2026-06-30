@@ -5,69 +5,34 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBCommunityChannelMessageDocument } from './documents/OrbitDBCommunityChannelMessageDocument';
 import OrbitDBCommunityChannelMessageMapper from './mappers/OrbitDBCommunityChannelMessageMapper';
-
-interface OrbitDBCommunityChannelThreadSummaryDocument {
-  lastReplyAt: number;
-  lastReplyMessageId: string;
-  replyCount: number;
-  rootMessageId: string;
-}
+import OrbitDBCommunityChannelMessageIndex from './OrbitDBCommunityChannelMessageIndex';
+import OrbitDBCommunityChannelThreadSummaryIndex from './OrbitDBCommunityChannelThreadSummaryIndex';
 
 export default class OrbitDBCommunityChannelMessageRepository extends CommunityChannelMessageRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
+  private readonly messageIndex: OrbitDBCommunityChannelMessageIndex;
+
+  private readonly threadSummaryIndex: OrbitDBCommunityChannelThreadSummaryIndex;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityChannelMessageMapper,
   ) {
     super();
+    this.messageIndex = new OrbitDBCommunityChannelMessageIndex(this.registry);
+    this.threadSummaryIndex = new OrbitDBCommunityChannelThreadSummaryIndex(
+      this.registry,
+      this.messageIndex,
+    );
   }
 
   private escapeRegex(value: string): string {
     return value.replace(
       OrbitDBCommunityChannelMessageRepository.REGEX_SPECIAL_CHARACTERS,
       '\\$&',
-    );
-  }
-
-  private getMessageId(
-    document: OrbitDBCommunityChannelMessageDocument,
-  ): string {
-    return document.messageId || document.id;
-  }
-
-  private hasStringFields(
-    value: Record<string, unknown>,
-    fields: string[],
-  ): boolean {
-    return fields.every((field) => typeof value[field] === 'string');
-  }
-
-  private isStringArray(value: unknown): value is string[] {
-    return (
-      Array.isArray(value) && value.every((item) => typeof item === 'string')
-    );
-  }
-
-  private isDocument(
-    value: Record<string, unknown>,
-  ): value is OrbitDBCommunityChannelMessageDocument {
-    return (
-      value.deleted !== true &&
-      value.scopeType === 'community_channel' &&
-      this.hasStringFields(value, [
-        'authorIdentityId',
-        'channelId',
-        'communityId',
-        'id',
-        'type',
-      ]) &&
-      typeof value.createdAt === 'number' &&
-      this.isStringArray(value.attachmentExternalIdentifiers)
     );
   }
 
@@ -89,234 +54,11 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     return documents.sort((left, right) => right.createdAt - left.createdAt);
   }
 
-  private threadSummaryHeadKey(communityId: string, channelId: string): string {
-    return `community-channel-thread-summaries:${communityId}:${channelId}`;
-  }
-
-  private messageIndexHeadKey(communityId: string, channelId: string): string {
-    return `community-channel-message-index:${communityId}:${channelId}`;
-  }
-
-  private rawMessageRecordsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] {
-    const messages = record?.messages;
-
-    if (!Array.isArray(messages)) {
-      return [];
-    }
-
-    return messages.filter(
-      (message): message is Record<string, unknown> =>
-        typeof message === 'object' &&
-        message !== null &&
-        !Array.isArray(message),
-    );
-  }
-
-  private messageDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBCommunityChannelMessageDocument[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    return this.rawMessageRecordsFromIndex(record).filter(
-      (message): message is OrbitDBCommunityChannelMessageDocument =>
-        this.isDocument(message),
-    );
-  }
-
-  private messageRecordId(record: Record<string, unknown>): string | undefined {
-    return typeof record.id === 'string'
-      ? record.id
-      : typeof record.messageId === 'string'
-        ? record.messageId
-        : undefined;
-  }
-
-  private mergeIndexedMessageRecord(
-    records: Record<string, unknown>[],
-    record: Record<string, unknown>,
-  ): Record<string, unknown>[] {
-    const recordId = this.messageRecordId(record);
-
-    if (!recordId) {
-      return records;
-    }
-
-    const merged = new Map<string, Record<string, unknown>>();
-
-    for (const current of records) {
-      const currentId = this.messageRecordId(current);
-
-      if (currentId) {
-        merged.set(currentId, current);
-      }
-    }
-
-    merged.set(recordId, record);
-
-    return [...merged.values()];
-  }
-
-  private deduplicateMessages(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): OrbitDBCommunityChannelMessageDocument[] {
-    const deduplicated = new Map<
-      string,
-      OrbitDBCommunityChannelMessageDocument
-    >();
-
-    for (const document of documents) {
-      const current = deduplicated.get(this.getMessageId(document));
-
-      if (!current || (current.receivedAt ?? 0) <= (document.receivedAt ?? 0)) {
-        deduplicated.set(this.getMessageId(document), document);
-      }
-    }
-
-    return [...deduplicated.values()];
-  }
-
-  private async putMessageIndex(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): Promise<void> {
-    const key = this.messageIndexHeadKey(
-      communityId.valueOf(),
-      channelId.valueOf(),
-    );
-    const messages = this.deduplicateMessages(documents);
-
-    await this.registry.putHead(key, {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      id: key,
-      messages: messages.map((message) => ({ ...message })),
-      updatedAt: Date.now(),
-    });
-  }
-
-  private async putMessageIndexRecord(
-    record: Record<string, unknown>,
-  ): Promise<void> {
-    const communityId =
-      typeof record.communityId === 'string' ? record.communityId : undefined;
-    const channelId =
-      typeof record.channelId === 'string' ? record.channelId : undefined;
-
-    if (!communityId || !channelId) {
-      return;
-    }
-
-    const key = this.messageIndexHeadKey(communityId, channelId);
-    const messages = this.mergeIndexedMessageRecord(
-      this.rawMessageRecordsFromIndex(await this.registry.findHead(key)),
-      record,
-    );
-
-    await this.registry.putHead(key, {
-      channelId,
-      communityId,
-      id: key,
-      messages,
-      updatedAt: Date.now(),
-    });
-  }
-
-  private async findMessageIndexDocuments(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<OrbitDBCommunityChannelMessageDocument[] | undefined> {
-    return this.messageDocumentsFromIndex(
-      await this.registry.findHead(
-        this.messageIndexHeadKey(communityId.valueOf(), channelId.valueOf()),
-      ),
-    );
-  }
-
   private async findMessageDocumentsByChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<OrbitDBCommunityChannelMessageDocument[]> {
-    const indexedDocuments = await this.findMessageIndexDocuments(
-      communityId,
-      channelId,
-    );
-
-    if (indexedDocuments !== undefined) {
-      return indexedDocuments;
-    }
-
-    return [];
-  }
-
-  private isThreadSummaryDocument(
-    value: unknown,
-  ): value is OrbitDBCommunityChannelThreadSummaryDocument {
-    if (typeof value !== 'object' || value === null) {
-      return false;
-    }
-
-    const summary = value as Record<string, unknown>;
-
-    return (
-      typeof summary.lastReplyAt === 'number' &&
-      typeof summary.lastReplyMessageId === 'string' &&
-      typeof summary.replyCount === 'number' &&
-      typeof summary.rootMessageId === 'string'
-    );
-  }
-
-  private threadSummariesFromHead(
-    document: Record<string, unknown> | undefined,
-  ): CommunityChannelThreadSummary[] | undefined {
-    if (!document) {
-      return undefined;
-    }
-
-    const summaries = document.summaries;
-
-    if (!Array.isArray(summaries)) {
-      return [];
-    }
-
-    return summaries
-      .filter((summary) => this.isThreadSummaryDocument(summary))
-      .map((summary) => CommunityChannelThreadSummary.fromPrimitives(summary));
-  }
-
-  private async findThreadSummaryHead(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<CommunityChannelThreadSummary[] | undefined> {
-    return this.threadSummariesFromHead(
-      await this.registry.findHead(
-        this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      ),
-    );
-  }
-
-  private async putThreadSummaryHead(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    summaries: CommunityChannelThreadSummary[],
-  ): Promise<void> {
-    await this.registry.putHead(
-      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      {
-        channelId: channelId.valueOf(),
-        communityId: communityId.valueOf(),
-        id: this.threadSummaryHeadKey(
-          communityId.valueOf(),
-          channelId.valueOf(),
-        ),
-        summaries: summaries.map((summary) => summary.toPrimitives()),
-        updatedAt: Date.now(),
-      },
-    );
+    return this.messageIndex.findByChannel(communityId, channelId);
   }
 
   private async tombstone(
@@ -333,210 +75,11 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
         this.registry.putDocument('messages', document),
       ),
     );
-    await Promise.all(
-      deletedDocuments.map((document) => this.putMessageIndexRecord(document)),
+    deletedDocuments.forEach((document) =>
+      this.messageIndex.replicateRecordInBackground(document),
     );
 
-    await this.refreshThreadSummaryHeadsForDocuments(documents);
-  }
-
-  private channelIdValueSet(channelIds: CommunityChannelId[]): Set<string> {
-    return new Set(channelIds.map((channelId) => channelId.valueOf()));
-  }
-
-  private findThreadCandidateDocuments(
-    communityId: CommunityId,
-    channelIdValues: Set<string>,
-  ): OrbitDBCommunityChannelMessageDocument[] {
-    return this.allIndexedMessageDocumentsForCommunity(communityId).filter(
-      (document) => channelIdValues.has(document.channelId),
-    );
-  }
-
-  private allIndexedMessageDocumentsForCommunity(
-    communityId: CommunityId,
-  ): OrbitDBCommunityChannelMessageDocument[] {
-    const prefix = `community-channel-message-index:${communityId.valueOf()}:`;
-
-    return this.registry
-      .findCachedHeadsByPrefix(prefix)
-      .flatMap((head) => this.messageDocumentsFromIndex(head) || []);
-  }
-
-  private rootIdsFrom(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): Set<string> {
-    return new Set(
-      documents
-        .map((document) => document.replyToMessageId)
-        .filter((id): id is string => typeof id === 'string'),
-    );
-  }
-
-  private findExistingRootIds(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-    rootIds: Set<string>,
-  ): Set<string> {
-    return new Set(
-      documents
-        .filter((document) => rootIds.has(this.getMessageId(document)))
-        .map((document) => this.getMessageId(document)),
-    );
-  }
-
-  private findRecentThreadReplyDocuments(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-    candidateLimit: number,
-  ): OrbitDBCommunityChannelMessageDocument[] {
-    return this.byCreatedAtDescending(
-      documents.filter(
-        (document) => typeof document.replyToMessageId === 'string',
-      ),
-    ).slice(0, candidateLimit);
-  }
-
-  private registerThreadReplySummary(
-    grouped: Map<string, CommunityChannelThreadSummary>,
-    document: OrbitDBCommunityChannelMessageDocument,
-    rootMessageId: string,
-  ): void {
-    const key = `${document.channelId}:${rootMessageId}`;
-    const current = grouped.get(key);
-
-    const replyMessageId = new CommunityChannelMessageId(
-      this.getMessageId(document),
-    );
-    const repliedAt = new Timestamp(document.createdAt);
-
-    grouped.set(
-      key,
-      current
-        ? current.withReply(replyMessageId, repliedAt)
-        : new CommunityChannelThreadSummary(
-            new CommunityChannelMessageId(rootMessageId),
-            replyMessageId,
-            1,
-            repliedAt,
-          ),
-    );
-  }
-
-  private groupThreadSummaries(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-    existingRootIds: Set<string>,
-  ): Map<string, CommunityChannelThreadSummary> {
-    const grouped = new Map<string, CommunityChannelThreadSummary>();
-
-    for (const document of this.byCreatedAtAscending(documents)) {
-      const rootMessageId = document.replyToMessageId;
-
-      if (rootMessageId && existingRootIds.has(rootMessageId)) {
-        this.registerThreadReplySummary(grouped, document, rootMessageId);
-      }
-    }
-
-    return grouped;
-  }
-
-  private limitSummariesByChannel(
-    grouped: Map<string, CommunityChannelThreadSummary>,
-    limitPerChannel: number,
-  ): Map<string, CommunityChannelThreadSummary[]> {
-    const summariesByChannelId = new Map<
-      string,
-      CommunityChannelThreadSummary[]
-    >();
-
-    for (const [key, summary] of grouped.entries()) {
-      const [channelId] = key.split(':');
-      const summaries = summariesByChannelId.get(channelId) || [];
-
-      summaries.push(summary);
-      summaries.sort(
-        (left, right) =>
-          right.getLastReplyAt().valueOf() - left.getLastReplyAt().valueOf(),
-      );
-      summariesByChannelId.set(channelId, summaries.slice(0, limitPerChannel));
-    }
-
-    return summariesByChannelId;
-  }
-
-  private threadSummariesFromDocuments(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-    limitPerChannel: number,
-  ): Map<string, CommunityChannelThreadSummary[]> {
-    const replyDocuments = this.findRecentThreadReplyDocuments(
-      documents,
-      documents.length,
-    );
-    const existingRootIds = this.findExistingRootIds(
-      documents,
-      this.rootIdsFrom(replyDocuments),
-    );
-
-    return this.limitSummariesByChannel(
-      this.groupThreadSummaries(replyDocuments, existingRootIds),
-      limitPerChannel,
-    );
-  }
-
-  private async hydrateThreadSummaryHeads(
-    communityId: CommunityId,
-    channelIds: CommunityChannelId[],
-  ): Promise<Map<string, CommunityChannelThreadSummary[]>> {
-    const channelIdValues = this.channelIdValueSet(channelIds);
-    const documents = await this.findThreadCandidateDocuments(
-      communityId,
-      channelIdValues,
-    );
-    const summariesByChannelId = this.threadSummariesFromDocuments(
-      documents,
-      Number.MAX_SAFE_INTEGER,
-    );
-
-    await Promise.all(
-      channelIds.map((channelId) =>
-        this.putThreadSummaryHead(
-          communityId,
-          channelId,
-          summariesByChannelId.get(channelId.valueOf()) || [],
-        ),
-      ),
-    );
-
-    return summariesByChannelId;
-  }
-
-  private async refreshThreadSummaryHead(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<void> {
-    await this.hydrateThreadSummaryHeads(communityId, [channelId]);
-  }
-
-  private async refreshThreadSummaryHeadsForDocuments(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): Promise<void> {
-    const affectedChannels = new Map<string, CommunityChannelId>();
-
-    for (const document of documents) {
-      affectedChannels.set(
-        `${document.communityId}:${document.channelId}`,
-        new CommunityChannelId(document.channelId),
-      );
-    }
-
-    await Promise.all(
-      [...affectedChannels.entries()].map(([key, channelId]) => {
-        const [communityId] = key.split(':');
-
-        return this.refreshThreadSummaryHead(
-          new CommunityId(communityId),
-          channelId,
-        );
-      }),
-    );
+    this.threadSummaryIndex.refreshForDocumentsInBackground(documents);
   }
 
   public async findById(
@@ -547,9 +90,9 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const document = (
       await this.findMessageDocumentsByChannel(communityId, channelId)
     ).find((candidate) =>
-      new CommunityChannelMessageId(this.getMessageId(candidate)).isEqual(
-        messageId,
-      ),
+      new CommunityChannelMessageId(
+        this.messageIndex.getMessageId(candidate),
+      ).isEqual(messageId),
     );
 
     return document ? this.mapper.toDomain(document) : undefined;
@@ -567,9 +110,9 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     );
     const beforeDocument = beforeMessageId
       ? documents.find((document) =>
-          new CommunityChannelMessageId(this.getMessageId(document)).isEqual(
-            beforeMessageId,
-          ),
+          new CommunityChannelMessageId(
+            this.messageIndex.getMessageId(document),
+          ).isEqual(beforeMessageId),
         )
       : undefined;
 
@@ -588,7 +131,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    const documents = this.allIndexedMessageDocumentsForCommunity(communityId);
+    const documents = this.messageIndex.allByCommunity(communityId);
 
     return Promise.resolve(
       this.toDomain(
@@ -601,9 +144,9 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    const documents = this.allIndexedMessageDocumentsForCommunity(
-      communityId,
-    ).filter((document) => !document.plaintextPayload);
+    const documents = this.messageIndex
+      .allByCommunity(communityId)
+      .filter((document) => !document.plaintextPayload);
 
     return Promise.resolve(
       this.toDomain(
@@ -632,45 +175,11 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelIds: CommunityChannelId[],
     limitPerChannel: number,
   ): Promise<Map<string, CommunityChannelThreadSummary[]>> {
-    if (channelIds.length === 0) {
-      return new Map();
-    }
-
-    const summariesByChannelId = new Map<
-      string,
-      CommunityChannelThreadSummary[]
-    >();
-    const missingChannelIds: CommunityChannelId[] = [];
-
-    for (const channelId of channelIds) {
-      const summaries = await this.findThreadSummaryHead(
-        communityId,
-        channelId,
-      );
-
-      if (summaries === undefined) {
-        missingChannelIds.push(channelId);
-
-        continue;
-      }
-
-      summariesByChannelId.set(
-        channelId.valueOf(),
-        [...summaries]
-          .sort(
-            (left, right) =>
-              right.getLastReplyAt().valueOf() -
-              left.getLastReplyAt().valueOf(),
-          )
-          .slice(0, limitPerChannel),
-      );
-    }
-
-    for (const channelId of missingChannelIds) {
-      summariesByChannelId.set(channelId.valueOf(), []);
-    }
-
-    return summariesByChannelId;
+    return this.threadSummaryIndex.findByChannel(
+      communityId,
+      channelIds,
+      limitPerChannel,
+    );
   }
 
   public async searchPublicByChannel(
@@ -698,14 +207,14 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const channelIdValues = new Set(
       channelIds.map((channelId) => channelId.valueOf()),
     );
-    const documents = this.allIndexedMessageDocumentsForCommunity(
-      communityId,
-    ).filter(
-      (document) =>
-        channelIdValues.has(document.channelId) &&
-        typeof document.plaintextPayload === 'string' &&
-        regex.test(document.plaintextPayload),
-    );
+    const documents = this.messageIndex
+      .allByCommunity(communityId)
+      .filter(
+        (document) =>
+          channelIdValues.has(document.channelId) &&
+          typeof document.plaintextPayload === 'string' &&
+          regex.test(document.plaintextPayload),
+      );
 
     return Promise.resolve(
       this.toDomain(
@@ -718,10 +227,10 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const document = this.mapper.toDocument(message);
 
     await this.registry.putDocument('messages', document);
-    await this.putMessageIndexRecord(document);
+    this.messageIndex.replicateRecordInBackground(document);
 
     if (document.replyToMessageId) {
-      await this.refreshThreadSummaryHead(
+      this.threadSummaryIndex.refreshForChannelInBackground(
         new CommunityId(document.communityId),
         new CommunityChannelId(document.channelId),
       );
@@ -736,9 +245,9 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     await this.tombstone(
       (await this.findMessageDocumentsByChannel(communityId, channelId)).filter(
         (document) =>
-          new CommunityChannelMessageId(this.getMessageId(document)).isEqual(
-            messageId,
-          ),
+          new CommunityChannelMessageId(
+            this.messageIndex.getMessageId(document),
+          ).isEqual(messageId),
       ),
     );
   }
@@ -753,8 +262,6 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    await this.tombstone(
-      this.allIndexedMessageDocumentsForCommunity(communityId),
-    );
+    await this.tombstone(this.messageIndex.allByCommunity(communityId));
   }
 }

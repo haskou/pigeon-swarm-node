@@ -1,6 +1,7 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import Kernel from '@haskou/ddd-kernel';
 import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
 import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
 import { Constructor } from '@haskou/ddd-kernel/domain';
@@ -174,6 +175,33 @@ export default class MessageBus
     }
   }
 
+  private runPublishSideEffect(
+    description: string,
+    publish: () => Promise<unknown> | unknown,
+  ): void {
+    try {
+      void Promise.resolve(publish()).catch((error: unknown) => {
+        Kernel.logger.warn?.(
+          `Domain event publish side effect failed: ${description} error=${String(error)}`,
+        );
+      });
+    } catch (error: unknown) {
+      Kernel.logger.warn?.(
+        `Domain event publish side effect failed: ${description} error=${String(error)}`,
+      );
+    }
+  }
+
+  private publishToWebSockets(domainEvents: DomainEvent[]): void {
+    try {
+      webSocketEventHub.publish(domainEvents);
+    } catch (error: unknown) {
+      Kernel.logger.warn?.(
+        `Domain event websocket publish failed: error=${String(error)}`,
+      );
+    }
+  }
+
   public registerEventType(
     bindingKey: string,
     DomainEventInstance: typeof DomainEvent,
@@ -185,12 +213,21 @@ export default class MessageBus
     this.publisherHooks.register(...hooks);
   }
 
-  public async publish(domainEvents: DomainEvent[]): Promise<void> {
+  public publish(domainEvents: DomainEvent[]): Promise<void> {
     const enrichedEvents = this.enrichEventsWithContext(domainEvents);
-    await this.adapter.publish(enrichedEvents);
-    await MessageBus.replicatedEventPublisher?.publish(enrichedEvents);
-    webSocketEventHub.publish(enrichedEvents);
-    await this.runPublisherHooks(enrichedEvents);
+
+    this.runPublishSideEffect('transport', () =>
+      this.adapter.publish(enrichedEvents),
+    );
+    this.runPublishSideEffect('replicated-events', () =>
+      MessageBus.replicatedEventPublisher?.publish(enrichedEvents),
+    );
+    this.publishToWebSockets(enrichedEvents);
+    this.runPublishSideEffect('publisher-hooks', () =>
+      this.runPublisherHooks(enrichedEvents),
+    );
+
+    return Promise.resolve();
   }
 
   public async dispatchReplicated(message: Message): Promise<void> {

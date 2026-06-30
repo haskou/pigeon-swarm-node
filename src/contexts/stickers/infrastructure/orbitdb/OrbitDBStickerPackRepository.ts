@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 
 import OrbitDBReplicatedStateRegistry from '../../../shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
@@ -7,8 +8,19 @@ import { StickerPackId } from '../../domain/value-objects/StickerPackId';
 import { OrbitDBStickerPackDocument } from './documents/OrbitDBStickerPackDocument';
 
 export default class OrbitDBStickerPackRepository extends StickerPackRepository {
+  private readonly packIndex: OrbitDBHeadIndex<OrbitDBStickerPackDocument>;
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
+    this.packIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'packs',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        current.updatedAt <= candidate.updatedAt,
+    });
   }
 
   private isDocument(
@@ -22,10 +34,6 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
       Array.isArray(document.stickers) &&
       typeof document.updatedAt === 'number'
     );
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private toDocument(pack: StickerPack): OrbitDBStickerPackDocument {
@@ -60,65 +68,45 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     return `sticker-pack-owner-index:${value}`;
   }
 
-  private documentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBStickerPackDocument[] {
-    const packs: unknown = record?.packs;
-
-    if (!Array.isArray(packs)) {
-      return [];
-    }
-
-    return (packs as unknown[])
-      .filter(
-        (document): document is OrbitDBStickerPackDocument =>
-          this.isRecord(document) && this.isDocument(document),
-      )
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-  }
-
-  private deduplicateDocuments(
+  private sortByUpdatedAtDescending(
     documents: OrbitDBStickerPackDocument[],
   ): OrbitDBStickerPackDocument[] {
-    const deduplicated = new Map<string, OrbitDBStickerPackDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || current.updatedAt <= document.updatedAt) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
+    return [...documents].sort(
+      (left, right) => right.updatedAt - left.updatedAt,
+    );
   }
 
   private async putHeads(document: OrbitDBStickerPackDocument): Promise<void> {
     await this.registry.putHead(this.headKey(document.id), { ...document });
 
     const key = this.ownerIndexHeadKey(document.ownerIdentityId);
-    const indexedDocuments = this.documentsFromIndex(
-      await this.registry.findHead(key),
-    );
-    const packs = this.deduplicateDocuments([...indexedDocuments, document]);
+    const packs = this.packIndex.deduplicate([
+      ...((await this.packIndex.find(key)) ?? []),
+      document,
+    ]);
 
-    await this.registry.putHead(key, {
-      id: key,
-      ownerIdentityId: document.ownerIdentityId,
-      packs: packs.map((pack) => ({ ...pack })),
-      updatedAt: Date.now(),
-    });
+    await this.packIndex.putDocuments(
+      key,
+      {
+        id: key,
+        ownerIdentityId: document.ownerIdentityId,
+      },
+      packs,
+    );
   }
 
   public async findAll(): Promise<StickerPack[]> {
-    const documents = this.registry
-      .findCachedHeadsByPrefix('sticker-pack:')
-      .map((document) => (this.isDocument(document) ? document : undefined))
-      .filter(
-        (document): document is OrbitDBStickerPackDocument =>
-          document !== undefined,
-      )
-      .sort((left, right) => right.updatedAt - left.updatedAt);
+    const documents = this.sortByUpdatedAtDescending(
+      this.packIndex.deduplicate(
+        this.registry
+          .findCachedHeadsByPrefix('sticker-pack:')
+          .map((document) => (this.isDocument(document) ? document : undefined))
+          .filter(
+            (document): document is OrbitDBStickerPackDocument =>
+              document !== undefined,
+          ),
+      ),
+    );
 
     return Promise.resolve(
       documents.map((document) => this.toDomain(document)),
@@ -135,8 +123,9 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
   public async findByOwner(
     ownerIdentityId: IdentityId,
   ): Promise<StickerPack[]> {
-    const documents = this.documentsFromIndex(
-      await this.registry.findHead(this.ownerIndexHeadKey(ownerIdentityId)),
+    const documents = this.sortByUpdatedAtDescending(
+      (await this.packIndex.find(this.ownerIndexHeadKey(ownerIdentityId))) ??
+        [],
     );
 
     return documents.map((document) => this.toDomain(document));

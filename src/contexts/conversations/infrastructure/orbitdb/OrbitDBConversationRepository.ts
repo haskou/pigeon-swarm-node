@@ -11,17 +11,32 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
-import { OrbitDBConversationDocument } from './documents/OrbitDBConversationDocument';
 import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversationMessageDocument';
 import OrbitDBConversationMapper from './mappers/OrbitDBConversationMapper';
 import OrbitDBConversationMessageMapper from './mappers/OrbitDBConversationMessageMapper';
+import OrbitDBConversationIndex from './OrbitDBConversationIndex';
+import OrbitDBConversationMessageIndex from './OrbitDBConversationMessageIndex';
+import OrbitDBConversationMessageSummaryIndex from './OrbitDBConversationMessageSummaryIndex';
 
 export default class OrbitDBConversationRepository implements ConversationRepository {
+  private readonly conversationIndex: OrbitDBConversationIndex;
+
+  private readonly messageIndex: OrbitDBConversationMessageIndex;
+
+  private readonly messageSummaryIndex: OrbitDBConversationMessageSummaryIndex;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly conversationMapper: OrbitDBConversationMapper,
     private readonly messageMapper: OrbitDBConversationMessageMapper,
-  ) {}
+  ) {
+    this.conversationIndex = new OrbitDBConversationIndex(this.registry);
+    this.messageIndex = new OrbitDBConversationMessageIndex(this.registry);
+    this.messageSummaryIndex = new OrbitDBConversationMessageSummaryIndex(
+      this.registry,
+      this.messageIndex,
+    );
+  }
 
   private numberValue(
     document: Record<string, unknown>,
@@ -32,19 +47,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return typeof value === 'number' ? value : undefined;
   }
 
-  private stringArrayValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string[] | undefined {
-    const value = document[attribute];
-
-    if (!Array.isArray(value)) {
-      return undefined;
-    }
-
-    return value.every((item) => typeof item === 'string') ? value : undefined;
-  }
-
   private stringValue(
     document: Record<string, unknown>,
     attribute: string,
@@ -52,144 +54,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const value = document[attribute];
 
     return typeof value === 'string' ? value : undefined;
-  }
-
-  private booleanValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): boolean | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'boolean' ? value : undefined;
-  }
-
-  private isCompleteConversation(
-    document: Partial<OrbitDBConversationDocument>,
-  ): document is OrbitDBConversationDocument {
-    return [
-      document.createdAt,
-      document.id,
-      document.networkId,
-      document.participantIds,
-      document.type,
-    ].every((value) => value !== undefined);
-  }
-
-  private isCompleteMessage(
-    document: Partial<OrbitDBConversationMessageDocument>,
-  ): document is OrbitDBConversationMessageDocument {
-    return [
-      document.authorId,
-      document.conversationId,
-      document.createdAt,
-      document.id,
-      document.messageId,
-      document.previousMessageIds,
-      document.scopeType,
-      document.signature,
-      document.type,
-    ].every((value) => value !== undefined);
-  }
-
-  private conversationFromRecord(
-    record: Record<string, unknown>,
-  ): OrbitDBConversationDocument | undefined {
-    const document: Partial<OrbitDBConversationDocument> = {
-      createdAt: this.numberValue(record, 'createdAt') ?? 0,
-      id: this.stringValue(record, 'id'),
-      lastEventId: this.stringValue(record, 'lastEventId'),
-      lastEventType: this.stringValue(record, 'lastEventType'),
-      name: this.stringValue(record, 'name'),
-      networkId: this.stringValue(record, 'networkId'),
-      participantIds: this.stringArrayValue(record, 'participantIds'),
-      receivedAt: this.numberValue(record, 'receivedAt'),
-      type: this.stringValue(record, 'type') as
-        | OrbitDBConversationDocument['type']
-        | undefined,
-      updatedAt: this.numberValue(record, 'updatedAt'),
-    };
-
-    return this.isCompleteConversation(document) ? document : undefined;
-  }
-
-  private messageFromRecord(
-    record: Record<string, unknown>,
-  ): OrbitDBConversationMessageDocument | undefined {
-    const document: Partial<OrbitDBConversationMessageDocument> = {
-      attachmentExternalIdentifiers:
-        this.stringArrayValue(record, 'attachmentExternalIdentifiers') ?? [],
-      authorId: this.stringValue(record, 'authorId'),
-      conversationId: this.stringValue(record, 'conversationId'),
-      createdAt: this.numberValue(record, 'createdAt'),
-      encryptedPayload: this.stringValue(record, 'encryptedPayload'),
-      id:
-        this.stringValue(record, 'id') || this.stringValue(record, 'messageId'),
-      lastEventId: this.stringValue(record, 'lastEventId'),
-      lastEventType: this.stringValue(record, 'lastEventType'),
-      messageId:
-        this.stringValue(record, 'messageId') || this.stringValue(record, 'id'),
-      networkId: this.stringValue(record, 'networkId'),
-      pollId: this.stringValue(record, 'pollId'),
-      previousMessageIds:
-        this.stringArrayValue(record, 'previousMessageIds') ?? [],
-      receivedAt: this.numberValue(record, 'receivedAt'),
-      recipientIds: this.stringArrayValue(record, 'recipientIds'),
-      replyToMessageId: this.stringValue(record, 'replyToMessageId'),
-      scopeType: this.stringValue(record, 'scopeType') as
-        | OrbitDBConversationMessageDocument['scopeType']
-        | undefined,
-      signature: this.stringValue(record, 'signature'),
-      targetMessageId: this.stringValue(record, 'targetMessageId'),
-      type: this.stringValue(record, 'type') as
-        | OrbitDBConversationMessageDocument['type']
-        | undefined,
-      valid: this.booleanValue(record, 'valid'),
-    };
-
-    return this.isCompleteMessage(document) &&
-      document.scopeType === 'conversation'
-      ? document
-      : undefined;
-  }
-
-  private deduplicateConversations(
-    documents: OrbitDBConversationDocument[],
-  ): OrbitDBConversationDocument[] {
-    const deduplicated = new Map<string, OrbitDBConversationDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
-  }
-
-  private freshness(document: OrbitDBConversationDocument): number {
-    return Math.max(
-      document.updatedAt ?? 0,
-      document.receivedAt ?? 0,
-      document.createdAt,
-    );
-  }
-
-  private conversationHeadKey(conversationId: string): string {
-    return `conversation:${conversationId}`;
-  }
-
-  private participantIndexHeadKey(participantId: string): string {
-    return `conversation-participant-index:${participantId}`;
-  }
-
-  private messageIndexHeadKey(conversationId: string): string {
-    return `conversation-message-index:${conversationId}`;
-  }
-
-  private messageSummaryHeadKey(conversationId: string): string {
-    return `conversation-message-summary:${conversationId}`;
   }
 
   private messageCreatedAtFromExternalId(
@@ -222,387 +86,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       return message.networkId;
     }
 
-    return (await this.findConversationDocumentById(conversationId))?.networkId;
-  }
-
-  private conversationDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBConversationDocument[] {
-    const conversations = record?.conversations;
-
-    if (!Array.isArray(conversations)) {
-      return [];
-    }
-
-    return conversations
-      .filter(
-        (conversation): conversation is Record<string, unknown> =>
-          typeof conversation === 'object' &&
-          conversation !== null &&
-          !Array.isArray(conversation),
-      )
-      .map((conversation) => this.conversationFromRecord(conversation))
-      .filter(
-        (document): document is OrbitDBConversationDocument =>
-          document !== undefined,
-      );
-  }
-
-  private async findParticipantIndexDocuments(
-    participantId: string,
-  ): Promise<OrbitDBConversationDocument[]> {
-    return this.conversationDocumentsFromIndex(
-      await this.registry.findHead(this.participantIndexHeadKey(participantId)),
-    );
-  }
-
-  private async putParticipantIndex(
-    participantId: string,
-    documents: OrbitDBConversationDocument[],
-  ): Promise<void> {
-    const conversations = this.deduplicateConversations(documents);
-    const networkIds = [
-      ...new Set(conversations.map((conversation) => conversation.networkId)),
-    ];
-
-    await this.registry.putHead(
-      this.participantIndexHeadKey(participantId),
-      {
-        conversations: conversations.map((conversation) => ({
-          ...conversation,
-        })),
-        id: this.participantIndexHeadKey(participantId),
-        participantId,
-        updatedAt: Date.now(),
-      },
-      networkIds,
-    );
-  }
-
-  private async putConversationHeads(
-    document: OrbitDBConversationDocument,
-  ): Promise<void> {
-    await this.registry.putHead(this.conversationHeadKey(document.id), {
-      ...document,
-    });
-    await Promise.all(
-      document.participantIds.map(async (participantId) =>
-        this.putParticipantIndex(participantId, [
-          ...(await this.findParticipantIndexDocuments(participantId)),
-          document,
-        ]),
-      ),
-    );
-  }
-
-  private async findConversationDocumentById(
-    conversationId: ConversationId,
-  ): Promise<OrbitDBConversationDocument | undefined> {
-    const head = await this.registry.findHead(
-      this.conversationHeadKey(conversationId.valueOf()),
-    );
-    const headDocument = head ? this.conversationFromRecord(head) : undefined;
-
-    if (headDocument) {
-      return headDocument;
-    }
-
-    return undefined;
-  }
-
-  private async findConversationDocumentsByParticipant(
-    participantId: IdentityId,
-  ): Promise<OrbitDBConversationDocument[]> {
-    const indexedDocuments = await this.findParticipantIndexDocuments(
-      participantId.valueOf(),
-    );
-
-    if (indexedDocuments.length > 0) {
-      return indexedDocuments;
-    }
-
-    return this.deduplicateConversations(
-      this.registry
-        .findCachedHeadsByPrefix('conversation:')
-        .map((candidate) => this.conversationFromRecord(candidate))
-        .filter(
-          (document): document is OrbitDBConversationDocument =>
-            document !== undefined &&
-            document.participantIds.includes(participantId.valueOf()),
-        ),
-    );
-  }
-
-  private rawMessageRecordsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] {
-    const messages = record?.messages;
-
-    if (!Array.isArray(messages)) {
-      return [];
-    }
-
-    return messages.filter(
-      (message): message is Record<string, unknown> =>
-        typeof message === 'object' &&
-        message !== null &&
-        !Array.isArray(message),
-    );
-  }
-
-  private messageSummaryFromRecord(
-    record: Record<string, unknown>,
-  ): Record<string, unknown> | undefined {
-    const authorId = this.stringValue(record, 'authorId');
-    const conversationId = this.stringValue(record, 'conversationId');
-    const createdAt = this.numberValue(record, 'createdAt');
-    const id =
-      this.stringValue(record, 'id') || this.stringValue(record, 'messageId');
-    const messageId =
-      this.stringValue(record, 'messageId') || this.stringValue(record, 'id');
-    const type = this.stringValue(record, 'type');
-
-    if (
-      !authorId ||
-      !conversationId ||
-      createdAt === undefined ||
-      !id ||
-      !type
-    ) {
-      return undefined;
-    }
-
-    return {
-      authorId,
-      conversationId,
-      createdAt,
-      id,
-      messageId,
-      networkId: this.stringValue(record, 'networkId'),
-      type,
-      valid: this.booleanValue(record, 'valid'),
-    };
-  }
-
-  private messageSummaryRecordsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    return this.rawMessageRecordsFromIndex(record)
-      .map((message) => this.messageSummaryFromRecord(message))
-      .filter(
-        (message): message is Record<string, unknown> => message !== undefined,
-      );
-  }
-
-  private async putMessageSummary(
-    conversationId: string,
-    records: Array<
-      Record<string, unknown> | OrbitDBConversationMessageDocument
-    >,
-  ): Promise<void> {
-    const key = this.messageSummaryHeadKey(conversationId);
-    const messages = records
-      .map((record) => this.messageSummaryFromRecord({ ...record }))
-      .filter(
-        (record): record is Record<string, unknown> => record !== undefined,
-      )
-      .reduce<Record<string, unknown>[]>(
-        (merged, record) => this.mergeIndexedMessageRecord(merged, record),
-        [],
-      );
-    const networkIds = [
-      ...new Set(
-        messages
-          .map((message) => this.stringValue(message, 'networkId'))
-          .filter((networkId): networkId is string => networkId !== undefined),
-      ),
-    ];
-
-    await this.registry.putHead(
-      key,
-      {
-        conversationId,
-        id: key,
-        messages: messages.map((message) => ({ ...message })),
-        updatedAt: Date.now(),
-      },
-      networkIds,
-    );
-  }
-
-  private async putMessageSummaryRecord(
-    conversationId: string,
-    record: Record<string, unknown>,
-  ): Promise<void> {
-    const summary = this.messageSummaryFromRecord(record);
-
-    if (!summary) {
-      return;
-    }
-
-    const key = this.messageSummaryHeadKey(conversationId);
-    const messages = this.mergeIndexedMessageRecord(
-      this.messageSummaryRecordsFromIndex(await this.registry.findHead(key)) ||
-        [],
-      summary,
-    );
-    const networkIds = [
-      ...new Set(
-        messages
-          .map((message) => this.stringValue(message, 'networkId'))
-          .filter((networkId): networkId is string => networkId !== undefined),
-      ),
-    ];
-
-    await this.registry.putHead(
-      key,
-      {
-        conversationId,
-        id: key,
-        messages: messages.map((message) => ({ ...message })),
-        updatedAt: Date.now(),
-      },
-      networkIds,
-    );
-  }
-
-  private messageDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBConversationMessageDocument[] {
-    return this.rawMessageRecordsFromIndex(record)
-      .filter((message) => this.booleanValue(message, 'valid') !== false)
-      .map((message) => this.messageFromRecord(message))
-      .filter(
-        (document): document is OrbitDBConversationMessageDocument =>
-          document !== undefined,
-      );
-  }
-
-  private async findMessageIndexDocuments(
-    conversationId: string,
-  ): Promise<OrbitDBConversationMessageDocument[] | undefined> {
-    const head = await this.registry.findHead(
-      this.messageIndexHeadKey(conversationId),
-    );
-
-    return head ? this.messageDocumentsFromIndex(head) : undefined;
-  }
-
-  private async findMessageSummaryRecords(
-    conversationId: string,
-  ): Promise<Record<string, unknown>[]> {
-    const summary = this.messageSummaryRecordsFromIndex(
-      await this.registry.findHead(this.messageSummaryHeadKey(conversationId)),
-    );
-
-    if (summary !== undefined) {
-      return summary;
-    }
-
-    const indexedDocuments =
-      await this.findMessageIndexDocuments(conversationId);
-
-    if (indexedDocuments !== undefined) {
-      await this.putMessageSummary(conversationId, indexedDocuments);
-
-      return indexedDocuments
-        .map((document) => this.messageSummaryFromRecord({ ...document }))
-        .filter(
-          (document): document is Record<string, unknown> =>
-            document !== undefined,
-        );
-    }
-
-    return [];
-  }
-
-  private mergeIndexedMessageRecord(
-    records: Record<string, unknown>[],
-    record: Record<string, unknown>,
-  ): Record<string, unknown>[] {
-    const recordId =
-      this.stringValue(record, 'id') || this.stringValue(record, 'messageId');
-
-    if (!recordId) {
-      return records;
-    }
-
-    const merged = new Map<string, Record<string, unknown>>();
-
-    for (const current of records) {
-      const currentId =
-        this.stringValue(current, 'id') ||
-        this.stringValue(current, 'messageId');
-
-      if (currentId) {
-        merged.set(currentId, current);
-      }
-    }
-
-    merged.set(recordId, record);
-
-    return [...merged.values()];
-  }
-
-  private async putMessageIndexRecord(
-    conversationId: string,
-    record: Record<string, unknown>,
-  ): Promise<void> {
-    const key = this.messageIndexHeadKey(conversationId);
-    const messages = this.mergeIndexedMessageRecord(
-      this.rawMessageRecordsFromIndex(await this.registry.findHead(key)),
-      record,
-    );
-    const networkIds = [
-      ...new Set(
-        messages
-          .map((message) => this.stringValue(message, 'networkId'))
-          .filter((networkId): networkId is string => networkId !== undefined),
-      ),
-    ];
-
-    await this.registry.putHead(
-      key,
-      {
-        conversationId,
-        id: key,
-        messages: messages.map((message) => ({ ...message })),
-        updatedAt: Date.now(),
-      },
-      networkIds,
-    );
-    await this.putMessageSummaryRecord(conversationId, record);
-  }
-
-  private async putMessageIndex(
-    conversationId: string,
-    documents: OrbitDBConversationMessageDocument[],
-  ): Promise<void> {
-    const key = this.messageIndexHeadKey(conversationId);
-    const messages = this.deduplicateMessages(documents);
-    const networkIds = [
-      ...new Set(
-        messages
-          .map((message) => message.networkId)
-          .filter((networkId): networkId is string => networkId !== undefined),
-      ),
-    ];
-
-    await this.registry.putHead(
-      key,
-      {
-        conversationId,
-        id: key,
-        messages: messages.map((message) => ({ ...message })),
-        updatedAt: Date.now(),
-      },
-      networkIds,
-    );
-    await this.putMessageSummary(conversationId, documents);
+    return (await this.conversationIndex.findById(conversationId))?.networkId;
   }
 
   private async putMessageRecord(
@@ -613,32 +97,25 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const conversationId = this.stringValue(record, 'conversationId');
 
     if (conversationId) {
-      await this.putMessageIndexRecord(conversationId, record);
+      this.messageIndex.replicateRecordInBackground(conversationId, record);
+      this.messageSummaryIndex.replicateRecordInBackground(
+        conversationId,
+        record,
+      );
     }
   }
 
   private deduplicateMessages(
     documents: OrbitDBConversationMessageDocument[],
   ): OrbitDBConversationMessageDocument[] {
-    const deduplicated = new Map<string, OrbitDBConversationMessageDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || (current.receivedAt ?? 0) <= (document.receivedAt ?? 0)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
+    return this.messageIndex.deduplicate(documents);
   }
 
   private async findMessageDocumentsByConversationId(
     conversationId: ConversationId,
   ): Promise<OrbitDBConversationMessageDocument[]> {
-    const indexedDocuments = await this.findMessageIndexDocuments(
-      conversationId.valueOf(),
-    );
+    const indexedDocuments =
+      await this.messageIndex.findByConversationId(conversationId);
 
     if (indexedDocuments !== undefined) {
       return indexedDocuments;
@@ -647,44 +124,12 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return [];
   }
 
-  private async findMessageDocumentsByConversationIds(
-    conversationIds: ConversationId[],
-  ): Promise<OrbitDBConversationMessageDocument[]> {
-    const indexedResults = await Promise.all(
-      conversationIds.map(async (conversationId) => ({
-        conversationId,
-        documents: await this.findMessageIndexDocuments(
-          conversationId.valueOf(),
-        ),
-      })),
-    );
-    const indexedDocuments = indexedResults
-      .filter(
-        (
-          result,
-        ): result is {
-          conversationId: ConversationId;
-          documents: OrbitDBConversationMessageDocument[];
-        } => result.documents !== undefined,
-      )
-      .flatMap((result) => result.documents);
-    const missingConversationIds = indexedResults
-      .filter((result) => result.documents === undefined)
-      .map((result) => result.conversationId);
-
-    if (missingConversationIds.length === 0) {
-      return this.deduplicateMessages(indexedDocuments);
-    }
-
-    return this.deduplicateMessages(indexedDocuments);
-  }
-
   private async readMarkerMessageCreatedAt(
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
   ): Promise<number | undefined> {
     const marker = await this.registry.findHead(
-      `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
+      this.readMarkerHeadKey(conversationId, recipientIdentityId),
     );
     const messageId = marker
       ? this.stringValue(marker, 'messageId')
@@ -702,17 +147,24 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return message?.createdAt;
   }
 
+  private readMarkerHeadKey(
+    conversationId: ConversationId,
+    recipientIdentityId: IdentityId,
+  ): string {
+    return `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`;
+  }
+
   private async findMessageDocumentById(
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<OrbitDBConversationMessageDocument | undefined> {
-    return (
-      await this.findMessageDocumentsByConversationId(conversationId)
-    ).find(
-      (document) =>
-        document.id === messageId.valueOf() ||
-        document.messageId === messageId.valueOf(),
-    );
+    return this.messageIndex.findById(conversationId, messageId);
+  }
+
+  private messageDocumentIds(
+    documents: OrbitDBConversationMessageDocument[],
+  ): Set<string> {
+    return this.messageIndex.documentIds(documents);
   }
 
   private async findMessagesByConversationId(
@@ -737,46 +189,10 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
   }
 
-  private isUnreadSummaryFor(
-    document: Record<string, unknown>,
-    recipientIdentityId: IdentityId,
-    readUntilCreatedAt?: number,
-  ): boolean {
-    const createdAt = this.numberValue(document, 'createdAt');
-    const type = this.stringValue(document, 'type');
-
-    return (
-      this.booleanValue(document, 'valid') !== false &&
-      createdAt !== undefined &&
-      (type === MessageType.SENT.valueOf() ||
-        type === MessageType.POLL.valueOf()) &&
-      this.stringValue(document, 'authorId') !==
-        recipientIdentityId.valueOf() &&
-      (readUntilCreatedAt === undefined || createdAt > readUntilCreatedAt)
-    );
-  }
-
-  private messageCreatedAtFromSummary(
-    documents: Record<string, unknown>[],
-    messageId: string | undefined,
-  ): number | undefined {
-    if (!messageId) {
-      return undefined;
-    }
-
-    const document = documents.find(
-      (candidate) =>
-        this.stringValue(candidate, 'id') === messageId ||
-        this.stringValue(candidate, 'messageId') === messageId,
-    );
-
-    return document ? this.numberValue(document, 'createdAt') : undefined;
-  }
-
   public async findById(
     conversationId: ConversationId,
   ): Promise<Conversation | undefined> {
-    const document = await this.findConversationDocumentById(conversationId);
+    const document = await this.conversationIndex.findById(conversationId);
 
     return document
       ? this.conversationMapper.toDomain(
@@ -789,7 +205,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   public async findMetadataById(
     conversationId: ConversationId,
   ): Promise<Conversation | undefined> {
-    const document = await this.findConversationDocumentById(conversationId);
+    const document = await this.conversationIndex.findById(conversationId);
 
     return document ? this.conversationMapper.toDomain(document) : undefined;
   }
@@ -806,8 +222,8 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     limit: number,
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]> {
-    const documents = this.deduplicateConversations(
-      await this.findConversationDocumentsByParticipant(participantId),
+    const documents = this.conversationIndex.deduplicate(
+      await this.conversationIndex.findByParticipant(participantId),
     );
     const beforeDocument = beforeConversationId
       ? documents.find(
@@ -930,7 +346,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const readMarkers = await Promise.all(
       conversationIds.map(async (conversationId) => {
         const marker = await this.registry.findHead(
-          `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
+          this.readMarkerHeadKey(conversationId, recipientIdentityId),
         );
 
         return {
@@ -945,7 +361,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const summaries = await Promise.all(
       conversationIds.map(async (conversationId) => ({
         conversationId: conversationId.valueOf(),
-        documents: await this.findMessageSummaryRecords(
+        documents: await this.messageSummaryIndex.findRecords(
           conversationId.valueOf(),
         ),
       })),
@@ -961,7 +377,10 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         return [
           marker.conversationId,
           marker.messageCreatedAt ??
-            this.messageCreatedAtFromSummary(documents, marker.messageId),
+            this.messageSummaryIndex.messageCreatedAtFrom(
+              documents,
+              marker.messageId,
+            ),
         ];
       }),
     );
@@ -971,8 +390,11 @@ export default class OrbitDBConversationRepository implements ConversationReposi
 
       for (const document of summary.documents) {
         if (
-          this.isUnreadSummaryFor(document, recipientIdentityId, readUntil) ===
-          false
+          this.messageSummaryIndex.isUnreadFor(
+            document,
+            recipientIdentityId,
+            readUntil,
+          ) === false
         ) {
           continue;
         }
@@ -1055,40 +477,40 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       networkId,
     );
 
-    await this.registry.putHead(
-      `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`,
-      {
-        conversationId: conversationId.valueOf(),
-        messageCreatedAt,
-        messageId: messageId.valueOf(),
-        networkId: markerNetworkId,
-        readAt: Timestamp.now().valueOf(),
-        recipientIdentityId: recipientIdentityId.valueOf(),
-      },
-      markerNetworkId ? [markerNetworkId] : [],
-    );
+    const marker = {
+      conversationId: conversationId.valueOf(),
+      messageCreatedAt,
+      messageId: messageId.valueOf(),
+      networkId: markerNetworkId,
+      readAt: Timestamp.now().valueOf(),
+      recipientIdentityId: recipientIdentityId.valueOf(),
+    };
+    const markerNetworkIds = markerNetworkId ? [markerNetworkId] : [];
+    const key = this.readMarkerHeadKey(conversationId, recipientIdentityId);
+
+    this.registry.replicateHeadInBackground(key, marker, markerNetworkIds);
   }
 
   public async save(conversation: Conversation): Promise<void> {
-    const existingDocument = await this.findConversationDocumentById(
-      conversation.getId(),
-    );
+    const conversationId = conversation.getId();
+    const existingDocument =
+      await this.conversationIndex.findById(conversationId);
     const document = this.conversationMapper.toDocument(
       conversation,
       new Timestamp(existingDocument?.createdAt ?? Timestamp.now().valueOf()),
     );
 
     await this.registry.putDocument('conversations', { ...document });
-    await this.putConversationHeads(document);
+    this.conversationIndex.replicateInBackground(document);
+
+    const existingMessageIds = this.messageDocumentIds(
+      await this.findMessageDocumentsByConversationId(conversationId),
+    );
 
     for (const message of conversation.toPrimitives().messages) {
       const messageId = new MessageId(message.id);
-      const existingMessage = await this.findMessageById(
-        new ConversationId(message.conversationId),
-        messageId,
-      );
 
-      if (existingMessage) {
+      if (existingMessageIds.has(messageId.valueOf())) {
         continue;
       }
 
@@ -1101,6 +523,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       await this.putMessageRecord({
         ...this.messageMapper.toDocument(conversation, domainMessage),
       });
+      existingMessageIds.add(messageId.valueOf());
 
       const targetMessageId = domainMessage.getTargetMessageId();
 

@@ -1,6 +1,7 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { Poll } from '../../domain/Poll';
@@ -9,8 +10,19 @@ import { PollId } from '../../domain/value-objects/PollId';
 import { OrbitDBPollDocument } from './documents/OrbitDBPollDocument';
 
 export default class OrbitDBPollRepository extends PollRepository {
+  private readonly pollIndex: OrbitDBHeadIndex<OrbitDBPollDocument>;
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
+    this.pollIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'polls',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.freshness(current) <= this.freshness(candidate),
+    });
   }
 
   private hasPollIdentityFields(document: Record<string, unknown>): boolean {
@@ -86,22 +98,6 @@ export default class OrbitDBPollRepository extends PollRepository {
     return Math.max(document.updatedAt ?? 0, document.createdAt);
   }
 
-  private deduplicateDocuments(
-    documents: OrbitDBPollDocument[],
-  ): OrbitDBPollDocument[] {
-    const deduplicated = new Map<string, OrbitDBPollDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
-  }
-
   private pollHeadKey(pollId: string): string {
     return `poll:${pollId}`;
   }
@@ -117,42 +113,22 @@ export default class OrbitDBPollRepository extends PollRepository {
     return `poll-group-conversation-index:${conversationId}`;
   }
 
-  private documentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBPollDocument[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    const polls = record.polls;
-
-    if (!Array.isArray(polls)) {
-      return [];
-    }
-
-    return polls
-      .filter(
-        (poll): poll is Record<string, unknown> =>
-          typeof poll === 'object' && poll !== null && !Array.isArray(poll),
-      )
-      .filter((poll): poll is OrbitDBPollDocument => this.isDocument(poll));
-  }
-
   private async putIndex(
     key: string,
     documents: OrbitDBPollDocument[],
   ): Promise<void> {
-    const polls = this.deduplicateDocuments(documents);
+    const polls = this.pollIndex.deduplicate(documents);
     const networkIds = [...new Set(polls.map((poll) => poll.networkId))];
 
-    await this.registry.putHead(
+    await this.pollIndex.putDocuments(
       key,
       {
         id: key,
-        polls: polls.map((poll) => ({ ...poll })),
-        updatedAt: Date.now(),
       },
-      networkIds,
+      polls,
+      {
+        networkIds,
+      },
     );
   }
 
@@ -161,7 +137,7 @@ export default class OrbitDBPollRepository extends PollRepository {
     document: OrbitDBPollDocument,
   ): Promise<void> {
     await this.putIndex(key, [
-      ...(this.documentsFromIndex(await this.registry.findHead(key)) || []),
+      ...((await this.pollIndex.find(key)) || []),
       document,
     ]);
   }
@@ -226,9 +202,7 @@ export default class OrbitDBPollRepository extends PollRepository {
       communityId.valueOf(),
       channelId.valueOf(),
     );
-    const indexedDocuments = this.documentsFromIndex(
-      await this.registry.findHead(key),
-    );
+    const indexedDocuments = await this.pollIndex.find(key);
     const documents = indexedDocuments ?? [];
 
     return this.sortDocuments(documents)
@@ -245,9 +219,7 @@ export default class OrbitDBPollRepository extends PollRepository {
     beforeCreatedAt?: number,
   ): Promise<Poll[]> {
     const key = this.groupConversationIndexHeadKey(conversationId.valueOf());
-    const indexedDocuments = this.documentsFromIndex(
-      await this.registry.findHead(key),
-    );
+    const indexedDocuments = await this.pollIndex.find(key);
     const documents = indexedDocuments ?? [];
 
     return this.sortDocuments(documents)

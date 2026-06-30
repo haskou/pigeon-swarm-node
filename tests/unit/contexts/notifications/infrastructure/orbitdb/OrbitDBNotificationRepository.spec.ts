@@ -86,35 +86,36 @@ describe('OrbitDBNotificationRepository', () => {
   it('should find a notification by id from the direct head', async () => {
     heads.set(`notification:${baseDocument.id}`, baseDocument);
 
-    const result = await repository.findById(new NotificationId(baseDocument.id));
+    const result = await repository.findById(
+      new NotificationId(baseDocument.id),
+    );
 
     expect(result?.toPrimitives()).toEqual(baseDocument);
     expect(query).not.toHaveBeenCalled();
   });
 
   it('should not scan OrbitDB notifications when id head is missing', async () => {
-    const result = await repository.findById(new NotificationId(baseDocument.id));
+    const result = await repository.findById(
+      new NotificationId(baseDocument.id),
+    );
 
     expect(result).toBeUndefined();
     expect(query).not.toHaveBeenCalled();
   });
 
   it('should find recipient notifications ordered by creation date', async () => {
-    heads.set(
-      `notification-recipient-index:${recipientIdentityId}`,
-      {
-        id: `notification-recipient-index:${recipientIdentityId}`,
-        notifications: [
-          baseDocument,
-          {
-            ...baseDocument,
-            createdAt: baseDocument.createdAt + 1,
-            id: '6a0df63c702bbe370bb0b8c0',
-          },
-        ],
-        recipientIdentityId,
-      },
-    );
+    heads.set(`notification-recipient-index:${recipientIdentityId}`, {
+      id: `notification-recipient-index:${recipientIdentityId}`,
+      notifications: [
+        baseDocument,
+        {
+          ...baseDocument,
+          createdAt: baseDocument.createdAt + 1,
+          id: '6a0df63c702bbe370bb0b8c0',
+        },
+      ],
+      recipientIdentityId,
+    });
 
     const result = await repository.findByRecipient(
       new IdentityId(recipientIdentityId),
@@ -128,14 +129,11 @@ describe('OrbitDBNotificationRepository', () => {
   });
 
   it('should find recipient notifications from recipient heads', async () => {
-    heads.set(
-      `notification-recipient-index:${recipientIdentityId}`,
-      {
-        id: `notification-recipient-index:${recipientIdentityId}`,
-        notifications: [baseDocument],
-        recipientIdentityId,
-      },
-    );
+    heads.set(`notification-recipient-index:${recipientIdentityId}`, {
+      id: `notification-recipient-index:${recipientIdentityId}`,
+      notifications: [baseDocument],
+      recipientIdentityId,
+    });
 
     const result = await repository.findByRecipient(
       new IdentityId(recipientIdentityId),
@@ -151,19 +149,20 @@ describe('OrbitDBNotificationRepository', () => {
   it('should save notifications into the replicated store', async () => {
     const notification = Notification.fromPrimitives(baseDocument);
 
-    await repository.save(notification);
+    headPut.mockImplementation(() => new Promise<string>(() => undefined));
+
+    await expect(repository.save(notification)).resolves.toBeUndefined();
+
+    const byId = await repository.findById(new NotificationId(baseDocument.id));
+    const byRecipient = await repository.findByRecipient(
+      new IdentityId(recipientIdentityId),
+      10,
+    );
 
     expect(put).toHaveBeenCalledWith(baseDocument);
-    expect(headPut).toHaveBeenCalledWith(
-      `notification:${baseDocument.id}`,
+    expect(byId?.toPrimitives()).toEqual(baseDocument);
+    expect(byRecipient.map((item) => item.toPrimitives())).toEqual([
       baseDocument,
-    );
-    expect(headPut).toHaveBeenCalledWith(
-      `notification-recipient-index:${recipientIdentityId}`,
-      expect.objectContaining({
-        notifications: [baseDocument],
-        recipientIdentityId,
-      }),
-    );
+    ]);
   });
 });

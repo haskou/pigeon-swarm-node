@@ -139,11 +139,10 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       store.save(request).then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
+    const savedRequest = await store.findById(request.getId());
 
     expect(result).toBe('saved');
-    expect(
-      heads.get(`community-membership-request:${request.getId().valueOf()}`),
-    ).toEqual(expect.objectContaining({ id: request.getId().valueOf() }));
+    expect(savedRequest?.getId().isEqual(request.getId())).toBe(true);
   });
 
   it('should find membership requests from fresh heads when identity indexes lag', async () => {

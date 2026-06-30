@@ -88,17 +88,6 @@ export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceR
     return document && this.isDocument(document) ? document : undefined;
   }
 
-  private async putHead(
-    document: OrbitDBIdentityPresenceDocument,
-    networkIds: string[] = [],
-  ): Promise<void> {
-    await this.registry.putHead(
-      this.headKey(document.identityId),
-      { ...document },
-      networkIds,
-    );
-  }
-
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityPresence | undefined> {
@@ -164,6 +153,10 @@ export default class OrbitDBIdentityPresenceRepository extends IdentityPresenceR
     const document = this.toDocument(presence);
 
     await this.registry.putDocument('presence', document, networkIds);
-    await this.putHead(document, networkIds);
+    this.registry.replicateHeadInBackground(
+      this.headKey(document.identityId),
+      document,
+      networkIds,
+    );
   }
 }

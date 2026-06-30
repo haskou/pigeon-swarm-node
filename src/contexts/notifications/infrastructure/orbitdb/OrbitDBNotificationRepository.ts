@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { Notification } from '../../domain/Notification';
@@ -8,11 +9,19 @@ import { OrbitDBNotificationDocument } from './documents/OrbitDBNotificationDocu
 import OrbitDBNotificationMapper from './mappers/OrbitDBNotificationMapper';
 
 export default class OrbitDBNotificationRepository extends NotificationRepository {
+  private readonly notificationIndex: OrbitDBHeadIndex<OrbitDBNotificationDocument>;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBNotificationMapper,
   ) {
     super();
+    this.notificationIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'notifications',
+      documentFromRecord: (record) => this.documentFromRecord(record),
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+    });
   }
 
   private numberValue(
@@ -73,18 +82,6 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     };
   }
 
-  private deduplicateDocuments(
-    documents: OrbitDBNotificationDocument[],
-  ): OrbitDBNotificationDocument[] {
-    const deduplicated = new Map<string, OrbitDBNotificationDocument>();
-
-    for (const document of documents) {
-      deduplicated.set(document.id, document);
-    }
-
-    return [...deduplicated.values()];
-  }
-
   private headKey(notificationId: string): string {
     return `notification:${notificationId}`;
   }
@@ -93,60 +90,50 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     return `notification-recipient-index:${recipientIdentityId}`;
   }
 
-  private notificationDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): OrbitDBNotificationDocument[] {
-    const notifications = record?.notifications;
-
-    if (!Array.isArray(notifications)) {
-      return [];
-    }
-
-    return notifications
-      .filter(
-        (notification): notification is Record<string, unknown> =>
-          typeof notification === 'object' &&
-          notification !== null &&
-          !Array.isArray(notification),
-      )
-      .map((notification) => this.documentFromRecord(notification))
-      .filter(
-        (document): document is OrbitDBNotificationDocument =>
-          document !== undefined,
-      );
-  }
-
   private async findRecipientIndexedDocuments(
     recipientIdentityId: IdentityId,
   ): Promise<OrbitDBNotificationDocument[]> {
-    return this.notificationDocumentsFromIndex(
-      await this.registry.findHead(
+    return (
+      (await this.notificationIndex.find(
         this.recipientIndexHeadKey(recipientIdentityId.valueOf()),
-      ),
+      )) ?? []
     );
   }
 
-  private async putHeads(document: OrbitDBNotificationDocument): Promise<void> {
-    await this.registry.putHead(this.headKey(document.id), { ...document });
+  private cachedRecipientIndexedDocuments(
+    recipientIdentityId: string,
+  ): OrbitDBNotificationDocument[] {
+    return (
+      this.notificationIndex.documentsFromHead(
+        this.registry.findCachedHead(
+          this.recipientIndexHeadKey(recipientIdentityId),
+        ),
+      ) ?? []
+    );
+  }
 
-    const recipientIdentityId = new IdentityId(document.recipientIdentityId);
-    const recipientDocuments =
-      await this.findRecipientIndexedDocuments(recipientIdentityId);
-    const notifications = this.deduplicateDocuments([
+  private replicateHeadsInBackground(
+    document: OrbitDBNotificationDocument,
+  ): void {
+    this.registry.replicateHeadInBackground(this.headKey(document.id), {
+      ...document,
+    });
+
+    const recipientDocuments = this.cachedRecipientIndexedDocuments(
+      document.recipientIdentityId,
+    );
+    const notifications = this.notificationIndex.deduplicate([
       ...recipientDocuments,
       document,
     ]);
 
-    await this.registry.putHead(
+    this.notificationIndex.replicateDocumentsInBackground(
       this.recipientIndexHeadKey(document.recipientIdentityId),
       {
         id: this.recipientIndexHeadKey(document.recipientIdentityId),
-        notifications: notifications.map((notification) => ({
-          ...notification,
-        })),
         recipientIdentityId: document.recipientIdentityId,
-        updatedAt: Date.now(),
       },
+      notifications,
     );
   }
 
@@ -183,7 +170,8 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
       ? this.mapper.toDocument(beforeNotification)
       : undefined;
 
-    return this.deduplicateDocuments(documents)
+    return this.notificationIndex
+      .deduplicate(documents)
       .filter((document) =>
         beforeDocument ? document.createdAt < beforeDocument.createdAt : true,
       )
@@ -198,6 +186,6 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     await this.registry.putDocument('notifications', {
       ...document,
     });
-    await this.putHeads(document);
+    this.replicateHeadsInBackground(document);
   }
 }

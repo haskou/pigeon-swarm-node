@@ -67,6 +67,9 @@ export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibr
     const document = this.toDocument(library);
 
     await this.registry.putDocument('stickerUserLibraries', document);
-    await this.registry.putHead(this.headKey(document.identityId), document);
+    this.registry.replicateHeadInBackground(
+      this.headKey(document.identityId),
+      document,
+    );
   }
 }
