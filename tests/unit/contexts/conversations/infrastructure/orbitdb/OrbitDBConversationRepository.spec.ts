@@ -310,6 +310,38 @@ describe('OrbitDBConversationRepository', () => {
       }),
     ]);
   });
+
+  it('should not read the message index once per existing message when saving', async () => {
+    const conversation = mother.build();
+
+    for (let index = 0; index < 5; index += 1) {
+      conversation.sendMessage(
+        mother.author,
+        new EncryptedMessagePayload(`existing-${index}`),
+        signature(),
+        new MessageSendOptions([], new Timestamp(1780000000000 + index)),
+      );
+    }
+    await repository.save(conversation);
+
+    conversation.sendMessage(
+      mother.recipient,
+      new EncryptedMessagePayload('new'),
+      signature(),
+      new MessageSendOptions([], new Timestamp(1780000000010)),
+    );
+    const findHead = jest.spyOn(registry, 'findHead');
+    findHead.mockClear();
+
+    await repository.save(conversation);
+
+    const messageIndexReads = findHead.mock.calls.filter(
+      ([key]) =>
+        key === `conversation-message-index:${conversation.getId().valueOf()}`,
+    );
+
+    expect(messageIndexReads).toHaveLength(2);
+  });
 });
 
 function signature(): Signature {

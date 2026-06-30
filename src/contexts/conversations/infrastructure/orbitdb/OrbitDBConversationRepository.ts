@@ -715,6 +715,14 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
   }
 
+  private messageDocumentIds(
+    documents: OrbitDBConversationMessageDocument[],
+  ): Set<string> {
+    return new Set(
+      documents.flatMap((document) => [document.id, document.messageId]),
+    );
+  }
+
   private async findMessagesByConversationId(
     conversationId: ConversationId,
   ): Promise<Message[]> {
@@ -1070,9 +1078,9 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   }
 
   public async save(conversation: Conversation): Promise<void> {
-    const existingDocument = await this.findConversationDocumentById(
-      conversation.getId(),
-    );
+    const conversationId = conversation.getId();
+    const existingDocument =
+      await this.findConversationDocumentById(conversationId);
     const document = this.conversationMapper.toDocument(
       conversation,
       new Timestamp(existingDocument?.createdAt ?? Timestamp.now().valueOf()),
@@ -1081,14 +1089,14 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     await this.registry.putDocument('conversations', { ...document });
     await this.putConversationHeads(document);
 
+    const existingMessageIds = this.messageDocumentIds(
+      await this.findMessageDocumentsByConversationId(conversationId),
+    );
+
     for (const message of conversation.toPrimitives().messages) {
       const messageId = new MessageId(message.id);
-      const existingMessage = await this.findMessageById(
-        new ConversationId(message.conversationId),
-        messageId,
-      );
 
-      if (existingMessage) {
+      if (existingMessageIds.has(messageId.valueOf())) {
         continue;
       }
 
@@ -1101,6 +1109,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       await this.putMessageRecord({
         ...this.messageMapper.toDocument(conversation, domainMessage),
       });
+      existingMessageIds.add(messageId.valueOf());
 
       const targetMessageId = domainMessage.getTargetMessageId();
 
