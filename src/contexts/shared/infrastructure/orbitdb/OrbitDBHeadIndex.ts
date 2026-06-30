@@ -45,12 +45,27 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
   private recordsHead(
     metadata: Record<string, unknown>,
     records: Record<string, unknown>[],
+    updatedAt: number = Date.now(),
   ): Record<string, unknown> {
     return {
       ...metadata,
       [this.options.collectionName]: records,
-      updatedAt: Date.now(),
+      updatedAt,
     };
+  }
+
+  private nextHeadUpdatedAt(head: Record<string, unknown> | undefined): number {
+    return Math.max(Date.now(), this.recordFreshness(head ?? {}) + 1);
+  }
+
+  private mergeHeadRecords(
+    heads: Array<Record<string, unknown> | undefined>,
+  ): Record<string, unknown>[] {
+    return heads
+      .flatMap((head) => this.recordsFromHead(head))
+      .reduce<
+        Record<string, unknown>[]
+      >((records, record) => this.mergeRecords(records, record), []);
   }
 
   private numberValue(
@@ -96,7 +111,7 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
 
     this.registry.cacheHeadLocally(
       key,
-      this.recordsHead(metadata, records),
+      this.recordsHead(metadata, records, this.nextHeadUpdatedAt(head)),
       networkIds,
     );
   }
@@ -112,7 +127,7 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
 
     this.registry.replicateHeadInBackground(
       key,
-      this.recordsHead(metadata, records),
+      this.recordsHead(metadata, records, this.nextHeadUpdatedAt(head)),
       networkIds,
     );
   }
@@ -124,13 +139,20 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     networkIds: string[],
     preferPersistedHead = false,
   ): Promise<void> {
+    const persistedHead = preferPersistedHead
+      ? await this.registry.findPersistedHead(key)
+      : undefined;
+    const cachedHead = this.registry.findCachedHead(key);
+
     this.replicateRecordHead(
       key,
       metadata,
       preferPersistedHead
-        ? await this.registry.findPersistedHead(key)
-        : (this.registry.findCachedHead(key) ??
-            (await this.registry.findPersistedHead(key))),
+        ? this.recordsHead(
+            metadata,
+            this.mergeHeadRecords([persistedHead, cachedHead]),
+          )
+        : (cachedHead ?? (await this.registry.findPersistedHead(key))),
       record,
       networkIds,
     );

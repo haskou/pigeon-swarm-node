@@ -269,6 +269,58 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     expect(messages).toEqual([]);
   });
 
+  it('should hide deleted messages from the channel message index immediately', async () => {
+    await saveDocuments(
+      document({
+        channelId: 'channel-1',
+        createdAt: 1,
+        encryptedPayload: 'encrypted-community-channel-message-payload',
+        id: 'message-1',
+      }),
+    );
+
+    await repository.delete(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      new CommunityChannelMessageId('message-1'),
+    );
+
+    const messages = await repository.findByChannel(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      50,
+    );
+
+    expect(messages).toEqual([]);
+  });
+
+  it('should hide deleted messages when deletion follows a pending save index write', async () => {
+    await repository.save(
+      CommunityChannelMessage.fromPrimitives(
+        document({
+          channelId: 'channel-1',
+          createdAt: 1,
+          encryptedPayload: 'encrypted-community-channel-message-payload',
+          id: 'message-1',
+        }) as never,
+      ),
+    );
+
+    await repository.delete(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      new CommunityChannelMessageId('message-1'),
+    );
+
+    const messages = await repository.findByChannel(
+      new CommunityId('community-1'),
+      new CommunityChannelId('channel-1'),
+      50,
+    );
+
+    expect(messages).toEqual([]);
+  });
+
   it('should build thread summaries for several channels from indexed messages', async () => {
     await saveDocuments(
       document({
