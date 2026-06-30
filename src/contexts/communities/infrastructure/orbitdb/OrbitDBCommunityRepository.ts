@@ -163,10 +163,10 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  private async putCommunityHead(
+  private replicateCommunityHeadInBackground(
     document: OrbitDBCommunityDocument,
-  ): Promise<void> {
-    await this.registry.putHead(
+  ): void {
+    this.registry.replicateHeadInBackground(
       this.communityHeadKey(document.id),
       {
         ...document,
@@ -212,8 +212,8 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     };
 
     await this.registry.putDocument('communities', deletedDocument);
-    await this.putCommunityHead(deletedDocument);
-    await this.putMemberIndexes(deletedDocument);
+    this.replicateCommunityHeadInBackground(deletedDocument);
+    this.refreshMemberIndexesInBackground(deletedDocument);
   }
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
@@ -279,7 +279,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const document = this.toFreshDocument(community);
 
     await this.registry.putDocument('communities', document);
-    await this.putCommunityHead(document);
+    this.replicateCommunityHeadInBackground(document);
     this.refreshMemberIndexesInBackground(document);
   }
 }

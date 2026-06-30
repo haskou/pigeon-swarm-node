@@ -62,6 +62,25 @@ export default class OrbitDBCommunityChannelMessageIndex {
         : undefined;
   }
 
+  private stringValue(
+    record: Record<string, unknown>,
+    attribute: string,
+  ): string | undefined {
+    const value = record[attribute];
+
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private networkIdsFrom(records: Record<string, unknown>[]): string[] {
+    return [
+      ...new Set(
+        records
+          .map((message) => this.stringValue(message, 'networkId'))
+          .filter((networkId): networkId is string => networkId !== undefined),
+      ),
+    ];
+  }
+
   public getMessageId(
     document: OrbitDBCommunityChannelMessageDocument,
   ): string {
@@ -130,6 +149,32 @@ export default class OrbitDBCommunityChannelMessageIndex {
         id: key,
       },
       record,
+    );
+  }
+
+  public replicateRecordInBackground(record: Record<string, unknown>): void {
+    const communityId = this.stringValue(record, 'communityId');
+    const channelId = this.stringValue(record, 'channelId');
+
+    if (!communityId || !channelId) {
+      return;
+    }
+
+    const key = this.messageIndexHeadKey(communityId, channelId);
+    const records = this.index.mergeRecords(
+      this.index.recordsFromHead(this.registry.findCachedHead(key)),
+      record,
+    );
+
+    this.index.replicateRecordInBackground(
+      key,
+      {
+        channelId,
+        communityId,
+        id: key,
+      },
+      record,
+      this.networkIdsFrom(records),
     );
   }
 }

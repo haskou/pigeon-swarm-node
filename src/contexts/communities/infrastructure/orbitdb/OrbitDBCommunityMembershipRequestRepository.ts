@@ -136,11 +136,13 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     );
   }
 
-  private async putHeads(
+  private replicateHeadsInBackground(
     document: OrbitDBCommunityMembershipRequestDocument,
-  ): Promise<void> {
-    await this.registry.putHead(this.headKey(document.id), { ...document });
-    await this.putIndexes(document);
+  ): void {
+    this.registry.replicateHeadInBackground(this.headKey(document.id), {
+      ...document,
+    });
+    this.refreshIndexesInBackground(document);
   }
 
   private async putIndexes(
@@ -222,7 +224,7 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
         };
 
         await this.registry.putDocument('requests', tombstone);
-        await this.putHeads(tombstone);
+        this.replicateHeadsInBackground(tombstone);
         this.cacheRequestDocument(tombstone);
       }),
     );
@@ -335,8 +337,7 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     const document = this.mapper.toDocument(request);
 
     await this.registry.putDocument('requests', document);
-    await this.registry.putHead(this.headKey(document.id), { ...document });
+    this.replicateHeadsInBackground(document);
     this.cacheRequestDocument(document);
-    this.refreshIndexesInBackground(document);
   }
 }

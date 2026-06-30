@@ -75,11 +75,11 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
         this.registry.putDocument('messages', document),
       ),
     );
-    await Promise.all(
-      deletedDocuments.map((document) => this.messageIndex.putRecord(document)),
+    deletedDocuments.forEach((document) =>
+      this.messageIndex.replicateRecordInBackground(document),
     );
 
-    await this.threadSummaryIndex.refreshForDocuments(documents);
+    this.threadSummaryIndex.refreshForDocumentsInBackground(documents);
   }
 
   public async findById(
@@ -227,10 +227,10 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const document = this.mapper.toDocument(message);
 
     await this.registry.putDocument('messages', document);
-    await this.messageIndex.putRecord(document);
+    this.messageIndex.replicateRecordInBackground(document);
 
     if (document.replyToMessageId) {
-      await this.threadSummaryIndex.refreshForChannel(
+      this.threadSummaryIndex.refreshForChannelInBackground(
         new CommunityId(document.communityId),
         new CommunityChannelId(document.channelId),
       );
