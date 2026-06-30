@@ -133,6 +133,6 @@ export default class OrbitDBCallRepository extends CallRepository {
     const document = this.toDocument(call);
 
     await this.registry.putDocument('calls', document);
-    await this.callIndex.put(document);
+    this.callIndex.put(document);
   }
 }

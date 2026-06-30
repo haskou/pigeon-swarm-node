@@ -210,8 +210,8 @@ export default class OrbitDBCallIndex {
     return document.status === 'active';
   }
 
-  private async putCallHead(document: OrbitDBCallDocument): Promise<void> {
-    await this.registry.putHead(
+  private replicateCallHeadInBackground(document: OrbitDBCallDocument): void {
+    this.registry.replicateHeadInBackground(
       this.callHeadKey(document.id),
       { ...document },
       [document.networkId],
@@ -445,8 +445,8 @@ export default class OrbitDBCallIndex {
     );
   }
 
-  public async put(document: OrbitDBCallDocument): Promise<void> {
-    await this.putCallHead(document);
+  public put(document: OrbitDBCallDocument): void {
+    this.replicateCallHeadInBackground(document);
     this.cacheCommunityChannelCall(document);
     this.refreshIndexesInBackground(document);
   }
