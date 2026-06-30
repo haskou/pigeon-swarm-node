@@ -13,6 +13,7 @@ const identityMother = new IdentityMother();
 describe('OrbitDBCommunityChannelMessageRepository', () => {
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
+  let headsPut: jest.Mock;
   let query: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityChannelMessageRepository;
@@ -20,6 +21,11 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
   beforeEach(() => {
     documents.splice(0);
     heads.clear();
+    headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
+      heads.set(key, value);
+
+      return 'ok';
+    });
     query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
@@ -30,11 +36,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
           return value ? { key, value } : undefined;
         }),
-        put: jest.fn(async (key: string, value: Record<string, unknown>) => {
-          heads.set(key, value);
-
-          return 'ok';
-        }),
+        put: headsPut,
       },
       messages: {
         put: jest.fn(async (document) => {
@@ -63,6 +65,8 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         CommunityChannelMessage.fromPrimitives(newDocument as never),
       );
     }
+
+    await flushBackgroundTasks();
   }
 
   it('should fetch syncable community messages without letting plaintext rows consume the limit', async () => {
@@ -203,6 +207,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     );
 
     await repository.save(message);
+    await flushBackgroundTasks();
     query.mockClear();
 
     const messages = await repository.findByChannel(
@@ -215,6 +220,21 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     expect(messages.map((current) => current.toPrimitives())).toEqual([
       expect.objectContaining({ id: 'message-1' }),
     ]);
+  });
+
+  it('should not wait for channel message index writes when saving a message', async () => {
+    const message = CommunityChannelMessage.fromPrimitives(
+      document({
+        channelId: 'channel-1',
+        createdAt: 1,
+        id: 'message-1',
+      }) as never,
+    );
+
+    headsPut.mockImplementationOnce(() => new Promise<string>(() => undefined));
+
+    await expect(repository.save(message)).resolves.toBeUndefined();
+    expect(documents).toEqual([expect.objectContaining({ id: 'message-1' })]);
   });
 
   it('should remove deleted messages from the channel message index', async () => {
@@ -238,6 +258,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('message-1'),
     );
+    await flushBackgroundTasks();
 
     const messages = await repository.findByChannel(
       new CommunityId('community-1'),
@@ -356,6 +377,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         }) as never,
       ),
     );
+    await flushBackgroundTasks();
 
     const summaries = await repository.findThreadSummariesByChannel(
       new CommunityId('community-1'),
@@ -403,6 +425,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('root-1'),
     );
+    await flushBackgroundTasks();
 
     const summaries = await repository.findThreadSummariesByChannel(
       new CommunityId('community-1'),
@@ -449,4 +472,10 @@ function upsertDocument(
   }
 
   currentDocuments[existingIndex] = newDocument;
+}
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve)).then(
+    () => new Promise((resolve) => setImmediate(resolve)),
+  );
 }

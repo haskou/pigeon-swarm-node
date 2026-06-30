@@ -8,6 +8,8 @@ import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 export default class OrbitDBHeadIndex<TDocument extends object> {
   private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
 
+  private readonly recordMergeQueues = new Map<string, Promise<void>>();
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly options: OrbitDBHeadIndexOptions<TDocument>,
@@ -49,6 +51,69 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
       [this.options.collectionName]: records,
       updatedAt: Date.now(),
     };
+  }
+
+  private replicateRecordHead(
+    key: string,
+    metadata: Record<string, unknown>,
+    head: Record<string, unknown> | undefined,
+    record: Record<string, unknown>,
+    networkIds: string[],
+  ): void {
+    const records = this.mergeRecords(this.recordsFromHead(head), record);
+
+    this.registry.replicateHeadInBackground(
+      key,
+      this.recordsHead(metadata, records),
+      networkIds,
+    );
+  }
+
+  private async replicateRecordHeadFromLatestState(
+    key: string,
+    metadata: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[],
+  ): Promise<void> {
+    this.replicateRecordHead(
+      key,
+      metadata,
+      this.registry.findCachedHead(key) ??
+        (await this.registry.findPersistedHead(key)),
+      record,
+      networkIds,
+    );
+  }
+
+  private queueRecordHeadReplication(
+    key: string,
+    metadata: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[],
+  ): void {
+    const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
+    const next = previous
+      .catch((): void => undefined)
+      .then(() =>
+        this.replicateRecordHeadFromLatestState(
+          key,
+          metadata,
+          record,
+          networkIds,
+        ),
+      )
+      .catch((error) => {
+        Kernel.logger.warn?.(
+          `OrbitDB head index record refresh failed: key=${key} error=${String(error)}`,
+        );
+      });
+
+    this.recordMergeQueues.set(key, next);
+    void next.finally(() => {
+      if (this.recordMergeQueues.get(key) === next) {
+        this.recordMergeQueues.delete(key);
+      }
+    });
   }
 
   public recordsFromHead(
@@ -182,24 +247,15 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[] = [],
   ): void {
+    const queue = this.recordMergeQueues.get(key);
     const cachedHead = this.registry.findCachedHead(key);
 
-    if (!cachedHead) {
-      void this.putRecord(key, metadata, record, networkIds).catch((error) => {
-        Kernel.logger.warn?.(
-          `OrbitDB head index record refresh failed: key=${key} error=${String(error)}`,
-        );
-      });
+    if (queue || !cachedHead) {
+      this.queueRecordHeadReplication(key, metadata, record, networkIds);
 
       return;
     }
 
-    const records = this.mergeRecords(this.recordsFromHead(cachedHead), record);
-
-    this.registry.replicateHeadInBackground(
-      key,
-      this.recordsHead(metadata, records),
-      networkIds,
-    );
+    this.replicateRecordHead(key, metadata, cachedHead, record, networkIds);
   }
 }

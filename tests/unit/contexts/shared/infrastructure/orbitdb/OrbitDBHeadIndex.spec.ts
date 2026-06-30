@@ -165,7 +165,7 @@ describe('OrbitDBHeadIndex', () => {
 
     expect(registry.findCachedHead('index:key')).toBeUndefined();
 
-    HttpRequestContext.run(request, () =>
+    HttpRequestContext.run(request, () => {
       index.replicateRecordInBackground(
         'index:key',
         {
@@ -174,13 +174,26 @@ describe('OrbitDBHeadIndex', () => {
         },
         document('second', 2),
         [networkId],
-      ),
-    );
+      );
+      index.replicateRecordInBackground(
+        'index:key',
+        {
+          id: 'index:key',
+          ownerId: 'owner',
+        },
+        document('third', 3),
+        [networkId],
+      );
+    });
     await flushBackgroundTasks();
 
     await expect(heads.get('index:key')).resolves.toEqual({
       id: 'index:key',
-      items: [document('first', 1), document('second', 2)],
+      items: [
+        document('first', 1),
+        document('second', 2),
+        document('third', 3),
+      ],
       ownerId: 'owner',
       updatedAt: expect.any(Number),
     });
@@ -194,5 +207,7 @@ describe('OrbitDBHeadIndex', () => {
 });
 
 function flushBackgroundTasks(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
+  return new Promise((resolve) => setImmediate(resolve)).then(
+    () => new Promise((resolve) => setImmediate(resolve)),
+  );
 }
