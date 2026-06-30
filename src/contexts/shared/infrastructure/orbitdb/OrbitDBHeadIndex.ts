@@ -20,6 +20,35 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
+  private documentsHead(
+    metadata: Record<string, unknown>,
+    documents: TDocument[],
+    options: OrbitDBHeadIndexPutOptions<TDocument> = {},
+  ): Record<string, unknown> {
+    const filteredDocuments = this.deduplicate(documents).filter(
+      options.filter ?? (() => true),
+    );
+
+    return {
+      ...metadata,
+      [this.options.collectionName]: filteredDocuments.map((document) => ({
+        ...document,
+      })),
+      updatedAt: Date.now(),
+    };
+  }
+
+  private recordsHead(
+    metadata: Record<string, unknown>,
+    records: Record<string, unknown>[],
+  ): Record<string, unknown> {
+    return {
+      ...metadata,
+      [this.options.collectionName]: records,
+      updatedAt: Date.now(),
+    };
+  }
+
   public recordsFromHead(
     head: Record<string, unknown> | undefined,
   ): Record<string, unknown>[] {
@@ -74,35 +103,6 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
 
   public deduplicate(documents: TDocument[]): TDocument[] {
     return this.deduplicator.deduplicate(documents);
-  }
-
-  private documentsHead(
-    metadata: Record<string, unknown>,
-    documents: TDocument[],
-    options: OrbitDBHeadIndexPutOptions<TDocument> = {},
-  ): Record<string, unknown> {
-    const filteredDocuments = this.deduplicate(documents).filter(
-      options.filter ?? (() => true),
-    );
-
-    return {
-      ...metadata,
-      [this.options.collectionName]: filteredDocuments.map((document) => ({
-        ...document,
-      })),
-      updatedAt: Date.now(),
-    };
-  }
-
-  private recordsHead(
-    metadata: Record<string, unknown>,
-    records: Record<string, unknown>[],
-  ): Record<string, unknown> {
-    return {
-      ...metadata,
-      [this.options.collectionName]: records,
-      updatedAt: Date.now(),
-    };
   }
 
   public mergeRecords(
