@@ -122,12 +122,15 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     metadata: Record<string, unknown>,
     record: Record<string, unknown>,
     networkIds: string[],
+    preferPersistedHead = false,
   ): Promise<void> {
     this.replicateRecordHead(
       key,
       metadata,
-      this.registry.findCachedHead(key) ??
-        (await this.registry.findPersistedHead(key)),
+      preferPersistedHead
+        ? await this.registry.findPersistedHead(key)
+        : (this.registry.findCachedHead(key) ??
+            (await this.registry.findPersistedHead(key))),
       record,
       networkIds,
     );
@@ -138,6 +141,7 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     metadata: Record<string, unknown>,
     record: Record<string, unknown>,
     networkIds: string[],
+    preferPersistedHead = false,
   ): void {
     const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
     const next = previous
@@ -148,6 +152,7 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
           metadata,
           record,
           networkIds,
+          preferPersistedHead,
         ),
       )
       .catch((error) => {
@@ -319,7 +324,12 @@ export default class OrbitDBHeadIndex<TDocument extends object> {
     }
 
     if (!cachedHead) {
-      this.queueRecordHeadReplication(key, metadata, record, networkIds);
+      this.registry.cacheHeadLocally(
+        key,
+        this.recordsHead(metadata, [record]),
+        networkIds,
+      );
+      this.queueRecordHeadReplication(key, metadata, record, networkIds, true);
 
       return;
     }

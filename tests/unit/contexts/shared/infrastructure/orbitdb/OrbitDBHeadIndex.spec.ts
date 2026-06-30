@@ -202,7 +202,7 @@ describe('OrbitDBHeadIndex', () => {
 
     expect(registry.findCachedHead('index:key')).toEqual({
       id: 'index:key',
-      items: [document('first', 1), document('second', 2)],
+      items: [document('queued', 1), document('second', 2)],
       ownerId: 'owner',
       updatedAt: expect.any(Number),
     });
@@ -246,6 +246,12 @@ describe('OrbitDBHeadIndex', () => {
         document('third', 3),
         [networkId],
       );
+    });
+    expect(registry.findCachedHead('index:key')).toEqual({
+      id: 'index:key',
+      items: [document('second', 2), document('third', 3)],
+      ownerId: 'owner',
+      updatedAt: expect.any(Number),
     });
     await flushBackgroundTasks();
 

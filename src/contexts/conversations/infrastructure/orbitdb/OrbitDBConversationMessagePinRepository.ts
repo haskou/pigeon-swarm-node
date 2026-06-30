@@ -1,6 +1,7 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -9,8 +10,19 @@ import ConversationMessagePinRepository from '../../domain/repositories/Conversa
 import { OrbitDBConversationMessagePinDocument } from './documents/OrbitDBConversationMessagePinDocument';
 
 export default class OrbitDBConversationMessagePinRepository extends ConversationMessagePinRepository {
+  private readonly pinIndex: OrbitDBHeadIndex<OrbitDBConversationMessagePinDocument>;
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
+    this.pinIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'pins',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.freshness(current) <= this.freshness(candidate),
+    });
   }
 
   private pinId(conversationId: ConversationId, messageId: MessageId): string {
@@ -41,76 +53,20 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     );
   }
 
-  private rawDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    const pins = record.pins;
-
-    if (!Array.isArray(pins)) {
-      return [];
-    }
-
-    return pins.filter(
-      (pin): pin is Record<string, unknown> =>
-        typeof pin === 'object' && pin !== null && !Array.isArray(pin),
-    );
-  }
-
-  private mergeDocuments(
-    documents: Record<string, unknown>[],
-    document: Record<string, unknown>,
-  ): Record<string, unknown>[] {
-    const merged = new Map<string, Record<string, unknown>>();
-
-    for (const current of documents) {
-      if (typeof current.id === 'string') {
-        merged.set(current.id, current);
-      }
-    }
-
-    if (typeof document.id === 'string') {
-      const current = merged.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        merged.set(document.id, document);
-      }
-    }
-
-    return [...merged.values()].filter((pin) => pin.removed !== true);
-  }
-
-  private async putIndex(
+  private putIndexDocument(
     conversationId: ConversationId,
-    documents: Record<string, unknown>[],
-  ): Promise<void> {
+    document: Record<string, unknown>,
+  ): void {
     const key = this.indexHeadKey(conversationId);
-    const pins = documents.reduce<Record<string, unknown>[]>(
-      (merged, document) => this.mergeDocuments(merged, document),
-      [],
-    );
 
-    await this.registry.putHead(key, {
-      conversationId: conversationId.valueOf(),
-      id: key,
-      pins: pins.map((pin) => ({ ...pin })),
-      updatedAt: Date.now(),
-    });
-  }
-
-  private async putIndexDocument(
-    conversationId: ConversationId,
-    document: Record<string, unknown>,
-  ): Promise<void> {
-    await this.putIndex(conversationId, [
-      ...(this.rawDocumentsFromIndex(
-        await this.registry.findHead(this.indexHeadKey(conversationId)),
-      ) || []),
+    this.pinIndex.replicateRecordInBackground(
+      key,
+      {
+        conversationId: conversationId.valueOf(),
+        id: key,
+      },
       document,
-    ]);
+    );
   }
 
   private toPin(
@@ -139,7 +95,7 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     };
 
     await this.registry.putDocument('pins', document);
-    await this.putIndexDocument(conversationId, document);
+    this.putIndexDocument(conversationId, document);
   }
 
   public async unpin(
@@ -156,14 +112,14 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     };
 
     await this.registry.putDocument('pins', document);
-    await this.putIndexDocument(conversationId, document);
+    this.putIndexDocument(conversationId, document);
   }
 
   public async findByConversation(
     conversationId: ConversationId,
   ): Promise<ConversationMessagePin[]> {
-    const indexedDocuments = this.rawDocumentsFromIndex(
-      await this.registry.findHead(this.indexHeadKey(conversationId)),
+    const indexedDocuments = await this.pinIndex.find(
+      this.indexHeadKey(conversationId),
     );
     const documents = indexedDocuments ?? [];
 

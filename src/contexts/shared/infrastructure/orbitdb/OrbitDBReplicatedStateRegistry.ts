@@ -870,9 +870,8 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
-    const cachedHead = this.cachedHeads.get(key);
 
-    return cachedHead ?? this.findStoredHead(key);
+    return this.findStoredHead(key);
   }
 
   public findCachedHeadsByPrefix(

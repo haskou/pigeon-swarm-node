@@ -21,10 +21,14 @@ function createStore(): {
   events: {
     on: jest.Mock<void, ['update', () => void]>;
   };
+  releaseWrites(): void;
+  stopWrites(): void;
 } {
   const entries = new Map<string, Record<string, unknown>>();
+  const writeBlockers: Array<() => void> = [];
+  let blockWrites = false;
 
-  return {
+  const store = {
     all: jest.fn(async () =>
       [...entries.entries()].map(([key, value]) => ({ key, value })),
     ),
@@ -37,6 +41,10 @@ function createStore(): {
         keyOrDocument: string | Record<string, unknown>,
         value?: unknown,
       ) => {
+        if (blockWrites) {
+          await new Promise<void>((resolve) => writeBlockers.push(resolve));
+        }
+
         const key =
           typeof keyOrDocument === 'string'
             ? keyOrDocument
@@ -54,7 +62,16 @@ function createStore(): {
     query: jest.fn(async (matcher) =>
       [...entries.values()].filter((document) => matcher(document)),
     ),
+    releaseWrites(): void {
+      blockWrites = false;
+      writeBlockers.splice(0).forEach((release) => release());
+    },
+    stopWrites(): void {
+      blockWrites = true;
+    },
   };
+
+  return store;
 }
 
 describe('OrbitDBConversationMessagePinRepository', () => {
@@ -64,14 +81,16 @@ describe('OrbitDBConversationMessagePinRepository', () => {
     'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
   );
   let registry: OrbitDBReplicatedStateRegistry;
+  let heads: ReturnType<typeof createStore>;
   let pins: ReturnType<typeof createStore>;
   let repository: OrbitDBConversationMessagePinRepository;
 
   beforeEach(() => {
     registry = new OrbitDBReplicatedStateRegistry();
+    heads = createStore();
     pins = createStore();
     registry.register('network-1', {
-      heads: createStore(),
+      heads,
       pins,
     } as never);
     repository = new OrbitDBConversationMessagePinRepository(registry);
@@ -109,9 +128,57 @@ describe('OrbitDBConversationMessagePinRepository', () => {
     await repository.unpin(conversationId, messageId);
     pins.query.mockClear();
 
-    await expect(repository.findByConversation(conversationId)).resolves.toEqual(
-      [],
-    );
+    await expect(
+      repository.findByConversation(conversationId),
+    ).resolves.toEqual([]);
     expect(pins.query).not.toHaveBeenCalled();
   });
+
+  it('does not wait for pin index head persistence when pinning', async () => {
+    heads.stopWrites();
+
+    await expect(
+      repository.pin(
+        conversationId,
+        messageId,
+        identityId,
+        new Timestamp(1780000000000),
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      repository.findByConversation(conversationId),
+    ).resolves.toHaveLength(1);
+
+    heads.releaseWrites();
+    await flushBackgroundTasks();
+  });
+
+  it('does not wait for pin index head persistence when unpinning', async () => {
+    await repository.pin(
+      conversationId,
+      messageId,
+      identityId,
+      new Timestamp(1780000000000),
+    );
+    await flushBackgroundTasks();
+    heads.stopWrites();
+
+    await expect(
+      repository.unpin(conversationId, messageId),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      repository.findByConversation(conversationId),
+    ).resolves.toEqual([]);
+
+    heads.releaseWrites();
+    await flushBackgroundTasks();
+  });
 });
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve)).then(
+    () => new Promise((resolve) => setImmediate(resolve)),
+  );
+}

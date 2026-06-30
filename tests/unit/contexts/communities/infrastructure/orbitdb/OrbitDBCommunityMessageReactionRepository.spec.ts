@@ -18,6 +18,8 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
   );
   const documents = new Map<string, Record<string, unknown>>();
   const headRecords = new Map<string, Record<string, unknown>>();
+  let blockHeadPersistence = false;
+  let headPersistenceBlockers: Array<() => void>;
   let query: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityMessageReactionRepository;
@@ -25,9 +27,10 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
   beforeEach(() => {
     documents.clear();
     headRecords.clear();
-    query = jest.fn(
-      (matcher: (document: Record<string, unknown>) => boolean) =>
-        Promise.resolve([...documents.values()].filter(matcher)),
+    blockHeadPersistence = false;
+    headPersistenceBlockers = [];
+    query = jest.fn((matcher: (document: Record<string, unknown>) => boolean) =>
+      Promise.resolve([...documents.values()].filter(matcher)),
     );
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register('network-1', {
@@ -40,6 +43,12 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
         },
         get: jest.fn(async (key) => ({ key, value: headRecords.get(key) })),
         put: jest.fn(async (key, value) => {
+          if (blockHeadPersistence) {
+            await new Promise<void>((resolve) =>
+              headPersistenceBlockers.push(resolve),
+            );
+          }
+
           headRecords.set(key as string, value as Record<string, unknown>);
 
           return 'ok';
@@ -103,4 +112,66 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     expect(afterDelete).toEqual([]);
     expect(query).not.toHaveBeenCalled();
   });
+
+  it('should not wait for reaction index head persistence when saving', async () => {
+    const reaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    blockHeadPersistence = true;
+
+    await expect(repository.save(reaction)).resolves.toBeUndefined();
+
+    const byMessage = await repository.findByMessageIds(
+      communityId,
+      channelId,
+      [messageId],
+    );
+
+    expect(byMessage.map((item) => item.toPrimitives())).toEqual([
+      reaction.toPrimitives(),
+    ]);
+
+    releaseHeadPersistence();
+    await flushBackgroundTasks();
+  });
+
+  it('should not wait for reaction index head persistence when deleting', async () => {
+    const reaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+
+    await repository.save(reaction);
+    await flushBackgroundTasks();
+    blockHeadPersistence = true;
+
+    await expect(repository.delete(reaction)).resolves.toBeUndefined();
+
+    await expect(
+      repository.findByMessageIds(communityId, channelId, [messageId]),
+    ).resolves.toEqual([]);
+
+    releaseHeadPersistence();
+    await flushBackgroundTasks();
+  });
+
+  function releaseHeadPersistence(): void {
+    blockHeadPersistence = false;
+    headPersistenceBlockers.splice(0).forEach((release) => release());
+  }
 });
+
+function flushBackgroundTasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve)).then(
+    () => new Promise((resolve) => setImmediate(resolve)),
+  );
+}
