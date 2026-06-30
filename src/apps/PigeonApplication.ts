@@ -35,7 +35,6 @@ import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 
 export default class PigeonApplication {
-  private readonly consumers: Consumer[] = [];
   private readonly logger = new WinstonLogger();
   private readonly kernel = new Kernel({
     environmentSchema: pigeonEnvironmentSchema,
@@ -43,7 +42,6 @@ export default class PigeonApplication {
     sourceDirectory: path.resolve(__dirname, '..'),
   });
 
-  private readonly schedulers: Scheduler[] = [];
   private server: ExpressKernelServer | undefined;
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
@@ -227,30 +225,6 @@ export default class PigeonApplication {
     return this.server;
   }
 
-  private getConsumerFromClass(
-    ClassDefinition: ApplicationServiceClass<Consumer>,
-  ): Consumer {
-    return this.kernel.di.getService<Consumer>(ClassDefinition);
-  }
-
-  private getInitializerFromClass(
-    ClassDefinition: ApplicationServiceClass<Initializer>,
-  ): Initializer {
-    return this.kernel.di.getService<Initializer>(ClassDefinition);
-  }
-
-  private getRuntimeFromClass(
-    ClassDefinition: ApplicationServiceClass<Runtime>,
-  ): Runtime {
-    return this.kernel.di.getService<Runtime>(ClassDefinition);
-  }
-
-  private getSchedulerFromClass(
-    ClassDefinition: ApplicationServiceClass<Scheduler>,
-  ): Scheduler {
-    return this.kernel.di.getService<Scheduler>(ClassDefinition);
-  }
-
   public loadEnvironmentVariables(environment?: string): void {
     this.kernel.loadEnvironmentVariables(environment);
   }
@@ -293,57 +267,39 @@ export default class PigeonApplication {
   public addConsumers(
     ...ClassDefinitions: ApplicationServiceClass<Consumer>[]
   ): void {
-    for (const ClassDefinition of ClassDefinitions) {
-      const consumer = this.getConsumerFromClass(ClassDefinition);
-
-      this.consumers.push(consumer);
-      this.kernel.registerConsumerInstances(consumer);
-    }
+    this.kernel.registerConsumers(...ClassDefinitions);
   }
 
   public async runConsumers(): Promise<void> {
-    for (const consumer of this.consumers) {
-      await consumer.init();
-    }
+    await this.kernel.runConsumers();
   }
 
   public addSchedulers(
     ...ClassDefinitions: ApplicationServiceClass<Scheduler>[]
   ): void {
-    for (const ClassDefinition of ClassDefinitions) {
-      this.schedulers.push(this.getSchedulerFromClass(ClassDefinition));
-    }
+    this.kernel.registerSchedulers(...ClassDefinitions);
   }
 
   public async runSchedulers(): Promise<void> {
-    for (const scheduler of this.schedulers) {
-      await scheduler.init();
-    }
+    await this.kernel.runSchedulers();
   }
 
   public async runInitializers(
     ...ClassDefinitions: ApplicationServiceClass<Initializer>[]
   ): Promise<void> {
-    for (const ClassDefinition of ClassDefinitions) {
-      await this.getInitializerFromClass(ClassDefinition).ensure();
-    }
+    await this.kernel.runInitializers(...ClassDefinitions);
   }
 
   public async runRuntimes(
     ...ClassDefinitions: ApplicationServiceClass<Runtime>[]
   ): Promise<void> {
-    for (const ClassDefinition of ClassDefinitions) {
-      await this.getRuntimeFromClass(ClassDefinition).run();
-    }
+    await this.kernel.runRuntimes(...ClassDefinitions);
   }
 
   public async runSchedulerNowAndSchedule(
     ClassDefinition: ApplicationServiceClass<Scheduler>,
   ): Promise<void> {
-    const scheduler = this.getSchedulerFromClass(ClassDefinition);
-
-    await scheduler.runOnce();
-    await scheduler.init();
+    await this.kernel.runSchedulerNowAndSchedule(ClassDefinition);
   }
 
   public logs(prefix?: string): void {
