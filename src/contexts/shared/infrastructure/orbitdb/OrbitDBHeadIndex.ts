@@ -6,14 +6,30 @@ import { OrbitDBHeadIndexPutOptions } from './OrbitDBHeadIndexPutOptions';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 
 export default class OrbitDBHeadIndex<TDocument extends object> {
-  private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
-
-  private readonly pendingRecords = new Map<
-    string,
-    Record<string, unknown>[]
+  private static readonly pendingRecordsByRegistry = new WeakMap<
+    OrbitDBReplicatedStateRegistry,
+    Map<string, Record<string, unknown>[]>
   >();
 
+  private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
+
   private readonly recordMergeQueues = new Map<string, Promise<void>>();
+
+  private get pendingRecords(): Map<string, Record<string, unknown>[]> {
+    let pendingRecords = OrbitDBHeadIndex.pendingRecordsByRegistry.get(
+      this.registry,
+    );
+
+    if (!pendingRecords) {
+      pendingRecords = new Map<string, Record<string, unknown>[]>();
+      OrbitDBHeadIndex.pendingRecordsByRegistry.set(
+        this.registry,
+        pendingRecords,
+      );
+    }
+
+    return pendingRecords;
+  }
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,

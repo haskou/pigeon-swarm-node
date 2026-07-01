@@ -229,7 +229,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const document = this.mapper.toDocument(message);
 
     await this.registry.putDocument('messages', document);
-    await this.messageIndex.replicateRecordInBackground(document);
+    void this.messageIndex.replicateRecordInBackground(document);
 
     if (document.replyToMessageId) {
       this.threadSummaryIndex.refreshForChannelInBackground(

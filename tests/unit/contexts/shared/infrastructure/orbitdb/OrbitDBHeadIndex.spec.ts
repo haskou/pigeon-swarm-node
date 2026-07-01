@@ -228,6 +228,38 @@ describe('OrbitDBHeadIndex', () => {
     expect(persistedHead?.items).toHaveLength(3);
   });
 
+  it('shares local pending record overlays across index instances', async () => {
+    const otherIndex = new OrbitDBHeadIndex<TestDocument>(registry, {
+      collectionName: 'items',
+      documentFromRecord: (record) =>
+        typeof record.id === 'string' &&
+        typeof record.updatedAt === 'number' &&
+        typeof record.value === 'string'
+          ? (record as TestDocument)
+          : undefined,
+      documentIds: (item) => [item.id, item.secondaryId].filter(Boolean),
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        current.updatedAt <= candidate.updatedAt,
+    });
+
+    index.replicateRecordInBackground(
+      'index:key',
+      {
+        id: 'index:key',
+        ownerId: 'owner',
+      },
+      document('queued', 1),
+      [networkId],
+    );
+
+    expect(registry.findCachedHead('index:key')).toBeUndefined();
+    await expect(otherIndex.find('index:key')).resolves.toEqual([
+      document('queued', 1),
+    ]);
+  });
+
   it('does not expose partial heads before merging a cold cache with persisted records', async () => {
     const request = {
       method: 'POST',

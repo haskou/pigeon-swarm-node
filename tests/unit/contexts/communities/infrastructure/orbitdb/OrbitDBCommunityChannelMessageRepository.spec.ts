@@ -13,6 +13,7 @@ const identityMother = new IdentityMother();
 describe('OrbitDBCommunityChannelMessageRepository', () => {
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
+  let headsGet: jest.Mock;
   let headsPut: jest.Mock;
   let query: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
@@ -21,6 +22,11 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
   beforeEach(() => {
     documents.splice(0);
     heads.clear();
+    headsGet = jest.fn(async (key: string) => {
+      const value = heads.get(key);
+
+      return value ? { key, value } : undefined;
+    });
     headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
       heads.set(key, value);
 
@@ -31,11 +37,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     registry.clear();
     registry.register('network-1', {
       heads: {
-        get: jest.fn(async (key: string) => {
-          const value = heads.get(key);
-
-          return value ? { key, value } : undefined;
-        }),
+        get: headsGet,
         put: headsPut,
       },
       messages: {
@@ -222,7 +224,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     ]);
   });
 
-  it('should not wait for channel message index writes when saving a message', async () => {
+  it('should not wait for cold channel message index reads when saving a message', async () => {
     const message = CommunityChannelMessage.fromPrimitives(
       document({
         channelId: 'channel-1',
@@ -231,7 +233,12 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       }) as never,
     );
 
-    headsPut.mockImplementationOnce(() => new Promise<string>(() => undefined));
+    headsGet
+      .mockImplementationOnce(async () => undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<Record<string, unknown> | undefined>(() => undefined),
+      );
 
     await expect(repository.save(message)).resolves.toBeUndefined();
     expect(documents).toEqual([expect.objectContaining({ id: 'message-1' })]);

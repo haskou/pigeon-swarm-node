@@ -760,6 +760,61 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
+  it.each(['pins', 'reactions'])(
+    'merges replicated %s head records without resurrecting stale tombstones',
+    async (collectionName) => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+      const key = `conversation-${collectionName}-index:conversation-1`;
+
+      await registry.register('network-1', firstNetwork.stores);
+      registry.cacheHeadLocally(
+        key,
+        {
+          id: key,
+          [collectionName]: [
+            {
+              id: `${collectionName}-1`,
+              removed: true,
+              updatedAt: 30,
+            },
+          ],
+          updatedAt: 31,
+        },
+        ['network-1'],
+      );
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          value: {
+            key,
+            value: {
+              id: key,
+              [collectionName]: [
+                {
+                  createdAt: 10,
+                  id: `${collectionName}-1`,
+                },
+              ],
+              updatedAt: 40,
+            },
+          },
+        },
+      });
+
+      await expect(registry.findHead(key)).resolves.toEqual({
+        id: key,
+        [collectionName]: [
+          {
+            id: `${collectionName}-1`,
+            removed: true,
+            updatedAt: 30,
+          },
+        ],
+        updatedAt: 40,
+      });
+    },
+  );
+
   it('does not merge aggregate record arrays as index collections', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
