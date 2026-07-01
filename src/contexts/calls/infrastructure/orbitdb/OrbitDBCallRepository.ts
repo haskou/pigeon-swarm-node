@@ -6,6 +6,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
 import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
@@ -13,6 +14,10 @@ import OrbitDBCallIndex from './OrbitDBCallIndex';
 
 export default class OrbitDBCallRepository extends CallRepository {
   private readonly callIndex: OrbitDBCallIndex;
+  private readonly callDocumentReplicationQueues = new Map<
+    string,
+    Promise<void>
+  >();
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
@@ -54,6 +59,28 @@ export default class OrbitDBCallRepository extends CallRepository {
 
   private toDomainList(documents: OrbitDBCallDocument[]): Call[] {
     return documents.map((document) => this.toDomain(document));
+  }
+
+  private replicateDocumentInBackground(document: OrbitDBCallDocument): void {
+    const previous =
+      this.callDocumentReplicationQueues.get(document.id) ?? Promise.resolve();
+    const next = previous
+      .catch((): void => undefined)
+      .then(() =>
+        this.registry.putDocument('calls', document, [document.networkId]),
+      )
+      .catch((error) => {
+        Kernel.logger.warn?.(
+          `Call document replication failed: callId=${document.id} error=${String(error)}`,
+        );
+      });
+
+    this.callDocumentReplicationQueues.set(document.id, next);
+    void next.finally(() => {
+      if (this.callDocumentReplicationQueues.get(document.id) === next) {
+        this.callDocumentReplicationQueues.delete(document.id);
+      }
+    });
   }
 
   public async findById(id: CallId): Promise<Call | undefined> {
@@ -129,12 +156,12 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
   }
 
-  public async save(call: Call): Promise<void> {
+  public save(call: Call): Promise<void> {
     const document = this.toDocument(call);
 
-    await this.registry.replicateDocumentInBackground('calls', document, [
-      document.networkId,
-    ]);
+    this.replicateDocumentInBackground(document);
     this.callIndex.put(document);
+
+    return Promise.resolve();
   }
 }
