@@ -205,6 +205,20 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toBeDefined();
   });
 
+  it('does not wait for call document replication when saving calls', async () => {
+    calls.put.mockImplementationOnce(() => new Promise(() => undefined));
+
+    const result = await Promise.race([
+      repository.save(communityCall()).then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeDefined();
+  });
+
   it('prefers fresh call heads over stale active indexes', async () => {
     await repository.save(communityCall());
     await flushBackgroundTasks();
