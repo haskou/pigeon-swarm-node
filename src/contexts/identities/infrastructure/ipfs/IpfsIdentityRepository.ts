@@ -78,6 +78,30 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     ];
   }
 
+  private async routingNetworkIdsFrom(
+    document: IdentityMetadataRecord,
+  ): Promise<string[]> {
+    const metadataNetworkIds = this.networkIdsFrom(document);
+
+    if (metadataNetworkIds.length > 0) {
+      return metadataNetworkIds;
+    }
+
+    if (document.identity) {
+      return [...new Set(this.mapper.toDocument(document.identity).networks)];
+    }
+
+    try {
+      const identityDocument = await this.getDocumentFromCid(
+        new IPFSId(document.cid),
+      );
+
+      return [...new Set(identityDocument.networks)];
+    } catch {
+      return [];
+    }
+  }
+
   private async deleteMetadata(cid: IPFSId): Promise<void> {
     try {
       await this.metadataIndex.deleteByExternalIdentifier(
@@ -476,7 +500,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     for (const document of this.latestMetadataByIdentity(
       await this.metadataIndex.findAll(),
     )) {
-      const networkIds = this.networkIdsFrom(document);
+      const networkIds = await this.routingNetworkIdsFrom(document);
 
       if (networkIds.length === 0) {
         continue;
