@@ -55,6 +55,53 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     );
   }
 
+  private latestMetadataByIdentity(
+    documents: IdentityMetadataRecord[],
+  ): IdentityMetadataRecord[] {
+    const latest = new Map<string, IdentityMetadataRecord>();
+
+    for (const document of this.deduplicateMetadata(documents)) {
+      if (!latest.has(document.identityId)) {
+        latest.set(document.identityId, document);
+      }
+    }
+
+    return [...latest.values()];
+  }
+
+  private networkIdsFrom(document: IdentityMetadataRecord): string[] {
+    return [
+      ...new Set([
+        ...(document.networkIds || []),
+        ...(document.networkId ? [document.networkId] : []),
+      ]),
+    ];
+  }
+
+  private async routingNetworkIdsFrom(
+    document: IdentityMetadataRecord,
+  ): Promise<string[]> {
+    const metadataNetworkIds = this.networkIdsFrom(document);
+
+    if (metadataNetworkIds.length > 0) {
+      return metadataNetworkIds;
+    }
+
+    if (document.identity) {
+      return [...new Set(this.mapper.toDocument(document.identity).networks)];
+    }
+
+    try {
+      const identityDocument = await this.getDocumentFromCid(
+        new IPFSId(document.cid),
+      );
+
+      return [...new Set(identityDocument.networks)];
+    } catch {
+      return [];
+    }
+  }
+
   private async deleteMetadata(cid: IPFSId): Promise<void> {
     try {
       await this.metadataIndex.deleteByExternalIdentifier(
@@ -448,31 +495,22 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   }
 
   public async republishLocalRoutingRecords(): Promise<number> {
-    const metadata = await this.metadataIndex.findAll();
-    const uniqueDocuments = new Map<string, IdentityMetadataRecord>();
-
-    for (const document of metadata) {
-      uniqueDocuments.set(`${document.identityId}:${document.cid}`, document);
-    }
-
     let republished = 0;
 
-    for (const document of uniqueDocuments.values()) {
-      try {
-        const identityDocument = await this.getDocumentFromCid(
-          new IPFSId(String(document.cid)),
-        );
-        const cid = await this.ipfsManager.addJSONToNetworks(
-          identityDocument,
-          identityDocument.networks,
-        );
-        const identity = this.mapper.toDomain(identityDocument);
+    for (const document of this.latestMetadataByIdentity(
+      await this.metadataIndex.findAll(),
+    )) {
+      const networkIds = await this.routingNetworkIdsFrom(document);
 
-        await this.saveMetadata(identity, cid);
+      if (networkIds.length === 0) {
+        continue;
+      }
+
+      try {
         await this.ipfsManager.putRecordToNetworks(
           this.ROUTING_KEY_PREFIX + document.identityId,
-          cid.valueOf(),
-          identityDocument.networks,
+          document.cid,
+          networkIds,
         );
         republished++;
       } catch {

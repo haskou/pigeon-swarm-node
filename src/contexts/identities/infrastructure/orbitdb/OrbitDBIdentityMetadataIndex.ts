@@ -12,8 +12,6 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
 
 export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex {
-  private readonly activeHeadRepairs = new Set<string>();
-
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -181,54 +179,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     await this.putHeads(latest);
   }
 
-  private repairHeadInBackground(
-    repairKey: string,
-    repair: () => Promise<void>,
-  ): void {
-    if (this.activeHeadRepairs.has(repairKey)) {
-      return;
-    }
-
-    this.activeHeadRepairs.add(repairKey);
-    void repair()
-      .catch((): undefined => undefined)
-      .finally(() => {
-        this.activeHeadRepairs.delete(repairKey);
-      });
-  }
-
-  private repairIdentityHeadInBackground(
-    identityId: string,
-    head: IdentityMetadataRecord,
-  ): void {
-    this.repairHeadInBackground(this.identityHeadKey(identityId), async () => {
-      const latest = this.latestRecordFrom([
-        head,
-        ...(await this.findStoredRecordsByIdentityId(identityId)),
-      ]);
-
-      if (latest) {
-        await this.readRepairHead(head, latest);
-      }
-    });
-  }
-
-  private repairHandleHeadInBackground(
-    handle: string,
-    head: IdentityMetadataRecord,
-  ): void {
-    this.repairHeadInBackground(this.handleHeadKey(handle), async () => {
-      const latest = this.latestRecordFrom([
-        head,
-        ...(await this.findStoredRecordsByHandle(handle)),
-      ]);
-
-      if (latest) {
-        await this.readRepairHead(head, latest);
-      }
-    });
-  }
-
   private async findStoredRecordsByIdentityId(
     identityId: string,
   ): Promise<IdentityMetadataRecord[]> {
@@ -378,8 +328,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
 
     if (head) {
-      this.repairHandleHeadInBackground(handle.valueOf(), head);
-
       return [head];
     }
 
@@ -389,10 +337,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     if (this.isHttpRequest()) {
       if (cachedLatest) {
-        this.repairHeadInBackground(this.handleHeadKey(handle.valueOf()), () =>
-          this.readRepairHead(head, cachedLatest),
-        );
-
         return [cachedLatest];
       }
 
@@ -421,8 +365,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     );
 
     if (head) {
-      this.repairIdentityHeadInBackground(identityId.valueOf(), head);
-
       return [head];
     }
 

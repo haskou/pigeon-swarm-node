@@ -361,15 +361,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
     for (const document of latestDocumentsByOwner.values()) {
       try {
-        const keychainDocument = await this.getDocumentFromCid(
+        await this.putRecordToOwnerNetworks(
+          document.ownerIdentityId,
           new IPFSId(document.cid),
         );
-        const cid = await this.addJSONToOwnerNetworks(
-          document.ownerIdentityId,
-          keychainDocument,
-        );
-
-        await this.putRecordToOwnerNetworks(document.ownerIdentityId, cid);
         republished++;
       } catch {
         continue;
