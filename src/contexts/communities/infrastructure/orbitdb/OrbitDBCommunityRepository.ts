@@ -211,7 +211,11 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       deletedAt: Date.now(),
     };
 
-    await this.registry.putDocument('communities', deletedDocument);
+    await this.registry.replicateDocumentInBackground(
+      'communities',
+      deletedDocument,
+      [deletedDocument.networkId],
+    );
     this.replicateCommunityHeadInBackground(deletedDocument);
     this.refreshMemberIndexesInBackground(deletedDocument);
   }
@@ -278,7 +282,9 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   public async save(community: Community): Promise<void> {
     const document = this.toFreshDocument(community);
 
-    await this.registry.putDocument('communities', document);
+    await this.registry.replicateDocumentInBackground('communities', document, [
+      document.networkId,
+    ]);
     this.replicateCommunityHeadInBackground(document);
     this.refreshMemberIndexesInBackground(document);
   }

@@ -194,11 +194,11 @@ export default class OrbitDBConversationMessageSummaryIndex {
   public replicateRecordInBackground(
     conversationId: string,
     record: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const summary = this.summaryFromRecord(record);
 
     if (!summary) {
-      return;
+      return Promise.resolve();
     }
 
     const key = this.messageSummaryHeadKey(conversationId);
@@ -207,7 +207,7 @@ export default class OrbitDBConversationMessageSummaryIndex {
       summary,
     );
 
-    this.index.replicateRecordInBackground(
+    return this.index.replicateRecordInBackground(
       key,
       {
         conversationId,

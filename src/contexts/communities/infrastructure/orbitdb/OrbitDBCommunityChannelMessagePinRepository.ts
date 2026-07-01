@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -10,8 +11,19 @@ import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { OrbitDBCommunityChannelMessagePinDocument } from './documents/OrbitDBCommunityChannelMessagePinDocument';
 
 export default class OrbitDBCommunityChannelMessagePinRepository extends CommunityChannelMessagePinRepository {
+  private readonly pinIndex: OrbitDBHeadIndex<OrbitDBCommunityChannelMessagePinDocument>;
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
+    this.pinIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'pins',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.freshness(current) <= this.freshness(candidate),
+    });
   }
 
   private pinId(
@@ -50,79 +62,22 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     );
   }
 
-  private rawDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    const pins = record.pins;
-
-    if (!Array.isArray(pins)) {
-      return [];
-    }
-
-    return pins.filter(
-      (pin): pin is Record<string, unknown> =>
-        typeof pin === 'object' && pin !== null && !Array.isArray(pin),
-    );
-  }
-
-  private mergeDocuments(
-    documents: Record<string, unknown>[],
-    document: Record<string, unknown>,
-  ): Record<string, unknown>[] {
-    const merged = new Map<string, Record<string, unknown>>();
-
-    for (const current of documents) {
-      if (typeof current.id === 'string') {
-        merged.set(current.id, current);
-      }
-    }
-
-    if (typeof document.id === 'string') {
-      const current = merged.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        merged.set(document.id, document);
-      }
-    }
-
-    return [...merged.values()].filter((pin) => pin.removed !== true);
-  }
-
-  private async putIndex(
+  private putIndexDocument(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-    documents: Record<string, unknown>[],
-  ): Promise<void> {
+    document: Record<string, unknown>,
+  ): void {
     const key = this.indexHeadKey(communityId, channelId);
-    const pins = documents.reduce(
-      (merged, document) => this.mergeDocuments(merged, document),
-      [] as Record<string, unknown>[],
-    );
 
-    await this.registry.putHead(key, {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      id: key,
-      pins: pins.map((pin) => ({ ...pin })),
-      updatedAt: Date.now(),
-    });
-  }
-
-  private async putIndexDocument(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    document: Record<string, unknown>,
-  ): Promise<void> {
-    await this.putIndex(communityId, channelId, [
-      ...(this.rawDocumentsFromIndex(
-        await this.registry.findHead(this.indexHeadKey(communityId, channelId)),
-      ) || []),
+    void this.pinIndex.replicateRecordInBackground(
+      key,
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: key,
+      },
       document,
-    ]);
+    );
   }
 
   private toPin(
@@ -153,7 +108,7 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     };
 
     await this.registry.putDocument('pins', document);
-    await this.putIndexDocument(communityId, channelId, document);
+    this.putIndexDocument(communityId, channelId, document);
   }
 
   public async unpin(
@@ -172,15 +127,15 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     };
 
     await this.registry.putDocument('pins', document);
-    await this.putIndexDocument(communityId, channelId, document);
+    this.putIndexDocument(communityId, channelId, document);
   }
 
   public async findByChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<CommunityChannelMessagePin[]> {
-    const indexedDocuments = this.rawDocumentsFromIndex(
-      await this.registry.findHead(this.indexHeadKey(communityId, channelId)),
+    const indexedDocuments = await this.pinIndex.find(
+      this.indexHeadKey(communityId, channelId),
     );
     const documents = indexedDocuments ?? [];
 

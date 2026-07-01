@@ -261,6 +261,36 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await write;
   });
 
+  it('replicates documents in background without waiting for persistence', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const delayedWrite = deferred<string>();
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.communities.put.mockImplementationOnce(
+      async () => delayedWrite.promise,
+    );
+
+    const result = await Promise.race([
+      registry
+        .replicateDocumentInBackground('communities', {
+          id: 'community-1',
+          networkId: 'network-1',
+        })
+        .then(() => 'written'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('written');
+    expect(firstNetwork.communities.put).toHaveBeenCalledWith({
+      id: 'community-1',
+      networkId: 'network-1',
+    });
+
+    delayedWrite.resolve('ok');
+    await flushPromises();
+  });
+
   it('writes heads to independent networks concurrently', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
@@ -645,6 +675,229 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       id: 'community-1',
       name: 'new',
       updatedAt: 2,
+    });
+  });
+
+  it('merges replicated indexed head records without resurrecting stale records', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const key = 'community-channel-message-index:community-1:channel-1';
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.putHead(
+      key,
+      {
+        id: key,
+        messages: [
+          {
+            encryptedPayload: 'encrypted-community-channel-message-payload',
+            id: 'message-1',
+            receivedAt: 10,
+          },
+        ],
+        updatedAt: 10,
+      },
+      ['network-1'],
+    );
+    registry.cacheHeadLocally(
+      key,
+      {
+        id: key,
+        messages: [
+          {
+            deleted: true,
+            deletedAt: 30,
+            encryptedPayload: 'encrypted-community-channel-message-payload',
+            id: 'message-1',
+            receivedAt: 10,
+          },
+        ],
+        updatedAt: 31,
+      },
+      ['network-1'],
+    );
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          key,
+          value: {
+            id: key,
+            messages: [
+              {
+                encryptedPayload: 'encrypted-community-channel-message-payload',
+                id: 'message-1',
+                receivedAt: 10,
+              },
+              {
+                id: 'message-deleted-1',
+                receivedAt: 20,
+                targetMessageId: 'message-1',
+              },
+            ],
+            updatedAt: 40,
+          },
+        },
+      },
+    });
+
+    await expect(registry.findHead(key)).resolves.toEqual({
+      id: key,
+      messages: [
+        {
+          deleted: true,
+          deletedAt: 30,
+          encryptedPayload: 'encrypted-community-channel-message-payload',
+          id: 'message-1',
+          receivedAt: 10,
+        },
+        {
+          id: 'message-deleted-1',
+          receivedAt: 20,
+          targetMessageId: 'message-1',
+        },
+      ],
+      updatedAt: 40,
+    });
+  });
+
+  it.each(['pins', 'reactions'])(
+    'merges replicated %s head records without resurrecting stale tombstones',
+    async (collectionName) => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+      const key = `conversation-${collectionName}-index:conversation-1`;
+
+      await registry.register('network-1', firstNetwork.stores);
+      registry.cacheHeadLocally(
+        key,
+        {
+          id: key,
+          [collectionName]: [
+            {
+              id: `${collectionName}-1`,
+              removed: true,
+              updatedAt: 30,
+            },
+          ],
+          updatedAt: 31,
+        },
+        ['network-1'],
+      );
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          value: {
+            key,
+            value: {
+              id: key,
+              [collectionName]: [
+                {
+                  createdAt: 10,
+                  id: `${collectionName}-1`,
+                },
+              ],
+              updatedAt: 40,
+            },
+          },
+        },
+      });
+
+      await expect(registry.findHead(key)).resolves.toEqual({
+        id: key,
+        [collectionName]: [
+          {
+            id: `${collectionName}-1`,
+            removed: true,
+            updatedAt: 30,
+          },
+        ],
+        updatedAt: 40,
+      });
+    },
+  );
+
+  it('does not merge aggregate record arrays as index collections', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+    registry.cacheHeadLocally('call:call-1', {
+      id: 'call-1',
+      participants: [{ identityId: 'identity-1', status: 'ringing' }],
+      updatedAt: 10,
+    });
+    registry.cacheHeadLocally('call:call-1', {
+      id: 'call-1',
+      participants: [
+        {
+          identityId: 'identity-1',
+          joinedAt: 20,
+          lastSeenAt: 20,
+          status: 'joined',
+        },
+      ],
+      updatedAt: 20,
+    });
+
+    await expect(registry.findHead('call:call-1')).resolves.toEqual({
+      id: 'call-1',
+      participants: [
+        {
+          identityId: 'identity-1',
+          joinedAt: 20,
+          lastSeenAt: 20,
+          status: 'joined',
+        },
+      ],
+      updatedAt: 20,
+    });
+  });
+
+  it('uses edited timestamps when merging indexed head records', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const key = 'community-channel-message-index:community-1:channel-1';
+
+    await registry.register('network-1', firstNetwork.stores);
+    registry.cacheHeadLocally(key, {
+      id: key,
+      messages: [
+        {
+          editedAt: 30,
+          encryptedPayload: 'edited-community-channel-message-payload',
+          id: 'message-1',
+        },
+      ],
+      updatedAt: 31,
+    });
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          key,
+          value: {
+            id: key,
+            messages: [
+              {
+                encryptedPayload: 'encrypted-community-channel-message-payload',
+                id: 'message-1',
+                receivedAt: 20,
+              },
+            ],
+            updatedAt: 40,
+          },
+        },
+      },
+    });
+
+    await expect(registry.findHead(key)).resolves.toEqual({
+      id: key,
+      messages: [
+        {
+          editedAt: 30,
+          encryptedPayload: 'edited-community-channel-message-payload',
+          id: 'message-1',
+        },
+      ],
+      updatedAt: 40,
     });
   });
 

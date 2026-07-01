@@ -20,6 +20,16 @@ type PersistedHeadCacheHydration = {
 export default class OrbitDBReplicatedStateRegistry {
   private static readonly HTTP_QUERY_WARNING_THRESHOLD_MS = 100;
   private static readonly BACKGROUND_QUERY_LOG_THRESHOLD_MS = 1000;
+  // TODO: Move indexed head merge policy to OrbitDBHeadIndex before adding
+  // per-index record identity or freshness rules here.
+  private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
+    'calls',
+    'conversations',
+    'messages',
+    'pins',
+    'reactions',
+    'summaries',
+  ]);
 
   private readonly storesByNetworkId = new Map<
     string,
@@ -117,16 +127,113 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.isRecord(entry) ? entry : undefined;
   }
 
-  private cacheHead(key: string, value: Record<string, unknown>): boolean {
-    const current = this.cachedHeads.get(key);
+  private headRecordCollectionNames(
+    document: Record<string, unknown>,
+  ): string[] {
+    return Object.entries(document)
+      .filter(
+        ([key, value]) =>
+          OrbitDBReplicatedStateRegistry.INDEX_HEAD_COLLECTION_NAMES.has(key) &&
+          Array.isArray(value) &&
+          value.length > 0 &&
+          value.every((item) => this.isRecord(item)),
+      )
+      .map(([key]) => key);
+  }
 
-    if (!current || this.isNewerOrEqualDocument(current, value)) {
-      this.cachedHeads.set(key, value);
+  private sharedHeadRecordCollectionName(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): string | undefined {
+    const currentNames = new Set(this.headRecordCollectionNames(current));
+    const candidateNames = this.headRecordCollectionNames(candidate).filter(
+      (name) => currentNames.has(name),
+    );
 
-      return true;
+    return candidateNames.length === 1 ? candidateNames[0] : undefined;
+  }
+
+  private recordId(record: Record<string, unknown>): string | undefined {
+    return (
+      this.stringValue(record, 'id') ||
+      this.stringValue(record, 'messageId') ||
+      this.stringValue(record, 'rootMessageId')
+    );
+  }
+
+  private mergeHeadRecords(
+    currentRecords: Record<string, unknown>[],
+    candidateRecords: Record<string, unknown>[],
+  ): Record<string, unknown>[] {
+    const merged = new Map<string, Record<string, unknown>>();
+    const withoutId: Record<string, unknown>[] = [];
+
+    for (const record of [...currentRecords, ...candidateRecords]) {
+      const id = this.recordId(record);
+
+      if (!id) {
+        withoutId.push(record);
+
+        continue;
+      }
+
+      const current = merged.get(id);
+
+      if (!current || this.isNewerOrEqualDocument(current, record)) {
+        merged.set(id, record);
+      }
     }
 
-    return false;
+    return [...withoutId, ...merged.values()];
+  }
+
+  private mergeHeadRecordCollection(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const collectionName = this.sharedHeadRecordCollectionName(
+      current,
+      candidate,
+    );
+
+    if (!collectionName) {
+      return candidate;
+    }
+
+    const currentRecords = current[collectionName] as Record<string, unknown>[];
+    const candidateRecords = candidate[collectionName] as Record<
+      string,
+      unknown
+    >[];
+
+    return {
+      ...candidate,
+      [collectionName]: this.mergeHeadRecords(currentRecords, candidateRecords),
+      updatedAt: Math.max(
+        this.documentFreshness(current),
+        this.documentFreshness(candidate),
+      ),
+    };
+  }
+
+  private cacheHead(
+    key: string,
+    value: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const current = this.cachedHeads.get(key);
+    const candidate = current
+      ? this.mergeHeadRecordCollection(current, value)
+      : value;
+    const accepted =
+      !current || this.isNewerOrEqualDocument(current, candidate);
+
+    if (accepted) {
+      this.cachedHeads.set(key, candidate);
+
+      return candidate;
+    }
+
+    return undefined;
   }
 
   private headKeysFromRecord(record: Record<string, unknown>): string[] {
@@ -201,8 +308,10 @@ export default class OrbitDBReplicatedStateRegistry {
       : this.headKeysFromRecord(record);
 
     for (const key of keys) {
-      if (this.cacheHead(key, record)) {
-        void this.persistHeadCache(networkId, key, record);
+      const cachedHead = this.cacheHead(key, record);
+
+      if (cachedHead) {
+        void this.persistHeadCache(networkId, key, cachedHead);
       }
     }
   }
@@ -225,9 +334,11 @@ export default class OrbitDBReplicatedStateRegistry {
       ];
 
       for (const key of keys) {
-        if (this.cacheHead(key, record.value)) {
+        const cachedHead = this.cacheHead(key, record.value);
+
+        if (cachedHead) {
           persistedAllHeads =
-            (await this.persistHeadCache(networkId, key, record.value)) &&
+            (await this.persistHeadCache(networkId, key, cachedHead)) &&
             persistedAllHeads;
         }
       }
@@ -349,7 +460,14 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private documentFreshness(document: Record<string, unknown>): number {
     return Math.max(
-      ...['deletedAt', 'receivedAt', 'updatedAt', 'createdAt']
+      ...[
+        'deletedAt',
+        'editedAt',
+        'endedAt',
+        'receivedAt',
+        'updatedAt',
+        'createdAt',
+      ]
         .map((attribute) => document[attribute])
         .filter((value): value is number => typeof value === 'number'),
       0,
@@ -737,9 +855,9 @@ export default class OrbitDBReplicatedStateRegistry {
       const directRecord = this.recordValue(await stores.heads.get?.(key));
 
       if (directRecord) {
-        this.cacheHead(key, directRecord);
+        const cachedHead = this.cacheHead(key, directRecord);
 
-        return directRecord;
+        return cachedHead ?? this.cachedHeads.get(key) ?? directRecord;
       }
     }
 
@@ -843,10 +961,37 @@ export default class OrbitDBReplicatedStateRegistry {
     );
 
     await Promise.all(
+      this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+        async ({ stores }) => {
+          await this.getStore(stores, storeName)?.put?.(cleanDocument);
+        },
+      ),
+    );
+  }
+
+  public async replicateDocumentInBackground(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    document: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): Promise<void> {
+    this.assertReady();
+    const cleanDocument = this.cleanDocument(document);
+    const targetNetworkIds = await this.targetNetworkIdsForDocument(
+      cleanDocument,
+      networkIds,
+    );
+
+    void Promise.all(
       this.storesForNetworkIds(targetNetworkIds).map((stores) =>
         this.getStore(stores, storeName)?.put?.(cleanDocument),
       ),
-    );
+    ).catch((error) => {
+      Kernel.logger.warn?.(
+        `OrbitDB replicated document refresh failed: store=${storeName}` +
+          ` id=${this.stringValue(cleanDocument, 'id') ?? 'unknown'}` +
+          ` error=${String(error)}`,
+      );
+    });
   }
 
   public async findHead(
@@ -870,9 +1015,8 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
-    const cachedHead = this.cachedHeads.get(key);
 
-    return cachedHead ?? this.findStoredHead(key);
+    return this.findStoredHead(key);
   }
 
   public findCachedHeadsByPrefix(
@@ -902,12 +1046,14 @@ export default class OrbitDBReplicatedStateRegistry {
       key,
       ...this.derivedHeadKeysFromRecord(cleanValue),
     ]) {
-      if (!this.cacheHead(headKey, cleanValue)) {
+      const cachedHead = this.cacheHead(headKey, cleanValue);
+
+      if (!cachedHead) {
         continue;
       }
 
       for (const networkId of targetNetworkIds) {
-        void this.persistHeadCache(networkId, headKey, cleanValue);
+        void this.persistHeadCache(networkId, headKey, cachedHead);
       }
     }
   }
@@ -932,21 +1078,35 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Promise<void> {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
+    const cachedValue = this.cacheHead(key, cleanValue);
+
+    if (!cachedValue) {
+      return;
+    }
+
     const targetNetworkIds = await this.targetNetworkIdsForDocument(
-      cleanValue,
+      cachedValue,
       networkIds,
     );
 
     await Promise.all(
       this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
         async ({ networkId, stores }) => {
-          await stores.heads.put?.(key, cleanValue);
-          this.cacheHead(key, cleanValue);
-          await this.persistHeadCache(networkId, key, cleanValue);
+          await stores.heads.put?.(key, cachedValue);
+          await this.persistHeadCache(networkId, key, cachedValue);
 
-          for (const derivedKey of this.derivedHeadKeysFromRecord(cleanValue)) {
-            this.cacheHead(derivedKey, cleanValue);
-            await this.persistHeadCache(networkId, derivedKey, cleanValue);
+          for (const derivedKey of this.derivedHeadKeysFromRecord(
+            cachedValue,
+          )) {
+            const cachedDerivedHead = this.cacheHead(derivedKey, cachedValue);
+
+            if (cachedDerivedHead) {
+              await this.persistHeadCache(
+                networkId,
+                derivedKey,
+                cachedDerivedHead,
+              );
+            }
           }
         },
       ),

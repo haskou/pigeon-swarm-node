@@ -3,17 +3,29 @@ import CommunityMessageReactionRepository from '@app/contexts/communities/domain
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBCommunityChannelMessageReactionDocument } from './documents/OrbitDBCommunityChannelMessageReactionDocument';
 import OrbitDBCommunityChannelMessageReactionMapper from './mappers/OrbitDBCommunityChannelMessageReactionMapper';
 
 export default class OrbitDBCommunityMessageReactionRepository extends CommunityMessageReactionRepository {
+  private readonly reactionIndex: OrbitDBHeadIndex<OrbitDBCommunityChannelMessageReactionDocument>;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityChannelMessageReactionMapper,
   ) {
     super();
+    this.reactionIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'reactions',
+      documentFromRecord: (record) =>
+        this.isDocument(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        this.freshness(current) <= this.freshness(candidate),
+    });
   }
 
   private documentId(reaction: CommunityChannelMessageReaction): string {
@@ -65,78 +77,20 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     );
   }
 
-  private rawDocumentsFromIndex(
-    record: Record<string, unknown> | undefined,
-  ): Record<string, unknown>[] | undefined {
-    if (!record) {
-      return undefined;
-    }
-
-    const reactions = record.reactions;
-
-    if (!Array.isArray(reactions)) {
-      return [];
-    }
-
-    return reactions.filter(
-      (reaction): reaction is Record<string, unknown> =>
-        typeof reaction === 'object' &&
-        reaction !== null &&
-        !Array.isArray(reaction),
-    );
-  }
-
-  private mergeDocuments(
-    documents: Record<string, unknown>[],
-    document: Record<string, unknown>,
-  ): Record<string, unknown>[] {
-    const merged = new Map<string, Record<string, unknown>>();
-
-    for (const current of documents) {
-      if (typeof current.id === 'string') {
-        merged.set(current.id, current);
-      }
-    }
-
-    if (typeof document.id === 'string') {
-      const current = merged.get(document.id);
-
-      if (!current || this.freshness(current) <= this.freshness(document)) {
-        merged.set(document.id, document);
-      }
-    }
-
-    return [...merged.values()].filter((reaction) => reaction.removed !== true);
-  }
-
-  private async putIndex(
+  private putIndexDocument(
     communityId: CommunityId,
-    documents: Record<string, unknown>[],
-  ): Promise<void> {
+    document: Record<string, unknown>,
+  ): void {
     const key = this.indexHeadKey(communityId);
-    const reactions = documents.reduce(
-      (merged, document) => this.mergeDocuments(merged, document),
-      [] as Record<string, unknown>[],
-    );
 
-    await this.registry.putHead(key, {
-      communityId: communityId.valueOf(),
-      id: key,
-      reactions: reactions.map((reaction) => ({ ...reaction })),
-      updatedAt: Date.now(),
-    });
-  }
-
-  private async putIndexDocument(
-    communityId: CommunityId,
-    document: Record<string, unknown>,
-  ): Promise<void> {
-    await this.putIndex(communityId, [
-      ...(this.rawDocumentsFromIndex(
-        await this.registry.findHead(this.indexHeadKey(communityId)),
-      ) || []),
+    void this.reactionIndex.replicateRecordInBackground(
+      key,
+      {
+        communityId: communityId.valueOf(),
+        id: key,
+      },
       document,
-    ]);
+    );
   }
 
   public async save(reaction: CommunityChannelMessageReaction): Promise<void> {
@@ -146,10 +100,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     );
 
     await this.registry.putDocument('reactions', document);
-    await this.putIndexDocument(
-      new CommunityId(document.communityId),
-      document,
-    );
+    this.putIndexDocument(new CommunityId(document.communityId), document);
   }
 
   public async delete(
@@ -162,10 +113,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     };
 
     await this.registry.putDocument('reactions', document);
-    await this.putIndexDocument(
-      new CommunityId(document.communityId),
-      document,
-    );
+    this.putIndexDocument(new CommunityId(document.communityId), document);
   }
 
   public async findByMessageIds(
@@ -195,8 +143,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     const messageIdValues = new Set(
       messageIds.map((messageId) => messageId.valueOf()),
     );
-    const indexedDocuments = this.rawDocumentsFromIndex(
-      await this.registry.findHead(this.indexHeadKey(communityId)),
+    const indexedDocuments = await this.reactionIndex.find(
+      this.indexHeadKey(communityId),
     );
     const documents = indexedDocuments ?? [];
 
@@ -220,8 +168,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessageReaction[]> {
-    const indexedDocuments = this.rawDocumentsFromIndex(
-      await this.registry.findHead(this.indexHeadKey(communityId)),
+    const indexedDocuments = await this.reactionIndex.find(
+      this.indexHeadKey(communityId),
     );
     const documents = indexedDocuments ?? [];
 
@@ -241,15 +189,14 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<void> {
-    const documents = (
-      this.rawDocumentsFromIndex(
-        await this.registry.findHead(this.indexHeadKey(communityId)),
-      ) ?? []
-    ).filter(
-      (document): document is OrbitDBCommunityChannelMessageReactionDocument =>
-        this.isDocument(document) &&
-        new CommunityChannelId(document.channelId).isEqual(channelId),
-    );
+    const documents =
+      (await this.reactionIndex.find(this.indexHeadKey(communityId)))?.filter(
+        (
+          document,
+        ): document is OrbitDBCommunityChannelMessageReactionDocument =>
+          this.isDocument(document) &&
+          new CommunityChannelId(document.channelId).isEqual(channelId),
+      ) ?? [];
 
     await Promise.all(
       documents.map(async (document) => {
@@ -260,16 +207,14 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
         };
 
         await this.registry.putDocument('reactions', tombstone);
-        await this.putIndexDocument(communityId, tombstone);
+        this.putIndexDocument(communityId, tombstone);
       }),
     );
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
     const documents =
-      this.rawDocumentsFromIndex(
-        await this.registry.findHead(this.indexHeadKey(communityId)),
-      ) ?? [];
+      (await this.reactionIndex.find(this.indexHeadKey(communityId))) ?? [];
 
     await Promise.all(
       documents
@@ -287,7 +232,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
           };
 
           await this.registry.putDocument('reactions', tombstone);
-          await this.putIndexDocument(communityId, tombstone);
+          this.putIndexDocument(communityId, tombstone);
         }),
     );
   }

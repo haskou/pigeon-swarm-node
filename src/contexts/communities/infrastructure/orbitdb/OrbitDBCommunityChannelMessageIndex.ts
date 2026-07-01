@@ -152,12 +152,14 @@ export default class OrbitDBCommunityChannelMessageIndex {
     );
   }
 
-  public replicateRecordInBackground(record: Record<string, unknown>): void {
+  public replicateRecordInBackground(
+    record: Record<string, unknown>,
+  ): Promise<void> {
     const communityId = this.stringValue(record, 'communityId');
     const channelId = this.stringValue(record, 'channelId');
 
     if (!communityId || !channelId) {
-      return;
+      return Promise.resolve();
     }
 
     const key = this.messageIndexHeadKey(communityId, channelId);
@@ -166,7 +168,7 @@ export default class OrbitDBCommunityChannelMessageIndex {
       record,
     );
 
-    this.index.replicateRecordInBackground(
+    return this.index.replicateRecordInBackground(
       key,
       {
         channelId,
