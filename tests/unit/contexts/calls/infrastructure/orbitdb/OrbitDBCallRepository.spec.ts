@@ -205,6 +205,61 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toBeDefined();
   });
 
+  it('does not wait for call document replication when saving calls', async () => {
+    calls.put.mockImplementationOnce(() => new Promise(() => undefined));
+
+    const result = await Promise.race([
+      repository.save(communityCall()).then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeDefined();
+  });
+
+  it('preserves call document replication order when previous writes are slow', async () => {
+    const putCall = calls.put.getMockImplementation();
+    const replicatedStatuses: string[] = [];
+    let releaseFirstWrite: () => void = () => undefined;
+    const firstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+
+    calls.put.mockImplementation(
+      async (keyOrDocument: string | Record<string, unknown>, value) => {
+        const document =
+          typeof keyOrDocument === 'string'
+            ? (value as Record<string, unknown>)
+            : keyOrDocument;
+
+        replicatedStatuses.push(String(document.status));
+
+        if (replicatedStatuses.length === 1) {
+          await firstWrite;
+        }
+
+        return putCall?.(keyOrDocument, value) ?? String(document.id);
+      },
+    );
+
+    await repository.save(communityCall());
+    await repository.save(communityCall('ended'));
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active']);
+
+    releaseFirstWrite();
+    await flushBackgroundTasks();
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active', 'ended']);
+    await expect(calls.get(callId)).resolves.toEqual(
+      expect.objectContaining({ status: 'ended' }),
+    );
+  });
+
   it('prefers fresh call heads over stale active indexes', async () => {
     await repository.save(communityCall());
     await flushBackgroundTasks();
