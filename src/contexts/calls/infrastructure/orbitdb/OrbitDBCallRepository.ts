@@ -132,7 +132,9 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async save(call: Call): Promise<void> {
     const document = this.toDocument(call);
 
-    await this.registry.putDocument('calls', document);
+    await this.registry.replicateDocumentInBackground('calls', document, [
+      document.networkId,
+    ]);
     this.callIndex.put(document);
   }
 }
