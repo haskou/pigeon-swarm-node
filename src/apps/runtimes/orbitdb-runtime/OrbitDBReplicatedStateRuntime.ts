@@ -29,8 +29,6 @@ export default class OrbitDBReplicatedStateRuntime {
 
   private readonly repairingSecondaryNetworkIds = new Set<string>();
 
-  private readonly pendingCriticalRepairNetworkIds = new Set<string>();
-
   constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
     private readonly messageBus: MessageBus,
@@ -135,7 +133,6 @@ export default class OrbitDBReplicatedStateRuntime {
           `OrbitDB replicated document update: networkId=${networkId}` +
             ` store=${name}`,
         );
-        this.repairHeads(networkId);
       });
     }
   }
@@ -171,8 +168,6 @@ export default class OrbitDBReplicatedStateRuntime {
       this.scheduledCriticalRepairNetworkIds.has(networkId) ||
       this.repairingCriticalNetworkIds.has(networkId)
     ) {
-      this.pendingCriticalRepairNetworkIds.add(networkId);
-
       return;
     }
 
@@ -201,10 +196,6 @@ export default class OrbitDBReplicatedStateRuntime {
         })
         .finally(() => {
           this.repairingCriticalNetworkIds.delete(networkId);
-
-          if (this.pendingCriticalRepairNetworkIds.delete(networkId)) {
-            this.repairHeads(networkId);
-          }
         });
     }, OrbitDBReplicatedStateRuntime.criticalRepairDelayMs);
     timeout.unref?.();

@@ -152,7 +152,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     expect((stores.events as unknown as FakeStore).all).not.toHaveBeenCalled();
   });
 
-  it('repairs read indexes again when replicated documents arrive after network registration', async () => {
+  it('does not run global read-index repair for replicated document updates', async () => {
     jest.useFakeTimers();
 
     const stores = fakeStores();
@@ -203,6 +203,6 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     updateHandler?.();
     await jest.advanceTimersByTimeAsync(1_000);
 
-    expect(repairCritical).toHaveBeenCalledTimes(2);
+    expect(repairCritical).toHaveBeenCalledTimes(1);
   });
 });
