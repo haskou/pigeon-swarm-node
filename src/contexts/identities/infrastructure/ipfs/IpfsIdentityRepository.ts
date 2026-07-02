@@ -378,7 +378,17 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     metadata: IdentityMetadataRecord[],
   ): Promise<IdentityCandidate | undefined> {
     for (const document of metadata) {
-      const candidate = await this.findCandidateReferenceFromMetadata(document);
+      const identity =
+        document.identity || this.identityByCid.get(document.cid);
+
+      if (!identity) {
+        continue;
+      }
+
+      const candidate = await this.findCandidateReferenceFromMetadata({
+        ...document,
+        identity,
+      });
 
       if (candidate?.hasHandle(handle)) {
         return candidate;

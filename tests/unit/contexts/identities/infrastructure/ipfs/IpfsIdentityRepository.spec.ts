@@ -669,6 +669,7 @@ describe('IpfsIdentityRepository', () => {
         {
           cid: cidString,
           handle: 'hasko',
+          identity,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
@@ -683,8 +684,7 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.findByIdentityId).not.toHaveBeenCalled();
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.stat).not.toHaveBeenCalled();
-      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(result.getExternalIdentifier()).toEqual(
         new IdentityExternalIdentifier(cidString),
@@ -706,6 +706,7 @@ describe('IpfsIdentityRepository', () => {
         {
           cid: latestCidString,
           handle: 'hasko',
+          identity,
           identityId: primitives.id,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
@@ -720,22 +721,15 @@ describe('IpfsIdentityRepository', () => {
           version: primitives.version - 1,
         },
       ]);
-      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
 
       const result = await repository.findCandidateByHandle(handle);
 
-      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
-        new IPFSId(latestCidString),
-      );
-      expect(ipfsManager.getJSON).not.toHaveBeenCalledWith(
-        new IPFSId(olderCidString),
-      );
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
 
-    it('should read handle metadata from the known identity networks', async () => {
+    it('should not read handle metadata from IPFS when metadata has no embedded identity', async () => {
       const networkId = '550e8400-e29b-41d4-a716-446655440000';
       const identity = await createSignedIdentityForNetwork(networkId, 'hasko');
       const primitives = identity.toPrimitives();
@@ -753,19 +747,54 @@ describe('IpfsIdentityRepository', () => {
           version: primitives.version,
         },
       ]);
-      ipfsManager.getJSONFromNetworks.mockResolvedValue(
-        mapper.toDocument(identity),
+      ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+      ipfsManager.getJSONFromNetworks.mockImplementation(
+        () => new Promise(() => undefined),
       );
 
-      const result = await repository.findCandidateByHandle(handle);
-
-      expect(ipfsManager.getJSONFromNetworks).toHaveBeenCalledWith(
-        new IPFSId(cidString),
-        [networkId],
+      await expect(repository.findCandidateByHandle(handle)).rejects.toThrow(
+        IdentityNotFoundError,
       );
+
+      expect(ipfsManager.getJSONFromNetworks).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.getBytesFromNetworks).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+    });
+
+    it('should resolve handle metadata from the local identity cache without reading IPFS', async () => {
+      const networkId = '550e8400-e29b-41d4-a716-446655440000';
+      const identity = await createSignedIdentityForNetwork(networkId, 'hasko');
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const cid = new IPFSId('bafycachedhandleidentity');
+
+      ipfsManager.addJSONToNetworks.mockResolvedValue(cid);
+      ipfsManager.putRecordToNetworks.mockResolvedValue(undefined);
+      await repository.save(identity);
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: cid.valueOf(),
+          handle: 'hasko',
+          identityId: primitives.id,
+          networkIds: [networkId],
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(ipfsManager.getJSONFromNetworks).not.toHaveBeenCalled();
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytesFromNetworks).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(result.getExternalIdentifier()).toEqual(
+        new IdentityExternalIdentifier(cid.valueOf()),
+      );
       expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
   });

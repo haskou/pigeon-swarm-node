@@ -1,6 +1,4 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
-import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityUpdateRequesterMismatchError } from '@app/contexts/identities/domain/errors/IdentityUpdateRequesterMismatchError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -25,9 +23,6 @@ export class PutIdentityRoute extends Route {
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
-  private readonly identityFinder: IdentityFinder =
-    this.get<IdentityFinder>(IdentityFinder);
-
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
@@ -50,11 +45,8 @@ export class PutIdentityRoute extends Route {
       throw new IdentityUpdateRequesterMismatchError();
     }
 
-    const identity = await this.identityPublisher.publish(
+    const candidate = await this.identityPublisher.publish(
       new PutIdentityRequest(body).getIdentityPublishMessage(),
-    );
-    const candidate = await this.identityFinder.findCandidate(
-      new IdentityFinderMessage(identity.toPrimitives().id),
     );
 
     return response
