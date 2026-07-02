@@ -35,8 +35,15 @@ package "nodes" {
     class NodePeer {
       -id: NodeId
       -owner?: IdentityId
-      -networks: Network[]
+      -networks: NodePeerNetwork[]
       -lastSeenAt: Timestamp
+      +toPrimitives(): object
+    }
+
+    class NodePeerNetwork {
+      -id: NetworkId
+      -name: NetworkName
+      -type: NodePeerNetworkType
       +toPrimitives(): object
     }
 
@@ -45,11 +52,13 @@ package "nodes" {
     class NetworkId
     class NetworkName
     class NetworkKey
+    class NodePeerNetworkType
 
     Node o--> "0..N" Network
     Node ..> NodeNetworkWasAdded
-    NodePeer o--> "0..N" Network
+    NodePeer o--> "0..N" NodePeerNetwork
     NodePeer --> NodeId
+    NodePeerNetwork *--> NodePeerNetworkType
     Node ..> NodeOwnerCanOnlyBeChangedByCurrentOwnerError
     Network *--> NetworkId
     Network *--> NetworkName
@@ -141,7 +150,12 @@ package "nodes" {
     }
 
     class NodePeersFinder {
-      +find(): Promise<NodePeer[]>
+      +findActive(): Promise<ActiveNodePeers>
+    }
+
+    class ActiveNodePeers {
+      +getLocalNode(): Node
+      +getPeers(): NodePeer[]
     }
 
     NodeNetworkAdder --> NodeLoaderService
@@ -160,6 +174,8 @@ package "nodes" {
     NodeHeartbeatSender ..> NodeHeartbeatWasSent
     NodePeerRegistrar --> NodePeerRepository
     NodePeersFinder --> NodePeerRepository
+    NodePeersFinder --> NodeRepository
+    NodePeersFinder ..> ActiveNodePeers
   }
 
   package "infrastructure" {

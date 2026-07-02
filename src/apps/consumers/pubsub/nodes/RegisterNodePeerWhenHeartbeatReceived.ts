@@ -9,6 +9,7 @@ import { DomainEvent } from '@haskou/ddd-kernel/domain';
 type NodeHeartbeatNetwork = {
   id: string;
   name: string;
+  type?: string;
 };
 
 export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
@@ -54,6 +55,7 @@ export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
       .map((network) => ({
         id: String(network.id),
         name: String(network.name),
+        ...(typeof network.type === 'string' ? { type: network.type } : {}),
       }));
   }
 

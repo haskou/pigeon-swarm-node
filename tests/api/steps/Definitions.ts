@@ -152,7 +152,13 @@ export default class Definitions {
     await database.deleteMany('node_peers', () => true);
     await database.save('node_peers', '550e8400-e29b-41d4-a716-446655440010', {
       lastSeenAt: Date.now(),
-      networks: [{ id: '550e8400-e29b-41d4-a716-446655440011', name: 'public' }],
+      networks: [
+        {
+          id: '550e8400-e29b-41d4-a716-446655440011',
+          name: 'public',
+          type: 'public',
+        },
+      ],
       owner: ownerIdentityId.valueOf(),
     });
   }

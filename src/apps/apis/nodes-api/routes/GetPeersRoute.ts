@@ -13,10 +13,10 @@ export class GetPeersRoute extends Route {
 
   @Get('/')
   public async getPeers(@Res() response: Response): Promise<Response> {
-    const peers = await this.finder.findActive();
+    const activePeers = await this.finder.findActive();
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new PeersViewModel(peers).toResource());
+      .send(new PeersViewModel(activePeers).toResource());
   }
 }

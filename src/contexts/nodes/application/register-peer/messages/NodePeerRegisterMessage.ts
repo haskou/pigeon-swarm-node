@@ -5,6 +5,7 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { NodePeerNetwork } from '../../../domain/NodePeerNetwork';
 import { NetworkName } from '../../../domain/value-objects/NetworkName';
+import { NodePeerNetworkType } from '../../../domain/value-objects/NodePeerNetworkType';
 
 export class NodePeerRegisterMessage {
   public readonly lastSeenAt: Timestamp;
@@ -18,17 +19,20 @@ export class NodePeerRegisterMessage {
     networks: Array<{
       id: string;
       name: string;
+      type?: string;
     }>,
     lastSeenAt: number,
   ) {
     this.lastSeenAt = new Timestamp(lastSeenAt);
-    this.networks = networks.map(
-      (network) =>
-        new NodePeerNetwork(
-          new NetworkId(network.id),
-          new NetworkName(network.name),
-        ),
-    );
+    this.networks = networks.map((network) => {
+      const name = new NetworkName(network.name);
+
+      return new NodePeerNetwork(
+        new NetworkId(network.id),
+        name,
+        network.type ? new NodePeerNetworkType(network.type) : undefined,
+      );
+    });
     this.nodeId = new NodeId(nodeId);
     this.owner = owner ? new IdentityId(owner) : undefined;
   }

@@ -2,6 +2,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { NodeHeartbeatWasSent } from '../../domain/events/NodeHeartbeatWasSent';
 import NodeRepository from '../../domain/repositories/NodeRepository';
+import { NodePeerNetworkType } from '../../domain/value-objects/NodePeerNetworkType';
 
 export default class NodeHeartbeatSender {
   constructor(
@@ -15,6 +16,9 @@ export default class NodeHeartbeatSender {
     const networks = Object.values(primitives.networks).map((network) => ({
       id: network.id,
       name: network.name,
+      type: network.key
+        ? NodePeerNetworkType.PRIVATE
+        : NodePeerNetworkType.PUBLIC,
     }));
 
     await this.eventPublisher.publish([

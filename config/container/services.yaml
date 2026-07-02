@@ -535,6 +535,8 @@ services:
     arguments:
       - >-
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob2RlUGVlclJlcG9zaXRvcnlfX05vZGVQZWVyUmVwb3NpdG9yeQ==
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob2RlUmVwb3NpdG9yeV9fTm9kZVJlcG9zaXRvcnk=
     abstract: false
     parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2FwcGxpY2F0aW9uX19sb2FkX19Ob2RlTG9hZGVyX19Ob2RlTG9hZGVy:

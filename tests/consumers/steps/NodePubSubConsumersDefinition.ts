@@ -26,7 +26,7 @@ export default class NodePubSubConsumersDefinition extends PubSubConsumerTestCon
 
     await consumer.handler(
       new NodeHeartbeatWasSent(this.nodeId, {
-        networks: [{ id: this.networkId, name: 'public' }],
+        networks: [{ id: this.networkId, name: 'public', type: 'public' }],
         owner: this.ownerIdentityId(),
       }),
     );
@@ -35,7 +35,9 @@ export default class NodePubSubConsumersDefinition extends PubSubConsumerTestCon
   @then('the node peer registrar should receive that peer')
   public nodePeerRegistrarShouldReceiveThatPeer(): void {
     const message = this.lastMessage<{
-      networks: Array<{ toPrimitives(): { id: string; name: string } }>;
+      networks: Array<{
+        toPrimitives(): { id: string; name: string; type?: string };
+      }>;
       nodeId: { valueOf(): string };
       owner?: { valueOf(): string };
     }>();
@@ -45,6 +47,7 @@ export default class NodePubSubConsumersDefinition extends PubSubConsumerTestCon
     expect(message.networks[0].toPrimitives()).to.deep.equal({
       id: this.networkId,
       name: 'public',
+      type: 'public',
     });
   }
 }
