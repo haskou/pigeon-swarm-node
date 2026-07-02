@@ -411,9 +411,11 @@ export default class OrbitDBCallIndex {
     timeoutThreshold: Timestamp,
   ): Promise<OrbitDBCallDocument[]> {
     return (
-      await this.callDocumentsFromIndexAndCache(
-        this.activeIndexHeadKey(),
-        (document) => document.status === 'active',
+      await this.freshPrimaryDocuments(
+        await this.callDocumentsFromIndexAndCache(
+          this.activeIndexHeadKey(),
+          (document) => document.status === 'active',
+        ),
       )
     ).filter(
       (document) =>
@@ -429,9 +431,11 @@ export default class OrbitDBCallIndex {
     timeoutThreshold: Timestamp,
   ): Promise<OrbitDBCallDocument[]> {
     return (
-      await this.callDocumentsFromIndexAndCache(
-        this.activeIndexHeadKey(),
-        (document) => document.status === 'active',
+      await this.freshPrimaryDocuments(
+        await this.callDocumentsFromIndexAndCache(
+          this.activeIndexHeadKey(),
+          (document) => document.status === 'active',
+        ),
       )
     ).filter(
       (document) =>

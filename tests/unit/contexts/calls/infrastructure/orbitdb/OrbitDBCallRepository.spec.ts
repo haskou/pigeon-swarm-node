@@ -176,6 +176,54 @@ describe('OrbitDBCallRepository', () => {
     expect(calls.query).not.toHaveBeenCalled();
   });
 
+  it('prefers fresh call heads over stale timeout indexes', async () => {
+    await repository.save(communityCall());
+    await flushBackgroundTasks();
+    const staleActiveIndex = await heads.get('call-active-index');
+    const missedDocument: OrbitDBCallDocument = {
+      ...communityCallDocument(),
+      participants: [
+        {
+          identityId: creatorIdentityId,
+          joinedAt: 1780000000000,
+          lastSeenAt: 1780000000000,
+          status: 'joined',
+        },
+        {
+          identityId: participantIdentityId,
+          missedAt: 1780000060000,
+          status: 'missed',
+        },
+      ],
+      status: 'missed',
+      updatedAt: 1780000060000,
+    };
+
+    expect(staleActiveIndex).toBeDefined();
+
+    const replicatedHeads = createStore();
+    const replicatedRegistry = new OrbitDBReplicatedStateRegistry();
+
+    await replicatedHeads.put(`call:${callId}`, missedDocument);
+    await replicatedHeads.put('call-active-index', staleActiveIndex);
+    await replicatedRegistry.register(networkId, {
+      calls: createStore(),
+      heads: replicatedHeads,
+    } as never);
+
+    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+
+    try {
+      await expect(
+        replicatedRepository.findTimedOutRingingCalls(
+          new Timestamp(1780000060000),
+        ),
+      ).resolves.toEqual([]);
+    } finally {
+      replicatedRegistry.clear();
+    }
+  });
+
   it('does not wait for secondary indexes when saving calls', async () => {
     const putHead = heads.put.getMockImplementation();
 

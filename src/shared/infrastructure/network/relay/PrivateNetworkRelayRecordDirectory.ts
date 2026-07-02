@@ -23,6 +23,8 @@ export type PrivateRelayListenOptions = {
 export default class PrivateNetworkRelayRecordDirectory {
   private static readonly defaultRelayRecordPublicationIntervalMs = 60 * 60_000;
 
+  private static readonly failedRelayRecordPublicationRetryMs = 15_000;
+
   private static readonly inlineIPNSValuePrefix =
     '/pigeon-swarm/private-relay/v1/';
 
@@ -42,6 +44,11 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly publicationIntervals: Record<
     string,
     ReturnType<typeof setInterval>
+  > = {};
+
+  private readonly publicationRetryTimeouts: Record<
+    string,
+    ReturnType<typeof setTimeout>
   > = {};
 
   private readonly noPublicPeerWarningKeys: Set<string> = new Set();
@@ -147,6 +154,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     const defaultInterval = Directory.defaultRelayRecordPublicationIntervalMs;
 
     return defaultInterval;
+  }
+
+  private getFailedRelayRecordPublicationRetryMs(): number {
+    return PrivateNetworkRelayRecordDirectory.failedRelayRecordPublicationRetryMs;
   }
 
   private getPublicPeerWaitMs(): number {
@@ -1286,11 +1297,55 @@ export default class PrivateNetworkRelayRecordDirectory {
     return false;
   }
 
+  private schedulePublicationRetry(
+    network: IPFSNetwork,
+    relayOptions: PrivateRelayListenOptions,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): void {
+    const networkId = network.getId();
+
+    if (this.publicationRetryTimeouts[networkId]) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      delete this.publicationRetryTimeouts[networkId];
+      this.publishUntilSuccessful(network, relayOptions, sharedPrivateKey);
+    }, this.getFailedRelayRecordPublicationRetryMs());
+
+    timeout.unref?.();
+    this.publicationRetryTimeouts[networkId] = timeout;
+  }
+
+  private publishUntilSuccessful(
+    network: IPFSNetwork,
+    relayOptions: PrivateRelayListenOptions,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): void {
+    this.publish(network, relayOptions, sharedPrivateKey)
+      .then((published) => {
+        if (!published) {
+          this.schedulePublicationRetry(
+            network,
+            relayOptions,
+            sharedPrivateKey,
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        Kernel.logger.warn(
+          `Private IPFS relay record publication crashed: networkId=${network.getId()}` +
+            ` error=${String(error)}`,
+        );
+        this.schedulePublicationRetry(network, relayOptions, sharedPrivateKey);
+      });
+  }
+
   public async publish(
     network: IPFSNetwork,
     relayOptions: PrivateRelayListenOptions,
     sharedPrivateKey: Libp2pPrivateKeyLike,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const multiaddrs = this.getPrivateRelayRecordMultiaddrs(
       network,
       relayOptions,
@@ -1302,7 +1357,7 @@ export default class PrivateNetworkRelayRecordDirectory {
           ' reason="No dialable relay multiaddr available."',
       );
 
-      return;
+      return false;
     }
 
     const issuedAt = Date.now();
@@ -1326,7 +1381,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         publicConnection,
       ))
     ) {
-      return;
+      return false;
     }
 
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
@@ -1348,7 +1403,7 @@ export default class PrivateNetworkRelayRecordDirectory {
             ' reason="No publication channel succeeded."',
         );
 
-        return;
+        return false;
       }
 
       Kernel.logger.debug(
@@ -1358,11 +1413,15 @@ export default class PrivateNetworkRelayRecordDirectory {
           ` publicPeers=${publicConnection.getPeers().length}` +
           ` multiaddrs="${multiaddrs.join(',')}"`,
       );
+
+      return true;
     } catch (error) {
       Kernel.logger.warn(
         `Private IPFS relay record publication failed: networkId=${network.getId()}` +
           ` error=${String(error)}`,
       );
+
+      return false;
     }
   }
 
@@ -1419,27 +1478,15 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
 
     if (relayOptions) {
-      this.publish(network, relayOptions, sharedPrivateKey).catch(
-        (error: unknown) => {
-          Kernel.logger.warn(
-            `Private IPFS relay record publication crashed: networkId=${networkId}` +
-              ` error=${String(error)}`,
-          );
-        },
-      );
+      this.publishUntilSuccessful(network, relayOptions, sharedPrivateKey);
     }
 
     if (relayOptions && !this.publicationIntervals[networkId]) {
-      const publicationInterval = setInterval(() => {
-        this.publish(network, relayOptions, sharedPrivateKey).catch(
-          (error: unknown) => {
-            Kernel.logger.debug(
-              `Private IPFS relay record refresh publication crashed: networkId=${networkId}` +
-                ` error=${String(error)}`,
-            );
-          },
-        );
-      }, this.getRelayRecordPublicationIntervalMs());
+      const publicationInterval = setInterval(
+        () =>
+          this.publishUntilSuccessful(network, relayOptions, sharedPrivateKey),
+        this.getRelayRecordPublicationIntervalMs(),
+      );
 
       publicationInterval.unref?.();
       this.publicationIntervals[networkId] = publicationInterval;
@@ -1478,6 +1525,13 @@ export default class PrivateNetworkRelayRecordDirectory {
     if (interval) {
       clearInterval(interval);
       delete this.discoveryIntervals[networkId];
+    }
+
+    const publicationRetryTimeout = this.publicationRetryTimeouts[networkId];
+
+    if (publicationRetryTimeout) {
+      clearTimeout(publicationRetryTimeout);
+      delete this.publicationRetryTimeouts[networkId];
     }
 
     const publicationInterval = this.publicationIntervals[networkId];
