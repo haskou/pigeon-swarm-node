@@ -1,5 +1,3 @@
-import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
-import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -15,20 +13,14 @@ export class PostIdentityRoute extends Route {
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
-  private readonly identityFinder: IdentityFinder =
-    this.get<IdentityFinder>(IdentityFinder);
-
   @Post('/')
   public async createIdentity(
     @Body({ options: { limit: '10mb' } }) body: PostIdentityBody,
     @Res() response: Response,
   ): Promise<Response> {
     const request = new PostIdentityRequest(body);
-    const identity = await this.identityPublisher.publish(
+    const candidate = await this.identityPublisher.publish(
       request.getIdentityPublishMessage(),
-    );
-    const candidate = await this.identityFinder.findCandidate(
-      new IdentityFinderMessage(identity.toPrimitives().id),
     );
 
     const viewModel = new IdentityViewModel(

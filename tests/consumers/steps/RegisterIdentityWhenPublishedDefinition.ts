@@ -164,12 +164,14 @@ export default class RegisterIdentityWhenPublishedDefinition {
     };
 
     await ipfs.registerNetwork(new IPFSNetworkConfig(networkId, networkName));
-    this.identity = await publisher.publish(
-      new IdentityPublishMessage({
-        ...signaturePayload,
-        signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
-      }),
-    );
+    this.identity = (
+      await publisher.publish(
+        new IdentityPublishMessage({
+          ...signaturePayload,
+          signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+        }),
+      )
+    ).getIdentity();
   }
 
   @given('the local identity registration metadata is missing')

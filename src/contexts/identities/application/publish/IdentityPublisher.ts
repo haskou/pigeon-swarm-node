@@ -2,7 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
-import { Identity } from '../../domain/Identity';
+import { IdentityCandidate } from '../../domain/IdentityCandidate';
 import IdentityRepository from '../../domain/repositories/IdentityRepository';
 import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import IdentitySaverService from '../../domain/services/IdentitySaverService';
@@ -16,7 +16,9 @@ export default class IdentityPublisher {
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
-  public async publish(message: IdentityPublishMessage): Promise<Identity> {
+  public async publish(
+    message: IdentityPublishMessage,
+  ): Promise<IdentityCandidate> {
     const identity = message.identity;
     const primitives = identity.toPrimitives();
     const isValid = await this.validator.isValidChainFor(
@@ -44,6 +46,6 @@ export default class IdentityPublisher {
 
     await this.eventPublisher.publish(events);
 
-    return identity;
+    return new IdentityCandidate(externalIdentifier, identity);
   }
 }
