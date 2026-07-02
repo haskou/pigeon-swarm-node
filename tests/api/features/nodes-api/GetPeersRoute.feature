@@ -9,13 +9,23 @@ Feature: Get peers
       {
         "peers": [
           {
+            "capabilities": {
+              "privateIpfs": false,
+              "publicIpfs": true,
+              "relay": false
+            },
+            "connectionSummary": {
+              "isSharedNetworkPeer": false,
+              "sharedNetworkCount": 0
+            },
             "id": "550e8400-e29b-41d4-a716-446655440010",
             "networks": [
               {
                 "id": "550e8400-e29b-41d4-a716-446655440011",
                 "name": "public"
               }
-            ]
+            ],
+            "nodeType": "reachable"
           }
         ]
       }

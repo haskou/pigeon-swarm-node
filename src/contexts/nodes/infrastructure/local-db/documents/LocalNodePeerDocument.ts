@@ -4,6 +4,7 @@ export interface LocalNodePeerDocument extends Record<string, unknown> {
   networks: Array<{
     id: string;
     name: string;
+    type?: string;
   }>;
   owner?: string;
 }

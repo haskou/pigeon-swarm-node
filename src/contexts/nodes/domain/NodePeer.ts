@@ -1,11 +1,12 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
+import { Timestamp } from '@haskou/value-objects';
 
 import { NodePeerNetwork } from './NodePeerNetwork';
+import { NodePeerPrimitives } from './NodePeerPrimitives';
 
 export class NodePeer {
-  public static fromPrimitives(primitives: PrimitiveOf<NodePeer>): NodePeer {
+  public static fromPrimitives(primitives: NodePeerPrimitives): NodePeer {
     return new NodePeer(
       new NodeId(primitives.id),
       primitives.owner ? new IdentityId(primitives.owner) : undefined,

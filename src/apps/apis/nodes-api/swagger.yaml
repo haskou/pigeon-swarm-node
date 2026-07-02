@@ -222,6 +222,10 @@ components:
         - lastSeenAt
         - networks
       properties:
+        capabilities:
+          $ref: '#/components/schemas/PeerCapabilitiesResource'
+        connectionSummary:
+          $ref: '#/components/schemas/PeerConnectionSummaryResource'
         id:
           type: string
         owner:
@@ -231,15 +235,47 @@ components:
         networks:
           type: array
           items:
-            type: object
-            required:
-              - id
-              - name
-            properties:
-              id:
-                type: string
-              name:
-                type: string
+            $ref: '#/components/schemas/PeerNetworkResource'
+        nodeType:
+          type: string
+          enum:
+            - leaf
+            - reachable
+            - relay
+            - unknown
+    PeerCapabilitiesResource:
+      type: object
+      required:
+        - privateIpfs
+        - publicIpfs
+        - relay
+      properties:
+        privateIpfs:
+          type: boolean
+        publicIpfs:
+          type: boolean
+        relay:
+          type: boolean
+    PeerConnectionSummaryResource:
+      type: object
+      required:
+        - isSharedNetworkPeer
+        - sharedNetworkCount
+      properties:
+        isSharedNetworkPeer:
+          type: boolean
+        sharedNetworkCount:
+          type: number
+    PeerNetworkResource:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
     PeersResource:
       type: object
       required:

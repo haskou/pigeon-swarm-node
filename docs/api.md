@@ -285,7 +285,7 @@ Event contracts used by frontend:
 | `identities.v1.identity.was_created`                  | identity id       | `networkIds`                                                                                                         |
 | `identities.v1.identity.was_updated`                  | identity id       | `networkIds`                                                                                                         |
 | `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                            |
-| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks`                                                                                                  |
+| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                      |
 | `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                |
 | `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                          |
 
@@ -661,6 +661,15 @@ Response:
 {
   "peers": [
     {
+      "capabilities": {
+        "privateIpfs": true,
+        "publicIpfs": true,
+        "relay": true
+      },
+      "connectionSummary": {
+        "isSharedNetworkPeer": true,
+        "sharedNetworkCount": 1
+      },
       "id": "<nodeId>",
       "owner": "<identityId>",
       "lastSeenAt": 1773848829055,
@@ -669,7 +678,8 @@ Response:
           "id": "<networkId>",
           "name": "public"
         }
-      ]
+      ],
+      "nodeType": "relay"
     }
   ]
 }
@@ -680,7 +690,7 @@ Implemented:
 - publish a local node heartbeat every 5 minutes through the consumer bus
 - store heartbeats received from remote nodes as active peers
 - return peers seen during the active peer window
-- include node id, owner and network id/name only
+- include node id, owner, network id/name, IPFS capabilities, shared-network summary and inferred node type
 - never expose private network keys in peer heartbeat payloads
 
 ## IPFS HTTP API

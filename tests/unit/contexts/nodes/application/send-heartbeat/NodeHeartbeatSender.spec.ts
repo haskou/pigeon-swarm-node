@@ -62,6 +62,7 @@ describe('NodeHeartbeatSender', () => {
         {
           id: networkId,
           name: 'private',
+          type: 'private',
         },
       ],
       owner: owner.valueOf(),
