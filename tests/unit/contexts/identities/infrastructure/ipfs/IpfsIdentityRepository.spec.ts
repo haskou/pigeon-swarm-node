@@ -35,6 +35,9 @@ describe('IpfsIdentityRepository', () => {
     ipfsManager.getRecordCandidates.mockResolvedValue([]);
     ipfsManager.stat.mockResolvedValue(true);
     ipfsManager.hasConnectedPeers.mockResolvedValue(false);
+    ipfsManager.findConnectedNetworkIds.mockImplementation(
+      async (networkIds) => networkIds,
+    );
   });
 
   async function createSignedIdentityForNetwork(
@@ -175,7 +178,7 @@ describe('IpfsIdentityRepository', () => {
       );
     });
 
-    it('should fetch legacy identity metadata only when networks are missing', async () => {
+    it('should skip legacy identity metadata without known networks', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
       const cid = 'bafy-legacy-identity';
@@ -189,20 +192,49 @@ describe('IpfsIdentityRepository', () => {
           version: 2,
         },
       ]);
-      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
       ipfsManager.putRecordToNetworks.mockResolvedValue(undefined);
 
       const republished = await repository.republishLocalRoutingRecords();
 
-      expect(republished).toBe(1);
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cid));
+      expect(republished).toBe(0);
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
-      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+      expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
         cid,
+        expect.any(Array),
+      );
+    });
+
+    it('should skip identity routing metadata when known networks have no connected peers', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+
+      metadataRepository.findAll.mockResolvedValue([
+        {
+          cid: 'bafy-identity-v2',
+          identityId: primitives.id,
+          networkIds: primitives.networks,
+          previousCid: 'bafy-identity-v1',
+          receivedAt: 2,
+          version: 2,
+        },
+      ]);
+      ipfsManager.findConnectedNetworkIds.mockResolvedValue([]);
+
+      const republished = await repository.republishLocalRoutingRecords();
+
+      expect(republished).toBe(0);
+      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith(
         primitives.networks,
       );
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
+      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
+      expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+      expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalled();
     });
   });
 

@@ -127,6 +127,23 @@ export default class IPFS {
       .some((network) => network.getPeers().length > 0);
   }
 
+  public async findConnectedNetworkIds(
+    networkIds: string[],
+  ): Promise<string[]> {
+    await this.initialize();
+
+    const connectedNetworkIds = new Set(
+      this.registry
+        .getAll()
+        .filter((network) => network.getPeers().length > 0)
+        .map((network) => network.getId()),
+    );
+
+    return [...new Set(networkIds)].filter((networkId) =>
+      connectedNetworkIds.has(networkId),
+    );
+  }
+
   public async getJSONFromNetwork<T>(
     cid: IPFSId,
     networkId: string,

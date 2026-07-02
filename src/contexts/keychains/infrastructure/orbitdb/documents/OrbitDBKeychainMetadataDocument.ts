@@ -6,6 +6,7 @@ export interface OrbitDBKeychainMetadataDocument extends Record<
   deleted?: boolean;
   encryptedPayload?: string;
   id: string;
+  networkIds?: string[];
   ownerIdentityId: string;
   previousCid: string | undefined;
   receivedAt: number;

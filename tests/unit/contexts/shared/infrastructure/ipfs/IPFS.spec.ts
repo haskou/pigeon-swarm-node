@@ -260,6 +260,35 @@ describe('IPFS', () => {
     });
   });
 
+  describe('findConnectedNetworkIds', () => {
+    it('should return only requested network ids with connected peers', async () => {
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+      const thirdNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.getId.mockReturnValue('network-1');
+      firstNetwork.getPeers.mockReturnValue(['peer-1']);
+      secondNetwork.getId.mockReturnValue('network-2');
+      secondNetwork.getPeers.mockReturnValue([]);
+      thirdNetwork.getId.mockReturnValue('network-3');
+      thirdNetwork.getPeers.mockReturnValue(['peer-3']);
+      registry.getAll.mockReturnValue([
+        firstNetwork,
+        secondNetwork,
+        thirdNetwork,
+      ]);
+
+      const connectedNetworkIds = await ipfs.findConnectedNetworkIds([
+        'network-1',
+        'network-1',
+        'network-2',
+        'missing-network',
+      ]);
+
+      expect(connectedNetworkIds).toEqual(['network-1']);
+    });
+  });
+
   describe('addJSON', () => {
     it('should add JSON to a specific network', async () => {
       const expectedCid = new IPFSId('bafyresult');
