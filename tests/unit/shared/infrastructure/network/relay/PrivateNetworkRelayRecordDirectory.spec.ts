@@ -139,6 +139,111 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(defaults.getRelayRecordIPNSWindowMs()).toBe(2 * 60 * 60_000);
   });
 
+  it('should retry failed startup relay record publications before the hourly refresh', async () => {
+    jest.useFakeTimers();
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(privateKey());
+
+    try {
+      publicConnection.getPeers.mockReturnValue([]);
+      publicConnection.waitForPeers.mockResolvedValueOnce(false);
+      publicConnection.publishPubSub.mockResolvedValue(undefined);
+      publicConnection.putRecord.mockResolvedValue(undefined);
+      (
+        directory as unknown as {
+          getPublicConnection: () => Promise<IPFSConnection>;
+        }
+      ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+      (
+        directory as unknown as {
+          publishRelayIPNSRecord: () => Promise<boolean>;
+        }
+      ).publishRelayIPNSRecord = jest.fn().mockResolvedValue(false);
+
+      directory.start(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+      );
+      await flushPromises();
+
+      expect(publicConnection.waitForPeers).toHaveBeenCalledTimes(1);
+      expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
+
+      publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+      publicConnection.waitForPeers.mockResolvedValue(true);
+      jest.advanceTimersByTime(15_000);
+      await flushPromises();
+
+      expect(publicConnection.waitForPeers).toHaveBeenCalledTimes(2);
+      expect(publicConnection.publishPubSub).toHaveBeenCalled();
+    } finally {
+      directory.stop(network.getId());
+      jest.useRealTimers();
+    }
+  });
+
+  it('should not retry stopped relay record publications after an in-flight failure', async () => {
+    jest.useFakeTimers();
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(privateKey());
+    let finishPeerWait: (result: boolean) => void = () => undefined;
+    const pendingPeerWait = new Promise<boolean>((resolve) => {
+      finishPeerWait = resolve;
+    });
+
+    try {
+      publicConnection.getPeers.mockReturnValue([]);
+      publicConnection.waitForPeers.mockReturnValue(pendingPeerWait);
+      publicConnection.publishPubSub.mockResolvedValue(undefined);
+      publicConnection.putRecord.mockResolvedValue(undefined);
+      (
+        directory as unknown as {
+          getPublicConnection: () => Promise<IPFSConnection>;
+        }
+      ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+      (
+        directory as unknown as {
+          publishRelayIPNSRecord: () => Promise<boolean>;
+        }
+      ).publishRelayIPNSRecord = jest.fn().mockResolvedValue(false);
+
+      directory.start(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+      );
+      await flushPromises();
+
+      directory.stop(network.getId());
+      finishPeerWait(false);
+      await flushPromises();
+
+      jest.advanceTimersByTime(15_000);
+      await flushPromises();
+
+      expect(publicConnection.waitForPeers).toHaveBeenCalledTimes(1);
+      expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
+    } finally {
+      directory.stop(network.getId());
+      jest.useRealTimers();
+    }
+  });
+
   it('should dial a locally cached relay before waiting for public routing peers', async () => {
     const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
     const networkKey = privateKey();
@@ -199,8 +304,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr =
-      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
@@ -270,8 +374,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr =
-      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
@@ -345,8 +448,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr =
-      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: now + 60_000,
       issuedAt: now,
@@ -407,3 +509,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 });
+
+function flushPromises(): Promise<void> {
+  return Promise.resolve()
+    .then(() => Promise.resolve())
+    .then(() => Promise.resolve());
+}
