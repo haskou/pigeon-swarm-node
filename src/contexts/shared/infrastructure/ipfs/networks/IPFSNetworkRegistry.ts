@@ -1,7 +1,15 @@
+import type { RelayRuntimeSettingsInput } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettingsInput';
+
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import PrivateNetworkRelayRecordDirectory, {
   PrivateRelayListenOptions,
 } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import {
+  defaultRelayRuntimeSettings,
+  normalizeRelayRuntimeSettings,
+  type RelayRuntimeSettings,
+  relayRuntimeSettingsKey,
+} from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import Kernel from '@haskou/ddd-kernel';
 import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
@@ -22,6 +30,11 @@ type IPFSNetworkRegistryState = {
   networks: IPFSNetwork[];
   removedListeners: Array<(networkId: string) => Promise<void> | void>;
   privateRelayPorts: Record<string, number>;
+  relaySettings: RelayRuntimeSettings;
+  relaySettingsKey: string;
+  relaySettingsListeners: Array<
+    (settings: RelayRuntimeSettings) => Promise<void> | void
+  >;
   sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
   sharedPeerPrivateKeyPem?: string;
 };
@@ -46,6 +59,9 @@ export default class IPFSNetworkRegistry {
       listeners: [],
       networks: [],
       privateRelayPorts: {},
+      relaySettings: defaultRelayRuntimeSettings(),
+      relaySettingsKey: relayRuntimeSettingsKey(defaultRelayRuntimeSettings()),
+      relaySettingsListeners: [],
       removedListeners: [],
     };
 
@@ -68,22 +84,12 @@ export default class IPFSNetworkRegistry {
     return `${this.storagePath}/orbitdb/${id}`;
   }
 
-  private isPrivateRelayServerDisabledByEnv(): boolean {
-    const relayEnabled = pigeonEnvironment().PIGEON_RELAY_ENABLED;
-
-    if (relayEnabled === undefined) {
-      return false;
-    }
-
-    return relayEnabled === false;
-  }
-
   private getPrivateRelayDisabledReason(): string {
-    if (this.isPrivateRelayServerDisabledByEnv()) {
-      return 'PIGEON_RELAY_ENABLED disables private relay server.';
+    if (!this.getRelaySettings().privateRelay.enabled) {
+      return 'Private relay server disabled by node relay configuration.';
     }
 
-    return 'PIGEON_PRIVATE_RELAY_PORT_START/END not configured or invalid.';
+    return 'Node private relay port range not configured or invalid.';
   }
 
   private getPrivateRelayPortRange():
@@ -92,17 +98,14 @@ export default class IPFSNetworkRegistry {
         start: number;
       }
     | undefined {
-    if (this.isPrivateRelayServerDisabledByEnv()) {
+    const relaySettings = this.getRelaySettings();
+
+    if (!relaySettings.privateRelay.enabled) {
       return undefined;
     }
 
-    const environment = pigeonEnvironment();
-    const start =
-      environment.PIGEON_PRIVATE_RELAY_PORT_START ||
-      environment.PIGEON_RELAY_PORT_START;
-    const end =
-      environment.PIGEON_PRIVATE_RELAY_PORT_END ||
-      environment.PIGEON_RELAY_PORT_END;
+    const start = relaySettings.privateRelay.portStart;
+    const end = relaySettings.privateRelay.portEnd;
 
     if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) {
       return undefined;
@@ -116,16 +119,7 @@ export default class IPFSNetworkRegistry {
   }
 
   private getPrivateRelayBootstrapMultiaddrs(): string[] {
-    const environment = pigeonEnvironment();
-    const bootstrapMultiaddrs =
-      environment.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS ||
-      environment.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS ||
-      '';
-
-    return bootstrapMultiaddrs
-      .split(/[\n,]+/)
-      .map((multiaddr) => multiaddr.trim())
-      .filter(Boolean);
+    return this.getRelaySettings().manualRelayMultiaddrs;
   }
 
   private getPrivateRelayPort(networkId: string): number | undefined {
@@ -171,7 +165,7 @@ export default class IPFSNetworkRegistry {
       return undefined;
     }
 
-    const publicHost = pigeonEnvironment().PIGEON_PUBLIC_HOST;
+    const publicHost = this.getRelaySettings().publicHost;
 
     return {
       ...(publicHost
@@ -223,7 +217,7 @@ export default class IPFSNetworkRegistry {
       state.disabledBootstrapLoggedNetworkIds.push(networkId);
       Kernel.logger.info(
         `Private IPFS relay bootstrap disabled: networkId=${networkId}` +
-          ' reason="PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS not configured."',
+          ' reason="No manual relay multiaddrs configured on the node."',
       );
 
       return;
@@ -350,12 +344,15 @@ export default class IPFSNetworkRegistry {
     const storageLocation = this.getNetworkStorageLocation(config.getId());
 
     if (key) {
+      const relaySettings = this.getRelaySettings();
       const relayOptions = this.getPrivateRelayListenAddresses(config.getId());
       this.logPrivateRelayServerState(config.getId(), relayOptions);
       const connection = await PrivateIPFS.create({
         key,
+        manualRelayMultiaddrs: relaySettings.manualRelayMultiaddrs,
         name: config.getName(),
         privateKey: sharedPrivateKey,
+        publicRelayDiscoveryEnabled: relaySettings.publicRelay.discoveryEnabled,
         ...(relayOptions
           ? {
               announceAddresses: relayOptions.announceAddresses,
@@ -369,7 +366,12 @@ export default class IPFSNetworkRegistry {
       this.dialPrivateRelayBootstraps(config.getId(), connection);
       const network = new IPFSNetwork(config, connection);
 
-      this.relayRecordDirectory.start(network, relayOptions, sharedPrivateKey);
+      this.relayRecordDirectory.start(network, relayOptions, sharedPrivateKey, {
+        discoveryEnabled:
+          relaySettings.privateRelay.publicRecordDiscoveryEnabled,
+        publicationEnabled:
+          relaySettings.privateRelay.publicRecordPublicationEnabled,
+      });
 
       return network;
     }
@@ -401,6 +403,41 @@ export default class IPFSNetworkRegistry {
 
     await this.loadOrCreateSharedPeerPrivateKey();
     state.initialized = true;
+  }
+
+  public configureRelaySettings(
+    relaySettingsInput: RelayRuntimeSettingsInput,
+  ): boolean {
+    const state = this.getState();
+    const relaySettings = normalizeRelayRuntimeSettings(relaySettingsInput);
+    const nextKey = relayRuntimeSettingsKey(relaySettings);
+    const changed = state.relaySettingsKey !== nextKey;
+
+    state.relaySettings = relaySettings;
+    state.relaySettingsKey = nextKey;
+
+    if (changed) {
+      state.privateRelayPorts = {};
+      for (const listener of state.relaySettingsListeners) {
+        Promise.resolve(listener(relaySettings)).catch((error: unknown) => {
+          Kernel.logger.warn(
+            `Relay settings listener failed: ${String(error)}`,
+          );
+        });
+      }
+    }
+
+    return changed;
+  }
+
+  public getRelaySettings(): RelayRuntimeSettings {
+    return normalizeRelayRuntimeSettings(this.getState().relaySettings);
+  }
+
+  public onRelaySettingsChanged(
+    listener: (settings: RelayRuntimeSettings) => Promise<void> | void,
+  ): void {
+    this.getState().relaySettingsListeners.push(listener);
   }
 
   public async register(config: IPFSNetworkConfig): Promise<IPFSNetwork> {

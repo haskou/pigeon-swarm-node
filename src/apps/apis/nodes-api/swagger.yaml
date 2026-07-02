@@ -18,6 +18,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeResource'
+  /node/relay-configuration/:
+    get:
+      tags:
+        - nodes
+      summary: Get local node relay configuration
+      description: Returns relay settings owned by the local node. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Local node relay configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRelayConfigurationResource'
+        '403':
+          description: The authenticated identity is not the node owner.
+    put:
+      tags:
+        - nodes
+      summary: Replace local node relay configuration
+      description: Configures public relay advertising, public relay discovery, private relay ports, private relay record publication/discovery, public host, and manual relay multiaddrs. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeRelayConfigurationResource'
+      responses:
+        '200':
+          description: Relay configuration replaced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRelayConfigurationResource'
+        '403':
+          description: The authenticated identity is not the node owner.
+        '409':
+          description: The relay configuration is invalid.
   /node/networks/:
     get:
       tags:
@@ -215,6 +260,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NetworkResource'
+    NodePrivateRelayConfigurationResource:
+      type: object
+      required:
+        - enabled
+        - publicRecordDiscoveryEnabled
+        - publicRecordPublicationEnabled
+      properties:
+        enabled:
+          type: boolean
+        portStart:
+          type: number
+          description: Required when enabled is true.
+        portEnd:
+          type: number
+          description: Required when enabled is true.
+        publicRecordDiscoveryEnabled:
+          type: boolean
+          description: Allows the private network to discover encrypted relay records through public IPFS.
+        publicRecordPublicationEnabled:
+          type: boolean
+          description: Allows the private relay server to publish encrypted relay records through public IPFS.
+    NodePublicRelayConfigurationResource:
+      type: object
+      required:
+        - autoEnabled
+        - discoveryEnabled
+        - enabled
+        - libp2pPort
+        - port
+      properties:
+        autoEnabled:
+          type: boolean
+        discoveryEnabled:
+          type: boolean
+          description: Allows private IPFS networks to use public relay records discovered through the public relay registry.
+        enabled:
+          type: boolean
+        libp2pPort:
+          type: number
+        port:
+          type: number
+    NodeCallsRelayConfigurationResource:
+      type: object
+      properties:
+        port:
+          type: number
+          description: TURN listening port used to derive local call relay URLs from publicHost.
+    NodeRelayConfigurationResource:
+      type: object
+      required:
+        - callsRelay
+        - manualRelayMultiaddrs
+        - privateRelay
+        - publicRelay
+      properties:
+        callsRelay:
+          $ref: '#/components/schemas/NodeCallsRelayConfigurationResource'
+        manualRelayMultiaddrs:
+          type: array
+          items:
+            type: string
+          description: Full libp2p multiaddrs manually configured as relay/bootstrap fallbacks.
+        privateRelay:
+          $ref: '#/components/schemas/NodePrivateRelayConfigurationResource'
+        publicHost:
+          type: string
+          description: DNS name or IPv4 address used when announcing public/private relay multiaddrs.
+        publicRelay:
+          $ref: '#/components/schemas/NodePublicRelayConfigurationResource'
     PeerResource:
       type: object
       required:

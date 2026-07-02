@@ -18,17 +18,6 @@ export default class PublicRelayRuntime {
   private static readonly globalStateKey = '__pigeonSwarmPublicRelayRuntime';
   private static readonly recordRefreshDivider = 3;
 
-  private readonly configuration = PublicRelayConfiguration.fromEnvironment();
-
-  private readonly addressFactory = new PublicRelayAddressFactory(
-    this.configuration,
-  );
-
-  private readonly adapter = new PublicRelayRuntimeAdapter(
-    this.configuration,
-    this.addressFactory,
-  );
-
   private readonly signer = new PublicRelayRecordSigner();
 
   private readonly relayRecordRegistry = new PublicRelayRecordRegistry();
@@ -40,19 +29,23 @@ export default class PublicRelayRuntime {
   private get state(): {
     failoverInterval?: NodeJS.Timeout;
     node?: PublicRelayRuntimeNode;
+    relaySettingsListenerRegistered?: boolean;
     relayRecordRefreshInterval?: NodeJS.Timeout;
     relayStateLogged?: boolean;
     localPeerId?: string;
     relayRecord?: PublicRelayDebugState['relayRecord'];
+    configurationKey?: string;
   } {
     const globalState = globalThis as typeof globalThis & {
       [PublicRelayRuntime.globalStateKey]?: {
         failoverInterval?: NodeJS.Timeout;
         node?: PublicRelayRuntimeNode;
+        relaySettingsListenerRegistered?: boolean;
         relayRecordRefreshInterval?: NodeJS.Timeout;
         relayStateLogged?: boolean;
         localPeerId?: string;
         relayRecord?: PublicRelayDebugState['relayRecord'];
+        configurationKey?: string;
       };
     };
 
@@ -68,6 +61,40 @@ export default class PublicRelayRuntime {
 
   public constructor(private readonly networkRegistry: IPFSNetworkRegistry) {}
 
+  private getConfiguration(): PublicRelayConfiguration {
+    return PublicRelayConfiguration.fromRuntimeSettings(
+      this.networkRegistry.getRelaySettings(),
+    );
+  }
+
+  private getAddressFactory(
+    configuration: PublicRelayConfiguration,
+  ): PublicRelayAddressFactory {
+    return new PublicRelayAddressFactory(configuration);
+  }
+
+  private getAdapter(
+    configuration: PublicRelayConfiguration,
+    addressFactory: PublicRelayAddressFactory,
+  ): PublicRelayRuntimeAdapter {
+    return new PublicRelayRuntimeAdapter(configuration, addressFactory);
+  }
+
+  private registerRelaySettingsListener(): void {
+    if (this.state.relaySettingsListenerRegistered) {
+      return;
+    }
+
+    this.state.relaySettingsListenerRegistered = true;
+    this.networkRegistry.onRelaySettingsChanged(() => {
+      this.start().catch((error: unknown) => {
+        Kernel.logger.warn(
+          `Public relay runtime reload failed: ${String(error)}`,
+        );
+      });
+    });
+  }
+
   private rememberLocalPeerId(privateKey: Libp2pPrivateKeyLike): string {
     this.state.localPeerId = libp2pKeyAdapter.peerIdFromPrivateKey(privateKey);
 
@@ -78,53 +105,61 @@ export default class PublicRelayRuntime {
     return this.relayRecordRegistry.allExceptPeer(peerId).length;
   }
 
-  private buildDebugReason(peerId: string | undefined): string {
-    if (!this.configuration.isRelayEnabled()) {
+  private buildDebugReason(
+    configuration: PublicRelayConfiguration,
+    peerId: string | undefined,
+  ): string {
+    if (!configuration.isRelayEnabled()) {
       if (
-        this.configuration.isRelayAutoEnabled() &&
-        !this.configuration.hasPublicHost()
+        configuration.isRelayAutoEnabled() &&
+        !configuration.hasPublicHost()
       ) {
-        return 'Relay auto-enable configured but PIGEON_PUBLIC_HOST is empty.';
+        return 'Relay auto-enable configured but node public host is empty.';
       }
 
       if (
-        this.configuration.isRelayAutoEnabled() &&
+        configuration.isRelayAutoEnabled() &&
         this.externalRelayCount(peerId) > 0
       ) {
         return 'Relay server disabled while another active public relay is known.';
       }
 
-      if (this.configuration.isRelayAutoEnabled()) {
+      if (configuration.isRelayAutoEnabled()) {
         return 'Relay auto-enable configured and no active public relay is known.';
       }
 
-      return 'Relay server disabled by PIGEON_RELAY_ENABLED.';
+      return 'Relay server disabled by node relay configuration.';
     }
 
-    if (!this.configuration.hasPublicHost()) {
-      return 'Relay enabled but not advertised because PIGEON_PUBLIC_HOST is empty.';
+    if (!configuration.hasPublicHost()) {
+      return 'Relay enabled but not advertised because node public host is empty.';
     }
 
-    return 'Relay enabled and advertised with PIGEON_PUBLIC_HOST.';
+    return 'Relay enabled and advertised with node public host.';
   }
 
-  private shouldStartRelay(peerId: string | undefined): boolean {
-    if (this.configuration.isRelayEnabled()) {
+  private shouldStartRelay(
+    configuration: PublicRelayConfiguration,
+    peerId: string | undefined,
+  ): boolean {
+    if (configuration.isRelayEnabled()) {
       return true;
     }
 
     return (
-      this.configuration.isRelayAutoEnabled() &&
-      this.configuration.hasPublicHost() &&
+      configuration.isRelayAutoEnabled() &&
+      configuration.hasPublicHost() &&
       this.externalRelayCount(peerId) === 0
     );
   }
 
   private async buildRelayRecord(
     peerId: string,
+    configuration: PublicRelayConfiguration,
+    addressFactory: PublicRelayAddressFactory,
   ): Promise<PublicRelayDebugState['relayRecord'] | undefined> {
-    const relayAddress = this.addressFactory.relayAdvertiseAddress(peerId);
-    const libp2pAddress = this.addressFactory.libp2pAdvertiseAddress(peerId);
+    const relayAddress = addressFactory.relayAdvertiseAddress(peerId);
+    const libp2pAddress = addressFactory.libp2pAdvertiseAddress(peerId);
 
     if (!relayAddress) {
       return undefined;
@@ -132,7 +167,7 @@ export default class PublicRelayRuntime {
 
     const issuedAt = Date.now();
     const payload: Omit<PublicRelayRecordPayload, 'publicKey'> = {
-      expiresAt: issuedAt + this.configuration.getRelayRecordTtlMs(),
+      expiresAt: issuedAt + configuration.getRelayRecordTtlMs(),
       issuedAt,
       multiaddrs: [relayAddress, libp2pAddress].filter(
         (address): address is string => Boolean(address),
@@ -156,7 +191,14 @@ export default class PublicRelayRuntime {
       return;
     }
 
-    this.state.relayRecord = await this.buildRelayRecord(peerId);
+    const configuration = this.getConfiguration();
+    const addressFactory = this.getAddressFactory(configuration);
+
+    this.state.relayRecord = await this.buildRelayRecord(
+      peerId,
+      configuration,
+      addressFactory,
+    );
 
     if (!this.state.relayRecord) {
       return;
@@ -184,7 +226,7 @@ export default class PublicRelayRuntime {
     const intervalMs = Math.max(
       1000,
       Math.floor(
-        this.configuration.getRelayRecordTtlMs() /
+        this.getConfiguration().getRelayRecordTtlMs() /
           PublicRelayRuntime.recordRefreshDivider,
       ),
     );
@@ -196,17 +238,16 @@ export default class PublicRelayRuntime {
   }
 
   private startFailoverMonitor(): void {
-    if (
-      this.state.failoverInterval ||
-      !this.configuration.isRelayAutoEnabled()
-    ) {
+    const configuration = this.getConfiguration();
+
+    if (this.state.failoverInterval || !configuration.isRelayAutoEnabled()) {
       return;
     }
 
     const intervalMs = Math.max(
       1000,
       Math.floor(
-        this.configuration.getRelayRecordTtlMs() /
+        configuration.getRelayRecordTtlMs() /
           PublicRelayRuntime.recordRefreshDivider,
       ),
     );
@@ -223,7 +264,10 @@ export default class PublicRelayRuntime {
     this.state.failoverInterval.unref?.();
   }
 
-  private logRelayState(peerId: string | undefined): void {
+  private logRelayState(
+    configuration: PublicRelayConfiguration,
+    peerId: string | undefined,
+  ): void {
     if (this.state.relayStateLogged) {
       return;
     }
@@ -232,43 +276,101 @@ export default class PublicRelayRuntime {
     Kernel.logger.info(
       `Public relay state: running=${Boolean(
         this.state.node,
-      )} enabled=${this.configuration.isRelayEnabled()} autoEnabled=${this.configuration.isRelayAutoEnabled()} advertised=${Boolean(
-        this.state.relayRecord,
-      )} discoveredRelays=${this.externalRelayCount(peerId)} reason="${this.buildDebugReason(
-        peerId,
-      )}"`,
+      )} enabled=${configuration.isRelayEnabled()}` +
+        ` autoEnabled=${configuration.isRelayAutoEnabled()} advertised=${Boolean(
+          this.state.relayRecord,
+        )} discoveredRelays=${this.externalRelayCount(peerId)}` +
+        ` reason="${this.buildDebugReason(configuration, peerId)}"`,
     );
   }
 
-  public async start(): Promise<void> {
-    const sharedPeerPrivateKey =
-      await this.networkRegistry.getSharedPeerPrivateKey();
-    const localPeerId = this.rememberLocalPeerId(sharedPeerPrivateKey);
-
-    this.startFailoverMonitor();
-
-    if (!this.shouldStartRelay(localPeerId) || this.state.node) {
-      this.logRelayState(localPeerId);
-
-      return;
+  private async stopCurrentNode(stopFailoverMonitor = true): Promise<void> {
+    if (stopFailoverMonitor && this.state.failoverInterval) {
+      clearInterval(this.state.failoverInterval);
+      this.state.failoverInterval = undefined;
     }
 
-    this.state.node = await this.adapter.createNode(sharedPeerPrivateKey);
+    if (this.state.relayRecordRefreshInterval) {
+      clearInterval(this.state.relayRecordRefreshInterval);
+      this.state.relayRecordRefreshInterval = undefined;
+    }
+
+    await this.state.node?.stop?.();
+    this.state.node = undefined;
+    this.state.relayRecord = undefined;
+    this.state.relayStateLogged = false;
+  }
+
+  private async applyConfigurationKey(configurationKey: string): Promise<void> {
+    if (
+      this.state.configurationKey &&
+      this.state.configurationKey !== configurationKey
+    ) {
+      await this.stopCurrentNode();
+    }
+
+    this.state.configurationKey = configurationKey;
+  }
+
+  private async startRelayNode(
+    configuration: PublicRelayConfiguration,
+    sharedPeerPrivateKey: Libp2pPrivateKeyLike,
+  ): Promise<string | undefined> {
+    const addressFactory = this.getAddressFactory(configuration);
+    const adapter = this.getAdapter(configuration, addressFactory);
+
+    this.state.node = await adapter.createNode(sharedPeerPrivateKey);
     const peerId = this.state.node.peerId?.toString();
 
     if (peerId) {
       this.state.localPeerId = peerId;
-      this.state.relayRecord = await this.buildRelayRecord(peerId);
+      this.state.relayRecord = await this.buildRelayRecord(
+        peerId,
+        configuration,
+        addressFactory,
+      );
     }
 
     this.startRecordRefresh();
+
+    return peerId;
+  }
+
+  public async start(): Promise<void> {
+    this.registerRelaySettingsListener();
+
+    const configuration = this.getConfiguration();
+    const sharedPeerPrivateKey =
+      await this.networkRegistry.getSharedPeerPrivateKey();
+    const localPeerId = this.rememberLocalPeerId(sharedPeerPrivateKey);
+
+    await this.applyConfigurationKey(configuration.toKey());
+    this.startFailoverMonitor();
+
+    if (!this.shouldStartRelay(configuration, localPeerId)) {
+      await this.stopCurrentNode(false);
+      this.logRelayState(configuration, localPeerId);
+
+      return;
+    }
+
+    if (this.state.node) {
+      this.logRelayState(configuration, localPeerId);
+
+      return;
+    }
+
+    const peerId = await this.startRelayNode(
+      configuration,
+      sharedPeerPrivateKey,
+    );
 
     Kernel.logger.info(
       `Public relay runtime started peerId="${peerId || 'unknown'}" advertised=${Boolean(
         this.state.relayRecord,
       )}`,
     );
-    this.logRelayState(peerId || localPeerId);
+    this.logRelayState(configuration, peerId || localPeerId);
   }
 
   public run(): Promise<void> {
@@ -276,30 +378,31 @@ export default class PublicRelayRuntime {
   }
 
   public debugState(): PublicRelayDebugState {
+    const configuration = this.getConfiguration();
+    const addressFactory = this.getAddressFactory(configuration);
     const peerId =
       this.state.node?.peerId?.toString() || this.state.localPeerId;
     const advertisedAddress = peerId
-      ? this.addressFactory.relayAdvertiseAddress(peerId)
+      ? addressFactory.relayAdvertiseAddress(peerId)
       : undefined;
 
     return {
       advertisedAddresses: advertisedAddress ? [advertisedAddress] : [],
-      bootstrapRelayMultiaddrs:
-        this.configuration.getBootstrapRelayMultiaddrs(),
-      debugReason: this.buildDebugReason(peerId),
+      bootstrapRelayMultiaddrs: configuration.getBootstrapRelayMultiaddrs(),
+      debugReason: this.buildDebugReason(configuration, peerId),
       discoveredRelayCount: this.externalRelayCount(peerId),
       discoveredRelayMultiaddrs:
         this.relayRecordRegistry.multiaddrsExceptPeer(peerId),
-      discoveryEnabled: this.configuration.isRelayDiscoveryEnabled(),
+      discoveryEnabled: configuration.isRelayDiscoveryEnabled(),
       fallbackRelayCount:
         this.relayRecordRegistry.fallbackAllExceptPeer(peerId).length,
       fallbackRelayMultiaddrs:
         this.relayRecordRegistry.fallbackMultiaddrsExceptPeer(peerId),
-      listenAddresses: [this.addressFactory.relayListenAddress()],
+      listenAddresses: [addressFactory.relayListenAddress()],
       peerId,
       relayAdvertised: Boolean(advertisedAddress),
-      relayAutoEnabled: this.configuration.isRelayAutoEnabled(),
-      relayEnabled: this.configuration.isRelayEnabled(),
+      relayAutoEnabled: configuration.isRelayAutoEnabled(),
+      relayEnabled: configuration.isRelayEnabled(),
       relayRecord: this.state.relayRecord,
       running: Boolean(this.state.node),
     };

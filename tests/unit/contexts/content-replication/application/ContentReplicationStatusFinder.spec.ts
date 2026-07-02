@@ -9,6 +9,7 @@ import { ContentReplicationMetadata } from '@app/contexts/content-replication/do
 import { ContentReplicationPriority } from '@app/contexts/content-replication/domain/value-objects/ContentReplicationPriority';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
+import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -56,6 +57,7 @@ describe('ContentReplicationStatusFinder', () => {
             id: localNodeId,
             networks: {},
             owner: undefined,
+            relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
           }),
         ),
       saveLocalNode: () => Promise.resolve(),

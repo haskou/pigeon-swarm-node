@@ -1,5 +1,6 @@
 import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
 import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
+import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import LocalNodeMetadataRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository';
 import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -25,6 +26,8 @@ describe('LocalNodeMetadataRepository', () => {
   const canonicalNodeId = NodeId.generate().valueOf();
   const privateNetworkId = NetworkId.generate();
   const publicNetworkId = NetworkId.generate();
+  const defaultRelayConfiguration =
+    NodeRelayConfiguration.default().toPrimitives();
 
   let repository: LocalNodeMetadataRepository;
   let database: MockProxy<EmbeddedLocalDatabase>;
@@ -78,6 +81,7 @@ describe('LocalNodeMetadataRepository', () => {
         },
         nodeId: canonicalNodeId,
         owner: owner.valueOf(),
+        relayConfiguration: defaultRelayConfiguration,
       });
       networkRegistry.getAll.mockReturnValue([]);
 
@@ -95,6 +99,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: owner.valueOf(),
+        relayConfiguration: defaultRelayConfiguration,
       });
       expect(networkRegistry.initialize).toHaveBeenCalled();
       expect(networkRegistry.register).toHaveBeenCalledTimes(2);
@@ -114,9 +119,11 @@ describe('LocalNodeMetadataRepository', () => {
         _id: 'local',
         networks: {},
         nodeId: primitives.id,
+        relayConfiguration: defaultRelayConfiguration,
       });
       expect(primitives.networks).toEqual({});
       expect(primitives.owner).toBeUndefined();
+      expect(primitives.relayConfiguration).toEqual(defaultRelayConfiguration);
     });
   });
 
@@ -134,6 +141,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
 
       networkRegistry.getAll.mockReturnValue([]);
@@ -150,6 +158,7 @@ describe('LocalNodeMetadataRepository', () => {
               .toPrimitives(),
           },
           nodeId: canonicalNodeId,
+          relayConfiguration: defaultRelayConfiguration,
         }),
       );
       expect(networkRegistry.initialize).toHaveBeenCalled();
@@ -164,6 +173,7 @@ describe('LocalNodeMetadataRepository', () => {
         id: canonicalNodeId,
         networks: {},
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
       const obsoleteNetwork = mock<IPFSNetwork>();
       const obsoleteNetworkId =
@@ -200,6 +210,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
 
       networkRegistry.getAll.mockReturnValue([
@@ -228,14 +239,50 @@ describe('LocalNodeMetadataRepository', () => {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
 
-      networkRegistry.getAll.mockReturnValue([createNetworkMock(networkMother)]);
+      networkRegistry.getAll.mockReturnValue([
+        createNetworkMock(networkMother),
+      ]);
 
       await repository.saveLocalNode(node);
 
       expect(networkRegistry.removeNetwork).not.toHaveBeenCalled();
       expect(networkRegistry.register).not.toHaveBeenCalled();
+    });
+
+    it('should recreate private networks when relay settings change', async () => {
+      const networkMother = new NetworkMother()
+        .withId(privateNetworkId)
+        .withName(new NetworkName('private_0'))
+        .withPrivateKey();
+      const node = Node.fromPrimitives({
+        id: canonicalNodeId,
+        networks: {
+          [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
+        },
+        owner: undefined,
+        relayConfiguration: NodeRelayConfiguration.fromPrimitives({
+          privateRelay: {
+            enabled: true,
+            portEnd: 4199,
+            portStart: 4100,
+            publicRecordDiscoveryEnabled: true,
+            publicRecordPublicationEnabled: true,
+          },
+        }).toPrimitives(),
+      });
+
+      networkRegistry.configureRelaySettings.mockReturnValue(true);
+      networkRegistry.getAll.mockReturnValue([createNetworkMock(networkMother)]);
+
+      await repository.saveLocalNode(node);
+
+      expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
+        privateNetworkId.valueOf(),
+      );
+      expect(networkRegistry.register).toHaveBeenCalledTimes(1);
     });
   });
 });

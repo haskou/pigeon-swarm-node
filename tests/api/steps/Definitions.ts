@@ -2170,6 +2170,30 @@ export default class Definitions {
     await this.signCurrentRequest('GET', '/node/networks/');
   }
 
+  @given('I sign the current node relay configuration query')
+  public async iSignTheCurrentNodeRelayConfigurationQuery(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/node/relay-configuration/');
+  }
+
+  @given('I sign the current node relay configuration request')
+  public async iSignTheCurrentNodeRelayConfigurationRequest(): Promise<void> {
+    await this.signCurrentRequest('PUT', '/node/relay-configuration/');
+  }
+
+  @given('another identity signs the current node relay configuration request')
+  public async anotherIdentitySignsTheCurrentNodeRelayConfigurationRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'PUT',
+      '/node/relay-configuration/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current node network request')
   public async iSignTheCurrentNodeNetworkRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/node/networks/');

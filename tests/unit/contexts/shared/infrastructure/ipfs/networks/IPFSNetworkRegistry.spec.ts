@@ -166,37 +166,12 @@ describe('IPFSNetworkRegistry', () => {
     .export({ format: 'pem', type: 'pkcs8' })
     .toString();
   const previousStoragePath = process.env.IPFS_STORAGE_PATH;
-  const previousRelayEnabled = process.env.PIGEON_RELAY_ENABLED;
-  const previousPrivateRelayPortStart =
-    process.env.PIGEON_PRIVATE_RELAY_PORT_START;
-  const previousPrivateRelayPortEnd = process.env.PIGEON_PRIVATE_RELAY_PORT_END;
-  const previousPrivateRelayBootstrapMultiaddrs =
-    process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS;
-  const previousLegacyRelayBootstrapMultiaddrs =
-    process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
 
   afterEach(() => {
     delete (globalThis as IPFSNetworkRegistryTestGlobal)
       .__pigeonSwarmIPFSNetworkRegistryState;
 
     restoreEnvVariable('IPFS_STORAGE_PATH', previousStoragePath);
-    restoreEnvVariable('PIGEON_RELAY_ENABLED', previousRelayEnabled);
-    restoreEnvVariable(
-      'PIGEON_PRIVATE_RELAY_PORT_START',
-      previousPrivateRelayPortStart,
-    );
-    restoreEnvVariable(
-      'PIGEON_PRIVATE_RELAY_PORT_END',
-      previousPrivateRelayPortEnd,
-    );
-    restoreEnvVariable(
-      'PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS',
-      previousPrivateRelayBootstrapMultiaddrs,
-    );
-    restoreEnvVariable(
-      'PIGEON_BOOTSTRAP_RELAY_MULTIADDRS',
-      previousLegacyRelayBootstrapMultiaddrs,
-    );
 
     jest.restoreAllMocks();
   });
@@ -346,12 +321,16 @@ describe('IPFSNetworkRegistry', () => {
   });
 
   describe('private relay bootstrap', () => {
-    it('should disable private relay server when explicitly configured', () => {
-      process.env.PIGEON_RELAY_ENABLED = 'false';
-      process.env.PIGEON_PRIVATE_RELAY_PORT_START = '4100';
-      process.env.PIGEON_PRIVATE_RELAY_PORT_END = '4199';
+    it('should disable private relay server when disabled by node settings', () => {
       const registry = createRegistry();
 
+      registry.configureRelaySettings({
+        privateRelay: {
+          enabled: false,
+          portEnd: 4199,
+          portStart: 4100,
+        },
+      });
       const relayOptions = (
         registry as unknown as {
           getPrivateRelayListenAddresses: (networkId: string) =>
@@ -365,12 +344,45 @@ describe('IPFSNetworkRegistry', () => {
       expect(relayOptions).toBeUndefined();
     });
 
-    it('should parse configured private relay bootstrap multiaddrs', () => {
-      process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS =
-        '/dns4/relay-1.example.com/tcp/4100/p2p/12D3KooWRelay1,\n' +
-        '/dns4/relay-2.example.com/tcp/4101/p2p/12D3KooWRelay2';
+    it('should build private relay listen options from node settings', () => {
       const registry = createRegistry();
 
+      registry.configureRelaySettings({
+        privateRelay: {
+          enabled: true,
+          portEnd: 4100,
+          portStart: 4100,
+        },
+        publicHost: 'relay.example.com',
+      });
+      const relayOptions = (
+        registry as unknown as {
+          getPrivateRelayListenAddresses: (networkId: string) =>
+            | {
+                announceAddresses?: string[];
+                listenAddresses: string[];
+              }
+            | undefined;
+        }
+      ).getPrivateRelayListenAddresses('network-1');
+
+      expect(relayOptions).toEqual(
+        expect.objectContaining({
+          announceAddresses: ['/dns4/relay.example.com/tcp/4100'],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4100'],
+        }),
+      );
+    });
+
+    it('should parse configured private relay bootstrap multiaddrs', () => {
+      const registry = createRegistry();
+
+      registry.configureRelaySettings({
+        manualRelayMultiaddrs: [
+          '/dns4/relay-1.example.com/tcp/4100/p2p/12D3KooWRelay1',
+          '/dns4/relay-2.example.com/tcp/4101/p2p/12D3KooWRelay2',
+        ],
+      });
       const multiaddrs = (
         registry as unknown as {
           getPrivateRelayBootstrapMultiaddrs: () => string[];
@@ -384,11 +396,14 @@ describe('IPFSNetworkRegistry', () => {
     });
 
     it('should dial configured private relay bootstrap multiaddrs', async () => {
-      process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS =
-        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay';
       const registry = createRegistry();
       const connection = mock<IPFSConnection>();
 
+      registry.configureRelaySettings({
+        manualRelayMultiaddrs: [
+          '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay',
+        ],
+      });
       connection.dial.mockResolvedValue(undefined);
       connection.getPeers.mockReturnValue(['12D3KooWRelay']);
 

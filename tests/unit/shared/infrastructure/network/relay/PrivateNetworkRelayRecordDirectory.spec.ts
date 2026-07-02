@@ -43,8 +43,6 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   let previousLocalDatabasePath: string | undefined;
 
   beforeEach(async () => {
-    delete process.env.PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED;
-    delete process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED;
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS;
     delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
@@ -124,6 +122,31 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(logger.warn).not.toHaveBeenCalledWith(
       expect.stringContaining('reason="No publication channel succeeded."'),
     );
+  });
+
+  it('should not publish or discover relay records when disabled by options', () => {
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const publish = jest.spyOn(directory, 'publish').mockResolvedValue();
+    const discover = jest.spyOn(directory, 'discover').mockResolvedValue();
+
+    directory.start(
+      privateNetwork(privateKey()),
+      {
+        announceAddresses: [
+          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+        ],
+        listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+        relayDataLimitBytes: 67_108_864,
+      },
+      mock(),
+      {
+        discoveryEnabled: false,
+        publicationEnabled: false,
+      },
+    );
+
+    expect(publish).not.toHaveBeenCalled();
+    expect(discover).not.toHaveBeenCalled();
   });
 
   it('should publish private relay records hourly by default', () => {

@@ -55,13 +55,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return 15_000;
   }
 
-  private static configuredBootstrapRelayMultiaddrs(): string[] {
-    return (pigeonEnvironment().PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
-      .split(',')
-      .map((address) => address.trim())
-      .filter(Boolean);
-  }
-
   private static localPeerId(heliaCore: HeliaInstance): string | undefined {
     return heliaCore.libp2p.peerId?.toString();
   }
@@ -69,11 +62,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private static async dialConfiguredBootstrapRelays(
     heliaCore: HeliaInstance,
     networkName: string,
+    multiaddrs: string[],
   ): Promise<void> {
     await HeliaIPFS.dialMultiaddrs(
       heliaCore,
       networkName,
-      HeliaIPFS.configuredBootstrapRelayMultiaddrs(),
+      multiaddrs,
       'configured bootstrap relay',
     );
   }
@@ -213,9 +207,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
-    await HeliaIPFS.dialConfiguredBootstrapRelays(heliaCore, networkName);
-    await HeliaIPFS.dialKnownPublicRelayRecords(heliaCore, networkName);
-    HeliaIPFS.dialPublicRelayRecordsWhenDiscovered(heliaCore, networkName);
+    await HeliaIPFS.dialConfiguredBootstrapRelays(
+      heliaCore,
+      networkName,
+      options.manualRelayMultiaddrs || [],
+    );
+
+    if (options.publicRelayDiscoveryEnabled) {
+      await HeliaIPFS.dialKnownPublicRelayRecords(heliaCore, networkName);
+      HeliaIPFS.dialPublicRelayRecordsWhenDiscovered(heliaCore, networkName);
+    }
 
     return heliaCore;
   }
