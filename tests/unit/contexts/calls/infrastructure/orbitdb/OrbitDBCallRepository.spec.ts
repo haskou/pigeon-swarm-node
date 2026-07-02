@@ -176,6 +176,102 @@ describe('OrbitDBCallRepository', () => {
     expect(calls.query).not.toHaveBeenCalled();
   });
 
+  it('prefers fresh call heads over stale timeout indexes', async () => {
+    const staleActiveDocument = communityCallDocument();
+    const staleActiveIndex = {
+      calls: [staleActiveDocument],
+      id: 'call-active-index',
+      updatedAt: 1780000000000,
+    };
+    const missedDocument: OrbitDBCallDocument = {
+      ...communityCallDocument(),
+      participants: [
+        {
+          identityId: creatorIdentityId,
+          joinedAt: 1780000000000,
+          lastSeenAt: 1780000000000,
+          status: 'joined',
+        },
+        {
+          identityId: participantIdentityId,
+          missedAt: 1780000060000,
+          status: 'missed',
+        },
+      ],
+      status: 'missed',
+      updatedAt: 1780000060000,
+    };
+
+    const replicatedHeads = createStore();
+    const replicatedRegistry = new OrbitDBReplicatedStateRegistry();
+
+    await replicatedHeads.put(`call:${callId}`, missedDocument);
+    await replicatedHeads.put('call-active-index', staleActiveIndex);
+    await replicatedRegistry.register(networkId, {
+      calls: createStore(),
+      heads: replicatedHeads,
+    } as never);
+
+    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+
+    try {
+      await expect(
+        replicatedRepository.findTimedOutRingingCalls(
+          new Timestamp(1780000060000),
+        ),
+      ).resolves.toEqual([]);
+    } finally {
+      replicatedRegistry.clear();
+    }
+  });
+
+  it('keeps fresher timeout index documents over stale call heads', async () => {
+    const stalePrimaryDocument = communityCallDocument();
+    const joinedDocument: OrbitDBCallDocument = {
+      ...communityCallDocument(),
+      participants: [
+        {
+          identityId: creatorIdentityId,
+          joinedAt: 1780000000000,
+          lastSeenAt: 1780000060000,
+          status: 'joined',
+        },
+        {
+          identityId: participantIdentityId,
+          joinedAt: 1780000060000,
+          lastSeenAt: 1780000060000,
+          status: 'joined',
+        },
+      ],
+      updatedAt: 1780000060000,
+    };
+    const replicatedHeads = createStore();
+    const replicatedRegistry = new OrbitDBReplicatedStateRegistry();
+
+    await replicatedHeads.put(`call:${callId}`, stalePrimaryDocument);
+    await replicatedHeads.put('call-active-index', {
+      calls: [joinedDocument],
+      id: 'call-active-index',
+      updatedAt: 1780000060000,
+    });
+    await replicatedRegistry.register(networkId, {
+      calls: createStore(),
+      heads: replicatedHeads,
+    } as never);
+
+    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+
+    try {
+      await expect(
+        replicatedRepository.findTimedOutRingingCalls(
+          new Timestamp(1780000060000),
+        ),
+      ).resolves.toEqual([]);
+    } finally {
+      replicatedRegistry.clear();
+    }
+  });
+
   it('does not wait for secondary indexes when saving calls', async () => {
     const putHead = heads.put.getMockImplementation();
 

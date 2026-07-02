@@ -139,7 +139,13 @@ export default class OrbitDBCallIndex {
           this.callHeadKey(document.id),
         );
 
-        return head && this.isDocument(head) ? head : document;
+        if (!head || !this.isDocument(head)) {
+          return document;
+        }
+
+        return this.freshness(head) >= this.freshness(document)
+          ? head
+          : document;
       }),
     );
   }
@@ -411,9 +417,11 @@ export default class OrbitDBCallIndex {
     timeoutThreshold: Timestamp,
   ): Promise<OrbitDBCallDocument[]> {
     return (
-      await this.callDocumentsFromIndexAndCache(
-        this.activeIndexHeadKey(),
-        (document) => document.status === 'active',
+      await this.freshPrimaryDocuments(
+        await this.callDocumentsFromIndexAndCache(
+          this.activeIndexHeadKey(),
+          (document) => document.status === 'active',
+        ),
       )
     ).filter(
       (document) =>
@@ -429,9 +437,11 @@ export default class OrbitDBCallIndex {
     timeoutThreshold: Timestamp,
   ): Promise<OrbitDBCallDocument[]> {
     return (
-      await this.callDocumentsFromIndexAndCache(
-        this.activeIndexHeadKey(),
-        (document) => document.status === 'active',
+      await this.freshPrimaryDocuments(
+        await this.callDocumentsFromIndexAndCache(
+          this.activeIndexHeadKey(),
+          (document) => document.status === 'active',
+        ),
       )
     ).filter(
       (document) =>
