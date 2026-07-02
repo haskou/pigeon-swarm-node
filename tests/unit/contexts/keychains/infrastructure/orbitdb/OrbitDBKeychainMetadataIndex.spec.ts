@@ -1,10 +1,12 @@
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
 
 describe('OrbitDBKeychainMetadataIndex', () => {
+  const networkId = '550e8400-e29b-41d4-a716-446655440002';
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
   let registry: OrbitDBReplicatedStateRegistry;
@@ -30,6 +32,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     await repository.save(
       keychain,
       new KeychainExternalIdentifier('bafykeychain2'),
+      [new NetworkId(networkId)],
     );
 
     const records = await repository.findByOwnerIdentityId(
@@ -39,6 +42,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     expect(records).toEqual([
       expect.objectContaining({
         cid: 'bafykeychain2',
+        networkIds: [networkId],
         ownerIdentityId: mother.ownerIdentityId.valueOf(),
         version: 2,
       }),

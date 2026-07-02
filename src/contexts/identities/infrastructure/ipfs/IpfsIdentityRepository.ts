@@ -78,9 +78,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     ];
   }
 
-  private async routingNetworkIdsFrom(
-    document: IdentityMetadataRecord,
-  ): Promise<string[]> {
+  private routingNetworkIdsFrom(document: IdentityMetadataRecord): string[] {
     const metadataNetworkIds = this.networkIdsFrom(document);
 
     if (metadataNetworkIds.length > 0) {
@@ -91,15 +89,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return [...new Set(this.mapper.toDocument(document.identity).networks)];
     }
 
-    try {
-      const identityDocument = await this.getDocumentFromCid(
-        new IPFSId(document.cid),
-      );
-
-      return [...new Set(identityDocument.networks)];
-    } catch {
-      return [];
-    }
+    return [];
   }
 
   private async deleteMetadata(cid: IPFSId): Promise<void> {
@@ -500,17 +490,24 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     for (const document of this.latestMetadataByIdentity(
       await this.metadataIndex.findAll(),
     )) {
-      const networkIds = await this.routingNetworkIdsFrom(document);
+      const networkIds = this.routingNetworkIdsFrom(document);
 
       if (networkIds.length === 0) {
         continue;
       }
 
       try {
+        const connectedNetworkIds =
+          await this.ipfsManager.findConnectedNetworkIds(networkIds);
+
+        if (connectedNetworkIds.length === 0) {
+          continue;
+        }
+
         await this.ipfsManager.putRecordToNetworks(
           this.ROUTING_KEY_PREFIX + document.identityId,
           document.cid,
-          networkIds,
+          connectedNetworkIds,
         );
         republished++;
       } catch {

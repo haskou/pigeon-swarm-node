@@ -3,6 +3,7 @@ import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value
 import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMetadataDocument';
@@ -30,6 +31,18 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     const value = document[attribute];
 
     return typeof value === 'number' ? value : undefined;
+  }
+
+  private stringArrayValue(
+    document: Record<string, unknown>,
+    attribute: string,
+  ): string[] | undefined {
+    const value = document[attribute];
+
+    return Array.isArray(value) &&
+      value.every((item) => typeof item === 'string')
+      ? value
+      : undefined;
   }
 
   private ownerIdentityIdFrom(
@@ -79,6 +92,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     return {
       cid,
       keychain: this.keychainFrom(document, ownerIdentityId),
+      networkIds: this.stringArrayValue(document, 'networkIds'),
       ownerIdentityId,
       previousCid: this.stringValue(document, 'previousCid'),
       receivedAt: this.numberValue(document, 'receivedAt') || 0,
@@ -95,6 +109,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       cid: record.cid,
       encryptedPayload: primitives?.encryptedPayload,
       id: record.cid,
+      networkIds: record.networkIds,
       ownerIdentityId: record.ownerIdentityId,
       previousCid:
         record.previousCid || primitives?.previousKeychainExternalIdentifier,
@@ -325,12 +340,14 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
   public async save(
     keychain: Keychain,
     externalIdentifier: KeychainExternalIdentifier,
+    networkIds: NetworkId[] = [],
   ): Promise<void> {
     const primitives = keychain.toPrimitives();
     const document: OrbitDBKeychainMetadataDocument = {
       cid: externalIdentifier.valueOf(),
       encryptedPayload: primitives.encryptedPayload,
       id: externalIdentifier.valueOf(),
+      networkIds: networkIds.map((networkId) => networkId.valueOf()),
       ownerIdentityId: primitives.ownerIdentityId,
       previousCid: primitives.previousKeychainExternalIdentifier,
       receivedAt: Date.now(),

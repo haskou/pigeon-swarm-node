@@ -24,6 +24,9 @@ describe('IpfsKeychainRepository', () => {
     );
     ipfs.hasConnectedPeers.mockResolvedValue(false);
     ipfs.getRecordCandidates.mockResolvedValue([]);
+    ipfs.findConnectedNetworkIds.mockImplementation(
+      async (networkIds) => networkIds,
+    );
   });
 
   it('should use replicated keychain metadata when the IPFS block is not available', async () => {
@@ -173,6 +176,7 @@ describe('IpfsKeychainRepository', () => {
       {
         cid: 'bafy-latest',
         keychain: latest,
+        networkIds: ['network-1'],
         ownerIdentityId: mother.ownerIdentityId.valueOf(),
         previousCid: 'bafy-older',
         receivedAt: 200,
@@ -181,33 +185,80 @@ describe('IpfsKeychainRepository', () => {
       {
         cid: 'bafy-older',
         keychain: older,
+        networkIds: ['network-1'],
         ownerIdentityId: mother.ownerIdentityId.valueOf(),
         previousCid: undefined,
         receivedAt: 100,
         version: 1,
       },
     ]);
-    ipfs.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
-      if (cid.valueOf() === 'identity-cid') {
-        return Promise.resolve({ networks: ['network-1'] } as T);
-      }
-
-      return Promise.resolve(new IpfsKeychainMapper().toDocument(latest) as T);
-    });
-    ipfs.getRecordCandidates.mockResolvedValue(['identity-cid']);
     ipfs.putRecordToNetworks.mockResolvedValue(undefined);
 
     const republished = await repository.republishLocalRoutingRecords();
 
     expect(republished).toBe(1);
-    expect(ipfs.getJSON).not.toHaveBeenCalledWith(new IPFSId('bafy-latest'));
-    expect(ipfs.getJSON).not.toHaveBeenCalledWith(new IPFSId('bafy-older'));
+    expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
+    expect(ipfs.getJSON).not.toHaveBeenCalled();
+    expect(ipfs.getBytes).not.toHaveBeenCalled();
     expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
     expect(ipfs.putRecordToNetworks).toHaveBeenCalledWith(
       `pigeon-swarm_keychain-${mother.ownerIdentityId.valueOf()}`,
       'bafy-latest',
       ['network-1'],
     );
+  });
+
+  it('should skip keychain routing metadata without known networks', async () => {
+    const mother = await KeychainMother.create();
+    const keychain = mother.withVersion(2).build();
+
+    metadataIndex.findAll.mockResolvedValue([
+      {
+        cid: 'bafy-latest',
+        keychain,
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 200,
+        version: 2,
+      },
+    ]);
+
+    const republished = await repository.republishLocalRoutingRecords();
+
+    expect(republished).toBe(0);
+    expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
+    expect(ipfs.getJSON).not.toHaveBeenCalled();
+    expect(ipfs.getBytes).not.toHaveBeenCalled();
+    expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
+    expect(ipfs.putRecordToNetworks).not.toHaveBeenCalled();
+  });
+
+  it('should skip keychain routing metadata when known networks have no connected peers', async () => {
+    const mother = await KeychainMother.create();
+    const keychain = mother.withVersion(2).build();
+
+    metadataIndex.findAll.mockResolvedValue([
+      {
+        cid: 'bafy-latest',
+        keychain,
+        networkIds: ['network-1'],
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 200,
+        version: 2,
+      },
+    ]);
+    ipfs.findConnectedNetworkIds.mockResolvedValue([]);
+
+    const republished = await repository.republishLocalRoutingRecords();
+
+    expect(republished).toBe(0);
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(['network-1']);
+    expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
+    expect(ipfs.getJSON).not.toHaveBeenCalled();
+    expect(ipfs.getBytes).not.toHaveBeenCalled();
+    expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
+    expect(ipfs.putRecordToNetworks).not.toHaveBeenCalled();
   });
 });
 
