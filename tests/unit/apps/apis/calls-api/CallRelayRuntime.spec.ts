@@ -6,6 +6,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
+import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -39,9 +40,7 @@ describe('CallRelayRuntime', () => {
 
   beforeEach(() => {
     previousEnvironment = { ...process.env };
-    process.env.CALLS_TURN_PORT = '4199';
     process.env.CALLS_TURN_SHARED_SECRET = 'turn-shared-secret';
-    process.env.PIGEON_PUBLIC_HOST = 'relay.example.test';
     clearCallRelayRuntimeState();
 
     networkRegistry = mock<IPFSNetworkRegistry>();
@@ -53,6 +52,14 @@ describe('CallRelayRuntime', () => {
     publicNetwork.getId.mockReturnValue('public-network');
     publicNetwork.isPrivate.mockReturnValue(false);
     networkRegistry.getAll.mockReturnValue([]);
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    );
     networkRegistry.getSharedPeerPrivateKey.mockResolvedValue(
       {} as Libp2pPrivateKeyLike,
     );

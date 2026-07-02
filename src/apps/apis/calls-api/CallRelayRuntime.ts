@@ -15,8 +15,6 @@ type CallRelayRuntimeState = {
 export default class CallRelayRuntime implements Runtime {
   private static readonly globalStateKey = '__pigeonSwarmCallRelayRuntime';
 
-  private readonly configuration = CallRelayConfiguration.fromEnvironment();
-
   public constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
     private readonly discovery: CallRelayRecordDiscovery,
@@ -34,6 +32,12 @@ export default class CallRelayRuntime implements Runtime {
     };
 
     return globalState[CallRelayRuntime.globalStateKey];
+  }
+
+  private get configuration(): CallRelayConfiguration {
+    return CallRelayConfiguration.fromRelaySettings(
+      this.networkRegistry.getRelaySettings(),
+    );
   }
 
   private async publishCurrentRecord(network: IPFSNetwork): Promise<void> {
