@@ -21,7 +21,7 @@ export type PrivateRelayListenOptions = {
 };
 
 export default class PrivateNetworkRelayRecordDirectory {
-  private static readonly defaultRelayRecordPublicationIntervalMs = 15_000;
+  private static readonly defaultRelayRecordPublicationIntervalMs = 60 * 60_000;
 
   private static readonly inlineIPNSValuePrefix =
     '/pigeon-swarm/private-relay/v1/';

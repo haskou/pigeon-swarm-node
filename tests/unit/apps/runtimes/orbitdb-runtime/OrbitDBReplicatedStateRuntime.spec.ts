@@ -152,7 +152,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     expect((stores.events as unknown as FakeStore).all).not.toHaveBeenCalled();
   });
 
-  it('repairs read indexes again when replicated documents arrive after network registration', async () => {
+  it('debounces targeted read-index repair for replicated document updates', async () => {
     jest.useFakeTimers();
 
     const stores = fakeStores();
@@ -174,6 +174,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
       unregisterNetworkStores: jest.fn(),
     } as unknown as OrbitDBReplicatedDomainEventPublisher;
     const repairCritical = jest.fn().mockResolvedValue({});
+    const repairStore = jest.fn().mockResolvedValue({ identities: 1 });
     const runtime = new OrbitDBReplicatedStateRuntime(
       networkRegistry,
       {} as MessageBus,
@@ -182,6 +183,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
       { project: jest.fn() } as unknown as OrbitDBDomainEventProjector,
       {
         repairCritical,
+        repairStore,
         repairSecondary: jest.fn().mockResolvedValue({}),
       } as unknown as OrbitDBMetadataHeadRepairer,
     );
@@ -201,8 +203,25 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     expect(repairCritical).toHaveBeenCalledTimes(1);
 
     updateHandler?.();
-    await jest.advanceTimersByTimeAsync(1_000);
+    updateHandler?.();
+    await jest.advanceTimersByTimeAsync(29_999);
 
-    expect(repairCritical).toHaveBeenCalledTimes(2);
+    expect(repairStore).not.toHaveBeenCalled();
+    expect(repairCritical).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(repairStore).toHaveBeenCalledTimes(1);
+    expect(repairStore).toHaveBeenCalledWith('identities');
+    expect(repairCritical).toHaveBeenCalledTimes(1);
+
+    updateHandler?.();
+    await jest.advanceTimersByTimeAsync(30_000);
+
+    expect(repairStore).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(15 * 60_000);
+
+    expect(repairStore).toHaveBeenCalledTimes(2);
   });
 });

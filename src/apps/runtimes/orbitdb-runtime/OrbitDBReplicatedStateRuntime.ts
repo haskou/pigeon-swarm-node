@@ -4,6 +4,7 @@ import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/Orb
 import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
+import { OrbitDBReplicatedDocumentStoreName } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
@@ -15,6 +16,10 @@ import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
 
 export default class OrbitDBReplicatedStateRuntime {
   private static readonly criticalRepairDelayMs = 1_000;
+
+  private static readonly documentUpdateRepairCooldownMs = 15 * 60_000;
+
+  private static readonly documentUpdateRepairDelayMs = 30_000;
 
   private static readonly secondaryRepairDelayMs = 120_000;
 
@@ -29,7 +34,14 @@ export default class OrbitDBReplicatedStateRuntime {
 
   private readonly repairingSecondaryNetworkIds = new Set<string>();
 
-  private readonly pendingCriticalRepairNetworkIds = new Set<string>();
+  private readonly scheduledDocumentUpdateRepairTimeouts = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
+  private readonly repairingDocumentUpdateKeys = new Set<string>();
+
+  private readonly lastDocumentUpdateRepairAt = new Map<string, number>();
 
   constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
@@ -101,7 +113,7 @@ export default class OrbitDBReplicatedStateRuntime {
   private replicatedDocumentStores(
     stores: OrbitDBReplicatedStateStores,
   ): Array<{
-    name: string;
+    name: OrbitDBReplicatedDocumentStoreName;
     store: OrbitDBDatabase | undefined;
   }> {
     return [
@@ -125,6 +137,83 @@ export default class OrbitDBReplicatedStateRuntime {
     ];
   }
 
+  private documentUpdateRepairKey(
+    networkId: string,
+    storeName: OrbitDBReplicatedDocumentStoreName,
+  ): string {
+    return `${networkId}:${storeName}`;
+  }
+
+  private documentUpdateRepairDelayFor(repairKey: string): number {
+    const lastRepairAt = this.lastDocumentUpdateRepairAt.get(repairKey) || 0;
+    const elapsedMs = Date.now() - lastRepairAt;
+    const cooldownRemainingMs = Math.max(
+      0,
+      OrbitDBReplicatedStateRuntime.documentUpdateRepairCooldownMs - elapsedMs,
+    );
+
+    return Math.max(
+      OrbitDBReplicatedStateRuntime.documentUpdateRepairDelayMs,
+      cooldownRemainingMs,
+    );
+  }
+
+  private repairDocumentStoreHeads(
+    networkId: string,
+    storeName: OrbitDBReplicatedDocumentStoreName,
+  ): void {
+    const repairKey = this.documentUpdateRepairKey(networkId, storeName);
+
+    if (
+      this.scheduledCriticalRepairNetworkIds.has(networkId) ||
+      this.repairingCriticalNetworkIds.has(networkId) ||
+      this.repairingDocumentUpdateKeys.has(repairKey)
+    ) {
+      return;
+    }
+
+    this.repairingDocumentUpdateKeys.add(repairKey);
+    this.headRepairer
+      .repairStore(storeName)
+      .then((result) => {
+        Kernel.logger.debug(
+          `OrbitDB document update read indexes repaired: networkId=${networkId}` +
+            ` store=${storeName}` +
+            ` result=${JSON.stringify(result)}`,
+        );
+      })
+      .catch((error: unknown) => {
+        Kernel.logger.warn(
+          `OrbitDB document update read index repair failed: networkId=${networkId}` +
+            ` store=${storeName}` +
+            ` error=${String(error)}`,
+        );
+      })
+      .finally(() => {
+        this.lastDocumentUpdateRepairAt.set(repairKey, Date.now());
+        this.repairingDocumentUpdateKeys.delete(repairKey);
+      });
+  }
+
+  private scheduleDocumentStoreHeadRepair(
+    networkId: string,
+    storeName: OrbitDBReplicatedDocumentStoreName,
+  ): void {
+    const repairKey = this.documentUpdateRepairKey(networkId, storeName);
+
+    if (this.scheduledDocumentUpdateRepairTimeouts.has(repairKey)) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      this.scheduledDocumentUpdateRepairTimeouts.delete(repairKey);
+      this.repairDocumentStoreHeads(networkId, storeName);
+    }, this.documentUpdateRepairDelayFor(repairKey));
+
+    timeout.unref?.();
+    this.scheduledDocumentUpdateRepairTimeouts.set(repairKey, timeout);
+  }
+
   private subscribeToDocumentUpdates(
     networkId: string,
     stores: OrbitDBReplicatedStateStores,
@@ -135,7 +224,7 @@ export default class OrbitDBReplicatedStateRuntime {
           `OrbitDB replicated document update: networkId=${networkId}` +
             ` store=${name}`,
         );
-        this.repairHeads(networkId);
+        this.scheduleDocumentStoreHeadRepair(networkId, name);
       });
     }
   }
@@ -171,8 +260,6 @@ export default class OrbitDBReplicatedStateRuntime {
       this.scheduledCriticalRepairNetworkIds.has(networkId) ||
       this.repairingCriticalNetworkIds.has(networkId)
     ) {
-      this.pendingCriticalRepairNetworkIds.add(networkId);
-
       return;
     }
 
@@ -201,10 +288,6 @@ export default class OrbitDBReplicatedStateRuntime {
         })
         .finally(() => {
           this.repairingCriticalNetworkIds.delete(networkId);
-
-          if (this.pendingCriticalRepairNetworkIds.delete(networkId)) {
-            this.repairHeads(networkId);
-          }
         });
     }, OrbitDBReplicatedStateRuntime.criticalRepairDelayMs);
     timeout.unref?.();
@@ -259,6 +342,18 @@ export default class OrbitDBReplicatedStateRuntime {
     });
     this.networkRegistry.onNetworkRemoved(async (networkId) => {
       this.registeredNetworks.delete(networkId);
+      for (const [repairKey, timeout] of [
+        ...this.scheduledDocumentUpdateRepairTimeouts.entries(),
+      ]) {
+        if (!repairKey.startsWith(`${networkId}:`)) {
+          continue;
+        }
+
+        clearTimeout(timeout);
+        this.scheduledDocumentUpdateRepairTimeouts.delete(repairKey);
+        this.repairingDocumentUpdateKeys.delete(repairKey);
+        this.lastDocumentUpdateRepairAt.delete(repairKey);
+      }
       await this.registry.unregister(networkId);
       this.publisher.unregisterNetworkStores(networkId);
     });
