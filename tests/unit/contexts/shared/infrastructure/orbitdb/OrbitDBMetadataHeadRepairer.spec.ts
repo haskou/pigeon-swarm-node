@@ -394,6 +394,37 @@ describe('OrbitDBMetadataHeadRepairer', () => {
       expect.objectContaining({ identityId: 'identity-1' }),
     );
   });
+
+  it('should repair a single replicated document store', async () => {
+    identities.push({
+      cid: 'identity-v1',
+      handle: 'hasko',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      receivedAt: 1,
+      version: 1,
+    });
+    keychains.push({
+      cid: 'keychain-v1',
+      id: 'identity-1',
+      ownerIdentityId: 'identity-1',
+      receivedAt: 1,
+      version: 1,
+    });
+
+    await expect(repairer.repairStore('identities')).resolves.toEqual({
+      identities: 1,
+    });
+
+    expect(heads.get('identity:identity-1')).toEqual(
+      expect.objectContaining({ id: 'identity-1' }),
+    );
+    expect(heads.get('identity-handle:hasko')).toEqual(
+      expect.objectContaining({ id: 'identity-1' }),
+    );
+    expect(heads.get('keychain:identity-1')).toBeUndefined();
+  });
 });
 
 function queryableStore(documents: Record<string, unknown>[]) {

@@ -1327,6 +1327,102 @@ export default class OrbitDBMetadataHeadRepairer {
     return grouped.size;
   }
 
+  private async repairCallStore(): Promise<Partial<RepairResult>> {
+    return {
+      callIndexes: await this.repairCallIndexes(await this.findCallDocuments()),
+    };
+  }
+
+  private async repairConversationStore(): Promise<Partial<RepairResult>> {
+    const conversationHeads = await this.repairConversationHeads();
+
+    return {
+      conversationParticipantIndexes: conversationHeads.participantIndexes,
+      conversations: conversationHeads.conversations,
+    };
+  }
+
+  private async repairMessageStore(): Promise<Partial<RepairResult>> {
+    const communityChannelMessages =
+      await this.findLiveCommunityChannelMessageDocuments();
+    const conversationMessages =
+      await this.findLiveConversationMessageDocuments();
+    const [
+      communityChannelMessageIndexes,
+      communityThreadSummaries,
+      conversationMessageIndexes,
+    ] = await Promise.all([
+      this.repairCommunityChannelMessageIndexes(communityChannelMessages),
+      this.repairCommunityThreadSummaryHeads(communityChannelMessages),
+      this.repairConversationMessageIndexes(conversationMessages),
+    ]);
+
+    return {
+      communityChannelMessageIndexes,
+      communityThreadSummaries,
+      conversationMessageIndexes,
+    };
+  }
+
+  private async repairPinStore(): Promise<Partial<RepairResult>> {
+    const pins = await this.findLivePinDocuments();
+    const [communityChannelPinIndexes, conversationPinIndexes] =
+      await Promise.all([
+        this.repairCommunityChannelPinIndexes(pins),
+        this.repairConversationPinIndexes(pins),
+      ]);
+
+    return {
+      communityChannelPinIndexes,
+      conversationPinIndexes,
+    };
+  }
+
+  private async repairPollStore(): Promise<Partial<RepairResult>> {
+    return {
+      pollIndexes: await this.repairPollIndexes(await this.findPollDocuments()),
+    };
+  }
+
+  private async repairReactionStore(): Promise<Partial<RepairResult>> {
+    return {
+      reactionIndexes: await this.repairReactionIndexes(
+        await this.findLiveReactionDocuments(),
+      ),
+    };
+  }
+
+  private repairersByStoreName(): Partial<
+    Record<
+      OrbitDBReplicatedDocumentStoreName,
+      () => Promise<Partial<RepairResult>>
+    >
+  > {
+    return {
+      calls: () => this.repairCallStore(),
+      communities: async () => ({
+        communities: await this.repairCommunityHeads(),
+      }),
+      conversations: () => this.repairConversationStore(),
+      identities: async () => ({
+        identities: await this.repairIdentityHeads(),
+      }),
+      keychains: async () => ({
+        keychains: await this.repairKeychainHeads(),
+      }),
+      messages: () => this.repairMessageStore(),
+      notifications: async () => ({
+        notificationIndexes: await this.repairNotificationIndexes(),
+      }),
+      pins: () => this.repairPinStore(),
+      polls: () => this.repairPollStore(),
+      presence: async () => ({
+        presenceHeads: await this.repairPresenceHeads(),
+      }),
+      reactions: () => this.repairReactionStore(),
+    };
+  }
+
   public async repairCritical(): Promise<CriticalRepairResult> {
     const conversationHeads = await this.repairConversationHeads();
     const [
@@ -1393,6 +1489,12 @@ export default class OrbitDBMetadataHeadRepairer {
       pollIndexes,
       reactionIndexes,
     };
+  }
+
+  public repairStore(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+  ): Promise<Partial<RepairResult>> {
+    return this.repairersByStoreName()[storeName]?.() ?? Promise.resolve({});
   }
 
   public async repair(): Promise<RepairResult> {
