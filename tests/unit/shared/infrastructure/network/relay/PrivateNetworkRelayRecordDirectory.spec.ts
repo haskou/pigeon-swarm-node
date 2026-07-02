@@ -48,6 +48,10 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS;
     delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
+    delete process.env.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS;
+    delete process.env.PIGEON_RELAY_RECORD_TTL_MS;
+    delete process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS;
+    delete process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
     previousLocalDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
     localDatabasePath = await fs.mkdtemp(
       path.join(os.tmpdir(), 'pigeon-relay-cache-'),
@@ -120,6 +124,19 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(logger.warn).not.toHaveBeenCalledWith(
       expect.stringContaining('reason="No publication channel succeeded."'),
     );
+  });
+
+  it('should publish private relay records hourly by default', () => {
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const defaults = directory as unknown as {
+      getRelayRecordIPNSWindowMs(): number;
+      getRelayRecordPublicationIntervalMs(): number;
+      getRelayRecordTtlMs(): number;
+    };
+
+    expect(defaults.getRelayRecordPublicationIntervalMs()).toBe(60 * 60_000);
+    expect(defaults.getRelayRecordTtlMs()).toBe(2 * 60 * 60_000);
+    expect(defaults.getRelayRecordIPNSWindowMs()).toBe(2 * 60 * 60_000);
   });
 
   it('should dial a locally cached relay before waiting for public routing peers', async () => {

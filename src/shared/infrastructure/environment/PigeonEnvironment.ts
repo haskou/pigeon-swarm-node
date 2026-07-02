@@ -52,7 +52,7 @@ export const pigeonEnvironmentSchema = {
     type: 'boolean',
   },
   PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS: {
-    defaultValue: 15,
+    defaultValue: 60 * 60,
     type: 'number',
   },
   PIGEON_PUBLIC_BOOTSTRAP_ENABLED: { defaultValue: true, type: 'boolean' },
@@ -76,16 +76,19 @@ export const pigeonEnvironmentSchema = {
     type: 'number',
   },
   PIGEON_RELAY_RECORD_IPNS_WINDOW_MS: {
-    defaultValue: 10 * 60_000,
+    defaultValue: 2 * 60 * 60_000,
     type: 'number',
   },
   PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS: { type: 'number' },
   PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS: { type: 'number' },
   PIGEON_RELAY_RECORD_TTL_MS: {
-    defaultValue: 10 * 60 * 1000,
+    defaultValue: 2 * 60 * 60 * 1000,
     type: 'number',
   },
-  PIGEON_RELAY_RECORD_TTL_SECONDS: { defaultValue: 300, type: 'number' },
+  PIGEON_RELAY_RECORD_TTL_SECONDS: {
+    defaultValue: 2 * 60 * 60,
+    type: 'number',
+  },
   PIGEON_STORED_RELAY_FALLBACK_MS: {
     defaultValue: 7 * 24 * 60 * 60 * 1000,
     type: 'number',
