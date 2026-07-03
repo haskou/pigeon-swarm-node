@@ -21,6 +21,10 @@ Feature: Post community invite API
     When I POST to accept the current community invite
     Then response code is equal to 200
     And response body should contain the other identity id
+    And the community member signs the current communities request
+    When I GET current communities
+    Then response code is equal to 200
+    And response body should contain "API community"
     And the community member signs the current community request
     When I GET the current community
     Then response code is equal to 200

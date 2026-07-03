@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import Kernel from '@haskou/ddd-kernel';
 
 import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -185,16 +184,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  private refreshMemberIndexesInBackground(
-    document: OrbitDBCommunityDocument,
-  ): void {
-    void this.putMemberIndexes(document).catch((error) => {
-      Kernel.logger.warn?.(
-        `Community member indexes refresh failed: communityId=${document.id} error=${String(error)}`,
-      );
-    });
-  }
-
   private toFreshDocument(community: Community): OrbitDBCommunityDocument {
     return {
       ...this.mapper.toDocument(community),
@@ -217,7 +206,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       [deletedDocument.networkId],
     );
     this.replicateCommunityHeadInBackground(deletedDocument);
-    this.refreshMemberIndexesInBackground(deletedDocument);
+    await this.putMemberIndexes(deletedDocument);
   }
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
@@ -286,6 +275,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       document.networkId,
     ]);
     this.replicateCommunityHeadInBackground(document);
-    this.refreshMemberIndexesInBackground(document);
+    await this.putMemberIndexes(document);
   }
 }

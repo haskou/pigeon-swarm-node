@@ -121,13 +121,14 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
-  it('should not wait for member index fanout when saving communities', async () => {
+  it('should wait for member index fanout when saving communities', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
+    const delayedMemberIndex = deferred<string>();
 
     headsPut.mockImplementation(
       async (key: string, value: Record<string, unknown>) => {
         if (key.startsWith('community-member-index:')) {
-          return new Promise(() => undefined);
+          await delayedMemberIndex.promise;
         }
 
         heads.set(key, value);
@@ -136,15 +137,23 @@ describe('OrbitDBCommunityRepository', () => {
       },
     );
 
+    const save = repository.save(community);
     const result = await Promise.race([
-      repository.save(community).then(() => 'saved'),
+      save.then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('saved');
+    expect(result).toBe('blocked');
     expect(heads.get('community:community-1')).toEqual(
       expect.objectContaining({ id: 'community-1' }),
     );
+    expect(
+      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+    ).toBeUndefined();
+
+    delayedMemberIndex.resolve('ok');
+
+    await expect(save).resolves.toBeUndefined();
   });
 
   it('should not wait for replicated document persistence when saving communities', async () => {
