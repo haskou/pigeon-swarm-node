@@ -1,11 +1,11 @@
 import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
+import NonOverlappingScheduler from '@app/shared/infrastructure/scheduler/NonOverlappingScheduler';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Kernel from '@haskou/ddd-kernel';
-import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
-export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
+export default class LocalRoutingRecordRepublisherScheduler extends NonOverlappingScheduler {
   constructor(
     private readonly identityRouting: IpfsIdentityRouting,
     private readonly keychainRouting: IpfsKeychainRouting,

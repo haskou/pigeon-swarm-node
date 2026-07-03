@@ -1,10 +1,10 @@
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
+import NonOverlappingScheduler from '@app/shared/infrastructure/scheduler/NonOverlappingScheduler';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Kernel from '@haskou/ddd-kernel';
-import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
-export default class ContentReplicationMaintenanceScheduler extends Scheduler {
+export default class ContentReplicationMaintenanceScheduler extends NonOverlappingScheduler {
   constructor(private readonly maintainer: ContentReplicationMaintainer) {
     super(new ReplicatedStateSchedulerErrorPolicy());
   }

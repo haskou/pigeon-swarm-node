@@ -1,9 +1,9 @@
 import IdentityPresenceExpirationRegistrar from '@app/contexts/presence/application/expire/IdentityPresenceExpirationRegistrar';
+import NonOverlappingScheduler from '@app/shared/infrastructure/scheduler/NonOverlappingScheduler';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
-import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
-export default class IdentityPresenceExpirationScheduler extends Scheduler {
+export default class IdentityPresenceExpirationScheduler extends NonOverlappingScheduler {
   constructor(
     private readonly expirationRegistrar: IdentityPresenceExpirationRegistrar,
   ) {
