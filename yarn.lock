@@ -1585,19 +1585,7 @@
     "@multiformats/multiaddr" "^13.0.3"
     progress-events "^1.0.1"
 
-"@libp2p/interface@^3.0.0", "@libp2p/interface@^3.0.2", "@libp2p/interface@^3.1.0":
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.1.0.tgz#0513f31d5349c4b89cd4e0b407070ddae1c2d372"
-  integrity sha512-RE7/XyvC47fQBe1cHxhMvepYKa5bFCUyFrrpj8PuM0E7JtzxU7F+Du5j4VXbg2yLDcToe0+j8mB7jvwE2AThYw==
-  dependencies:
-    "@multiformats/dns" "^1.0.6"
-    "@multiformats/multiaddr" "^13.0.1"
-    main-event "^1.0.1"
-    multiformats "^13.4.0"
-    progress-events "^1.0.1"
-    uint8arraylist "^2.4.8"
-
-"@libp2p/interface@^3.2.0", "@libp2p/interface@^3.2.4":
+"@libp2p/interface@3.2.4", "@libp2p/interface@^3.0.0", "@libp2p/interface@^3.0.2", "@libp2p/interface@^3.1.0", "@libp2p/interface@^3.2.0", "@libp2p/interface@^3.2.3", "@libp2p/interface@^3.2.4":
   version "3.2.4"
   resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.2.4.tgz#2140d626889e11897c748dc89ff14b17834551c6"
   integrity sha512-o/ZMbsplniVQhz0AW1CinZcfZPEfr7ttu4w7aivrFAs6xDpnJYmN3FTeEgTt93EHs+AEOcIT76V3KMFDZmIEcQ==
@@ -1608,18 +1596,6 @@
     multiformats "^14.0.0"
     progress-events "^1.1.0"
     uint8arraylist "^3.0.2"
-
-"@libp2p/interface@^3.2.3":
-  version "3.2.3"
-  resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.2.3.tgz#c2c5f5dfeecf23ae3fcb03df50e3f5d7ec748606"
-  integrity sha512-OKZFrY+x8IYl4Fr/YWjh4s6+uks5zQBIAdg2cl+zaRUpPORfk1ELI4r+eB+fUlXR9mHDsQylSSzmAqi0drDfiA==
-  dependencies:
-    "@multiformats/dns" "^1.0.6"
-    "@multiformats/multiaddr" "^13.0.3"
-    main-event "^1.0.1"
-    multiformats "^14.0.0"
-    progress-events "^1.1.0"
-    uint8arraylist "^2.4.8"
 
 "@libp2p/kad-dht@^16.2.0":
   version "16.3.3"
@@ -5367,7 +5343,7 @@ interface-blockstore@^6.0.2:
     interface-store "^7.0.0"
     multiformats "^13.4.2"
 
-interface-datastore@^10.0.0, interface-datastore@^10.0.1:
+interface-datastore@10.0.1, interface-datastore@^10.0.0, interface-datastore@^10.0.1, interface-datastore@^9.0.0, interface-datastore@^9.0.1, interface-datastore@^9.0.2, interface-datastore@^9.0.3:
   version "10.0.1"
   resolved "https://registry.yarnpkg.com/interface-datastore/-/interface-datastore-10.0.1.tgz#d4dbc0ffef74f2b0cd90b32f7691a5a4dee66de7"
   integrity sha512-DYMj/Og5Cz1Qwkx6/x5KRvR8SYEX7rVAv3KKCm2NzTwWSfpNAC4PahjcYbHyoZBP6zPWrhQv5n5wE+vaDdgSAg==
@@ -5375,22 +5351,6 @@ interface-datastore@^10.0.0, interface-datastore@^10.0.1:
     abort-error "^1.0.2"
     interface-store "^8.0.0"
     uint8arrays "^6.1.1"
-
-interface-datastore@^9.0.0, interface-datastore@^9.0.1, interface-datastore@^9.0.2:
-  version "9.0.2"
-  resolved "https://registry.yarnpkg.com/interface-datastore/-/interface-datastore-9.0.2.tgz#6cc02cc07d5946b6198e7262ea03937297de6662"
-  integrity sha512-jebn+GV/5LTDDoyicNIB4D9O0QszpPqT09Z/MpEWvf3RekjVKpXJCDguM5Au2fwIFxFDAQMZe5bSla0jMamCNg==
-  dependencies:
-    interface-store "^7.0.0"
-    uint8arrays "^5.1.0"
-
-interface-datastore@^9.0.3:
-  version "9.0.3"
-  resolved "https://registry.yarnpkg.com/interface-datastore/-/interface-datastore-9.0.3.tgz#ad181f970cf4756cbe3e416043634f7daaabb86a"
-  integrity sha512-NLZa7Mp+0qn48nSwIY/C36da4uVIKzwG2tuEIpaSJArsuB2RrdyDWwkoDUyjsJ+VrMntXz38VSk9vXTx/ZUpAw==
-  dependencies:
-    interface-store "^7.0.0"
-    uint8arrays "^5.1.0"
 
 interface-store@^7.0.0:
   version "7.0.1"
