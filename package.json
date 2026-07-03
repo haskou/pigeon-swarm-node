@@ -38,7 +38,7 @@
   "author": "",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "@haskou/ddd-kernel": "2.0.3",
+    "@haskou/ddd-kernel": "2.0.6",
     "@haskou/value-objects": "2.13.1",
     "@helia/block-brokers": "^5.2.4",
     "@helia/json": "^5.1.1",
