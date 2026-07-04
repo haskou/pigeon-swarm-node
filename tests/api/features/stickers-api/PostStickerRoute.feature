@@ -4,7 +4,7 @@ Feature: Post sticker route
   So that clients can render sticker metadata
 
   Background:
-    Given I register a private IPFS network "api-stickers-network"
+    Given I register a test IPFS network "api-stickers-network"
 
   Scenario: Add a static sticker to a pack
     Given I am an anonymous user

@@ -5,7 +5,7 @@ Feature: Post public IPFS content route
 
   Scenario: Publish public content to IPFS
     Given I am an anonymous user
-    And I register a private IPFS network "api-test-network"
+    And I register a test IPFS network "api-test-network"
     And I set raw IPFS content with content type "image/png" and text "hello"
     And I sign the current public IPFS content request
     When I POST to "/ipfs/public"

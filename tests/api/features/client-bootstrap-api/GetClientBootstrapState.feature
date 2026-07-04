@@ -1,7 +1,7 @@
 Feature: Get client bootstrap state
 
   Scenario: Read identity keychain and conversations through the API
-    Given I register a private IPFS network "client-bootstrap-network"
+    Given I register a test IPFS network "client-bootstrap-network"
     And I have created a one-to-one conversation
     And I sign the current identity keychain request
     When I GET the authenticated identity keychain

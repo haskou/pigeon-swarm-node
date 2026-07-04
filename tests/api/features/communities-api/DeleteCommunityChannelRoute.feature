@@ -5,7 +5,7 @@ Feature: Delete community channel API
 
   Scenario: Owner deletes a private community text channel and its messages
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-delete-channel-network"
+    And I register a test IPFS network "communities-api-delete-channel-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -30,7 +30,7 @@ Feature: Delete community channel API
 
   Scenario: Non-owner cannot delete a private community text channel
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-delete-channel-owner-network"
+    And I register a test IPFS network "communities-api-delete-channel-owner-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

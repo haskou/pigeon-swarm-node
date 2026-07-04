@@ -5,7 +5,7 @@ Feature: Post identity route
 
   Scenario: Reject legacy backend-generated identity creation
     Given I am an anonymous user
-    And I register a private IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
     And I set json body
       """
       {
@@ -22,7 +22,7 @@ Feature: Post identity route
 
   Scenario: Publish a client-signed identity without sending a password
     Given I am an anonymous user
-    And I register a private IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
     And I set a client-signed identity body with name "bob" and handle "bob"
     When I POST to "/identities/"
     Then response code is equal to 200
@@ -43,7 +43,7 @@ Feature: Post identity route
 
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user
-    And I register a private IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
     And I set a client-signed identity body with name "carol" and handle "carol"
     When I POST to "/identities/"
     Then response code is equal to 200

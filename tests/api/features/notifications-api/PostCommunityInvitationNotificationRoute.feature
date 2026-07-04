@@ -5,7 +5,7 @@ Feature: Post community invitation notification API
 
   Scenario: Create a community invitation notification
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-notification-network"
+    And I register a test IPFS network "communities-api-notification-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

@@ -4,7 +4,7 @@ Feature: Start calls
   So that clients can negotiate realtime media without a central media server
 
   Scenario: Start a one-to-one conversation call
-    Given I register a private IPFS network "api-calls-one-to-one-network"
+    Given I register a test IPFS network "api-calls-one-to-one-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
@@ -15,7 +15,7 @@ Feature: Start calls
       | scope.type | conversation |
 
   Scenario: Start a group conversation call
-    Given I register a private IPFS network "api-calls-group-network"
+    Given I register a test IPFS network "api-calls-group-network"
     And I have created a group conversation
     And I set a conversation call body
     And I sign the current call start request
@@ -26,7 +26,7 @@ Feature: Start calls
       | scope.type | conversation |
 
   Scenario: Start a community channel call
-    Given I register a private IPFS network "api-calls-community-network"
+    Given I register a test IPFS network "api-calls-community-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -50,7 +50,7 @@ Feature: Start calls
     And response body should contain "connectedIdentityIds"
 
   Scenario: Ignore extra invitees for a community channel call
-    Given I register a private IPFS network "api-calls-community-extra-invitee-network"
+    Given I register a test IPFS network "api-calls-community-extra-invitee-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -71,7 +71,7 @@ Feature: Start calls
     And response body should not contain "MCowBQYDK2VwAyEAA0YLLSFyAaDRgmbqSTJ2gTeRCJq6QfP9RNHHp0/qbtY="
 
   Scenario: Reuse an active community channel call
-    Given I register a private IPFS network "api-calls-community-reuse-network"
+    Given I register a test IPFS network "api-calls-community-reuse-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

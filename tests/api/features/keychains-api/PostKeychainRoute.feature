@@ -5,7 +5,7 @@ Feature: Post keychain route
 
   Scenario: Publish keychain successfully
     Given I am an anonymous user
-    And I register a private IPFS network "keychain-api-network"
+    And I register a test IPFS network "keychain-api-network"
     And I set json body
       """
       {

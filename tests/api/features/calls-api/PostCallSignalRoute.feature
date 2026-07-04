@@ -4,7 +4,7 @@ Feature: Send call signal
   So that participants can negotiate media sessions
 
   Scenario: Send a signal to a call participant
-    Given I register a private IPFS network "api-calls-signal-network"
+    Given I register a test IPFS network "api-calls-signal-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
@@ -19,7 +19,7 @@ Feature: Send call signal
       | status | active |
 
   Scenario: Reject signalling to an identity outside the call
-    Given I register a private IPFS network "api-calls-invalid-signal-network"
+    Given I register a test IPFS network "api-calls-invalid-signal-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request

@@ -5,7 +5,7 @@ Feature: Patch community API
 
   Scenario: Updating community profile preserves channels
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-profile-network"
+    And I register a test IPFS network "communities-api-profile-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -29,7 +29,7 @@ Feature: Patch community API
 
   Scenario: Updating community profile enables auto join
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-profile-auto-join-network"
+    And I register a test IPFS network "communities-api-profile-auto-join-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

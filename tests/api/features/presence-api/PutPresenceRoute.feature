@@ -1,7 +1,7 @@
 Feature: PUT /presence/me
 
   Background:
-    Given I register a private IPFS network "presence-api-network"
+    Given I register a test IPFS network "presence-api-network"
 
   Scenario: Update authenticated identity presence
     Given I set json body

@@ -4,7 +4,7 @@ Feature: Get call history
   So that clients can render past calls
 
   Scenario: List ended calls for a participant
-    Given I register a private IPFS network "api-calls-history-network"
+    Given I register a test IPFS network "api-calls-history-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request

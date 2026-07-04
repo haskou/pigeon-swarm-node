@@ -5,7 +5,7 @@ Feature: Get IPFS content route
 
   Scenario: Retrieve content from IPFS with a stored CID
     Given I am an anonymous user
-    And I register a private IPFS network "api-test-network"
+    And I register a test IPFS network "api-test-network"
     And I store the following json in IPFS network "api-test-network"
       """
       {

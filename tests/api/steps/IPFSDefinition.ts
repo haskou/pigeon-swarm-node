@@ -165,14 +165,28 @@ export default class IPFSDefinition {
     );
   }
 
-  public async registerPrivateNetwork(networkAlias: string): Promise<string> {
+  private shouldUseRealPrivateIPFS(): boolean {
+    return process.env.PIGEON_API_TEST_REAL_IPFS === 'true';
+  }
+
+  private createNetworkConfig(
+    networkId: string,
+    networkName: string,
+  ): IPFSNetworkConfig {
+    return new IPFSNetworkConfig(
+      networkId,
+      networkName,
+      this.shouldUseRealPrivateIPFS() ? this.generateNetworkKey() : undefined,
+    );
+  }
+
+  public async registerTestNetwork(networkAlias: string): Promise<string> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkAlias}-${this.scenarioSuffix}`;
     const networkId = UUID.generate().toString();
-    const networkConfig = new IPFSNetworkConfig(
+    const networkConfig = this.createNetworkConfig(
       networkId,
       scenarioNetworkName,
-      this.generateNetworkKey(),
     );
 
     await ipfs.registerNetwork(networkConfig);
@@ -183,16 +197,15 @@ export default class IPFSDefinition {
     return networkId;
   }
 
-  public async registerPrivateNetworkWithId(
+  public async registerTestNetworkWithId(
     networkId: string,
     networkName: string,
   ): Promise<string> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkName}-${this.scenarioSuffix}`;
-    const networkConfig = new IPFSNetworkConfig(
+    const networkConfig = this.createNetworkConfig(
       networkId,
       scenarioNetworkName,
-      this.generateNetworkKey(),
     );
 
     await ipfs.registerNetwork(networkConfig);

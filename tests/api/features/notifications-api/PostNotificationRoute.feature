@@ -4,7 +4,7 @@ Feature: Post notification route
   So that recipients can accept invitations without exposing private keys
 
   Background:
-    Given I register a private IPFS network "notifications-api-network"
+    Given I register a test IPFS network "notifications-api-network"
 
   Scenario: Create a conversation invitation notification
     Given I am an anonymous user

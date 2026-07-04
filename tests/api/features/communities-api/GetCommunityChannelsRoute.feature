@@ -5,7 +5,7 @@ Feature: Get community channels API
 
   Scenario: List text channels with active thread summaries
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-channel-threads-network"
+    And I register a test IPFS network "communities-api-channel-threads-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -33,7 +33,7 @@ Feature: Get community channels API
 
   Scenario: Do not list threads whose root message was deleted
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-deleted-channel-threads-network"
+    And I register a test IPFS network "communities-api-deleted-channel-threads-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

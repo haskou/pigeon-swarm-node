@@ -2707,10 +2707,10 @@ export default class Definitions {
     }
   }
 
-  @given('I register a private IPFS network {string}')
-  public async iRegisterAPrivateIPFSNetwork(networkName: string): Promise<void> {
+  @given('I register a test IPFS network {string}')
+  public async iRegisterATestIPFSNetwork(networkName: string): Promise<void> {
     this.currentNetworkId =
-      await this.ipfsDefinition.registerPrivateNetwork(networkName);
+      await this.ipfsDefinition.registerTestNetwork(networkName);
   }
 
   @given('I use an unknown IPFS network id')
@@ -2719,14 +2719,14 @@ export default class Definitions {
   }
 
   @given(
-    'I register a private IPFS network with id {string} and name {string}',
+    'I register a test IPFS network with id {string} and name {string}',
   )
-  public async iRegisterAPrivateIPFSNetworkWithIdAndName(
+  public async iRegisterATestIPFSNetworkWithIdAndName(
     networkId: string,
     networkName: string,
   ): Promise<void> {
     this.currentNetworkId =
-      await this.ipfsDefinition.registerPrivateNetworkWithId(
+      await this.ipfsDefinition.registerTestNetworkWithId(
         networkId,
         networkName,
       );

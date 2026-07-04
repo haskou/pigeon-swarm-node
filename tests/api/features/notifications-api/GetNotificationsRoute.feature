@@ -4,7 +4,7 @@ Feature: Get notifications route
   So that I can see pending actions for my identity
 
   Background:
-    Given I register a private IPFS network "notifications-api-network"
+    Given I register a test IPFS network "notifications-api-network"
 
   Scenario: List notifications for the recipient
     Given I am an anonymous user

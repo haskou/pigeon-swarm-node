@@ -1,7 +1,7 @@
 Feature: GET /presence
 
   Background:
-    Given I register a private IPFS network "presence-api-network"
+    Given I register a test IPFS network "presence-api-network"
 
   Scenario: Read current identity presence
     Given I set json body

@@ -5,7 +5,7 @@ Feature: Get community discovery API
 
   Scenario: Discover communities by search text
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-discovery-network"
+    And I register a test IPFS network "communities-api-discovery-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -20,7 +20,7 @@ Feature: Get community discovery API
 
   Scenario: Hide communities from discovery
     Given I am an anonymous user
-    And I register a private IPFS network "communities-api-hidden-discovery-network"
+    And I register a test IPFS network "communities-api-hidden-discovery-network"
     And I set a hidden private community body
     And I sign the current community creation request
     When I POST to "/communities/"

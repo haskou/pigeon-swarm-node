@@ -8,7 +8,7 @@ Feature: Get IPFS replication status route
     And I sign the current node owner request
     When I PUT "/node/owner/"
     Then response code is equal to 200
-    And I register a private IPFS network "api-replication-status-network"
+    And I register a test IPFS network "api-replication-status-network"
     And I set raw IPFS content with content type "image/png" and text "hello"
     And I sign the current public IPFS content request
     When I POST to "/ipfs/public"
