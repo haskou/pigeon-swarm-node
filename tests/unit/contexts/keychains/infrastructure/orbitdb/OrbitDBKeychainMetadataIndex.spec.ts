@@ -256,7 +256,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     const mother = await KeychainMother.create();
     const ownerIdentityId = mother.ownerIdentityId.valueOf();
 
-    heads.set(`keychain:${ownerIdentityId}`, {
+    await registry.putHead(`keychain:${ownerIdentityId}`, {
       cid: 'bafykeychain-v1',
       id: ownerIdentityId,
       ownerIdentityId,

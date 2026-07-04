@@ -3,7 +3,7 @@ import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/e
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
-import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
+import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBCommunityInviteDocument } from './documents/OrbitDBCommunityInviteDocument';

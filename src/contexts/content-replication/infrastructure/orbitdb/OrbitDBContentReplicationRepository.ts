@@ -1,7 +1,7 @@
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
 import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
-import OrbitDBDocumentDeduplicator from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDocumentDeduplicator';
+import { OrbitDBDocumentDeduplicator } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDocumentDeduplicator';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBContentReplicationDocument } from './documents/OrbitDBContentReplicationDocument';

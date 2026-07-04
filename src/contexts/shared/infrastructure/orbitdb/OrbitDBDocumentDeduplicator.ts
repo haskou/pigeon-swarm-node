@@ -1,6 +1,6 @@
 import { OrbitDBDocumentDeduplicatorOptions } from './OrbitDBDocumentDeduplicatorOptions';
 
-export default class OrbitDBDocumentDeduplicator<TDocument extends object> {
+export class OrbitDBDocumentDeduplicator<TDocument extends object> {
   constructor(
     private readonly options: OrbitDBDocumentDeduplicatorOptions<TDocument>,
   ) {}

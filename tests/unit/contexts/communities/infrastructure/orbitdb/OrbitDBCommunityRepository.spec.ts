@@ -246,13 +246,17 @@ describe('OrbitDBCommunityRepository', () => {
   it('should read communities from heads when indexes exist', async () => {
     const primitives = communityPrimitives();
 
-    heads.set('community:community-1', primitives);
-    heads.set(`community-member-index:${identityMother.id.valueOf()}`, {
-      communities: [primitives],
-      id: `community-member-index:${identityMother.id.valueOf()}`,
-      identityId: identityMother.id.valueOf(),
-      updatedAt: Date.now(),
-    });
+    await registry.putHead('community:community-1', primitives, [networkId]);
+    await registry.putHead(
+      `community-member-index:${identityMother.id.valueOf()}`,
+      {
+        communities: [primitives],
+        id: `community-member-index:${identityMother.id.valueOf()}`,
+        identityId: identityMother.id.valueOf(),
+        updatedAt: Date.now(),
+      },
+      [networkId],
+    );
 
     const byId = await repository.findById(new CommunityId('community-1'));
     const byMember = await repository.findByMember(identityMother.id);

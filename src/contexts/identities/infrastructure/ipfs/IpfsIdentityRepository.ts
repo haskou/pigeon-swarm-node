@@ -232,14 +232,47 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   ): Promise<IdentityCandidate | undefined> {
     const identity = await this.findCandidateFromMetadata(metadata);
 
+    if (identity) {
+      return new IdentityCandidate(
+        new IdentityExternalIdentifier(metadata.cid),
+        identity,
+      );
+    }
+
+    return this.findPreviousCandidateReferenceFromMetadata(metadata);
+  }
+
+  private async findPreviousCandidateReferenceFromMetadata(
+    metadata: IdentityMetadataRecord,
+  ): Promise<IdentityCandidate | undefined> {
+    if (!metadata.previousCid) {
+      return undefined;
+    }
+
+    const externalIdentifier = new IdentityExternalIdentifier(
+      metadata.previousCid,
+    );
+    const identity = await this.findPreviousIdentity(externalIdentifier);
+
     if (!identity) {
       return undefined;
     }
 
-    return new IdentityCandidate(
-      new IdentityExternalIdentifier(metadata.cid),
+    const identityId = new IdentityId(metadata.identityId);
+    const isValid = await this.validator.isValidChainFor(
+      identityId,
       identity,
+      (previousExternalIdentifier) =>
+        this.findPreviousIdentity(previousExternalIdentifier),
     );
+
+    if (!isValid) {
+      return undefined;
+    }
+
+    await this.saveMetadata(identity, new IPFSId(metadata.previousCid));
+
+    return new IdentityCandidate(externalIdentifier, identity);
   }
 
   private async findFirstCandidateReferenceFromMetadata(
@@ -381,13 +414,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       const identity =
         document.identity || this.identityByCid.get(document.cid);
 
-      if (!identity) {
+      if (!identity && !document.previousCid) {
         continue;
       }
 
       const candidate = await this.findCandidateReferenceFromMetadata({
         ...document,
-        identity,
+        ...(identity ? { identity } : {}),
       });
 
       if (candidate?.hasHandle(handle)) {

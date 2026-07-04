@@ -84,7 +84,7 @@ describe('OrbitDBNotificationRepository', () => {
   });
 
   it('should find a notification by id from the direct head', async () => {
-    heads.set(`notification:${baseDocument.id}`, baseDocument);
+    await registry.putHead(`notification:${baseDocument.id}`, baseDocument);
 
     const result = await repository.findById(
       new NotificationId(baseDocument.id),
@@ -104,18 +104,21 @@ describe('OrbitDBNotificationRepository', () => {
   });
 
   it('should find recipient notifications ordered by creation date', async () => {
-    heads.set(`notification-recipient-index:${recipientIdentityId}`, {
-      id: `notification-recipient-index:${recipientIdentityId}`,
-      notifications: [
-        baseDocument,
-        {
-          ...baseDocument,
-          createdAt: baseDocument.createdAt + 1,
-          id: '6a0df63c702bbe370bb0b8c0',
-        },
-      ],
-      recipientIdentityId,
-    });
+    await registry.putHead(
+      `notification-recipient-index:${recipientIdentityId}`,
+      {
+        id: `notification-recipient-index:${recipientIdentityId}`,
+        notifications: [
+          baseDocument,
+          {
+            ...baseDocument,
+            createdAt: baseDocument.createdAt + 1,
+            id: '6a0df63c702bbe370bb0b8c0',
+          },
+        ],
+        recipientIdentityId,
+      },
+    );
 
     const result = await repository.findByRecipient(
       new IdentityId(recipientIdentityId),
@@ -129,11 +132,14 @@ describe('OrbitDBNotificationRepository', () => {
   });
 
   it('should find recipient notifications from recipient heads', async () => {
-    heads.set(`notification-recipient-index:${recipientIdentityId}`, {
-      id: `notification-recipient-index:${recipientIdentityId}`,
-      notifications: [baseDocument],
-      recipientIdentityId,
-    });
+    await registry.putHead(
+      `notification-recipient-index:${recipientIdentityId}`,
+      {
+        id: `notification-recipient-index:${recipientIdentityId}`,
+        notifications: [baseDocument],
+        recipientIdentityId,
+      },
+    );
 
     const result = await repository.findByRecipient(
       new IdentityId(recipientIdentityId),

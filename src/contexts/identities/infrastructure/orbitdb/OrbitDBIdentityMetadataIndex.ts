@@ -6,7 +6,6 @@ import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
@@ -148,10 +147,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return `identity-handle:${handle}`;
   }
 
-  private isHttpRequest(): boolean {
-    return HttpRequestContext.current() !== undefined;
-  }
-
   private async findHead(
     key: string,
   ): Promise<IdentityMetadataRecord | undefined> {
@@ -177,52 +172,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     }
 
     this.replicateHeadsInBackground(latest);
-  }
-
-  private async findStoredRecordsByIdentityId(
-    identityId: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.identityIdFrom(document) === identityId,
-      {
-        mode: 'fallback',
-        operation: 'IdentityMetadataIndex.findByIdentityId',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
-  private async findStoredRecordsByHandle(
-    handle: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.stringValue(document, 'handle') === handle,
-      {
-        mode: 'fallback',
-        operation: 'OrbitDBIdentityMetadataIndex.findStoredRecordsByHandle',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
   }
 
   private async findStoredRecordsByNetworkId(
@@ -325,7 +274,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   public async findByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
-    const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
+    const key = this.handleHeadKey(handle.valueOf());
+    const head = await this.findHead(key);
 
     if (head) {
       return [head];
@@ -335,26 +285,11 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       this.findCachedRecordsByHandle(handle.valueOf()),
     );
 
-    if (this.isHttpRequest()) {
-      if (cachedLatest) {
-        return [cachedLatest];
-      }
-
-      return [];
+    if (cachedLatest) {
+      return [cachedLatest];
     }
 
-    const latest = this.latestRecordFrom([
-      ...(cachedLatest ? [cachedLatest] : []),
-      ...(await this.findStoredRecordsByHandle(handle.valueOf())),
-    ]);
-
-    if (!latest) {
-      return [];
-    }
-
-    this.readRepairHead(head, latest);
-
-    return [latest];
+    return [];
   }
 
   public async findByIdentityId(
@@ -368,21 +303,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [head];
     }
 
-    if (this.isHttpRequest()) {
-      return [];
-    }
-
-    const latest = this.latestRecordFrom([
-      ...(await this.findStoredRecordsByIdentityId(identityId.valueOf())),
-    ]);
-
-    if (!latest) {
-      return [];
-    }
-
-    this.readRepairHead(head, latest);
-
-    return [latest];
+    return [];
   }
 
   public async findLatestByNetworkId(

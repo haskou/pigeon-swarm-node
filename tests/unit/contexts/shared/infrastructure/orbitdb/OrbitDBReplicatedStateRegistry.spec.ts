@@ -551,6 +551,21 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
 
+  it('does not read replicated head stores on head cache misses', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.get.mockImplementation(() => {
+      throw new Error('Head cache misses should not read replicated stores');
+    });
+
+    await expect(registry.findHead('identity-handle:202020')).resolves.toBe(
+      undefined,
+    );
+    expect(firstNetwork.heads.get).not.toHaveBeenCalled();
+  });
+
   it('updates the head cache from replicated head updates', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
@@ -985,6 +1000,34 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     releaseHeadScan();
     await Promise.resolve();
     await Promise.resolve();
+  });
+
+  it('restores derived identity handle heads from the local cache', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+
+    await headCache.save('network-1', 'identity:identity-1', {
+      cid: 'bafyidentity',
+      handle: 'hasko',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      receivedAt: 1,
+      version: 1,
+    });
+    await headCache.markWarm('network-1');
+    firstNetwork.heads.all.mockResolvedValue([]);
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(registry.findCachedHead('identity-handle:hasko')).toEqual({
+      cid: 'bafyidentity',
+      handle: 'hasko',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      receivedAt: 1,
+      version: 1,
+    });
   });
 
   it('waits for OrbitDB heads when the local cache is not marked warm', async () => {

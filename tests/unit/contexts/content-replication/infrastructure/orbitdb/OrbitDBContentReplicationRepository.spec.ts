@@ -102,7 +102,11 @@ describe('OrbitDBContentReplicationRepository', () => {
   });
 
   it('should find IPFS content replication metadata by CID from the direct head', async () => {
-    heads.set(`content-replication:${cid}`, { ...baseDocument });
+    await registry.putHead(
+      `content-replication:${cid}`,
+      { ...baseDocument },
+      [networkId],
+    );
 
     const result = await repository.findByCid(new ContentId(cid));
 
@@ -113,7 +117,7 @@ describe('OrbitDBContentReplicationRepository', () => {
         filename: baseDocument.filename,
       }),
     );
-    expect(headGet).toHaveBeenCalledWith(`content-replication:${cid}`);
+    expect(headGet).not.toHaveBeenCalled();
     expect(query).not.toHaveBeenCalled();
   });
 
