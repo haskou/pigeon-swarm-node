@@ -174,52 +174,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     this.replicateHeadsInBackground(latest);
   }
 
-  private async findStoredRecordsByIdentityId(
-    identityId: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.identityIdFrom(document) === identityId,
-      {
-        mode: 'fallback',
-        operation: 'IdentityMetadataIndex.findByIdentityId',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
-  private async findStoredRecordsByHandle(
-    handle: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.stringValue(document, 'handle') === handle,
-      {
-        mode: 'fallback',
-        operation: 'OrbitDBIdentityMetadataIndex.findStoredRecordsByHandle',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
   private async findStoredRecordsByNetworkId(
     networkId: string,
   ): Promise<IdentityMetadataRecord[]> {
@@ -335,18 +289,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [cachedLatest];
     }
 
-    const latest = this.latestRecordFrom([
-      ...(cachedLatest ? [cachedLatest] : []),
-      ...(await this.findStoredRecordsByHandle(handle.valueOf())),
-    ]);
-
-    if (!latest) {
-      return [];
-    }
-
-    this.readRepairHead(head, latest);
-
-    return [latest];
+    return [];
   }
 
   public async findByIdentityId(
@@ -360,17 +303,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [head];
     }
 
-    const latest = this.latestRecordFrom([
-      ...(await this.findStoredRecordsByIdentityId(identityId.valueOf())),
-    ]);
-
-    if (!latest) {
-      return [];
-    }
-
-    this.readRepairHead(head, latest);
-
-    return [latest];
+    return [];
   }
 
   public async findLatestByNetworkId(

@@ -551,6 +551,21 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
 
+  it('does not read replicated head stores on head cache misses', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.get.mockImplementation(() => {
+      throw new Error('Head cache misses should not read replicated stores');
+    });
+
+    await expect(registry.findHead('identity-handle:202020')).resolves.toBe(
+      undefined,
+    );
+    expect(firstNetwork.heads.get).not.toHaveBeenCalled();
+  });
+
   it('updates the head cache from replicated head updates', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

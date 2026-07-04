@@ -1002,17 +1002,10 @@ export default class OrbitDBReplicatedStateRegistry {
     });
   }
 
-  public async findHead(
-    key: string,
-  ): Promise<Record<string, unknown> | undefined> {
+  public findHead(key: string): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
-    const cachedHead = this.cachedHeads.get(key);
 
-    if (cachedHead) {
-      return cachedHead;
-    }
-
-    return this.findStoredHead(key);
+    return Promise.resolve(this.cachedHeads.get(key));
   }
 
   public async findPersistedHead(

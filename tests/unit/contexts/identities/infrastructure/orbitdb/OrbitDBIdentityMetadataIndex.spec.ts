@@ -160,14 +160,18 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     };
 
     await registry.register(networkId.valueOf(), stores as never);
-    heads.set(`identity:${identityId}`, {
-      cid: 'bafyidentity-v1',
-      id: identityId,
-      identityId,
-      networkIds: [networkId.valueOf()],
-      receivedAt: 1,
-      version: 1,
-    });
+    await registry.putHead(
+      `identity:${identityId}`,
+      {
+        cid: 'bafyidentity-v1',
+        id: identityId,
+        identityId,
+        networkIds: [networkId.valueOf()],
+        receivedAt: 1,
+        version: 1,
+      },
+      [networkId.valueOf()],
+    );
     documents.push({
       cid: 'bafyidentity-v2',
       id: identityId,
@@ -193,6 +197,24 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       }),
     );
     expect(stores.identities.query).not.toHaveBeenCalled();
+  });
+
+  it('should not scan stored identity records when identity id head is missing', async () => {
+    const mother = new IdentityMother();
+    const networkId = mother.networks[0];
+    const query = jest.fn(() =>
+      Promise.reject(new Error('Identity id lookup should not scan stores')),
+    );
+
+    registry.clear();
+    await registry.register(
+      networkId.valueOf(),
+      identityStoresWithIdentityQuery(new Map(), query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([]);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('should read identity metadata by handle from the head index', async () => {
@@ -247,15 +269,19 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     };
 
     await registry.register(networkId.valueOf(), stores as never);
-    heads.set(`identity-handle:${handle.valueOf()}`, {
-      cid: 'bafyidentity-handle-v1',
-      handle: handle.valueOf(),
-      id: identityId,
-      identityId,
-      networkIds: [networkId.valueOf()],
-      receivedAt: 1,
-      version: 1,
-    });
+    await registry.putHead(
+      `identity-handle:${handle.valueOf()}`,
+      {
+        cid: 'bafyidentity-handle-v1',
+        handle: handle.valueOf(),
+        id: identityId,
+        identityId,
+        networkIds: [networkId.valueOf()],
+        receivedAt: 1,
+        version: 1,
+      },
+      [networkId.valueOf()],
+    );
     documents.push({
       cid: 'bafyidentity-handle-v2',
       handle: handle.valueOf(),
@@ -282,6 +308,24 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       }),
     );
     expect(stores.identities.query).not.toHaveBeenCalled();
+  });
+
+  it('should not scan stored identity records when handle head is missing', async () => {
+    const query = jest.fn(() =>
+      Promise.reject(new Error('Handle lookup should not scan stores')),
+    );
+
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(new Map(), query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    await expect(
+      repository.findByHandle(new ProfileHandle('202020')),
+    ).resolves.toEqual([]);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('should read persisted handle heads on cache misses', async () => {
