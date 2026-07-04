@@ -8,7 +8,6 @@ import { MessageId } from '@app/contexts/conversations/domain/value-objects/Mess
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import { Kernel } from '@haskou/ddd-kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -108,7 +107,7 @@ export default class Definitions {
   }
 
   @after()
-  public async cleanupMemoryStorage(): Promise<void> {
+  public async cleanupScenarioStorage(): Promise<void> {
     const database =
       Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
     const callRelayRecordRegistry =
@@ -129,15 +128,9 @@ export default class Definitions {
   public async theLocalNodeHasNoOwnerAndNoNetworks(): Promise<void> {
     const database =
       Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
-    const networkRegistry =
-      Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry);
 
     await database.delete('node_metadata', 'local');
-    await Promise.all(
-      networkRegistry
-        .getAll()
-        .map((network) => networkRegistry.removeNetwork(network.getId())),
-    );
+    await this.ipfsDefinition.cleanupRegisteredNetworks();
   }
 
   @given('a node peer heartbeat has been received')
@@ -2714,12 +2707,10 @@ export default class Definitions {
     }
   }
 
-  @given('I register an in-memory IPFS network {string}')
-  public async iRegisterAnInMemoryIPFSNetwork(
-    networkName: string,
-  ): Promise<void> {
+  @given('I register a private IPFS network {string}')
+  public async iRegisterAPrivateIPFSNetwork(networkName: string): Promise<void> {
     this.currentNetworkId =
-      await this.ipfsDefinition.registerInMemoryNetwork(networkName);
+      await this.ipfsDefinition.registerPrivateNetwork(networkName);
   }
 
   @given('I use an unknown IPFS network id')
@@ -2728,14 +2719,14 @@ export default class Definitions {
   }
 
   @given(
-    'I register an in-memory IPFS network with id {string} and name {string}',
+    'I register a private IPFS network with id {string} and name {string}',
   )
-  public async iRegisterAnInMemoryIPFSNetworkWithIdAndName(
+  public async iRegisterAPrivateIPFSNetworkWithIdAndName(
     networkId: string,
     networkName: string,
   ): Promise<void> {
     this.currentNetworkId =
-      await this.ipfsDefinition.registerInMemoryNetworkWithId(
+      await this.ipfsDefinition.registerPrivateNetworkWithId(
         networkId,
         networkName,
       );

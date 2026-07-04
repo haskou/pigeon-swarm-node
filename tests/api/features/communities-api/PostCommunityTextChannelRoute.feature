@@ -5,7 +5,7 @@ Feature: Post community text channel API
 
   Scenario: Owner creates a private community text channel
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-channel-network"
+    And I register a private IPFS network "communities-api-channel-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -21,7 +21,7 @@ Feature: Post community text channel API
 
   Scenario: Non-owner cannot create a private community text channel
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-owner-network"
+    And I register a private IPFS network "communities-api-owner-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

@@ -1,7 +1,7 @@
 Feature: Edit conversation messages
 
   Scenario: Edit an encrypted message in a one-to-one conversation
-    Given I register an in-memory IPFS network "api-conversation-edit-message-network"
+    Given I register a private IPFS network "api-conversation-edit-message-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I set an edit conversation message body

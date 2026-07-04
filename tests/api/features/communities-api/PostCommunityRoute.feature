@@ -5,7 +5,7 @@ Feature: Post community API
 
   Scenario: Create a private community successfully
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-network"
+    And I register a private IPFS network "communities-api-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -18,7 +18,7 @@ Feature: Post community API
 
   Scenario: Create a public community successfully
     Given I am an anonymous user
-    And I register an in-memory IPFS network "public-communities-api-network"
+    And I register a private IPFS network "public-communities-api-network"
     And I set a public community body
     And I sign the current community creation request
     When I POST to "/communities/"

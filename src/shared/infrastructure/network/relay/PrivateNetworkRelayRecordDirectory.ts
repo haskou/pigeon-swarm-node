@@ -111,6 +111,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     return pigeonEnvironment().PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS;
   }
 
+  private isRelayDiscoveryEnabled(): boolean {
+    return pigeonEnvironment().PIGEON_RELAY_DISCOVERY_ENABLED;
+  }
+
   private getActiveRelayRecordDiscoveryIntervalMs(): number {
     const environment = pigeonEnvironment();
     const configuredIntervalMs =
@@ -1596,11 +1600,6 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): void {
     const networkId = network.getId();
 
-    Kernel.logger.info(
-      `Private IPFS relay record discovery started: networkId=${networkId}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-    );
-
     if (relayOptions) {
       const publicationGeneration =
         this.ensureActivePublicationGeneration(networkId);
@@ -1628,6 +1627,15 @@ export default class PrivateNetworkRelayRecordDirectory {
         this.publicationIntervals[networkId] = publicationInterval;
       }
     }
+
+    if (!this.isRelayDiscoveryEnabled()) {
+      return;
+    }
+
+    Kernel.logger.info(
+      `Private IPFS relay record discovery started: networkId=${networkId}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+    );
 
     this.discover(network, sharedPrivateKey).catch((error: unknown) => {
       Kernel.logger.debug(

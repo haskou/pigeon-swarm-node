@@ -1,7 +1,7 @@
 Feature: Get conversation messages
 
   Scenario: List encrypted messages in a one-to-one conversation
-    Given I register an in-memory IPFS network "api-conversation-message-list-network"
+    Given I register a private IPFS network "api-conversation-message-list-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I sign the current latest conversation messages request
@@ -10,7 +10,7 @@ Feature: Get conversation messages
     And response body should contain "encrypted-message-payload"
 
   Scenario: List replies in a one-to-one conversation
-    Given I register an in-memory IPFS network "api-conversation-reply-list-network"
+    Given I register a private IPFS network "api-conversation-reply-list-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I set an encrypted conversation reply body
@@ -23,7 +23,7 @@ Feature: Get conversation messages
     And response body should contain "replyToMessageId"
 
   Scenario: Page messages before a known message
-    Given I register an in-memory IPFS network "api-conversation-pagination-network"
+    Given I register a private IPFS network "api-conversation-pagination-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I sign the current latest conversation messages request

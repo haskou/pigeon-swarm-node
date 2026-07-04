@@ -5,7 +5,7 @@ Feature: React to community channel messages
 
   Scenario: Add and list a community channel message reaction
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-message-reaction-network"
+    And I register a private IPFS network "communities-api-message-reaction-network"
     And I have created a private community text channel
     And I have sent an encrypted community channel message
     And I set a community channel message reaction body
@@ -26,7 +26,7 @@ Feature: React to community channel messages
 
   Scenario: Remove a community channel message reaction
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-message-reaction-removal-network"
+    And I register a private IPFS network "communities-api-message-reaction-removal-network"
     And I have created a private community text channel
     And I have sent an encrypted community channel message
     And I set a community channel message reaction body

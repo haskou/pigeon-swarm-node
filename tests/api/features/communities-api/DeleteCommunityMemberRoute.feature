@@ -5,7 +5,7 @@ Feature: Delete community member API
 
   Scenario: Member leaves a private community
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-leave-member-network"
+    And I register a private IPFS network "communities-api-leave-member-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -27,7 +27,7 @@ Feature: Delete community member API
 
   Scenario: Owner leaves a private community when they are the only member
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-owner-leave-member-network"
+    And I register a private IPFS network "communities-api-owner-leave-member-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -64,7 +64,7 @@ Feature: Delete community member API
 
   Scenario: Owner cannot leave a private community while other members remain
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-owner-leave-with-members-network"
+    And I register a private IPFS network "communities-api-owner-leave-with-members-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

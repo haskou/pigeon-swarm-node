@@ -5,7 +5,7 @@ Feature: Patch community membership request API
 
   Scenario: Invited identity declines an invitation
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-decline-invitation-network"
+    And I register a private IPFS network "communities-api-decline-invitation-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

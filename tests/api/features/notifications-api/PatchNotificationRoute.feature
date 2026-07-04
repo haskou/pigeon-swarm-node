@@ -4,7 +4,7 @@ Feature: Patch notification route
   So that I can accept or decline actionable invitations
 
   Background:
-    Given I register an in-memory IPFS network "notifications-api-network"
+    Given I register a private IPFS network "notifications-api-network"
 
   Scenario: Accept a conversation invitation notification
     Given I am an anonymous user

@@ -5,7 +5,7 @@ Feature: Post community join request API
 
   Scenario: Request to join a community and owner accepts it
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-join-request-network"
+    And I register a private IPFS network "communities-api-join-request-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -33,7 +33,7 @@ Feature: Post community join request API
 
   Scenario: Auto-join community accepts membership immediately
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-auto-join-network"
+    And I register a private IPFS network "communities-api-auto-join-network"
     And I set an auto-join private community body
     And I sign the current community creation request
     When I POST to "/communities/"

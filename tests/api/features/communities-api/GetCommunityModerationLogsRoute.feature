@@ -1,7 +1,7 @@
 Feature: Get community moderation logs
 
   Scenario: List moderation logs for community administration
-    Given I register an in-memory IPFS network "community-moderation-logs-network"
+    Given I register a private IPFS network "community-moderation-logs-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

@@ -5,7 +5,7 @@ Feature: Get community membership requests API
 
   Scenario: Owner sees invitations they created
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-membership-requests-network"
+    And I register a private IPFS network "communities-api-membership-requests-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
