@@ -379,7 +379,15 @@ export default class OrbitDBReplicatedStateRegistry {
       const heads = await this.headCache.findByNetworkId(networkId);
       const warm = await this.headCache.isWarm(networkId);
 
-      heads.forEach((head) => this.cacheHead(head.key, head.value));
+      heads.forEach((head) => {
+        for (const key of [
+          head.key,
+          ...this.headKeysFromRecord(head.value),
+          ...this.derivedHeadKeysFromRecord(head.value),
+        ]) {
+          this.cacheHead(key, head.value);
+        }
+      });
 
       if (heads.length > 0) {
         Kernel.logger.debug?.(
@@ -1002,10 +1010,6 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (cachedHead) {
       return cachedHead;
-    }
-
-    if (HttpRequestContext.current()) {
-      return undefined;
     }
 
     return this.findStoredHead(key);

@@ -763,6 +763,48 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
     });
 
+    it('should fallback to a valid previous handle candidate when latest metadata is not readable', async () => {
+      const networkId = '550e8400-e29b-41d4-a716-446655440000';
+      const identity = await createSignedIdentityForNetwork(networkId, 'hasko');
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const latestCidString = 'bafybrokenlatesthandleidentity';
+      const previousCidString = 'bafyvalidprevioushandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: latestCidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          networkIds: [networkId],
+          previousCid: previousCidString,
+          receivedAt: Date.now(),
+          version: primitives.version + 1,
+        },
+      ]);
+      ipfsManager.getJSONFromNetworks
+        .mockRejectedValueOnce(new Error('broken latest identity'));
+      ipfsManager.getJSON.mockResolvedValueOnce(mapper.toDocument(identity));
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(ipfsManager.getJSONFromNetworks).toHaveBeenCalledWith(
+        new IPFSId(latestCidString),
+        [networkId],
+      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(previousCidString),
+      );
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(previousCidString),
+      );
+      expect(result.getExternalIdentifier()).toEqual(
+        new IdentityExternalIdentifier(previousCidString),
+      );
+      expect(result.getIdentity().toPrimitives()).toEqual(primitives);
+    });
+
     it('should resolve handle metadata from the local identity cache without reading IPFS', async () => {
       const networkId = '550e8400-e29b-41d4-a716-446655440000';
       const identity = await createSignedIdentityForNetwork(networkId, 'hasko');

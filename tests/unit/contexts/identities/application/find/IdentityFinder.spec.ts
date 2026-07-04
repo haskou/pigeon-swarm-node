@@ -19,6 +19,19 @@ describe('IdentityFinder', () => {
   });
 
   describe('find', () => {
+    it('should resolve handle references by handle', async () => {
+      const identity = await mother.build();
+      const message = new IdentityFinderMessage('hasko');
+
+      finderService.findByHandle.mockResolvedValue(identity);
+
+      const result = await finder.find(message);
+
+      expect(finderService.findByHandle).toHaveBeenCalledWith(message.handle);
+      expect(finderService.findById).not.toHaveBeenCalled();
+      expect(result).toEqual(identity);
+    });
+
     it('should return the identity from the finder service', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();

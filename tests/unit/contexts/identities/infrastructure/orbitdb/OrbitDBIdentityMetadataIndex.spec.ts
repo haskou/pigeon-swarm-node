@@ -6,8 +6,6 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
-import type { Request } from 'express';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
@@ -286,27 +284,58 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(stores.identities.query).not.toHaveBeenCalled();
   });
 
-  it('should not query stored identity records by handle during http requests', async () => {
-    const query = jest.fn(() =>
-      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
+  it('should read persisted handle heads on cache misses', async () => {
+    const mother = new IdentityMother();
+    const identity = mother.build();
+    const primitives = identity.toPrimitives();
+    const query = jest.fn(
+      (matcher: (document: Record<string, unknown>) => boolean) =>
+        Promise.resolve(
+          [
+            {
+              cid: 'bafyidentity-http-fallback',
+              handle: 'hasko',
+              id: 'bafyidentity-http-fallback',
+              identityId: primitives.id,
+              networkIds: primitives.networks,
+              receivedAt: 1,
+              version: primitives.version,
+            },
+          ].filter(matcher),
+        ),
     );
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set('identity-handle:hasko', {
+      cid: 'bafyidentity-http-head',
+      handle: 'hasko',
+      id: 'bafyidentity-http-head',
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      receivedAt: 1,
+      version: primitives.version,
+    });
 
     registry.clear();
     await registry.register(
-      'network-http',
-      identityStoresWithIdentityQuery(new Map(), query),
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
-    const records = await runHttpRequest(() =>
-      repository.findByHandle(new ProfileHandle('hasko')),
-    );
+    const records = await repository.findByHandle(new ProfileHandle('hasko'));
 
-    expect(records).toEqual([]);
+    expect(records).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-http-head',
+        handle: 'hasko',
+        identityId: primitives.id,
+      }),
+    ]);
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should use cached identity records by handle during http requests', async () => {
+  it('should use cached identity records by handle without scanning stores', async () => {
     const query = jest.fn(() =>
       Promise.reject(new Error('HTTP identity lookup should not scan stores')),
     );
@@ -325,14 +354,12 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     });
     registry.clear();
     await registry.register(
-      'network-http',
+      'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
-    const records = await runHttpRequest(() =>
-      repository.findByHandle(new ProfileHandle('hasko')),
-    );
+    const records = await repository.findByHandle(new ProfileHandle('hasko'));
 
     expect(records).toEqual([
       expect.objectContaining({
@@ -345,24 +372,54 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should not query stored identity records by identity id during http requests', async () => {
-    const query = jest.fn(() =>
-      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
-    );
+  it('should read persisted identity id heads on cache misses', async () => {
     const mother = new IdentityMother();
+    const identity = mother.build();
+    const primitives = identity.toPrimitives();
+    const query = jest.fn(
+      (matcher: (document: Record<string, unknown>) => boolean) =>
+        Promise.resolve(
+          [
+            {
+              cid: 'bafyidentity-id-http-fallback',
+              handle: primitives.profile.handle,
+              id: 'bafyidentity-id-http-fallback',
+              identity: primitives,
+              identityId: primitives.id,
+              networkIds: primitives.networks,
+              receivedAt: 1,
+              version: primitives.version,
+            },
+          ].filter(matcher),
+        ),
+    );
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set(`identity:${primitives.id}`, {
+      cid: 'bafyidentity-id-http-head',
+      handle: primitives.profile.handle,
+      id: 'bafyidentity-id-http-head',
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      receivedAt: 1,
+      version: primitives.version,
+    });
 
     registry.clear();
     await registry.register(
-      'network-http',
-      identityStoresWithIdentityQuery(new Map(), query),
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
-    const records = await runHttpRequest(() =>
-      repository.findByIdentityId(mother.id),
-    );
+    const records = await repository.findByIdentityId(mother.id);
 
-    expect(records).toEqual([]);
+    expect(records).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-id-http-head',
+        identityId: primitives.id,
+      }),
+    ]);
     expect(query).not.toHaveBeenCalled();
   });
 });
@@ -430,18 +487,6 @@ function identityStoresWithIdentityQuery(
       query,
     },
   } as never;
-}
-
-function runHttpRequest<T>(callback: () => T): T {
-  return HttpRequestContext.run(
-    {
-      method: 'GET',
-      originalUrl: '/api/identities/hasko',
-      path: '/identities/hasko',
-      url: '/api/identities/hasko',
-    } as Request,
-    callback,
-  );
 }
 
 function upsertDocument(

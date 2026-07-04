@@ -6,7 +6,6 @@ import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
@@ -146,10 +145,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
   private handleHeadKey(handle: string): string {
     return `identity-handle:${handle}`;
-  }
-
-  private isHttpRequest(): boolean {
-    return HttpRequestContext.current() !== undefined;
   }
 
   private async findHead(
@@ -325,7 +320,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   public async findByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
-    const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
+    const key = this.handleHeadKey(handle.valueOf());
+    const head = await this.findHead(key);
 
     if (head) {
       return [head];
@@ -335,12 +331,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       this.findCachedRecordsByHandle(handle.valueOf()),
     );
 
-    if (this.isHttpRequest()) {
-      if (cachedLatest) {
-        return [cachedLatest];
-      }
-
-      return [];
+    if (cachedLatest) {
+      return [cachedLatest];
     }
 
     const latest = this.latestRecordFrom([
@@ -366,10 +358,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     if (head) {
       return [head];
-    }
-
-    if (this.isHttpRequest()) {
-      return [];
     }
 
     const latest = this.latestRecordFrom([

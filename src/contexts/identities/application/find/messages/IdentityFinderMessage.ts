@@ -8,9 +8,9 @@ export class IdentityFinderMessage {
 
   constructor(reference: string) {
     try {
-      this.identityId = new IdentityId(reference);
-    } catch {
       this.handle = new ProfileHandle(reference);
+    } catch {
+      this.identityId = new IdentityId(reference);
     }
   }
 }
