@@ -30,6 +30,13 @@ const mockMultiaddr = jest
 const mockParseCid = jest
   .fn()
   .mockReturnValue({ code: 0x70, toString: () => 'bafymockcid' });
+const mockUnixfsAddBytes = jest
+  .fn()
+  .mockResolvedValue({ toString: () => 'bafymockcid' });
+const mockUnixfsCat = jest.fn();
+const mockUnixfsRm = jest
+  .fn()
+  .mockResolvedValue({ toString: () => 'bafymockcid' });
 
 jest.mock(
   'helia',
@@ -45,6 +52,18 @@ jest.mock(
     json: jest.fn().mockReturnValue({
       add: jest.fn().mockResolvedValue({ toString: () => 'bafymockcid' }),
       get: jest.fn().mockResolvedValue({ test: true }),
+    }),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/unixfs',
+  () => ({
+    unixfs: jest.fn().mockReturnValue({
+      addBytes: mockUnixfsAddBytes,
+      cat: mockUnixfsCat,
+      rm: mockUnixfsRm,
     }),
   }),
   { virtual: true },
@@ -127,7 +146,12 @@ jest.mock(
 jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
-    logger: { debug: jest.fn(), error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+    logger: {
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    },
   },
 }));
 
@@ -151,6 +175,13 @@ describe('PublicIPFS', () => {
     mockHeliaNode.pins.rm.mockReturnValue(
       pinResults({ toString: () => 'bafymockcid' }),
     );
+    mockUnixfsAddBytes.mockResolvedValue({ toString: () => 'bafymockcid' });
+    mockUnixfsCat.mockReturnValue(
+      (async function* bytes() {
+        yield new Uint8Array([1, 2, 3]);
+      })(),
+    );
+    mockUnixfsRm.mockResolvedValue({ toString: () => 'bafymockcid' });
   });
 
   describe('create', () => {
@@ -265,7 +296,10 @@ describe('PublicIPFS', () => {
       mockHeliaNode.libp2p.getPeers.mockReturnValue(['connected-peer']);
       mockHeliaNode.blockstore.get.mockResolvedValue(new Uint8Array([1, 2, 3]));
 
-      const result = await connection.getBytes(new IPFSId('bafkrawcid'), signal);
+      const result = await connection.getBytes(
+        new IPFSId('bafkrawcid'),
+        signal,
+      );
 
       expect(result).toEqual(Buffer.from([1, 2, 3]));
       expect(mockHeliaNode.blockstore.get).toHaveBeenCalledWith(parsedCid, {
@@ -288,6 +322,11 @@ describe('PublicIPFS', () => {
       await connection.removeJSON(cid);
 
       expect(mockHeliaNode.pins.rm).toHaveBeenCalled();
+      expect(mockUnixfsRm).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        '',
+        { signal: undefined },
+      );
       expect(mockHeliaNode.blockstore.delete).toHaveBeenCalled();
     });
   });

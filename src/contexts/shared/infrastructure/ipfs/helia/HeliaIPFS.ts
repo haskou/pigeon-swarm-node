@@ -728,6 +728,21 @@ export abstract class HeliaIPFS implements IPFSConnection {
       parsedCid,
       signal,
     );
+
+    if (!IPFSCidCodec.isRaw(parsedCid)) {
+      try {
+        const unixfsClient = await heliaRuntimeAdapter.createUnixfsClient(
+          this.heliaCore,
+        );
+
+        await unixfsClient.rm(parsedCid, '', { signal });
+      } catch {
+        Kernel.logger.debug?.(
+          `Skipped IPFS UnixFS DAG removal before block deletion: ${cid.valueOf()}`,
+        );
+      }
+    }
+
     await this.heliaCore.blockstore.delete(parsedCid, { signal });
   }
 

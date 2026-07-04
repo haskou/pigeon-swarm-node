@@ -1,6 +1,8 @@
 import { ContentReplicaClaim } from '@app/contexts/content-replication/domain/ContentReplicaClaim';
 import ContentReplicaClaimRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicaClaimRepository';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBContentReplicaClaimDocument } from './documents/OrbitDBContentReplicaClaimDocument';
@@ -41,7 +43,8 @@ export default class OrbitDBContentReplicaClaimRepository extends ContentReplica
       this.stringValue(document, 'id') !== undefined &&
       this.stringValue(document, 'kind') === 'content_replica_claim' &&
       this.stringValue(document, 'networkId') !== undefined &&
-      this.stringValue(document, 'nodeId') !== undefined
+      this.stringValue(document, 'nodeId') !== undefined &&
+      this.numberValue(document, 'withdrawnAt') === undefined
     );
   }
 
@@ -73,6 +76,31 @@ export default class OrbitDBContentReplicaClaimRepository extends ContentReplica
 
   public async save(claim: ContentReplicaClaim): Promise<void> {
     const document = this.mapper.toDocument(claim);
+
+    await this.registry.putDocument('contentReplication', document, [
+      document.networkId,
+    ]);
+    this.registry.replicateHeadInBackground(this.headKey(document), document, [
+      document.networkId,
+    ]);
+  }
+
+  public async withdraw(
+    cid: ContentId,
+    networkId: NetworkId,
+    nodeId: NodeId,
+  ): Promise<void> {
+    const withdrawnAt = Date.now();
+    const document: OrbitDBContentReplicaClaimDocument = {
+      cid: cid.valueOf(),
+      claimedAt: 0,
+      id: `${cid.valueOf()}:${networkId.valueOf()}:${nodeId.valueOf()}`,
+      kind: 'content_replica_claim',
+      networkId: networkId.valueOf(),
+      nodeId: nodeId.valueOf(),
+      updatedAt: withdrawnAt,
+      withdrawnAt,
+    };
 
     await this.registry.putDocument('contentReplication', document, [
       document.networkId,

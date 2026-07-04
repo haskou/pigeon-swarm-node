@@ -79,4 +79,37 @@ describe('OrbitDBContentReplicaClaimRepository', () => {
 
     expect(put).toHaveBeenCalledWith(document);
   });
+
+  it('should ignore withdrawn replica claims', async () => {
+    await repository.withdraw(
+      new ContentId(cid),
+      new NetworkId(networkId),
+      new NodeId(nodeId),
+    );
+
+    const result = await repository.findByCids([new ContentId(cid)]);
+
+    expect(result).toEqual([]);
+  });
+
+  it('should persist withdrawn replica claim tombstones', async () => {
+    await repository.withdraw(
+      new ContentId(cid),
+      new NetworkId(networkId),
+      new NodeId(nodeId),
+    );
+
+    expect(put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cid,
+        claimedAt: 0,
+        id: `${cid}:${networkId}:${nodeId}`,
+        kind: 'content_replica_claim',
+        networkId,
+        nodeId,
+        updatedAt: expect.any(Number),
+        withdrawnAt: expect.any(Number),
+      }),
+    );
+  });
 });

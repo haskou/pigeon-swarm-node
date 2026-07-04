@@ -2,8 +2,8 @@ import { InvalidPasswordError } from '@app/contexts/shared/domain/errors/Invalid
 import { assert, StringValueObject } from '@haskou/value-objects';
 
 export class Password extends StringValueObject {
+  private static readonly MIN_LENGTH = 20;
   private static readonly MAX_LENGTH = 256;
-  private static readonly MIN_LENGTH = 12;
 
   constructor(value: string | StringValueObject) {
     super(value);
