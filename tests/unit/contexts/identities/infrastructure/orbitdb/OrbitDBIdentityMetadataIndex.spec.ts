@@ -59,6 +59,56 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     );
   });
 
+  it('should not wait for identity head persistence when saving metadata', async () => {
+    const mother = new IdentityMother();
+    const identity = mother.build();
+    const networkId = mother.networks[0].valueOf();
+    const delayedHead = deferred<string>();
+    const stores = identityStores(documents, heads) as unknown as {
+      heads: { put: jest.Mock };
+    };
+
+    registry.clear();
+    await registry.register(networkId, stores as never);
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+    stores.heads.put.mockImplementation(
+      async (key: string, value: Record<string, unknown>) => {
+        await delayedHead.promise;
+        heads.set(key, value);
+
+        return 'ok';
+      },
+    );
+
+    const save = repository.save(
+      identity,
+      new IdentityExternalIdentifier('bafyidentity-fast-head'),
+    );
+    const result = await Promise.race([
+      save.then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    expect(heads.get(`identity:${mother.id.valueOf()}`)).toBeUndefined();
+    await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-fast-head',
+        identityId: mother.id.valueOf(),
+      }),
+    ]);
+
+    delayedHead.resolve('ok');
+    await flushBackgroundTasks();
+
+    expect(heads.get(`identity:${mother.id.valueOf()}`)).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-fast-head',
+        identityId: mother.id.valueOf(),
+      }),
+    );
+  });
+
   it('should tombstone identity metadata by external identifier', async () => {
     const mother = new IdentityMother();
     await repository.save(
@@ -415,4 +465,16 @@ async function flushBackgroundTasks(): Promise<void> {
   await new Promise<void>((resolve) => {
     setImmediate(resolve);
   });
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
 }

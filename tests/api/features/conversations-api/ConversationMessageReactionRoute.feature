@@ -1,7 +1,7 @@
 Feature: React to conversation messages
 
   Scenario: Add and list a message reaction
-    Given I register an in-memory IPFS network "api-conversation-message-reaction-network"
+    Given I register a test IPFS network "api-conversation-message-reaction-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I set a conversation message reaction body
@@ -21,7 +21,7 @@ Feature: React to conversation messages
     And response body should contain "👍"
 
   Scenario: Remove a message reaction
-    Given I register an in-memory IPFS network "api-conversation-message-reaction-removal-network"
+    Given I register a test IPFS network "api-conversation-message-reaction-removal-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I set a conversation message reaction body

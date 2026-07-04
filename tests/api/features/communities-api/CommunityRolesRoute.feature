@@ -5,7 +5,7 @@ Feature: Community roles API
 
   Scenario: Owner grants channel management through a role
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-roles-network"
+    And I register a test IPFS network "communities-api-roles-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -39,7 +39,7 @@ Feature: Community roles API
 
   Scenario: Owner restricts a channel to a role
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-channel-permissions-network"
+    And I register a test IPFS network "communities-api-channel-permissions-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

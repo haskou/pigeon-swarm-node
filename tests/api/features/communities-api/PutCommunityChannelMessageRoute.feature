@@ -4,7 +4,7 @@ Feature: Put community channel message API
 
   Scenario: Edit an encrypted community channel message
     Given I am an anonymous user
-    And I register an in-memory IPFS network "api-community-edit-message-network"
+    And I register a test IPFS network "api-community-edit-message-network"
     And I have created a private community text channel
     And I have sent an encrypted community channel message
     And I set an edit community channel message body

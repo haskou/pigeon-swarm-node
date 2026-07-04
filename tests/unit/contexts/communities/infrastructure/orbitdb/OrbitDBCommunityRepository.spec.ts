@@ -121,7 +121,7 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
-  it('should wait for member index fanout when saving communities', async () => {
+  it('should not wait for member index persistence when saving communities', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
     const delayedMemberIndex = deferred<string>();
 
@@ -143,17 +143,27 @@ describe('OrbitDBCommunityRepository', () => {
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('blocked');
+    expect(result).toBe('saved');
     expect(heads.get('community:community-1')).toEqual(
       expect.objectContaining({ id: 'community-1' }),
     );
     expect(
       heads.get(`community-member-index:${identityMother.id.valueOf()}`),
     ).toBeUndefined();
+    await expect(repository.findByMember(identityMother.id)).resolves.toHaveLength(
+      1,
+    );
 
     delayedMemberIndex.resolve('ok');
+    await flushBackgroundTasks();
 
-    await expect(save).resolves.toBeUndefined();
+    expect(
+      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+    ).toEqual(
+      expect.objectContaining({
+        communities: [expect.objectContaining({ id: 'community-1' })],
+      }),
+    );
   });
 
   it('should not wait for replicated document persistence when saving communities', async () => {

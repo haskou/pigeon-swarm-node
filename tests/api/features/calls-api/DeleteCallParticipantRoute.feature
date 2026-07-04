@@ -4,7 +4,7 @@ Feature: Leave call participant
   So that call state reflects participant intent
 
   Scenario: Decline a ringing one-to-one call
-    Given I register an in-memory IPFS network "api-calls-decline-network"
+    Given I register a test IPFS network "api-calls-decline-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request

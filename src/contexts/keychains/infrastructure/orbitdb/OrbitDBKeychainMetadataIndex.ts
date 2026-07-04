@@ -190,15 +190,15 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       );
   }
 
-  private async readRepairHead(
+  private readRepairHead(
     head: KeychainMetadataRecord | undefined,
     latest: KeychainMetadataRecord,
-  ): Promise<void> {
+  ): void {
     if (head?.cid === latest.cid) {
       return;
     }
 
-    await this.putHead(this.toStorageDocument(latest));
+    this.replicateHeadInBackground(this.toStorageDocument(latest));
   }
 
   private repairHeadInBackground(
@@ -230,7 +230,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
         ])[0];
 
         if (latest) {
-          await this.readRepairHead(head, latest);
+          this.readRepairHead(head, latest);
         }
       },
     );
@@ -261,15 +261,18 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       );
   }
 
-  private async putHead(
+  private replicateHeadInBackground(
     document: OrbitDBKeychainMetadataDocument,
-  ): Promise<void> {
-    await Promise.all([
-      this.registry.putHead(this.ownerHeadKey(document.ownerIdentityId), {
+  ): void {
+    this.registry.replicateHeadInBackground(
+      this.ownerHeadKey(document.ownerIdentityId),
+      {
         ...document,
-      }),
-      this.registry.putHead(this.cidHeadKey(document.cid), { ...document }),
-    ]);
+      },
+    );
+    this.registry.replicateHeadInBackground(this.cidHeadKey(document.cid), {
+      ...document,
+    });
   }
 
   public findAll(): Promise<KeychainMetadataRecord[]> {
@@ -331,7 +334,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     const latest = sortedRecords[0];
 
     if (latest) {
-      await this.readRepairHead(head, latest);
+      this.readRepairHead(head, latest);
     }
 
     return sortedRecords;
@@ -357,6 +360,6 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     };
 
     await this.registry.putDocument('keychains', document);
-    await this.putHead(document);
+    this.replicateHeadInBackground(document);
   }
 }

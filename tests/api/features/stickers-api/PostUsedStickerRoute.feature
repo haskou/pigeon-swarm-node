@@ -4,7 +4,7 @@ Feature: Post used sticker route
   So that identities can see their recent stickers
 
   Background:
-    Given I register an in-memory IPFS network "api-stickers-network"
+    Given I register a test IPFS network "api-stickers-network"
 
   Scenario: Record a recently used sticker
     Given I am an anonymous user

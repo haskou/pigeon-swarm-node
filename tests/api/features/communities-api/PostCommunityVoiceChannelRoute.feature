@@ -5,7 +5,7 @@ Feature: Post community voice channel API
 
   Scenario: Owner creates a private community voice channel
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-voice-channel-network"
+    And I register a test IPFS network "communities-api-voice-channel-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

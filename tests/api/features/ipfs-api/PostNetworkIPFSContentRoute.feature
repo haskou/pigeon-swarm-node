@@ -5,7 +5,7 @@ Feature: Post network IPFS content route
 
   Scenario: Publish encrypted private content to an IPFS network
     Given I am an anonymous user
-    And I register an in-memory IPFS network "api-test-network"
+    And I register a test IPFS network "api-test-network"
     And I set raw IPFS content with content type "application/octet-stream" and text "encrypted-by-client"
     And I sign the current network IPFS content request
     When I POST to the current IPFS network

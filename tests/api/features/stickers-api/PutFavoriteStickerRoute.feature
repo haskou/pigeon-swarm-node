@@ -4,7 +4,7 @@ Feature: Put favorite sticker route
   So that identities can keep a quick-access sticker list
 
   Background:
-    Given I register an in-memory IPFS network "api-stickers-network"
+    Given I register a test IPFS network "api-stickers-network"
 
   Scenario: Favorite and unfavorite a sticker
     Given I am an anonymous user

@@ -133,21 +133,13 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       );
   }
 
-  private async putMemberIndex(
+  private replicateMemberIndexInBackground(
     identityId: string,
     community: OrbitDBCommunityDocument,
-  ): Promise<void> {
+  ): void {
     const key = this.memberIndexHeadKey(identityId);
-    const indexedCommunities = (await this.communityIndex.find(key)) || [];
-    const communities = this.freshestDocumentsFirst([
-      ...indexedCommunities,
-      community,
-    ]).filter(
-      (document) =>
-        document.deleted !== true && document.memberIds.includes(identityId),
-    );
 
-    await this.communityIndex.putDocuments(
+    void this.communityIndex.replicateRecordInBackground(
       key,
       {
         id: key,
@@ -155,10 +147,8 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         memberId: identityId,
         networkId: community.networkId,
       },
-      communities,
-      {
-        networkIds: [community.networkId],
-      },
+      community,
+      [community.networkId],
     );
   }
 
@@ -174,13 +164,11 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  private async putMemberIndexes(
+  private replicateMemberIndexesInBackground(
     document: OrbitDBCommunityDocument,
-  ): Promise<void> {
-    await Promise.all(
-      document.memberIds.map((memberId) =>
-        this.putMemberIndex(memberId, document),
-      ),
+  ): void {
+    document.memberIds.forEach((memberId) =>
+      this.replicateMemberIndexInBackground(memberId, document),
     );
   }
 
@@ -206,7 +194,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       [deletedDocument.networkId],
     );
     this.replicateCommunityHeadInBackground(deletedDocument);
-    await this.putMemberIndexes(deletedDocument);
+    this.replicateMemberIndexesInBackground(deletedDocument);
   }
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
@@ -275,6 +263,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       document.networkId,
     ]);
     this.replicateCommunityHeadInBackground(document);
-    await this.putMemberIndexes(document);
+    this.replicateMemberIndexesInBackground(document);
   }
 }

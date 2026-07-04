@@ -1,12 +1,14 @@
 import * as fsSync from 'fs';
 import path from 'path';
+import { generateKeyPairSync } from 'crypto';
 
-import { UUID } from '@haskou/value-objects';
+import { PrivateKey, UUID } from '@haskou/value-objects';
 
 import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipfs/helia/HeliaIPFSParser';
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import IPFSNetworkRegistry from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Kernel } from '@haskou/ddd-kernel';
 
 type IdentityResponseShape = {
@@ -155,11 +157,37 @@ export default class IPFSDefinition {
     }
   }
 
-  public async registerInMemoryNetwork(networkAlias: string): Promise<string> {
+  private generateNetworkKey(): PrivateKey {
+    const { privateKey } = generateKeyPairSync('ed25519');
+
+    return new PrivateKey(
+      privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+    );
+  }
+
+  private shouldUseRealPrivateIPFS(): boolean {
+    return process.env.PIGEON_API_TEST_REAL_IPFS === 'true';
+  }
+
+  private createNetworkConfig(
+    networkId: string,
+    networkName: string,
+  ): IPFSNetworkConfig {
+    return new IPFSNetworkConfig(
+      networkId,
+      networkName,
+      this.shouldUseRealPrivateIPFS() ? this.generateNetworkKey() : undefined,
+    );
+  }
+
+  public async registerTestNetwork(networkAlias: string): Promise<string> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkAlias}-${this.scenarioSuffix}`;
     const networkId = UUID.generate().toString();
-    const networkConfig = new IPFSNetworkConfig(networkId, scenarioNetworkName);
+    const networkConfig = this.createNetworkConfig(
+      networkId,
+      scenarioNetworkName,
+    );
 
     await ipfs.registerNetwork(networkConfig);
     this.ipfsNetworkAliases[networkAlias] = scenarioNetworkName;
@@ -169,13 +197,16 @@ export default class IPFSDefinition {
     return networkId;
   }
 
-  public async registerInMemoryNetworkWithId(
+  public async registerTestNetworkWithId(
     networkId: string,
     networkName: string,
   ): Promise<string> {
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
     const scenarioNetworkName = `${networkName}-${this.scenarioSuffix}`;
-    const networkConfig = new IPFSNetworkConfig(networkId, scenarioNetworkName);
+    const networkConfig = this.createNetworkConfig(
+      networkId,
+      scenarioNetworkName,
+    );
 
     await ipfs.registerNetwork(networkConfig);
     this.ipfsNetworkAliases[networkName] = scenarioNetworkName;
@@ -298,16 +329,18 @@ export default class IPFSDefinition {
   }
 
   public async cleanupRegisteredNetworks(): Promise<void> {
-    if (this.registeredNetworkIds.length === 0) {
-      return;
-    }
-
     const ipfs = Kernel.di.getService<IPFS>(IPFS);
+    const networkRegistry =
+      Kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry);
+    const networkIds = [
+      ...new Set([
+        ...this.registeredNetworkIds,
+        ...networkRegistry.getAll().map((network) => network.getId()),
+      ]),
+    ];
 
-    await Promise.all(
-      this.registeredNetworkIds.map((networkId) =>
-        ipfs.removeNetwork(networkId),
-      ),
-    );
+    for (const networkId of networkIds) {
+      await ipfs.removeNetwork(networkId);
+    }
   }
 }
