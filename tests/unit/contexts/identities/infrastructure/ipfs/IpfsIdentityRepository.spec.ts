@@ -805,6 +805,42 @@ describe('IpfsIdentityRepository', () => {
       expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
 
+    it('should reject previous handle candidates from another identity', async () => {
+      const networkId = '550e8400-e29b-41d4-a716-446655440000';
+      const identity = await createSignedIdentityForNetwork(networkId, 'hasko');
+      const otherIdentity = await createSignedIdentityForNetwork(
+        networkId,
+        'hasko',
+      );
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('hasko');
+      const latestCidString = 'bafybrokenlatesthandleidentity';
+      const previousCidString = 'bafywrongprevioushandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: latestCidString,
+          handle: 'hasko',
+          identityId: primitives.id,
+          networkIds: [networkId],
+          previousCid: previousCidString,
+          receivedAt: Date.now(),
+          version: primitives.version + 1,
+        },
+      ]);
+      ipfsManager.getJSONFromNetworks.mockRejectedValueOnce(
+        new Error('broken latest identity'),
+      );
+      ipfsManager.getJSON.mockResolvedValueOnce(
+        mapper.toDocument(otherIdentity),
+      );
+
+      await expect(repository.findCandidateByHandle(handle)).rejects.toThrow(
+        IdentityNotFoundError,
+      );
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
     it('should resolve handle metadata from the local identity cache without reading IPFS', async () => {
       const networkId = '550e8400-e29b-41d4-a716-446655440000';
       const identity = await createSignedIdentityForNetwork(networkId, 'hasko');

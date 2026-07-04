@@ -258,6 +258,18 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return undefined;
     }
 
+    const identityId = new IdentityId(metadata.identityId);
+    const isValid = await this.validator.isValidChainFor(
+      identityId,
+      identity,
+      (previousExternalIdentifier) =>
+        this.findPreviousIdentity(previousExternalIdentifier),
+    );
+
+    if (!isValid) {
+      return undefined;
+    }
+
     await this.saveMetadata(identity, new IPFSId(metadata.previousCid));
 
     return new IdentityCandidate(externalIdentifier, identity);
