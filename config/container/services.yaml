@@ -227,6 +227,11 @@ services:
     parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkQ2FjaGVfX09yYml0REJSZXBsaWNhdGVkSGVhZENhY2hl: >-
     @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fTG9jYWxPcmJpdERCUmVwbGljYXRlZEhlYWRDYWNoZV9fTG9jYWxPcmJpdERCUmVwbGljYXRlZEhlYWRDYWNoZQ==
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkS2V5RGVyaXZlcl9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkS2V5RGVyaXZlcg==:
+    class: /contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadKeyDeriver
+    arguments: []
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRTdGF0ZVJlZ2lzdHJ5X19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnk=:
     class: /contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry
     arguments: []

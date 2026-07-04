@@ -9,6 +9,7 @@ import { OrbitDBQueryDocumentsMode } from './OrbitDBQueryDocumentsMode';
 import { OrbitDBQueryDocumentsOptions } from './OrbitDBQueryDocumentsOptions';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
+import OrbitDBReplicatedHeadKeyDeriver from './OrbitDBReplicatedHeadKeyDeriver';
 import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import ReplicatedStateNotReadyError from './ReplicatedStateNotReadyError';
 
@@ -39,6 +40,8 @@ export default class OrbitDBReplicatedStateRegistry {
   private readonly cachedHeads = new Map<string, Record<string, unknown>>();
 
   private headCache?: OrbitDBReplicatedHeadCache;
+
+  private readonly headKeyDeriver = new OrbitDBReplicatedHeadKeyDeriver();
 
   private static defaultHeadCache(): OrbitDBReplicatedHeadCache | undefined {
     if (process.env.JEST_WORKER_ID || pigeonEnvironment().NODE_ENV === 'test') {
@@ -236,56 +239,6 @@ export default class OrbitDBReplicatedStateRegistry {
     return undefined;
   }
 
-  private headKeysFromRecord(record: Record<string, unknown>): string[] {
-    const keys = new Set<string>();
-    const identityId =
-      this.stringValue(record, 'identityId') || this.stringValue(record, 'id');
-    const handle = this.stringValue(record, 'handle');
-    const ownerIdentityId = this.stringValue(record, 'ownerIdentityId');
-    const cid = this.stringValue(record, 'cid');
-    const id = this.stringValue(record, 'id');
-
-    if (identityId) {
-      keys.add(`identity:${identityId}`);
-    }
-
-    if (handle) {
-      keys.add(`identity-handle:${handle}`);
-    }
-
-    if (ownerIdentityId) {
-      keys.add(`keychain:${ownerIdentityId}`);
-    }
-
-    if (ownerIdentityId && cid) {
-      keys.add(`keychain-cid:${cid}`);
-    }
-
-    if (id) {
-      keys.add(id);
-    }
-
-    return [...keys];
-  }
-
-  private derivedHeadKeysFromRecord(record: Record<string, unknown>): string[] {
-    const keys = new Set<string>();
-    const scope = record.scope;
-
-    if (
-      this.isRecord(scope) &&
-      scope.type === 'community_channel' &&
-      typeof scope.communityId === 'string' &&
-      typeof scope.channelId === 'string'
-    ) {
-      keys.add(
-        `call-community-channel-head:${scope.communityId}:${scope.channelId}`,
-      );
-    }
-
-    return [...keys];
-  }
-
   private cacheHeadUpdate(
     networkId: string,
     entry: { payload?: { value?: unknown } },
@@ -304,8 +257,8 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     const keys = explicitKey
-      ? [explicitKey, ...this.derivedHeadKeysFromRecord(record)]
-      : this.headKeysFromRecord(record);
+      ? this.headKeyDeriver.cachedKeys(explicitKey, record)
+      : this.headKeyDeriver.implicitKeys(record);
 
     for (const key of keys) {
       const cachedHead = this.cacheHead(key, record);
@@ -328,10 +281,7 @@ export default class OrbitDBReplicatedStateRegistry {
         continue;
       }
 
-      const keys = [
-        record.key,
-        ...this.derivedHeadKeysFromRecord(record.value),
-      ];
+      const keys = this.headKeyDeriver.cachedKeys(record.key, record.value);
 
       for (const key of keys) {
         const cachedHead = this.cacheHead(key, record.value);
@@ -380,11 +330,10 @@ export default class OrbitDBReplicatedStateRegistry {
       const warm = await this.headCache.isWarm(networkId);
 
       heads.forEach((head) => {
-        for (const key of [
+        for (const key of this.headKeyDeriver.cachedKeys(
           head.key,
-          ...this.headKeysFromRecord(head.value),
-          ...this.derivedHeadKeysFromRecord(head.value),
-        ]) {
+          head.value,
+        )) {
           this.cacheHead(key, head.value);
         }
       });
@@ -1039,10 +988,7 @@ export default class OrbitDBReplicatedStateRegistry {
       ...new Set([...networkIds, ...this.networkIdsFromDocument(cleanValue)]),
     ];
 
-    for (const headKey of [
-      key,
-      ...this.derivedHeadKeysFromRecord(cleanValue),
-    ]) {
+    for (const headKey of this.headKeyDeriver.cachedKeys(key, cleanValue)) {
       const cachedHead = this.cacheHead(headKey, cleanValue);
 
       if (!cachedHead) {
@@ -1092,9 +1038,14 @@ export default class OrbitDBReplicatedStateRegistry {
           await stores.heads.put?.(key, cachedValue);
           await this.persistHeadCache(networkId, key, cachedValue);
 
-          for (const derivedKey of this.derivedHeadKeysFromRecord(
+          for (const derivedKey of this.headKeyDeriver.explicitKeys(
+            key,
             cachedValue,
           )) {
+            if (derivedKey === key) {
+              continue;
+            }
+
             const cachedDerivedHead = this.cacheHead(derivedKey, cachedValue);
 
             if (cachedDerivedHead) {

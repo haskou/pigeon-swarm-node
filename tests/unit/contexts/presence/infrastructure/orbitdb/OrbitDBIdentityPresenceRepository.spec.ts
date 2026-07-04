@@ -55,7 +55,7 @@ describe('OrbitDBIdentityPresenceRepository', () => {
   it('should find presence by identity from the direct head', async () => {
     const identityId = identityMother.id.valueOf();
 
-    headRecords.set(`presence:${identityId}`, presenceDocument(identityId));
+    await registry.putHead(`presence:${identityId}`, presenceDocument(identityId));
 
     const presence = await repository.findByIdentityId(
       new IdentityId(identityId),
@@ -123,7 +123,7 @@ describe('OrbitDBIdentityPresenceRepository', () => {
   it('should fetch a presence list from heads before scanning documents', async () => {
     const identityId = identityMother.id.valueOf();
 
-    headRecords.set(`presence:${identityId}`, presenceDocument(identityId));
+    await registry.putHead(`presence:${identityId}`, presenceDocument(identityId));
 
     const presences = await repository.findByIdentityIds([
       new IdentityId(identityId),
