@@ -168,15 +168,15 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return latest;
   }
 
-  private async readRepairHead(
+  private readRepairHead(
     head: IdentityMetadataRecord | undefined,
     latest: IdentityMetadataRecord,
-  ): Promise<void> {
+  ): void {
     if (head?.cid === latest.cid) {
       return;
     }
 
-    await this.putHeads(latest);
+    this.replicateHeadsInBackground(latest);
   }
 
   private async findStoredRecordsByIdentityId(
@@ -268,18 +268,18 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     ];
   }
 
-  private async putHeads(document: IdentityMetadataRecord): Promise<void> {
+  private replicateHeadsInBackground(document: IdentityMetadataRecord): void {
     const networkIds = this.networkIdsFor(document);
     const storageDocument = this.toStorageDocument(document);
 
-    await this.registry.putHead(
+    this.registry.replicateHeadInBackground(
       this.identityHeadKey(document.identityId),
       storageDocument,
       networkIds,
     );
 
     if (document.handle) {
-      await this.registry.putHead(
+      this.registry.replicateHeadInBackground(
         this.handleHeadKey(document.handle),
         storageDocument,
         networkIds,
@@ -352,7 +352,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [];
     }
 
-    await this.readRepairHead(head, latest);
+    this.readRepairHead(head, latest);
 
     return [latest];
   }
@@ -380,7 +380,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [];
     }
 
-    await this.readRepairHead(head, latest);
+    this.readRepairHead(head, latest);
 
     return [latest];
   }
@@ -405,7 +405,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     for (const document of documents) {
       if (!latestDocuments.has(document.identityId)) {
         latestDocuments.set(document.identityId, document);
-        await this.readRepairHead(
+        this.readRepairHead(
           await this.findHead(this.identityHeadKey(document.identityId)),
           document,
         );
@@ -435,7 +435,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       'identities',
       this.toStorageDocument(record),
     );
-    await this.putHeads(record);
+    this.replicateHeadsInBackground(record);
   }
 
   public async deleteByExternalIdentifier(
