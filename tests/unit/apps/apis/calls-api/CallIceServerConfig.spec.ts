@@ -1,5 +1,6 @@
 import { CallIceServerConfig } from '@app/apps/apis/calls-api/CallIceServerConfig';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { createHmac } from 'crypto';
 
 describe('CallIceServerConfig', () => {
@@ -55,11 +56,17 @@ describe('CallIceServerConfig', () => {
 
   it('should derive local TURN urls from the public host and configured TURN port', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
-    const resource = CallIceServerConfig.fromEnvironment({
-      CALLS_TURN_PORT: '4199',
-      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
-      PIGEON_PUBLIC_HOST: 'relay.example.test',
-    }).toResource(identityId);
+    const resource = CallIceServerConfig.fromEnvironment(
+      {
+        CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      },
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    ).toResource(identityId);
     const username = `1770003600:${identityId.valueOf()}`;
     const credential = createHmac('sha1', 'turn-shared-secret')
       .update(username)

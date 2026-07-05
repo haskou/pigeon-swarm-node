@@ -113,10 +113,6 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
-| `PIGEON_RELAY_ENABLED` | unset | No | Optional private relay toggle. Leave unset or set `true` to allow relay startup when a port range exists. Set `false` to force-disable private relay startup. |
-| `PIGEON_PRIVATE_RELAY_PORT_START` | unset | No | First TCP port in the private PSK circuit-relay range. When unset, private networks do not start relay servers. |
-| `PIGEON_PRIVATE_RELAY_PORT_END` | unset | No | Last TCP port in the private PSK circuit-relay range. Must be greater than or equal to `PIGEON_PRIVATE_RELAY_PORT_START`. |
-| `PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS` | unset | No | Optional fallback. Comma- or newline-separated private relay multiaddrs to dial when public relay record discovery has not found a relay yet. Each value must be a full libp2p multiaddr, including `/p2p/<peerId>`. |
 | `PIGEON_RELAY_RECORD_TTL_MS` | `7200000` | No | Private relay record lifetime. Defaults to 2 hours. |
 | `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `15000` | No | How often private networks refresh public relay record discovery. |
 | `PIGEON_RELAY_RECORD_IPNS_WINDOW_MS` | `7200000` | No | Deterministic IPNS key rotation window for private relay records. Discovery checks the current and previous windows. |
@@ -124,11 +120,12 @@ installed `web-push` module path.
 | `PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS` | `3600000` | No | How often private relay nodes refresh their public relay record publication after the initial publish. |
 | `PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS` | `15000` | No | Maximum time to wait when dialing a discovered private relay multiaddr before logging the failure and retrying later. |
 | `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
-| `PIGEON_PUBLIC_HOST` | unset | Required for public relay advertising | Public DNS name used in announced private relay multiaddrs when the node is reachable from other hosts. |
 
-Private networks are no longer configured through environment variables.
+Private networks and relay ownership settings are no longer configured through
+environment variables.
 
-They must be added through application methods/use cases (for example, node network management flows) and are persisted in storage metadata.
+They must be added through the node relay configuration API and are persisted in
+local node metadata.
 
 ### Private IPFS relay range
 
@@ -138,18 +135,28 @@ private network when a relay port range is configured.
 
 Example:
 
-```dotenv
-PIGEON_PRIVATE_RELAY_PORT_START=4100
-PIGEON_PRIVATE_RELAY_PORT_END=4199
-PIGEON_RELAY_ENABLED=true
-PIGEON_RELAY_DATA_LIMIT_BYTES=67108864
-PIGEON_PUBLIC_HOST=relay.example.com
+```http
+PUT /node/relay-configuration
 ```
 
-Leaf node bootstrap example:
-
-```dotenv
-PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS=/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId
+```json
+{
+  "publicHost": "relay.example.com",
+  "manualRelayMultiaddrs": [
+    "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
+  ],
+  "publicNetwork": {
+    "enabled": true,
+    "port": 4011
+  },
+  "privateRelay": {
+    "enabled": true,
+    "portStart": 4100,
+    "portEnd": 4199,
+    "publicationEnabled": true,
+    "discoveryEnabled": true
+  }
+}
 ```
 
 Operational rules:
@@ -157,14 +164,15 @@ Operational rules:
 - expose the whole configured port range in Docker/firewall when the node should
   relay more than one private network;
 - each private network gets a stable port from the range;
-- nodes with a relay range publish an encrypted private relay record through the
-  public IPFS routing layer for each private network;
+- nodes with `privateRelay.enabled` and `privateRelay.publicationEnabled`
+  publish an encrypted private relay record through the public IPFS routing
+  layer for each private network;
 - the relay record lookup key and encrypted payload are derived from the private
   network key, so nodes outside the private network cannot read the relay
   multiaddrs;
-- nodes without the range do not start relay servers; they discover private
-  relay records automatically and may also use
-  `PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS` as an explicit fallback;
+- nodes without `privateRelay.enabled` do not start relay servers; they can
+  discover private relay records when `privateRelay.discoveryEnabled` is true,
+  and can always use `manualRelayMultiaddrs` as an explicit fallback;
 - CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.
@@ -178,19 +186,27 @@ the backend advertise its reachable URLs.
 The same host-level port range can be reused operationally when the protocols do
 not collide. The existing private IPFS relay range is TCP. TURN media relay
 ports should usually reuse that numeric range over UDP in coturn, while the TURN
-listening port is configured separately with `CALLS_TURN_PORT`.
+listening port is configured with `callsRelay.port` in
+`PUT /node/relay-configuration`.
 
 Example:
 
 ```dotenv
-PIGEON_PUBLIC_HOST=relay.example.com
-PIGEON_PRIVATE_RELAY_PORT_START=4100
-PIGEON_PRIVATE_RELAY_PORT_END=4199
-
 CALLS_TURN_SHARED_SECRET=shared-coturn-rest-secret
-CALLS_TURN_PORT=3478
-CALLS_TURN_PUBLIC_HOST=relay.example.com
 CALLS_TURN_TRANSPORTS=udp,tcp
+```
+
+```http
+PUT /node/relay-configuration
+```
+
+```json
+{
+  "publicHost": "relay.example.com",
+  "callsRelay": {
+    "port": 3478
+  }
+}
 ```
 
 Coturn must be configured with the same REST secret and a relay media range that

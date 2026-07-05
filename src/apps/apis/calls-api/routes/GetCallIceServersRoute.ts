@@ -1,3 +1,4 @@
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';
@@ -12,6 +13,9 @@ export class GetCallIceServersRoute extends CallRouteSupport {
     CallRelayRecordRegistry,
   );
 
+  private readonly networkRegistry =
+    this.get<IPFSNetworkRegistry>(IPFSNetworkRegistry);
+
   @Get('/ice-servers')
   public async getIceServers(
     @Req() request: Request,
@@ -22,7 +26,9 @@ export class GetCallIceServersRoute extends CallRouteSupport {
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
-        CallIceServerConfig.fromEnvironment().toResource(
+        CallIceServerConfig.fromRelaySettings(
+          this.networkRegistry.getRelaySettings(),
+        ).toResource(
           identityId,
           this.callRelayRecordRegistry.urlsExceptPeer(undefined),
         ),

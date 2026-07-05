@@ -9,7 +9,9 @@ import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { NodeNetworkWasRemoved } from './events/NodeNetworkWasRemoved';
+import { NodeRelayConfigurationWasUpdated } from './events/NodeRelayConfigurationWasUpdated';
 import { Network } from './Network';
+import { NodeRelayConfiguration } from './NodeRelayConfiguration';
 
 export class Node extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Node>): Node {
@@ -22,6 +24,7 @@ export class Node extends AggregateRoot {
         ]),
       ),
       primitives.owner ? new IdentityId(primitives.owner) : undefined,
+      NodeRelayConfiguration.fromPrimitives(primitives.relayConfiguration),
     );
   }
 
@@ -29,6 +32,7 @@ export class Node extends AggregateRoot {
     private readonly id: NodeId,
     private readonly networks: Map<NetworkId, Network> = new Map(),
     private owner?: IdentityId,
+    private relayConfiguration: NodeRelayConfiguration = NodeRelayConfiguration.default(),
   ) {
     super();
   }
@@ -85,6 +89,21 @@ export class Node extends AggregateRoot {
     this.owner = owner;
   }
 
+  public updateRelayConfiguration(
+    relayConfiguration: NodeRelayConfiguration,
+  ): void {
+    if (this.relayConfiguration.isEqual(relayConfiguration)) {
+      return;
+    }
+
+    this.relayConfiguration = relayConfiguration;
+    this.record(
+      new NodeRelayConfigurationWasUpdated(this.id.valueOf(), {
+        relayConfiguration: this.relayConfiguration.toPrimitives(),
+      }),
+    );
+  }
+
   public hasOwner(): boolean {
     return this.owner !== undefined;
   }
@@ -111,6 +130,7 @@ export class Node extends AggregateRoot {
         ]),
       ),
       owner: this.owner?.valueOf(),
+      relayConfiguration: this.relayConfiguration.toPrimitives(),
     };
   }
 }

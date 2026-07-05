@@ -1,5 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import {
+  defaultRelayRuntimeSettings,
+  RelayRuntimeSettings,
+} from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { createHmac } from 'crypto';
 
 import {
@@ -51,9 +55,9 @@ export class CallIceServerConfig {
   }
 
   private static getTurnPublicHost(
-    environment: CallIceServerEnvironment,
+    relaySettings: RelayRuntimeSettings,
   ): string | undefined {
-    return environment.CALLS_TURN_PUBLIC_HOST || environment.PIGEON_PUBLIC_HOST;
+    return relaySettings.publicHost;
   }
 
   private static getTurnTransports(
@@ -70,12 +74,13 @@ export class CallIceServerConfig {
 
   private static getAdvertisedTurnUrls(
     environment: CallIceServerEnvironment,
+    relaySettings: RelayRuntimeSettings,
   ): string[] {
     const explicitUrls = this.splitEnvironmentList(environment.CALLS_TURN_URLS);
-    const publicHost = this.getTurnPublicHost(environment);
-    const port = Number(environment.CALLS_TURN_PORT);
+    const publicHost = this.getTurnPublicHost(relaySettings);
+    const port = relaySettings.callsRelay.port;
 
-    if (!publicHost || !Number.isInteger(port) || port <= 0) {
+    if (!publicHost || port === undefined) {
       return explicitUrls;
     }
 
@@ -88,6 +93,7 @@ export class CallIceServerConfig {
 
   public static fromEnvironment(
     environment: CallIceServerEnvironment = pigeonEnvironment(),
+    relaySettings: RelayRuntimeSettings = defaultRelayRuntimeSettings(),
   ): CallIceServerConfig {
     return new CallIceServerConfig({
       iceTransportPolicy: this.normalizeIceTransportPolicy(
@@ -105,9 +111,16 @@ export class CallIceServerConfig {
         environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
         environment.CALLS_TURN_DISCOVERY_ENABLED !== 'false',
       turnSharedSecret: environment.CALLS_TURN_SHARED_SECRET,
-      turnUrls: this.getAdvertisedTurnUrls(environment),
+      turnUrls: this.getAdvertisedTurnUrls(environment, relaySettings),
       turnUsername: environment.CALLS_TURN_USERNAME,
     });
+  }
+
+  public static fromRelaySettings(
+    relaySettings: RelayRuntimeSettings,
+    environment: CallIceServerEnvironment = pigeonEnvironment(),
+  ): CallIceServerConfig {
+    return CallIceServerConfig.fromEnvironment(environment, relaySettings);
   }
 
   public constructor(private readonly values: CallIceServerConfigValues) {}

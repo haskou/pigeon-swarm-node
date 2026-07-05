@@ -232,7 +232,10 @@ export class HeliaIPFSParser {
             .then((connectionProtector) => {
               privateLibp2pConfig.connectionProtector = connectionProtector;
 
-              return heliaRuntimeAdapter.withBootstrapRelays(libp2pConfig);
+              return heliaRuntimeAdapter.withBootstrapRelays(
+                libp2pConfig,
+                options.manualRelayMultiaddrs,
+              );
             })
         );
       }),

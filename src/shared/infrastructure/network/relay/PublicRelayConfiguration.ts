@@ -1,26 +1,35 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 
 import { PublicRelayConfigurationOptions } from './PublicRelayConfigurationOptions';
+import {
+  defaultRelayRuntimeSettings,
+  RelayRuntimeSettings,
+} from './RelayRuntimeSettings';
 
 export class PublicRelayConfiguration {
   public static fromEnvironment(
     environment = pigeonEnvironment(),
   ): PublicRelayConfiguration {
+    return PublicRelayConfiguration.fromRuntimeSettings(
+      defaultRelayRuntimeSettings(),
+      environment,
+    );
+  }
+
+  public static fromRuntimeSettings(
+    settings: RelayRuntimeSettings,
+    environment = pigeonEnvironment(),
+  ): PublicRelayConfiguration {
     return new PublicRelayConfiguration({
-      bootstrapRelayMultiaddrs: (
-        environment.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || ''
-      )
-        .split(',')
-        .map((address) => address.trim())
-        .filter(Boolean),
-      libp2pPort: environment.PIGEON_LIBP2P_PORT,
+      bootstrapRelayMultiaddrs: settings.manualRelayMultiaddrs,
+      libp2pPort: settings.publicRelay.libp2pPort,
       privateRelayRecordRefreshSeconds:
         environment.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS,
-      publicHost: environment.PIGEON_PUBLIC_HOST,
-      relayAutoEnabled: environment.PIGEON_RELAY_AUTO_ENABLE,
-      relayDiscoveryEnabled: environment.PIGEON_RELAY_DISCOVERY_ENABLED,
-      relayEnabled: environment.PIGEON_RELAY_ENABLED === true,
-      relayPort: environment.PIGEON_RELAY_PORT,
+      publicHost: settings.publicHost,
+      relayAutoEnabled: settings.publicRelay.autoEnabled,
+      relayDiscoveryEnabled: settings.publicRelay.discoveryEnabled,
+      relayEnabled: settings.publicRelay.enabled,
+      relayPort: settings.publicRelay.port,
       relayRecordTtlSeconds: environment.PIGEON_RELAY_RECORD_TTL_SECONDS,
     });
   }
@@ -65,5 +74,9 @@ export class PublicRelayConfiguration {
 
   public hasPublicHost(): boolean {
     return Boolean(this.options.publicHost);
+  }
+
+  public toKey(): string {
+    return JSON.stringify(this.options);
   }
 }

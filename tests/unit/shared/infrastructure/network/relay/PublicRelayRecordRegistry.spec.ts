@@ -1,4 +1,5 @@
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import { defaultRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import PublicRelayRuntime from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
@@ -108,7 +109,12 @@ describe('PublicRelayRecordRegistry', () => {
       'peer-external',
       Date.now() + 60_000,
     );
-    const runtime = new PublicRelayRuntime(mock<IPFSNetworkRegistry>());
+    const networkRegistry = mock<IPFSNetworkRegistry>();
+    const runtime = new PublicRelayRuntime(networkRegistry);
+
+    networkRegistry.getRelaySettings.mockReturnValue(
+      defaultRelayRuntimeSettings(),
+    );
 
     registry.save(localRecord);
     registry.save(externalRecord);

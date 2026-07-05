@@ -2,6 +2,7 @@ import { PeersViewModel } from '@app/apps/apis/nodes-api/view-model/PeersViewMod
 import { ActiveNodePeers } from '@app/contexts/nodes/application/find-peers/ActiveNodePeers';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
+import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 
 describe('PeersViewModel', () => {
   it('should expose peer capabilities, connection summary and node type', () => {
@@ -17,6 +18,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
     const peer = NodePeer.fromPrimitives({
       id: '550e8400-e29b-41d4-a716-446655440010',
@@ -81,6 +83,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
     const peer = NodePeer.fromPrimitives({
       id: '550e8400-e29b-41d4-a716-446655440010',

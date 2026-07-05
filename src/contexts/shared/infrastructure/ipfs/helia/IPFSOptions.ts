@@ -4,7 +4,9 @@ export type IPFSOptions = {
   announceAddresses?: string[];
   enableRelayServer?: boolean;
   listenAddresses?: string[];
+  manualRelayMultiaddrs?: string[];
   storageLocation: 'memory' | string;
   privateKey?: Libp2pPrivateKeyLike;
+  publicRelayDiscoveryEnabled?: boolean;
   relayDataLimitBytes?: number;
 };

@@ -204,6 +204,8 @@ paths:
     $ref: './link-previews-api/swagger.yaml#/paths/~1link-previews'
   /node/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1'
+  /node/relay-configuration/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1relay-configuration~1'
   /node/networks/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1'
   /node/networks/{networkId}/:

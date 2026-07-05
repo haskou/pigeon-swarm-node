@@ -1897,6 +1897,18 @@ services:
         @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2FwcGxpY2F0aW9uX191cGRhdGUtcmVsYXktY29uZmlndXJhdGlvbl9fTm9kZVJlbGF5Q29uZmlndXJhdGlvblVwZGF0ZXJfX05vZGVSZWxheUNvbmZpZ3VyYXRpb25VcGRhdGVy:
+    class: >-
+      /contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVMb2FkZXJTZXJ2aWNlX19Ob2RlTG9hZGVyU2VydmljZQ==
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fc2VydmljZXNfX05vZGVTYXZlclNlcnZpY2VfX05vZGVTYXZlclNlcnZpY2U=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2luZnJhc3RydWN0dXJlX19sb2NhbC1kYl9fTG9jYWxOb2RlTmV0d29ya0RhdGFDbGVhbmVyX19Mb2NhbE5vZGVOZXR3b3JrRGF0YUNsZWFuZXI=:
     class: /contexts/nodes/infrastructure/local-db/LocalNodeNetworkDataCleaner
     arguments:

@@ -287,6 +287,23 @@ describe('IPFS', () => {
 
       expect(connectedNetworkIds).toEqual(['network-1']);
     });
+
+    it('should wait for peers before returning connected network ids when requested', async () => {
+      const network = mock<IPFSNetwork>();
+
+      network.getId.mockReturnValue('network-1');
+      network.getPeers.mockReturnValueOnce([]).mockReturnValue(['peer-1']);
+      network.waitForPeers.mockResolvedValue(true);
+      registry.getAll.mockReturnValue([network]);
+
+      const connectedNetworkIds = await ipfs.findConnectedNetworkIds(
+        ['network-1'],
+        15_000,
+      );
+
+      expect(network.waitForPeers).toHaveBeenCalledWith(15_000);
+      expect(connectedNetworkIds).toEqual(['network-1']);
+    });
   });
 
   describe('addJSON', () => {

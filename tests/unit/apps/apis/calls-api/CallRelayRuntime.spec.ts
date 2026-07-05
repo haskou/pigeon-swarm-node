@@ -6,6 +6,10 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
+import {
+  normalizeRelayRuntimeSettings,
+  RelayRuntimeSettings,
+} from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -31,6 +35,9 @@ function clearCallRelayRuntimeState(): void {
 
 describe('CallRelayRuntime', () => {
   let previousEnvironment: NodeJS.ProcessEnv;
+  let relaySettingsChangedListener:
+    | ((settings: RelayRuntimeSettings) => Promise<void> | void)
+    | undefined;
   let networkRegistry: MockProxy<IPFSNetworkRegistry>;
   let discovery: MockProxy<CallRelayRecordDiscovery>;
   let logger: MockProxy<WinstonLogger>;
@@ -40,9 +47,8 @@ describe('CallRelayRuntime', () => {
 
   beforeEach(() => {
     previousEnvironment = { ...process.env };
-    process.env.CALLS_TURN_PORT = '4199';
     process.env.CALLS_TURN_SHARED_SECRET = 'turn-shared-secret';
-    process.env.PIGEON_PUBLIC_HOST = 'relay.example.test';
+    relaySettingsChangedListener = undefined;
     clearCallRelayRuntimeState();
 
     networkRegistry = mock<IPFSNetworkRegistry>();
@@ -57,9 +63,20 @@ describe('CallRelayRuntime', () => {
     publicNetwork.getId.mockReturnValue('public-network');
     publicNetwork.isPrivate.mockReturnValue(false);
     networkRegistry.getAll.mockReturnValue([]);
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    );
     networkRegistry.getSharedPeerPrivateKey.mockResolvedValue(
       {} as Libp2pPrivateKeyLike,
     );
+    networkRegistry.onRelaySettingsChanged.mockImplementation((listener) => {
+      relaySettingsChangedListener = listener;
+    });
     jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger);
     signer.sign.mockImplementation(async (payload) => {
       return new CallRelayRecord(
@@ -144,6 +161,54 @@ describe('CallRelayRuntime', () => {
           'turn:relay.example.test:4199?transport=tcp',
         ],
         version: 1,
+      }),
+    );
+  });
+
+  it('should publish a local call relay record when relay settings become publishable', async () => {
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    networkRegistry.getAll.mockReturnValue([publicNetwork]);
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({}),
+    );
+
+    await runtime.run();
+
+    expect(discovery.startConnection).toHaveBeenCalledWith(publicNetwork);
+    expect(signer.sign).not.toHaveBeenCalled();
+
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    );
+
+    await relaySettingsChangedListener?.(networkRegistry.getRelaySettings());
+
+    expect(signer.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
+        version: 1,
+      }),
+      expect.anything(),
+      'turn-shared-secret',
+    );
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      publicNetwork,
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
       }),
     );
   });

@@ -288,6 +288,7 @@ Event contracts used by frontend:
 | `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                      |
 | `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                |
 | `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                          |
+| `nodes.v1.node.relay_configuration.was_updated`       | node id           | `relayConfiguration`                                                                                                 |
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
@@ -359,9 +360,8 @@ Implemented:
 
 - require signed request auth before exposing relay credentials
 - read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
-- derive local TURN server URLs from `CALLS_TURN_PUBLIC_HOST` or
-  `PIGEON_PUBLIC_HOST` plus `CALLS_TURN_PORT` when `CALLS_TURN_URLS` is not
-  enough
+- derive local TURN server URLs from node `relayConfiguration.publicHost` plus
+  `relayConfiguration.callsRelay.port` when `CALLS_TURN_URLS` is not enough
 - when `CALLS_TURN_SHARED_SECRET` is configured, generate temporary coturn REST
   credentials per authenticated identity:
   `username=<expiresAtUnix>:<identityId>` and
@@ -386,10 +386,10 @@ peer connection per participant pair. For large groups, add an SFU/media relay
 later so every client uploads one media stream and receives only the streams it
 needs.
 
-The backend does not embed a TURN server. `CALLS_TURN_PORT` and discovered
-records only describe reachable coturn instances; the coturn process/service
-must be running and must expose its listening port and relay media port range.
-The node-to-node relay discovery protocol is documented in
+The backend does not embed a TURN server. Node relay configuration and
+discovered records only describe reachable coturn instances; the coturn
+process/service must be running and must expose its listening port and relay
+media port range. The node-to-node relay discovery protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md).
 
 ### Start call
@@ -536,6 +536,90 @@ Implemented:
 - return the local node id
 - return the owner when the node has already been claimed
 - keep networks out of this response
+
+### Get local node relay configuration
+
+```http
+GET /node/relay-configuration
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Response:
+
+```json
+{
+  "publicHost": "relay.example.com",
+  "callsRelay": {
+    "port": 3478
+  },
+  "manualRelayMultiaddrs": [
+    "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
+  ],
+  "publicNetwork": {
+    "enabled": true,
+    "port": 4011
+  },
+  "privateRelay": {
+    "enabled": true,
+    "portStart": 4100,
+    "portEnd": 4199,
+    "publicationEnabled": true,
+    "discoveryEnabled": true
+  }
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner
+- return the relay configuration persisted in local node metadata
+- reject anonymous and non-owner requests
+
+### Replace local node relay configuration
+
+```http
+PUT /node/relay-configuration
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Request:
+
+```json
+{
+  "publicHost": "relay.example.com",
+  "callsRelay": {
+    "port": 3478
+  },
+  "manualRelayMultiaddrs": [
+    "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
+  ],
+  "publicNetwork": {
+    "enabled": true,
+    "port": 4011
+  },
+  "privateRelay": {
+    "enabled": true,
+    "portStart": 4100,
+    "portEnd": 4199,
+    "publicationEnabled": true,
+    "discoveryEnabled": true
+  }
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner
+- configure public relay advertising, public relay discovery, private relay
+  ports, private relay public-record publication/discovery and manual relay
+  multiaddrs from node metadata instead of environment variables
+- recreate private IPFS networks when relay settings change so ports, manual
+  relay multiaddrs and discovery settings take effect
+- reload the public relay runtime when owner-owned relay settings change
 
 ### Get local node networks
 
