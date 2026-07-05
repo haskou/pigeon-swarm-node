@@ -189,6 +189,55 @@ describe('LocalNodeMetadataRepository', () => {
       await delayedRegistration.promise;
     });
 
+    it('should synchronize background networks from the latest saved metadata', async () => {
+      const delayedInitialization = deferred<void>();
+      const firstNetworkMother = new NetworkMother()
+        .withId(privateNetworkId)
+        .withName(new NetworkName('private_0'))
+        .withPrivateKey();
+      const secondNetworkMother = new NetworkMother()
+        .withId(publicNetworkId)
+        .withName(new NetworkName('public_0'))
+        .withoutKey();
+      const firstNode = Node.fromPrimitives({
+        id: canonicalNodeId,
+        networks: {
+          [privateNetworkId.valueOf()]: firstNetworkMother
+            .build()
+            .toPrimitives(),
+        },
+        owner: undefined,
+      });
+      const latestNode = Node.fromPrimitives({
+        id: canonicalNodeId,
+        networks: {
+          [privateNetworkId.valueOf()]: firstNetworkMother
+            .build()
+            .toPrimitives(),
+          [publicNetworkId.valueOf()]: secondNetworkMother
+            .build()
+            .toPrimitives(),
+        },
+        owner: undefined,
+      });
+
+      networkRegistry.initialize.mockReturnValue(delayedInitialization.promise);
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await repository.saveLocalNode(firstNode);
+      await repository.saveLocalNode(latestNode);
+
+      delayedInitialization.resolve(undefined);
+      await flushPromises();
+
+      const registeredNetworkIds = networkRegistry.register.mock.calls.map(
+        ([config]) => config.getId(),
+      );
+
+      expect(registeredNetworkIds).toContain(privateNetworkId.valueOf());
+      expect(registeredNetworkIds).toContain(publicNetworkId.valueOf());
+    });
+
     it('should remove obsolete networks', async () => {
       const node = Node.fromPrimitives({
         id: canonicalNodeId,

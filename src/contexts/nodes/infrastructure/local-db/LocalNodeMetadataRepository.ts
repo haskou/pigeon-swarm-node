@@ -13,6 +13,8 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   private static readonly NAMESPACE = 'node_metadata';
   private static readonly LOCAL_NODE_ID = 'local';
 
+  private latestSavedMetadata?: LocalNodeMetadataDocument;
+
   constructor(
     private readonly database: EmbeddedLocalDatabase,
     private readonly networkRegistry: IPFSNetworkRegistry,
@@ -110,8 +112,24 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     }
   }
 
-  private syncRuntimeNetworksInBackground(node: Node): void {
-    void this.syncRuntimeNetworks(node).catch((error: unknown) => {
+  private nodeFromMetadata(metadata: LocalNodeMetadataDocument): Node {
+    return Node.fromPrimitives({
+      id: metadata.nodeId,
+      networks: metadata.networks,
+      owner: metadata.owner,
+    });
+  }
+
+  private async syncLatestRuntimeNetworks(): Promise<void> {
+    await this.syncRuntimeNetworks(
+      this.nodeFromMetadata(
+        this.latestSavedMetadata ?? (await this.loadOrCreateMetadata()),
+      ),
+    );
+  }
+
+  private syncRuntimeNetworksInBackground(): void {
+    void this.syncLatestRuntimeNetworks().catch((error: unknown) => {
       Kernel.logger.warn?.(
         `Local node runtime network sync failed: error=${String(error)}`,
       );
@@ -120,11 +138,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
 
   public async loadLocalNode(): Promise<Node> {
     const metadata = await this.loadOrCreateMetadata();
-    const node = Node.fromPrimitives({
-      id: metadata.nodeId,
-      networks: metadata.networks,
-      owner: metadata.owner,
-    });
+    const node = this.nodeFromMetadata(metadata);
 
     await this.syncRuntimeNetworks(node);
 
@@ -138,7 +152,10 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   }
 
   public async saveLocalNode(node: Node): Promise<void> {
-    await this.persistMetadata(this.metadataMapper.toDocument(node));
-    this.syncRuntimeNetworksInBackground(node);
+    const metadata = this.metadataMapper.toDocument(node);
+
+    await this.persistMetadata(metadata);
+    this.latestSavedMetadata = metadata;
+    this.syncRuntimeNetworksInBackground();
   }
 }
