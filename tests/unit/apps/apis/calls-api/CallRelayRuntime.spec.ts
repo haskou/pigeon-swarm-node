@@ -42,6 +42,7 @@ describe('CallRelayRuntime', () => {
   let discovery: MockProxy<CallRelayRecordDiscovery>;
   let logger: MockProxy<WinstonLogger>;
   let signer: MockProxy<CallRelayRecordSigner>;
+  let privateNetwork: MockProxy<IPFSNetwork>;
   let publicNetwork: MockProxy<IPFSNetwork>;
 
   beforeEach(() => {
@@ -54,8 +55,11 @@ describe('CallRelayRuntime', () => {
     discovery = mock<CallRelayRecordDiscovery>();
     logger = mock<WinstonLogger>();
     signer = mock<CallRelayRecordSigner>();
+    privateNetwork = mock<IPFSNetwork>();
     publicNetwork = mock<IPFSNetwork>();
 
+    privateNetwork.getId.mockReturnValue('private-network');
+    privateNetwork.isPrivate.mockReturnValue(true);
     publicNetwork.getId.mockReturnValue('public-network');
     publicNetwork.isPrivate.mockReturnValue(false);
     networkRegistry.getAll.mockReturnValue([]);
@@ -134,6 +138,33 @@ describe('CallRelayRuntime', () => {
     );
   });
 
+  it('should publish a signed call relay record when a private network is registered', async () => {
+    let registeredListener:
+      | ((network: IPFSNetwork) => Promise<void> | void)
+      | undefined;
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    networkRegistry.onNetworkRegistered.mockImplementation((listener) => {
+      registeredListener = listener;
+    });
+
+    await runtime.run();
+    await registeredListener?.(privateNetwork);
+
+    expect(discovery.startConnection).toHaveBeenCalledWith(privateNetwork);
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
+        version: 1,
+      }),
+    );
+  });
+
   it('should publish a local call relay record when relay settings become publishable', async () => {
     const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
 
@@ -177,6 +208,60 @@ describe('CallRelayRuntime', () => {
         urls: [
           'turn:relay.example.test:4199?transport=udp',
           'turn:relay.example.test:4199?transport=tcp',
+        ],
+      }),
+    );
+  });
+
+  it('should keep publishing private network call relay records after relay settings change', async () => {
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    networkRegistry.getAll.mockReturnValue([privateNetwork]);
+
+    await runtime.run();
+
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      expect.objectContaining({
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
+      }),
+    );
+
+    discovery.publishConnection.mockClear();
+    signer.sign.mockClear();
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4200,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    );
+
+    await relaySettingsChangedListener?.(networkRegistry.getRelaySettings());
+
+    expect(signer.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4200?transport=udp',
+          'turn:relay.example.test:4200?transport=tcp',
+        ],
+        version: 1,
+      }),
+      expect.anything(),
+      'turn-shared-secret',
+    );
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4200?transport=udp',
+          'turn:relay.example.test:4200?transport=tcp',
         ],
       }),
     );

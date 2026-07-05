@@ -37,6 +37,12 @@ export class CallIceServerConfig {
       : CallIceServerConfig.DEFAULT_ICE_TRANSPORT_POLICY;
   }
 
+  private static isConfiguredIceTransportPolicy(
+    value: string | undefined,
+  ): boolean {
+    return value === 'all' || value === 'relay';
+  }
+
   private static splitEnvironmentList(value: string | undefined): string[] {
     return (value || '')
       .split(',')
@@ -93,6 +99,9 @@ export class CallIceServerConfig {
       iceTransportPolicy: this.normalizeIceTransportPolicy(
         environment.CALLS_ICE_TRANSPORT_POLICY,
       ),
+      iceTransportPolicyConfigured: this.isConfiguredIceTransportPolicy(
+        environment.CALLS_ICE_TRANSPORT_POLICY,
+      ),
       stunUrls: this.splitEnvironmentList(environment.CALLS_STUN_URLS),
       turnCredential: environment.CALLS_TURN_CREDENTIAL,
       turnCredentialTtlSeconds: this.normalizeCredentialTtl(
@@ -115,6 +124,18 @@ export class CallIceServerConfig {
   }
 
   public constructor(private readonly values: CallIceServerConfigValues) {}
+
+  private iceTransportPolicyFor(turnUrls: string[]): 'all' | 'relay' {
+    if (
+      turnUrls.length === 0 &&
+      this.values.iceTransportPolicy === 'relay' &&
+      !this.values.iceTransportPolicyConfigured
+    ) {
+      return 'all';
+    }
+
+    return this.values.iceTransportPolicy;
+  }
 
   private createTurnCredentials(identityId: IdentityId): TurnCredentials {
     if (!this.values.turnSharedSecret) {
@@ -168,7 +189,7 @@ export class CallIceServerConfig {
 
     return {
       iceServers,
-      iceTransportPolicy: this.values.iceTransportPolicy,
+      iceTransportPolicy: this.iceTransportPolicyFor(turnUrls),
     };
   }
 }

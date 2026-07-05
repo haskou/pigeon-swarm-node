@@ -26,6 +26,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private static readonly failedRelayRecordPublicationRetryMs = 15_000;
 
+  private static readonly maxCachedRelayRecordDialFailures = 3;
+
   private static readonly inlineIPNSValuePrefix =
     '/pigeon-swarm/private-relay/v1/';
 
@@ -84,6 +86,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly activeRelayRecordObservedAt: Record<string, number> = {};
 
   private readonly activeRelayDiscoveryAttempts: Record<string, number> = {};
+
+  private readonly cachedRelayDialFailures: Record<string, number> = {};
 
   private readonly activePrivateRelayDialKeys: Set<string> = new Set();
 
@@ -399,6 +403,65 @@ export default class PrivateNetworkRelayRecordDirectory {
         ` multiaddr="${multiaddr}"` +
         ` error=${message}`,
     );
+  }
+
+  private getCachedRelayDialFailureKey(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): string {
+    return [
+      network.getId(),
+      relayRecord.peerId,
+      ...relayRecord.multiaddrs,
+    ].join(':');
+  }
+
+  private forgetCachedRelayDialFailures(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): void {
+    delete this.cachedRelayDialFailures[
+      this.getCachedRelayDialFailureKey(network, relayRecord)
+    ];
+  }
+
+  private async invalidateCachedRelayRecord(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): Promise<void> {
+    await this.localDatabase.delete(
+      PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+      network.getId(),
+    );
+    this.forgetCachedRelayDialFailures(network, relayRecord);
+    this.relayRecordEnvelopeCache.delete(
+      PrivateNetworkRelayRecordCodec.lookupKey(network),
+    );
+    this.forgetActiveRelayRecord(network.getId());
+    Kernel.logger.warn(
+      `Private IPFS relay cached record invalidated: networkId=${network.getId()}` +
+        ` peerId=${relayRecord.peerId}` +
+        ` attempts=${PrivateNetworkRelayRecordDirectory.maxCachedRelayRecordDialFailures}`,
+    );
+  }
+
+  private async recordCachedRelayDialFailure(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): Promise<void> {
+    const failureKey = this.getCachedRelayDialFailureKey(network, relayRecord);
+    const failures = (this.cachedRelayDialFailures[failureKey] ?? 0) + 1;
+
+    this.cachedRelayDialFailures[failureKey] = failures;
+
+    if (
+      failures <
+      PrivateNetworkRelayRecordDirectory.maxCachedRelayRecordDialFailures
+    ) {
+      return;
+    }
+
+    await this.invalidateCachedRelayRecord(network, relayRecord);
   }
 
   private infoWhenRelayIPNSRecordIsDiscovered(
@@ -852,7 +915,17 @@ export default class PrivateNetworkRelayRecordDirectory {
         );
       }
 
-      return this.dialPrivateRelayRecord(network, relayRecord);
+      const connected = await this.dialPrivateRelayRecord(network, relayRecord);
+
+      if (connected) {
+        this.forgetCachedRelayDialFailures(network, relayRecord);
+
+        return true;
+      }
+
+      await this.recordCachedRelayDialFailure(network, relayRecord);
+
+      return false;
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay cached record discovery skipped: networkId=${network.getId()}` +
@@ -1086,7 +1159,24 @@ export default class PrivateNetworkRelayRecordDirectory {
       ? this.getRelayRecordFromEnvelope(network, envelope)
       : undefined;
 
-    return this.dialRelayRecordWhenAvailable(network, relayRecord);
+    const connected = await this.dialRelayRecordWhenAvailable(
+      network,
+      relayRecord,
+    );
+
+    if (!relayRecord) {
+      return connected;
+    }
+
+    if (connected) {
+      this.forgetCachedRelayDialFailures(network, relayRecord);
+
+      return true;
+    }
+
+    await this.recordCachedRelayDialFailure(network, relayRecord);
+
+    return false;
   }
 
   private logIgnoredRelayRecord(network: IPFSNetwork, reason: string): void {
