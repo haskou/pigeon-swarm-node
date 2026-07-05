@@ -51,6 +51,7 @@ describe('OrbitDBContentReplicaClaimRepository', () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     registry.clear();
   });
 
@@ -77,7 +78,10 @@ describe('OrbitDBContentReplicaClaimRepository', () => {
 
     await repository.save(claim);
 
-    expect(put).toHaveBeenCalledWith(document);
+    expect(put).toHaveBeenCalledWith({
+      ...document,
+      updatedAt: document.claimedAt,
+    });
   });
 
   it('should ignore withdrawn replica claims', async () => {
@@ -111,5 +115,34 @@ describe('OrbitDBContentReplicaClaimRepository', () => {
         withdrawnAt: expect.any(Number),
       }),
     );
+  });
+
+  it('should allow active claims to supersede withdrawal tombstones', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1780000000000);
+    await repository.withdraw(
+      new ContentId(cid),
+      new NetworkId(networkId),
+      new NodeId(nodeId),
+    );
+
+    await repository.save(
+      ContentReplicaClaim.create(
+        new ContentId(cid),
+        new NetworkId(networkId),
+        new NodeId(nodeId),
+        new Timestamp(1780000000001),
+      ),
+    );
+
+    const result = await repository.findByCids([new ContentId(cid)]);
+
+    expect(result.map((claim) => claim.toPrimitives())).toEqual([
+      {
+        cid,
+        claimedAt: 1780000000001,
+        networkId,
+        nodeId,
+      },
+    ]);
   });
 });
