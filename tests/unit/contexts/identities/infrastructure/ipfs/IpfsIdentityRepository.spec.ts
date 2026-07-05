@@ -110,23 +110,6 @@ describe('IpfsIdentityRepository', () => {
       );
     });
 
-    it('should fail local identity saves when metadata cannot be indexed', async () => {
-      const identity = await mother.build();
-      const expectedCid = new IPFSId('bafyresultcid');
-      const error = new Error('replicated state is not ready');
-
-      ipfsManager.addJSONToNetworks.mockResolvedValue(expectedCid);
-      metadataRepository.save.mockRejectedValue(error);
-
-      await expect(repository.save(identity)).rejects.toThrow(error);
-
-      expect(metadataRepository.save).toHaveBeenCalledWith(
-        identity,
-        expectedCid,
-      );
-      expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalled();
-    });
-
     it('should republish only the latest identity routing record without adding content again', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();

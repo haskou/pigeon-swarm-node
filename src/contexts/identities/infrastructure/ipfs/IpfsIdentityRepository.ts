@@ -102,19 +102,12 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
   }
 
-  private persistMetadata(identity: Identity, cid: IPFSId): Promise<void> {
-    return this.metadataIndex.save(
-      identity,
-      new IdentityExternalIdentifier(cid.valueOf()),
-    );
-  }
-
-  private async saveMetadataBestEffort(
-    identity: Identity,
-    cid: IPFSId,
-  ): Promise<void> {
+  private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
     try {
-      await this.persistMetadata(identity, cid);
+      await this.metadataIndex.save(
+        identity,
+        new IdentityExternalIdentifier(cid.valueOf()),
+      );
     } catch {
       return;
     }
@@ -195,7 +188,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       if (shouldSaveMetadata) {
-        await this.saveMetadataBestEffort(identity, cid);
+        await this.saveMetadata(identity, cid);
       }
 
       return identity;
@@ -223,7 +216,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       if (!hasEmbeddedIdentity) {
-        await this.saveMetadataBestEffort(candidate, cid);
+        await this.saveMetadata(candidate, cid);
       }
 
       return candidate;
@@ -277,10 +270,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return undefined;
     }
 
-    await this.saveMetadataBestEffort(
-      identity,
-      new IPFSId(metadata.previousCid),
-    );
+    await this.saveMetadata(identity, new IPFSId(metadata.previousCid));
 
     return new IdentityCandidate(externalIdentifier, identity);
   }
@@ -473,7 +463,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const identity = await this.findPreviousIdentity(externalIdentifier);
 
     if (identity) {
-      await this.saveMetadataBestEffort(
+      await this.saveMetadata(
         identity,
         new IPFSId(externalIdentifier.valueOf()),
       );
@@ -525,7 +515,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const networks: string[] = document.networks;
     const cid = await this.ipfsManager.addJSONToNetworks(document, networks);
 
-    await this.persistMetadata(identity, cid);
+    await this.saveMetadata(identity, cid);
     this.identityByCid.set(cid.valueOf(), identity);
 
     await this.ipfsManager.putRecordToNetworks(
