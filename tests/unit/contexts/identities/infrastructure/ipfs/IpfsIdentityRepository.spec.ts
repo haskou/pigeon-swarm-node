@@ -83,7 +83,10 @@ describe('IpfsIdentityRepository', () => {
 
   describe('save', () => {
     it('should save identity document to all networks and put record', async () => {
-      const identity = await mother.build();
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'mallory',
+      );
       const primitives = identity.toPrimitives();
       const expectedCid = new IPFSId('bafyresultcid');
 
@@ -104,6 +107,11 @@ describe('IpfsIdentityRepository', () => {
         expectedCid.valueOf(),
         primitives.networks,
       );
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-handle-' + primitives.profile.handle,
+        expectedCid.valueOf(),
+        primitives.networks,
+      );
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         expectedCid,
@@ -111,7 +119,10 @@ describe('IpfsIdentityRepository', () => {
     });
 
     it('should republish only the latest identity routing record without adding content again', async () => {
-      const identity = await mother.build();
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'mallory',
+      );
       const primitives = identity.toPrimitives();
 
       metadataRepository.findAll.mockResolvedValue([
@@ -149,7 +160,10 @@ describe('IpfsIdentityRepository', () => {
     });
 
     it('should republish legacy embedded identity metadata using its networks', async () => {
-      const identity = await mother.build();
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'mallory',
+      );
       const primitives = identity.toPrimitives();
 
       metadataRepository.findAll.mockResolvedValue([
@@ -173,6 +187,11 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.save).not.toHaveBeenCalled();
       expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
+        'bafy-identity-v2',
+        primitives.networks,
+      );
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-handle-' + primitives.profile.handle,
         'bafy-identity-v2',
         primitives.networks,
       );
@@ -693,6 +712,35 @@ describe('IpfsIdentityRepository', () => {
       expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
 
+    it('should resolve handle candidates from routing records when local metadata is missing', async () => {
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'test',
+      );
+      const primitives = identity.toPrimitives();
+      const handle = new ProfileHandle('test');
+      const cidString = 'bafyremotehandleidentity';
+
+      metadataRepository.findByHandle.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([cidString]);
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const result = await repository.findCandidateByHandle(handle);
+
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-handle-test',
+      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(cidString),
+      );
+      expect(result.getExternalIdentifier()).toEqual(
+        new IdentityExternalIdentifier(cidString),
+      );
+      expect(result.getIdentity().toPrimitives()).toEqual(primitives);
+    });
+
     it('should not fetch older handle metadata when the latest candidate is valid', async () => {
       const identity = await createSignedIdentityForNetwork(
         '550e8400-e29b-41d4-a716-446655440000',
@@ -730,7 +778,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result.getIdentity().toPrimitives()).toEqual(primitives);
     });
 
-    it('should not read handle metadata from IPFS when metadata has no embedded identity', async () => {
+    it('should not read local handle metadata from IPFS when metadata has no embedded identity', async () => {
       const networkId = '550e8400-e29b-41d4-a716-446655440000';
       const identity = await createSignedIdentityForNetwork(networkId, 'hasko');
       const primitives = identity.toPrimitives();
@@ -749,6 +797,7 @@ describe('IpfsIdentityRepository', () => {
         },
       ]);
       ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+      ipfsManager.getRecordCandidates.mockResolvedValue([]);
       ipfsManager.getJSONFromNetworks.mockImplementation(
         () => new Promise(() => undefined),
       );
@@ -761,7 +810,9 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.getBytesFromNetworks).not.toHaveBeenCalled();
-      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+      expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-handle-hasko',
+      );
     });
 
     it('should fallback to a valid previous handle candidate when latest metadata is not readable', async () => {

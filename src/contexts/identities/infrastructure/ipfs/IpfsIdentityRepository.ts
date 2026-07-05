@@ -15,6 +15,7 @@ import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
 export default class IpfsIdentityRepository extends IdentityRepository {
+  private readonly HANDLE_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-handle-';
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
   private readonly identityByCid = new Map<string, Identity>();
@@ -90,6 +91,18 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
 
     return [];
+  }
+
+  private routingHandleFrom(
+    document: IdentityMetadataRecord,
+  ): string | undefined {
+    if (document.handle) {
+      return document.handle;
+    }
+
+    return document.identity
+      ? this.mapper.toDocument(document.identity).profile.handle
+      : undefined;
   }
 
   private async deleteMetadata(cid: IPFSId): Promise<void> {
@@ -312,6 +325,21 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return this.findCandidateReferencesFromCids(id, cidStrings, knownCids);
   }
 
+  private async findRemoteHandleCandidateReferences(
+    handle: ProfileHandle,
+    knownCids: Set<string>,
+  ): Promise<IdentityCandidate[]> {
+    const cidStrings = await this.ipfsManager.getRecordCandidates(
+      this.HANDLE_ROUTING_KEY_PREFIX + handle.valueOf(),
+    );
+
+    return this.findHandleCandidateReferencesFromCids(
+      handle,
+      cidStrings,
+      knownCids,
+    );
+  }
+
   private async shouldUseOnlyLocalMetadata(
     metadata: IdentityMetadataRecord[],
   ): Promise<boolean> {
@@ -406,6 +434,71 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     );
   }
 
+  private async findHandleCandidateFromCid(
+    handle: ProfileHandle,
+    cid: IPFSId,
+  ): Promise<Identity | undefined> {
+    try {
+      const identity = await this.getIdentityFromCid(cid);
+
+      if (!identity.hasHandle(handle)) {
+        return undefined;
+      }
+
+      const identityId = new IdentityId(identity.toPrimitives().id);
+      const isValid = await this.validator.isValidChainFor(
+        identityId,
+        identity,
+        (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
+      );
+
+      if (!isValid) {
+        this.identityByCid.delete(cid.valueOf());
+        await this.deleteMetadata(cid);
+
+        return undefined;
+      }
+
+      await this.saveMetadata(identity, cid);
+
+      return identity;
+    } catch {
+      this.identityByCid.delete(cid.valueOf());
+
+      return undefined;
+    }
+  }
+
+  private async findHandleCandidateReferencesFromCids(
+    handle: ProfileHandle,
+    cidStrings: string[],
+    knownCids: Set<string>,
+  ): Promise<IdentityCandidate[]> {
+    const candidates = await Promise.all(
+      cidStrings
+        .filter((cidString) => !knownCids.has(cidString))
+        .map(async (cidString) => {
+          const candidate = await this.findHandleCandidateFromCid(
+            handle,
+            new IPFSId(cidString),
+          );
+
+          if (!candidate) {
+            return undefined;
+          }
+
+          return new IdentityCandidate(
+            new IdentityExternalIdentifier(cidString),
+            candidate,
+          );
+        }),
+    );
+
+    return candidates.filter(
+      (candidate): candidate is IdentityCandidate => candidate !== undefined,
+    );
+  }
+
   private async findFirstHandleCandidateFromMetadata(
     handle: ProfileHandle,
     metadata: IdentityMetadataRecord[],
@@ -452,6 +545,17 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
     if (candidate) {
       return candidate;
+    }
+
+    const remoteCandidates = await this.findRemoteHandleCandidateReferences(
+      handle,
+      new Set(metadata.map((document) => document.cid)),
+    );
+    const [remoteCandidate] =
+      this.sortCandidateReferencesByFreshness(remoteCandidates);
+
+    if (remoteCandidate) {
+      return remoteCandidate;
     }
 
     throw new IdentityNotFoundError(handle.valueOf());
@@ -524,6 +628,14 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       networks,
     );
 
+    if (document.profile.handle) {
+      await this.ipfsManager.putRecordToNetworks(
+        this.HANDLE_ROUTING_KEY_PREFIX + document.profile.handle,
+        cid.valueOf(),
+        networks,
+      );
+    }
+
     return new IdentityExternalIdentifier(cid.valueOf());
   }
 
@@ -534,6 +646,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       await this.metadataIndex.findAll(),
     )) {
       const networkIds = this.routingNetworkIdsFrom(document);
+      const handle = this.routingHandleFrom(document);
 
       if (networkIds.length === 0) {
         continue;
@@ -552,6 +665,15 @@ export default class IpfsIdentityRepository extends IdentityRepository {
           document.cid,
           connectedNetworkIds,
         );
+
+        if (handle) {
+          await this.ipfsManager.putRecordToNetworks(
+            this.HANDLE_ROUTING_KEY_PREFIX + handle,
+            document.cid,
+            connectedNetworkIds,
+          );
+        }
+
         republished++;
       } catch {
         continue;
