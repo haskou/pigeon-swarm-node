@@ -557,6 +557,10 @@ Response:
   "manualRelayMultiaddrs": [
     "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
   ],
+  "publicNetwork": {
+    "enabled": true,
+    "port": 4011
+  },
   "privateRelay": {
     "enabled": true,
     "portStart": 4100,
@@ -593,6 +597,10 @@ Request:
   "manualRelayMultiaddrs": [
     "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
   ],
+  "publicNetwork": {
+    "enabled": true,
+    "port": 4011
+  },
   "privateRelay": {
     "enabled": true,
     "portStart": 4100,

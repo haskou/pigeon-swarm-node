@@ -16,4 +16,9 @@ export class PutNodeRelayConfigurationBody {
   };
 
   public publicHost?: string;
+
+  public publicNetwork?: {
+    enabled?: boolean;
+    port?: number;
+  };
 }

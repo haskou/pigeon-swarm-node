@@ -8,6 +8,7 @@ export class NodeRelayConfigurationViewModel {
   public toResource(): NodeRelayConfigurationResource {
     const relayConfiguration = this.node.toPrimitives().relayConfiguration;
     const privateRelay = relayConfiguration.privateRelay;
+    const publicRelay = relayConfiguration.publicRelay;
 
     return {
       callsRelay: relayConfiguration.callsRelay,
@@ -20,6 +21,10 @@ export class NodeRelayConfigurationViewModel {
         publicationEnabled: privateRelay.publicRecordPublicationEnabled,
       },
       publicHost: relayConfiguration.publicHost,
+      publicNetwork: {
+        enabled: publicRelay.enabled,
+        port: publicRelay.port,
+      },
     };
   }
 }

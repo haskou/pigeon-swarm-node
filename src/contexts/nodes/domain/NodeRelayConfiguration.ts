@@ -7,6 +7,20 @@ import { NodeRelayMultiaddrs } from './value-objects/NodeRelayMultiaddrs';
 import { NodeRelayPublicHost } from './value-objects/NodeRelayPublicHost';
 
 export class NodeRelayConfiguration {
+  private static publicRelayConfigurationFrom(
+    primitives?: NodeRelayConfigurationInput,
+  ): NodeRelayConfigurationInput['publicRelay'] {
+    if (!primitives?.publicNetwork) {
+      return primitives?.publicRelay;
+    }
+
+    return {
+      discoveryEnabled: primitives.publicNetwork.enabled ?? false,
+      enabled: primitives.publicNetwork.enabled ?? false,
+      port: primitives.publicNetwork.port,
+    };
+  }
+
   public static default(): NodeRelayConfiguration {
     return NodeRelayConfiguration.fromPrimitives();
   }
@@ -19,7 +33,9 @@ export class NodeRelayConfiguration {
         ? new NodeRelayPublicHost(primitives.publicHost)
         : undefined,
       NodeCallsRelayConfiguration.fromPrimitives(primitives?.callsRelay),
-      NodePublicRelayConfiguration.fromPrimitives(primitives?.publicRelay),
+      NodePublicRelayConfiguration.fromPrimitives(
+        NodeRelayConfiguration.publicRelayConfigurationFrom(primitives),
+      ),
       NodePrivateRelayConfiguration.fromPrimitives(primitives?.privateRelay),
       NodeRelayMultiaddrs.fromPrimitives(primitives?.manualRelayMultiaddrs),
     );

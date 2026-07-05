@@ -14,6 +14,10 @@ Feature: Put node relay configuration
       {
         "callsRelay": {},
         "manualRelayMultiaddrs": [],
+        "publicNetwork": {
+          "enabled": false,
+          "port": 4011
+        },
         "privateRelay": {
           "enabled": false,
           "publicationEnabled": false,
@@ -39,6 +43,10 @@ Feature: Put node relay configuration
         "manualRelayMultiaddrs": [
           "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
         ],
+        "publicNetwork": {
+          "enabled": true,
+          "port": 4011
+        },
         "privateRelay": {
           "enabled": true,
           "portStart": 4100,
@@ -61,6 +69,10 @@ Feature: Put node relay configuration
         "manualRelayMultiaddrs": [
           "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
         ],
+        "publicNetwork": {
+          "enabled": true,
+          "port": 4011
+        },
         "privateRelay": {
           "enabled": true,
           "portStart": 4100,
@@ -79,6 +91,9 @@ Feature: Put node relay configuration
       {
         "callsRelay": {},
         "manualRelayMultiaddrs": [],
+        "publicNetwork": {
+          "enabled": false
+        },
         "privateRelay": {
           "enabled": false,
           "publicationEnabled": false,
@@ -92,6 +107,9 @@ Feature: Put node relay configuration
       """
       {
         "manualRelayMultiaddrs": [],
+        "publicNetwork": {
+          "enabled": false
+        },
         "privateRelay": {
           "enabled": false,
           "publicationEnabled": false,
@@ -114,6 +132,10 @@ Feature: Put node relay configuration
           "enabled": false,
           "publicationEnabled": false,
           "discoveryEnabled": false
+        },
+        "publicNetwork": {
+          "enabled": true,
+          "port": 4011
         },
         "manualRelayMultiaddrs": []
       }

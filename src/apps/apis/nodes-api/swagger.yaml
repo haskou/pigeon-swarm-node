@@ -287,12 +287,25 @@ components:
         port:
           type: number
           description: TURN listening port used to derive local call relay URLs from publicHost.
+    NodePublicNetworkConfigurationResource:
+      type: object
+      required:
+        - enabled
+        - port
+      properties:
+        enabled:
+          type: boolean
+          description: Enables a stable public libp2p endpoint for this node.
+        port:
+          type: number
+          description: Public libp2p TCP port announced with publicHost when enabled.
     NodeRelayConfigurationResource:
       type: object
       required:
         - callsRelay
         - manualRelayMultiaddrs
         - privateRelay
+        - publicNetwork
       properties:
         callsRelay:
           $ref: '#/components/schemas/NodeCallsRelayConfigurationResource'
@@ -305,7 +318,9 @@ components:
           $ref: '#/components/schemas/NodePrivateRelayConfigurationResource'
         publicHost:
           type: string
-          description: DNS name or IPv4 address used when announcing public/private relay multiaddrs.
+          description: DNS name or IPv4 address used when announcing public network, private relay and call relay addresses.
+        publicNetwork:
+          $ref: '#/components/schemas/NodePublicNetworkConfigurationResource'
     PeerResource:
       type: object
       required:
