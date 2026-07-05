@@ -4,6 +4,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import Kernel from '@haskou/ddd-kernel';
 
 import { LocalNodeMetadataDocument } from './documents/LocalNodeMetadataDocument';
 import LocalNodeMetadataMapper from './mappers/LocalNodeMetadataMapper';
@@ -109,6 +110,14 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     }
   }
 
+  private syncRuntimeNetworksInBackground(node: Node): void {
+    void this.syncRuntimeNetworks(node).catch((error: unknown) => {
+      Kernel.logger.warn?.(
+        `Local node runtime network sync failed: error=${String(error)}`,
+      );
+    });
+  }
+
   public async loadLocalNode(): Promise<Node> {
     const metadata = await this.loadOrCreateMetadata();
     const node = Node.fromPrimitives({
@@ -130,6 +139,6 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
 
   public async saveLocalNode(node: Node): Promise<void> {
     await this.persistMetadata(this.metadataMapper.toDocument(node));
-    await this.syncRuntimeNetworks(node);
+    this.syncRuntimeNetworksInBackground(node);
   }
 }

@@ -20,11 +20,9 @@ export class PostNodeNetworkRoute extends NodeNetworkRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     await this.assertOwnerCanManageNetworksWhenClaimed(request);
-    await this.adder.addNetwork(
+    const node = await this.adder.addNetwork(
       new NodeNetworkAdderMessage(body.id, body.name, body.key),
     );
-
-    const node = await this.nodeLoader.loadNode();
 
     return response
       .status(HttpRouteStatusEnum.OK)

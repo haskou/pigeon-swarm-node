@@ -121,7 +121,7 @@ describe('LocalNodeMetadataRepository', () => {
   });
 
   describe('saveLocalNode', () => {
-    it('should persist metadata and register missing networks', async () => {
+    it('should persist metadata and register missing networks in background', async () => {
       const desiredPrivateNetworkMother = new NetworkMother()
         .withId(privateNetworkId)
         .withName(new NetworkName('private_0'))
@@ -152,11 +152,41 @@ describe('LocalNodeMetadataRepository', () => {
           nodeId: canonicalNodeId,
         }),
       );
+      await flushPromises();
       expect(networkRegistry.initialize).toHaveBeenCalled();
       expect(networkRegistry.register).toHaveBeenCalledTimes(1);
       expect(networkRegistry.register.mock.calls[0][0].toPrimitives()).toEqual(
         desiredPrivateNetworkMother.build().toPrimitives(),
       );
+    });
+
+    it('should not wait for missing network registration before resolving', async () => {
+      const delayedRegistration = deferred<IPFSNetwork>();
+      const desiredPrivateNetworkMother = new NetworkMother()
+        .withId(privateNetworkId)
+        .withName(new NetworkName('private_0'))
+        .withPrivateKey();
+      const node = Node.fromPrimitives({
+        id: canonicalNodeId,
+        networks: {
+          [privateNetworkId.valueOf()]: desiredPrivateNetworkMother
+            .build()
+            .toPrimitives(),
+        },
+        owner: undefined,
+      });
+
+      networkRegistry.getAll.mockReturnValue([]);
+      networkRegistry.register.mockReturnValue(delayedRegistration.promise);
+
+      await expect(repository.saveLocalNode(node)).resolves.toBeUndefined();
+      expect(database.save).toHaveBeenCalled();
+      expect(networkRegistry.register).toHaveBeenCalledTimes(1);
+
+      delayedRegistration.resolve(
+        createNetworkMock(desiredPrivateNetworkMother),
+      );
+      await delayedRegistration.promise;
     });
 
     it('should remove obsolete networks', async () => {
@@ -166,8 +196,7 @@ describe('LocalNodeMetadataRepository', () => {
         owner: undefined,
       });
       const obsoleteNetwork = mock<IPFSNetwork>();
-      const obsoleteNetworkId =
-        '550e8400-e29b-41d4-a716-446655440002';
+      const obsoleteNetworkId = '550e8400-e29b-41d4-a716-446655440002';
 
       obsoleteNetwork.getId.mockReturnValue(obsoleteNetworkId);
       obsoleteNetwork.getName.mockReturnValue('private_legacy');
@@ -178,6 +207,7 @@ describe('LocalNodeMetadataRepository', () => {
 
       await repository.saveLocalNode(node);
 
+      await flushPromises();
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
         obsoleteNetworkId,
       );
@@ -208,6 +238,7 @@ describe('LocalNodeMetadataRepository', () => {
 
       await repository.saveLocalNode(node);
 
+      await flushPromises();
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
         privateNetworkId.valueOf(),
       );
@@ -230,12 +261,33 @@ describe('LocalNodeMetadataRepository', () => {
         owner: undefined,
       });
 
-      networkRegistry.getAll.mockReturnValue([createNetworkMock(networkMother)]);
+      networkRegistry.getAll.mockReturnValue([
+        createNetworkMock(networkMother),
+      ]);
 
       await repository.saveLocalNode(node);
 
+      await flushPromises();
       expect(networkRegistry.removeNetwork).not.toHaveBeenCalled();
       expect(networkRegistry.register).not.toHaveBeenCalled();
     });
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
