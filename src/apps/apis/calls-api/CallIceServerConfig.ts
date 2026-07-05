@@ -103,6 +103,14 @@ export class CallIceServerConfig {
 
   public constructor(private readonly values: CallIceServerConfigValues) {}
 
+  private iceTransportPolicyFor(turnUrls: string[]): 'all' | 'relay' {
+    if (turnUrls.length === 0 && this.values.iceTransportPolicy === 'relay') {
+      return 'all';
+    }
+
+    return this.values.iceTransportPolicy;
+  }
+
   private createTurnCredentials(identityId: IdentityId): TurnCredentials {
     if (!this.values.turnSharedSecret) {
       return {
@@ -155,7 +163,7 @@ export class CallIceServerConfig {
 
     return {
       iceServers,
-      iceTransportPolicy: this.values.iceTransportPolicy,
+      iceTransportPolicy: this.iceTransportPolicyFor(turnUrls),
     };
   }
 }

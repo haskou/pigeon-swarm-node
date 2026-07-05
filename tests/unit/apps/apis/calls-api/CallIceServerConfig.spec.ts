@@ -14,7 +14,8 @@ describe('CallIceServerConfig', () => {
   it('should expose TURN servers with relay-only transport by default', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_TURN_CREDENTIAL: 'turn-password',
-      CALLS_TURN_URLS: 'turn:turn.example.test:3478?transport=udp, turn:turn.example.test:3478?transport=tcp',
+      CALLS_TURN_URLS:
+        'turn:turn.example.test:3478?transport=udp, turn:turn.example.test:3478?transport=tcp',
       CALLS_TURN_USERNAME: 'turn-user',
     }).toResource(identityId);
 
@@ -105,6 +106,28 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
+      iceServers: [
+        {
+          urls: ['stun:stun.example.test:3478'],
+        },
+      ],
+      iceTransportPolicy: 'all',
+    });
+  });
+
+  it('should not return relay-only transport policy without TURN servers', () => {
+    const emptyResource = CallIceServerConfig.fromEnvironment({}).toResource(
+      identityId,
+    );
+    const stunResource = CallIceServerConfig.fromEnvironment({
+      CALLS_STUN_URLS: 'stun:stun.example.test:3478',
+    }).toResource(identityId);
+
+    expect(emptyResource).toEqual({
+      iceServers: [],
+      iceTransportPolicy: 'all',
+    });
+    expect(stunResource).toEqual({
       iceServers: [
         {
           urls: ['stun:stun.example.test:3478'],
