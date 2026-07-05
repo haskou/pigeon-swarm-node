@@ -124,8 +124,8 @@ installed `web-push` module path.
 Private networks and relay ownership settings are no longer configured through
 environment variables.
 
-They must be added through application methods/use cases and are persisted in
-storage metadata.
+They must be added through the node relay configuration API and are persisted in
+local node metadata.
 
 ### Private IPFS relay range
 
@@ -145,19 +145,16 @@ PUT /node/relay-configuration
   "manualRelayMultiaddrs": [
     "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
   ],
-  "publicRelay": {
+  "publicNetwork": {
     "enabled": true,
-    "autoEnabled": false,
-    "discoveryEnabled": true,
-    "port": 4011,
-    "libp2pPort": 4001
+    "port": 4011
   },
   "privateRelay": {
     "enabled": true,
     "portStart": 4100,
     "portEnd": 4199,
-    "publicRecordPublicationEnabled": true,
-    "publicRecordDiscoveryEnabled": true
+    "publicationEnabled": true,
+    "discoveryEnabled": true
   }
 }
 ```
@@ -167,16 +164,15 @@ Operational rules:
 - expose the whole configured port range in Docker/firewall when the node should
   relay more than one private network;
 - each private network gets a stable port from the range;
-- nodes with `privateRelay.enabled` and
-  `privateRelay.publicRecordPublicationEnabled` publish an encrypted private
-  relay record through the public IPFS routing layer for each private network;
+- nodes with `privateRelay.enabled` and `privateRelay.publicationEnabled`
+  publish an encrypted private relay record through the public IPFS routing
+  layer for each private network;
 - the relay record lookup key and encrypted payload are derived from the private
   network key, so nodes outside the private network cannot read the relay
   multiaddrs;
 - nodes without `privateRelay.enabled` do not start relay servers; they can
-  discover private relay records when
-  `privateRelay.publicRecordDiscoveryEnabled` is true, and can always use
-  `manualRelayMultiaddrs` as an explicit fallback;
+  discover private relay records when `privateRelay.discoveryEnabled` is true,
+  and can always use `manualRelayMultiaddrs` as an explicit fallback;
 - CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.
