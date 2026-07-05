@@ -208,29 +208,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       );
   }
 
-  private async findStoredRecordsByHandle(
-    handle: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        this.stringValue(document, 'handle') === handle &&
-        Boolean(this.identityIdFrom(document)),
-      {
-        mode: 'fallback',
-        operation: 'IdentityMetadataIndex.findByHandle',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
   private networkIdsFor(document: IdentityMetadataRecord): string[] {
     return [
       ...new Set([
@@ -310,16 +287,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     if (cachedLatest) {
       return [cachedLatest];
-    }
-
-    const storedLatest = this.latestRecordFrom(
-      await this.findStoredRecordsByHandle(handle.valueOf()),
-    );
-
-    if (storedLatest) {
-      this.replicateHeadsInBackground(storedLatest);
-
-      return [storedLatest];
     }
 
     return [];
