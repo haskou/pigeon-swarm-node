@@ -38,9 +38,10 @@ describe('NodeNetworkAdder', () => {
       node.pullDomainEvents.mockReturnValue(events);
 
       // Act
-      await adder.addNetwork(message);
+      const result = await adder.addNetwork(message);
 
       // Assert
+      expect(result).toBe(node);
       expect(loader.loadNode).toHaveBeenCalledTimes(1);
       expect(node.addNetwork).toHaveBeenCalledWith(message.network);
       expect(saver.saveNode).toHaveBeenCalledWith(node);
@@ -77,9 +78,10 @@ describe('NodeNetworkAdder', () => {
       node.pullDomainEvents.mockReturnValue(events);
 
       // Act
-      await adder.addPublicNetwork(message);
+      const result = await adder.addPublicNetwork(message);
 
       // Assert
+      expect(result).toBe(node);
       expect(loader.loadNode).toHaveBeenCalledTimes(1);
       expect(node.addNetwork).toHaveBeenCalledWith(message.network);
       expect(saver.saveNode).toHaveBeenCalledWith(node);

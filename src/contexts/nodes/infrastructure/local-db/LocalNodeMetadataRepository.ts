@@ -4,6 +4,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import Kernel from '@haskou/ddd-kernel';
 
 import { LocalNodeMetadataDocument } from './documents/LocalNodeMetadataDocument';
 import LocalNodeMetadataMapper from './mappers/LocalNodeMetadataMapper';
@@ -11,6 +12,8 @@ import LocalNodeMetadataMapper from './mappers/LocalNodeMetadataMapper';
 export default class LocalNodeMetadataRepository extends NodeRepository {
   private static readonly NAMESPACE = 'node_metadata';
   private static readonly LOCAL_NODE_ID = 'local';
+
+  private latestSavedMetadata?: LocalNodeMetadataDocument;
 
   constructor(
     private readonly database: EmbeddedLocalDatabase,
@@ -109,13 +112,33 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     }
   }
 
-  public async loadLocalNode(): Promise<Node> {
-    const metadata = await this.loadOrCreateMetadata();
-    const node = Node.fromPrimitives({
+  private nodeFromMetadata(metadata: LocalNodeMetadataDocument): Node {
+    return Node.fromPrimitives({
       id: metadata.nodeId,
       networks: metadata.networks,
       owner: metadata.owner,
     });
+  }
+
+  private async syncLatestRuntimeNetworks(): Promise<void> {
+    await this.syncRuntimeNetworks(
+      this.nodeFromMetadata(
+        this.latestSavedMetadata ?? (await this.loadOrCreateMetadata()),
+      ),
+    );
+  }
+
+  private syncRuntimeNetworksInBackground(): void {
+    void this.syncLatestRuntimeNetworks().catch((error: unknown) => {
+      Kernel.logger.warn?.(
+        `Local node runtime network sync failed: error=${String(error)}`,
+      );
+    });
+  }
+
+  public async loadLocalNode(): Promise<Node> {
+    const metadata = await this.loadOrCreateMetadata();
+    const node = this.nodeFromMetadata(metadata);
 
     await this.syncRuntimeNetworks(node);
 
@@ -129,7 +152,10 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   }
 
   public async saveLocalNode(node: Node): Promise<void> {
-    await this.persistMetadata(this.metadataMapper.toDocument(node));
-    await this.syncRuntimeNetworks(node);
+    const metadata = this.metadataMapper.toDocument(node);
+
+    await this.persistMetadata(metadata);
+    this.latestSavedMetadata = metadata;
+    this.syncRuntimeNetworksInBackground();
   }
 }

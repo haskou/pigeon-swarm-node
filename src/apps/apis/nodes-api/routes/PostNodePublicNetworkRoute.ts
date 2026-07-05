@@ -18,9 +18,9 @@ export class PostNodePublicNetworkRoute extends NodeNetworkRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     await this.assertOwnerCanManageNetworksWhenClaimed(request);
-    await this.adder.addPublicNetwork(new NodePublicNetworkAdderMessage());
-
-    const node = await this.nodeLoader.loadNode();
+    const node = await this.adder.addPublicNetwork(
+      new NodePublicNetworkAdderMessage(),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
