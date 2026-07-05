@@ -78,6 +78,7 @@ describe('ContentReplicationMaintainer', () => {
         return {};
       },
       findBytesInNetwork: async () => Buffer.from([]),
+      provideInNetwork: async (): Promise<void> => undefined,
       removeFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
@@ -119,6 +120,7 @@ describe('ContentReplicationMaintainer', () => {
       findJSONInNetwork: async () => {
         throw new Error('Public uploads must not be fetched as JSON.');
       },
+      provideInNetwork: async (): Promise<void> => undefined,
       removeFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
@@ -180,6 +182,7 @@ describe('ContentReplicationMaintainer', () => {
     const contentStorage = {
       findBytesInNetwork: async () => Buffer.from([]),
       findJSONInNetwork: async () => ({}),
+      provideInNetwork: async (): Promise<void> => undefined,
       removeFromNetwork: async (_cid: { valueOf(): string }): Promise<void> => {
         releasedCids.push(_cid.valueOf());
       },
@@ -235,5 +238,77 @@ describe('ContentReplicationMaintainer', () => {
     });
     expect(releasedCids).toEqual(['bafy-extra']);
     expect(withdrawnClaims).toEqual([`bafy-extra:${networkId}:${localNodeId}`]);
+  });
+
+  it('reannounces already claimed local replicas without fetching them again', async () => {
+    const providedReplicas: string[] = [];
+    const claimRepository: ContentReplicaClaimRepository = {
+      findByCids: async () => [],
+      save: async () => {
+        throw new Error('Already claimed replicas must not be claimed again.');
+      },
+      withdraw: async () => undefined,
+    };
+    const contentStorage = {
+      findBytesInNetwork: async () => {
+        throw new Error('Already claimed replicas must not be fetched again.');
+      },
+      findJSONInNetwork: async () => {
+        throw new Error('Already claimed replicas must not be fetched again.');
+      },
+      provideInNetwork: async (
+        _cid: { valueOf(): string },
+        targetNetworkId: { valueOf(): string },
+      ): Promise<void> => {
+        providedReplicas.push(`${_cid.valueOf()}:${targetNetworkId.valueOf()}`);
+      },
+      removeFromNetwork: async (): Promise<void> => undefined,
+    };
+    const eventPublisher: DomainEventPublisher = {
+      publish: async () => undefined,
+    };
+
+    const result = await new ContentReplicationMaintainer(
+      {
+        find: async () => ({
+          contents: [
+            {
+              cid: 'bafy-claimed',
+              contentType: 'image/png',
+              context: 'ipfs_public_upload',
+              createdAt: 1770000000000,
+              filename: 'avatar.png',
+              networks: [
+                {
+                  activeNodeCount: 2,
+                  desiredReplicas: 2,
+                  knownReplicaNodeIds: [localNodeId],
+                  knownReplicas: 1,
+                  localResponsible: true,
+                  networkId,
+                  releaseLocalReplica: false,
+                  responsibleNodeIds: [localNodeId],
+                },
+              ],
+              priority: 'normal',
+              sizeBytes: 128,
+              updatedAt: 1770000000000,
+            },
+          ],
+          localNodeId,
+        }),
+      } as unknown as ContentReplicationStatusFinder,
+      claimRepository,
+      contentStorage as unknown as ReplicatedContentStorage,
+      eventPublisher,
+    ).maintain();
+
+    expect(result).toEqual({
+      claimedReplicas: 0,
+      failedClaims: 0,
+      failedReleases: 0,
+      releasedReplicas: 0,
+    });
+    expect(providedReplicas).toEqual([`bafy-claimed:${networkId}`]);
   });
 });

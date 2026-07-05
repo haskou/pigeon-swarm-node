@@ -32,6 +32,36 @@ const jsSendQueueReplacement = `        }, {
             message
         });`;
 
+const sendQueueWithProgressSearch = `    }, {
+      onProgress: options?.onProgress,
+      peerId,
+      signal: options?.signal ?? AbortSignal.timeout(this.messageSendTimeout),
+      message
+    })`;
+
+const sendQueueWithProgressReplacement = `    }, {
+      onProgress: options?.onProgress,
+      peerId,
+      runOnLimitedConnection: this.runOnLimitedConnections,
+      signal: options?.signal ?? AbortSignal.timeout(this.messageSendTimeout),
+      message
+    })`;
+
+const jsSendQueueWithProgressSearch = `        }, {
+            onProgress: options?.onProgress,
+            peerId,
+            signal: options?.signal ?? AbortSignal.timeout(this.messageSendTimeout),
+            message
+        });`;
+
+const jsSendQueueWithProgressReplacement = `        }, {
+            onProgress: options?.onProgress,
+            peerId,
+            runOnLimitedConnection: this.runOnLimitedConnections,
+            signal: options?.signal ?? AbortSignal.timeout(this.messageSendTimeout),
+            message
+        });`;
+
 const dialSearch = `      this.libp2p.dial(peer, options),`;
 
 const dialReplacement = `      this.libp2p.dial(peer, {
@@ -82,6 +112,40 @@ const tsExistingConnectionReplacement = `    options?.onProgress?.(new CustomPro
 
     // dial and wait for identify - this is to avoid opening a protocol stream`;
 
+const connectToSearch = `    options?.onProgress?.(new CustomProgressEvent<PeerId | Multiaddr | Multiaddr[]>('bitswap:dial', peer))
+
+    // dial and wait for identify - this is to avoid opening a protocol stream`;
+
+const connectToReplacement = `    options?.onProgress?.(new CustomProgressEvent<PeerId | Multiaddr | Multiaddr[]>('bitswap:dial', peer))
+    if (typeof peer?.equals === 'function') {
+      const existingConnection = this.libp2p.getConnections(peer)[0]
+
+      if (existingConnection != null) {
+        this.safeDispatchEvent('peer:connected', {
+          detail: peer
+        })
+
+        return existingConnection
+      }
+    }
+
+    // dial and wait for identify - this is to avoid opening a protocol stream`;
+
+const jsConnectToSearch = `        options?.onProgress?.(new CustomProgressEvent('bitswap:dial', peer));
+        // dial and wait for identify - this is to avoid opening a protocol stream`;
+
+const jsConnectToReplacement = `        options?.onProgress?.(new CustomProgressEvent('bitswap:dial', peer));
+        if (typeof peer?.equals === 'function') {
+            const existingConnection = this.libp2p.getConnections(peer)[0];
+            if (existingConnection != null) {
+                this.safeDispatchEvent('peer:connected', {
+                    detail: peer
+                });
+                return existingConnection;
+            }
+        }
+        // dial and wait for identify - this is to avoid opening a protocol stream`;
+
 const existingConnectionWithoutDispatch = `            if (existingConnection != null) {
                 return existingConnection;
             }`;
@@ -129,13 +193,13 @@ for (const relativePath of files) {
 
   const current = fs.readFileSync(filePath, 'utf8');
   const hasSendQueuePatch =
-    current.includes(sendQueueReplacement) ||
-    current.includes(jsSendQueueReplacement);
+    current.includes('runOnLimitedConnection: this.runOnLimitedConnections,\n      signal: options?.signal') ||
+    current.includes('runOnLimitedConnection: this.runOnLimitedConnections,\n            signal: options?.signal');
   const hasDialPatch =
     current.includes(dialReplacement) || current.includes(jsDialReplacement);
-  const hasExistingConnectionPatch =
-    current.includes(existingConnectionWithDispatch) ||
-    current.includes(tsExistingConnectionWithDispatch);
+  const hasExistingConnectionPatch = current.includes(
+    'const existingConnection = this.libp2p.getConnections(peer)[0]',
+  );
   const hasTopologyPatch =
     current.includes(topologyReplacement) ||
     current.includes(tsTopologyReplacement);
@@ -154,7 +218,17 @@ for (const relativePath of files) {
   if (!hasSendQueuePatch) {
     next = next.includes(sendQueueSearch)
       ? next.replace(sendQueueSearch, sendQueueReplacement)
-      : next.replace(jsSendQueueSearch, jsSendQueueReplacement);
+      : next.includes(jsSendQueueSearch)
+        ? next.replace(jsSendQueueSearch, jsSendQueueReplacement)
+        : next.includes(sendQueueWithProgressSearch)
+          ? next.replace(
+              sendQueueWithProgressSearch,
+              sendQueueWithProgressReplacement,
+            )
+          : next.replace(
+              jsSendQueueWithProgressSearch,
+              jsSendQueueWithProgressReplacement,
+            );
   }
 
   if (!hasDialPatch) {
@@ -174,6 +248,10 @@ for (const relativePath of files) {
             tsExistingConnectionWithoutDispatch,
             tsExistingConnectionWithDispatch,
           )
+        : next.includes(connectToSearch)
+        ? next.replace(connectToSearch, connectToReplacement)
+        : next.includes(jsConnectToSearch)
+        ? next.replace(jsConnectToSearch, jsConnectToReplacement)
         : next.includes(existingConnectionSearch)
       ? next.replace(existingConnectionSearch, existingConnectionReplacement)
       : next.replace(tsExistingConnectionSearch, tsExistingConnectionReplacement);

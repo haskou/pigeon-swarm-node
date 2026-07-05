@@ -85,14 +85,16 @@ export default class ContentReplicationMaintainer {
     const context = new ContentReplicationContext(content.context);
     const networkId = new NetworkId(network.networkId);
 
-    if (context.isPublicUpload()) {
+    if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
+      await this.contentStorage.provideInNetwork(cid, networkId);
+
+      return 0;
+    }
+
+    if (context.isReplicatedAsBytes()) {
       await this.contentStorage.findBytesInNetwork(cid, networkId);
     } else {
       await this.contentStorage.findJSONInNetwork<unknown>(cid, networkId);
-    }
-
-    if (this.hasLocalClaim(network.knownReplicaNodeIds, localNodeId)) {
-      return 0;
     }
 
     await this.claimReplica({
