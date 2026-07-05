@@ -4,7 +4,7 @@ Feature: Put saved sticker pack route
   So that identities can manage their sticker libraries
 
   Background:
-    Given I register an in-memory IPFS network "api-stickers-network"
+    Given I register a test IPFS network "api-stickers-network"
 
   Scenario: Save and remove a sticker pack
     Given I am an anonymous user

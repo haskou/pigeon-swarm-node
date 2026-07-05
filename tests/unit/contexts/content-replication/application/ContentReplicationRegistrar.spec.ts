@@ -46,6 +46,7 @@ describe('ContentReplicationRegistrar', () => {
       save: async (claim) => {
         savedClaims.push(claim);
       },
+      withdraw: async () => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
       publish: async (events) => {
@@ -76,10 +77,9 @@ describe('ContentReplicationRegistrar', () => {
     expect(publishedEvents[0][0].eventName()).toBe(
       ContentReplicationWasRegisteredEvent.EVENT_NAME,
     );
-    expect(publishedEvents[0].map((event) => event.attributes.networkIds)).toEqual([
-      [firstNetworkId],
-      [secondNetworkId],
-    ]);
+    expect(
+      publishedEvents[0].map((event) => event.attributes.networkIds),
+    ).toEqual([[firstNetworkId], [secondNetworkId]]);
   });
 
   it('can register content in several networks while claiming only local replicas', async () => {
@@ -97,6 +97,7 @@ describe('ContentReplicationRegistrar', () => {
       save: async (claim) => {
         savedClaims.push(claim);
       },
+      withdraw: async () => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
       publish: async () => undefined,
@@ -147,6 +148,7 @@ describe('ContentReplicationRegistrar', () => {
 
         return undefined;
       },
+      withdraw: async () => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
       publish: async () => undefined,
@@ -190,6 +192,7 @@ describe('ContentReplicationRegistrar', () => {
       save: async (claim) => {
         savedClaims.push(claim);
       },
+      withdraw: async () => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
       publish: () => new Promise<void>(() => undefined),

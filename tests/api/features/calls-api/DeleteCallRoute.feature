@@ -4,7 +4,7 @@ Feature: End call
   So that clients can close active media sessions
 
   Scenario: End a one-to-one conversation call
-    Given I register an in-memory IPFS network "api-calls-end-network"
+    Given I register a test IPFS network "api-calls-end-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request

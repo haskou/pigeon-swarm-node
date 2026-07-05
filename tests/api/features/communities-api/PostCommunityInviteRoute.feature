@@ -5,7 +5,7 @@ Feature: Post community invite API
 
   Scenario: Owner creates an invite and another identity accepts it
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-invite-network"
+    And I register a test IPFS network "communities-api-invite-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -21,6 +21,10 @@ Feature: Post community invite API
     When I POST to accept the current community invite
     Then response code is equal to 200
     And response body should contain the other identity id
+    And the community member signs the current communities request
+    When I GET current communities
+    Then response code is equal to 200
+    And response body should contain "API community"
     And the community member signs the current community request
     When I GET the current community
     Then response code is equal to 200
@@ -28,7 +32,7 @@ Feature: Post community invite API
 
   Scenario: Owner creates an invite with an encrypted community key
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-encrypted-invite-network"
+    And I register a test IPFS network "communities-api-encrypted-invite-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -48,7 +52,7 @@ Feature: Post community invite API
 
   Scenario: Invite cannot be accepted more times than allowed
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-invite-max-uses-network"
+    And I register a test IPFS network "communities-api-invite-max-uses-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -69,7 +73,7 @@ Feature: Post community invite API
 
   Scenario: Expired invite cannot be accepted
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-expired-invite-network"
+    And I register a test IPFS network "communities-api-expired-invite-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -87,7 +91,7 @@ Feature: Post community invite API
 
   Scenario: Expired invite cannot be read
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-expired-invite-read-network"
+    And I register a test IPFS network "communities-api-expired-invite-read-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -104,7 +108,7 @@ Feature: Post community invite API
 
   Scenario: Exhausted invite cannot be read
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-exhausted-invite-read-network"
+    And I register a test IPFS network "communities-api-exhausted-invite-read-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

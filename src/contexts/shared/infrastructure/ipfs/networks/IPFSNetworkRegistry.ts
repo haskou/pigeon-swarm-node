@@ -27,6 +27,7 @@ type IPFSNetworkRegistryState = {
   disabledBootstrapLoggedNetworkIds: string[];
   initialized: boolean;
   listeners: Array<(network: IPFSNetwork) => Promise<void> | void>;
+  mutationQueue: Promise<void>;
   networks: IPFSNetwork[];
   removedListeners: Array<(networkId: string) => Promise<void> | void>;
   privateRelayPorts: Record<string, number>;
@@ -57,6 +58,7 @@ export default class IPFSNetworkRegistry {
       disabledBootstrapLoggedNetworkIds: [],
       initialized: false,
       listeners: [],
+      mutationQueue: Promise.resolve(),
       networks: [],
       privateRelayPorts: {},
       relaySettings: defaultRelayRuntimeSettings(),
@@ -70,6 +72,35 @@ export default class IPFSNetworkRegistry {
 
   private getNetworks(): IPFSNetwork[] {
     return this.getState().networks;
+  }
+
+  private enqueueMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const state = this.getState();
+    const queued = state.mutationQueue.then(operation, operation);
+
+    state.mutationQueue = queued.then(
+      (): undefined => undefined,
+      (): undefined => undefined,
+    );
+
+    return queued;
+  }
+
+  private async removeNetworkNow(id: string): Promise<void> {
+    const networks = this.getNetworks();
+    const index = networks.findIndex((network) => network.getId() === id);
+
+    if (index === -1) {
+      return;
+    }
+
+    const [network] = networks.splice(index, 1);
+
+    await Promise.all(
+      this.getState().removedListeners.map((listener) => listener(id)),
+    );
+    this.relayRecordDirectory.stop(id);
+    await network.stop();
   }
 
   private getSharedPeerKeyFilePath(): string {
@@ -441,25 +472,27 @@ export default class IPFSNetworkRegistry {
   }
 
   public async register(config: IPFSNetworkConfig): Promise<IPFSNetwork> {
-    const existing = this.getNetworks().find(
-      (network) => network.getId() === config.getId(),
-    );
+    return this.enqueueMutation(async () => {
+      const existing = this.getNetworks().find(
+        (network) => network.getId() === config.getId(),
+      );
 
-    if (existing) {
-      return existing;
-    }
+      if (existing) {
+        return existing;
+      }
 
-    const sharedPrivateKey = await this.loadOrCreateSharedPeerPrivateKey();
-    const network = await this.createNetworkFromConfig(
-      config,
-      sharedPrivateKey,
-    );
-    this.getNetworks().push(network);
-    await Promise.all(
-      this.getState().listeners.map((listener) => listener(network)),
-    );
+      const sharedPrivateKey = await this.loadOrCreateSharedPeerPrivateKey();
+      const network = await this.createNetworkFromConfig(
+        config,
+        sharedPrivateKey,
+      );
+      this.getNetworks().push(network);
+      await Promise.all(
+        this.getState().listeners.map((listener) => listener(network)),
+      );
 
-    return network;
+      return network;
+    });
   }
 
   public onNetworkRegistered(
@@ -475,31 +508,20 @@ export default class IPFSNetworkRegistry {
   }
 
   public async removeNetwork(id: string): Promise<void> {
-    const networks = this.getNetworks();
-    const index = networks.findIndex((network) => network.getId() === id);
-
-    if (index === -1) {
-      return;
-    }
-
-    const [network] = networks.splice(index, 1);
-
-    await Promise.all(
-      this.getState().removedListeners.map((listener) => listener(id)),
-    );
-    this.relayRecordDirectory.stop(id);
-    await network.stop();
+    await this.enqueueMutation(() => this.removeNetworkNow(id));
   }
 
   public async deleteNetwork(id: string): Promise<void> {
-    await this.removeNetwork(id);
-    await fs.rm(this.getNetworkStorageLocation(id), {
-      force: true,
-      recursive: true,
-    });
-    await fs.rm(this.getOrbitDBStorageLocation(id), {
-      force: true,
-      recursive: true,
+    await this.enqueueMutation(async () => {
+      await this.removeNetworkNow(id);
+      await fs.rm(this.getNetworkStorageLocation(id), {
+        force: true,
+        recursive: true,
+      });
+      await fs.rm(this.getOrbitDBStorageLocation(id), {
+        force: true,
+        recursive: true,
+      });
     });
   }
 

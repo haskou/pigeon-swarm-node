@@ -6,8 +6,6 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
-import type { Request } from 'express';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
@@ -56,6 +54,56 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     ]);
     expect(records[0].identity?.toPrimitives()).toEqual(
       identity.toPrimitives(),
+    );
+  });
+
+  it('should not wait for identity head persistence when saving metadata', async () => {
+    const mother = new IdentityMother();
+    const identity = mother.build();
+    const networkId = mother.networks[0].valueOf();
+    const delayedHead = deferred<string>();
+    const stores = identityStores(documents, heads) as unknown as {
+      heads: { put: jest.Mock };
+    };
+
+    registry.clear();
+    await registry.register(networkId, stores as never);
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+    stores.heads.put.mockImplementation(
+      async (key: string, value: Record<string, unknown>) => {
+        await delayedHead.promise;
+        heads.set(key, value);
+
+        return 'ok';
+      },
+    );
+
+    const save = repository.save(
+      identity,
+      new IdentityExternalIdentifier('bafyidentity-fast-head'),
+    );
+    const result = await Promise.race([
+      save.then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    expect(heads.get(`identity:${mother.id.valueOf()}`)).toBeUndefined();
+    await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-fast-head',
+        identityId: mother.id.valueOf(),
+      }),
+    ]);
+
+    delayedHead.resolve('ok');
+    await flushBackgroundTasks();
+
+    expect(heads.get(`identity:${mother.id.valueOf()}`)).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-fast-head',
+        identityId: mother.id.valueOf(),
+      }),
     );
   });
 
@@ -112,14 +160,18 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     };
 
     await registry.register(networkId.valueOf(), stores as never);
-    heads.set(`identity:${identityId}`, {
-      cid: 'bafyidentity-v1',
-      id: identityId,
-      identityId,
-      networkIds: [networkId.valueOf()],
-      receivedAt: 1,
-      version: 1,
-    });
+    await registry.putHead(
+      `identity:${identityId}`,
+      {
+        cid: 'bafyidentity-v1',
+        id: identityId,
+        identityId,
+        networkIds: [networkId.valueOf()],
+        receivedAt: 1,
+        version: 1,
+      },
+      [networkId.valueOf()],
+    );
     documents.push({
       cid: 'bafyidentity-v2',
       id: identityId,
@@ -145,6 +197,24 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       }),
     );
     expect(stores.identities.query).not.toHaveBeenCalled();
+  });
+
+  it('should not scan stored identity records when identity id head is missing', async () => {
+    const mother = new IdentityMother();
+    const networkId = mother.networks[0];
+    const query = jest.fn(() =>
+      Promise.reject(new Error('Identity id lookup should not scan stores')),
+    );
+
+    registry.clear();
+    await registry.register(
+      networkId.valueOf(),
+      identityStoresWithIdentityQuery(new Map(), query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([]);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('should read identity metadata by handle from the head index', async () => {
@@ -199,15 +269,19 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     };
 
     await registry.register(networkId.valueOf(), stores as never);
-    heads.set(`identity-handle:${handle.valueOf()}`, {
-      cid: 'bafyidentity-handle-v1',
-      handle: handle.valueOf(),
-      id: identityId,
-      identityId,
-      networkIds: [networkId.valueOf()],
-      receivedAt: 1,
-      version: 1,
-    });
+    await registry.putHead(
+      `identity-handle:${handle.valueOf()}`,
+      {
+        cid: 'bafyidentity-handle-v1',
+        handle: handle.valueOf(),
+        id: identityId,
+        identityId,
+        networkIds: [networkId.valueOf()],
+        receivedAt: 1,
+        version: 1,
+      },
+      [networkId.valueOf()],
+    );
     documents.push({
       cid: 'bafyidentity-handle-v2',
       handle: handle.valueOf(),
@@ -236,27 +310,76 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(stores.identities.query).not.toHaveBeenCalled();
   });
 
-  it('should not query stored identity records by handle during http requests', async () => {
+  it('should not scan stored identity records when handle head is missing', async () => {
     const query = jest.fn(() =>
-      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
+      Promise.reject(new Error('Handle lookup should not scan stores')),
     );
 
     registry.clear();
     await registry.register(
-      'network-http',
+      'network-lookup',
       identityStoresWithIdentityQuery(new Map(), query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
-    const records = await runHttpRequest(() =>
-      repository.findByHandle(new ProfileHandle('hasko')),
-    );
-
-    expect(records).toEqual([]);
+    await expect(
+      repository.findByHandle(new ProfileHandle('202020')),
+    ).resolves.toEqual([]);
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should use cached identity records by handle during http requests', async () => {
+  it('should read persisted handle heads on cache misses', async () => {
+    const mother = new IdentityMother();
+    const identity = mother.build();
+    const primitives = identity.toPrimitives();
+    const query = jest.fn(
+      (matcher: (document: Record<string, unknown>) => boolean) =>
+        Promise.resolve(
+          [
+            {
+              cid: 'bafyidentity-http-fallback',
+              handle: 'hasko',
+              id: 'bafyidentity-http-fallback',
+              identityId: primitives.id,
+              networkIds: primitives.networks,
+              receivedAt: 1,
+              version: primitives.version,
+            },
+          ].filter(matcher),
+        ),
+    );
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set('identity-handle:hasko', {
+      cid: 'bafyidentity-http-head',
+      handle: 'hasko',
+      id: 'bafyidentity-http-head',
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      receivedAt: 1,
+      version: primitives.version,
+    });
+
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, query),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    const records = await repository.findByHandle(new ProfileHandle('hasko'));
+
+    expect(records).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-http-head',
+        handle: 'hasko',
+        identityId: primitives.id,
+      }),
+    ]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('should use cached identity records by handle without scanning stores', async () => {
     const query = jest.fn(() =>
       Promise.reject(new Error('HTTP identity lookup should not scan stores')),
     );
@@ -275,14 +398,12 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     });
     registry.clear();
     await registry.register(
-      'network-http',
+      'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
-    const records = await runHttpRequest(() =>
-      repository.findByHandle(new ProfileHandle('hasko')),
-    );
+    const records = await repository.findByHandle(new ProfileHandle('hasko'));
 
     expect(records).toEqual([
       expect.objectContaining({
@@ -295,24 +416,54 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should not query stored identity records by identity id during http requests', async () => {
-    const query = jest.fn(() =>
-      Promise.reject(new Error('HTTP identity lookup should not scan stores')),
-    );
+  it('should read persisted identity id heads on cache misses', async () => {
     const mother = new IdentityMother();
+    const identity = mother.build();
+    const primitives = identity.toPrimitives();
+    const query = jest.fn(
+      (matcher: (document: Record<string, unknown>) => boolean) =>
+        Promise.resolve(
+          [
+            {
+              cid: 'bafyidentity-id-http-fallback',
+              handle: primitives.profile.handle,
+              id: 'bafyidentity-id-http-fallback',
+              identity: primitives,
+              identityId: primitives.id,
+              networkIds: primitives.networks,
+              receivedAt: 1,
+              version: primitives.version,
+            },
+          ].filter(matcher),
+        ),
+    );
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set(`identity:${primitives.id}`, {
+      cid: 'bafyidentity-id-http-head',
+      handle: primitives.profile.handle,
+      id: 'bafyidentity-id-http-head',
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      receivedAt: 1,
+      version: primitives.version,
+    });
 
     registry.clear();
     await registry.register(
-      'network-http',
-      identityStoresWithIdentityQuery(new Map(), query),
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
-    const records = await runHttpRequest(() =>
-      repository.findByIdentityId(mother.id),
-    );
+    const records = await repository.findByIdentityId(mother.id);
 
-    expect(records).toEqual([]);
+    expect(records).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-id-http-head',
+        identityId: primitives.id,
+      }),
+    ]);
     expect(query).not.toHaveBeenCalled();
   });
 });
@@ -382,18 +533,6 @@ function identityStoresWithIdentityQuery(
   } as never;
 }
 
-function runHttpRequest<T>(callback: () => T): T {
-  return HttpRequestContext.run(
-    {
-      method: 'GET',
-      originalUrl: '/api/identities/hasko',
-      path: '/identities/hasko',
-      url: '/api/identities/hasko',
-    } as Request,
-    callback,
-  );
-}
-
 function upsertDocument(
   currentDocuments: Record<string, unknown>[],
   newDocument: Record<string, unknown>,
@@ -415,4 +554,16 @@ async function flushBackgroundTasks(): Promise<void> {
   await new Promise<void>((resolve) => {
     setImmediate(resolve);
   });
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
 }

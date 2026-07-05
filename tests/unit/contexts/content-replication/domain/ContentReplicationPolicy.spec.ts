@@ -37,7 +37,7 @@ describe('ContentReplicationPolicy', () => {
     ).toBe(false);
   });
 
-  it('should not release local replicas solely from replica claims', () => {
+  it('should not release local replicas without a local replica claim', () => {
     expect(
       policy.canReleaseLocalReplica({
         activeNodeCount: 10,
@@ -46,5 +46,27 @@ describe('ContentReplicationPolicy', () => {
         responsibleNodeIds: ['node-1', 'node-2', 'node-3'],
       }),
     ).toBe(false);
+  });
+
+  it('should not release local replicas before responsible nodes have claimed them', () => {
+    expect(
+      policy.canReleaseLocalReplica({
+        activeNodeCount: 10,
+        knownReplicaNodeIds: ['node-1', 'node-2', 'node-4'],
+        localNodeId: 'node-4',
+        responsibleNodeIds: ['node-1', 'node-2', 'node-3'],
+      }),
+    ).toBe(false);
+  });
+
+  it('should release extra local replicas once responsible nodes have claimed them', () => {
+    expect(
+      policy.canReleaseLocalReplica({
+        activeNodeCount: 10,
+        knownReplicaNodeIds: ['node-1', 'node-2', 'node-3', 'node-4'],
+        localNodeId: 'node-4',
+        responsibleNodeIds: ['node-1', 'node-2', 'node-3'],
+      }),
+    ).toBe(true);
   });
 });

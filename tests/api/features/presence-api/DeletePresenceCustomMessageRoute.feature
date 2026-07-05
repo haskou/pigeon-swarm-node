@@ -1,7 +1,7 @@
 Feature: DELETE /presence/me/custom-message
 
   Background:
-    Given I register an in-memory IPFS network "presence-api-network"
+    Given I register a test IPFS network "presence-api-network"
 
   Scenario: Clear authenticated identity custom message
     Given I set json body

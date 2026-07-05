@@ -1,5 +1,6 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
+import { Node } from '../../domain/Node';
 import NodeLoaderService from '../../domain/services/NodeLoaderService';
 import NodeSaverService from '../../domain/services/NodeSaverService';
 import { NodeNetworkAdderMessage } from './messages/NodeNetworkAdderMessage';
@@ -14,21 +15,23 @@ export default class NodeNetworkAdder {
 
   private async saveNetwork(
     message: NodeNetworkAdderMessage | NodePublicNetworkAdderMessage,
-  ): Promise<void> {
+  ): Promise<Node> {
     const node = await this.loader.loadNode();
     node.addNetwork(message.network);
 
     await this.saver.saveNode(node);
     await this.eventPublisher.publish(node.pullDomainEvents());
+
+    return node;
   }
 
-  public async addNetwork(message: NodeNetworkAdderMessage): Promise<void> {
-    await this.saveNetwork(message);
+  public async addNetwork(message: NodeNetworkAdderMessage): Promise<Node> {
+    return this.saveNetwork(message);
   }
 
   public async addPublicNetwork(
     message: NodePublicNetworkAdderMessage,
-  ): Promise<void> {
-    await this.saveNetwork(message);
+  ): Promise<Node> {
+    return this.saveNetwork(message);
   }
 }

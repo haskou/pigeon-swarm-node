@@ -29,10 +29,23 @@ export default class ContentReplicationPolicy {
     localNodeId: string;
     responsibleNodeIds: string[];
   }): boolean {
-    void params;
+    if (
+      params.activeNodeCount <=
+      ContentReplicationPolicy.FULL_REPLICATION_NODE_LIMIT
+    ) {
+      return false;
+    }
 
-    // Remote replica claims are not proof that a responsible node holds
-    // content.
-    return false;
+    if (params.responsibleNodeIds.includes(params.localNodeId)) {
+      return false;
+    }
+
+    if (!params.knownReplicaNodeIds.includes(params.localNodeId)) {
+      return false;
+    }
+
+    return params.responsibleNodeIds.every((nodeId) =>
+      params.knownReplicaNodeIds.includes(nodeId),
+    );
   }
 }

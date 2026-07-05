@@ -474,6 +474,29 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
   }
 
+  private async localBlockBytes(
+    parsedCid: ParsedCidLike,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    const block = this.heliaCore.blockstore.get(parsedCid, {
+      signal,
+    } as NonNullable<
+      Parameters<HeliaInstance['blockstore']['get']>[1]
+    >) as unknown;
+
+    if (!this.isAsyncIterableBytes(block)) {
+      return block as Promise<Uint8Array> | Uint8Array;
+    }
+
+    const chunks: Uint8Array[] = [];
+
+    for await (const chunk of block) {
+      chunks.push(chunk);
+    }
+
+    return Buffer.concat(chunks);
+  }
+
   private createBlockRetrievalOptions(signal?: AbortSignal): {
     signal?: AbortSignal;
   } {
@@ -596,6 +619,58 @@ export abstract class HeliaIPFS implements IPFSConnection {
           `Skipped IPFS content pinning for local availability: ${parsedCid.toString()}`,
         );
       });
+  }
+
+  private async localDagDescendantCids(
+    cid: ParsedCidLike,
+    signal?: AbortSignal,
+    visited: Set<string> = new Set(),
+  ): Promise<ParsedCidLike[]> {
+    const cidKey = cid.toString();
+
+    if (visited.has(cidKey) || IPFSCidCodec.isRaw(cid)) {
+      return [];
+    }
+
+    visited.add(cidKey);
+
+    let childCids: ParsedCidLike[];
+
+    try {
+      const block = await this.localBlockBytes(cid, signal);
+
+      childCids = await heliaRuntimeAdapter.decodeDagPbLinks(block);
+    } catch {
+      Kernel.logger.debug?.(
+        `Skipped IPFS DAG traversal for block deletion: ${cidKey}`,
+      );
+
+      return [];
+    }
+
+    const descendants: ParsedCidLike[] = [];
+
+    for (const childCid of childCids) {
+      descendants.push(
+        ...(await this.localDagDescendantCids(childCid, signal, visited)),
+      );
+      descendants.push(childCid);
+    }
+
+    return descendants;
+  }
+
+  private async deleteLocalBlock(
+    cid: ParsedCidLike,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    try {
+      if (await this.heliaCore.blockstore.has(cid, { signal })) {
+        await this.heliaCore.blockstore.delete(cid, { signal });
+      }
+    } catch {
+      Kernel.logger.debug?.(`Skipped IPFS block deletion: ${cid.toString()}`);
+    }
   }
 
   public async addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId> {
@@ -729,7 +804,17 @@ export abstract class HeliaIPFS implements IPFSConnection {
       parsedCid,
       signal,
     );
-    await this.heliaCore.blockstore.delete(parsedCid, { signal });
+
+    if (!IPFSCidCodec.isRaw(parsedCid)) {
+      for (const linkedCid of await this.localDagDescendantCids(
+        parsedCid,
+        signal,
+      )) {
+        await this.deleteLocalBlock(linkedCid, signal);
+      }
+    }
+
+    await this.deleteLocalBlock(parsedCid, signal);
   }
 
   public async stat(

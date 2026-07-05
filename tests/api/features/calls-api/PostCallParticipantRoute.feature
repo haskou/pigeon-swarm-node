@@ -4,7 +4,7 @@ Feature: Join call participant
   So that clients can establish media sessions
 
   Scenario: Join a ringing one-to-one call
-    Given I register an in-memory IPFS network "api-calls-join-network"
+    Given I register a test IPFS network "api-calls-join-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
@@ -18,7 +18,7 @@ Feature: Join call participant
       | status | active |
 
   Scenario: Refresh joined participant heartbeat
-    Given I register an in-memory IPFS network "api-calls-heartbeat-network"
+    Given I register a test IPFS network "api-calls-heartbeat-network"
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request

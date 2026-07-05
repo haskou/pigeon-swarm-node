@@ -6,7 +6,6 @@ import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
@@ -148,10 +147,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return `identity-handle:${handle}`;
   }
 
-  private isHttpRequest(): boolean {
-    return HttpRequestContext.current() !== undefined;
-  }
-
   private async findHead(
     key: string,
   ): Promise<IdentityMetadataRecord | undefined> {
@@ -168,61 +163,15 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return latest;
   }
 
-  private async readRepairHead(
+  private readRepairHead(
     head: IdentityMetadataRecord | undefined,
     latest: IdentityMetadataRecord,
-  ): Promise<void> {
+  ): void {
     if (head?.cid === latest.cid) {
       return;
     }
 
-    await this.putHeads(latest);
-  }
-
-  private async findStoredRecordsByIdentityId(
-    identityId: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.identityIdFrom(document) === identityId,
-      {
-        mode: 'fallback',
-        operation: 'IdentityMetadataIndex.findByIdentityId',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
-  private async findStoredRecordsByHandle(
-    handle: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'identities',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.stringValue(document, 'handle') === handle,
-      {
-        mode: 'fallback',
-        operation: 'OrbitDBIdentityMetadataIndex.findStoredRecordsByHandle',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
+    this.replicateHeadsInBackground(latest);
   }
 
   private async findStoredRecordsByNetworkId(
@@ -268,18 +217,18 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     ];
   }
 
-  private async putHeads(document: IdentityMetadataRecord): Promise<void> {
+  private replicateHeadsInBackground(document: IdentityMetadataRecord): void {
     const networkIds = this.networkIdsFor(document);
     const storageDocument = this.toStorageDocument(document);
 
-    await this.registry.putHead(
+    this.registry.replicateHeadInBackground(
       this.identityHeadKey(document.identityId),
       storageDocument,
       networkIds,
     );
 
     if (document.handle) {
-      await this.registry.putHead(
+      this.registry.replicateHeadInBackground(
         this.handleHeadKey(document.handle),
         storageDocument,
         networkIds,
@@ -325,7 +274,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   public async findByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
-    const head = await this.findHead(this.handleHeadKey(handle.valueOf()));
+    const key = this.handleHeadKey(handle.valueOf());
+    const head = await this.findHead(key);
 
     if (head) {
       return [head];
@@ -335,26 +285,11 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       this.findCachedRecordsByHandle(handle.valueOf()),
     );
 
-    if (this.isHttpRequest()) {
-      if (cachedLatest) {
-        return [cachedLatest];
-      }
-
-      return [];
+    if (cachedLatest) {
+      return [cachedLatest];
     }
 
-    const latest = this.latestRecordFrom([
-      ...(cachedLatest ? [cachedLatest] : []),
-      ...(await this.findStoredRecordsByHandle(handle.valueOf())),
-    ]);
-
-    if (!latest) {
-      return [];
-    }
-
-    await this.readRepairHead(head, latest);
-
-    return [latest];
+    return [];
   }
 
   public async findByIdentityId(
@@ -368,21 +303,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return [head];
     }
 
-    if (this.isHttpRequest()) {
-      return [];
-    }
-
-    const latest = this.latestRecordFrom([
-      ...(await this.findStoredRecordsByIdentityId(identityId.valueOf())),
-    ]);
-
-    if (!latest) {
-      return [];
-    }
-
-    await this.readRepairHead(head, latest);
-
-    return [latest];
+    return [];
   }
 
   public async findLatestByNetworkId(
@@ -405,7 +326,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     for (const document of documents) {
       if (!latestDocuments.has(document.identityId)) {
         latestDocuments.set(document.identityId, document);
-        await this.readRepairHead(
+        this.readRepairHead(
           await this.findHead(this.identityHeadKey(document.identityId)),
           document,
         );
@@ -435,7 +356,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       'identities',
       this.toStorageDocument(record),
     );
-    await this.putHeads(record);
+    this.replicateHeadsInBackground(record);
   }
 
   public async deleteByExternalIdentifier(

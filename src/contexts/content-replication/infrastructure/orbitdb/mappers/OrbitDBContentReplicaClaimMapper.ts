@@ -15,6 +15,7 @@ export default class OrbitDBContentReplicaClaimMapper {
       kind: 'content_replica_claim',
       networkId: primitives.networkId,
       nodeId: primitives.nodeId,
+      updatedAt: primitives.claimedAt,
     };
   }
 

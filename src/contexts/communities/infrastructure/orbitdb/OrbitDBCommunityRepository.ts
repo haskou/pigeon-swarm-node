@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import OrbitDBHeadIndex from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
+import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import Kernel from '@haskou/ddd-kernel';
 
 import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -134,21 +133,13 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       );
   }
 
-  private async putMemberIndex(
+  private replicateMemberIndexInBackground(
     identityId: string,
     community: OrbitDBCommunityDocument,
-  ): Promise<void> {
+  ): void {
     const key = this.memberIndexHeadKey(identityId);
-    const indexedCommunities = (await this.communityIndex.find(key)) || [];
-    const communities = this.freshestDocumentsFirst([
-      ...indexedCommunities,
-      community,
-    ]).filter(
-      (document) =>
-        document.deleted !== true && document.memberIds.includes(identityId),
-    );
 
-    await this.communityIndex.putDocuments(
+    void this.communityIndex.replicateRecordInBackground(
       key,
       {
         id: key,
@@ -156,10 +147,8 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         memberId: identityId,
         networkId: community.networkId,
       },
-      communities,
-      {
-        networkIds: [community.networkId],
-      },
+      community,
+      [community.networkId],
     );
   }
 
@@ -175,24 +164,12 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  private async putMemberIndexes(
-    document: OrbitDBCommunityDocument,
-  ): Promise<void> {
-    await Promise.all(
-      document.memberIds.map((memberId) =>
-        this.putMemberIndex(memberId, document),
-      ),
-    );
-  }
-
-  private refreshMemberIndexesInBackground(
+  private replicateMemberIndexesInBackground(
     document: OrbitDBCommunityDocument,
   ): void {
-    void this.putMemberIndexes(document).catch((error) => {
-      Kernel.logger.warn?.(
-        `Community member indexes refresh failed: communityId=${document.id} error=${String(error)}`,
-      );
-    });
+    document.memberIds.forEach((memberId) =>
+      this.replicateMemberIndexInBackground(memberId, document),
+    );
   }
 
   private toFreshDocument(community: Community): OrbitDBCommunityDocument {
@@ -217,7 +194,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       [deletedDocument.networkId],
     );
     this.replicateCommunityHeadInBackground(deletedDocument);
-    this.refreshMemberIndexesInBackground(deletedDocument);
+    this.replicateMemberIndexesInBackground(deletedDocument);
   }
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
@@ -286,6 +263,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       document.networkId,
     ]);
     this.replicateCommunityHeadInBackground(document);
-    this.refreshMemberIndexesInBackground(document);
+    this.replicateMemberIndexesInBackground(document);
   }
 }

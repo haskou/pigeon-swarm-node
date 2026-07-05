@@ -318,6 +318,63 @@ describe('IPFSNetworkRegistry', () => {
 
       expect(listener).toHaveBeenCalledWith(network);
     });
+
+    it('should serialize deletion after an in-flight registration', async () => {
+      process.env.IPFS_STORAGE_PATH = '/tmp/pigeon-swarm-ipfs';
+      const registry = createRegistry();
+      const network = mock<IPFSNetwork>();
+      const registration = deferred<IPFSNetwork>();
+      const removeStorage = fs.rm as jest.MockedFunction<typeof fs.rm>;
+
+      removeStorage.mockResolvedValue(undefined);
+      network.getId.mockReturnValue('network-1');
+      network.stop.mockResolvedValue(undefined);
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockReturnValue(registration.promise);
+
+      const registering = registry.register(
+        new IPFSNetworkConfig(
+          'network-1',
+          'private_1',
+          new PrivateKey(validPem),
+        ),
+      );
+      const deleting = registry.deleteNetwork('network-1');
+
+      await Promise.resolve();
+
+      expect(removeStorage).not.toHaveBeenCalled();
+
+      registration.resolve(network);
+
+      await registering;
+      await deleting;
+
+      expect(network.stop).toHaveBeenCalled();
+      expect(removeStorage).toHaveBeenCalledWith(
+        '/tmp/pigeon-swarm-ipfs/orbitdb/network-1',
+        {
+          force: true,
+          recursive: true,
+        },
+      );
+    });
   });
 
   describe('private relay bootstrap', () => {
@@ -508,3 +565,15 @@ describe('IPFSNetworkRegistry', () => {
     });
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
+}

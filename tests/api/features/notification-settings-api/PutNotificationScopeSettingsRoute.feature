@@ -1,7 +1,7 @@
 Feature: PUT /notification-settings/scopes
 
   Background:
-    Given I register an in-memory IPFS network "notification-settings-api-network"
+    Given I register a test IPFS network "notification-settings-api-network"
 
   Scenario: Upsert conversation notification settings
     Given I set json body

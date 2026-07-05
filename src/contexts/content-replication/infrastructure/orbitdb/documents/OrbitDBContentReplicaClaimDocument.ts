@@ -8,4 +8,6 @@ export interface OrbitDBContentReplicaClaimDocument extends Record<
   kind: 'content_replica_claim';
   networkId: string;
   nodeId: string;
+  updatedAt?: number;
+  withdrawnAt?: number;
 }

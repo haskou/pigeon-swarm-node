@@ -1,7 +1,7 @@
 Feature: Delete conversation messages
 
   Scenario: Delete an encrypted message in a one-to-one conversation
-    Given I register an in-memory IPFS network "api-conversation-delete-message-network"
+    Given I register a test IPFS network "api-conversation-delete-message-network"
     And I have created a one-to-one conversation
     And I have sent an encrypted conversation message
     And I set a delete conversation message body

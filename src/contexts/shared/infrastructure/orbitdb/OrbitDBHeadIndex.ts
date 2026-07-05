@@ -1,11 +1,11 @@
 import Kernel from '@haskou/ddd-kernel';
 
-import OrbitDBDocumentDeduplicator from './OrbitDBDocumentDeduplicator';
+import { OrbitDBDocumentDeduplicator } from './OrbitDBDocumentDeduplicator';
 import { OrbitDBHeadIndexOptions } from './OrbitDBHeadIndexOptions';
 import { OrbitDBHeadIndexPutOptions } from './OrbitDBHeadIndexPutOptions';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 
-export default class OrbitDBHeadIndex<TDocument extends object> {
+export class OrbitDBHeadIndex<TDocument extends object> {
   private static readonly pendingRecordsByRegistry = new WeakMap<
     OrbitDBReplicatedStateRegistry,
     Map<string, Record<string, unknown>[]>

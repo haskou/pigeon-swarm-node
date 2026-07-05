@@ -107,14 +107,20 @@ export default class ContentReplicationMaintainer {
   private async releaseExtraReplica(
     content: ReplicatedContentStatus,
     network: ContentNetworkReplicationStatus,
+    localNodeId: string,
   ): Promise<number> {
     if (!network.releaseLocalReplica) {
       return 0;
     }
 
-    await this.contentStorage.removeFromNetwork(
-      new ContentId(content.cid),
-      new NetworkId(network.networkId),
+    const cid = new ContentId(content.cid);
+    const networkId = new NetworkId(network.networkId);
+
+    await this.contentStorage.removeFromNetwork(cid, networkId);
+    await this.claimRepository.withdraw(
+      cid,
+      networkId,
+      new NodeId(localNodeId),
     );
 
     return 1;
@@ -145,6 +151,7 @@ export default class ContentReplicationMaintainer {
       result.releasedReplicas = await this.releaseExtraReplica(
         content,
         network,
+        localNodeId,
       );
     } catch {
       result.failedReleases = 1;

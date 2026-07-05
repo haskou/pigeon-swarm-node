@@ -58,6 +58,58 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     );
   });
 
+  it('should not wait for keychain head persistence when saving metadata', async () => {
+    const mother = await KeychainMother.create();
+    const keychain = mother.withVersion(2).build();
+    const delayedHead = deferred<string>();
+    const stores = keychainStores(documents, heads) as unknown as {
+      heads: { put: jest.Mock };
+    };
+
+    registry.clear();
+    await registry.register(networkId, stores as never);
+    repository = new OrbitDBKeychainMetadataIndex(registry);
+    stores.heads.put.mockImplementation(
+      async (key: string, value: Record<string, unknown>) => {
+        await delayedHead.promise;
+        heads.set(key, value);
+
+        return 'ok';
+      },
+    );
+
+    const save = repository.save(
+      keychain,
+      new KeychainExternalIdentifier('bafykeychain-fast-head'),
+      [new NetworkId(networkId)],
+    );
+    const result = await Promise.race([
+      save.then(() => 'saved'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    ]);
+
+    expect(result).toBe('saved');
+    expect(heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`)).toBeUndefined();
+    await expect(
+      repository.findByOwnerIdentityId(mother.ownerIdentityId),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafykeychain-fast-head',
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+      }),
+    ]);
+
+    delayedHead.resolve('ok');
+    await flushBackgroundTasks();
+
+    expect(heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`)).toEqual(
+      expect.objectContaining({
+        cid: 'bafykeychain-fast-head',
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+      }),
+    );
+  });
+
   it('should return all non-deleted keychain metadata ordered by freshness', async () => {
     await registry.putHead('keychain:owner-1', {
       cid: 'old',
@@ -204,7 +256,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     const mother = await KeychainMother.create();
     const ownerIdentityId = mother.ownerIdentityId.valueOf();
 
-    heads.set(`keychain:${ownerIdentityId}`, {
+    await registry.putHead(`keychain:${ownerIdentityId}`, {
       cid: 'bafykeychain-v1',
       id: ownerIdentityId,
       ownerIdentityId,
@@ -296,4 +348,16 @@ async function flushBackgroundTasks(): Promise<void> {
   await new Promise<void>((resolve) => {
     setImmediate(resolve);
   });
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
 }

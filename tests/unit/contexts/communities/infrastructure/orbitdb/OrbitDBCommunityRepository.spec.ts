@@ -121,13 +121,14 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
-  it('should not wait for member index fanout when saving communities', async () => {
+  it('should not wait for member index persistence when saving communities', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
+    const delayedMemberIndex = deferred<string>();
 
     headsPut.mockImplementation(
       async (key: string, value: Record<string, unknown>) => {
         if (key.startsWith('community-member-index:')) {
-          return new Promise(() => undefined);
+          await delayedMemberIndex.promise;
         }
 
         heads.set(key, value);
@@ -136,14 +137,32 @@ describe('OrbitDBCommunityRepository', () => {
       },
     );
 
+    const save = repository.save(community);
     const result = await Promise.race([
-      repository.save(community).then(() => 'saved'),
+      save.then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
     expect(result).toBe('saved');
     expect(heads.get('community:community-1')).toEqual(
       expect.objectContaining({ id: 'community-1' }),
+    );
+    expect(
+      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+    ).toBeUndefined();
+    await expect(repository.findByMember(identityMother.id)).resolves.toHaveLength(
+      1,
+    );
+
+    delayedMemberIndex.resolve('ok');
+    await flushBackgroundTasks();
+
+    expect(
+      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+    ).toEqual(
+      expect.objectContaining({
+        communities: [expect.objectContaining({ id: 'community-1' })],
+      }),
     );
   });
 
@@ -227,13 +246,17 @@ describe('OrbitDBCommunityRepository', () => {
   it('should read communities from heads when indexes exist', async () => {
     const primitives = communityPrimitives();
 
-    heads.set('community:community-1', primitives);
-    heads.set(`community-member-index:${identityMother.id.valueOf()}`, {
-      communities: [primitives],
-      id: `community-member-index:${identityMother.id.valueOf()}`,
-      identityId: identityMother.id.valueOf(),
-      updatedAt: Date.now(),
-    });
+    await registry.putHead('community:community-1', primitives, [networkId]);
+    await registry.putHead(
+      `community-member-index:${identityMother.id.valueOf()}`,
+      {
+        communities: [primitives],
+        id: `community-member-index:${identityMother.id.valueOf()}`,
+        identityId: identityMother.id.valueOf(),
+        updatedAt: Date.now(),
+      },
+      [networkId],
+    );
 
     const byId = await repository.findById(new CommunityId('community-1'));
     const byMember = await repository.findByMember(identityMother.id);

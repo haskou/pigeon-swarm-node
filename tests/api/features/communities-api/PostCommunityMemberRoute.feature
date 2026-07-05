@@ -5,7 +5,7 @@ Feature: Post community member API
 
   Scenario: Owner invites a member and the member accepts before reading the private community
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-member-network"
+    And I register a test IPFS network "communities-api-member-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

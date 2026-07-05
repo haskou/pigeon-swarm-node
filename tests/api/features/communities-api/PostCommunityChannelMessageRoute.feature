@@ -5,7 +5,7 @@ Feature: Post community channel message API
 
   Scenario: Member sends and lists encrypted private community text channel messages
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-message-network"
+    And I register a test IPFS network "communities-api-message-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -28,7 +28,7 @@ Feature: Post community channel message API
 
   Scenario: Member sends and searches plaintext public community text channel messages
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-public-message-network"
+    And I register a test IPFS network "communities-api-public-message-network"
     And I set a public community body
     And I sign the current community creation request
     When I POST to "/communities/"
@@ -68,7 +68,7 @@ Feature: Post community channel message API
 
   Scenario: Owner sends a message mentioning everyone
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-message-mentions-network"
+    And I register a test IPFS network "communities-api-message-mentions-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

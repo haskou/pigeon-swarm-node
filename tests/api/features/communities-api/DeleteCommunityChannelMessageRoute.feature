@@ -5,7 +5,7 @@ Feature: Delete community channel message API
 
   Scenario: Member deletes an encrypted private community text channel message
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-delete-message-network"
+    And I register a test IPFS network "communities-api-delete-message-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"

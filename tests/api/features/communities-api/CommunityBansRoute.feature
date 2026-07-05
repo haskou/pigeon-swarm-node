@@ -5,7 +5,7 @@ Feature: Community bans API
 
   Scenario: Owner bans an identity and blocks join requests
     Given I am an anonymous user
-    And I register an in-memory IPFS network "communities-api-bans-network"
+    And I register a test IPFS network "communities-api-bans-network"
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities/"
