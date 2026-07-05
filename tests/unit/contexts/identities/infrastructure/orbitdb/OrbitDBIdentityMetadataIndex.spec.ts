@@ -310,22 +310,72 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(stores.identities.query).not.toHaveBeenCalled();
   });
 
-  it('should not scan stored identity records when handle head is missing', async () => {
-    const query = jest.fn(() =>
-      Promise.reject(new Error('Handle lookup should not scan stores')),
+  it('should scan stored identity records when handle head is missing', async () => {
+    const query = jest.fn(
+      (matcher: (document: Record<string, unknown>) => boolean) =>
+        Promise.resolve(
+          [
+            {
+              cid: 'bafyidentity-handle-fallback-v1',
+              handle: 'hasko',
+              id: 'identity-1',
+              identityId: 'identity-1',
+              networkIds: ['network-lookup'],
+              receivedAt: 1,
+              version: 1,
+            },
+            {
+              cid: 'bafyidentity-handle-fallback-v2',
+              handle: 'hasko',
+              id: 'identity-1',
+              identityId: 'identity-1',
+              networkIds: ['network-lookup'],
+              receivedAt: 2,
+              version: 2,
+            },
+            {
+              cid: 'bafyidentity-other-handle',
+              handle: 'other',
+              id: 'identity-2',
+              identityId: 'identity-2',
+              networkIds: ['network-lookup'],
+              receivedAt: 3,
+              version: 3,
+            },
+          ].filter(matcher),
+        ),
     );
 
     registry.clear();
     await registry.register(
       'network-lookup',
-      identityStoresWithIdentityQuery(new Map(), query),
+      identityStoresWithIdentityQuery(heads, query),
     );
     repository = new OrbitDBIdentityMetadataIndex(registry);
 
     await expect(
-      repository.findByHandle(new ProfileHandle('202020')),
-    ).resolves.toEqual([]);
-    expect(query).not.toHaveBeenCalled();
+      repository.findByHandle(new ProfileHandle('hasko')),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-handle-fallback-v2',
+        handle: 'hasko',
+        identityId: 'identity-1',
+      }),
+    ]);
+    expect(query).toHaveBeenCalled();
+    await flushBackgroundTasks();
+    expect(heads.get('identity:identity-1')).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-handle-fallback-v2',
+        handle: 'hasko',
+      }),
+    );
+    expect(heads.get('identity-handle:hasko')).toEqual(
+      expect.objectContaining({
+        cid: 'bafyidentity-handle-fallback-v2',
+        handle: 'hasko',
+      }),
+    );
   });
 
   it('should read persisted handle heads on cache misses', async () => {
