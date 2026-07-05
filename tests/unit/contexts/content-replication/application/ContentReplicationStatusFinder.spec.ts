@@ -47,6 +47,7 @@ describe('ContentReplicationStatusFinder', () => {
           ),
         ]),
       save: () => Promise.resolve(),
+      withdraw: () => Promise.resolve(),
     };
     const nodeRepository: NodeRepository = {
       loadLocalNodeId: () => Promise.resolve(new NodeId(localNodeId)),

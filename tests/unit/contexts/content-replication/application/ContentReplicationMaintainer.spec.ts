@@ -67,6 +67,7 @@ describe('ContentReplicationMaintainer', () => {
       save: async (claim) => {
         savedClaims.push(claim);
       },
+      withdraw: async () => undefined,
     };
     const contentStorage = {
       findJSONInNetwork: async (_cid: { valueOf(): string }) => {
@@ -107,6 +108,7 @@ describe('ContentReplicationMaintainer', () => {
     const claimRepository: ContentReplicaClaimRepository = {
       findByCids: async () => [],
       save: async () => undefined,
+      withdraw: async () => undefined,
     };
     const contentStorage = {
       findBytesInNetwork: async (_cid: { valueOf(): string }) => {
@@ -161,5 +163,77 @@ describe('ContentReplicationMaintainer', () => {
     expect(result.failedClaims).toBe(0);
     expect(result.claimedReplicas).toBe(1);
     expect(fetchedBytes).toEqual(['bafy-public']);
+  });
+
+  it('releases extra local replicas marked by replication status', async () => {
+    const releasedCids: string[] = [];
+    const withdrawnClaims: string[] = [];
+    const claimRepository: ContentReplicaClaimRepository = {
+      findByCids: async () => [],
+      save: async () => undefined,
+      withdraw: async (cid, targetNetworkId, nodeId) => {
+        withdrawnClaims.push(
+          `${cid.valueOf()}:${targetNetworkId.valueOf()}:${nodeId.valueOf()}`,
+        );
+      },
+    };
+    const contentStorage = {
+      findBytesInNetwork: async () => Buffer.from([]),
+      findJSONInNetwork: async () => ({}),
+      removeFromNetwork: async (_cid: { valueOf(): string }): Promise<void> => {
+        releasedCids.push(_cid.valueOf());
+      },
+    };
+    const eventPublisher: DomainEventPublisher = {
+      publish: async () => undefined,
+    };
+
+    const result = await new ContentReplicationMaintainer(
+      {
+        find: async () => ({
+          contents: [
+            {
+              cid: 'bafy-extra',
+              contentType: 'application/octet-stream',
+              context: 'ipfs_private_upload',
+              createdAt: 1770000000000,
+              networks: [
+                {
+                  activeNodeCount: 10,
+                  desiredReplicas: 5,
+                  knownReplicaNodeIds: [
+                    'node-1',
+                    'node-2',
+                    'node-3',
+                    localNodeId,
+                  ],
+                  knownReplicas: 4,
+                  localResponsible: false,
+                  networkId,
+                  releaseLocalReplica: true,
+                  responsibleNodeIds: ['node-1', 'node-2', 'node-3'],
+                },
+              ],
+              priority: 'normal',
+              sizeBytes: 128,
+              updatedAt: 1770000000000,
+            },
+          ],
+          localNodeId,
+        }),
+      } as unknown as ContentReplicationStatusFinder,
+      claimRepository,
+      contentStorage as unknown as ReplicatedContentStorage,
+      eventPublisher,
+    ).maintain();
+
+    expect(result).toEqual({
+      claimedReplicas: 0,
+      failedClaims: 0,
+      failedReleases: 0,
+      releasedReplicas: 1,
+    });
+    expect(releasedCids).toEqual(['bafy-extra']);
+    expect(withdrawnClaims).toEqual([`bafy-extra:${networkId}:${localNodeId}`]);
   });
 });

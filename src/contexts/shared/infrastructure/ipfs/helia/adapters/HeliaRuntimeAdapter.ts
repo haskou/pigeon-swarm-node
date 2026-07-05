@@ -1,4 +1,5 @@
 import type * as HeliaBlockBrokersModule from '@helia/block-brokers';
+import type * as IpldDagPbModule from '@ipld/dag-pb';
 import type * as CircuitRelayModule from '@libp2p/circuit-relay-v2';
 import type * as GossipsubModule from '@libp2p/gossipsub';
 import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
@@ -56,6 +57,7 @@ export class HeliaRuntimeAdapter {
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
   private heliaRoutersModulePromise?: Promise<typeof import('@helia/routers')>;
   private heliaUnixfsModulePromise?: Promise<typeof import('@helia/unixfs')>;
+  private ipldDagPbModulePromise?: Promise<typeof IpldDagPbModule>;
   private gossipsubModulePromise?: Promise<typeof GossipsubModule>;
   private ipnsModulePromise?: Promise<typeof IPNSModule>;
   private ipnsValidatorModulePromise?: Promise<typeof IPNSValidatorModule>;
@@ -122,6 +124,13 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof import('@helia/routers')>('@helia/routers');
 
     return this.heliaRoutersModulePromise;
+  }
+
+  private loadIpldDagPbModule(): Promise<typeof IpldDagPbModule> {
+    this.ipldDagPbModulePromise ??=
+      this.nativeImport<typeof IpldDagPbModule>('@ipld/dag-pb');
+
+    return this.ipldDagPbModulePromise;
   }
 
   private loadBlockBrokersModule(): Promise<typeof HeliaBlockBrokersModule> {
@@ -599,6 +608,12 @@ export class HeliaRuntimeAdapter {
     const cidModule = await this.loadCidModule();
 
     return cidModule.CID.parse(value);
+  }
+
+  public async decodeDagPbLinks(block: Uint8Array): Promise<MultiformatsCid[]> {
+    const dagPbModule = await this.loadIpldDagPbModule();
+
+    return dagPbModule.decode(block).Links.map((link) => link.Hash);
   }
 
   public async createMemoryBlockstore(): Promise<MemoryBlockstore> {
