@@ -541,6 +541,69 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       `${relayRecord.multiaddrs[0]}/p2p-circuit`,
     );
   });
+
+  it('should invalidate a locally cached relay after repeated failed dials', async () => {
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const networkKey = privateKey();
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      networkKey,
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayRecord: PrivateNetworkRelayRecord = {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: [relayMultiaddr],
+      peerId: '12D3KooWRelay',
+      role: 'relay',
+      version: 1,
+    };
+    const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
+
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.dial.mockRejectedValue(new Error('dial failed'));
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.getPeers.mockReturnValue([]);
+    publicConnection.waitForPeers.mockResolvedValue(false);
+
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+    await localDatabase.save(
+      PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+      network.getId(),
+      {
+        _id: network.getId(),
+        cachedAt: Date.now(),
+        envelope,
+        networkId: network.getId(),
+      } satisfies PrivateRelayRecordCacheDocument,
+    );
+
+    await directory.discover(network, mock());
+    await directory.discover(network, mock());
+    await directory.discover(network, mock());
+
+    expect(privateConnection.dial).toHaveBeenCalledTimes(3);
+    await expect(
+      localDatabase.findOne(
+        PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
+        network.getId(),
+      ),
+    ).resolves.toBeUndefined();
+
+    privateConnection.dial.mockClear();
+
+    await directory.discover(network, mock());
+
+    expect(privateConnection.dial).not.toHaveBeenCalled();
+  });
 });
 
 function flushPromises(): Promise<void> {
