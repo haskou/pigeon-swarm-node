@@ -91,10 +91,7 @@ export default class CallRelayRuntime implements Runtime {
   }
 
   private async startOnNetwork(network: IPFSNetwork): Promise<void> {
-    if (
-      network.isPrivate() ||
-      this.state.startedNetworkIds.includes(network.getId())
-    ) {
+    if (this.state.startedNetworkIds.includes(network.getId())) {
       return;
     }
 

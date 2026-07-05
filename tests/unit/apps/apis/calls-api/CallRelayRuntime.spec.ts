@@ -35,6 +35,7 @@ describe('CallRelayRuntime', () => {
   let discovery: MockProxy<CallRelayRecordDiscovery>;
   let logger: MockProxy<WinstonLogger>;
   let signer: MockProxy<CallRelayRecordSigner>;
+  let privateNetwork: MockProxy<IPFSNetwork>;
   let publicNetwork: MockProxy<IPFSNetwork>;
 
   beforeEach(() => {
@@ -48,8 +49,11 @@ describe('CallRelayRuntime', () => {
     discovery = mock<CallRelayRecordDiscovery>();
     logger = mock<WinstonLogger>();
     signer = mock<CallRelayRecordSigner>();
+    privateNetwork = mock<IPFSNetwork>();
     publicNetwork = mock<IPFSNetwork>();
 
+    privateNetwork.getId.mockReturnValue('private-network');
+    privateNetwork.isPrivate.mockReturnValue(true);
     publicNetwork.getId.mockReturnValue('public-network');
     publicNetwork.isPrivate.mockReturnValue(false);
     networkRegistry.getAll.mockReturnValue([]);
@@ -108,6 +112,33 @@ describe('CallRelayRuntime', () => {
         poolSignature: 'pool-signature',
         role: 'call-relay',
         signature: 'signature',
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
+        version: 1,
+      }),
+    );
+  });
+
+  it('should publish a signed call relay record when a private network is registered', async () => {
+    let registeredListener:
+      | ((network: IPFSNetwork) => Promise<void> | void)
+      | undefined;
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    networkRegistry.onNetworkRegistered.mockImplementation((listener) => {
+      registeredListener = listener;
+    });
+
+    await runtime.run();
+    await registeredListener?.(privateNetwork);
+
+    expect(discovery.startConnection).toHaveBeenCalledWith(privateNetwork);
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      expect.objectContaining({
+        role: 'call-relay',
         urls: [
           'turn:relay.example.test:4199?transport=udp',
           'turn:relay.example.test:4199?transport=tcp',
