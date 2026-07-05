@@ -16,5 +16,9 @@ export type NodeRelayConfigurationInput = Partial<
     discoveryEnabled?: boolean;
     publicationEnabled?: boolean;
   };
+  publicNetwork?: {
+    enabled?: boolean;
+    port?: number;
+  };
   publicRelay?: Partial<PrimitiveOf<NodePublicRelayConfiguration>>;
 };
