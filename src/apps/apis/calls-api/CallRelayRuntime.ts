@@ -9,13 +9,12 @@ import CallRelayRecordSigner from './CallRelayRecordSigner';
 
 type CallRelayRuntimeState = {
   publicationIntervals: Record<string, NodeJS.Timeout>;
+  relaySettingsListenerRegistered: boolean;
   startedNetworkIds: string[];
 };
 
 export default class CallRelayRuntime implements Runtime {
   private static readonly globalStateKey = '__pigeonSwarmCallRelayRuntime';
-
-  private readonly configuration = CallRelayConfiguration.fromEnvironment();
 
   public constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
@@ -30,10 +29,17 @@ export default class CallRelayRuntime implements Runtime {
 
     globalState[CallRelayRuntime.globalStateKey] ??= {
       publicationIntervals: {},
+      relaySettingsListenerRegistered: false,
       startedNetworkIds: [],
     };
 
     return globalState[CallRelayRuntime.globalStateKey];
+  }
+
+  private get configuration(): CallRelayConfiguration {
+    return CallRelayConfiguration.fromRelaySettings(
+      this.networkRegistry.getRelaySettings(),
+    );
   }
 
   private async publishCurrentRecord(network: IPFSNetwork): Promise<void> {
@@ -90,6 +96,54 @@ export default class CallRelayRuntime implements Runtime {
     this.state.publicationIntervals[network.getId()] = interval;
   }
 
+  private registerRelaySettingsListener(): void {
+    if (this.state.relaySettingsListenerRegistered) {
+      return;
+    }
+
+    this.state.relaySettingsListenerRegistered = true;
+    this.networkRegistry.onRelaySettingsChanged(() => {
+      return this.restartPublication().catch((error: unknown) => {
+        Kernel.logger.warn(
+          `Call relay publication reload failed: ${String(error)}`,
+        );
+      });
+    });
+  }
+
+  private stopPublicationIntervals(): void {
+    for (const interval of Object.values(this.state.publicationIntervals)) {
+      clearInterval(interval);
+    }
+
+    this.state.publicationIntervals = {};
+  }
+
+  private async refreshPublication(network: IPFSNetwork): Promise<void> {
+    if (network.isPrivate()) {
+      return;
+    }
+
+    if (!this.state.startedNetworkIds.includes(network.getId())) {
+      await this.startOnNetwork(network);
+
+      return;
+    }
+
+    await this.publishCurrentRecord(network);
+    this.startPublicationInterval(network);
+  }
+
+  private async restartPublication(): Promise<void> {
+    this.stopPublicationIntervals();
+
+    await Promise.all(
+      this.networkRegistry
+        .getAll()
+        .map((network) => this.refreshPublication(network)),
+    );
+  }
+
   private async startOnNetwork(network: IPFSNetwork): Promise<void> {
     if (
       network.isPrivate() ||
@@ -122,6 +176,7 @@ export default class CallRelayRuntime implements Runtime {
       return;
     }
 
+    this.registerRelaySettingsListener();
     this.networkRegistry.onNetworkRegistered((network) =>
       this.startOnNetwork(network).catch((error: unknown) => {
         Kernel.logger.warn(

@@ -342,13 +342,6 @@ export class HeliaRuntimeAdapter {
       .filter(Boolean);
   }
 
-  private getRelayBootstrapMultiaddrs(): string[] {
-    return (pigeonEnvironment().PIGEON_BOOTSTRAP_RELAY_MULTIADDRS || '')
-      .split(',')
-      .map((address) => address.trim())
-      .filter(Boolean);
-  }
-
   private async withPublicBootstrap(
     defaults: Libp2pDefaults,
   ): Promise<Libp2pDefaults> {
@@ -377,9 +370,8 @@ export class HeliaRuntimeAdapter {
 
   public async withBootstrapRelays(
     defaults: Libp2pDefaults,
+    relayMultiaddrs: string[] = [],
   ): Promise<Libp2pDefaults> {
-    const relayMultiaddrs = this.getRelayBootstrapMultiaddrs();
-
     if (relayMultiaddrs.length === 0) {
       return defaults;
     }

@@ -3,7 +3,9 @@ import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/Node
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
 import { NodeNetworkWasRemoved } from '@app/contexts/nodes/domain/events/NodeNetworkWasRemoved';
+import { NodeRelayConfigurationWasUpdated } from '@app/contexts/nodes/domain/events/NodeRelayConfigurationWasUpdated';
 import { Node } from '@app/contexts/nodes/domain/Node';
+import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
@@ -40,6 +42,7 @@ describe('Node', () => {
         ]),
       ),
       owner: mother.owner?.valueOf(),
+      relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     };
   });
 
@@ -117,6 +120,7 @@ describe('Node', () => {
           [networkId.valueOf()]: network.toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
       });
 
       restored.removeNetwork(new NetworkId(networkId.valueOf()));
@@ -160,6 +164,43 @@ describe('Node', () => {
       expect(() => node.assignOwner(nextOwner, anotherIdentity)).toThrow(
         NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
       );
+    });
+  });
+
+  describe('updateRelayConfiguration', () => {
+    it('should update relay configuration and record a domain event', () => {
+      const relayConfiguration = NodeRelayConfiguration.fromPrimitives({
+        callsRelay: {
+          port: 4199,
+        },
+        manualRelayMultiaddrs: [
+          '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId',
+        ],
+        privateRelay: {
+          enabled: true,
+          portEnd: 4199,
+          portStart: 4100,
+          publicRecordDiscoveryEnabled: true,
+          publicRecordPublicationEnabled: true,
+        },
+        publicHost: 'relay.example.com',
+        publicRelay: {
+          autoEnabled: false,
+          discoveryEnabled: true,
+          enabled: true,
+          libp2pPort: 4001,
+          port: 4011,
+        },
+      });
+
+      node.updateRelayConfiguration(relayConfiguration);
+
+      expect(node.toPrimitives().relayConfiguration).toEqual(
+        relayConfiguration.toPrimitives(),
+      );
+      expect(node.pullDomainEvents()).toEqual([
+        expect.any(NodeRelayConfigurationWasUpdated),
+      ]);
     });
   });
 });

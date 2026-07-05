@@ -78,11 +78,13 @@ import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeych
 import { PostLinkPreviewRoute } from '@app/apps/apis/link-previews-api/routes/PostLinkPreviewRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
+import { GetNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRelayConfigurationRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
+import { PutNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeRelayConfigurationRoute';
 import { DeleteNotificationScopeSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/DeleteNotificationScopeSettingsRoute';
 import { GetNotificationSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/GetNotificationSettingsRoute';
 import { PutNotificationScopeSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/PutNotificationScopeSettingsRoute';
@@ -162,6 +164,8 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostNodeNetworkRoute,
   PostNodePublicNetworkRoute,
   PutNodeOwnerRoute,
+  GetNodeRelayConfigurationRoute,
+  PutNodeRelayConfigurationRoute,
   GetPeersRoute,
   GetNotificationsRoute,
   PostNotificationRoute,

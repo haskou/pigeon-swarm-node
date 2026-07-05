@@ -218,7 +218,8 @@ process bindings do not collide. In practice:
 
 - private IPFS relay range uses TCP in the backend process;
 - TURN media relay range should usually use UDP in coturn;
-- `CALLS_TURN_PORT` is the TURN listening port, not the media relay range.
+- `relayConfiguration.callsRelay.port` is the TURN listening port, not the
+  media relay range.
 
 ```mermaid
 flowchart LR
@@ -247,14 +248,16 @@ running there.
 | --- | --- |
 | `CALLS_TURN_SHARED_SECRET` | Shared coturn REST secret. Required for temporary credentials and relay discovery. |
 | `CALLS_TURN_URLS` | Explicit local TURN URLs to advertise and return. Comma-separated. |
-| `CALLS_TURN_PUBLIC_HOST` | Public host used to derive local TURN URLs. Falls back to `PIGEON_PUBLIC_HOST`. |
-| `CALLS_TURN_PORT` | TURN listening port used to derive local TURN URLs. |
 | `CALLS_TURN_TRANSPORTS` | Transports used when deriving URLs. Defaults to `udp,tcp`. |
 | `CALLS_TURN_RECORD_TTL_MS` | Signed record lifetime. Defaults to 10 minutes. |
 | `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL. |
 | `CALLS_TURN_DISCOVERY_ENABLED` | Set to `false` to disable pubsub discovery. |
 | `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | Temporary credential lifetime for `/calls/ice-servers`. Defaults to 3600 seconds. |
 | `CALLS_ICE_TRANSPORT_POLICY` | Defaults to `relay` for production privacy. Use `all` only for trusted/dev networks. |
+
+When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
+`relayConfiguration.publicHost` and `relayConfiguration.callsRelay.port` in
+`PUT /node/relay-configuration`.
 
 ## Operational States
 

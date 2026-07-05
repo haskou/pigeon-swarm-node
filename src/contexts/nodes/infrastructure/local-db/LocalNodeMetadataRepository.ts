@@ -1,6 +1,8 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
+import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -29,10 +31,30 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     return (
       document._id === LocalNodeMetadataRepository.LOCAL_NODE_ID &&
       typeof document.nodeId === 'string' &&
-      typeof document.networks === 'object' &&
-      document.networks !== null &&
-      !Array.isArray(document.networks) &&
-      (document.owner === undefined || typeof document.owner === 'string')
+      this.hasValidNetworks(document.networks) &&
+      this.hasValidOwner(document.owner) &&
+      this.hasValidRelayConfiguration(document.relayConfiguration)
+    );
+  }
+
+  private hasValidNetworks(networks: unknown): boolean {
+    return (
+      typeof networks === 'object' &&
+      networks !== null &&
+      !Array.isArray(networks)
+    );
+  }
+
+  private hasValidOwner(owner: unknown): boolean {
+    return owner === undefined || typeof owner === 'string';
+  }
+
+  private hasValidRelayConfiguration(relayConfiguration: unknown): boolean {
+    return (
+      relayConfiguration === undefined ||
+      (typeof relayConfiguration === 'object' &&
+        relayConfiguration !== null &&
+        !Array.isArray(relayConfiguration))
     );
   }
 
@@ -48,6 +70,9 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
         networks: document.networks,
         nodeId: new NodeId(document.nodeId).valueOf(),
         owner: document.owner,
+        relayConfiguration:
+          document.relayConfiguration ??
+          NodeRelayConfiguration.default().toPrimitives(),
       };
     }
 
@@ -76,9 +101,26 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     );
   }
 
+  private shouldRecreateNetwork(
+    currentNetwork: IPFSNetwork,
+    targetConfig: IPFSNetworkConfig,
+    relaySettingsChanged: boolean,
+  ): boolean {
+    const currentKey = currentNetwork.getConfig().getKey()?.valueOf();
+    const targetKey = targetConfig.getKey()?.valueOf();
+
+    return (
+      currentKey !== targetKey ||
+      (relaySettingsChanged && targetConfig.getKey() !== undefined)
+    );
+  }
+
   private async syncRuntimeNetworks(node: Node): Promise<void> {
     await this.networkRegistry.initialize();
 
+    const relaySettingsChanged = this.networkRegistry.configureRelaySettings(
+      node.toPrimitives().relayConfiguration,
+    );
     const targetConfigs = this.buildNetworkConfigs(node);
     const targetConfigsById = new Map(
       targetConfigs.map((config) => [config.getId(), config]),
@@ -94,10 +136,13 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
         continue;
       }
 
-      const currentKey = currentNetwork.getConfig().getKey()?.valueOf();
-      const targetKey = targetConfig.getKey()?.valueOf();
-
-      if (currentKey !== targetKey) {
+      if (
+        this.shouldRecreateNetwork(
+          currentNetwork,
+          targetConfig,
+          relaySettingsChanged,
+        )
+      ) {
         await this.networkRegistry.removeNetwork(id);
         await this.networkRegistry.register(targetConfig);
         targetConfigsById.delete(id);
@@ -117,6 +162,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       id: metadata.nodeId,
       networks: metadata.networks,
       owner: metadata.owner,
+      relayConfiguration: metadata.relayConfiguration,
     });
   }
 

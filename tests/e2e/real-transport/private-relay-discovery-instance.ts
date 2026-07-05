@@ -79,8 +79,6 @@ async function main(): Promise<void> {
 }
 
 function configureEnvironment(): void {
-  delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
-  delete process.env.PIGEON_PRIVATE_RELAY_BOOTSTRAP_MULTIADDRS;
   delete process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED;
   delete process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS;
   process.env.IPFS_STORAGE_PATH = path.join(STORAGE_ROOT, 'public-ipfs');

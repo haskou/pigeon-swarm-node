@@ -118,7 +118,9 @@ export class PublicRelayRuntimeAdapter {
       config as never,
     )) as unknown as PublicRelayRuntimeNode;
 
-    await new PublicRelayPeerAnnouncer(true).start(node);
+    if (this.configuration.isRelayDiscoveryEnabled()) {
+      await new PublicRelayPeerAnnouncer(true).start(node);
+    }
 
     return node;
   }

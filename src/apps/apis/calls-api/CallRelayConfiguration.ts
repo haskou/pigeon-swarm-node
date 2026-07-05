@@ -1,4 +1,8 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import {
+  defaultRelayRuntimeSettings,
+  RelayRuntimeSettings,
+} from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 
 import { CallIceServerEnvironment } from './types/CallIceServerEnvironment';
 
@@ -8,11 +12,22 @@ export class CallRelayConfiguration {
 
   public static fromEnvironment(
     environment: CallIceServerEnvironment = pigeonEnvironment(),
+    relaySettings: RelayRuntimeSettings = defaultRelayRuntimeSettings(),
   ): CallRelayConfiguration {
-    return new CallRelayConfiguration(environment);
+    return new CallRelayConfiguration(environment, relaySettings);
   }
 
-  public constructor(private readonly environment: CallIceServerEnvironment) {}
+  public static fromRelaySettings(
+    relaySettings: RelayRuntimeSettings,
+    environment: CallIceServerEnvironment = pigeonEnvironment(),
+  ): CallRelayConfiguration {
+    return new CallRelayConfiguration(environment, relaySettings);
+  }
+
+  public constructor(
+    private readonly environment: CallIceServerEnvironment,
+    private readonly relaySettings: RelayRuntimeSettings,
+  ) {}
 
   private splitEnvironmentList(value: string | undefined): string[] {
     return (value || '')
@@ -22,10 +37,7 @@ export class CallRelayConfiguration {
   }
 
   private getPublicHost(): string | undefined {
-    return (
-      this.environment.CALLS_TURN_PUBLIC_HOST ||
-      this.environment.PIGEON_PUBLIC_HOST
-    );
+    return this.relaySettings.publicHost;
   }
 
   private getTurnTransports(): string[] {
@@ -40,9 +52,9 @@ export class CallRelayConfiguration {
 
   private getGeneratedTurnUrls(): string[] {
     const publicHost = this.getPublicHost();
-    const port = Number(this.environment.CALLS_TURN_PORT);
+    const port = this.relaySettings.callsRelay.port;
 
-    if (!publicHost || !Number.isInteger(port) || port <= 0) {
+    if (!publicHost || port === undefined) {
       return [];
     }
 

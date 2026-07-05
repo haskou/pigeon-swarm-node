@@ -253,7 +253,10 @@ describe('IpfsKeychainRepository', () => {
     const republished = await repository.republishLocalRoutingRecords();
 
     expect(republished).toBe(0);
-    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(['network-1']);
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(
+      ['network-1'],
+      15_000,
+    );
     expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
     expect(ipfs.getJSON).not.toHaveBeenCalled();
     expect(ipfs.getBytes).not.toHaveBeenCalled();

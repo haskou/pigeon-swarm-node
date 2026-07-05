@@ -5,6 +5,7 @@ import { PublicRelayRecordDiscovery } from '@app/shared/infrastructure/network/r
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import PublicRelayRuntime from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 import { PublicRelayRuntimeNode } from '@app/shared/infrastructure/network/relay/PublicRelayRuntimeNode';
+import { defaultRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 function clearPublicRelayRuntimeState(): void {
@@ -43,7 +44,8 @@ describe('PublicRelayRuntime', () => {
   });
 
   it('should log public relay record publish failures', async () => {
-    const runtime = new PublicRelayRuntime(mock<IPFSNetworkRegistry>());
+    const networkRegistry = mock<IPFSNetworkRegistry>();
+    const runtime = new PublicRelayRuntime(networkRegistry);
     const record = publicRelayRecord();
     const node = {
       peerId: {
@@ -55,6 +57,9 @@ describe('PublicRelayRuntime', () => {
     } as PublicRelayRuntimeNode;
     const discovery = mock<PublicRelayRecordDiscovery>();
 
+    networkRegistry.getRelaySettings.mockReturnValue(
+      defaultRelayRuntimeSettings(),
+    );
     discovery.publish.mockRejectedValue(new Error('pubsub stopped'));
     (
       runtime as unknown as {

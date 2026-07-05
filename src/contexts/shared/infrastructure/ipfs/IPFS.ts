@@ -129,8 +129,25 @@ export default class IPFS {
 
   public async findConnectedNetworkIds(
     networkIds: string[],
+    waitForPeersTimeoutMs: number = 0,
   ): Promise<string[]> {
     await this.initialize();
+
+    const requestedNetworkIds = [...new Set(networkIds)];
+    const requestedNetworks = this.registry
+      .getAll()
+      .filter((network) => requestedNetworkIds.includes(network.getId()));
+
+    if (
+      waitForPeersTimeoutMs > 0 &&
+      requestedNetworks.every((network) => network.getPeers().length === 0)
+    ) {
+      await Promise.all(
+        requestedNetworks.map((network) =>
+          network.waitForPeers(waitForPeersTimeoutMs),
+        ),
+      );
+    }
 
     const connectedNetworkIds = new Set(
       this.registry
@@ -139,7 +156,7 @@ export default class IPFS {
         .map((network) => network.getId()),
     );
 
-    return [...new Set(networkIds)].filter((networkId) =>
+    return requestedNetworkIds.filter((networkId) =>
       connectedNetworkIds.has(networkId),
     );
   }

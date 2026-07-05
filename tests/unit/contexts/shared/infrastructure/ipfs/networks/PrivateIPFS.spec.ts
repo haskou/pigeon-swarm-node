@@ -12,6 +12,7 @@ const mockHeliaNode = {
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
 const mockBitswap = jest.fn().mockReturnValue('mock-bitswap');
+const mockBootstrap = jest.fn().mockReturnValue('mock-bootstrap');
 const mockLibp2pRouting = jest.fn().mockReturnValue('mock-libp2p-routing');
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockLibp2pDefaults = jest.fn().mockReturnValue({
@@ -62,6 +63,14 @@ jest.mock(
   '@helia/routers',
   () => ({
     libp2pRouting: mockLibp2pRouting,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@libp2p/bootstrap',
+  () => ({
+    bootstrap: mockBootstrap,
   }),
   { virtual: true },
 );
@@ -135,7 +144,12 @@ jest.mock(
 jest.mock('@haskou/ddd-kernel', () => ({
   __esModule: true,
   default: {
-    logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+    logger: {
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    },
   },
 }));
 
@@ -153,7 +167,6 @@ describe('PrivateIPFS', () => {
   const { privateKey: nodeKey } = generateKeyPairSync('ed25519');
   const validPem = nodeKey.export({ format: 'pem', type: 'pkcs8' }).toString();
   const publicRelayRecordRegistry = new PublicRelayRecordRegistry();
-  let previousBootstrapRelayMultiaddrs: string | undefined;
   let previousPublicRelayRecordsPath: string | undefined;
 
   const defaultOptions: PrivateIPFSOptions = {
@@ -163,11 +176,8 @@ describe('PrivateIPFS', () => {
   };
 
   beforeEach(() => {
-    previousBootstrapRelayMultiaddrs =
-      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
     previousPublicRelayRecordsPath =
       process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH;
-    delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
     delete process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH;
     publicRelayRecordRegistry.clear();
     (
@@ -178,13 +188,6 @@ describe('PrivateIPFS', () => {
 
   afterEach(() => {
     publicRelayRecordRegistry.clear();
-
-    if (previousBootstrapRelayMultiaddrs === undefined) {
-      delete process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS;
-    } else {
-      process.env.PIGEON_BOOTSTRAP_RELAY_MULTIADDRS =
-        previousBootstrapRelayMultiaddrs;
-    }
 
     if (previousPublicRelayRecordsPath === undefined) {
       delete process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH;
@@ -246,6 +249,22 @@ describe('PrivateIPFS', () => {
       expect(mockCreateHelia).toHaveBeenCalledWith(
         expect.objectContaining({
           libp2p: mockHeliaNode.libp2p,
+        }),
+      );
+    });
+
+    it('should configure manual relay multiaddrs as bootstrap relays', async () => {
+      const multiaddr = '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay';
+
+      await PrivateIPFS.create({
+        ...defaultOptions,
+        manualRelayMultiaddrs: [multiaddr],
+      });
+
+      expect(mockBootstrap).toHaveBeenCalledWith(
+        expect.objectContaining({
+          list: [multiaddr],
+          tagName: 'pigeon-relay-bootstrap',
         }),
       );
     });
