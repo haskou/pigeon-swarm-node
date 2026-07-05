@@ -45,7 +45,6 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   beforeEach(async () => {
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_GENERIC_DHT_ENABLED;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_PUBSUB_ENABLED;
-    delete process.env.PIGEON_RELAY_DISCOVERY_ENABLED;
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS;
     delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
@@ -276,24 +275,6 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       directory.stop(network.getId());
       jest.useRealTimers();
     }
-  });
-
-  it('should not start private relay discovery when relay discovery is disabled', async () => {
-    process.env.PIGEON_RELAY_DISCOVERY_ENABLED = 'false';
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
-    const network = privateNetwork(privateKey());
-    const getPublicConnection = jest.fn();
-
-    (
-      directory as unknown as {
-        getPublicConnection: () => Promise<IPFSConnection>;
-      }
-    ).getPublicConnection = getPublicConnection;
-
-    directory.start(network, undefined, mock());
-    await flushPromises();
-
-    expect(getPublicConnection).not.toHaveBeenCalled();
   });
 
   it('should dial a locally cached relay before waiting for public routing peers', async () => {

@@ -13,7 +13,7 @@
     "test": "npm-run-all lint test:unit test:api test:consumer test:scheduler",
     "test:unit": "jest --passWithNoTests",
     "test:api": "NODE_ENV=test cucumber-js -p api --publish-quiet",
-    "test:api:real-ipfs": "NODE_ENV=test PIGEON_API_TEST_REAL_IPFS=true IPFS_STORAGE_PATH=./memory/ipfs PIGEON_RELAY_DISCOVERY_ENABLED=false cucumber-js -p api_support --publish-quiet tests/api/features/ipfs-api/PostNetworkIPFSContentRoute.feature tests/api/features/communities-api/PostCommunityInviteRoute.feature tests/api/features/identities-api/PostIdentityRoute.feature tests/api/features/keychains-api/PostKeychainRoute.feature",
+    "test:api:real-ipfs": "NODE_ENV=test PIGEON_API_TEST_REAL_IPFS=true IPFS_STORAGE_PATH=./memory/ipfs cucumber-js -p api_support --publish-quiet tests/api/features/ipfs-api/PostNetworkIPFSContentRoute.feature tests/api/features/communities-api/PostCommunityInviteRoute.feature tests/api/features/identities-api/PostIdentityRoute.feature tests/api/features/keychains-api/PostKeychainRoute.feature",
     "test:api:only": "NODE_ENV=test cucumber-js -p api --publish-quiet --tags @Only",
     "test:consumer": "NODE_ENV=test cucumber-js -p consumer --publish-quiet",
     "test:consumer:only": "NODE_ENV=test cucumber-js -p consumer --publish-quiet --tags @Only",
