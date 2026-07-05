@@ -541,7 +541,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
       try {
         const connectedNetworkIds =
-          await this.ipfsManager.findConnectedNetworkIds(networkIds);
+          await this.ipfsManager.findConnectedNetworkIds(networkIds, 15_000);
 
         if (connectedNetworkIds.length === 0) {
           continue;

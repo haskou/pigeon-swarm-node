@@ -313,7 +313,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
       try {
         const connectedNetworkIds =
-          await this.ipfsManager.findConnectedNetworkIds(networkIds);
+          await this.ipfsManager.findConnectedNetworkIds(networkIds, 15_000);
 
         if (connectedNetworkIds.length === 0) {
           continue;

@@ -138,6 +138,10 @@ export class IPFSNetwork {
     return this.connection.getPeers();
   }
 
+  public waitForPeers(timeoutMs?: number): Promise<boolean> {
+    return this.connection.waitForPeers(timeoutMs);
+  }
+
   public getMultiaddrs(): string[] {
     return this.connection.getMultiaddrs();
   }

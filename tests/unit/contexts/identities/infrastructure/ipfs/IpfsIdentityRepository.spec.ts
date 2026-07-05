@@ -229,6 +229,7 @@ describe('IpfsIdentityRepository', () => {
       expect(republished).toBe(0);
       expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith(
         primitives.networks,
+        15_000,
       );
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
