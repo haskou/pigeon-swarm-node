@@ -6,4 +6,8 @@ export class ContentReplicationContext extends StringValueObject {
   public isPublicUpload(): boolean {
     return this.valueOf() === ContentReplicationContext.PUBLIC_UPLOAD;
   }
+
+  public isReplicatedAsBytes(): boolean {
+    return this.isPublicUpload();
+  }
 }

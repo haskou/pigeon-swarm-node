@@ -23,6 +23,11 @@ export default abstract class ReplicatedContentStorage {
     networkId: NetworkId,
   ): Promise<T>;
 
+  public abstract provideInNetwork(
+    contentId: ContentId,
+    networkId: NetworkId,
+  ): Promise<void>;
+
   public abstract isRawContent(contentId: ContentId): Promise<boolean>;
 
   public abstract publishDocument(document: unknown): Promise<ContentId>;

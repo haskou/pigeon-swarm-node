@@ -72,6 +72,24 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
     );
   }
 
+  public async provideInNetwork(
+    contentId: ContentId,
+    networkId: NetworkId,
+  ): Promise<void> {
+    await this.translateNotFound(contentId, async () => {
+      const ipfsId = this.toIpfsId(contentId);
+      const hasLocalContent = await this.ipfs.stat(ipfsId, true, [
+        networkId.valueOf(),
+      ]);
+
+      if (!hasLocalContent) {
+        throw new IPFSContentNotFoundError(contentId.valueOf());
+      }
+
+      await this.ipfs.provideContentFromNetwork(ipfsId, networkId.valueOf());
+    });
+  }
+
   public isRawContent(contentId: ContentId): Promise<boolean> {
     return this.ipfs.isRawCid(this.toIpfsId(contentId));
   }
