@@ -115,7 +115,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should not return relay-only transport policy without TURN servers', () => {
+  it('should not return default relay-only transport policy without TURN servers', () => {
     const emptyResource = CallIceServerConfig.fromEnvironment({}).toResource(
       identityId,
     );
@@ -134,6 +134,22 @@ describe('CallIceServerConfig', () => {
         },
       ],
       iceTransportPolicy: 'all',
+    });
+  });
+
+  it('should respect explicit relay-only transport policy without TURN servers', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_ICE_TRANSPORT_POLICY: 'relay',
+      CALLS_STUN_URLS: 'stun:stun.example.test:3478',
+    }).toResource(identityId);
+
+    expect(resource).toEqual({
+      iceServers: [
+        {
+          urls: ['stun:stun.example.test:3478'],
+        },
+      ],
+      iceTransportPolicy: 'relay',
     });
   });
 });
