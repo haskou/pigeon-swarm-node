@@ -1,7 +1,7 @@
 export type NodePrivateRelayConfigurationResource = {
+  discoveryEnabled: boolean;
   enabled: boolean;
   portEnd?: number;
   portStart?: number;
-  publicRecordDiscoveryEnabled: boolean;
-  publicRecordPublicationEnabled: boolean;
+  publicationEnabled: boolean;
 };

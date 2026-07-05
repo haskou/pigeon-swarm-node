@@ -14,12 +14,17 @@ export class NodePrivateRelayConfiguration {
   }
 
   public static fromPrimitives(
-    primitives?: Partial<PrimitiveOf<NodePrivateRelayConfiguration>>,
+    primitives?: Partial<PrimitiveOf<NodePrivateRelayConfiguration>> & {
+      discoveryEnabled?: boolean;
+      publicationEnabled?: boolean;
+    },
   ): NodePrivateRelayConfiguration {
     const {
+      discoveryEnabled,
       enabled = false,
       portEnd,
       portStart,
+      publicationEnabled,
       publicRecordDiscoveryEnabled = false,
       publicRecordPublicationEnabled = false,
     } = primitives ?? {};
@@ -28,8 +33,8 @@ export class NodePrivateRelayConfiguration {
       enabled,
       NodePrivateRelayConfiguration.optionalPort(portStart),
       NodePrivateRelayConfiguration.optionalPort(portEnd),
-      publicRecordPublicationEnabled,
-      publicRecordDiscoveryEnabled,
+      publicationEnabled ?? publicRecordPublicationEnabled,
+      discoveryEnabled ?? publicRecordDiscoveryEnabled,
     );
   }
 

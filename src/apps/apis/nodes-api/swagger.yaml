@@ -263,10 +263,13 @@ components:
     NodePrivateRelayConfigurationResource:
       type: object
       required:
+        - discoveryEnabled
         - enabled
-        - publicRecordDiscoveryEnabled
-        - publicRecordPublicationEnabled
+        - publicationEnabled
       properties:
+        discoveryEnabled:
+          type: boolean
+          description: Allows private networks to discover published private relay records.
         enabled:
           type: boolean
         portStart:
@@ -275,32 +278,9 @@ components:
         portEnd:
           type: number
           description: Required when enabled is true.
-        publicRecordDiscoveryEnabled:
+        publicationEnabled:
           type: boolean
-          description: Allows the private network to discover encrypted relay records through public IPFS.
-        publicRecordPublicationEnabled:
-          type: boolean
-          description: Allows the private relay server to publish encrypted relay records through public IPFS.
-    NodePublicRelayConfigurationResource:
-      type: object
-      required:
-        - autoEnabled
-        - discoveryEnabled
-        - enabled
-        - libp2pPort
-        - port
-      properties:
-        autoEnabled:
-          type: boolean
-        discoveryEnabled:
-          type: boolean
-          description: Allows private IPFS networks to use public relay records discovered through the public relay registry.
-        enabled:
-          type: boolean
-        libp2pPort:
-          type: number
-        port:
-          type: number
+          description: Allows the private relay server to publish encrypted private relay records.
     NodeCallsRelayConfigurationResource:
       type: object
       properties:
@@ -313,7 +293,6 @@ components:
         - callsRelay
         - manualRelayMultiaddrs
         - privateRelay
-        - publicRelay
       properties:
         callsRelay:
           $ref: '#/components/schemas/NodeCallsRelayConfigurationResource'
@@ -327,8 +306,6 @@ components:
         publicHost:
           type: string
           description: DNS name or IPv4 address used when announcing public/private relay multiaddrs.
-        publicRelay:
-          $ref: '#/components/schemas/NodePublicRelayConfigurationResource'
     PeerResource:
       type: object
       required:

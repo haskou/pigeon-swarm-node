@@ -6,6 +6,20 @@ export class NodeRelayConfigurationViewModel {
   constructor(private readonly node: Node) {}
 
   public toResource(): NodeRelayConfigurationResource {
-    return this.node.toPrimitives().relayConfiguration;
+    const relayConfiguration = this.node.toPrimitives().relayConfiguration;
+    const privateRelay = relayConfiguration.privateRelay;
+
+    return {
+      callsRelay: relayConfiguration.callsRelay,
+      manualRelayMultiaddrs: relayConfiguration.manualRelayMultiaddrs,
+      privateRelay: {
+        discoveryEnabled: privateRelay.publicRecordDiscoveryEnabled,
+        enabled: privateRelay.enabled,
+        portEnd: privateRelay.portEnd,
+        portStart: privateRelay.portStart,
+        publicationEnabled: privateRelay.publicRecordPublicationEnabled,
+      },
+      publicHost: relayConfiguration.publicHost,
+    };
   }
 }

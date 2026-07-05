@@ -12,6 +12,9 @@ export type NodeRelayConfigurationInput = Partial<
   >
 > & {
   callsRelay?: Partial<PrimitiveOf<NodeCallsRelayConfiguration>>;
-  privateRelay?: Partial<PrimitiveOf<NodePrivateRelayConfiguration>>;
+  privateRelay?: Partial<PrimitiveOf<NodePrivateRelayConfiguration>> & {
+    discoveryEnabled?: boolean;
+    publicationEnabled?: boolean;
+  };
   publicRelay?: Partial<PrimitiveOf<NodePublicRelayConfiguration>>;
 };

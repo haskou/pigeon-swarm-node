@@ -557,19 +557,12 @@ Response:
   "manualRelayMultiaddrs": [
     "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
   ],
-  "publicRelay": {
-    "enabled": true,
-    "autoEnabled": false,
-    "discoveryEnabled": true,
-    "port": 4011,
-    "libp2pPort": 4001
-  },
   "privateRelay": {
     "enabled": true,
     "portStart": 4100,
     "portEnd": 4199,
-    "publicRecordPublicationEnabled": true,
-    "publicRecordDiscoveryEnabled": true
+    "publicationEnabled": true,
+    "discoveryEnabled": true
   }
 }
 ```
@@ -600,19 +593,12 @@ Request:
   "manualRelayMultiaddrs": [
     "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
   ],
-  "publicRelay": {
-    "enabled": true,
-    "autoEnabled": false,
-    "discoveryEnabled": true,
-    "port": 4011,
-    "libp2pPort": 4001
-  },
   "privateRelay": {
     "enabled": true,
     "portStart": 4100,
     "portEnd": 4199,
-    "publicRecordPublicationEnabled": true,
-    "publicRecordDiscoveryEnabled": true
+    "publicationEnabled": true,
+    "discoveryEnabled": true
   }
 }
 ```

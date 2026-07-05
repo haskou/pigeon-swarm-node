@@ -6,20 +6,14 @@ export class PutNodeRelayConfigurationBody {
   public manualRelayMultiaddrs?: string[];
 
   public privateRelay?: {
+    discoveryEnabled?: boolean;
     enabled?: boolean;
     portEnd?: number;
     portStart?: number;
+    publicationEnabled?: boolean;
     publicRecordDiscoveryEnabled?: boolean;
     publicRecordPublicationEnabled?: boolean;
   };
 
   public publicHost?: string;
-
-  public publicRelay?: {
-    autoEnabled?: boolean;
-    discoveryEnabled?: boolean;
-    enabled?: boolean;
-    libp2pPort?: number;
-    port?: number;
-  };
 }

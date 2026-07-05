@@ -14,20 +14,14 @@ Feature: Put node relay configuration
       {
         "callsRelay": {},
         "manualRelayMultiaddrs": [],
-        "publicRelay": {
-          "enabled": false,
-          "autoEnabled": false,
-          "discoveryEnabled": false,
-          "port": 4011,
-          "libp2pPort": 4001
-        },
         "privateRelay": {
           "enabled": false,
-          "publicRecordPublicationEnabled": false,
-          "publicRecordDiscoveryEnabled": false
+          "publicationEnabled": false,
+          "discoveryEnabled": false
         }
       }
       """
+    And response body should not contain "publicRelay"
 
   Scenario: Replace relay configuration as the owner
     Given the local node has no owner and no networks
@@ -45,19 +39,12 @@ Feature: Put node relay configuration
         "manualRelayMultiaddrs": [
           "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
         ],
-        "publicRelay": {
-          "enabled": true,
-          "autoEnabled": false,
-          "discoveryEnabled": true,
-          "port": 4011,
-          "libp2pPort": 4001
-        },
         "privateRelay": {
           "enabled": true,
           "portStart": 4100,
           "portEnd": 4199,
-          "publicRecordPublicationEnabled": true,
-          "publicRecordDiscoveryEnabled": true
+          "publicationEnabled": true,
+          "discoveryEnabled": true
         }
       }
       """
@@ -74,19 +61,16 @@ Feature: Put node relay configuration
         "manualRelayMultiaddrs": [
           "/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId"
         ],
-        "publicRelay": {
-          "enabled": true,
-          "discoveryEnabled": true
-        },
         "privateRelay": {
           "enabled": true,
           "portStart": 4100,
           "portEnd": 4199,
-          "publicRecordPublicationEnabled": true,
-          "publicRecordDiscoveryEnabled": true
+          "publicationEnabled": true,
+          "discoveryEnabled": true
         }
       }
       """
+    And response body should not contain "publicRelay"
 
   Scenario: Replace relay configuration before the node is claimed
     Given the local node has no owner and no networks
@@ -95,15 +79,10 @@ Feature: Put node relay configuration
       {
         "callsRelay": {},
         "manualRelayMultiaddrs": [],
-        "publicRelay": {
-          "enabled": false,
-          "autoEnabled": false,
-          "discoveryEnabled": true
-        },
         "privateRelay": {
           "enabled": false,
-          "publicRecordPublicationEnabled": false,
-          "publicRecordDiscoveryEnabled": false
+          "publicationEnabled": false,
+          "discoveryEnabled": true
         }
       }
       """
@@ -113,18 +92,14 @@ Feature: Put node relay configuration
       """
       {
         "manualRelayMultiaddrs": [],
-        "publicRelay": {
-          "enabled": false,
-          "autoEnabled": false,
-          "discoveryEnabled": true
-        },
         "privateRelay": {
           "enabled": false,
-          "publicRecordPublicationEnabled": false,
-          "publicRecordDiscoveryEnabled": false
+          "publicationEnabled": false,
+          "discoveryEnabled": true
         }
       }
       """
+    And response body should not contain "publicRelay"
 
   Scenario: Reject relay configuration changes from a non-owner
     Given the local node has no owner and no networks
@@ -135,17 +110,10 @@ Feature: Put node relay configuration
     Given I set json body
       """
       {
-        "publicRelay": {
-          "enabled": true,
-          "autoEnabled": false,
-          "discoveryEnabled": false,
-          "port": 4011,
-          "libp2pPort": 4001
-        },
         "privateRelay": {
           "enabled": false,
-          "publicRecordPublicationEnabled": false,
-          "publicRecordDiscoveryEnabled": false
+          "publicationEnabled": false,
+          "discoveryEnabled": false
         },
         "manualRelayMultiaddrs": []
       }
