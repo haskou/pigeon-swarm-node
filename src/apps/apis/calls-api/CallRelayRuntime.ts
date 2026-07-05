@@ -120,10 +120,6 @@ export default class CallRelayRuntime implements Runtime {
   }
 
   private async refreshPublication(network: IPFSNetwork): Promise<void> {
-    if (network.isPrivate()) {
-      return;
-    }
-
     if (!this.state.startedNetworkIds.includes(network.getId())) {
       await this.startOnNetwork(network);
 

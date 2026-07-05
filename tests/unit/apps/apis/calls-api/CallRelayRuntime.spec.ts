@@ -212,4 +212,58 @@ describe('CallRelayRuntime', () => {
       }),
     );
   });
+
+  it('should keep publishing private network call relay records after relay settings change', async () => {
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    networkRegistry.getAll.mockReturnValue([privateNetwork]);
+
+    await runtime.run();
+
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      expect.objectContaining({
+        urls: [
+          'turn:relay.example.test:4199?transport=udp',
+          'turn:relay.example.test:4199?transport=tcp',
+        ],
+      }),
+    );
+
+    discovery.publishConnection.mockClear();
+    signer.sign.mockClear();
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4200,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    );
+
+    await relaySettingsChangedListener?.(networkRegistry.getRelaySettings());
+
+    expect(signer.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4200?transport=udp',
+          'turn:relay.example.test:4200?transport=tcp',
+        ],
+        version: 1,
+      }),
+      expect.anything(),
+      'turn-shared-secret',
+    );
+    expect(discovery.publishConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      expect.objectContaining({
+        role: 'call-relay',
+        urls: [
+          'turn:relay.example.test:4200?transport=udp',
+          'turn:relay.example.test:4200?transport=tcp',
+        ],
+      }),
+    );
+  });
 });
