@@ -183,6 +183,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
 
       networkRegistry.getAll.mockReturnValue([]);
@@ -216,6 +217,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
       const latestNode = Node.fromPrimitives({
         id: canonicalNodeId,
@@ -228,6 +230,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        relayConfiguration: defaultRelayConfiguration,
       });
 
       networkRegistry.initialize.mockReturnValue(delayedInitialization.promise);
@@ -359,6 +362,7 @@ describe('LocalNodeMetadataRepository', () => {
       networkRegistry.getAll.mockReturnValue([createNetworkMock(networkMother)]);
 
       await repository.saveLocalNode(node);
+      await flushPromises();
 
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
         privateNetworkId.valueOf(),
