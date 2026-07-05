@@ -1,5 +1,5 @@
 import { StickerPackFindMessage } from '@app/contexts/stickers/application/find-pack/messages/StickerPackFindMessage';
-import { StickerPackFinder } from '@app/contexts/stickers/application/find-pack/StickerPackFinder';
+import StickerPackFinder from '@app/contexts/stickers/application/find-pack/StickerPackFinder';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
 import { Get, JsonController, Param, Res } from 'routing-controllers';

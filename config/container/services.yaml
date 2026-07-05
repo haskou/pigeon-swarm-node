@@ -703,6 +703,13 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc3RpY2tlcnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19TdGlja2VyVXNlckxpYnJhcnlSZXBvc2l0b3J5X19TdGlja2VyVXNlckxpYnJhcnlSZXBvc2l0b3J5
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc3RpY2tlcnNfX2FwcGxpY2F0aW9uX19maW5kLXBhY2tfX1N0aWNrZXJQYWNrRmluZGVyX19TdGlja2VyUGFja0ZpbmRlcg==:
+    class: /contexts/stickers/application/find-pack/StickerPackFinder
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc3RpY2tlcnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19TdGlja2VyUGFja1JlcG9zaXRvcnlfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc3RpY2tlcnNfX2FwcGxpY2F0aW9uX19maW5kLXBhY2tzX19TdGlja2VyUGFja3NGaW5kZXJfX1N0aWNrZXJQYWNrc0ZpbmRlcg==:
     class: /contexts/stickers/application/find-packs/StickerPacksFinder
     arguments:

@@ -3,7 +3,7 @@ import StickerPackRepository from '../../domain/repositories/StickerPackReposito
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerPackFindMessage } from './messages/StickerPackFindMessage';
 
-export class StickerPackFinder {
+export default class StickerPackFinder {
   constructor(private readonly repository: StickerPackRepository) {}
 
   public async find(message: StickerPackFindMessage): Promise<StickerPack> {
