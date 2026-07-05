@@ -37,6 +37,7 @@ const mockUnixfsCat = jest.fn();
 const mockUnixfsRm = jest
   .fn()
   .mockResolvedValue({ toString: () => 'bafymockcid' });
+const mockDagPbDecode = jest.fn();
 
 jest.mock(
   'helia',
@@ -73,6 +74,14 @@ jest.mock(
   '@multiformats/multiaddr',
   () => ({
     multiaddr: mockMultiaddr,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@ipld/dag-pb',
+  () => ({
+    decode: mockDagPbDecode,
   }),
   { virtual: true },
 );
@@ -182,6 +191,7 @@ describe('PublicIPFS', () => {
       })(),
     );
     mockUnixfsRm.mockResolvedValue({ toString: () => 'bafymockcid' });
+    mockDagPbDecode.mockReturnValue({ Links: [] });
   });
 
   describe('create', () => {
@@ -312,22 +322,31 @@ describe('PublicIPFS', () => {
   });
 
   describe('removeJSON', () => {
-    it('should unpin pinned content before deleting the block', async () => {
+    it('should unpin pinned content before deleting UnixFS DAG blocks', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
       const cid = new IPFSId('bafymockcid');
+      const childCid = { code: 0x55, toString: () => 'bafkchildcid' };
 
       mockHeliaNode.blockstore.has.mockResolvedValue(true);
+      mockHeliaNode.blockstore.get.mockResolvedValue(new Uint8Array([1, 2, 3]));
       mockHeliaNode.pins.isPinned.mockResolvedValue(true);
+      mockDagPbDecode.mockReturnValue({ Links: [{ Hash: childCid }] });
 
       await connection.removeJSON(cid);
 
       expect(mockHeliaNode.pins.rm).toHaveBeenCalled();
-      expect(mockUnixfsRm).toHaveBeenCalledWith(
-        expect.objectContaining({ toString: expect.any(Function) }),
-        '',
+      expect(mockUnixfsRm).not.toHaveBeenCalled();
+      expect(mockDagPbDecode).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]));
+      expect(mockHeliaNode.blockstore.delete).toHaveBeenNthCalledWith(
+        1,
+        childCid,
         { signal: undefined },
       );
-      expect(mockHeliaNode.blockstore.delete).toHaveBeenCalled();
+      expect(mockHeliaNode.blockstore.delete).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ toString: expect.any(Function) }),
+        { signal: undefined },
+      );
     });
   });
 
