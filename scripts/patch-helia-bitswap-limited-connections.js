@@ -197,9 +197,10 @@ for (const relativePath of files) {
     current.includes('runOnLimitedConnection: this.runOnLimitedConnections,\n            signal: options?.signal');
   const hasDialPatch =
     current.includes(dialReplacement) || current.includes(jsDialReplacement);
-  const hasExistingConnectionPatch = current.includes(
-    'const existingConnection = this.libp2p.getConnections(peer)[0]',
-  );
+  const hasExistingConnectionPatch =
+    /const existingConnection = this\.libp2p\.getConnections\(peer\)\[0\][\s\S]{0,300}this\.safeDispatchEvent\('peer:connected'[\s\S]{0,200}return existingConnection/.test(
+      current,
+    );
   const hasTopologyPatch =
     current.includes(topologyReplacement) ||
     current.includes(tsTopologyReplacement);
