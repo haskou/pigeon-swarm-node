@@ -150,6 +150,12 @@ export class IPFSNetwork {
     return this.connection.getHeliaCore();
   }
 
+  public onPeerConnected(
+    listener: (peerId: string) => Promise<void> | void,
+  ): void {
+    this.connection.onPeerConnected(listener);
+  }
+
   public getPeerId(): string {
     return this.connection.getPeerId();
   }

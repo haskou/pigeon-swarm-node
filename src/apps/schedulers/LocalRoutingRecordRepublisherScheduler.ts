@@ -24,7 +24,7 @@ export default class LocalRoutingRecordRepublisherScheduler extends Scheduler {
 
   public getCronExpression(): CronExpression {
     return {
-      minute: '*/5',
+      minute: 30,
       second: 30,
     };
   }

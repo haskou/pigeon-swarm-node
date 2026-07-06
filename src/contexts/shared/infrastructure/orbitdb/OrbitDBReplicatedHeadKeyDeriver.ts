@@ -12,10 +12,42 @@ export default class OrbitDBReplicatedHeadKeyDeriver {
     return typeof value === 'string' ? value : undefined;
   }
 
+  private identityRecordFrom(
+    document: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const identity = document.identity;
+
+    return this.isRecord(identity) ? identity : undefined;
+  }
+
+  private isProjectedIdentityRecord(record: Record<string, unknown>): boolean {
+    return (
+      Boolean(this.stringValue(record, 'cid')) &&
+      Boolean(this.stringValue(record, 'id')) &&
+      Boolean(this.stringValue(record, 'lastEventId'))
+    );
+  }
+
+  private identityIdFrom(record: Record<string, unknown>): string | undefined {
+    const identityId = this.stringValue(record, 'identityId');
+    const identityRecord = this.identityRecordFrom(record);
+    const embeddedIdentityId = identityRecord
+      ? this.stringValue(identityRecord, 'id')
+      : undefined;
+    const projectedIdentityId = this.isProjectedIdentityRecord(record)
+      ? this.stringValue(record, 'id')
+      : undefined;
+
+    if (identityId && embeddedIdentityId && identityId !== embeddedIdentityId) {
+      return undefined;
+    }
+
+    return identityId || embeddedIdentityId || projectedIdentityId;
+  }
+
   private aliasKeysFromRecord(record: Record<string, unknown>): string[] {
     const keys = new Set<string>();
-    const identityId =
-      this.stringValue(record, 'identityId') || this.stringValue(record, 'id');
+    const identityId = this.identityIdFrom(record);
     const handle = this.stringValue(record, 'handle');
     const ownerIdentityId = this.stringValue(record, 'ownerIdentityId');
     const cid = this.stringValue(record, 'cid');
@@ -25,7 +57,7 @@ export default class OrbitDBReplicatedHeadKeyDeriver {
       keys.add(`identity:${identityId}`);
     }
 
-    if (handle) {
+    if (identityId && handle) {
       keys.add(`identity-handle:${handle}`);
     }
 

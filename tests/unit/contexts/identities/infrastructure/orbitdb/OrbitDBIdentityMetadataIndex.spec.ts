@@ -416,6 +416,75 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it('should ignore cached heads that are not identity metadata', async () => {
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+    const mother = new IdentityMother();
+    const identityId = mother.id.valueOf();
+
+    cachedHeads.set('identity:bafyimage', {
+      cid: 'bafyimage',
+      contentType: 'image/png',
+      id: 'bafyimage',
+      networkIds: [mother.networks[0].valueOf()],
+      receivedAt: 2,
+      sizeBytes: 123,
+      version: 1,
+    });
+    cachedHeads.set(`identity:${identityId}`, {
+      cid: 'bafyidentity-cached',
+      handle: 'hasko',
+      id: identityId,
+      identityId,
+      networkIds: [mother.networks[0].valueOf()],
+      receivedAt: 1,
+      version: 1,
+    });
+
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    await expect(repository.findAll()).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-cached',
+        identityId,
+      }),
+    ]);
+  });
+
+  it('should read projected identity heads without explicit identityId', async () => {
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+    const mother = new IdentityMother();
+    const identityId = mother.id.valueOf();
+
+    cachedHeads.set(`identity:${identityId}`, {
+      cid: 'bafyidentity-projected',
+      handle: 'hasko',
+      id: identityId,
+      lastEventId: 'event-1',
+      networkIds: [mother.networks[0].valueOf()],
+      receivedAt: 1,
+      version: 1,
+    });
+
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry);
+
+    await expect(repository.findAll()).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-projected',
+        identityId,
+      }),
+    ]);
+  });
+
   it('should read persisted identity id heads on cache misses', async () => {
     const mother = new IdentityMother();
     const identity = mother.build();

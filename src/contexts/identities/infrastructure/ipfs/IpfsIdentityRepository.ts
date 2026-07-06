@@ -639,13 +639,33 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return new IdentityExternalIdentifier(cid.valueOf());
   }
 
-  public async republishLocalRoutingRecords(): Promise<number> {
+  public async republishLocalRoutingRecords(
+    networkId?: string,
+  ): Promise<number> {
     let republished = 0;
-
-    for (const document of this.latestMetadataByIdentity(
+    const documents = this.latestMetadataByIdentity(
       await this.metadataIndex.findAll(),
-    )) {
-      const networkIds = this.routingNetworkIdsFrom(document);
+    );
+    const routableNetworkIds = documents
+      .flatMap((document) => this.routingNetworkIdsFrom(document))
+      .filter(
+        (routableNetworkId) => !networkId || routableNetworkId === networkId,
+      );
+
+    if (routableNetworkIds.length === 0) {
+      return 0;
+    }
+
+    const connectedNetworkIds = new Set(
+      await this.ipfsManager.findConnectedNetworkIds(routableNetworkIds),
+    );
+
+    for (const document of documents) {
+      const networkIds = this.routingNetworkIdsFrom(document).filter(
+        (documentNetworkId) =>
+          connectedNetworkIds.has(documentNetworkId) &&
+          (!networkId || documentNetworkId === networkId),
+      );
       const handle = this.routingHandleFrom(document);
 
       if (networkIds.length === 0) {
@@ -653,24 +673,17 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       try {
-        const connectedNetworkIds =
-          await this.ipfsManager.findConnectedNetworkIds(networkIds, 15_000);
-
-        if (connectedNetworkIds.length === 0) {
-          continue;
-        }
-
         await this.ipfsManager.putRecordToNetworks(
           this.ROUTING_KEY_PREFIX + document.identityId,
           document.cid,
-          connectedNetworkIds,
+          networkIds,
         );
 
         if (handle) {
           await this.ipfsManager.putRecordToNetworks(
             this.HANDLE_ROUTING_KEY_PREFIX + handle,
             document.cid,
-            connectedNetworkIds,
+            networkIds,
           );
         }
 

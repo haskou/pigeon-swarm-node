@@ -152,6 +152,9 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
+      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith(
+        primitives.networks,
+      );
       expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
         'bafy-identity-v2',
@@ -185,6 +188,9 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
+      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith(
+        primitives.networks,
+      );
       expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
         'bafy-identity-v2',
@@ -220,6 +226,7 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
+      expect(ipfsManager.findConnectedNetworkIds).not.toHaveBeenCalled();
       expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
         cid,
@@ -248,13 +255,123 @@ describe('IpfsIdentityRepository', () => {
       expect(republished).toBe(0);
       expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith(
         primitives.networks,
-        15_000,
       );
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
       expect(metadataRepository.save).not.toHaveBeenCalled();
       expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalled();
+    });
+
+    it('should resolve connected networks once per identity republish pass', async () => {
+      const connectedNetworkId = '550e8400-e29b-41d4-a716-446655440000';
+      const disconnectedNetworkId = '550e8400-e29b-41d4-a716-446655440001';
+      const connectedIdentity = await createSignedIdentityForNetwork(
+        connectedNetworkId,
+        'connected',
+      );
+      const disconnectedIdentity = await createSignedIdentityForNetwork(
+        disconnectedNetworkId,
+        'disconnected',
+      );
+      const connectedPrimitives = connectedIdentity.toPrimitives();
+      const disconnectedPrimitives = disconnectedIdentity.toPrimitives();
+
+      metadataRepository.findAll.mockResolvedValue([
+        {
+          cid: 'bafy-connected-identity',
+          identityId: connectedPrimitives.id,
+          networkIds: connectedPrimitives.networks,
+          previousCid: undefined,
+          receivedAt: 2,
+          version: 1,
+        },
+        {
+          cid: 'bafy-disconnected-identity',
+          identityId: disconnectedPrimitives.id,
+          networkIds: disconnectedPrimitives.networks,
+          previousCid: undefined,
+          receivedAt: 1,
+          version: 1,
+        },
+      ]);
+      ipfsManager.findConnectedNetworkIds.mockResolvedValue([
+        connectedNetworkId,
+      ]);
+
+      const republished = await repository.republishLocalRoutingRecords();
+
+      expect(republished).toBe(1);
+      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith([
+        connectedNetworkId,
+        disconnectedNetworkId,
+      ]);
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + connectedPrimitives.id,
+        'bafy-connected-identity',
+        [connectedNetworkId],
+      );
+      expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + disconnectedPrimitives.id,
+        'bafy-disconnected-identity',
+        expect.any(Array),
+      );
+    });
+
+    it('should republish identity routing records only for the requested network', async () => {
+      const requestedNetworkId = '550e8400-e29b-41d4-a716-446655440000';
+      const otherNetworkId = '550e8400-e29b-41d4-a716-446655440001';
+      const requestedIdentity = await createSignedIdentityForNetwork(
+        requestedNetworkId,
+        'requested',
+      );
+      const otherIdentity = await createSignedIdentityForNetwork(
+        otherNetworkId,
+        'other',
+      );
+      const requestedPrimitives = requestedIdentity.toPrimitives();
+      const otherPrimitives = otherIdentity.toPrimitives();
+
+      metadataRepository.findAll.mockResolvedValue([
+        {
+          cid: 'bafy-requested-identity',
+          identityId: requestedPrimitives.id,
+          networkIds: requestedPrimitives.networks,
+          previousCid: undefined,
+          receivedAt: 2,
+          version: 1,
+        },
+        {
+          cid: 'bafy-other-identity',
+          identityId: otherPrimitives.id,
+          networkIds: otherPrimitives.networks,
+          previousCid: undefined,
+          receivedAt: 1,
+          version: 1,
+        },
+      ]);
+      ipfsManager.findConnectedNetworkIds.mockResolvedValue([
+        requestedNetworkId,
+      ]);
+
+      const republished =
+        await repository.republishLocalRoutingRecords(requestedNetworkId);
+
+      expect(republished).toBe(1);
+      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith([
+        requestedNetworkId,
+      ]);
+      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + requestedPrimitives.id,
+        'bafy-requested-identity',
+        [requestedNetworkId],
+      );
+      expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalledWith(
+        'pigeon-swarm_identity-' + otherPrimitives.id,
+        'bafy-other-identity',
+        expect.any(Array),
+      );
     });
   });
 

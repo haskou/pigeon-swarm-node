@@ -44,6 +44,15 @@ export default class OrbitDBMetadataHeadRepairer {
     return typeof value === 'number' ? value : undefined;
   }
 
+  private hasConflictingIdentityIds(
+    identityId: string | undefined,
+    embeddedIdentityId: string | undefined,
+  ): boolean {
+    return Boolean(
+      identityId && embeddedIdentityId && identityId !== embeddedIdentityId,
+    );
+  }
+
   private isStringArray(value: unknown): value is string[] {
     return (
       Array.isArray(value) && value.every((item) => typeof item === 'string')
@@ -62,9 +71,31 @@ export default class OrbitDBMetadataHeadRepairer {
   private identityIdFrom(
     document: Record<string, unknown>,
   ): string | undefined {
+    const identityId = this.stringValue(document, 'identityId');
+    const identity = this.isRecord(document.identity)
+      ? document.identity
+      : undefined;
+    const embeddedIdentityId = identity
+      ? this.stringValue(identity, 'id')
+      : undefined;
+    const projectedIdentityId = this.isProjectedIdentityRecord(document)
+      ? this.stringValue(document, 'id')
+      : undefined;
+
+    if (this.hasConflictingIdentityIds(identityId, embeddedIdentityId)) {
+      return undefined;
+    }
+
+    return identityId || embeddedIdentityId || projectedIdentityId;
+  }
+
+  private isProjectedIdentityRecord(
+    document: Record<string, unknown>,
+  ): boolean {
     return (
-      this.stringValue(document, 'identityId') ||
-      this.stringValue(document, 'id')
+      Boolean(this.stringValue(document, 'cid')) &&
+      Boolean(this.stringValue(document, 'id')) &&
+      Boolean(this.stringValue(document, 'lastEventId'))
     );
   }
 

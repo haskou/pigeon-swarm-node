@@ -32,4 +32,16 @@ describe('LocalRoutingRecordRepublisherScheduler', () => {
       'Republished local routing records: identities=2, keychains=3, messages=0',
     );
   });
+
+  it('runs local routing record maintenance hourly', () => {
+    expect(
+      new LocalRoutingRecordRepublisherScheduler(
+        identityRouting,
+        keychainRouting,
+      ).getCronExpression(),
+    ).toEqual({
+      minute: 30,
+      second: 30,
+    });
+  });
 });
