@@ -269,10 +269,13 @@ describe('PrivateIPFS', () => {
       );
     });
 
-    it('should not register connection event listeners', async () => {
+    it('should register peer connection event listeners for deferred provider publication', async () => {
       await PrivateIPFS.create(defaultOptions);
 
-      expect(mockHeliaNode.libp2p.addEventListener).not.toHaveBeenCalled();
+      expect(mockHeliaNode.libp2p.addEventListener).toHaveBeenCalledWith(
+        'peer:connect',
+        expect.any(Function),
+      );
     });
 
     it('should not dial cached public relay records advertised by itself', async () => {
