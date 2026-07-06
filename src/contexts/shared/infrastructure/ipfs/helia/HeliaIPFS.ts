@@ -578,6 +578,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     cid: IPFSId,
     signal?: AbortSignal,
   ): Promise<void> {
+    if (!this.hasPeers()) {
+      return;
+    }
+
     const routingAbort = this.createRoutingAbortSignal(signal);
 
     try {

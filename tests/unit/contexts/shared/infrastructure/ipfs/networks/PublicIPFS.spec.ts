@@ -14,7 +14,7 @@ const mockHeliaNode = {
     isPinned: jest.fn(),
     rm: jest.fn(),
   },
-  routing: { get: jest.fn(), put: jest.fn() },
+  routing: { get: jest.fn(), provide: jest.fn(), put: jest.fn() },
 };
 
 async function* pinResults(cid: { toString(): string }) {
@@ -318,6 +318,30 @@ describe('PublicIPFS', () => {
         providers: ['connected-peer'],
         signal,
       });
+    });
+  });
+
+  describe('provideContent', () => {
+    it('should skip provider publication when there are no connected peers', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      await connection.provideContent(new IPFSId('bafymockcid'));
+
+      expect(mockHeliaNode.routing.provide).not.toHaveBeenCalled();
+    });
+
+    it('should publish content provider records when peers are connected', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.routing.provide.mockResolvedValue(undefined);
+
+      await connection.provideContent(new IPFSId('bafymockcid'));
+
+      expect(mockHeliaNode.routing.provide).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        { signal: expect.any(AbortSignal) },
+      );
     });
   });
 
