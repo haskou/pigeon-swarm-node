@@ -214,6 +214,18 @@ describe('IPFSNetwork', () => {
     });
   });
 
+  describe('onPeerConnected', () => {
+    it('should delegate to connection.onPeerConnected', () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const listener = jest.fn();
+
+      network.onPeerConnected(listener);
+
+      expect(connection.onPeerConnected).toHaveBeenCalledWith(listener);
+    });
+  });
+
   describe('getMultiaddrs', () => {
     it('should delegate to connection.getMultiaddrs', () => {
       const config = new IPFSNetworkConfig(networkId, 'net');

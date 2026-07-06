@@ -1125,6 +1125,29 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return this.heliaCore.libp2p.getPeers().map((peer) => peer.toString());
   }
 
+  public onPeerConnected(
+    listener: (peerId: string) => Promise<void> | void,
+  ): void {
+    this.heliaCore.libp2p.addEventListener('peer:connect', (event) => {
+      const peerConnectEvent = event as Event & {
+        detail?: {
+          peer?: { toString(): string };
+          remotePeer?: { toString(): string };
+        };
+      };
+      const peerId =
+        peerConnectEvent.detail?.remotePeer?.toString() ||
+        peerConnectEvent.detail?.peer?.toString() ||
+        '';
+
+      void Promise.resolve(listener(peerId)).catch((error: unknown) => {
+        Kernel.logger.warn(
+          `IPFS peer connection listener failed: peerId=${peerId} error=${String(error)}`,
+        );
+      });
+    });
+  }
+
   public getMultiaddrs(): string[] {
     return this.heliaCore.libp2p
       .getMultiaddrs()
