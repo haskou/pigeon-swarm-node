@@ -45,12 +45,25 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): string | undefined {
     const identityId = this.stringValue(document, 'identityId');
     const embeddedIdentityId = identity?.toPrimitives().id;
+    const projectedIdentityId = this.isProjectedIdentityRecord(document)
+      ? this.stringValue(document, 'id')
+      : undefined;
 
     if (identityId && embeddedIdentityId && identityId !== embeddedIdentityId) {
       return undefined;
     }
 
-    return identityId || embeddedIdentityId;
+    return identityId || embeddedIdentityId || projectedIdentityId;
+  }
+
+  private isProjectedIdentityRecord(
+    document: Record<string, unknown>,
+  ): boolean {
+    return (
+      Boolean(this.stringValue(document, 'cid')) &&
+      Boolean(this.stringValue(document, 'id')) &&
+      Boolean(this.stringValue(document, 'lastEventId'))
+    );
   }
 
   private networkIdsFrom(

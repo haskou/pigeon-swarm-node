@@ -663,6 +663,39 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
   });
 
+  it('derives identity head keys from projected identity records without explicit identityId', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          cid: 'identity-v1',
+          handle: 'hasko',
+          id: 'identity-1',
+          lastEventId: 'event-1',
+          networkIds: ['network-1'],
+          receivedAt: 100,
+          version: 1,
+        },
+      },
+    });
+
+    await expect(registry.findHead('identity:identity-1')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'identity-v1',
+        id: 'identity-1',
+      }),
+    );
+    await expect(registry.findHead('identity-handle:hasko')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'identity-v1',
+        id: 'identity-1',
+      }),
+    );
+  });
+
   it('derives keychain head keys from replicated head updates without explicit keys', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

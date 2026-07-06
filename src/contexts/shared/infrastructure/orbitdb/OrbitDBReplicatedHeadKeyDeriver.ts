@@ -20,18 +20,29 @@ export default class OrbitDBReplicatedHeadKeyDeriver {
     return this.isRecord(identity) ? identity : undefined;
   }
 
+  private isProjectedIdentityRecord(record: Record<string, unknown>): boolean {
+    return (
+      Boolean(this.stringValue(record, 'cid')) &&
+      Boolean(this.stringValue(record, 'id')) &&
+      Boolean(this.stringValue(record, 'lastEventId'))
+    );
+  }
+
   private identityIdFrom(record: Record<string, unknown>): string | undefined {
     const identityId = this.stringValue(record, 'identityId');
     const identityRecord = this.identityRecordFrom(record);
     const embeddedIdentityId = identityRecord
       ? this.stringValue(identityRecord, 'id')
       : undefined;
+    const projectedIdentityId = this.isProjectedIdentityRecord(record)
+      ? this.stringValue(record, 'id')
+      : undefined;
 
     if (identityId && embeddedIdentityId && identityId !== embeddedIdentityId) {
       return undefined;
     }
 
-    return identityId || embeddedIdentityId;
+    return identityId || embeddedIdentityId || projectedIdentityId;
   }
 
   private aliasKeysFromRecord(record: Record<string, unknown>): string[] {

@@ -95,7 +95,7 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         cid: 'identity-v2',
         handle: 'hasko',
         id: 'identity-1',
-        identityId: 'identity-1',
+        lastEventId: 'event-identity-v2',
         networkIds: ['network-1'],
         receivedAt: 2,
         version: 2,
