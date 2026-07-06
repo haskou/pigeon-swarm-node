@@ -629,6 +629,40 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
   });
 
+  it('does not derive identity head keys from non-identity records', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        value: {
+          cid: 'bafyimage',
+          contentType: 'image/png',
+          handle: 'avatar',
+          id: 'bafyimage',
+          networkIds: ['network-1'],
+          receivedAt: 100,
+          sizeBytes: 123,
+          version: 1,
+        },
+      },
+    });
+
+    await expect(
+      registry.findHead('identity:bafyimage'),
+    ).resolves.toBeUndefined();
+    await expect(
+      registry.findHead('identity-handle:avatar'),
+    ).resolves.toBeUndefined();
+    await expect(registry.findHead('bafyimage')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'bafyimage',
+        version: 1,
+      }),
+    );
+  });
+
   it('derives keychain head keys from replicated head updates without explicit keys', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

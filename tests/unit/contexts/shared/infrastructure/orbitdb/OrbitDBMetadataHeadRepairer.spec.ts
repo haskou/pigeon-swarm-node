@@ -100,6 +100,15 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         receivedAt: 2,
         version: 2,
       },
+      {
+        cid: 'bafyimage',
+        contentType: 'image/png',
+        id: 'bafyimage',
+        networkIds: ['network-1'],
+        receivedAt: 3,
+        sizeBytes: 123,
+        version: 1,
+      },
     );
     keychains.push(
       {
@@ -292,6 +301,7 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     expect(heads.get('identity-handle:hasko')).toEqual(
       expect.objectContaining({ cid: 'identity-v2', version: 2 }),
     );
+    expect(heads.get('identity:bafyimage')).toBeUndefined();
     expect(heads.get('keychain:identity-1')).toEqual(
       expect.objectContaining({ cid: 'keychain-v2', version: 2 }),
     );

@@ -41,11 +41,16 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
   private identityIdFrom(
     document: Record<string, unknown>,
+    identity: Identity | undefined,
   ): string | undefined {
-    return (
-      this.stringValue(document, 'identityId') ||
-      this.stringValue(document, 'id')
-    );
+    const identityId = this.stringValue(document, 'identityId');
+    const embeddedIdentityId = identity?.toPrimitives().id;
+
+    if (identityId && embeddedIdentityId && identityId !== embeddedIdentityId) {
+      return undefined;
+    }
+
+    return identityId || embeddedIdentityId;
   }
 
   private networkIdsFrom(
@@ -80,7 +85,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     document: Record<string, unknown>,
   ): IdentityMetadataRecord | undefined {
     const cid = this.stringValue(document, 'cid');
-    const identityId = this.identityIdFrom(document);
+    const identity = this.identityFrom(document);
+    const identityId = this.identityIdFrom(document, identity);
 
     if (!cid || !identityId || document.deleted === true) {
       return undefined;
@@ -89,7 +95,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return {
       cid,
       handle: this.stringValue(document, 'handle'),
-      identity: this.identityFrom(document),
+      identity,
       identityId,
       networkId: this.stringValue(document, 'networkId'),
       networkIds: this.networkIdsFrom(document),

@@ -62,10 +62,19 @@ export default class OrbitDBMetadataHeadRepairer {
   private identityIdFrom(
     document: Record<string, unknown>,
   ): string | undefined {
-    return (
-      this.stringValue(document, 'identityId') ||
-      this.stringValue(document, 'id')
-    );
+    const identityId = this.stringValue(document, 'identityId');
+    const identity = this.isRecord(document.identity)
+      ? document.identity
+      : undefined;
+    const embeddedIdentityId = identity
+      ? this.stringValue(identity, 'id')
+      : undefined;
+
+    if (identityId && embeddedIdentityId && identityId !== embeddedIdentityId) {
+      return undefined;
+    }
+
+    return identityId || embeddedIdentityId;
   }
 
   private ownerIdentityIdFrom(
