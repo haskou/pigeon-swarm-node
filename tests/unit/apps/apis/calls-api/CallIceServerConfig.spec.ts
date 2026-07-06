@@ -144,7 +144,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should respect explicit relay-only transport policy without TURN servers', () => {
+  it('should fall back to direct candidates when explicit relay-only policy has no TURN servers', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_ICE_TRANSPORT_POLICY: 'relay',
       CALLS_STUN_URLS: 'stun:stun.example.test:3478',
@@ -156,7 +156,24 @@ describe('CallIceServerConfig', () => {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
+    });
+  });
+
+  it('should not expose TURN servers without valid credentials', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_ICE_TRANSPORT_POLICY: 'relay',
+      CALLS_STUN_URLS: 'stun:stun.example.test:3478',
+      CALLS_TURN_URLS: 'turn:turn.example.test:3478?transport=udp',
+    }).toResource(identityId);
+
+    expect(resource).toEqual({
+      iceServers: [
+        {
+          urls: ['stun:stun.example.test:3478'],
+        },
+      ],
+      iceTransportPolicy: 'all',
     });
   });
 });

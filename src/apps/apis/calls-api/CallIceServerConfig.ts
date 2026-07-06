@@ -125,16 +125,20 @@ export class CallIceServerConfig {
 
   public constructor(private readonly values: CallIceServerConfigValues) {}
 
-  private iceTransportPolicyFor(turnUrls: string[]): 'all' | 'relay' {
-    if (
-      turnUrls.length === 0 &&
-      this.values.iceTransportPolicy === 'relay' &&
-      !this.values.iceTransportPolicyConfigured
-    ) {
+  private iceTransportPolicyFor(hasUsableTurnServer: boolean): 'all' | 'relay' {
+    if (!hasUsableTurnServer && this.values.iceTransportPolicy === 'relay') {
       return 'all';
     }
 
     return this.values.iceTransportPolicy;
+  }
+
+  private hasTurnCredentials(): boolean {
+    if (this.values.turnSharedSecret) {
+      return true;
+    }
+
+    return Boolean(this.values.turnUsername && this.values.turnCredential);
   }
 
   private createTurnCredentials(identityId: IdentityId): TurnCredentials {
@@ -171,7 +175,10 @@ export class CallIceServerConfig {
           ])
         : this.values.turnUrls;
 
-    if (turnUrls.length > 0) {
+    const hasUsableTurnServer =
+      turnUrls.length > 0 && this.hasTurnCredentials();
+
+    if (hasUsableTurnServer) {
       const credentials = this.createTurnCredentials(identityId);
 
       iceServers.push({
@@ -189,7 +196,7 @@ export class CallIceServerConfig {
 
     return {
       iceServers,
-      iceTransportPolicy: this.iceTransportPolicyFor(turnUrls),
+      iceTransportPolicy: this.iceTransportPolicyFor(hasUsableTurnServer),
     };
   }
 }
