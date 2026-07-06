@@ -253,7 +253,7 @@ running there.
 | `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL. |
 | `CALLS_TURN_DISCOVERY_ENABLED` | Set to `false` to disable pubsub discovery. |
 | `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | Temporary credential lifetime for `/calls/ice-servers`. Defaults to 3600 seconds. |
-| `CALLS_ICE_TRANSPORT_POLICY` | Defaults to `relay` for production privacy. Use `all` only for trusted/dev networks. |
+| `CALLS_ICE_TRANSPORT_POLICY` | Defaults to `relay` when `/calls/ice-servers` can return a usable TURN server. Without TURN URLs plus valid credentials, the endpoint returns `all` so clients can still use direct ICE candidates unless the operator explicitly configures `relay`. |
 
 When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
 `relayConfiguration.publicHost` and `relayConfiguration.callsRelay.port` in

@@ -159,4 +159,21 @@ describe('CallIceServerConfig', () => {
       iceTransportPolicy: 'relay',
     });
   });
+
+  it('should respect explicit relay-only transport policy without TURN credentials', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_ICE_TRANSPORT_POLICY: 'relay',
+      CALLS_STUN_URLS: 'stun:stun.example.test:3478',
+      CALLS_TURN_URLS: 'turn:turn.example.test:3478?transport=udp',
+    }).toResource(identityId);
+
+    expect(resource).toEqual({
+      iceServers: [
+        {
+          urls: ['stun:stun.example.test:3478'],
+        },
+      ],
+      iceTransportPolicy: 'relay',
+    });
+  });
 });
