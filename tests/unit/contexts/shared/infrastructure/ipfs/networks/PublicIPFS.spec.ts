@@ -1,3 +1,5 @@
+let peerConnectListeners: Array<(event: Event) => void> = [];
+
 const mockHeliaNode = {
   blockstore: {
     delete: jest.fn(),
@@ -6,6 +8,13 @@ const mockHeliaNode = {
   },
   datastore: { get: jest.fn(), put: jest.fn() },
   libp2p: {
+    addEventListener: jest.fn(
+      (event: string, listener: (event: Event) => void): void => {
+        if (event === 'peer:connect') {
+          peerConnectListeners.push(listener);
+        }
+      },
+    ),
     getPeers: jest.fn().mockReturnValue([]),
     peerId: { toString: () => 'mock-peer-id' },
   },
@@ -19,6 +28,24 @@ const mockHeliaNode = {
 
 async function* pinResults(cid: { toString(): string }) {
   yield cid;
+}
+
+function emitPeerConnect(peerId: string = 'peer-id'): void {
+  for (const listener of peerConnectListeners) {
+    listener({
+      detail: {
+        remotePeer: {
+          toString: () => peerId,
+        },
+      },
+    } as unknown as Event);
+  }
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
 }
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
@@ -174,6 +201,7 @@ describe('PublicIPFS', () => {
     (
       PublicIPFS as unknown as { connectionPool: Record<string, unknown> }
     ).connectionPool = {};
+    peerConnectListeners = [];
     jest.clearAllMocks();
     mockHeliaNode.libp2p.getPeers.mockReturnValue([]);
     mockParseCid.mockReturnValue({ code: 0x70, toString: () => 'bafymockcid' });
@@ -322,12 +350,30 @@ describe('PublicIPFS', () => {
   });
 
   describe('provideContent', () => {
-    it('should skip provider publication when there are no connected peers', async () => {
+    it('should defer provider publication when there are no connected peers', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 
       await connection.provideContent(new IPFSId('bafymockcid'));
 
       expect(mockHeliaNode.routing.provide).not.toHaveBeenCalled();
+    });
+
+    it('should publish deferred provider records when a peer connects', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      await connection.provideContent(new IPFSId('bafymockcid'));
+      await connection.provideContent(new IPFSId('bafymockcid'));
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.routing.provide.mockResolvedValue(undefined);
+
+      emitPeerConnect();
+      await flushPromises();
+
+      expect(mockHeliaNode.routing.provide).toHaveBeenCalledTimes(1);
+      expect(mockHeliaNode.routing.provide).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        { signal: expect.any(AbortSignal) },
+      );
     });
 
     it('should publish content provider records when peers are connected', async () => {

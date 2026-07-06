@@ -41,6 +41,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly successfulPublicRelayDials = new Set<string>();
 
   private readonly pinningStrategy: HeliaPinningStrategy;
+  private readonly pendingContentProviderCids = new Map<string, IPFSId>();
+  private publishingPendingContentProviders = false;
 
   private static getRoutingRecordTimeoutMs(): number {
     const environment = pigeonEnvironment();
@@ -227,6 +229,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     pinningStrategy?: HeliaPinningStrategy,
   ) {
     this.pinningStrategy = pinningStrategy ?? new HeliaPinningStrategy();
+    this.onPeerConnected(() => this.publishPendingContentProviders());
   }
 
   private createRoutingAbortSignal(signal?: AbortSignal): {
@@ -579,6 +582,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
     signal?: AbortSignal,
   ): Promise<void> {
     if (!this.hasPeers()) {
+      this.queueContentProviderRetry(cid);
+
       return;
     }
 
@@ -598,6 +603,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
         signal: routingAbort.signal,
       });
     } catch (error: unknown) {
+      if (!this.hasPeers()) {
+        this.queueContentProviderRetry(cid);
+      }
+
       Kernel.logger.debug?.(
         `IPFS provider publication skipped for cid="${cid.valueOf()}": ${String(
           error,
@@ -606,6 +615,61 @@ export abstract class HeliaIPFS implements IPFSConnection {
     } finally {
       clearTimeout(routingAbort.timeout);
     }
+  }
+
+  private queueContentProviderRetry(cid: IPFSId): void {
+    this.pendingContentProviderCids.set(cid.valueOf(), cid);
+  }
+
+  private nextPendingContentProviderCid(): IPFSId | undefined {
+    const [next] = this.pendingContentProviderCids.entries();
+
+    if (!next) {
+      return undefined;
+    }
+
+    const [key, cid] = next;
+
+    this.pendingContentProviderCids.delete(key);
+
+    return cid;
+  }
+
+  private async publishPendingContentProvidersNow(): Promise<void> {
+    while (this.hasPeers()) {
+      const cid = this.nextPendingContentProviderCid();
+
+      if (!cid) {
+        return;
+      }
+
+      await this.provideContent(cid);
+    }
+  }
+
+  private publishPendingContentProviders(): void {
+    if (
+      this.publishingPendingContentProviders ||
+      this.pendingContentProviderCids.size === 0 ||
+      !this.hasPeers()
+    ) {
+      return;
+    }
+
+    this.publishingPendingContentProviders = true;
+    void this.publishPendingContentProvidersNow()
+      .catch((error: unknown) => {
+        Kernel.logger.debug?.(
+          `IPFS pending provider publication failed: ${String(error)}`,
+        );
+      })
+      .finally(() => {
+        this.publishingPendingContentProviders = false;
+
+        if (this.pendingContentProviderCids.size > 0 && this.hasPeers()) {
+          this.publishPendingContentProviders();
+        }
+      });
   }
 
   private provideContentInBackground(cid: IPFSId): void {
