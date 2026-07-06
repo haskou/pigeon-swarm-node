@@ -201,6 +201,7 @@ describe('IpfsKeychainRepository', () => {
     expect(ipfs.getJSON).not.toHaveBeenCalled();
     expect(ipfs.getBytes).not.toHaveBeenCalled();
     expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(['network-1']);
     expect(ipfs.putRecordToNetworks).toHaveBeenCalledWith(
       `pigeon-swarm_keychain-${mother.ownerIdentityId.valueOf()}`,
       'bafy-latest',
@@ -230,6 +231,7 @@ describe('IpfsKeychainRepository', () => {
     expect(ipfs.getJSON).not.toHaveBeenCalled();
     expect(ipfs.getBytes).not.toHaveBeenCalled();
     expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
+    expect(ipfs.findConnectedNetworkIds).not.toHaveBeenCalled();
     expect(ipfs.putRecordToNetworks).not.toHaveBeenCalled();
   });
 
@@ -253,15 +255,101 @@ describe('IpfsKeychainRepository', () => {
     const republished = await repository.republishLocalRoutingRecords();
 
     expect(republished).toBe(0);
-    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(
-      ['network-1'],
-      15_000,
-    );
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(['network-1']);
     expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
     expect(ipfs.getJSON).not.toHaveBeenCalled();
     expect(ipfs.getBytes).not.toHaveBeenCalled();
     expect(ipfs.addJSONToNetworks).not.toHaveBeenCalled();
     expect(ipfs.putRecordToNetworks).not.toHaveBeenCalled();
+  });
+
+  it('should resolve connected networks once per keychain republish pass', async () => {
+    const connectedMother = await KeychainMother.create();
+    const disconnectedMother = await KeychainMother.create();
+
+    metadataIndex.findAll.mockResolvedValue([
+      {
+        cid: 'bafy-connected-keychain',
+        keychain: connectedMother.withVersion(1).build(),
+        networkIds: ['network-1'],
+        ownerIdentityId: connectedMother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 2,
+        version: 1,
+      },
+      {
+        cid: 'bafy-disconnected-keychain',
+        keychain: disconnectedMother.withVersion(1).build(),
+        networkIds: ['network-2'],
+        ownerIdentityId: disconnectedMother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+    ]);
+    ipfs.findConnectedNetworkIds.mockResolvedValue(['network-1']);
+
+    const republished = await repository.republishLocalRoutingRecords();
+
+    expect(republished).toBe(1);
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledTimes(1);
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith([
+      'network-1',
+      'network-2',
+    ]);
+    expect(ipfs.putRecordToNetworks).toHaveBeenCalledWith(
+      `pigeon-swarm_keychain-${connectedMother.ownerIdentityId.valueOf()}`,
+      'bafy-connected-keychain',
+      ['network-1'],
+    );
+    expect(ipfs.putRecordToNetworks).not.toHaveBeenCalledWith(
+      `pigeon-swarm_keychain-${disconnectedMother.ownerIdentityId.valueOf()}`,
+      'bafy-disconnected-keychain',
+      expect.any(Array),
+    );
+  });
+
+  it('should republish keychain routing records only for the requested network', async () => {
+    const requestedMother = await KeychainMother.create();
+    const otherMother = await KeychainMother.create();
+
+    metadataIndex.findAll.mockResolvedValue([
+      {
+        cid: 'bafy-requested-keychain',
+        keychain: requestedMother.withVersion(1).build(),
+        networkIds: ['network-1'],
+        ownerIdentityId: requestedMother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 2,
+        version: 1,
+      },
+      {
+        cid: 'bafy-other-keychain',
+        keychain: otherMother.withVersion(1).build(),
+        networkIds: ['network-2'],
+        ownerIdentityId: otherMother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 1,
+        version: 1,
+      },
+    ]);
+    ipfs.findConnectedNetworkIds.mockResolvedValue(['network-1']);
+
+    const republished =
+      await repository.republishLocalRoutingRecords('network-1');
+
+    expect(republished).toBe(1);
+    expect(ipfs.findConnectedNetworkIds).toHaveBeenCalledWith(['network-1']);
+    expect(ipfs.putRecordToNetworks).toHaveBeenCalledWith(
+      `pigeon-swarm_keychain-${requestedMother.ownerIdentityId.valueOf()}`,
+      'bafy-requested-keychain',
+      ['network-1'],
+    );
+    expect(ipfs.putRecordToNetworks).not.toHaveBeenCalledWith(
+      `pigeon-swarm_keychain-${otherMother.ownerIdentityId.valueOf()}`,
+      'bafy-other-keychain',
+      expect.any(Array),
+    );
   });
 });
 

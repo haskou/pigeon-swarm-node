@@ -292,7 +292,9 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     return new KeychainExternalIdentifier(cid.valueOf());
   }
 
-  public async republishLocalRoutingRecords(): Promise<number> {
+  public async republishLocalRoutingRecords(
+    networkId?: string,
+  ): Promise<number> {
     const metadata = await this.metadataIndex.findAll();
     const latestDocumentsByOwner = new Map<string, KeychainMetadataRecord>();
 
@@ -303,26 +305,36 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
 
     let republished = 0;
+    const routableNetworkIds = [...latestDocumentsByOwner.values()]
+      .flatMap((document) => document.networkIds || [])
+      .filter(
+        (routableNetworkId) => !networkId || routableNetworkId === networkId,
+      );
+
+    if (routableNetworkIds.length === 0) {
+      return 0;
+    }
+
+    const connectedNetworkIds = new Set(
+      await this.ipfsManager.findConnectedNetworkIds(routableNetworkIds),
+    );
 
     for (const document of latestDocumentsByOwner.values()) {
-      const networkIds = document.networkIds || [];
+      const networkIds = (document.networkIds || []).filter(
+        (documentNetworkId) =>
+          connectedNetworkIds.has(documentNetworkId) &&
+          (!networkId || documentNetworkId === networkId),
+      );
 
       if (networkIds.length === 0) {
         continue;
       }
 
       try {
-        const connectedNetworkIds =
-          await this.ipfsManager.findConnectedNetworkIds(networkIds, 15_000);
-
-        if (connectedNetworkIds.length === 0) {
-          continue;
-        }
-
         await this.ipfsManager.putRecordToNetworks(
           this.ROUTING_KEY_PREFIX + document.ownerIdentityId,
           document.cid,
-          connectedNetworkIds,
+          networkIds,
         );
         republished++;
       } catch {
