@@ -126,7 +126,11 @@ export class CallIceServerConfig {
   public constructor(private readonly values: CallIceServerConfigValues) {}
 
   private iceTransportPolicyFor(hasUsableTurnServer: boolean): 'all' | 'relay' {
-    if (!hasUsableTurnServer && this.values.iceTransportPolicy === 'relay') {
+    if (
+      !hasUsableTurnServer &&
+      this.values.iceTransportPolicy === 'relay' &&
+      !this.values.iceTransportPolicyConfigured
+    ) {
       return 'all';
     }
 

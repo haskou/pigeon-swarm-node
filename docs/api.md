@@ -377,7 +377,8 @@ Implemented:
   fallback when no shared secret is configured
 - default `iceTransportPolicy` to `relay` only when a usable TURN server is
   available; without TURN URLs plus valid credentials, return `all` so clients
-  can still use direct ICE candidates
+  can still use direct ICE candidates unless the operator explicitly configured
+  `CALLS_ICE_TRANSPORT_POLICY=relay`
 - include STUN servers only when `CALLS_STUN_URLS` is explicitly configured
 - allow `CALLS_ICE_TRANSPORT_POLICY=all` for development or trusted networks
 
