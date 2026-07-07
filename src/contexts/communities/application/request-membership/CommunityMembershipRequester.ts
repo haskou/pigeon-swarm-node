@@ -57,8 +57,7 @@ export default class CommunityMembershipRequester {
       return acceptedRequest;
     }
 
-    const membershipRequest = CommunityMembershipRequest.request(
-      community.getId(),
+    const membershipRequest = community.createMembershipRequest(
       message.actorIdentityId,
     );
 

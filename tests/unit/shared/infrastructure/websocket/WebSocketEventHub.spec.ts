@@ -340,6 +340,52 @@ describe('WebSocketEventHub', () => {
     expect(otherClient.send).not.toHaveBeenCalled();
   });
 
+  it('routes community poll events through community channel recipients without member ids', async () => {
+    const hub = new WebSocketEventHub();
+    const recipientIdentityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const recipientClient = buildClient();
+    const otherClient = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const event = new TestDomainEvent('community-id', {
+      poll: {
+        id: 'poll-id',
+        scope: {
+          channelId: 'channel-id',
+          communityId: 'community-id',
+          type: 'community_channel',
+        },
+      },
+      pollId: 'poll-id',
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('polls.v1.poll.was_created');
+    clientMessageHandler.findCommunityChannelEventRecipients.mockResolvedValue([
+      recipientIdentityId.valueOf(),
+    ]);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(recipientIdentityId, recipientClient);
+    hub.register(otherIdentityId, otherClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+    await flushPromises();
+
+    expect(recipientClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(otherClient.send).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findCommunityChannelEventRecipients,
+    ).toHaveBeenCalledWith('community-id', 'channel-id');
+    expect(JSON.parse(event.decode()).attributes).not.toHaveProperty(
+      'memberIds',
+    );
+  });
+
   it('sends presence updates only to the updated identity', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
@@ -656,6 +702,7 @@ function getClientMessageHandler(client: WebSocket): (message: Buffer) => void {
 
 function buildClientMessageHandler(): jest.Mocked<WebSocketClientMessageHandler> {
   return {
+    findCommunityChannelEventRecipients: jest.fn().mockResolvedValue([]),
     findCommunityChannelTypingRecipients: jest.fn().mockResolvedValue([]),
     findConversationTypingRecipients: jest.fn().mockResolvedValue([]),
     findIdentityUpdateRecipients: jest.fn().mockResolvedValue([]),

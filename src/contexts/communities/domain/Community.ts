@@ -743,6 +743,18 @@ export class Community extends AggregateRoot {
     this.createAccessValidator().assertIsNotBanned(identityId);
   }
 
+  public createMembershipRequest(
+    requesterIdentityId: IdentityId,
+  ): CommunityMembershipRequest {
+    this.requestMembership(requesterIdentityId);
+
+    return CommunityMembershipRequest.request(
+      this.id,
+      requesterIdentityId,
+      this.ownerIdentityId,
+    );
+  }
+
   public visibleChannelsFor(
     identityId: IdentityId,
   ): ReturnType<CommunityChannels['toPrimitives']> {

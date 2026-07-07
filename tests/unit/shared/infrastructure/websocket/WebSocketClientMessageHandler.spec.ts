@@ -86,6 +86,34 @@ describe('WebSocketClientMessageHandler', () => {
     ).resolves.toEqual([recipient.valueOf()]);
   });
 
+  it('should return community channel event recipients visible in the channel', async () => {
+    const recipient = new IdentityId(
+      'MCowBQYDK2VwAyECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=',
+    );
+    const community = mock<Community>();
+
+    community.visibleMembersForTextChannel.mockReturnValue([recipient]);
+    communityRepository.findById.mockResolvedValue(community);
+
+    await expect(
+      handler.findCommunityChannelEventRecipients(
+        'community-id',
+        'channel-id',
+      ),
+    ).resolves.toEqual([recipient.valueOf()]);
+  });
+
+  it('should not return community channel event recipients for missing communities', async () => {
+    communityRepository.findById.mockResolvedValue(undefined);
+
+    await expect(
+      handler.findCommunityChannelEventRecipients(
+        'community-id',
+        'channel-id',
+      ),
+    ).resolves.toEqual([]);
+  });
+
   it('should return identity update recipients from conversations and communities', async () => {
     const updatedIdentity = new IdentityId(
       'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
@@ -103,7 +131,7 @@ describe('WebSocketClientMessageHandler', () => {
       updatedIdentity,
       conversationRecipient,
     ]);
-    community.getMemberIds.mockReturnValue([
+    community.findIdentityUpdateRecipientsFor.mockReturnValue([
       updatedIdentity,
       conversationRecipient,
       communityRecipient,

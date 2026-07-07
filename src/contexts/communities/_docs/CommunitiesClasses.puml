@@ -239,6 +239,7 @@ package "communities/domain" {
     + updateProfile(actor, name, description, banner?): void
     + viewAsMember(identityId): void
     + requestMembership(identityId): void
+    + createMembershipRequest(requesterIdentityId): CommunityMembershipRequest
   }
 
   class CommunityAccessValidator {

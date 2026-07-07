@@ -222,6 +222,20 @@ describe('Community', () => {
     ).toThrow('Community permission denied: create_polls');
   });
 
+  it('records the owner identity in join request events', () => {
+    const community = createCommunity();
+    community.pullDomainEvents();
+    const request = community.createMembershipRequest(member);
+    const event = request.pullDomainEvents()[0];
+
+    expect(event.attributes).toMatchObject({
+      communityId: community.getId().valueOf(),
+      identityId: member.valueOf(),
+      ownerIdentityId: owner.valueOf(),
+      requesterIdentityId: member.valueOf(),
+    });
+  });
+
   it('keeps community visibility as immutable settings', () => {
     const community = Community.create(
       owner,
