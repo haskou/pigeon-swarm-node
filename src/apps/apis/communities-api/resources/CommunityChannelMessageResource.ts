@@ -1,5 +1,4 @@
 export interface CommunityChannelMessageResource {
-  attachmentExternalIdentifiers: string[];
   authorIdentityId: string;
   channelId: string;
   communityId: string;

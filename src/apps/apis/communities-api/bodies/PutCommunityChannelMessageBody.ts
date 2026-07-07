@@ -12,11 +12,6 @@ import {
 import { CommunityMessageMentionBody } from './CommunityMessageMentionBody';
 
 export class PutCommunityChannelMessageBody {
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  public readonly attachmentExternalIdentifiers?: string[];
-
   @IsInt()
   public readonly createdAt: number;
 

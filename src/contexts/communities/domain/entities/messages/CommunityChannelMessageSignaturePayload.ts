@@ -1,7 +1,6 @@
 export class CommunityChannelMessageSignaturePayload {
   public static fromPrimitives(primitives: {
     actorIdentityId?: string;
-    attachmentExternalIdentifiers?: string[];
     authorIdentityId?: string;
     channelId: string;
     communityId: string;
@@ -20,7 +19,6 @@ export class CommunityChannelMessageSignaturePayload {
   private constructor(
     private readonly primitives: {
       actorIdentityId?: string;
-      attachmentExternalIdentifiers?: string[];
       authorIdentityId?: string;
       channelId: string;
       communityId: string;
@@ -56,7 +54,6 @@ export class CommunityChannelMessageSignaturePayload {
 
   public toPrimitives(): {
     actorIdentityId?: string;
-    attachmentExternalIdentifiers?: string[];
     authorIdentityId?: string;
     channelId: string;
     communityId: string;
@@ -82,8 +79,6 @@ export class CommunityChannelMessageSignaturePayload {
     }
 
     return {
-      attachmentExternalIdentifiers:
-        this.primitives.attachmentExternalIdentifiers ?? [],
       authorIdentityId: this.primitives.authorIdentityId,
       channelId: this.primitives.channelId,
       communityId: this.primitives.communityId,

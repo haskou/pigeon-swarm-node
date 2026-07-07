@@ -34,7 +34,6 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
     const message = await this.editor.edit(
       new CommunityChannelMessageEditMessage({
         actorIdentityId: authorIdentityId.valueOf(),
-        attachmentExternalIdentifiers: body.attachmentExternalIdentifiers ?? [],
         channelId,
         communityId,
         createdAt: body.createdAt,

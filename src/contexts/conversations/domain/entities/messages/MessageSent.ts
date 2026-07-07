@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { AttachmentExternalIdentifier } from '../../value-objects/AttachmentExternalIdentifier';
 import { ConversationId } from '../../value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../value-objects/MessageId';
@@ -13,13 +12,8 @@ export class MessageSent extends Message {
   public static create(
     metadata: MessageMetadata,
     encryptedPayload: EncryptedMessagePayload,
-    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
   ): MessageSent {
-    return new MessageSent(
-      metadata,
-      encryptedPayload,
-      attachmentExternalIdentifiers,
-    );
+    return new MessageSent(metadata, encryptedPayload);
   }
 
   public static fromPrimitives(
@@ -40,19 +34,14 @@ export class MessageSent extends Message {
           : undefined,
       ),
       new EncryptedMessagePayload(primitives.encryptedPayload),
-      primitives.attachmentExternalIdentifiers.map(
-        (externalIdentifier) =>
-          new AttachmentExternalIdentifier(externalIdentifier),
-      ),
     );
   }
 
   constructor(
     metadata: MessageMetadata,
     private readonly encryptedPayload: EncryptedMessagePayload,
-    attachmentExternalIdentifiers: AttachmentExternalIdentifier[] = [],
   ) {
-    super(metadata, attachmentExternalIdentifiers);
+    super(metadata);
   }
 
   public getType(): MessageType {

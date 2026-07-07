@@ -17,7 +17,6 @@ describe('MessageSendMessage', () => {
         'encrypted-payload',
         SIGNATURE,
         1780000000000,
-        ['attachment-1'],
         ['previous-message-1'],
         'reply-message-1',
       ),
@@ -30,8 +29,6 @@ describe('MessageSendMessage', () => {
     expect(message.getSignature().valueOf()).toBe(SIGNATURE);
     expect(options.getId().valueOf()).toBe('message-1');
     expect(options.getCreatedAt().valueOf()).toBe(1780000000000);
-    expect(options.getAttachments().map((attachment) => attachment.valueOf()))
-      .toEqual(['attachment-1']);
     expect(options.getPreviousMessageIds().map((messageId) =>
       messageId.valueOf(),
     )).toEqual(['previous-message-1']);

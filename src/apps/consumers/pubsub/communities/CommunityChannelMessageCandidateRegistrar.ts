@@ -1,5 +1,4 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelMessageAttachments } from '@app/contexts/communities/domain/CommunityChannelMessageAttachments';
 import { CommunityChannelMessageMentions } from '@app/contexts/communities/domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
@@ -9,7 +8,6 @@ import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communiti
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import { CommunityChannelAttachmentId } from '@app/contexts/communities/domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -59,17 +57,6 @@ export default class CommunityChannelMessageCandidateRegistrar {
               ? new CommunityMentionTargetId(mention.targetId)
               : undefined,
           ),
-      ),
-    );
-  }
-
-  private attachmentIdsFrom(
-    primitives: CommunityChannelMessageCandidate,
-  ): CommunityChannelMessageAttachments {
-    return CommunityChannelMessageAttachments.from(
-      primitives.attachmentExternalIdentifiers.map(
-        (externalIdentifier) =>
-          new CommunityChannelAttachmentId(externalIdentifier),
       ),
     );
   }
@@ -176,7 +163,6 @@ export default class CommunityChannelMessageCandidateRegistrar {
         payload,
         new Signature(primitives.signature),
         new Timestamp(primitives.editedAt),
-        this.attachmentIdsFrom(primitives),
         mentions,
       ),
     );
@@ -184,7 +170,6 @@ export default class CommunityChannelMessageCandidateRegistrar {
     this.signatureService.assertValidSignature(
       authorIdentityId,
       CommunityChannelMessageSignaturePayload.fromPrimitives({
-        attachmentExternalIdentifiers: primitives.attachmentExternalIdentifiers,
         authorIdentityId: authorIdentityId.valueOf(),
         channelId: primitives.channelId,
         communityId: primitives.communityId,

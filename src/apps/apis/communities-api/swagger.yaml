@@ -1614,7 +1614,6 @@ components:
         - communityId
         - channelId
         - authorIdentityId
-        - attachmentExternalIdentifiers
         - mentions
         - reactions
         - type
@@ -1637,10 +1636,6 @@ components:
         signature:
           type: string
           description: Present for sent messages. Omitted for poll timeline items.
-        attachmentExternalIdentifiers:
-          type: array
-          items:
-            type: string
         mentions:
           type: array
           description: Visible mention metadata used for permission checks and notifications. Content remains encrypted.
@@ -2007,10 +2002,6 @@ components:
           description: Required for public communities. Plain text payload stored for indexing/search.
         signature:
           type: string
-        attachmentExternalIdentifiers:
-          type: array
-          items:
-            type: string
         mentions:
           type: array
           items:
@@ -2063,10 +2054,6 @@ components:
           description: Required when editing public community messages. Updated plain text payload stored for indexing/search.
         signature:
           type: string
-        attachmentExternalIdentifiers:
-          type: array
-          items:
-            type: string
         mentions:
           type: array
           items:

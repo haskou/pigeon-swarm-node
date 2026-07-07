@@ -1,7 +1,6 @@
 import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandidate';
 
 const communityChannelMessagePrimitiveKeys = [
-  'attachmentExternalIdentifiers',
   'authorIdentityId',
   'channelId',
   'communityId',

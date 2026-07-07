@@ -81,8 +81,6 @@ export default class OrbitDBConversationMessageIndex {
     record: Record<string, unknown>,
   ): OrbitDBConversationMessageDocument | undefined {
     const document: Partial<OrbitDBConversationMessageDocument> = {
-      attachmentExternalIdentifiers:
-        this.stringArrayValue(record, 'attachmentExternalIdentifiers') ?? [],
       authorId: this.stringValue(record, 'authorId'),
       conversationId: this.stringValue(record, 'conversationId'),
       createdAt: this.numberValue(record, 'createdAt'),

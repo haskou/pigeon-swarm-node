@@ -10,7 +10,6 @@ import {
 
 import { CommunityAccessValidator } from './asserts/CommunityAccessValidator';
 import { CommunityOwnerValidator } from './asserts/CommunityOwnerValidator';
-import { CommunityChannelMessageAttachments } from './CommunityChannelMessageAttachments';
 import { CommunityChannelMessageMentions } from './CommunityChannelMessageMentions';
 import { CommunityChannelPermissions } from './entities/channels/CommunityChannelPermissions';
 import { CommunityChannels } from './entities/channels/CommunityChannels';
@@ -254,7 +253,6 @@ export class Community extends AggregateRoot {
     metadata: CommunityChannelMessageMetadata,
     payload: CommunityChannelMessagePayload,
     signature: Signature,
-    attachmentExternalIdentifiers: CommunityChannelMessageAttachments,
     mentions: CommunityChannelMessageMentions,
   ): CommunityChannelMessage {
     const authorIdentityId = metadata.getAuthorIdentityId();
@@ -271,7 +269,6 @@ export class Community extends AggregateRoot {
       metadata,
       payload,
       signature,
-      attachmentExternalIdentifiers,
       mentions,
     );
 

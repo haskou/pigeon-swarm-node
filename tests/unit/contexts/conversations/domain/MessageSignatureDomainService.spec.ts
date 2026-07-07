@@ -26,14 +26,13 @@ describe('MessageSignatureDomainService', () => {
         new MessageId('reply-message-id'),
       ),
       MessageType.SENT,
-      [],
       new EncryptedMessagePayload('encrypted-message-payload'),
     );
     const signingContent =
       new MessageSignatureDomainService().getCanonicalSigningContent(payload);
 
     expect(signingContent).toBe(
-      `{"attachmentExternalIdentifiers":[],"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"encryptedPayload":"encrypted-message-payload","id":"message-id","previousMessageIds":[],"replyToMessageId":"reply-message-id","type":"sent"}`,
+      `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"encryptedPayload":"encrypted-message-payload","id":"message-id","previousMessageIds":[],"replyToMessageId":"reply-message-id","type":"sent"}`,
     );
   });
 
@@ -48,7 +47,6 @@ describe('MessageSignatureDomainService', () => {
         new Signature(signature),
       ),
       MessageType.DELETED,
-      [],
       undefined,
       new MessageId('message-id'),
     );
@@ -56,7 +54,7 @@ describe('MessageSignatureDomainService', () => {
       new MessageSignatureDomainService().getCanonicalSigningContent(payload);
 
     expect(signingContent).toBe(
-      `{"attachmentExternalIdentifiers":[],"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"id":"deleted-message-id","previousMessageIds":[],"targetMessageId":"message-id","type":"deleted"}`,
+      `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"id":"deleted-message-id","previousMessageIds":[],"targetMessageId":"message-id","type":"deleted"}`,
     );
   });
 });

@@ -77,7 +77,6 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
   async function signedCandidate(): Promise<CommunityChannelMessageCandidate> {
     const signaturePayload =
       CommunityChannelMessageSignaturePayload.fromPrimitives({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: identityMother.id.valueOf(),
         channelId,
         communityId,
@@ -95,7 +94,6 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
     );
 
     return {
-      attachmentExternalIdentifiers: [],
       authorIdentityId: identityMother.id.valueOf(),
       channelId,
       communityId,

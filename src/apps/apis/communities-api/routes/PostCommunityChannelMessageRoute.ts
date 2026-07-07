@@ -32,7 +32,6 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
     const authorIdentityId = await this.authenticate(request);
     const message = await this.sender.send(
       new CommunityChannelMessageSendMessage({
-        attachmentExternalIdentifiers: body.attachmentExternalIdentifiers,
         authorIdentityId: authorIdentityId.valueOf(),
         channelId,
         communityId,

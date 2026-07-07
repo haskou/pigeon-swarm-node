@@ -373,7 +373,6 @@ async function sendConversationMessage(
   const id = MessageId.generate().valueOf();
   const createdAt = Date.now();
   const signaturePayload = {
-    attachmentExternalIdentifiers: [] as string[],
     authorId: author.id,
     conversationId,
     createdAt,
@@ -385,7 +384,6 @@ async function sendConversationMessage(
     type: MessageType.SENT.valueOf(),
   };
   const body = {
-    attachmentExternalIdentifiers: [] as string[],
     createdAt,
     encryptedPayload,
     id,

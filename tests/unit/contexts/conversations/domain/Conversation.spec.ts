@@ -8,7 +8,6 @@ import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/dom
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { AttachmentExternalIdentifier } from '@app/contexts/conversations/domain/value-objects/AttachmentExternalIdentifier';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
@@ -43,11 +42,7 @@ describe('Conversation', () => {
         author,
         new EncryptedMessagePayload('encrypted-payload'),
         signature(),
-        new MessageSendOptions([
-            new AttachmentExternalIdentifier(
-              'bafybeigdyrzt5sfp7udm7hu76t5dp5whztr3v3gvl6wv4x7q5v2fi6c5mm',
-            ),
-          ]),
+        new MessageSendOptions(),
       );
 
       expect(message).toBeInstanceOf(MessageSent);
@@ -100,7 +95,6 @@ describe('Conversation', () => {
         new EncryptedMessagePayload('reply-payload'),
         signature(),
         new MessageSendOptions(
-          [],
           undefined,
           undefined,
           [newer.getId()],
@@ -128,7 +122,6 @@ describe('Conversation', () => {
           new EncryptedMessagePayload('reply-payload'),
           signature(),
           new MessageSendOptions(
-            [],
             undefined,
             undefined,
             [],
@@ -145,7 +138,6 @@ describe('Conversation', () => {
           new EncryptedMessagePayload('message-payload'),
           signature(),
           new MessageSendOptions(
-            [],
             undefined,
             undefined,
             [MessageId.generate()],
@@ -168,7 +160,6 @@ describe('Conversation', () => {
           new EncryptedMessagePayload('reply-payload'),
           signature(),
           new MessageSendOptions(
-            [],
             undefined,
             undefined,
             [],
@@ -282,7 +273,7 @@ describe('Conversation', () => {
         author,
         new EncryptedMessagePayload('message-after-poll'),
         signature(),
-        new MessageSendOptions([], undefined, undefined, [poll.getId()]),
+        new MessageSendOptions(undefined, undefined, [poll.getId()]),
       );
 
       expect(conversation.toPrimitives().messages[0]).toEqual(
