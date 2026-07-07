@@ -182,6 +182,14 @@ package "conversations.application" {
     +findTimeline(query): Promise<ConversationMessagesTimeline>
   }
 
+  class ConversationsFinder {
+    +find(query): Promise<Conversation[]>
+  }
+
+  class ConversationUnreadCounter {
+    +count(message): Promise<Map<string, number>>
+  }
+
   class ConversationMessagesTimeline {
     +messages(): Message[]
     +reactions(): MessageReaction[]
@@ -238,6 +246,8 @@ package "conversations.application" {
   LatestMessagesFinder --> MessageReactionRepository
   LatestMessagesFinder --> CallRepository
   LatestMessagesFinder --> PollRepository
+  ConversationsFinder --> ConversationRepository
+  ConversationUnreadCounter --> ConversationRepository
   MessageEditor --> ConversationRepository
   MessageEditor --> DomainEventPublisher
   MessageDeleter --> ConversationRepository
