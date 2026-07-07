@@ -91,7 +91,7 @@ export default class WebSocketClientMessageHandler {
 
     for (const community of communities) {
       for (const recipient of this.excludeIdentity(
-        community.getMemberIds(),
+        community.findIdentityUpdateRecipientsFor(actorId),
         actorId,
       )) {
         recipients.add(recipient);
