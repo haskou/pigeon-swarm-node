@@ -12,9 +12,6 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import '@app/contexts/content-replication/infrastructure/ipfs/IpfsContentStorage';
 import '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
-import { orbitDBReplicatedEventTypes } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedEventTypes';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
-import { Kernel } from '@haskou/ddd-kernel';
 
 async function init() {
   console.time('Kernel');
@@ -30,12 +27,6 @@ async function init() {
   console.timeEnd('Dependency Injection');
 
   application.configureWebSocketEventHub();
-
-  const messageBus = Kernel.di.getService<MessageBus>(MessageBus);
-
-  for (const eventType of orbitDBReplicatedEventTypes) {
-    messageBus.registerEventType(eventType.bindingKey, eventType.domainEvent);
-  }
 
   console.time('Run server');
   await application.runServer();

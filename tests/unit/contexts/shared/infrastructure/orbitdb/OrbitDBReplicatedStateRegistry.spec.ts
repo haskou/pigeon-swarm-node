@@ -3,7 +3,7 @@ import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
+import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { Request } from 'express';
@@ -133,7 +133,7 @@ function createStores(): {
   heads: Store;
   messages: Store;
   notifications: Store;
-  stores: OrbitDBReplicatedStateStores;
+  stores: OrbitDBPrivateNetworkStores;
 } {
   const communities = createStore();
   const contentReplication = createStore();
@@ -145,7 +145,6 @@ function createStores(): {
   const storeSet = {
     communities,
     conversations: createStore(),
-    events: createStore(),
     heads,
     identities,
     contentReplication,
@@ -164,7 +163,7 @@ function createStores(): {
     heads,
     messages,
     notifications,
-    stores: storeSet as unknown as OrbitDBReplicatedStateStores,
+    stores: storeSet as unknown as OrbitDBPrivateNetworkStores,
   };
 }
 

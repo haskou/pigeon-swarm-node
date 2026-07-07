@@ -1,24 +1,21 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
-import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
-import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import path from 'path';
 
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBInstance } from './OrbitDBInstance';
-import { OrbitDBReplicatedStoreAddresses } from './OrbitDBReplicatedStoreAddresses';
-import { OrbitDBReplicatedStoreSet } from './OrbitDBReplicatedStoreSet';
+import { OrbitDBPrivateNetworkStoreAddresses } from './OrbitDBPrivateNetworkStoreAddresses';
+import { OrbitDBPrivateNetworkStoreSet } from './OrbitDBPrivateNetworkStoreSet';
 import orbitDBRuntimeAdapter from './OrbitDBRuntimeAdapter';
 
-export class OrbitDBReplicatedStateStores {
+export class OrbitDBPrivateNetworkStores {
   private static readonly syncErrorWarningKeys = new Set<string>();
 
   private readonly orbitdb: OrbitDBInstance;
   public readonly calls: OrbitDBDatabase;
   public readonly communities: OrbitDBDatabase;
   public readonly conversations: OrbitDBDatabase;
-  public readonly events: OrbitDBDatabase;
   public readonly heads: OrbitDBDatabase;
   public readonly identities: OrbitDBDatabase;
   public readonly contentReplication: OrbitDBDatabase;
@@ -45,13 +42,6 @@ export class OrbitDBReplicatedStateStores {
 
   private static getStoreName(networkId: string, store: string): string {
     return `private-network/${networkId}/${store}`;
-  }
-
-  private static getLocalStoragePath(): string {
-    return path.join(
-      pigeonEnvironment().IPFS_STORAGE_PATH,
-      'orbitdb-local-ipfs',
-    );
   }
 
   private static async openDocumentsStore(
@@ -114,7 +104,7 @@ export class OrbitDBReplicatedStateStores {
       const level = this.isTransientSyncError(error) ? 'debug' : 'warn';
 
       Kernel.logger[level]?.(
-        `OrbitDB replicated store sync error handled: networkId=${networkId}` +
+        `OrbitDB private network store sync error handled: networkId=${networkId}` +
           ` store=${store}` +
           ` transient=${this.isTransientSyncError(error)}` +
           ` error=${String(error)}`,
@@ -124,7 +114,7 @@ export class OrbitDBReplicatedStateStores {
 
   public static async open(
     network: IPFSNetwork,
-  ): Promise<OrbitDBReplicatedStateStores> {
+  ): Promise<OrbitDBPrivateNetworkStores> {
     const networkId = network.getId();
     const AccessController =
       await orbitDBRuntimeAdapter.createPrivateNetworkAccessController();
@@ -133,15 +123,6 @@ export class OrbitDBReplicatedStateStores {
       id: `pigeon-swarm:${networkId}:${network.getPeerId()}`,
       ipfs: network.getHeliaCore(),
     });
-
-    const events = await orbitdb.open(
-      this.getStoreName(networkId, 'events/domain-events'),
-      {
-        AccessController,
-        type: 'events',
-      },
-    );
-    this.registerSyncErrorLogger(networkId, 'events/domain-events', events);
 
     const heads = await orbitdb.open(
       this.getStoreName(networkId, 'keyvalue/heads'),
@@ -153,10 +134,11 @@ export class OrbitDBReplicatedStateStores {
     this.registerSyncErrorLogger(networkId, 'keyvalue/heads', heads);
 
     Kernel.logger.debug?.(
-      `OrbitDB replicated state opened: networkId=${networkId} peerId=${network.getPeerId()}`,
+      `OrbitDB private network stores opened: networkId=${networkId}` +
+        ` peerId=${network.getPeerId()}`,
     );
 
-    return new OrbitDBReplicatedStateStores({
+    return new OrbitDBPrivateNetworkStores({
       calls: await this.openDocumentsStore(
         orbitdb,
         networkId,
@@ -181,7 +163,6 @@ export class OrbitDBReplicatedStateStores {
         'documents/conversations',
         AccessController,
       ),
-      events,
       heads,
       identities: await this.openDocumentsStore(
         orbitdb,
@@ -265,23 +246,10 @@ export class OrbitDBReplicatedStateStores {
     });
   }
 
-  public static async openLocal(): Promise<OrbitDBReplicatedStateStores> {
-    const connection = await PublicIPFS.create({
-      storageLocation: this.getLocalStoragePath(),
-    });
-    const network = new IPFSNetwork(
-      new IPFSNetworkConfig('local', 'local-orbitdb-state'),
-      connection,
-    );
-
-    return this.open(network);
-  }
-
-  private constructor(stores: OrbitDBReplicatedStoreSet) {
+  private constructor(stores: OrbitDBPrivateNetworkStoreSet) {
     this.calls = stores.calls;
     this.communities = stores.communities;
     this.conversations = stores.conversations;
-    this.events = stores.events;
     this.heads = stores.heads;
     this.identities = stores.identities;
     this.contentReplication = stores.contentReplication;
@@ -300,13 +268,12 @@ export class OrbitDBReplicatedStateStores {
     this.stickerUserLibraries = stores.stickerUserLibraries;
   }
 
-  public getAddresses(): OrbitDBReplicatedStoreAddresses {
+  public getAddresses(): OrbitDBPrivateNetworkStoreAddresses {
     return {
       calls: this.calls.address,
       communities: this.communities.address,
       contentReplication: this.contentReplication.address,
       conversations: this.conversations.address,
-      events: this.events.address,
       heads: this.heads.address,
       identities: this.identities.address,
       keychains: this.keychains.address,

@@ -28,8 +28,7 @@ package "shared/infrastructure/local-db" {
 package "shared/infrastructure/orbitdb" {
   class OrbitDBReplicatedStateRegistry
   class LocalOrbitDBReplicatedHeadCache
-  class OrbitDBReplicatedStateStores
-  class OrbitDBReplicatedDomainEventPublisher
+  class OrbitDBPrivateNetworkStores
 }
 
 package "shared/infrastructure/ipfs" {
@@ -70,8 +69,7 @@ AxiosHttpClient ..|> HttpClient
 BaseRequester ..> HttpClient
 
 LocalProcessedDomainEventRepository ..> EmbeddedLocalDatabase
-OrbitDBReplicatedDomainEventPublisher ..> OrbitDBReplicatedStateStores
-OrbitDBReplicatedStateRegistry ..> OrbitDBReplicatedStateStores
+OrbitDBReplicatedStateRegistry ..> OrbitDBPrivateNetworkStores
 OrbitDBReplicatedStateRegistry ..> LocalOrbitDBReplicatedHeadCache
 LocalOrbitDBReplicatedHeadCache ..> EmbeddedLocalDatabase
 
