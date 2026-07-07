@@ -4,7 +4,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import Kernel from '@haskou/ddd-kernel';
 import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
 import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
-import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainMessageBus } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
@@ -25,9 +24,7 @@ export default class MessageBus
 {
   private static sourceEventContext = new Map<string, DomainEvent>();
   private static activeContextIds: string[] = [];
-  private static replicatedEventPublisher?: DomainEventPublisher;
   private adapter: MessageBusAdapter;
-  private readonly domainEventTypes = new Map<string, typeof DomainEvent>();
   private readonly publisherHooks = new PublisherHookPipeline();
   private readonly localSubscriptionHandlers = new Map<
     string,
@@ -60,16 +57,6 @@ export default class MessageBus
     }
 
     return MessageBus.sourceEventContext.get(currentEventId);
-  }
-
-  public static setReplicatedEventPublisher(
-    publisher: DomainEventPublisher,
-  ): void {
-    MessageBus.replicatedEventPublisher = publisher;
-  }
-
-  public static clearReplicatedEventPublisher(): void {
-    MessageBus.replicatedEventPublisher = undefined;
   }
 
   constructor(
@@ -131,21 +118,6 @@ export default class MessageBus
     });
   }
 
-  private instanceDomainEvent(
-    DomainEventInstance: typeof DomainEvent,
-    message: Message,
-  ): DomainEvent {
-    const EventConstructor = DomainEventInstance as Constructor<DomainEvent>;
-
-    return new EventConstructor(
-      message.aggregate_id,
-      message.attributes,
-      message.event_id,
-      new Date(message.occurred_on),
-      message.user_id,
-    );
-  }
-
   private registerLocalHandler(
     bindingKey: string,
     DomainEventInstance: typeof DomainEvent,
@@ -153,7 +125,6 @@ export default class MessageBus
   ): void {
     const handlers = this.localSubscriptionHandlers.get(bindingKey) || [];
 
-    this.registerEventType(bindingKey, DomainEventInstance);
     handlers.push({ DomainEventInstance, handler });
     this.localSubscriptionHandlers.set(bindingKey, handlers);
   }
@@ -202,13 +173,6 @@ export default class MessageBus
     }
   }
 
-  public registerEventType(
-    bindingKey: string,
-    DomainEventInstance: typeof DomainEvent,
-  ): void {
-    this.domainEventTypes.set(bindingKey, DomainEventInstance);
-  }
-
   public registerPublisherHooks(...hooks: PublisherHook[]): void {
     this.publisherHooks.register(...hooks);
   }
@@ -219,43 +183,12 @@ export default class MessageBus
     this.runPublishSideEffect('transport', () =>
       this.adapter.publish(enrichedEvents),
     );
-    this.runPublishSideEffect('replicated-events', () =>
-      MessageBus.replicatedEventPublisher?.publish(enrichedEvents),
-    );
     this.publishToWebSockets(enrichedEvents);
     this.runPublishSideEffect('publisher-hooks', () =>
       this.runPublisherHooks(enrichedEvents),
     );
 
     return Promise.resolve();
-  }
-
-  public async dispatchReplicated(message: Message): Promise<void> {
-    const handlers = this.localSubscriptionHandlers.get(message.type) || [];
-    const eventType = this.domainEventTypes.get(message.type);
-    const events =
-      handlers.length > 0
-        ? handlers.map(({ DomainEventInstance }) =>
-            this.instanceDomainEvent(DomainEventInstance, message),
-          )
-        : eventType
-          ? [this.instanceDomainEvent(eventType, message)]
-          : [];
-
-    await Promise.all(
-      handlers.map(async ({ DomainEventInstance, handler }) => {
-        const event = this.instanceDomainEvent(DomainEventInstance, message);
-
-        try {
-          MessageBus.setSourceEvent(event);
-          await handler(event);
-        } finally {
-          MessageBus.clearSourceEvent();
-        }
-      }),
-    );
-
-    webSocketEventHub.publish(events);
   }
 
   public async consume(

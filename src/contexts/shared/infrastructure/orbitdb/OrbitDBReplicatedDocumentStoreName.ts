@@ -11,7 +11,6 @@ export type OrbitDBReplicatedDocumentStoreName =
   | 'notifications'
   | 'pins'
   | 'polls'
-  | 'presence'
   | 'reactions'
   | 'requests'
   | 'stickerPacks'

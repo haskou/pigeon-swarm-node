@@ -45,7 +45,6 @@ export default class CommunityChannelMessageSender {
       message.metadata,
       message.payload,
       message.signature,
-      message.attachmentExternalIdentifiers,
       message.mentions,
     );
     this.signatureService.assertValidSignature(

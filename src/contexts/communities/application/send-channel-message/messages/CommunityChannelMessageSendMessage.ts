@@ -1,12 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { CommunityChannelMessageAttachments as Attachments } from '../../../domain/CommunityChannelMessageAttachments';
 import { CommunityChannelMessageMentions as Mentions } from '../../../domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessageMention } from '../../../domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from '../../../domain/entities/messages/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from '../../../domain/entities/messages/CommunityChannelMessagePayload';
-import { CommunityChannelAttachmentId } from '../../../domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
@@ -14,7 +12,6 @@ import { CommunityMentionTargetId } from '../../../domain/value-objects/Communit
 import { CommunityMentionType } from '../../../domain/value-objects/CommunityMentionType';
 
 export class CommunityChannelMessageSendMessage {
-  public readonly attachmentExternalIdentifiers: Attachments;
   public readonly authorIdentityId: IdentityId;
   public readonly channelId: CommunityChannelId;
   public readonly communityId: CommunityId;
@@ -25,7 +22,6 @@ export class CommunityChannelMessageSendMessage {
   public readonly signature: Signature;
 
   constructor(input: {
-    attachmentExternalIdentifiers?: string[];
     authorIdentityId: string;
     channelId: string;
     communityId: string;
@@ -56,12 +52,6 @@ export class CommunityChannelMessageSendMessage {
       plaintextPayload: input.plaintextPayload,
     });
     this.signature = new Signature(input.signature);
-    this.attachmentExternalIdentifiers = Attachments.from(
-      (input.attachmentExternalIdentifiers ?? []).map(
-        (externalIdentifier) =>
-          new CommunityChannelAttachmentId(externalIdentifier),
-      ),
-    );
     this.mentions = Mentions.from(
       (input.mentions ?? []).map(
         (mention) =>

@@ -1,12 +1,10 @@
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { AttachmentExternalIdentifier } from '../../../domain/value-objects/AttachmentExternalIdentifier';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../../domain/value-objects/MessageId';
 import { MessageSendOptions } from '../../../domain/value-objects/MessageSendOptions';
 
 export class MessageSendPayload {
-  private readonly attachments: AttachmentExternalIdentifier[];
   private readonly createdAt: Timestamp;
   private readonly encryptedPayload: EncryptedMessagePayload;
   private readonly id: MessageId;
@@ -19,14 +17,9 @@ export class MessageSendPayload {
     encryptedPayload: string,
     signature: string,
     createdAt: number,
-    attachmentExternalIdentifiers: string[] = [],
     previousMessageIds: string[] = [],
     replyToMessageId?: string,
   ) {
-    this.attachments = attachmentExternalIdentifiers.map(
-      (externalIdentifier) =>
-        new AttachmentExternalIdentifier(externalIdentifier),
-    );
     this.createdAt = new Timestamp(createdAt);
     this.encryptedPayload = new EncryptedMessagePayload(encryptedPayload);
     this.id = new MessageId(id);
@@ -49,7 +42,6 @@ export class MessageSendPayload {
 
   public getOptions(): MessageSendOptions {
     return new MessageSendOptions(
-      this.attachments,
       this.createdAt,
       this.id,
       this.previousMessageIds,

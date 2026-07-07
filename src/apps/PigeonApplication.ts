@@ -11,6 +11,8 @@ import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
+import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
+import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
@@ -145,6 +147,10 @@ export default class PigeonApplication {
       overrides: [
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },
+        {
+          token: IdentityPresenceRepository,
+          useClass: InMemoryIdentityPresenceRepository,
+        },
       ],
     });
     this.kernel.registerConsumerMiddleware(

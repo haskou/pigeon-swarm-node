@@ -52,18 +52,18 @@ package "identities/application" {
 }
 
 package "presence/infrastructure" {
-  class OrbitDBIdentityPresenceRepository
+  class InMemoryIdentityPresenceRepository
 }
 
 IdentityPresence --> PresenceStatus
 IdentityPresence --> PresenceCustomMessage
 IdentityPresence --> IdentityPresenceWasUpdatedEvent
-IdentityPresenceFinder --> OrbitDBIdentityPresenceRepository
-IdentityPresenceUpdater --> OrbitDBIdentityPresenceRepository
+IdentityPresenceFinder --> InMemoryIdentityPresenceRepository
+IdentityPresenceUpdater --> InMemoryIdentityPresenceRepository
 IdentityPresenceUpdater --> IdentityPresenceNetworkResolver
-IdentityPresenceHeartbeatRecorder --> OrbitDBIdentityPresenceRepository
+IdentityPresenceHeartbeatRecorder --> InMemoryIdentityPresenceRepository
 IdentityPresenceHeartbeatRecorder --> IdentityPresenceNetworkResolver
-IdentityPresenceExpirationRegistrar --> OrbitDBIdentityPresenceRepository
+IdentityPresenceExpirationRegistrar --> InMemoryIdentityPresenceRepository
 IdentityPresenceExpirationRegistrar --> IdentityPresenceNetworkResolver
 IdentityPresenceNetworkResolver --> IdentityNetworksFinder
 

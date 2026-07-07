@@ -2,7 +2,6 @@ export interface OrbitDBCommunityChannelMessageDocument extends Record<
   string,
   unknown
 > {
-  attachmentExternalIdentifiers: string[];
   authorIdentityId: string;
   channelId: string;
   communityId: string;

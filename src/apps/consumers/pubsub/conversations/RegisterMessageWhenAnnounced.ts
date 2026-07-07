@@ -68,7 +68,6 @@ export default class RegisterMessageWhenAnnounced extends Consumer {
     return (
       this.hasRequiredStringFields(value) &&
       typeof Reflect.get(value, 'createdAt') === 'number' &&
-      this.isStringArray(Reflect.get(value, 'attachmentExternalIdentifiers')) &&
       this.isStringArray(Reflect.get(value, 'previousMessageIds'))
     );
   }

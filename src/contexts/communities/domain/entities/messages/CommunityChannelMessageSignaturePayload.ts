@@ -1,7 +1,6 @@
 export class CommunityChannelMessageSignaturePayload {
   public static fromPrimitives(primitives: {
     actorIdentityId?: string;
-    attachmentExternalIdentifiers?: string[];
     authorIdentityId?: string;
     channelId: string;
     communityId: string;
@@ -20,7 +19,6 @@ export class CommunityChannelMessageSignaturePayload {
   private constructor(
     private readonly primitives: {
       actorIdentityId?: string;
-      attachmentExternalIdentifiers?: string[];
       authorIdentityId?: string;
       channelId: string;
       communityId: string;
@@ -56,7 +54,6 @@ export class CommunityChannelMessageSignaturePayload {
 
   public toPrimitives(): {
     actorIdentityId?: string;
-    attachmentExternalIdentifiers?: string[];
     authorIdentityId?: string;
     channelId: string;
     communityId: string;
@@ -82,8 +79,6 @@ export class CommunityChannelMessageSignaturePayload {
     }
 
     return {
-      attachmentExternalIdentifiers:
-        this.primitives.attachmentExternalIdentifiers ?? [],
       authorIdentityId: this.primitives.authorIdentityId,
       channelId: this.primitives.channelId,
       communityId: this.primitives.communityId,
@@ -99,21 +94,26 @@ export class CommunityChannelMessageSignaturePayload {
 
   public toSigningPrimitiveCandidates(): Array<Record<string, unknown>> {
     const canonicalPayload = this.toPrimitives();
+    const emptyAttachmentExternalIdentifiers: string[] = [];
+    const candidates = [canonicalPayload];
 
-    if (
-      !this.isMessagePayload() ||
-      !this.primitives.mentions ||
-      this.primitives.mentions.length > 0
-    ) {
-      return [canonicalPayload];
-    }
-
-    return [
-      canonicalPayload,
-      {
+    if (this.primitives.mentions && this.primitives.mentions.length === 0) {
+      candidates.push({
         ...canonicalPayload,
         mentions: [],
+      });
+    }
+
+    if (!this.isMessagePayload()) {
+      return candidates;
+    }
+
+    return candidates.flatMap((candidate) => [
+      candidate,
+      {
+        ...candidate,
+        attachmentExternalIdentifiers: emptyAttachmentExternalIdentifiers,
       },
-    ];
+    ]);
   }
 }

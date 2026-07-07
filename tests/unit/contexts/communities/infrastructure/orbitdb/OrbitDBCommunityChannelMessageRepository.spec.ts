@@ -541,7 +541,6 @@ function document(
   overrides: Partial<ReturnType<CommunityChannelMessage['toPrimitives']>>,
 ): Record<string, unknown> {
   return {
-    attachmentExternalIdentifiers: [],
     authorIdentityId: identityMother.id.valueOf(),
     channelId: 'channel-1',
     communityId: 'community-1',

@@ -45,8 +45,7 @@ export default class OrbitDBCommunityChannelMessageIndex {
         'id',
         'type',
       ]) &&
-      typeof value.createdAt === 'number' &&
-      this.isStringArray(value.attachmentExternalIdentifiers)
+      typeof value.createdAt === 'number'
     );
   }
 

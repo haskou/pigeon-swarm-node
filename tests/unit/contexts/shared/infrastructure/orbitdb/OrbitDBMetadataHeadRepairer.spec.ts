@@ -12,7 +12,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
   const notifications: Record<string, unknown>[] = [];
   const pins: Record<string, unknown>[] = [];
   const polls: Record<string, unknown>[] = [];
-  const presence: Record<string, unknown>[] = [];
   const reactions: Record<string, unknown>[] = [];
   let registry: OrbitDBReplicatedStateRegistry;
   let repairer: OrbitDBMetadataHeadRepairer;
@@ -28,7 +27,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     notifications.splice(0);
     pins.splice(0);
     polls.splice(0);
-    presence.splice(0);
     reactions.splice(0);
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register(
@@ -44,7 +42,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         notifications,
         pins,
         polls,
-        presence,
         reactions,
       }),
     );
@@ -135,7 +132,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     });
     messages.push(
       {
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -145,7 +141,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         type: 'sent',
       },
       {
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -156,7 +151,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         type: 'sent',
       },
       {
-        attachmentExternalIdentifiers: [],
         authorId: 'identity-1',
         conversationId: 'conversation-1',
         createdAt: 3,
@@ -263,13 +257,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
       status: 'visible',
       type: 'conversation_invitation',
     });
-    presence.push({
-      id: 'identity-1',
-      identityId: 'identity-1',
-      status: 'available',
-      updatedAt: 11,
-    });
-
     await expect(repairer.repair()).resolves.toEqual({
       callIndexes: 3,
       communities: 1,
@@ -284,7 +271,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
       keychains: 1,
       notificationIndexes: 1,
       pollIndexes: 2,
-      presenceHeads: 1,
       reactionIndexes: 2,
     });
     expect(heads.get('community:community-1')).toEqual(
@@ -400,9 +386,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         notifications: [expect.objectContaining({ id: 'notification-1' })],
       }),
     );
-    expect(heads.get('presence:identity-1')).toEqual(
-      expect.objectContaining({ identityId: 'identity-1' }),
-    );
   });
 
   it('should repair a single replicated document store', async () => {
@@ -457,7 +440,6 @@ function replicatedStores(stores: {
   notifications: Record<string, unknown>[];
   pins: Record<string, unknown>[];
   polls: Record<string, unknown>[];
-  presence: Record<string, unknown>[];
   reactions: Record<string, unknown>[];
 }) {
   return {
@@ -485,7 +467,6 @@ function replicatedStores(stores: {
     notifications: queryableStore(stores.notifications),
     pins: queryableStore(stores.pins),
     polls: queryableStore(stores.polls),
-    presence: queryableStore(stores.presence),
     reactions: queryableStore(stores.reactions),
   } as never;
 }

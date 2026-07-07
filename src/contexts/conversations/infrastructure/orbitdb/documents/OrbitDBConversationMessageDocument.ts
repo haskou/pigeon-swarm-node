@@ -2,7 +2,6 @@ export interface OrbitDBConversationMessageDocument extends Record<
   string,
   unknown
 > {
-  attachmentExternalIdentifiers: string[];
   authorId: string;
   conversationId: string;
   createdAt: number;

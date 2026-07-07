@@ -52,7 +52,6 @@ package "conversations.domain" {
 
   class MessageSent {
     -payload: EncryptedPayload
-    -attachmentExternalIdentifiers: AttachmentExternalIdentifier[]
   }
 
   class MessageEdited {
@@ -137,9 +136,8 @@ package "conversations.domain" {
   Message <|-- MessageDeleted
   Message *--> MessageMetadata
   Conversation o--> IdentityId
-  MessageSent --> EncryptedPayload
-  MessageSent o--> AttachmentExternalIdentifier
-  MessageEdited --> MessageId
+MessageSent --> EncryptedPayload
+MessageEdited --> MessageId
   MessageDeleted --> MessageId
   Conversation ..> MessageSendOptions
   Conversation ..> MessageEditOptions
@@ -275,7 +273,6 @@ package "conversations.infrastructure" {
     -replyToMessageId?: string
     -targetMessageId?: string
     -payload: object
-    -attachmentExternalIdentifiers: string[]
     -previousMessageIds: string[]
     -createdAt: number
     -signature: string

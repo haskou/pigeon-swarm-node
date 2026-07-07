@@ -1173,7 +1173,6 @@ export default class Definitions {
     const id = `community-message:${Date.now()}:${randomUUID()}`;
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorIdentityId: this.ownerIdentityId?.valueOf() || '',
       channelId: this.communityChannelId,
       communityId: this.communityId,
@@ -1184,7 +1183,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       encryptedPayload: 'encrypted-community-channel-message-payload',
       id,
@@ -1206,7 +1204,6 @@ export default class Definitions {
     const id = `community-message:${Date.now()}:${randomUUID()}`;
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorIdentityId: this.ownerIdentityId?.valueOf() || '',
       channelId: this.communityChannelId,
       communityId: this.communityId,
@@ -1218,7 +1215,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       encryptedPayload: 'encrypted-community-channel-reply-payload',
       id,
@@ -1257,7 +1253,6 @@ export default class Definitions {
     const id = `community-message:${Date.now()}:${randomUUID()}`;
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorIdentityId: this.ownerIdentityId?.valueOf() || '',
       channelId: this.communityChannelId,
       communityId: this.communityId,
@@ -1268,7 +1263,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       id,
       plaintextPayload: 'plain public searchable community message',
@@ -1297,7 +1291,6 @@ export default class Definitions {
       },
     ];
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorIdentityId: this.ownerIdentityId?.valueOf() || '',
       channelId: this.communityChannelId,
       communityId: this.communityId,
@@ -1309,7 +1302,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       encryptedPayload: 'encrypted-community-channel-message-payload',
       id,
@@ -1361,7 +1353,6 @@ export default class Definitions {
     const keyPair = await this.ensureIdentityKeyPair();
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorIdentityId: this.ownerIdentityId?.valueOf() || '',
       channelId: this.communityChannelId,
       communityId: this.communityId,
@@ -1372,7 +1363,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       encryptedPayload: 'edited-community-channel-message-payload',
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
@@ -1783,7 +1773,6 @@ export default class Definitions {
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorId: this.ownerIdentityId?.valueOf() || '',
       conversationId: this.conversationId || '',
       createdAt,
@@ -1796,7 +1785,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       encryptedPayload: 'encrypted-message-payload',
       id,
@@ -1815,7 +1803,6 @@ export default class Definitions {
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorId: this.ownerIdentityId?.valueOf() || '',
       conversationId: this.conversationId || '',
       createdAt,
@@ -1828,7 +1815,6 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify({
-      attachmentExternalIdentifiers: [],
       createdAt,
       encryptedPayload: 'encrypted-reply-payload',
       id,
@@ -1861,7 +1847,6 @@ export default class Definitions {
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorId: this.ownerIdentityId?.valueOf() || '',
       conversationId: this.conversationId,
       createdAt,
@@ -1890,7 +1875,6 @@ export default class Definitions {
     const createdAt = Date.now();
     const previousMessageIds = [this.messageId];
     const payload = {
-      attachmentExternalIdentifiers: [] as string[],
       authorId: this.ownerIdentityId?.valueOf() || '',
       conversationId: this.conversationId,
       createdAt,

@@ -1,7 +1,7 @@
 Feature: Post network IPFS content route
   As an API consumer
   I want to publish encrypted private binary content to a selected IPFS network
-  So that conversation messages can reference private attachment CIDs
+  So that encrypted message payloads can reference private content CIDs
 
   Scenario: Publish encrypted private content to an IPFS network
     Given I am an anonymous user

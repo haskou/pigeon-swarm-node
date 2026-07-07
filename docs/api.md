@@ -135,6 +135,9 @@ client since the previous heartbeat. Heartbeats are not individually signed
 because the WebSocket upgrade already authenticated the identity. Backend marks
 the identity `disconnected` after roughly 20 seconds without heartbeat and
 derives `away` after 5 minutes without activity while heartbeat is still active.
+Presence is runtime state kept in node memory and replicated to peers through
+domain events. It is not written to OrbitDB/IPFS and resets when the node
+restarts.
 
 Heartbeat acknowledgement:
 
@@ -791,8 +794,8 @@ POST /ipfs/public
 
 Requires signed request headers. The authenticated identity does not need to be
 published yet, so clients can generate a keypair locally, sign this request, get
-a CID, and then publish the identity with `profile.picture`, `profile.banner` or a message with
-`attachmentExternalIdentifiers`.
+a CID, and then publish the identity with `profile.picture`, `profile.banner` or
+inside an encrypted message payload.
 
 Request body is the raw binary content. Send metadata as headers:
 
@@ -889,8 +892,7 @@ Implemented:
 - preserve `X-Filename` when provided; do not send a sensitive clear-text
   filename here if it should remain private
 - limit encrypted content size to 50 MiB
-- return the CID to place in `attachmentExternalIdentifiers` for encrypted
-  conversation messages
+- return the CID to place inside encrypted message payloads
 
 ### Get IPFS JSON content
 
@@ -1008,8 +1010,9 @@ Implemented security rules:
 
 ## Identity Presence HTTP API
 
-Presence is replicated runtime state. It is not stored in IPFS and it is synced
-through network-scoped OrbitDB state.
+Presence is runtime state kept in node memory. Selected status, custom messages,
+heartbeat fields and derived states are replicated through domain events, are
+not written to OrbitDB/IPFS, and reset when the node restarts.
 
 Statuses:
 
@@ -1096,7 +1099,8 @@ Returns the updated presence resource.
 
 ### WebSocket presence events
 
-When visible presence changes, backend emits:
+When a presence preference changes or an ephemeral heartbeat snapshot is
+refreshed, backend emits:
 
 ```json
 {
@@ -1504,7 +1508,6 @@ Response:
       "encryptedPayload": "<encryptedMessagePayload>",
       "previousMessageIds": [],
       "replyToMessageId": "<messageId>",
-      "attachmentExternalIdentifiers": [],
       "reactions": [
         {
           "authorIdentityId": "<identityId>",
@@ -1575,7 +1578,6 @@ Response:
   "encryptedPayload": "<encryptedMessagePayload>",
   "previousMessageIds": [],
   "replyToMessageId": "<messageId>",
-  "attachmentExternalIdentifiers": [],
   "reactions": []
 }
 ```
@@ -1633,7 +1635,6 @@ Response:
       "encryptedPayload": "<encryptedMessagePayload>",
       "previousMessageIds": ["<messageId>"],
       "replyToMessageId": "<messageId>",
-      "attachmentExternalIdentifiers": [],
       "reactions": []
     }
   ],
@@ -1712,7 +1713,6 @@ List response:
         "createdAt": 1773848829055,
         "encryptedPayload": "<encryptedMessagePayload>",
         "previousMessageIds": [],
-        "attachmentExternalIdentifiers": [],
         "reactions": []
       }
     }
@@ -1742,8 +1742,7 @@ Request:
   "encryptedPayload": "<encryptedMessagePayload>",
   "signature": "<messageSignature>",
   "previousMessageIds": ["<lastKnownMessageId>"],
-  "replyToMessageId": "<messageId>",
-  "attachmentExternalIdentifiers": ["<privateContentCid>"]
+  "replyToMessageId": "<messageId>"
 }
 ```
 
@@ -1759,7 +1758,6 @@ Response:
   "encryptedPayload": "<encryptedMessagePayload>",
   "previousMessageIds": [],
   "replyToMessageId": "<messageId>",
-  "attachmentExternalIdentifiers": [],
   "reactions": []
 }
 ```
@@ -1779,8 +1777,9 @@ Implemented:
 - publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
   `networkId` and `participantIds`
 - derive unread state from OrbitDB replicated read markers and message metadata
-- store only attachment CIDs in the message; private attachment bytes must be
-  encrypted by the client and published first with `POST /ipfs/{networkId}`
+- attachment CIDs and metadata belong inside the client-encrypted payload; private
+  attachment bytes must be encrypted by the client and published first with
+  `POST /ipfs/{networkId}`
 
 ### Edit message
 
@@ -1811,7 +1810,6 @@ Response:
   "createdAt": 1773848829055,
   "encryptedPayload": "<updatedEncryptedMessagePayload>",
   "previousMessageIds": ["<editedMessageId>"],
-  "attachmentExternalIdentifiers": [],
   "reactions": [],
   "targetMessageId": "<editedMessageId>"
 }
@@ -1964,7 +1962,6 @@ Response:
   "type": "deleted",
   "createdAt": 1773848829055,
   "previousMessageIds": ["<deletedMessageId>"],
-  "attachmentExternalIdentifiers": [],
   "reactions": [],
   "targetMessageId": "<deletedMessageId>"
 }
@@ -2854,8 +2851,7 @@ Request:
       "type": "role",
       "targetId": "<roleId>"
     }
-  ],
-  "attachmentExternalIdentifiers": ["<privateContentCid>"]
+  ]
 }
 ```
 
@@ -2868,8 +2864,7 @@ For public communities, send `plaintextPayload` instead of
   "createdAt": 1773848829055,
   "plaintextPayload": "Plain public message that can be indexed",
   "signature": "<messageSignature>",
-  "mentions": [],
-  "attachmentExternalIdentifiers": []
+  "mentions": []
 }
 ```
 
@@ -2883,7 +2878,6 @@ Response:
   "authorIdentityId": "<identityId>",
   "encryptedPayload": "<encryptedCommunityChannelMessagePayload>",
   "signature": "<messageSignature>",
-  "attachmentExternalIdentifiers": [],
   "mentions": [],
   "replyToMessageId": "<messageId>",
   "reactions": [],
@@ -2909,15 +2903,15 @@ Implemented:
 - store `encryptedPayload` as opaque client-encrypted text for private
   communities
 - store `plaintextPayload` as indexable plain text for public communities
-- store attachment CIDs only; private attachment bytes must be encrypted by the
-  client and published first with `POST /ipfs/{networkId}`
+- attachment CIDs and metadata belong inside the client-encrypted payload; private
+  attachment bytes must be encrypted by the client and published first with
+  `POST /ipfs/{networkId}`
 - allow threads by sending `replyToMessageId` with the id of an existing
   channel message in the same community channel
 - validate the message signature against this canonical payload:
 
 ```json
 {
-  "attachmentExternalIdentifiers": [],
   "authorIdentityId": "<identityId>",
   "channelId": "<channelId>",
   "communityId": "<communityId>",
@@ -2940,7 +2934,6 @@ For public communities, the canonical payload replaces `encryptedPayload` with
 
 ```json
 {
-  "attachmentExternalIdentifiers": [],
   "authorIdentityId": "<identityId>",
   "channelId": "<channelId>",
   "communityId": "<communityId>",
@@ -2974,8 +2967,7 @@ Request:
   "createdAt": 1773848929055,
   "encryptedPayload": "<editedEncryptedCommunityChannelMessagePayload>",
   "signature": "<messageEditionSignature>",
-  "mentions": [],
-  "attachmentExternalIdentifiers": []
+  "mentions": []
 }
 ```
 
@@ -2985,7 +2977,6 @@ The edition signature must be generated from this canonical payload:
 
 ```json
 {
-  "attachmentExternalIdentifiers": [],
   "authorIdentityId": "<identityId>",
   "channelId": "<channelId>",
   "communityId": "<communityId>",
@@ -3231,7 +3222,6 @@ Response:
       "channelId": "<channelId>",
       "authorIdentityId": "<identityId>",
       "plaintextPayload": "Plain public message that matched",
-      "attachmentExternalIdentifiers": [],
       "mentions": [],
       "reactions": [],
       "type": "sent",

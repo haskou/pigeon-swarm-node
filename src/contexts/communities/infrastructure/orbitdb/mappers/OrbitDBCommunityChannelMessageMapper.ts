@@ -9,7 +9,6 @@ export default class OrbitDBCommunityChannelMessageMapper {
     const primitives = message.toPrimitives();
 
     return {
-      attachmentExternalIdentifiers: primitives.attachmentExternalIdentifiers,
       authorIdentityId: primitives.authorIdentityId,
       channelId: primitives.channelId,
       communityId: primitives.communityId,
@@ -32,7 +31,6 @@ export default class OrbitDBCommunityChannelMessageMapper {
     document: OrbitDBCommunityChannelMessageDocument,
   ): CommunityChannelMessage {
     return CommunityChannelMessage.fromPrimitives({
-      attachmentExternalIdentifiers: document.attachmentExternalIdentifiers,
       authorIdentityId: document.authorIdentityId,
       channelId: document.channelId,
       communityId: document.communityId,

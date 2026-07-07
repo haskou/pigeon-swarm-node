@@ -1,6 +1,5 @@
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { CommunityChannelMessageAttachments as Attachments } from '../../CommunityChannelMessageAttachments';
 import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
 import { CommunityChannelMessage } from './CommunityChannelMessage';
 import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
@@ -10,7 +9,6 @@ export class CommunityChannelMessageEdition {
     private readonly payload: CommunityChannelMessagePayload,
     private readonly signature: Signature,
     private readonly editedAt: Timestamp,
-    private readonly attachmentExternalIdentifiers: Attachments,
     private readonly mentions: Mentions,
   ) {}
 
@@ -19,7 +17,6 @@ export class CommunityChannelMessageEdition {
       this.payload,
       this.signature,
       this.editedAt,
-      this.attachmentExternalIdentifiers,
       this.mentions,
     );
   }

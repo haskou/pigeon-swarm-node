@@ -2,9 +2,7 @@ import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
 
-import { CommunityChannelMessageAttachments as Attachments } from '../../CommunityChannelMessageAttachments';
 import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
-import { CommunityChannelAttachmentId } from '../../value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '../../value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../value-objects/CommunityId';
@@ -18,16 +16,9 @@ export class CommunityChannelMessage {
     metadata: CommunityChannelMessageMetadata,
     payload: CommunityChannelMessagePayload,
     signature: Signature,
-    attachmentExternalIdentifiers: Attachments = Attachments.empty(),
     mentions: Mentions = Mentions.empty(),
   ): CommunityChannelMessage {
-    return new CommunityChannelMessage(
-      metadata,
-      payload,
-      signature,
-      attachmentExternalIdentifiers,
-      mentions,
-    );
+    return new CommunityChannelMessage(metadata, payload, signature, mentions);
   }
 
   public static poll(
@@ -38,7 +29,6 @@ export class CommunityChannelMessage {
       metadata,
       undefined,
       undefined,
-      Attachments.empty(),
       Mentions.empty(),
       undefined,
       pollId,
@@ -66,12 +56,6 @@ export class CommunityChannelMessage {
           })
         : undefined,
       primitives.signature ? new Signature(primitives.signature) : undefined,
-      Attachments.from(
-        primitives.attachmentExternalIdentifiers.map(
-          (externalIdentifier) =>
-            new CommunityChannelAttachmentId(externalIdentifier),
-        ),
-      ),
       Mentions.from(
         (primitives.mentions || []).map((mention) =>
           CommunityChannelMessageMention.fromPrimitives(mention),
@@ -86,7 +70,6 @@ export class CommunityChannelMessage {
     private readonly metadata: CommunityChannelMessageMetadata,
     private readonly payload: CommunityChannelMessagePayload | undefined,
     private readonly signature: Signature | undefined,
-    private readonly attachmentExternalIdentifiers: Attachments,
     private readonly mentions: Mentions,
     private readonly editedAt?: Timestamp,
     private readonly pollId?: PollId,
@@ -128,7 +111,6 @@ export class CommunityChannelMessage {
     const primitives = this.toPrimitives();
 
     return CommunityChannelMessageSignaturePayload.fromPrimitives({
-      attachmentExternalIdentifiers: primitives.attachmentExternalIdentifiers,
       authorIdentityId: primitives.authorIdentityId,
       channelId: primitives.channelId,
       communityId: primitives.communityId,
@@ -150,14 +132,12 @@ export class CommunityChannelMessage {
     payload: CommunityChannelMessagePayload,
     signature: Signature,
     editedAt: Timestamp,
-    attachmentExternalIdentifiers: Attachments,
     mentions: Mentions,
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       this.metadata,
       payload,
       signature,
-      attachmentExternalIdentifiers,
       mentions,
       editedAt,
     );
@@ -167,8 +147,6 @@ export class CommunityChannelMessage {
     const payload = this.payload?.toPrimitives();
 
     return {
-      attachmentExternalIdentifiers:
-        this.attachmentExternalIdentifiers.toPrimitives(),
       authorIdentityId: this.metadata.getAuthorIdentityId().valueOf(),
       channelId: this.metadata.getChannelId().valueOf(),
       communityId: this.metadata.getCommunityId().valueOf(),
