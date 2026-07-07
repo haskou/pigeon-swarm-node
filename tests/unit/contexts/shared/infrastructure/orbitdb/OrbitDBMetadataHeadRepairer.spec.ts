@@ -132,7 +132,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     });
     messages.push(
       {
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -142,7 +141,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         type: 'sent',
       },
       {
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -153,7 +151,6 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         type: 'sent',
       },
       {
-        attachmentExternalIdentifiers: [],
         authorId: 'identity-1',
         conversationId: 'conversation-1',
         createdAt: 3,

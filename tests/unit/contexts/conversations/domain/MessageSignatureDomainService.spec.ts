@@ -6,7 +6,8 @@ import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/valu
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { PublicKey, Signature, Timestamp } from '@haskou/value-objects';
+import { mock } from 'jest-mock-extended';
 
 const identityId =
   'MCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=';
@@ -26,14 +27,13 @@ describe('MessageSignatureDomainService', () => {
         new MessageId('reply-message-id'),
       ),
       MessageType.SENT,
-      [],
       new EncryptedMessagePayload('encrypted-message-payload'),
     );
     const signingContent =
       new MessageSignatureDomainService().getCanonicalSigningContent(payload);
 
     expect(signingContent).toBe(
-      `{"attachmentExternalIdentifiers":[],"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"encryptedPayload":"encrypted-message-payload","id":"message-id","previousMessageIds":[],"replyToMessageId":"reply-message-id","type":"sent"}`,
+      `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"encryptedPayload":"encrypted-message-payload","id":"message-id","previousMessageIds":[],"replyToMessageId":"reply-message-id","type":"sent"}`,
     );
   });
 
@@ -48,7 +48,6 @@ describe('MessageSignatureDomainService', () => {
         new Signature(signature),
       ),
       MessageType.DELETED,
-      [],
       undefined,
       new MessageId('message-id'),
     );
@@ -56,7 +55,37 @@ describe('MessageSignatureDomainService', () => {
       new MessageSignatureDomainService().getCanonicalSigningContent(payload);
 
     expect(signingContent).toBe(
-      `{"attachmentExternalIdentifiers":[],"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"id":"deleted-message-id","previousMessageIds":[],"targetMessageId":"message-id","type":"deleted"}`,
+      `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"id":"deleted-message-id","previousMessageIds":[],"targetMessageId":"message-id","type":"deleted"}`,
     );
+  });
+
+  it('accepts legacy sent message signatures with empty attachment identifiers', () => {
+    const publicKey = mock<PublicKey>();
+    const payload = new MessageSignaturePayload(
+      new MessageMetadata(
+        new MessageId('message-id'),
+        new ConversationId('one-to-one:conversation-id'),
+        new IdentityId(identityId),
+        [],
+        new Timestamp(1778536870557),
+        new Signature(signature),
+        new MessageId('reply-message-id'),
+      ),
+      MessageType.SENT,
+      new EncryptedMessagePayload('encrypted-message-payload'),
+    );
+    const legacySigningContent = `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"encryptedPayload":"encrypted-message-payload","id":"message-id","previousMessageIds":[],"replyToMessageId":"reply-message-id","type":"sent","attachmentExternalIdentifiers":[]}`;
+
+    publicKey.isValidSignature.mockImplementation(
+      (signingContent) => signingContent === legacySigningContent,
+    );
+
+    expect(
+      new MessageSignatureDomainService().isValidSignature(
+        publicKey,
+        payload,
+        new Signature(signature),
+      ),
+    ).toBe(true);
   });
 });

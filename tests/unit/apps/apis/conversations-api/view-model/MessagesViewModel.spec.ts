@@ -99,7 +99,6 @@ describe('MessagesViewModel', () => {
     return {
       getId: () => new MessageId(id),
       toPrimitives: () => ({
-        attachmentExternalIdentifiers: [] as string[],
         authorId: 'author-id',
         conversationId: 'conversation-id',
         createdAt,
@@ -115,7 +114,6 @@ describe('MessagesViewModel', () => {
     return {
       getId: () => new MessageId(id),
       toPrimitives: () => ({
-        attachmentExternalIdentifiers: [] as string[],
         authorId: 'author-id',
         conversationId: 'conversation-id',
         createdAt,

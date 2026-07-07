@@ -158,7 +158,6 @@ export class Conversation extends AggregateRoot {
         options.getReplyToMessageId(),
       ),
       encryptedPayload,
-      options.getAttachments(),
     );
 
     this.messages.push(message);

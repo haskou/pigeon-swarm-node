@@ -1,4 +1,3 @@
-import { AttachmentExternalIdentifier } from '../../value-objects/AttachmentExternalIdentifier';
 import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../value-objects/MessageId';
 import { MessageType } from '../../value-objects/MessageType';
@@ -8,13 +7,19 @@ export class MessageSignaturePayload {
   constructor(
     private readonly metadata: MessageMetadata,
     private readonly type: MessageType,
-    private readonly attachments: AttachmentExternalIdentifier[] = [],
     private readonly encryptedPayload?: EncryptedMessagePayload,
     private readonly targetMessageId?: MessageId,
   ) {}
 
+  private isMessagePayload(): boolean {
+    return (
+      this.type.isEqual(MessageType.EDITED) ||
+      this.type.isEqual(MessageType.POLL) ||
+      this.type.isEqual(MessageType.SENT)
+    );
+  }
+
   public toPrimitives(): {
-    attachmentExternalIdentifiers: string[];
     authorId: string;
     conversationId: string;
     createdAt: number;
@@ -26,9 +31,6 @@ export class MessageSignaturePayload {
     type: string;
   } {
     return {
-      attachmentExternalIdentifiers: this.attachments.map((attachment) =>
-        attachment.valueOf(),
-      ),
       authorId: this.metadata.getAuthorId().valueOf(),
       conversationId: this.metadata.getConversationId().valueOf(),
       createdAt: this.metadata.getCreatedAt().valueOf(),
@@ -41,5 +43,22 @@ export class MessageSignaturePayload {
       targetMessageId: this.targetMessageId?.valueOf(),
       type: this.type.valueOf(),
     };
+  }
+
+  public toSigningPrimitiveCandidates(): Array<Record<string, unknown>> {
+    const canonicalPayload = this.toPrimitives();
+    const emptyAttachmentExternalIdentifiers: string[] = [];
+
+    if (!this.isMessagePayload()) {
+      return [canonicalPayload];
+    }
+
+    return [
+      canonicalPayload,
+      {
+        ...canonicalPayload,
+        attachmentExternalIdentifiers: emptyAttachmentExternalIdentifiers,
+      },
+    ];
   }
 }

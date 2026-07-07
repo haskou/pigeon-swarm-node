@@ -1,5 +1,4 @@
 export interface CommunityChannelMessageCandidate {
-  attachmentExternalIdentifiers: string[];
   authorIdentityId: string;
   channelId: string;
   communityId: string;

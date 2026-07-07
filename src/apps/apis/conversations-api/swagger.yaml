@@ -537,10 +537,6 @@ components:
         replyToMessageId:
           type: string
           description: Optional id of the existing sent message this message replies to.
-        attachmentExternalIdentifiers:
-          type: array
-          items:
-            type: string
     DeleteConversationMessageBody:
       type: object
       required:
@@ -679,7 +675,6 @@ components:
         - type
         - createdAt
         - previousMessageIds
-        - attachmentExternalIdentifiers
       properties:
         id:
           type: string
@@ -704,10 +699,6 @@ components:
             $ref: '#/components/schemas/MessageReactionResource'
         replyToMessageId:
           type: string
-        attachmentExternalIdentifiers:
-          type: array
-          items:
-            type: string
         targetMessageId:
           type: string
     MessagesResource:

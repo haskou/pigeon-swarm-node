@@ -28,7 +28,6 @@ describe('CommunityChannelMessagesViewModel', () => {
   ): CommunityChannelMessage {
     return {
       toPrimitives: () => ({
-        attachmentExternalIdentifiers: [] as string[],
         authorIdentityId: 'author-id',
         channelId: 'channel-id',
         communityId: 'community-id',
@@ -48,7 +47,6 @@ describe('CommunityChannelMessagesViewModel', () => {
   ): CommunityChannelMessage {
     return {
       toPrimitives: () => ({
-        attachmentExternalIdentifiers: [] as string[],
         authorIdentityId: 'author-id',
         channelId: 'channel-id',
         communityId: 'community-id',

@@ -20,7 +20,6 @@ export class PostConversationMessageRequest {
         this.body.encryptedPayload,
         this.body.signature,
         this.body.createdAt,
-        this.body.attachmentExternalIdentifiers,
         this.body.previousMessageIds,
         this.body.replyToMessageId,
       ),

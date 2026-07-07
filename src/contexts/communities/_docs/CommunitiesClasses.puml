@@ -216,9 +216,9 @@ package "communities/domain" {
     + leave(member): void
     + banMember(actor, member): void
     + unbanMember(actor, member): void
-    + sendChannelMessage(metadata, payload, signature, attachments, mentions): CommunityChannelMessage
+    + sendChannelMessage(metadata, payload, signature, mentions): CommunityChannelMessage
     + acceptSentChannelMessage(message, payload): CommunityChannelMessage
-    + editChannelMessage(actor, targetMessage, channelId, payload, signature, editedAt, attachments, mentions): CommunityChannelMessage
+    + editChannelMessage(actor, targetMessage, channelId, payload, signature, editedAt, mentions): CommunityChannelMessage
     + reactWithSticker(identityId, channelId, messageId, emoji): CommunityChannelMessageReaction
     + deleteChannelMessage(actor, targetMessage, channelId): void
     + viewTextChannel(identityId, channelId): void
@@ -329,14 +329,8 @@ package "communities/domain" {
     - payload: CommunityChannelMessagePayload
     - signature: Signature
     - createdAt: Timestamp
-    - attachmentExternalIdentifiers: CommunityChannelMessageAttachments
     - mentions: CommunityChannelMessageMentions
     + create(...): CommunityChannelMessage
-  }
-
-  class CommunityChannelMessageAttachments {
-    - attachments: CommunityChannelAttachmentId[]
-    + toArray(): CommunityChannelAttachmentId[]
   }
 
   class CommunityChannelMessageMentions {
@@ -438,7 +432,6 @@ package "communities/domain" {
   class CommunityChannelMessageMention
   class CommunityChannelMessageEncryptedPayload
   class CommunityChannelMessagePlaintextPayload
-  class CommunityChannelAttachmentId
   class CommunityVisibility
   class CommunityChannelMessageReactionEmoji
   class CommunityInviteToken
@@ -525,11 +518,10 @@ package "communities/domain" {
   CommunityChannelMessage --> CommunityId
   CommunityChannelMessage --> CommunityChannelId
   CommunityChannelMessage --> IdentityId
-  CommunityChannelMessage --> CommunityChannelMessagePayload
-  CommunityChannelMessagePayload --> CommunityChannelMessageEncryptedPayload
-  CommunityChannelMessagePayload --> CommunityChannelMessagePlaintextPayload
-  CommunityChannelMessage --> CommunityChannelAttachmentId
-  CommunityChannelMessageReaction --> CommunityId
+CommunityChannelMessage --> CommunityChannelMessagePayload
+CommunityChannelMessagePayload --> CommunityChannelMessageEncryptedPayload
+CommunityChannelMessagePayload --> CommunityChannelMessagePlaintextPayload
+CommunityChannelMessageReaction --> CommunityId
   CommunityChannelMessageReaction --> CommunityChannelId
   CommunityChannelMessageReaction --> CommunityChannelMessageId
   CommunityChannelMessageReaction --> IdentityId

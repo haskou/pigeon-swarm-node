@@ -84,13 +84,13 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('first'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000000)),
+      new MessageSendOptions(new Timestamp(1780000000000)),
     );
     conversation.sendMessage(
       mother.recipient,
       new EncryptedMessagePayload('second'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000001)),
+      new MessageSendOptions(new Timestamp(1780000000001)),
     );
 
     await repository.save(conversation);
@@ -141,13 +141,13 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('first'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000000)),
+      new MessageSendOptions(new Timestamp(1780000000000)),
     );
     conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('second'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000001)),
+      new MessageSendOptions(new Timestamp(1780000000001)),
     );
     await repository.save(conversation);
 
@@ -285,13 +285,13 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('first'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000000)),
+      new MessageSendOptions(new Timestamp(1780000000000)),
     );
     secondConversation.sendMessage(
       secondAuthor,
       new EncryptedMessagePayload('second'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000001)),
+      new MessageSendOptions(new Timestamp(1780000000001)),
     );
     await repository.save(firstConversation);
     await repository.save(secondConversation);
@@ -328,7 +328,7 @@ describe('OrbitDBConversationRepository', () => {
       mother.author,
       new EncryptedMessagePayload('target'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000000)),
+      new MessageSendOptions(new Timestamp(1780000000000)),
     );
     await repository.save(conversation);
 
@@ -361,7 +361,7 @@ describe('OrbitDBConversationRepository', () => {
         mother.author,
         new EncryptedMessagePayload(`existing-${index}`),
         signature(),
-        new MessageSendOptions([], new Timestamp(1780000000000 + index)),
+        new MessageSendOptions(new Timestamp(1780000000000 + index)),
       );
     }
     await repository.save(conversation);
@@ -370,7 +370,7 @@ describe('OrbitDBConversationRepository', () => {
       mother.recipient,
       new EncryptedMessagePayload('new'),
       signature(),
-      new MessageSendOptions([], new Timestamp(1780000000010)),
+      new MessageSendOptions(new Timestamp(1780000000010)),
     );
     const findHead = jest.spyOn(registry, 'findHead');
     findHead.mockClear();

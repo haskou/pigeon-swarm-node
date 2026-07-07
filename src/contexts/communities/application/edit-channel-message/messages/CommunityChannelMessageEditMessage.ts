@@ -1,13 +1,11 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature, Timestamp } from '@haskou/value-objects';
 
-import { CommunityChannelMessageAttachments } from '../../../domain/CommunityChannelMessageAttachments';
 import { CommunityChannelMessageMentions } from '../../../domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessageEdition } from '../../../domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '../../../domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessagePayload } from '../../../domain/entities/messages/CommunityChannelMessagePayload';
 import { CommunityChannelMessageSignaturePayload } from '../../../domain/entities/messages/CommunityChannelMessageSignaturePayload';
-import { CommunityChannelAttachmentId } from '../../../domain/value-objects/CommunityChannelAttachmentId';
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
@@ -25,7 +23,6 @@ export class CommunityChannelMessageEditMessage {
 
   constructor(input: {
     actorIdentityId: string;
-    attachmentExternalIdentifiers?: string[];
     channelId: string;
     communityId: string;
     createdAt: number;
@@ -56,25 +53,14 @@ export class CommunityChannelMessageEditMessage {
           ),
       ),
     );
-    const attachmentExternalIdentifiers =
-      CommunityChannelMessageAttachments.from(
-        (input.attachmentExternalIdentifiers ?? []).map(
-          (externalIdentifier) =>
-            new CommunityChannelAttachmentId(externalIdentifier),
-        ),
-      );
-
     this.edition = new CommunityChannelMessageEdition(
       payload,
       this.signature,
       new Timestamp(input.createdAt),
-      attachmentExternalIdentifiers,
       mentions,
     );
     this.signaturePayload =
       CommunityChannelMessageSignaturePayload.fromPrimitives({
-        attachmentExternalIdentifiers:
-          input.attachmentExternalIdentifiers ?? [],
         authorIdentityId: input.actorIdentityId,
         channelId: input.channelId,
         communityId: input.communityId,

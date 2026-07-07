@@ -1,12 +1,13 @@
 import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import { PublicKey, Signature } from '@haskou/value-objects';
+import { mock } from 'jest-mock-extended';
 
 describe('CommunityChannelMessageSignatureDomainService', () => {
   it('builds sent channel messages canonical signing content', () => {
     const serializedPayload =
       new CommunityChannelMessageSignatureDomainService().getCanonicalSigningContent(
         CommunityChannelMessageSignaturePayload.fromPrimitives({
-          attachmentExternalIdentifiers: [],
           authorIdentityId: 'identity-id',
           channelId: 'channel-id',
           communityId: 'community-id',
@@ -18,7 +19,7 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
       );
 
     expect(serializedPayload).toBe(
-      '{"attachmentExternalIdentifiers":[],"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"encryptedPayload":"encrypted-community-message-payload","id":"community-message-id","type":"sent"}',
+      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"encryptedPayload":"encrypted-community-message-payload","id":"community-message-id","type":"sent"}',
     );
   });
 
@@ -26,7 +27,6 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
     const serializedPayload =
       new CommunityChannelMessageSignatureDomainService().getCanonicalSigningContent(
         CommunityChannelMessageSignaturePayload.fromPrimitives({
-          attachmentExternalIdentifiers: [],
           authorIdentityId: 'identity-id',
           channelId: 'channel-id',
           communityId: 'community-id',
@@ -38,7 +38,7 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
       );
 
     expect(serializedPayload).toBe(
-      '{"attachmentExternalIdentifiers":[],"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"public-community-message-payload","type":"sent"}',
+      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"public-community-message-payload","type":"sent"}',
     );
   });
 
@@ -46,7 +46,6 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
     const serializedPayload =
       new CommunityChannelMessageSignatureDomainService().getCanonicalSigningContent(
         CommunityChannelMessageSignaturePayload.fromPrimitives({
-          attachmentExternalIdentifiers: [],
           authorIdentityId: 'identity-id',
           channelId: 'channel-id',
           communityId: 'community-id',
@@ -58,7 +57,7 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
       );
 
     expect(serializedPayload).toBe(
-      '{"attachmentExternalIdentifiers":[],"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"public-poll-message-payload","type":"poll"}',
+      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"public-poll-message-payload","type":"poll"}',
     );
   });
 
@@ -85,7 +84,6 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
     const serializedPayload =
       new CommunityChannelMessageSignatureDomainService().getCanonicalSigningContent(
         CommunityChannelMessageSignaturePayload.fromPrimitives({
-          attachmentExternalIdentifiers: [],
           authorIdentityId: 'identity-id',
           channelId: 'channel-id',
           communityId: 'community-id',
@@ -97,7 +95,7 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
       );
 
     expect(serializedPayload).toBe(
-      '{"attachmentExternalIdentifiers":[],"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"encryptedPayload":"edited-community-message-payload","id":"community-message-id","type":"edited"}',
+      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"encryptedPayload":"edited-community-message-payload","id":"community-message-id","type":"edited"}',
     );
   });
 
@@ -105,7 +103,6 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
     const serializedPayload =
       new CommunityChannelMessageSignatureDomainService().getCanonicalSigningContent(
         CommunityChannelMessageSignaturePayload.fromPrimitives({
-          attachmentExternalIdentifiers: [],
           authorIdentityId: 'identity-id',
           channelId: 'channel-id',
           communityId: 'community-id',
@@ -117,7 +114,37 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
       );
 
     expect(serializedPayload).toBe(
-      '{"attachmentExternalIdentifiers":[],"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"edited-public-community-message-payload","type":"edited"}',
+      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"edited-public-community-message-payload","type":"edited"}',
     );
+  });
+
+  it('accepts legacy channel message signatures with empty attachment identifiers', () => {
+    const publicKey = mock<PublicKey>();
+    const signature = new Signature(
+      'N19zbyYoEWjEZZ9YlXHiWFV3zDFzgApaAhlX9LtJZdS0OwniOywLmU1hjyfB4IaU45Ka5kSSTUwdCcfSEEWQBQ==',
+    );
+    const payload = CommunityChannelMessageSignaturePayload.fromPrimitives({
+      authorIdentityId: 'identity-id',
+      channelId: 'channel-id',
+      communityId: 'community-id',
+      createdAt: 1778536870557,
+      encryptedPayload: 'encrypted-community-message-payload',
+      id: 'community-message-id',
+      type: 'sent',
+    });
+    const legacySigningContent =
+      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"encryptedPayload":"encrypted-community-message-payload","id":"community-message-id","type":"sent","attachmentExternalIdentifiers":[]}';
+
+    publicKey.isValidSignature.mockImplementation(
+      (signingContent) => signingContent === legacySigningContent,
+    );
+
+    expect(
+      new CommunityChannelMessageSignatureDomainService().isValidSignature(
+        publicKey,
+        payload,
+        signature,
+      ),
+    ).toBe(true);
   });
 });

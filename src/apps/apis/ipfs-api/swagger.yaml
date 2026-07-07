@@ -11,7 +11,7 @@ paths:
       tags:
         - ipfs
       summary: Publish encrypted private content to a selected IPFS network
-      description: Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document in the selected network, and returns the CID to reference from encrypted message payloads and attachmentExternalIdentifiers.
+      description: Accepts raw encrypted bytes from the client, stores them as an opaque private JSON IPFS document in the selected network, and returns the CID to reference from encrypted message payloads.
       security:
         - signedRequest: []
       parameters:

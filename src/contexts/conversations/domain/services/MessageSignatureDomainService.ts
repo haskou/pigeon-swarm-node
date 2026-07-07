@@ -31,10 +31,11 @@ export default class MessageSignatureDomainService {
     payload: MessageSignaturePayload,
     signature: Signature,
   ): boolean {
-    return publicKey.isValidSignature(
-      this.getCanonicalSigningContent(payload),
-      signature,
-    );
+    return payload
+      .toSigningPrimitiveCandidates()
+      .some((candidate) =>
+        publicKey.isValidSignature(JSON.stringify(candidate), signature),
+      );
   }
 
   public assertValidMessageSignature(message: Message): void {

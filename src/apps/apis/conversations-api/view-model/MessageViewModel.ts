@@ -14,7 +14,6 @@ export class MessageViewModel {
     const primitives = this.message.toPrimitives();
 
     return {
-      attachmentExternalIdentifiers: primitives.attachmentExternalIdentifiers,
       authorIdentityId: primitives.authorId,
       conversationId: primitives.conversationId,
       createdAt: primitives.createdAt,
