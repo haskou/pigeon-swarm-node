@@ -1,9 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import https from 'https';
 
-import HttpClient from './HttpClient';
-
-export type HttpConfig = Record<string, unknown>;
+import { HttpClient } from './HttpClient';
 
 export default class AxiosHttpClient implements HttpClient {
   public baseUrl: string;
@@ -20,7 +18,7 @@ export default class AxiosHttpClient implements HttpClient {
     };
   }
 
-  public client(data?: HttpConfig): AxiosInstance {
+  public client(data?: Record<string, unknown>): AxiosInstance {
     return axios.create({
       baseURL: `${this.baseUrl}`,
       data,

@@ -2,7 +2,8 @@ import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
 import * as fsSync from 'fs';
 import { createHash, createPrivateKey } from 'node:crypto';
 
-import heliaRuntimeAdapter, {
+import {
+  heliaRuntimeAdapter,
   Libp2pDefaults,
   RuntimeBlockstore,
   RuntimeDatastore,

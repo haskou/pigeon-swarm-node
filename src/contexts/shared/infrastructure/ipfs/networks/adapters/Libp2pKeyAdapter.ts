@@ -106,6 +106,4 @@ export class Libp2pKeyAdapter {
   }
 }
 
-const libp2pKeyAdapter = new Libp2pKeyAdapter();
-
-export default libp2pKeyAdapter;
+export const libp2pKeyAdapter = new Libp2pKeyAdapter();

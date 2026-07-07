@@ -633,6 +633,4 @@ export class HeliaRuntimeAdapter {
   }
 }
 
-const heliaRuntimeAdapter = new HeliaRuntimeAdapter();
-
-export default heliaRuntimeAdapter;
+export const heliaRuntimeAdapter = new HeliaRuntimeAdapter();

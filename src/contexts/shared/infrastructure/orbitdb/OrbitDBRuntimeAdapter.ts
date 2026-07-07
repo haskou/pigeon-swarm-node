@@ -44,6 +44,4 @@ export class OrbitDBRuntimeAdapter {
   }
 }
 
-const orbitDBRuntimeAdapter = new OrbitDBRuntimeAdapter();
-
-export default orbitDBRuntimeAdapter;
+export const orbitDBRuntimeAdapter = new OrbitDBRuntimeAdapter();

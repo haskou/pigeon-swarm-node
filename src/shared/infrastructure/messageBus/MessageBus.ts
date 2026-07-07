@@ -13,7 +13,7 @@ import { webSocketEventHub } from '../websocket/WebSocketEventHub';
 import Libp2pGossipsubAdapter from './libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from './memory/MemoryMessageBusAdapter';
 import { Message } from './Message';
-import MessageBusAdapter from './MessageBusAdapter';
+import { MessageBusAdapter } from './MessageBusAdapter';
 
 type LocalSubscriptionHandler = {
   DomainEventInstance: typeof DomainEvent;

@@ -3,7 +3,7 @@ import IpfsIdentityRouting from '@app/contexts/identities/infrastructure/ipfs/Ip
 import IpfsKeychainRouting from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Log from '@app/shared/infrastructure/logs/Log';
+import { Log } from '@app/shared/infrastructure/logs/Log';
 import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 

@@ -1,7 +1,7 @@
 import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/ContentReplicationMaintenanceScheduler';
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
 import { ContentReplicationMaintenanceResult } from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintenanceResult';
-import Log from '@app/shared/infrastructure/logs/Log';
+import { Log } from '@app/shared/infrastructure/logs/Log';
 import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 

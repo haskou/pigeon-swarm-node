@@ -1,6 +1,6 @@
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
-interface MessageBusAdapter {
+export interface MessageBusAdapter {
   consume(
     queueName: string,
     bindingKey: string,
@@ -11,5 +11,3 @@ interface MessageBusAdapter {
 
   publish(domainEvents: DomainEvent[]): Promise<void>;
 }
-
-export default MessageBusAdapter;

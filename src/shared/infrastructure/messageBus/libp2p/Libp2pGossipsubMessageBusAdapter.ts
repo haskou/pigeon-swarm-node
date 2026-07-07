@@ -6,7 +6,7 @@ import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import { Message } from '../Message';
-import MessageBusAdapter from '../MessageBusAdapter';
+import { MessageBusAdapter } from '../MessageBusAdapter';
 import PubSubNetworkMessageCodec from './PubSubNetworkMessageCodec';
 import PubSubTopicResolver from './PubSubTopicResolver';
 

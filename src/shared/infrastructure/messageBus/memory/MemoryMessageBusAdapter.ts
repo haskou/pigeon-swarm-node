@@ -4,7 +4,7 @@ import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import { Message } from '../Message';
-import MessageBusAdapter from '../MessageBusAdapter';
+import { MessageBusAdapter } from '../MessageBusAdapter';
 
 type MemoryMessage = {
   routingKey: string;

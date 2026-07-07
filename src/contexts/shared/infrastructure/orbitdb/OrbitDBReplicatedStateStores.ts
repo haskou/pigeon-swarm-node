@@ -9,7 +9,7 @@ import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBInstance } from './OrbitDBInstance';
 import { OrbitDBReplicatedStoreAddresses } from './OrbitDBReplicatedStoreAddresses';
 import { OrbitDBReplicatedStoreSet } from './OrbitDBReplicatedStoreSet';
-import orbitDBRuntimeAdapter from './OrbitDBRuntimeAdapter';
+import { orbitDBRuntimeAdapter } from './OrbitDBRuntimeAdapter';
 
 export class OrbitDBReplicatedStateStores {
   private static readonly syncErrorWarningKeys = new Set<string>();

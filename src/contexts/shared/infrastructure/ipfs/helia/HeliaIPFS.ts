@@ -10,7 +10,8 @@ import * as fs from 'fs/promises';
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPrivateKeyLike';
-import heliaRuntimeAdapter, {
+import {
+  heliaRuntimeAdapter,
   DatastoreKeyLike,
   HeliaInstance,
   HeliaLibp2pConfig,
