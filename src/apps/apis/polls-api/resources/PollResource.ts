@@ -13,7 +13,6 @@ export interface PollResource {
     channelId?: string;
     communityId?: string;
     conversationId?: string;
-    networkId: string;
     type: string;
   };
   status: string;

@@ -11,7 +11,6 @@ import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptio
 import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('Poll', () => {
@@ -21,11 +20,9 @@ describe('Poll', () => {
   const voter = new IdentityId(
     'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
   );
-  const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440001');
   const scope = PollScope.communityChannel(
     new CommunityId('community'),
     new CommunityChannelId('channel'),
-    networkId,
   );
   const options = [
     PollOption.create(new PollOptionId('a'), new PollOptionText('Option A')),
@@ -82,7 +79,7 @@ describe('Poll', () => {
     expect(events).toHaveLength(1);
     expect(events[0].eventName()).toBe('polls.v1.poll.was_created');
     expect(JSON.parse(events[0].decode())).toMatchObject({
-      aggregate_id: scope.selectEventStreamId(),
+      aggregate_id: 'community',
       attributes: {
         memberIds: [creator.valueOf(), voter.valueOf()],
         poll: {

@@ -191,7 +191,6 @@ components:
         scope:
           type: object
           required:
-            - networkId
             - type
           properties:
             channelId:
@@ -199,8 +198,6 @@ components:
             communityId:
               type: string
             conversationId:
-              type: string
-            networkId:
               type: string
             type:
               type: string

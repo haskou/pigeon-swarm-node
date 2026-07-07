@@ -1,8 +1,11 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageMetadata } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMetadata';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessagePollOptions } from '@app/contexts/conversations/domain/value-objects/MessagePollOptions';
 
 import { PollTimelineMessageRegisterMessage } from './messages/PollTimelineMessageRegisterMessage';
@@ -16,13 +19,8 @@ export default class PollTimelineMessageRegistrar {
 
   private async registerConversationTimelineMessage(
     message: PollTimelineMessageRegisterMessage,
+    conversationId: ConversationId,
   ): Promise<void> {
-    const scope = message.poll.getScope();
-    const conversationId = scope.getConversationId();
-
-    if (!conversationId) {
-      return;
-    }
     const conversation =
       await this.conversationRepository.findById(conversationId);
 
@@ -40,14 +38,9 @@ export default class PollTimelineMessageRegistrar {
 
   private async registerCommunityChannelTimelineMessage(
     message: PollTimelineMessageRegisterMessage,
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
   ): Promise<void> {
-    const scope = message.poll.getScope();
-    const communityId = scope.getCommunityId();
-    const channelId = scope.getChannelId();
-
-    if (!communityId || !channelId) {
-      return;
-    }
     await this.communityMessageRepository.save(
       CommunityChannelMessage.poll(
         new CommunityChannelMessageMetadata(
@@ -65,7 +58,15 @@ export default class PollTimelineMessageRegistrar {
   public async register(
     message: PollTimelineMessageRegisterMessage,
   ): Promise<void> {
-    await this.registerConversationTimelineMessage(message);
-    await this.registerCommunityChannelTimelineMessage(message);
+    await message.poll.getScope().match<Promise<void>>({
+      communityChannel: (communityId, channelId) =>
+        this.registerCommunityChannelTimelineMessage(
+          message,
+          communityId,
+          channelId,
+        ),
+      groupConversation: (conversationId) =>
+        this.registerConversationTimelineMessage(message, conversationId),
+    });
   }
 }

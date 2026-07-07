@@ -1,3 +1,8 @@
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
 import { PollScope } from '@app/contexts/polls/domain/PollScope';
@@ -5,12 +10,9 @@ import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptio
 import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
 import OrbitDBPollRepository from '@app/contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 type Entry = {
   key?: string;
@@ -74,20 +76,15 @@ describe('OrbitDBPollRepository', () => {
   let polls: ReturnType<typeof createStore>;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBPollRepository;
+  let communityRepository: MockProxy<CommunityRepository>;
+  let conversationRepository: MockProxy<ConversationRepository>;
 
   function poll(scope: 'community_channel' | 'group_conversation'): Poll {
     return Poll.create(
       new IdentityId(creatorIdentityId),
       scope === 'community_channel'
-        ? PollScope.communityChannel(
-            communityId,
-            channelId,
-            new NetworkId(networkId),
-          )
-        : PollScope.groupConversation(
-            conversationId,
-            new NetworkId(networkId),
-          ),
+        ? PollScope.communityChannel(communityId, channelId)
+        : PollScope.groupConversation(conversationId),
       new PollQuestion('Question?'),
       [
         PollOption.create(
@@ -103,11 +100,23 @@ describe('OrbitDBPollRepository', () => {
   beforeEach(() => {
     polls = createStore();
     registry = new OrbitDBReplicatedStateRegistry();
+    communityRepository = mock<CommunityRepository>();
+    conversationRepository = mock<ConversationRepository>();
     registry.register(networkId, {
       heads: createStore(),
       polls,
     } as never);
-    repository = new OrbitDBPollRepository(registry);
+    communityRepository.findById.mockResolvedValue({
+      toPrimitives: () => ({ networkId }),
+    } as never);
+    conversationRepository.findMetadataById.mockResolvedValue({
+      toPrimitives: () => ({ networkId }),
+    } as never);
+    repository = new OrbitDBPollRepository(
+      registry,
+      communityRepository,
+      conversationRepository,
+    );
   });
 
   afterEach(() => {
@@ -118,6 +127,7 @@ describe('OrbitDBPollRepository', () => {
     const savedPoll = poll('community_channel');
 
     await repository.save(savedPoll);
+    const storedDocument = await polls.get(savedPoll.getId().valueOf());
     polls.query.mockClear();
 
     const result = await repository.findByCommunityChannel(
@@ -129,6 +139,17 @@ describe('OrbitDBPollRepository', () => {
     expect(result.map((item) => item.toPrimitives().id)).toEqual([
       savedPoll.getId().valueOf(),
     ]);
+    expect(communityRepository.findById).toHaveBeenCalledWith(communityId);
+    expect(storedDocument).toMatchObject({
+      networkId,
+      scope: {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        type: 'community_channel',
+      },
+    });
+    expect(storedDocument?.scope).not.toHaveProperty('networkId');
+    expect(storedDocument?.scope).not.toHaveProperty('conversationId');
     expect(polls.query).not.toHaveBeenCalled();
   });
 
@@ -136,6 +157,7 @@ describe('OrbitDBPollRepository', () => {
     const savedPoll = poll('group_conversation');
 
     await repository.save(savedPoll);
+    const storedDocument = await polls.get(savedPoll.getId().valueOf());
     polls.query.mockClear();
 
     const result = await repository.findByGroupConversation(
@@ -146,6 +168,19 @@ describe('OrbitDBPollRepository', () => {
     expect(result.map((item) => item.toPrimitives().id)).toEqual([
       savedPoll.getId().valueOf(),
     ]);
+    expect(conversationRepository.findMetadataById).toHaveBeenCalledWith(
+      conversationId,
+    );
+    expect(storedDocument).toMatchObject({
+      networkId,
+      scope: {
+        conversationId: conversationId.valueOf(),
+        type: 'group_conversation',
+      },
+    });
+    expect(storedDocument?.scope).not.toHaveProperty('networkId');
+    expect(storedDocument?.scope).not.toHaveProperty('channelId');
+    expect(storedDocument?.scope).not.toHaveProperty('communityId');
     expect(polls.query).not.toHaveBeenCalled();
   });
 
