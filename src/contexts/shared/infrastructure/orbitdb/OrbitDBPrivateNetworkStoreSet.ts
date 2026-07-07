@@ -1,11 +1,10 @@
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBInstance } from './OrbitDBInstance';
 
-export type OrbitDBReplicatedStoreSet = {
+export type OrbitDBPrivateNetworkStoreSet = {
   calls: OrbitDBDatabase;
   communities: OrbitDBDatabase;
   conversations: OrbitDBDatabase;
-  events: OrbitDBDatabase;
   heads: OrbitDBDatabase;
   identities: OrbitDBDatabase;
   contentReplication: OrbitDBDatabase;

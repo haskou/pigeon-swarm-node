@@ -1,8 +1,7 @@
-export type OrbitDBReplicatedStoreAddresses = {
+export type OrbitDBPrivateNetworkStoreAddresses = {
   calls: string;
   communities: string;
   conversations: string;
-  events: string;
   heads: string;
   identities: string;
   contentReplication: string;

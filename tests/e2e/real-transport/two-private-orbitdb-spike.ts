@@ -28,6 +28,7 @@ type OrbitDatabase = {
   close(): Promise<void>;
   del?(key: string): Promise<string>;
   events: {
+    on(event: 'error', handler: (error: unknown) => void): void;
     on(event: 'update', handler: (entry: OrbitEntry) => void): void;
   };
   get?(key: string): Promise<{ key?: string; value: unknown } | unknown>;
@@ -92,7 +93,6 @@ type PrivateOrbitNode = {
 
 type StoreAddresses = {
   communities: string;
-  events: string;
   heads: string;
   identities: string;
   keychains: string;
@@ -101,7 +101,7 @@ type StoreAddresses = {
   requests: string;
 };
 
-type ProjectionStores = {
+type PrivateOrbitDbStores = {
   communities: OrbitDatabase;
   heads: OrbitDatabase;
   identities: OrbitDatabase;
@@ -111,263 +111,12 @@ type ProjectionStores = {
   requests: OrbitDatabase;
 };
 
-type DomainEvent =
-  | {
-      cid: string;
-      identityId: string;
-      type: 'identity.updated';
-    }
-  | {
-      cid: string;
-      identityId: string;
-      type: 'keychain.updated';
-    }
-  | {
-      channelId: string;
-      communityId: string;
-      memberIds: string[];
-      type: 'community.created';
-    }
-  | {
-      body: string;
-      conversationId: string;
-      createdAt: number;
-      messageId: string;
-      type: 'message.created';
-    }
-  | {
-      body: string;
-      editedAt: number;
-      messageId: string;
-      type: 'message.edited';
-    }
-  | {
-      conversationId: string;
-      identityId: string;
-      messageId: string;
-      readAt: number;
-      type: 'message.read';
-    }
-  | {
-      identityId: string;
-      notificationId: string;
-      scopeId: string;
-      type: 'notification.created';
-    }
-  | {
-      communityId: string;
-      inviteId: string;
-      invitedIdentityId: string;
-      status: 'pending';
-      type: 'community.invite.created';
-    }
-  | {
-      communityId: string;
-      requestId: string;
-      requesterIdentityId: string;
-      status: 'pending';
-      type: 'community.membership_request.created';
-    };
-
-type DomainEventEnvelope = {
-  event: DomainEvent;
-  eventId: string;
-};
-
 type TestLogger = {
   debug(message: string): void;
   error(message: string): void;
   info(message: string): void;
   warn(message: string): void;
 };
-
-class OrbitDbProjection {
-  private readonly processedEventIds = new Set<string>();
-  private readonly websocketEvents: string[] = [];
-
-  constructor(
-    private readonly eventStore: OrbitDatabase,
-    private readonly stores: ProjectionStores,
-  ) {}
-
-  public getWebsocketEvents(): string[] {
-    return [...this.websocketEvents];
-  }
-
-  public async start(): Promise<void> {
-    await this.replayExistingEvents();
-    this.eventStore.events.on('update', (entry) => {
-      this.projectEntry(entry).catch((error: unknown) => {
-        throw error;
-      });
-    });
-  }
-
-  private async replayExistingEvents(): Promise<void> {
-    const entries = await this.eventStore.all?.();
-
-    for (const entry of entries || []) {
-      await this.projectValue(entry.value);
-    }
-  }
-
-  private async projectEntry(entry: OrbitEntry): Promise<void> {
-    await this.projectValue(entry.payload?.value);
-  }
-
-  private async projectValue(value: unknown): Promise<void> {
-    if (!this.isDomainEventEnvelope(value)) {
-      return;
-    }
-
-    if (this.processedEventIds.has(value.eventId)) {
-      return;
-    }
-
-    this.processedEventIds.add(value.eventId);
-    await this.projectDomainEvent(value.event);
-    this.websocketEvents.push(value.event.type);
-  }
-
-  private isDomainEventEnvelope(value: unknown): value is DomainEventEnvelope {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      'eventId' in value &&
-      'event' in value
-    );
-  }
-
-  private async projectDomainEvent(event: DomainEvent): Promise<void> {
-    if (event.type === 'identity.updated') {
-      await this.putDocument(this.stores.identities, {
-        cid: event.cid,
-        id: event.identityId,
-      });
-
-      return;
-    }
-
-    if (event.type === 'keychain.updated') {
-      await this.putDocument(this.stores.keychains, {
-        cid: event.cid,
-        id: event.identityId,
-      });
-
-      return;
-    }
-
-    if (event.type === 'community.created') {
-      await this.putDocument(this.stores.communities, {
-        channelIds: [event.channelId],
-        id: event.communityId,
-        memberIds: event.memberIds,
-      });
-
-      return;
-    }
-
-    if (event.type === 'message.created') {
-      await this.putDocument(this.stores.messages, {
-        body: event.body,
-        conversationId: event.conversationId,
-        createdAt: event.createdAt,
-        editedAt: null,
-        id: event.messageId,
-      });
-      await this.putKey(
-        `latest-message:${event.conversationId}`,
-        event.messageId,
-      );
-
-      return;
-    }
-
-    if (event.type === 'message.edited') {
-      const existing = await this.getDocument(this.stores.messages, event.messageId);
-      await this.putDocument(this.stores.messages, {
-        ...existing,
-        body: event.body,
-        editedAt: event.editedAt,
-        id: event.messageId,
-      });
-
-      return;
-    }
-
-    if (event.type === 'message.read') {
-      await this.putKey(
-        `read-marker:${event.conversationId}:${event.identityId}`,
-        {
-          messageId: event.messageId,
-          readAt: event.readAt,
-        },
-      );
-
-      return;
-    }
-
-    if (event.type === 'notification.created') {
-      await this.putDocument(this.stores.notifications, {
-        id: event.notificationId,
-        identityId: event.identityId,
-        scopeId: event.scopeId,
-      });
-
-      return;
-    }
-
-    if (event.type === 'community.invite.created') {
-      await this.putDocument(this.stores.requests, {
-        communityId: event.communityId,
-        id: event.inviteId,
-        identityId: event.invitedIdentityId,
-        kind: 'invite',
-        status: event.status,
-      });
-
-      return;
-    }
-
-    await this.putDocument(this.stores.requests, {
-      communityId: event.communityId,
-      id: event.requestId,
-      identityId: event.requesterIdentityId,
-      kind: 'join_request',
-      status: event.status,
-    });
-  }
-
-  private async getDocument(
-    store: OrbitDatabase,
-    key: string,
-  ): Promise<Record<string, unknown>> {
-    const entry = await store.get?.(key);
-
-    if (
-      typeof entry === 'object' &&
-      entry !== null &&
-      'value' in entry &&
-      typeof entry.value === 'object' &&
-      entry.value !== null
-    ) {
-      return entry.value as Record<string, unknown>;
-    }
-
-    return {};
-  }
-
-  private async putDocument(
-    store: OrbitDatabase,
-    document: Record<string, unknown>,
-  ): Promise<void> {
-    await store.put?.(document);
-  }
-
-  private async putKey(key: string, value: unknown): Promise<void> {
-    await this.stores.heads.put?.(key, value);
-  }
-}
 
 async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
@@ -391,13 +140,13 @@ async function main(): Promise<void> {
       'relay direct multiaddr',
     );
     const provider = await createNode('provider', networkKey, {
-      listenAddresses: [`${relayAddress}/p2p-circuit`],
+      listenAddresses: ['/ip4/127.0.0.1/tcp/0', `${relayAddress}/p2p-circuit`],
     });
     const requester = await createNode('requester', networkKey, {
-      listenAddresses: [`${relayAddress}/p2p-circuit`],
+      listenAddresses: ['/ip4/127.0.0.1/tcp/0', `${relayAddress}/p2p-circuit`],
     });
     const intruder = await createNode('intruder', networkKey, {
-      listenAddresses: [`${relayAddress}/p2p-circuit`],
+      listenAddresses: ['/ip4/127.0.0.1/tcp/0', `${relayAddress}/p2p-circuit`],
     });
     nodes.push(provider, requester, intruder);
 
@@ -422,30 +171,16 @@ async function main(): Promise<void> {
       writers,
     );
     assertSameStoreAddresses(providerStores, requesterStores);
-    const providerProjection = new OrbitDbProjection(
-      providerStores.events,
-      providerStores,
-    );
-    const requesterProjection = new OrbitDbProjection(
-      requesterStores.events,
-      requesterStores,
-    );
-
-    await providerProjection.start();
-    await requesterProjection.start();
-    await waitForOrbitPeer(providerStores.events);
-    await waitForOrbitPeer(requesterStores.events);
-    await assertAccessControl(providerStores.events, [
+    await waitForOrbitPeer(providerStores.identities);
+    await waitForOrbitPeer(requesterStores.identities);
+    await assertAccessControl(providerStores.identities, [
       provider.orbitdb.identity.id,
       requester.orbitdb.identity.id,
     ]);
 
-    const eventEnvelopes = createDomainEvents();
-    for (const envelope of eventEnvelopes) {
-      await providerStores.events.add?.(envelope);
-    }
+    await writeReplicatedDocuments(providerStores);
 
-    await assertQueryViability(requesterStores, requesterProjection);
+    await assertQueryViability(requesterStores);
     await assertUnauthorizedWriteIsRejected(
       orbitdbCore,
       intruder,
@@ -457,13 +192,13 @@ async function main(): Promise<void> {
       requester,
       writers,
     );
-    await assertQueryViability(restartedRequester.stores, restartedRequester.projection);
+    await assertQueryViability(restartedRequester.stores);
     await restartedRequester.orbitdb.stop();
 
     console.info(
       JSON.stringify(
         {
-          eventCount: eventEnvelopes.length,
+          replicatedStoreCount: Object.keys(getAddresses(providerStores)).length,
           providerPeerId: getPeerId(provider.helia),
           requesterPeerId: getPeerId(requester.helia),
           result: 'PASS',
@@ -532,20 +267,16 @@ async function openStores(
   orbitdbCore: OrbitDbCore,
   orbitdb: OrbitDbInstance,
   writers: string[],
-): Promise<ProjectionStores & { events: OrbitDatabase }> {
+): Promise<PrivateOrbitDbStores> {
   const AccessController = orbitdbCore.IPFSAccessController({ write: writers });
 
-  return {
+  const stores = {
     communities: await openDocuments(
       orbitdbCore,
       orbitdb,
       `${NETWORK_ID}/documents/communities`,
       AccessController,
     ),
-    events: await orbitdb.open(`${NETWORK_ID}/events/domain-events`, {
-      AccessController,
-      type: 'events',
-    }),
     heads: await orbitdb.open(`${NETWORK_ID}/keyvalue/heads`, {
       AccessController,
       type: 'keyvalue',
@@ -581,6 +312,20 @@ async function openStores(
       AccessController,
     ),
   };
+
+  registerSyncErrorLoggers(stores);
+
+  return stores;
+}
+
+function registerSyncErrorLoggers(stores: PrivateOrbitDbStores): void {
+  for (const [storeName, store] of Object.entries(stores)) {
+    store.events.on('error', (error: unknown) => {
+      console.warn(
+        `OrbitDB sync error handled in real-transport spike: store=${storeName} error=${String(error)}`,
+      );
+    });
+  }
 }
 
 async function openDocuments(
@@ -597,8 +342,8 @@ async function openDocuments(
 }
 
 function assertSameStoreAddresses(
-  providerStores: ProjectionStores & { events: OrbitDatabase },
-  requesterStores: ProjectionStores & { events: OrbitDatabase },
+  providerStores: PrivateOrbitDbStores,
+  requesterStores: PrivateOrbitDbStores,
 ): void {
   const providerAddresses = getAddresses(providerStores);
   const requesterAddresses = getAddresses(requesterStores);
@@ -613,10 +358,9 @@ function assertSameStoreAddresses(
   }
 }
 
-function getAddresses(stores: ProjectionStores & { events: OrbitDatabase }): StoreAddresses {
+function getAddresses(stores: PrivateOrbitDbStores): StoreAddresses {
   return {
     communities: stores.communities.address,
-    events: stores.events.address,
     heads: stores.heads.address,
     identities: stores.identities.address,
     keychains: stores.keychains.address,
@@ -632,16 +376,13 @@ async function restartOrbitDb(
   writers: string[],
 ): Promise<{
   orbitdb: OrbitDbInstance;
-  projection: OrbitDbProjection;
-  stores: ProjectionStores & { events: OrbitDatabase };
+  stores: PrivateOrbitDbStores;
 }> {
   await node.orbitdb?.stop();
   const orbitdb = await createOrbitDb(orbitdbCore, node);
   const stores = await openStores(orbitdbCore, orbitdb, writers);
-  const projection = new OrbitDbProjection(stores.events, stores);
-  await projection.start();
 
-  return { orbitdb, projection, stores };
+  return { orbitdb, stores };
 }
 
 async function connectThroughRelay(
@@ -772,99 +513,58 @@ function generateNetworkKey(): string {
   return privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
 }
 
-function createDomainEvents(): DomainEventEnvelope[] {
-  return [
-    {
-      event: {
-        cid: 'cid-identity-hasko-v2',
-        identityId: 'identity-hasko',
-        type: 'identity.updated',
-      },
-      eventId: 'event-identity-updated',
-    },
-    {
-      event: {
-        cid: 'cid-keychain-hasko-v5',
-        identityId: 'identity-hasko',
-        type: 'keychain.updated',
-      },
-      eventId: 'event-keychain-updated',
-    },
-    {
-      event: {
-        channelId: 'channel-general',
-        communityId: 'community-alpha',
-        memberIds: ['identity-hasko', 'identity-maria'],
-        type: 'community.created',
-      },
-      eventId: 'event-community-created',
-    },
-    {
-      event: {
-        body: 'Initial encrypted/plain payload reference',
-        conversationId: 'group:orbitdb-spike',
-        createdAt: 1781020000000,
-        messageId: 'message-1',
-        type: 'message.created',
-      },
-      eventId: 'event-message-created',
-    },
-    {
-      event: {
-        body: 'Edited payload reference',
-        editedAt: 1781020005000,
-        messageId: 'message-1',
-        type: 'message.edited',
-      },
-      eventId: 'event-message-edited',
-    },
-    {
-      event: {
-        conversationId: 'group:orbitdb-spike',
-        identityId: 'identity-maria',
-        messageId: 'message-1',
-        readAt: 1781020006000,
-        type: 'message.read',
-      },
-      eventId: 'event-message-read',
-    },
-    {
-      event: {
-        identityId: 'identity-maria',
-        notificationId: 'notification-1',
-        scopeId: 'group:orbitdb-spike',
-        type: 'notification.created',
-      },
-      eventId: 'event-notification-created',
-    },
-    {
-      event: {
-        communityId: 'community-alpha',
-        inviteId: 'invite-1',
-        invitedIdentityId: 'identity-maria',
-        status: 'pending',
-        type: 'community.invite.created',
-      },
-      eventId: 'event-community-invite-created',
-    },
-    {
-      event: {
-        communityId: 'community-alpha',
-        requestId: 'join-request-1',
-        requesterIdentityId: 'identity-yuki',
-        status: 'pending',
-        type: 'community.membership_request.created',
-      },
-      eventId: 'event-community-membership-request-created',
-    },
-  ];
+async function writeReplicatedDocuments(stores: PrivateOrbitDbStores): Promise<void> {
+  await stores.identities.put?.({
+    cid: 'cid-identity-hasko-v2',
+    id: 'identity-hasko',
+  });
+  await stores.keychains.put?.({
+    cid: 'cid-keychain-hasko-v5',
+    id: 'identity-hasko',
+  });
+  await stores.communities.put?.({
+    channelIds: ['channel-general'],
+    id: 'community-alpha',
+    memberIds: ['identity-hasko', 'identity-maria'],
+  });
+  await stores.messages.put?.({
+    body: 'Edited payload reference',
+    conversationId: 'group:orbitdb-spike',
+    createdAt: 1781020000000,
+    editedAt: 1781020005000,
+    id: 'message-1',
+  });
+  await stores.heads.put?.('latest-message:group:orbitdb-spike', 'message-1');
+  await stores.heads.put?.('read-marker:group:orbitdb-spike:identity-maria', {
+    messageId: 'message-1',
+    readAt: 1781020006000,
+  });
+  await stores.notifications.put?.({
+    id: 'notification-1',
+    identityId: 'identity-maria',
+    scopeId: 'group:orbitdb-spike',
+  });
+  await stores.requests.put?.({
+    communityId: 'community-alpha',
+    id: 'invite-1',
+    identityId: 'identity-maria',
+    kind: 'invite',
+    status: 'pending',
+  });
+  await stores.requests.put?.({
+    communityId: 'community-alpha',
+    id: 'join-request-1',
+    identityId: 'identity-yuki',
+    kind: 'join_request',
+    status: 'pending',
+  });
 }
 
 async function assertAccessControl(
-  eventStore: OrbitDatabase,
+  replicatedStore: OrbitDatabase,
   expectedWriters: string[],
 ): Promise<void> {
-  const writers = eventStore.access?.write || [];
+  const writers = replicatedStore.access?.write || [];
 
   for (const expectedWriter of expectedWriters) {
     if (!writers.includes(expectedWriter)) {
@@ -885,13 +585,9 @@ async function assertUnauthorizedWriteIsRejected(
     let rejected = false;
 
     try {
-      await stores.events.add?.({
-        event: {
-          cid: 'cid-intruder',
-          identityId: 'identity-intruder',
-          type: 'identity.updated',
-        },
-        eventId: 'event-intruder',
+      await stores.identities.put?.({
+        cid: 'cid-intruder',
+        id: 'identity-intruder',
       });
     } catch {
       rejected = true;
@@ -906,78 +602,75 @@ async function assertUnauthorizedWriteIsRejected(
   }
 }
 
-async function assertQueryViability(
-  stores: ProjectionStores,
-  projection: OrbitDbProjection,
-): Promise<void> {
+async function assertQueryViability(stores: PrivateOrbitDbStores): Promise<void> {
   await waitFor(async () => {
     const identity = await getDocumentValue(stores.identities, 'identity-hasko');
 
     return identity?.cid === 'cid-identity-hasko-v2' ? true : undefined;
-  }, 'latest identity projection');
+  }, 'latest identity replication');
 
-  const keychain = await getDocumentValue(stores.keychains, 'identity-hasko');
-  if (keychain?.cid !== 'cid-keychain-hasko-v5') {
-    throw new Error('Latest keychain projection was not replicated');
-  }
+  await waitFor(async () => {
+    const keychain = await getDocumentValue(stores.keychains, 'identity-hasko');
 
-  const messages = await stores.messages.query?.(
-    (message) => message.conversationId === 'group:orbitdb-spike',
-  );
-  const [message] = messages || [];
-  if (
-    messages?.length !== 1 ||
-    message.id !== 'message-1' ||
-    message.body !== 'Edited payload reference' ||
-    message.editedAt !== 1781020005000
-  ) {
-    throw new Error('Message timeline/edit projection was not viable');
-  }
+    return keychain?.cid === 'cid-keychain-hasko-v5' ? true : undefined;
+  }, 'latest keychain replication');
 
-  const readMarker = await stores.heads.get?.(
-    'read-marker:group:orbitdb-spike:identity-maria',
-  );
-  if (!isRecord(readMarker) || readMarker.messageId !== 'message-1') {
-    throw new Error('Read marker keyvalue projection was not viable');
-  }
+  await waitFor(async () => {
+    const messages = await stores.messages.query?.(
+      (message) => message.conversationId === 'group:orbitdb-spike',
+    );
+    const [message] = messages || [];
 
-  const notifications = await stores.notifications.query?.(
-    (notification) => notification.identityId === 'identity-maria',
-  );
-  if (notifications?.length !== 1) {
-    throw new Error('Notification query projection was not viable');
-  }
+    return messages?.length === 1 &&
+      message.id === 'message-1' &&
+      message.body === 'Edited payload reference' &&
+      message.editedAt === 1781020005000
+      ? true
+      : undefined;
+  }, 'message timeline/edit replication');
 
-  const inviteRequests = await stores.requests.query?.(
-    (request) =>
-      request.communityId === 'community-alpha' &&
-      request.identityId === 'identity-maria',
-  );
-  const joinRequests = await stores.requests.query?.(
-    (request) =>
-      request.communityId === 'community-alpha' &&
-      request.kind === 'join_request',
-  );
-  if (inviteRequests?.length !== 1 || joinRequests?.length !== 1) {
-    throw new Error('Invite or membership request query was not viable');
-  }
+  await waitFor(async () => {
+    const readMarker = await stores.heads.get?.(
+      'read-marker:group:orbitdb-spike:identity-maria',
+    );
 
-  const websocketEvents = projection.getWebsocketEvents();
-  for (const event of [
-    'identity.updated',
-    'keychain.updated',
-    'community.created',
-    'message.created',
-    'message.edited',
-    'message.read',
-    'notification.created',
-    'community.invite.created',
-    'community.membership_request.created',
-  ]) {
-    if (!websocketEvents.includes(event)) {
-      throw new Error(`Missing websocket projection for ${event}`);
-    }
-  }
+    return isRecord(readMarker) && readMarker.messageId === 'message-1'
+      ? true
+      : undefined;
+  }, 'read marker keyvalue replication');
+
+  await waitFor(async () => {
+    const notifications = await stores.notifications.query?.(
+      (notification) => notification.identityId === 'identity-maria',
+    );
+
+    return notifications?.length === 1 ? true : undefined;
+  }, 'notification query replication');
+
+  await waitFor(async () => {
+    const inviteRequests = await stores.requests.query?.(
+      (request) =>
+        request.communityId === 'community-alpha' &&
+        request.identityId === 'identity-maria',
+    );
+    const joinRequests = await stores.requests.query?.(
+      (request) =>
+        request.communityId === 'community-alpha' &&
+        request.kind === 'join_request',
+    );
+
+    return inviteRequests?.length === 1 && joinRequests?.length === 1
+      ? true
+      : undefined;
+  }, 'invite and membership request replication');
+
+  await waitFor(async () => {
+    const latestMessage = await stores.heads.get?.(
+      'latest-message:group:orbitdb-spike',
+    );
+
+    return latestMessage === 'message-1' ? true : undefined;
+  }, 'latest message keyvalue replication');
 }
 
 async function getDocumentValue(
