@@ -43,7 +43,7 @@ export default class PollScopeAuthorizer {
     }
 
     return new PollScopeResolution(
-      PollAudience.empty(),
+      PollAudience.communityChannel(),
       PollScope.communityChannel(message.communityId, message.channelId),
     );
   }

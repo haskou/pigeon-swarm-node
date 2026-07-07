@@ -11,6 +11,10 @@ export class PollAudience {
     return new PollAudience([], participantIds);
   }
 
+  public static communityChannel(): PollAudience {
+    return new PollAudience([], []);
+  }
+
   public static empty(): PollAudience {
     return new PollAudience([], []);
   }
