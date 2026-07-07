@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Community } from '../../domain/Community';
 import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
-import { CommunityInviteWasAcceptedEvent } from '../../domain/events/CommunityInviteWasAcceptedEvent';
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
@@ -30,17 +29,10 @@ export default class CommunityInviteAccepter {
 
     community.requestMembership(message.actorIdentityId);
     const acceptedInvite = await this.inviteRepository.consume(invite);
-    community.joinWithInvite(message.actorIdentityId);
+    community.acceptInvite(message.actorIdentityId, acceptedInvite);
+
     await this.communityRepository.save(community);
-    await this.eventPublisher.publish([
-      new CommunityInviteWasAcceptedEvent(acceptedInvite.getToken().valueOf(), {
-        communityId: community.getId().valueOf(),
-        identityId: message.actorIdentityId.valueOf(),
-        invite: acceptedInvite.toPrimitives(),
-        networkId: community.getNetworkId().valueOf(),
-      }),
-      ...community.pullDomainEvents(),
-    ]);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

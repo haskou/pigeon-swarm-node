@@ -31,7 +31,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
     community: Community,
     communityId: CommunityId,
   ): boolean {
-    return community.getId().isEqual(communityId);
+    return community.isIdentifiedBy(communityId);
   }
 
   private payloadFrom(

@@ -40,10 +40,10 @@ export default class CommunityChannelDeleter {
         CommunityModerationTargetType.CHANNEL,
         message.channelId,
       ),
-      { type: channelType },
+      { type: channelType.valueOf() },
     );
 
-    if (channelType === 'text') {
+    if (channelType.isText()) {
       await this.messageRepository.deleteByChannel(
         message.communityId,
         message.channelId,

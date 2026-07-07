@@ -207,12 +207,18 @@ package "communities/domain" {
     - channels: CommunityChannels
     - settings: CommunitySettings
     + create(ownerIdentityId, networkId, profile, settings): Community
-    + joinWithInvite(member): void
     + createInvite(actor, expiresAt?, maxUses?, encryptedCommunityKey?): CommunityInvite
+    + acceptInvite(member, acceptedInvite): void
     + inviteMember(actor, invitedIdentityId): CommunityMembershipRequest
     + acceptMembershipRequest(actor, membershipRequest): void
+    + acceptMembershipRequestAutomatically(membershipRequest): void
     + declineMembershipRequest(actor, membershipRequest): void
+    + isIdentifiedBy(communityId): boolean
     + isAutoJoinEnabled(): boolean
+    + findIdentityUpdateRecipientsFor(identityId): IdentityId[]
+    + authorizeVoiceChannelCall(identityId, channelId): void
+    + authorizeTextChannelPollCreation(identityId, channelId): void
+    + authorizeTextChannelPollVote(identityId, channelId): void
     + leave(member): void
     + banMember(actor, member): void
     + unbanMember(actor, member): void
@@ -247,6 +253,8 @@ package "communities/domain" {
     + visibleChannelsFor(identityId): object
     + visibleTextChannelIdsFor(identityId): CommunityChannelId[]
     + visibleMembersForTextChannel(channelId): IdentityId[]
+    + assertCanCreateTextChannelPoll(identityId, channelId): void
+    + assertCanVoteTextChannelPoll(identityId, channelId): void
   }
 
   note right of CommunityAccessValidator
@@ -293,6 +301,7 @@ package "communities/domain" {
     - voiceChannels: CommunityVoiceChannel[]
     + addText(name): CommunityTextChannel
     + addVoice(name): CommunityVoiceChannel
+    + remove(channelId): CommunityChannelType
     + updatePermissions(channelId, permissions): void
     + visiblePrimitivesFor(canView): object
   }
@@ -332,6 +341,7 @@ package "communities/domain" {
     - attachmentExternalIdentifiers: CommunityChannelMessageAttachments
     - mentions: CommunityChannelMessageMentions
     + create(...): CommunityChannelMessage
+    + getCreatedAt(): Timestamp
   }
 
   class CommunityChannelMessageAttachments {
@@ -421,6 +431,7 @@ package "communities/domain" {
     + request(communityId, requesterIdentityId): CommunityMembershipRequest
     + accept(actorIdentityId, ownerIdentityId): void
     + decline(actorIdentityId, ownerIdentityId): void
+    + getType(): CommunityRequestType
   }
 
   class CommunityId
@@ -430,6 +441,7 @@ package "communities/domain" {
   class CommunityBanner
   class CommunityChannelId
   class CommunityChannelName
+  class CommunityChannelType
   class CommunityPermission
   class CommunityRoleId
   class CommunityRoleName
@@ -446,7 +458,12 @@ package "communities/domain" {
   class CommunityInviteUses
   class EncryptedCommunityInviteKey
   class CommunityRequestId
-  class CommunityRequestStatus
+  class CommunityRequestStatus {
+    + isAccepted(): boolean
+    + isDeclined(): boolean
+    + isPending(): boolean
+    + isResolution(): boolean
+  }
   class CommunityRequestType
   class CommunityMembershipRequestTimestamps
   class CommunityModerationLogId
@@ -520,6 +537,7 @@ package "communities/domain" {
   CommunityVoiceChannel --> CommunityChannelId
   CommunityVoiceChannel --> CommunityChannelName
   CommunityVoiceChannel --> CommunityChannelPermissions
+  CommunityChannels --> CommunityChannelType
   CommunityChannelPermissions --> CommunityRoleId
   CommunityChannelMessage --> CommunityChannelMessageId
   CommunityChannelMessage --> CommunityId

@@ -69,7 +69,7 @@ export default class CommunityMembershipRequestUpdater {
       ),
       {
         identityId: membershipRequest.getIdentityId().valueOf(),
-        type: membershipRequest.toPrimitives().type,
+        type: membershipRequest.getType().valueOf(),
       },
     );
   }
@@ -87,7 +87,9 @@ export default class CommunityMembershipRequestUpdater {
 
     if (message.isAccepted()) {
       await this.acceptRequest(membershipRequest, message);
-    } else {
+    }
+
+    if (message.isDeclined()) {
       await this.declineRequest(membershipRequest, message);
     }
 

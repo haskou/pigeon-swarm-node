@@ -1,5 +1,6 @@
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { CallScope } from '../../domain/CallScope';
 import { InvalidCallScopeError } from '../../domain/errors/InvalidCallScopeError';
@@ -22,13 +23,12 @@ export default class CallScopeResolver {
     if (!community) {
       throw new InvalidCallScopeError();
     }
+    community.authorizeVoiceChannelCall(message.requesterIdentityId, channelId);
+    const communityPrimitives = community.toPrimitives();
 
     return new ResolvedCallScope(
-      community.getNetworkId(),
-      community.membersForVoiceChannelCall(
-        message.requesterIdentityId,
-        channelId,
-      ),
+      new NetworkId(communityPrimitives.networkId),
+      [message.requesterIdentityId],
       CallScope.communityChannel(communityId, channelId),
     );
   }

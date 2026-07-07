@@ -3,6 +3,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { CommunityTextChannel } from '../../domain/entities/channels/CommunityTextChannel';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { CommunityChannelType } from '../../domain/value-objects/CommunityChannelType';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
@@ -36,7 +37,10 @@ export default class CommunityTextChannelCreator {
         CommunityModerationTargetType.CHANNEL,
         channel.getId(),
       ),
-      { name: message.name.valueOf(), type: 'text' },
+      {
+        name: message.name.valueOf(),
+        type: CommunityChannelType.TEXT.valueOf(),
+      },
     );
 
     return channel;

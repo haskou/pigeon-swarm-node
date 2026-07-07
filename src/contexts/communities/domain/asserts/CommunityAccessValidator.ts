@@ -263,22 +263,18 @@ export class CommunityAccessValidator {
     );
   }
 
-  public visibleMembersForTextChannelPollCreation(
+  public assertCanCreateTextChannelPoll(
     identityId: IdentityId,
     channelId: CommunityChannelId,
-  ): IdentityId[] {
+  ): void {
     this.assertCanViewTextChannel(identityId, channelId);
     this.assertHasPermission(identityId, CommunityPermission.CREATE_POLLS);
-
-    return this.visibleMembersForTextChannel(channelId);
   }
 
-  public visibleMembersForTextChannelPollVote(
+  public assertCanVoteTextChannelPoll(
     identityId: IdentityId,
     channelId: CommunityChannelId,
-  ): IdentityId[] {
+  ): void {
     this.assertCanViewTextChannel(identityId, channelId);
-
-    return this.visibleMembersForTextChannel(channelId);
   }
 }

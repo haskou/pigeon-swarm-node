@@ -214,11 +214,11 @@ describe('Community', () => {
 
     community.addMember(owner, member);
 
-    expect(
-      community.visibleMembersForTextChannelPollVote(member, channel.getId()),
-    ).toEqual([owner, member]);
     expect(() =>
-      community.visibleMembersForTextChannelPollCreation(member, channel.getId()),
+      community.authorizeTextChannelPollVote(member, channel.getId()),
+    ).not.toThrow();
+    expect(() =>
+      community.authorizeTextChannelPollCreation(member, channel.getId()),
     ).toThrow('Community permission denied: create_polls');
   });
 

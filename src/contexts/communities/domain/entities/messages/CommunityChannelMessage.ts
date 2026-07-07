@@ -112,6 +112,10 @@ export class CommunityChannelMessage {
     return this.metadata.getChannelId();
   }
 
+  public getCreatedAt(): Timestamp {
+    return this.metadata.getCreatedAt();
+  }
+
   public isIdentifiedBy(messageId: CommunityChannelMessageId): boolean {
     return this.metadata.getId().isEqual(messageId);
   }

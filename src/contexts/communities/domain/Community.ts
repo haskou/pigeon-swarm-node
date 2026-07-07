@@ -38,6 +38,8 @@ import { CommunityChannelMessageWasSentEvent } from './events/CommunityChannelMe
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
+import { CommunityInviteWasAcceptedEvent } from './events/CommunityInviteWasAcceptedEvent';
+import { CommunityInviteWasCreatedEvent } from './events/CommunityInviteWasCreatedEvent';
 import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEvent';
 import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
 import { CommunityWasCreatedEvent } from './events/CommunityWasCreatedEvent';
@@ -48,6 +50,7 @@ import { CommunityChannelId } from './value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from './value-objects/CommunityChannelMessageId';
 import { CommunityChannelMessageReactionEmoji } from './value-objects/CommunityChannelMessageReactionEmoji';
 import { CommunityChannelName } from './value-objects/CommunityChannelName';
+import { CommunityChannelType } from './value-objects/CommunityChannelType';
 import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
 import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
@@ -186,10 +189,6 @@ export class Community extends AggregateRoot {
     this.join(member);
   }
 
-  public joinWithInvite(member: IdentityId): void {
-    this.join(member);
-  }
-
   public createInvite(
     actor: IdentityId,
     expiresAt?: Timestamp,
@@ -198,13 +197,37 @@ export class Community extends AggregateRoot {
   ): CommunityInvite {
     this.createAccessValidator().assertCanCreateInvite(actor);
 
-    return CommunityInvite.create(
+    const invite = CommunityInvite.create(
       this.id,
       actor,
       expiresAt,
       maxUses,
       encryptedCommunityKey,
     );
+    this.record(
+      new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {
+        communityId: this.id.valueOf(),
+        invite: invite.toPrimitives(),
+        networkId: this.networkId.valueOf(),
+      }),
+    );
+
+    return invite;
+  }
+
+  public acceptInvite(
+    member: IdentityId,
+    acceptedInvite: CommunityInvite,
+  ): void {
+    this.record(
+      new CommunityInviteWasAcceptedEvent(acceptedInvite.getToken().valueOf(), {
+        communityId: this.id.valueOf(),
+        identityId: member.valueOf(),
+        invite: acceptedInvite.toPrimitives(),
+        networkId: this.networkId.valueOf(),
+      }),
+    );
+    this.join(member);
   }
 
   public inviteMember(
@@ -233,6 +256,13 @@ export class Community extends AggregateRoot {
       actor,
       membershipRequest.isRequest() ? actor : this.ownerIdentityId,
     );
+    this.join(membershipRequest.getIdentityId());
+  }
+
+  public acceptMembershipRequestAutomatically(
+    membershipRequest: CommunityMembershipRequest,
+  ): void {
+    membershipRequest.acceptAutomatically(this.ownerIdentityId);
     this.join(membershipRequest.getIdentityId());
   }
 
@@ -360,13 +390,11 @@ export class Community extends AggregateRoot {
     );
   }
 
-  public membersForVoiceChannelCall(
+  public authorizeVoiceChannelCall(
     identityId: IdentityId,
     channelId: CommunityChannelId,
-  ): IdentityId[] {
+  ): void {
     this.createAccessValidator().assertCanConnectVoice(identityId, channelId);
-
-    return this.getMemberIds();
   }
 
   public deleteChannelMessage(
@@ -523,7 +551,7 @@ export class Community extends AggregateRoot {
   public deleteChannel(
     actor: IdentityId,
     channelId: CommunityChannelId,
-  ): 'text' | 'voice' {
+  ): CommunityChannelType {
     this.createAccessValidator().assertCanManageChannels(actor);
 
     const channelType = this.channels.remove(channelId);
@@ -673,20 +701,18 @@ export class Community extends AggregateRoot {
     return this.id;
   }
 
-  public getOwnerIdentityId(): IdentityId {
-    return this.ownerIdentityId;
-  }
-
-  public getNetworkId(): NetworkId {
-    return this.networkId;
-  }
-
-  public getMemberIds(): IdentityId[] {
-    return this.membership.getMemberIds();
+  public isIdentifiedBy(communityId: CommunityId): boolean {
+    return this.id.isEqual(communityId);
   }
 
   public isMember(identityId: IdentityId): boolean {
     return this.membership.isMember(identityId);
+  }
+
+  public findIdentityUpdateRecipientsFor(identityId: IdentityId): IdentityId[] {
+    return this.membership
+      .getMemberIds()
+      .filter((memberId) => memberId.isNotEqual(identityId));
   }
 
   public belongsToNetwork(networkId: NetworkId): boolean {
@@ -737,25 +763,21 @@ export class Community extends AggregateRoot {
     return accessValidator.visibleMembersForTextChannel(channelId);
   }
 
-  public visibleMembersForTextChannelPollCreation(
+  public authorizeTextChannelPollCreation(
     identityId: IdentityId,
     channelId: CommunityChannelId,
-  ): IdentityId[] {
-    const accessValidator = this.createAccessValidator();
-
-    return accessValidator.visibleMembersForTextChannelPollCreation(
+  ): void {
+    this.createAccessValidator().assertCanCreateTextChannelPoll(
       identityId,
       channelId,
     );
   }
 
-  public visibleMembersForTextChannelPollVote(
+  public authorizeTextChannelPollVote(
     identityId: IdentityId,
     channelId: CommunityChannelId,
-  ): IdentityId[] {
-    const accessValidator = this.createAccessValidator();
-
-    return accessValidator.visibleMembersForTextChannelPollVote(
+  ): void {
+    this.createAccessValidator().assertCanVoteTextChannelPoll(
       identityId,
       channelId,
     );

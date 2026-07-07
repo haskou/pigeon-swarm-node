@@ -18,14 +18,11 @@ export class CommunityDiscoveryViewModel {
   private findPendingRequest(
     community: Community,
   ): CommunityMembershipRequest | undefined {
-    return this.requests.find((request) => {
-      const primitives = request.toPrimitives();
-
-      return (
-        primitives.communityId === community.getId().valueOf() &&
-        primitives.status === 'pending'
-      );
-    });
+    return this.requests.find(
+      (request) =>
+        community.isIdentifiedBy(request.getCommunityId()) &&
+        request.isPending(),
+    );
   }
 
   private membershipStatus(
@@ -40,9 +37,7 @@ export class CommunityDiscoveryViewModel {
       return 'none';
     }
 
-    return request.toPrimitives().type === 'invitation'
-      ? 'invited'
-      : 'requested';
+    return request.isInvitation() ? 'invited' : 'requested';
   }
 
   private communityToResource(
