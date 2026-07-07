@@ -26,7 +26,6 @@ export class OrbitDBPrivateNetworkStores {
   public readonly notifications: OrbitDBDatabase;
   public readonly pins: OrbitDBDatabase;
   public readonly polls: OrbitDBDatabase;
-  public readonly presence: OrbitDBDatabase;
   public readonly reactions: OrbitDBDatabase;
   public readonly requests: OrbitDBDatabase;
   public readonly stickerPacks: OrbitDBDatabase;
@@ -213,12 +212,6 @@ export class OrbitDBPrivateNetworkStores {
         'documents/polls',
         AccessController,
       ),
-      presence: await this.openDocumentsStore(
-        orbitdb,
-        networkId,
-        'documents/presence',
-        AccessController,
-      ),
       reactions: await this.openDocumentsStore(
         orbitdb,
         networkId,
@@ -261,7 +254,6 @@ export class OrbitDBPrivateNetworkStores {
     this.orbitdb = stores.orbitdb;
     this.pins = stores.pins;
     this.polls = stores.polls;
-    this.presence = stores.presence;
     this.reactions = stores.reactions;
     this.requests = stores.requests;
     this.stickerPacks = stores.stickerPacks;
@@ -283,7 +275,6 @@ export class OrbitDBPrivateNetworkStores {
       notificationSettings: this.notificationSettings.address,
       pins: this.pins.address,
       polls: this.polls.address,
-      presence: this.presence.address,
       reactions: this.reactions.address,
       requests: this.requests.address,
       stickerPacks: this.stickerPacks.address,

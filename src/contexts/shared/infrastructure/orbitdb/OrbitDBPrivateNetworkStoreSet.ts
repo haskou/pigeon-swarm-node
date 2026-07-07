@@ -16,7 +16,6 @@ export type OrbitDBPrivateNetworkStoreSet = {
   orbitdb: OrbitDBInstance;
   pins: OrbitDBDatabase;
   polls: OrbitDBDatabase;
-  presence: OrbitDBDatabase;
   reactions: OrbitDBDatabase;
   requests: OrbitDBDatabase;
   stickerPacks: OrbitDBDatabase;

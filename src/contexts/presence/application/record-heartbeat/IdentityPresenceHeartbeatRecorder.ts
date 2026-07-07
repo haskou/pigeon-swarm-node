@@ -23,7 +23,11 @@ export default class IdentityPresenceHeartbeatRecorder {
 
     presence.recordHeartbeat(message.activityDetected, networkIds);
     await this.repository.save(presence, networkIds);
-    await this.eventPublisher.publish(presence.pullDomainEvents());
+    const events = presence.pullDomainEvents();
+
+    if (events.length > 0) {
+      await this.eventPublisher.publish(events);
+    }
 
     return presence;
   }

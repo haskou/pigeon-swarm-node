@@ -12,7 +12,6 @@ export type OrbitDBPrivateNetworkStoreAddresses = {
   notifications: string;
   pins: string;
   polls: string;
-  presence: string;
   reactions: string;
   requests: string;
   stickerPacks: string;

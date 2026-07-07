@@ -135,6 +135,9 @@ client since the previous heartbeat. Heartbeats are not individually signed
 because the WebSocket upgrade already authenticated the identity. Backend marks
 the identity `disconnected` after roughly 20 seconds without heartbeat and
 derives `away` after 5 minutes without activity while heartbeat is still active.
+Presence is runtime state kept in node memory and replicated to peers through
+domain events. It is not written to OrbitDB/IPFS and resets when the node
+restarts.
 
 Heartbeat acknowledgement:
 
@@ -1006,8 +1009,9 @@ Implemented security rules:
 
 ## Identity Presence HTTP API
 
-Presence is replicated runtime state. It is not stored in IPFS and it is synced
-through network-scoped OrbitDB state.
+Presence is runtime state kept in node memory. Selected status, custom messages,
+heartbeat fields and derived states are replicated through domain events, are
+not written to OrbitDB/IPFS, and reset when the node restarts.
 
 Statuses:
 
@@ -1094,7 +1098,8 @@ Returns the updated presence resource.
 
 ### WebSocket presence events
 
-When visible presence changes, backend emits:
+When a presence preference changes or an ephemeral heartbeat snapshot is
+refreshed, backend emits:
 
 ```json
 {

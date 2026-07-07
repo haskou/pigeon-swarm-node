@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Presence API
   version: 1.0.0
-  description: Replicated identity presence, custom status and heartbeat state.
+  description: Runtime identity presence state replicated through domain events.
 tags:
   - name: presence
 paths:
@@ -14,7 +14,8 @@ paths:
       description: |
         Returns presence for the requested identity ids. Invisible identities are
         exposed as `disconnected` unless the authenticated viewer is asking for
-        their own identity.
+        their own identity. Presence state is kept in memory and replicated
+        through domain events; it is not persisted in OrbitDB/IPFS.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

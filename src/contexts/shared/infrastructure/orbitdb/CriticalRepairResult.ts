@@ -5,5 +5,4 @@ export type CriticalRepairResult = {
   identities: number;
   keychains: number;
   notificationIndexes: number;
-  presenceHeads: number;
 };
