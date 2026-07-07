@@ -1,7 +1,6 @@
-import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
+import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 
 export type RegisteredOrbitDBNetwork = {
   localPeerId: string;
-  processedEventIds: Set<string>;
-  stores: OrbitDBReplicatedStateStores;
+  stores: OrbitDBPrivateNetworkStores;
 };

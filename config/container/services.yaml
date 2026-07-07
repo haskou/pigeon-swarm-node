@@ -220,11 +220,6 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCRG9tYWluRXZlbnRQcm9qZWN0b3JfX09yYml0REJEb21haW5FdmVudFByb2plY3Rvcg==:
-    class: /contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector
-    arguments: []
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZEhlYWRDYWNoZV9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkQ2FjaGU=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19Mb2NhbE9yYml0REJSZXBsaWNhdGVkSGVhZENhY2hlX19Mb2NhbE9yYml0REJSZXBsaWNhdGVkSGVhZENhY2hl
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZEhlYWRLZXlEZXJpdmVyX19PcmJpdERCUmVwbGljYXRlZEhlYWRLZXlEZXJpdmVy:
@@ -680,14 +675,6 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZERvbWFpbkV2ZW50UHVibGlzaGVyX19PcmJpdERCUmVwbGljYXRlZERvbWFpbkV2ZW50UHVibGlzaGVy:
-    class: >-
-      /contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCRG9tYWluRXZlbnRQcm9qZWN0b3JfX09yYml0REJEb21haW5FdmVudFByb2plY3Rvcg==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19SZXBsaWNhdGVkU3RhdGVOb3RSZWFkeUVycm9yX19SZXBsaWNhdGVkU3RhdGVOb3RSZWFkeUVycm9y:
@@ -1643,6 +1630,17 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5Um91dGluZ19fSXBmc0lkZW50aXR5Um91dGluZw==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3J1bnRpbWVzX19vcmJpdGRiLXJ1bnRpbWVfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSdW50aW1lX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUnVudGltZQ==:
+    class: /apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCTWV0YWRhdGFIZWFkUmVwYWlyZXJfX09yYml0REJNZXRhZGF0YUhlYWRSZXBhaXJlcg==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3N0YXJ0LWNhbGxfX0NhbGxTdGFydGVyX19DYWxsU3RhcnRlcg==:
@@ -2649,23 +2647,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX19zZW5kX19QdXNoTm90aWZpY2F0aW9uRGVsaXZlcnlfX1B1c2hOb3RpZmljYXRpb25EZWxpdmVyeQ==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb24tc2V0dGluZ3NfX2FwcGxpY2F0aW9uX19zaG91bGQtZGVsaXZlcl9fTm90aWZpY2F0aW9uRGVsaXZlcnlQcmVmZXJlbmNlQ2hlY2tlcl9fTm90aWZpY2F0aW9uRGVsaXZlcnlQcmVmZXJlbmNlQ2hlY2tlcg==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3J1bnRpbWVzX19vcmJpdGRiLXJ1bnRpbWVfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSdW50aW1lX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUnVudGltZQ==:
-    class: /apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNfX01lc3NhZ2VCdXM=
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZERvbWFpbkV2ZW50UHVibGlzaGVyX19PcmJpdERCUmVwbGljYXRlZERvbWFpbkV2ZW50UHVibGlzaGVy
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCRG9tYWluRXZlbnRQcm9qZWN0b3JfX09yYml0REJEb21haW5FdmVudFByb2plY3Rvcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCTWV0YWRhdGFIZWFkUmVwYWlyZXJfX09yYml0REJNZXRhZGF0YUhlYWRSZXBhaXJlcg==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2RlbGV0ZS1jaGFubmVsX19Db21tdW5pdHlDaGFubmVsRGVsZXRlcl9fQ29tbXVuaXR5Q2hhbm5lbERlbGV0ZXI=:

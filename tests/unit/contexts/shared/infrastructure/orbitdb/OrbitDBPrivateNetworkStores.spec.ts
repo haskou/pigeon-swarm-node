@@ -1,7 +1,7 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
-import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
+import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import orbitDBRuntimeAdapter from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
 import Kernel from '@haskou/ddd-kernel';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
@@ -20,7 +20,7 @@ function orbitDBDatabase(): OrbitDBDatabase {
   };
 }
 
-describe('OrbitDBReplicatedStateStores', () => {
+describe('OrbitDBPrivateNetworkStores', () => {
   let logger: MockProxy<WinstonLogger>;
 
   beforeEach(() => {
@@ -60,7 +60,7 @@ describe('OrbitDBReplicatedStateStores', () => {
       .spyOn(orbitDBRuntimeAdapter, 'createOrbitDB')
       .mockResolvedValue(orbitdb);
 
-    await OrbitDBReplicatedStateStores.open(network);
+    await OrbitDBPrivateNetworkStores.open(network);
 
     expect(() => {
       (openedDatabases[0].events as EventEmitter).emit(
@@ -71,7 +71,9 @@ describe('OrbitDBReplicatedStateStores', () => {
       );
     }).not.toThrow();
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining('OrbitDB replicated store sync error handled'),
+      expect.stringContaining(
+        'OrbitDB private network store sync error handled',
+      ),
     );
   });
 });

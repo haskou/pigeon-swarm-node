@@ -1,15 +1,10 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
-import OrbitDBDomainEventProjector from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDomainEventProjector';
-import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
+import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import { OrbitDBReplicatedDocumentStoreName } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDocumentStoreName';
-import OrbitDBReplicatedDomainEventPublisher from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDomainEventPublisher';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { OrbitDBReplicatedStateStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateStores';
-import { ReplicatedDomainEventMessage } from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedDomainEventMessage';
-import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import Kernel from '@haskou/ddd-kernel';
 
 import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
@@ -45,74 +40,11 @@ export default class OrbitDBReplicatedStateRuntime {
 
   constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
-    private readonly messageBus: MessageBus,
-    private readonly publisher: OrbitDBReplicatedDomainEventPublisher,
     private readonly registry: OrbitDBReplicatedStateRegistry,
-    private readonly projector: OrbitDBDomainEventProjector,
     private readonly headRepairer: OrbitDBMetadataHeadRepairer,
   ) {}
 
-  private isReplicatedMessage(
-    value: unknown,
-  ): value is ReplicatedDomainEventMessage {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      'aggregate_id' in value &&
-      'attributes' in value &&
-      'event_id' in value &&
-      'occurred_on' in value &&
-      'replication' in value &&
-      'type' in value
-    );
-  }
-
-  private async projectAndDispatch(
-    networkId: string,
-    message: ReplicatedDomainEventMessage,
-  ): Promise<void> {
-    const registeredNetwork = this.registeredNetworks.get(networkId);
-
-    if (!registeredNetwork) {
-      return;
-    }
-
-    if (registeredNetwork.processedEventIds.has(message.event_id)) {
-      return;
-    }
-
-    registeredNetwork.processedEventIds.add(message.event_id);
-    await this.projector.project(registeredNetwork.stores, message);
-
-    if (message.replication.originPeerId === registeredNetwork.localPeerId) {
-      return;
-    }
-
-    await this.messageBus.dispatchReplicated(message);
-  }
-
-  private subscribeToEvents(
-    networkId: string,
-    stores: OrbitDBReplicatedStateStores,
-  ): void {
-    stores.events.events.on('update', (entry: OrbitDBEntry) => {
-      const value = entry.payload?.value;
-
-      if (!this.isReplicatedMessage(value)) {
-        return;
-      }
-
-      this.projectAndDispatch(networkId, value).catch((error: unknown) => {
-        Kernel.logger.error(
-          `OrbitDB replicated event dispatch failed: networkId=${networkId} error=${String(error)}`,
-        );
-      });
-    });
-  }
-
-  private replicatedDocumentStores(
-    stores: OrbitDBReplicatedStateStores,
-  ): Array<{
+  private replicatedDocumentStores(stores: OrbitDBPrivateNetworkStores): Array<{
     name: OrbitDBReplicatedDocumentStoreName;
     store: OrbitDBDatabase | undefined;
   }> {
@@ -215,7 +147,7 @@ export default class OrbitDBReplicatedStateRuntime {
 
   private subscribeToDocumentUpdates(
     networkId: string,
-    stores: OrbitDBReplicatedStateStores,
+    stores: OrbitDBPrivateNetworkStores,
   ): void {
     for (const { name, store } of this.replicatedDocumentStores(stores)) {
       store?.events?.on?.('update', () => {
@@ -235,21 +167,18 @@ export default class OrbitDBReplicatedStateRuntime {
       return;
     }
 
-    const stores = await OrbitDBReplicatedStateStores.open(network);
+    const stores = await OrbitDBPrivateNetworkStores.open(network);
     const localPeerId = network.getPeerId();
 
     this.registeredNetworks.set(networkId, {
       localPeerId,
-      processedEventIds: new Set(),
       stores,
     });
     await this.registry.register(networkId, stores);
-    this.publisher.registerNetworkStores(networkId, localPeerId, stores);
-    this.subscribeToEvents(networkId, stores);
     this.subscribeToDocumentUpdates(networkId, stores);
     this.repairHeads(networkId);
     Kernel.logger.info(
-      `OrbitDB replicated state stores registered: networkId=${networkId}` +
+      `OrbitDB private network stores registered: networkId=${networkId}` +
         ` peerId=${localPeerId}`,
     );
   }
@@ -353,9 +282,6 @@ export default class OrbitDBReplicatedStateRuntime {
         this.lastDocumentUpdateRepairAt.delete(repairKey);
       }
       await this.registry.unregister(networkId);
-      this.publisher.unregisterNetworkStores(networkId);
     });
-
-    MessageBus.setReplicatedEventPublisher(this.publisher);
   }
 }

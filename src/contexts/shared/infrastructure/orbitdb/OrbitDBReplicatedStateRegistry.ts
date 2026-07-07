@@ -5,12 +5,12 @@ import Kernel from '@haskou/ddd-kernel';
 
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
+import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBQueryDocumentsMode } from './OrbitDBQueryDocumentsMode';
 import { OrbitDBQueryDocumentsOptions } from './OrbitDBQueryDocumentsOptions';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedHeadKeyDeriver from './OrbitDBReplicatedHeadKeyDeriver';
-import { OrbitDBReplicatedStateStores } from './OrbitDBReplicatedStateStores';
 import ReplicatedStateNotReadyError from './ReplicatedStateNotReadyError';
 
 type PersistedHeadCacheHydration = {
@@ -34,7 +34,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly storesByNetworkId = new Map<
     string,
-    OrbitDBReplicatedStateStores
+    OrbitDBPrivateNetworkStores
   >();
 
   private readonly cachedHeads = new Map<string, Record<string, unknown>>();
@@ -71,7 +71,7 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private getStore(
-    stores: OrbitDBReplicatedStateStores,
+    stores: OrbitDBPrivateNetworkStores,
     storeName: OrbitDBReplicatedDocumentStoreName,
   ): OrbitDBDatabase | undefined {
     return stores[storeName];
@@ -271,7 +271,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private async hydrateHeadCache(
     networkId: string,
-    stores: OrbitDBReplicatedStateStores,
+    stores: OrbitDBPrivateNetworkStores,
   ): Promise<number> {
     const records = await this.allRecords(stores.heads);
     let persistedAllHeads = true;
@@ -303,7 +303,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private hydrateOrbitDBHeadCacheInBackground(
     networkId: string,
-    stores: OrbitDBReplicatedStateStores,
+    stores: OrbitDBPrivateNetworkStores,
   ): void {
     void this.hydrateHeadCache(networkId, stores)
       .then((heads) => {
@@ -767,7 +767,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private storesForNetworkIds(
     networkIds: string[],
-  ): OrbitDBReplicatedStateStores[] {
+  ): OrbitDBPrivateNetworkStores[] {
     return this.networkStoreEntriesForNetworkIds(networkIds).map(
       ({ stores }) => stores,
     );
@@ -775,8 +775,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private networkStoreEntriesForNetworkIds(
     networkIds: string[],
-  ): Array<{ networkId: string; stores: OrbitDBReplicatedStateStores }> {
-    const stores = new Map<string, OrbitDBReplicatedStateStores>();
+  ): Array<{ networkId: string; stores: OrbitDBPrivateNetworkStores }> {
+    const stores = new Map<string, OrbitDBPrivateNetworkStores>();
 
     for (const networkId of networkIds) {
       const networkStores = this.storesByNetworkId.get(networkId);
@@ -823,7 +823,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   public async register(
     networkId: string,
-    stores: OrbitDBReplicatedStateStores,
+    stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
     this.storesByNetworkId.set(networkId, stores);
     stores.heads.events?.on?.('update', (entry) =>
