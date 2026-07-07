@@ -17,6 +17,13 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
     return primitives ? IdentityPresence.fromPrimitives(primitives) : undefined;
   }
 
+  private isOlderThanCurrent(
+    snapshot: PrimitiveOf<IdentityPresence>,
+    current: PrimitiveOf<IdentityPresence> | undefined,
+  ): boolean {
+    return current !== undefined && snapshot.updatedAt < current.updatedAt;
+  }
+
   public findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityPresence | undefined> {
@@ -54,11 +61,14 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
 
   public save(presence: IdentityPresence): Promise<void> {
     const snapshot = this.clone(presence);
+    const primitives = snapshot.toPrimitives();
+    const identityId = snapshot.getIdentityId().valueOf();
 
-    this.presences.set(
-      snapshot.getIdentityId().valueOf(),
-      snapshot.toPrimitives(),
-    );
+    if (this.isOlderThanCurrent(primitives, this.presences.get(identityId))) {
+      return Promise.resolve();
+    }
+
+    this.presences.set(identityId, primitives);
 
     return Promise.resolve();
   }

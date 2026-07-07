@@ -69,7 +69,7 @@ describe('IdentityPresenceHeartbeatRecorder', () => {
     );
   });
 
-  it('publishes an ephemeral heartbeat announcement when visible status does not change', async () => {
+  it('keeps unchanged heartbeat ticks out of the event publisher', async () => {
     const identityId = new IdentityId(
       'MCowBQYDK2VwAyEAq3hAwZS8E8LE8Z+qoSHj8U5RF9Ky+fKDgT/spDURDkc=',
     );
@@ -87,8 +87,6 @@ describe('IdentityPresenceHeartbeatRecorder', () => {
       new IdentityPresenceHeartbeatMessage(identityId.valueOf(), true),
     );
 
-    const [publishedEvents] = eventPublisher.publish.mock.calls[0];
-
-    expect(publishedEvents).toHaveLength(1);
+    expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 });
