@@ -129,7 +129,6 @@ export default class OrbitDBReplicatedStateRuntime {
       { name: 'notificationSettings', store: stores.notificationSettings },
       { name: 'pins', store: stores.pins },
       { name: 'polls', store: stores.polls },
-      { name: 'presence', store: stores.presence },
       { name: 'reactions', store: stores.reactions },
       { name: 'requests', store: stores.requests },
       { name: 'stickerPacks', store: stores.stickerPacks },
@@ -276,8 +275,7 @@ export default class OrbitDBReplicatedStateRuntime {
               ` keychains=${result.keychains}` +
               ` communities=${result.communities}` +
               ` conversations=${result.conversations}` +
-              ` notificationIndexes=${result.notificationIndexes}` +
-              ` presenceHeads=${result.presenceHeads}`,
+              ` notificationIndexes=${result.notificationIndexes}`,
           );
           this.repairSecondaryHeads(networkId);
         })

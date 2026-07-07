@@ -1295,29 +1295,6 @@ export default class OrbitDBMetadataHeadRepairer {
     return repairedIndexes.reduce((total, count) => total + count, 0);
   }
 
-  private async repairPresenceHeads(): Promise<number> {
-    const documents = await this.queryRepairDocuments(
-      'presence',
-      (document) =>
-        Boolean(this.stringValue(document, 'identityId')) &&
-        Boolean(this.stringValue(document, 'status')) &&
-        typeof document.updatedAt === 'number',
-      'OrbitDBMetadataHeadRepairer.repairPresenceHeads',
-    );
-
-    for (const document of documents) {
-      const identityId = this.stringValue(document, 'identityId');
-
-      if (!identityId) {
-        continue;
-      }
-
-      await this.registry.putHead(`presence:${identityId}`, { ...document });
-    }
-
-    return documents.length;
-  }
-
   private async repairNotificationIndexes(): Promise<number> {
     const documents = await this.queryRepairDocuments(
       'notifications',
@@ -1447,28 +1424,19 @@ export default class OrbitDBMetadataHeadRepairer {
       }),
       pins: () => this.repairPinStore(),
       polls: () => this.repairPollStore(),
-      presence: async () => ({
-        presenceHeads: await this.repairPresenceHeads(),
-      }),
       reactions: () => this.repairReactionStore(),
     };
   }
 
   public async repairCritical(): Promise<CriticalRepairResult> {
     const conversationHeads = await this.repairConversationHeads();
-    const [
-      communities,
-      identities,
-      keychains,
-      notificationIndexes,
-      presenceHeads,
-    ] = await Promise.all([
-      this.repairCommunityHeads(),
-      this.repairIdentityHeads(),
-      this.repairKeychainHeads(),
-      this.repairNotificationIndexes(),
-      this.repairPresenceHeads(),
-    ]);
+    const [communities, identities, keychains, notificationIndexes] =
+      await Promise.all([
+        this.repairCommunityHeads(),
+        this.repairIdentityHeads(),
+        this.repairKeychainHeads(),
+        this.repairNotificationIndexes(),
+      ]);
 
     return {
       communities,
@@ -1477,7 +1445,6 @@ export default class OrbitDBMetadataHeadRepairer {
       identities,
       keychains,
       notificationIndexes,
-      presenceHeads,
     };
   }
 

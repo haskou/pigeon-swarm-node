@@ -17,7 +17,6 @@ export type OrbitDBReplicatedStoreSet = {
   orbitdb: OrbitDBInstance;
   pins: OrbitDBDatabase;
   polls: OrbitDBDatabase;
-  presence: OrbitDBDatabase;
   reactions: OrbitDBDatabase;
   requests: OrbitDBDatabase;
   stickerPacks: OrbitDBDatabase;

@@ -149,8 +149,6 @@ export class IdentityPresence extends AggregateRoot {
     networkIds: string[],
     now: Timestamp = Timestamp.now(),
   ): void {
-    const previous = this.status;
-
     this.lastHeartbeatAt = now;
 
     if (activityDetected) {
@@ -160,9 +158,7 @@ export class IdentityPresence extends AggregateRoot {
     this.status = this.derivedStatus(now);
     this.updatedAt = now;
 
-    if (this.changedFrom(previous)) {
-      this.recordUpdated(networkIds);
-    }
+    this.recordUpdated(networkIds);
   }
 
   public refreshDerivedStatus(

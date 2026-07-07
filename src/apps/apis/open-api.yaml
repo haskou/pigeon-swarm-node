@@ -45,6 +45,8 @@ paths:
         socket every 10 seconds. Include `"active": true` when the user has
         produced activity since the previous heartbeat. The server answers
         `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
+        Presence is kept in memory, replicated through domain events, and is
+        not written to OrbitDB/IPFS.
         Heartbeat messages are not signed because the WebSocket upgrade already
         authenticated the connection.
 
