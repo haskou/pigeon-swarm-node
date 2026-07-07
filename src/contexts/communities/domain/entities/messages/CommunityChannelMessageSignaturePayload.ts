@@ -94,21 +94,26 @@ export class CommunityChannelMessageSignaturePayload {
 
   public toSigningPrimitiveCandidates(): Array<Record<string, unknown>> {
     const canonicalPayload = this.toPrimitives();
+    const emptyAttachmentExternalIdentifiers: string[] = [];
+    const candidates = [canonicalPayload];
 
-    if (
-      !this.isMessagePayload() ||
-      !this.primitives.mentions ||
-      this.primitives.mentions.length > 0
-    ) {
-      return [canonicalPayload];
-    }
-
-    return [
-      canonicalPayload,
-      {
+    if (this.primitives.mentions && this.primitives.mentions.length === 0) {
+      candidates.push({
         ...canonicalPayload,
         mentions: [],
+      });
+    }
+
+    if (!this.isMessagePayload()) {
+      return candidates;
+    }
+
+    return candidates.flatMap((candidate) => [
+      candidate,
+      {
+        ...candidate,
+        attachmentExternalIdentifiers: emptyAttachmentExternalIdentifiers,
       },
-    ];
+    ]);
   }
 }
