@@ -279,7 +279,7 @@ Event contracts used by frontend:
 | `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                            |
 | `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
 | `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
-| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `memberIds` or `participantIds`                                                                     |
+| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `participantIds` for group conversations                                                            |
 | `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                   |
 | `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                               |
 | `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                        |
@@ -428,15 +428,17 @@ Implemented:
 - group calls use an existing group conversation id
 - community channel calls use an existing community voice channel id
 - `invitedParticipantIds` is only used for conversation calls; community
-  channel call participants are always derived from current community members
+  channel calls start with the authenticated caller and add other identities
+  only when they join the active voice-channel call
 - community channel call start is idempotent by `(communityId, channelId)`:
   when an active call already exists for that voice channel, `POST /calls`
   returns the existing call instead of creating a second one
 - when returning an existing community channel call, the authenticated caller is
   joined or added as a joined participant when needed
 - caller must be a conversation participant or community member
-- start emits `calls.v1.call.started` to the call participants
-- the creator starts as `joined`; other participants start as `ringing`
+- start emits `calls.v1.call.started` to the current call participants
+- the creator starts as `joined`; explicit conversation invitees start as
+  `ringing`
 - community channel calls are voice-channel presence state; they do not create
   chat timeline `call_event` items and do not generate missed-call
   notifications
@@ -1537,8 +1539,7 @@ Response:
       "allowsMultipleVotes": true,
       "scope": {
         "type": "group_conversation",
-        "conversationId": "group:<id>",
-        "networkId": "<networkId>"
+        "conversationId": "group:<id>"
       },
       "status": "open",
       "votes": []
@@ -3039,8 +3040,7 @@ Response:
       "scope": {
         "type": "community_channel",
         "communityId": "<communityId>",
-        "channelId": "<channelId>",
-        "networkId": "<networkId>"
+        "channelId": "<channelId>"
       },
       "status": "open",
       "votes": []
@@ -4045,8 +4045,8 @@ Poll events are emitted through websocket as domain events:
 - `polls.v1.vote.was_removed`
 - `polls.v1.poll.was_closed`
 
-Community poll events include `memberIds` for realtime routing. Group
-conversation poll events include `participantIds`.
+Community poll events are scoped by community/channel and do not expose the
+member list. Group conversation poll events include `participantIds`.
 
 ### Create poll
 

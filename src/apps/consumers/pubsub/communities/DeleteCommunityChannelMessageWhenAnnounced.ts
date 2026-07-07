@@ -78,7 +78,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       targetMessageId,
     );
 
-    if (!community.getId().isEqual(communityId)) {
+    if (!community.isIdentifiedBy(communityId)) {
       return;
     }
 

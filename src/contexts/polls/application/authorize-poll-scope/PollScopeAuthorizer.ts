@@ -30,24 +30,21 @@ export default class PollScopeAuthorizer {
       throw new CommunityNotFoundError();
     }
 
-    const visibleMembers =
-      action === 'create'
-        ? community.visibleMembersForTextChannelPollCreation(
-            message.actorIdentityId,
-            message.channelId,
-          )
-        : community.visibleMembersForTextChannelPollVote(
-            message.actorIdentityId,
-            message.channelId,
-          );
+    if (action === 'create') {
+      community.authorizeTextChannelPollCreation(
+        message.actorIdentityId,
+        message.channelId,
+      );
+    } else {
+      community.authorizeTextChannelPollVote(
+        message.actorIdentityId,
+        message.channelId,
+      );
+    }
 
     return new PollScopeResolution(
-      PollAudience.communityMembers(visibleMembers),
-      PollScope.communityChannel(
-        community.getId(),
-        message.channelId,
-        community.getNetworkId(),
-      ),
+      PollAudience.communityChannel(),
+      PollScope.communityChannel(message.communityId, message.channelId),
     );
   }
 
@@ -56,33 +53,26 @@ export default class PollScopeAuthorizer {
     poll: Poll,
     action: 'create' | 'vote',
   ): Promise<PollScopeResolution> {
-    const scope = poll.getScope();
-    const communityId = scope.getCommunityId();
-    const channelId = scope.getChannelId();
-    const conversationId = scope.getConversationId();
-
-    if (scope.isCommunityChannel() && communityId && channelId) {
-      const message = new CommunityChannelPollScopeAuthorizeMessage(
-        actorIdentityId.valueOf(),
-        communityId.valueOf(),
-        channelId.valueOf(),
-      );
-
-      return action === 'create'
-        ? this.authorizeCommunityChannelCreation(message)
-        : this.authorizeCommunityChannelVote(message);
-    }
-
-    if (conversationId) {
-      return this.authorizeGroupConversation(
-        new GroupConversationPollScopeAuthorizeMessage(
+    return poll.getScope().match<Promise<PollScopeResolution>>({
+      communityChannel: (communityId, channelId) => {
+        const message = new CommunityChannelPollScopeAuthorizeMessage(
           actorIdentityId.valueOf(),
-          conversationId.valueOf(),
-        ),
-      );
-    }
+          communityId.valueOf(),
+          channelId.valueOf(),
+        );
 
-    throw new InvalidPollScopeError();
+        return action === 'create'
+          ? this.authorizeCommunityChannelCreation(message)
+          : this.authorizeCommunityChannelVote(message);
+      },
+      groupConversation: (conversationId) =>
+        this.authorizeGroupConversation(
+          new GroupConversationPollScopeAuthorizeMessage(
+            actorIdentityId.valueOf(),
+            conversationId.valueOf(),
+          ),
+        ),
+    });
   }
 
   public authorizeCommunityChannelCreation(
@@ -117,10 +107,7 @@ export default class PollScopeAuthorizer {
 
     return new PollScopeResolution(
       PollAudience.conversationParticipants(conversation.getParticipantIds()),
-      PollScope.groupConversation(
-        conversation.getId(),
-        conversation.getNetworkId(),
-      ),
+      PollScope.groupConversation(conversation.getId()),
     );
   }
 

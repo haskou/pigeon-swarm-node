@@ -17,10 +17,8 @@ export default class CommunityMembershipRequester {
   private async acceptAutomatically(
     community: Awaited<ReturnType<CommunityFinder['find']>>,
     membershipRequest: CommunityMembershipRequest,
-    message: CommunityMembershipRequestCreateMessage,
   ): Promise<void> {
-    membershipRequest.acceptAutomatically(community.getOwnerIdentityId());
-    community.joinWithInvite(message.actorIdentityId);
+    community.acceptMembershipRequestAutomatically(membershipRequest);
     await this.communityRepository.save(community);
     await this.requestRepository.save(membershipRequest);
     await this.eventPublisher.publish(community.pullDomainEvents());
@@ -46,7 +44,7 @@ export default class CommunityMembershipRequester {
     community.requestMembership(message.actorIdentityId);
 
     if (pendingRequest && community.isAutoJoinEnabled()) {
-      await this.acceptAutomatically(community, pendingRequest, message);
+      await this.acceptAutomatically(community, pendingRequest);
 
       return pendingRequest;
     }
@@ -59,14 +57,12 @@ export default class CommunityMembershipRequester {
       return acceptedRequest;
     }
 
-    const membershipRequest = CommunityMembershipRequest.request(
-      community.getId(),
+    const membershipRequest = community.createMembershipRequest(
       message.actorIdentityId,
-      community.getOwnerIdentityId(),
     );
 
     if (community.isAutoJoinEnabled()) {
-      await this.acceptAutomatically(community, membershipRequest, message);
+      await this.acceptAutomatically(community, membershipRequest);
 
       return membershipRequest;
     }

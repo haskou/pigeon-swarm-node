@@ -214,12 +214,26 @@ describe('Community', () => {
 
     community.addMember(owner, member);
 
-    expect(
-      community.visibleMembersForTextChannelPollVote(member, channel.getId()),
-    ).toEqual([owner, member]);
     expect(() =>
-      community.visibleMembersForTextChannelPollCreation(member, channel.getId()),
+      community.authorizeTextChannelPollVote(member, channel.getId()),
+    ).not.toThrow();
+    expect(() =>
+      community.authorizeTextChannelPollCreation(member, channel.getId()),
     ).toThrow('Community permission denied: create_polls');
+  });
+
+  it('records the owner identity in join request events', () => {
+    const community = createCommunity();
+    community.pullDomainEvents();
+    const request = community.createMembershipRequest(member);
+    const event = request.pullDomainEvents()[0];
+
+    expect(event.attributes).toMatchObject({
+      communityId: community.getId().valueOf(),
+      identityId: member.valueOf(),
+      ownerIdentityId: owner.valueOf(),
+      requesterIdentityId: member.valueOf(),
+    });
   });
 
   it('keeps community visibility as immutable settings', () => {

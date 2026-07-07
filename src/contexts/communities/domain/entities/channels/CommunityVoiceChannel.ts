@@ -2,6 +2,7 @@ import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelId } from '../../value-objects/CommunityChannelId';
 import { CommunityChannelName } from '../../value-objects/CommunityChannelName';
+import { CommunityChannelType } from '../../value-objects/CommunityChannelType';
 import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 
 export class CommunityVoiceChannel {
@@ -32,10 +33,6 @@ export class CommunityVoiceChannel {
     private readonly createdAt: Timestamp,
   ) {}
 
-  private type(): 'voice' {
-    return 'voice';
-  }
-
   public getId(): CommunityChannelId {
     return this.id;
   }
@@ -58,7 +55,7 @@ export class CommunityVoiceChannel {
       id: this.id.valueOf(),
       name: this.name.valueOf(),
       permissions: this.permissions.toPrimitives(),
-      type: this.type(),
+      type: CommunityChannelType.voicePrimitive(),
     };
   }
 }

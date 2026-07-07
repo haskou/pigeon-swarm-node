@@ -63,7 +63,7 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
     const messageId = new CommunityChannelMessageId(event.attributes.messageId);
     const authorIdentityId = new IdentityId(event.attributes.authorIdentityId);
 
-    if (!community.getId().isEqual(communityId)) {
+    if (!community.isIdentifiedBy(communityId)) {
       return;
     }
 

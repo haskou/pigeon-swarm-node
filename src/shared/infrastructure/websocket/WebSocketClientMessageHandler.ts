@@ -67,6 +67,27 @@ export default class WebSocketClientMessageHandler {
     }
   }
 
+  public async findCommunityChannelEventRecipients(
+    communityId: string,
+    channelId: string,
+  ): Promise<string[]> {
+    const community = await this.communityRepository.findById(
+      new CommunityId(communityId),
+    );
+
+    if (!community) {
+      return [];
+    }
+
+    try {
+      return community
+        .visibleMembersForTextChannel(new CommunityChannelId(channelId))
+        .map((identityId) => identityId.valueOf());
+    } catch {
+      return [];
+    }
+  }
+
   public async findIdentityUpdateRecipients(
     identityId: string,
   ): Promise<string[]> {
@@ -91,7 +112,7 @@ export default class WebSocketClientMessageHandler {
 
     for (const community of communities) {
       for (const recipient of this.excludeIdentity(
-        community.getMemberIds(),
+        community.findIdentityUpdateRecipientsFor(actorId),
         actorId,
       )) {
         recipients.add(recipient);

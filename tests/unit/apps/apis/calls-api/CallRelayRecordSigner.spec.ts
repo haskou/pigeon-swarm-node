@@ -10,7 +10,7 @@ jest.mock(
   '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter',
   () => ({
     __esModule: true,
-    default: {
+    libp2pKeyAdapter: {
       peerIdFromPrivateKey: jest.fn(() => '12D3KooWCallRelay'),
       peerIdFromPublicKey: jest.fn(() => '12D3KooWCallRelay'),
       publicKeyFromProtobuf: jest.fn(async () => mockPublicKey),

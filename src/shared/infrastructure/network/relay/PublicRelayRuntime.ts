@@ -1,4 +1,5 @@
-import libp2pKeyAdapter, {
+import {
+  libp2pKeyAdapter,
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';

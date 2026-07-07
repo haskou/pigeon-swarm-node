@@ -1,7 +1,9 @@
-import heliaRuntimeAdapter, {
+import {
+  heliaRuntimeAdapter,
   Libp2pDefaults,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
-import libp2pKeyAdapter, {
+import {
+  libp2pKeyAdapter,
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { PublicRelayPeerAnnouncer } from '@app/shared/infrastructure/pubsub/libp2p/PublicRelayPeerAnnouncer';

@@ -200,6 +200,10 @@ export class CommunityMembershipRequest extends AggregateRoot {
     return this.identityId;
   }
 
+  public getType(): CommunityRequestType {
+    return this.type;
+  }
+
   public isPending(): boolean {
     return this.status.isPending();
   }

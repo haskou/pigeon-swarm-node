@@ -4,7 +4,7 @@ import { HttpApp } from '@haskou/ddd-kernel/adapters/ui';
 import expressWinston from 'express-winston';
 import winston, { Logger, format } from 'winston';
 
-import Log from './Log';
+import { Log } from './Log';
 
 type HttpAppProvider = {
   readonly app: HttpApp;

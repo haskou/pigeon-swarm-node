@@ -434,6 +434,14 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udGVudFJlcGxpY2F0aW9uU3RhdHVzU3VtbWFyeVJlcG9zaXRvcnlfX0NvbnRlbnRSZXBsaWNhdGlvblN0YXR1c1N1bW1hcnlSZXBvc2l0b3J5
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fY291bnQtdW5yZWFkLWNvbnZlcnNhdGlvbnNfX0NvbnZlcnNhdGlvblVucmVhZENvdW50ZXJfX0NvbnZlcnNhdGlvblVucmVhZENvdW50ZXI=:
+    class: >-
+      /contexts/conversations/application/count-unread-conversations/ConversationUnreadCounter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19hcHBsaWNhdGlvbl9fZmluZC1jb252ZXJzYXRpb25zX19Db252ZXJzYXRpb25zRmluZGVyX19Db252ZXJzYXRpb25zRmluZGVy:
     class: /contexts/conversations/application/find-conversations/ConversationsFinder
     arguments:

@@ -1,5 +1,9 @@
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -12,7 +16,11 @@ import { OrbitDBPollDocument } from './documents/OrbitDBPollDocument';
 export default class OrbitDBPollRepository extends PollRepository {
   private readonly pollIndex: OrbitDBHeadIndex<OrbitDBPollDocument>;
 
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly communityRepository: CommunityRepository,
+    private readonly conversationRepository: ConversationRepository,
+  ) {
     super();
     this.pollIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'polls',
@@ -60,8 +68,33 @@ export default class OrbitDBPollRepository extends PollRepository {
     );
   }
 
-  private toDocument(poll: Poll): OrbitDBPollDocument {
+  private async resolveNetworkId(poll: Poll): Promise<string> {
+    return poll.getScope().match<Promise<string>>({
+      communityChannel: async (communityId) => {
+        const community = await this.communityRepository.findById(communityId);
+
+        if (!community) {
+          throw new CommunityNotFoundError();
+        }
+
+        return community.toPrimitives().networkId;
+      },
+      groupConversation: async (conversationId) => {
+        const conversation =
+          await this.conversationRepository.findMetadataById(conversationId);
+
+        if (!conversation) {
+          throw new ConversationNotFoundError(conversationId);
+        }
+
+        return conversation.toPrimitives().networkId;
+      },
+    });
+  }
+
+  private async toDocument(poll: Poll): Promise<OrbitDBPollDocument> {
     const primitives = poll.toPrimitives();
+    const networkId = await this.resolveNetworkId(poll);
 
     return {
       allowsMultipleVotes: primitives.allowsMultipleVotes,
@@ -69,7 +102,7 @@ export default class OrbitDBPollRepository extends PollRepository {
       creatorIdentityId: primitives.creatorIdentityId,
       expiresAt: primitives.expiresAt,
       id: primitives.id,
-      networkId: primitives.scope.networkId,
+      networkId,
       options: primitives.options,
       question: primitives.question,
       scope: primitives.scope,
@@ -231,7 +264,7 @@ export default class OrbitDBPollRepository extends PollRepository {
   }
 
   public async save(poll: Poll): Promise<void> {
-    const document = this.toDocument(poll);
+    const document = await this.toDocument(poll);
 
     await this.registry.putDocument('polls', document);
     await this.putHeads(document);

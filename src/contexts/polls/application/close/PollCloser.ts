@@ -21,8 +21,13 @@ export class PollCloser {
 
     poll.close();
     await this.repository.save(poll);
+    const eventStreamId = poll.getScope().match({
+      communityChannel: (communityId) => communityId.valueOf(),
+      groupConversation: (conversationId) => conversationId.valueOf(),
+    });
+
     await this.eventPublisher.publish([
-      new PollWasClosedEvent(poll.getScope().selectEventStreamId(), {
+      new PollWasClosedEvent(eventStreamId, {
         ...message.audience.toPrimitives(),
         actorIdentityId: message.actorIdentityId.valueOf(),
         poll: poll.toPrimitives(),

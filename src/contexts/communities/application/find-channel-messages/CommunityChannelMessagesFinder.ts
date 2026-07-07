@@ -39,7 +39,7 @@ export default class CommunityChannelMessagesFinder {
       message.channelId,
       this.messageIds(messages),
     );
-    const upperBound = messages.at(-1)?.toPrimitives().createdAt;
+    const upperBound = messages.at(-1)?.getCreatedAt().valueOf();
     const polls =
       message.beforeMessageId && messages.length === 0
         ? []

@@ -7,7 +7,7 @@ import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBInstance } from './OrbitDBInstance';
 import { OrbitDBPrivateNetworkStoreAddresses } from './OrbitDBPrivateNetworkStoreAddresses';
 import { OrbitDBPrivateNetworkStoreSet } from './OrbitDBPrivateNetworkStoreSet';
-import orbitDBRuntimeAdapter from './OrbitDBRuntimeAdapter';
+import { orbitDBRuntimeAdapter } from './OrbitDBRuntimeAdapter';
 
 export class OrbitDBPrivateNetworkStores {
   private static readonly syncErrorWarningKeys = new Set<string>();

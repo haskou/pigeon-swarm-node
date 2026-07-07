@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { CommunityInvite } from '../../domain/entities/invites/CommunityInvite';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
-import { CommunityInviteWasCreatedEvent } from '../../domain/events/CommunityInviteWasCreatedEvent';
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
@@ -30,13 +29,7 @@ export default class CommunityInviteCreator {
     );
 
     await this.inviteRepository.save(invite);
-    await this.eventPublisher.publish([
-      new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {
-        communityId: community.getId().valueOf(),
-        invite: invite.toPrimitives(),
-        networkId: community.getNetworkId().valueOf(),
-      }),
-    ]);
+    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,

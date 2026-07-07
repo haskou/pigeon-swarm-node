@@ -27,7 +27,15 @@ export class CommunityRequestStatus extends Enum<string> {
     return this.isEqual(CommunityRequestStatus.ACCEPTED);
   }
 
+  public isDeclined(): boolean {
+    return this.isEqual(CommunityRequestStatus.DECLINED);
+  }
+
   public isPending(): boolean {
     return this.isEqual(CommunityRequestStatus.PENDING);
+  }
+
+  public isResolution(): boolean {
+    return this.isAccepted() || this.isDeclined();
   }
 }

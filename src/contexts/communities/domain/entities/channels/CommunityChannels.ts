@@ -3,6 +3,7 @@ import { assert } from '@haskou/value-objects';
 import { CommunityChannelNotFoundError } from '../../errors/CommunityChannelNotFoundError';
 import { CommunityChannelId } from '../../value-objects/CommunityChannelId';
 import { CommunityChannelName } from '../../value-objects/CommunityChannelName';
+import { CommunityChannelType } from '../../value-objects/CommunityChannelType';
 import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 import { CommunityTextChannel } from './CommunityTextChannel';
 import { CommunityVoiceChannel } from './CommunityVoiceChannel';
@@ -13,10 +14,22 @@ export class CommunityChannels {
     private readonly voiceChannels: CommunityVoiceChannel[],
   ) {}
 
-  private find(channelId: CommunityChannelId) {
+  private find(
+    channelId: CommunityChannelId,
+  ): CommunityTextChannel | CommunityVoiceChannel | undefined {
     return [...this.textChannels, ...this.voiceChannels].find((candidate) =>
       candidate.getId().isEqual(channelId),
     );
+  }
+
+  private findExisting(
+    channelId: CommunityChannelId,
+  ): CommunityTextChannel | CommunityVoiceChannel {
+    const channel = this.find(channelId);
+
+    assert(channel, new CommunityChannelNotFoundError());
+
+    return channel;
   }
 
   private findText(channelId: CommunityChannelId): CommunityTextChannel {
@@ -83,13 +96,10 @@ export class CommunityChannels {
     channelId: CommunityChannelId,
     name: CommunityChannelName,
   ): void {
-    const channel = this.find(channelId);
-
-    assert(channel, new CommunityChannelNotFoundError());
-    channel?.rename(name);
+    this.findExisting(channelId).rename(name);
   }
 
-  public remove(channelId: CommunityChannelId): 'text' | 'voice' {
+  public remove(channelId: CommunityChannelId): CommunityChannelType {
     const textChannelIndex = this.textChannels.findIndex((candidate) =>
       candidate.getId().isEqual(channelId),
     );
@@ -97,7 +107,7 @@ export class CommunityChannels {
     if (textChannelIndex !== -1) {
       this.textChannels.splice(textChannelIndex, 1);
 
-      return 'text';
+      return CommunityChannelType.TEXT;
     }
 
     const voiceChannelIndex = this.voiceChannels.findIndex((candidate) =>
@@ -107,7 +117,7 @@ export class CommunityChannels {
     if (voiceChannelIndex !== -1) {
       this.voiceChannels.splice(voiceChannelIndex, 1);
 
-      return 'voice';
+      return CommunityChannelType.VOICE;
     }
 
     throw new CommunityChannelNotFoundError();
@@ -117,10 +127,7 @@ export class CommunityChannels {
     channelId: CommunityChannelId,
     permissions: CommunityChannelPermissions,
   ): void {
-    const channel = this.find(channelId);
-
-    assert(channel, new CommunityChannelNotFoundError());
-    channel?.updatePermissions(permissions);
+    this.findExisting(channelId).updatePermissions(permissions);
   }
 
   public toPrimitives() {

@@ -14,7 +14,6 @@ export interface OrbitDBPollDocument extends Record<string, unknown> {
     channelId: string | undefined;
     communityId: string | undefined;
     conversationId: string | undefined;
-    networkId: string;
     type: string;
   };
   status: string;

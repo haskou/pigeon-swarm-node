@@ -1,6 +1,6 @@
 import { IPFSContentNotFoundError } from './errors/IPFSContentNotFoundError';
 import { IPFSNetworksNotFoundByIdsError } from './errors/IPFSNetworksNotFoundByIdsError';
-import heliaRuntimeAdapter from './helia/adapters/HeliaRuntimeAdapter';
+import { heliaRuntimeAdapter } from './helia/adapters/HeliaRuntimeAdapter';
 import IPFSCidCodec from './helia/IPFSCidCodec';
 import IPFSContentRacer from './helia/IPFSContentRacer';
 import { IPFSId } from './helia/IPFSId';

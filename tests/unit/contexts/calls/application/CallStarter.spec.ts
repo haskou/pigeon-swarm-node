@@ -70,4 +70,53 @@ describe('CallStarter', () => {
     expect(call.hasParticipant(recipient)).toBe(true);
     expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
   });
+
+  it('starts a community channel call with only the requester joined initially', async () => {
+    const repository: MockProxy<CallRepository> = mock<CallRepository>();
+    const conversationRepository: MockProxy<ConversationRepository> =
+      mock<ConversationRepository>();
+    const communityRepository: MockProxy<CommunityRepository> =
+      mock<CommunityRepository>();
+    const eventPublisher: MockProxy<DomainEventPublisher> =
+      mock<DomainEventPublisher>();
+    const authorizeVoiceChannelCall = jest.fn();
+    let savedCall: Awaited<Parameters<CallRepository['save']>[0]> | undefined;
+
+    repository.findActiveByCommunityChannel.mockResolvedValue(undefined);
+    repository.save.mockImplementation((call) => {
+      savedCall = call;
+
+      return Promise.resolve();
+    });
+    communityRepository.findById.mockResolvedValue({
+      authorizeVoiceChannelCall,
+      toPrimitives: () => ({
+        networkId: networkId.valueOf(),
+      }),
+    } as never);
+
+    const starter = new CallStarter(
+      repository,
+      new CallScopeResolver(conversationRepository, communityRepository),
+      eventPublisher,
+    );
+
+    const call = await starter.start(
+      new CallStartMessage(
+        caller.valueOf(),
+        'community_channel',
+        undefined,
+        'community-1',
+        'voice-1',
+      ),
+    );
+
+    expect(repository.save).toHaveBeenCalledWith(call);
+    expect(savedCall).toBe(call);
+    expect(authorizeVoiceChannelCall).toHaveBeenCalledTimes(1);
+    expect(call.hasParticipant(caller)).toBe(true);
+    expect(call.hasParticipant(recipient)).toBe(false);
+    expect(call.toPrimitives().participantIds).toEqual([caller.valueOf()]);
+    expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
+  });
 });

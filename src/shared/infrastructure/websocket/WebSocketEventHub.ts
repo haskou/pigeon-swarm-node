@@ -279,6 +279,66 @@ export class WebSocketEventHub {
     );
   }
 
+  private communityChannelPollScope(
+    event: DomainEvent,
+  ): { channelId: string; communityId: string } | undefined {
+    const poll = event.attributes.poll;
+
+    if (typeof poll !== 'object' || poll === null) {
+      return undefined;
+    }
+
+    const scope = (poll as { scope?: unknown }).scope;
+
+    if (typeof scope !== 'object' || scope === null) {
+      return undefined;
+    }
+
+    const { channelId, communityId, type } = scope as {
+      channelId?: unknown;
+      communityId?: unknown;
+      type?: unknown;
+    };
+
+    if (
+      type !== 'community_channel' ||
+      typeof communityId !== 'string' ||
+      typeof channelId !== 'string'
+    ) {
+      return undefined;
+    }
+
+    return { channelId, communityId };
+  }
+
+  private async relayCommunityPollEventToRecipients(
+    event: DomainEvent,
+    message: WebSocketRealtimeMessage,
+  ): Promise<void> {
+    if (!event.eventName().startsWith('polls.')) {
+      return;
+    }
+
+    const scope = this.communityChannelPollScope(event);
+
+    if (!scope) {
+      return;
+    }
+
+    const baseRecipients = this.getEventRecipients(event);
+    const recipients = (
+      (await this.clientMessageHandler?.findCommunityChannelEventRecipients(
+        scope.communityId,
+        scope.channelId,
+      )) || []
+    ).filter((recipient) => !baseRecipients.has(recipient));
+
+    this.debug(
+      `WebSocket community poll fanout "${event.aggregateId}" communityId="${scope.communityId}" channelId="${scope.channelId}" recipients="${recipients.join(',')}"`,
+    );
+    this.sendToRecipients(recipients, message);
+  }
+
   private async relayIdentityUpdateToRelatedRecipients(
     event: DomainEvent,
     message: WebSocketRealtimeMessage,
@@ -420,6 +480,13 @@ export class WebSocketEventHub {
           `WebSocket identity update fanout failed for "${event.aggregateId}": ${String(error)}`,
         );
       });
+      this.relayCommunityPollEventToRecipients(event, domainEventMessage).catch(
+        (error: unknown) => {
+          Kernel.logger?.error(
+            `WebSocket community poll fanout failed for "${event.aggregateId}": ${String(error)}`,
+          );
+        },
+      );
       const conversationCallEvents =
         this.conversationCallEventMapper.toEvents(event);
 

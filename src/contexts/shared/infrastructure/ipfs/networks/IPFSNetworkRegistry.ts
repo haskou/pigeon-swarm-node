@@ -16,7 +16,7 @@ import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
 import { IPFSConnection } from '../helia/IPFSConnection';
-import libp2pKeyAdapter from './adapters/Libp2pKeyAdapter';
+import { libp2pKeyAdapter } from './adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from './adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from './IPFSNetwork';
 import { IPFSNetworkConfig } from './IPFSNetworkConfig';
