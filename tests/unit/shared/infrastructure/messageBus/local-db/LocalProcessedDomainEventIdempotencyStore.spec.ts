@@ -10,6 +10,11 @@ describe('LocalProcessedDomainEventIdempotencyStore', () => {
   beforeEach(() => {
     database = mock<EmbeddedLocalDatabase>();
     store = new LocalProcessedDomainEventIdempotencyStore(database);
+    (
+      LocalProcessedDomainEventIdempotencyStore as unknown as {
+        nextCleanupAt: number;
+      }
+    ).nextCleanupAt = 0;
   });
 
   it('should know when a message has already been processed', async () => {
@@ -42,6 +47,9 @@ describe('LocalProcessedDomainEventIdempotencyStore', () => {
       {
         processedAt: expect.any(Number),
       },
+    );
+    expect(database.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
+      database.save.mock.invocationCallOrder[0],
     );
   });
 });

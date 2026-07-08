@@ -12,7 +12,7 @@ describe('LinkPreviewCacheRepository', () => {
     ).nextCleanupAt = 0;
   });
 
-  it('purges expired previews in background when saving a preview', async () => {
+  it('purges expired previews before saving a preview', async () => {
     await new LinkPreviewCacheRepository(database).save({
       finalUrl: 'https://example.com/',
       title: 'Example',
@@ -32,6 +32,9 @@ describe('LinkPreviewCacheRepository', () => {
         title: 'Example',
         url: 'https://example.com/',
       },
+    );
+    expect(database.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
+      database.save.mock.invocationCallOrder[0],
     );
   });
 });

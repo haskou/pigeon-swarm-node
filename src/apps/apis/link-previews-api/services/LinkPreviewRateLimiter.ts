@@ -14,7 +14,7 @@ export default class LinkPreviewRateLimiter {
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
-  private cleanupExpiredBucketsInBackground(now: number): void {
+  private async cleanupExpiredBuckets(now: number): Promise<void> {
     if (now < LinkPreviewRateLimiter.nextCleanupAt) {
       return;
     }
@@ -22,13 +22,11 @@ export default class LinkPreviewRateLimiter {
     LinkPreviewRateLimiter.nextCleanupAt =
       now + LinkPreviewRateLimiter.CLEANUP_INTERVAL_MS;
 
-    void Promise.resolve(
-      this.database.deleteMany(
-        LinkPreviewRateLimiter.NAMESPACE,
-        (document) =>
-          typeof document.resetAt === 'number' && document.resetAt <= now,
-      ),
-    ).catch((): undefined => undefined);
+    await this.database.deleteMany(
+      LinkPreviewRateLimiter.NAMESPACE,
+      (document) =>
+        typeof document.resetAt === 'number' && document.resetAt <= now,
+    );
   }
 
   private id(identityId: IdentityId, ipAddress: string): string {
@@ -68,7 +66,7 @@ export default class LinkPreviewRateLimiter {
     const id = this.id(identityId, ipAddress);
     const now = Date.now();
 
-    this.cleanupExpiredBucketsInBackground(now);
+    await this.cleanupExpiredBuckets(now);
 
     const current = await this.database.findOne(
       LinkPreviewRateLimiter.NAMESPACE,

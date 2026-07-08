@@ -10,7 +10,7 @@ export default class LocalProcessedDomainEventIdempotencyStore implements Idempo
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
-  private cleanupExpiredRecordsInBackground(now: number): void {
+  private async cleanupExpiredRecords(now: number): Promise<void> {
     if (now < LocalProcessedDomainEventIdempotencyStore.nextCleanupAt) {
       return;
     }
@@ -18,15 +18,13 @@ export default class LocalProcessedDomainEventIdempotencyStore implements Idempo
     LocalProcessedDomainEventIdempotencyStore.nextCleanupAt =
       now + LocalProcessedDomainEventIdempotencyStore.CLEANUP_INTERVAL_MS;
 
-    void Promise.resolve(
-      this.database.deleteMany(
-        LocalProcessedDomainEventIdempotencyStore.NAMESPACE,
-        (document) =>
-          typeof document.processedAt === 'number' &&
-          document.processedAt <
-            now - LocalProcessedDomainEventIdempotencyStore.TTL_MS,
-      ),
-    ).catch((): undefined => undefined);
+    await this.database.deleteMany(
+      LocalProcessedDomainEventIdempotencyStore.NAMESPACE,
+      (document) =>
+        typeof document.processedAt === 'number' &&
+        document.processedAt <
+          now - LocalProcessedDomainEventIdempotencyStore.TTL_MS,
+    );
   }
 
   public async has(key: string): Promise<boolean> {
@@ -41,7 +39,7 @@ export default class LocalProcessedDomainEventIdempotencyStore implements Idempo
   public async mark(key: string): Promise<void> {
     const now = Date.now();
 
-    this.cleanupExpiredRecordsInBackground(now);
+    await this.cleanupExpiredRecords(now);
 
     await this.database.save(
       LocalProcessedDomainEventIdempotencyStore.NAMESPACE,

@@ -22,7 +22,7 @@ export default class LinkPreviewCacheRepository {
     );
   }
 
-  private cleanupExpiredPreviewsInBackground(now: number): void {
+  private async cleanupExpiredPreviews(now: number): Promise<void> {
     if (now < LinkPreviewCacheRepository.nextCleanupAt) {
       return;
     }
@@ -30,13 +30,11 @@ export default class LinkPreviewCacheRepository {
     LinkPreviewCacheRepository.nextCleanupAt =
       now + LinkPreviewCacheRepository.CLEANUP_INTERVAL_MS;
 
-    void Promise.resolve(
-      this.database.deleteMany(
-        LinkPreviewCacheRepository.NAMESPACE,
-        (document) =>
-          typeof document.expiresAt === 'number' && document.expiresAt <= now,
-      ),
-    ).catch((): undefined => undefined);
+    await this.database.deleteMany(
+      LinkPreviewCacheRepository.NAMESPACE,
+      (document) =>
+        typeof document.expiresAt === 'number' && document.expiresAt <= now,
+    );
   }
 
   public async find(url: URL): Promise<LinkPreviewResource | undefined> {
@@ -60,7 +58,7 @@ export default class LinkPreviewCacheRepository {
   public async save(preview: LinkPreviewResource): Promise<void> {
     const now = Date.now();
 
-    this.cleanupExpiredPreviewsInBackground(now);
+    await this.cleanupExpiredPreviews(now);
 
     await this.database.save(
       LinkPreviewCacheRepository.NAMESPACE,

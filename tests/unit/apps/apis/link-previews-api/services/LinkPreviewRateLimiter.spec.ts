@@ -32,7 +32,7 @@ describe('LinkPreviewRateLimiter', () => {
     restoreRateLimit();
   });
 
-  it('purges expired buckets in background while consuming a bucket', async () => {
+  it('purges expired buckets before consuming a bucket', async () => {
     database.findOne.mockResolvedValue(undefined);
 
     await new LinkPreviewRateLimiter(database).consume(
@@ -51,6 +51,9 @@ describe('LinkPreviewRateLimiter', () => {
         count: 1,
         resetAt: expect.any(Number),
       },
+    );
+    expect(database.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
+      database.save.mock.invocationCallOrder[0],
     );
   });
 });

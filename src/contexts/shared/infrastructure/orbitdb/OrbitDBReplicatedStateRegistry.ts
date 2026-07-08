@@ -495,6 +495,75 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  private async isSameHeadContentPersisted(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[],
+  ): Promise<boolean> {
+    const entries = this.networkStoreEntriesForNetworkIds(networkIds);
+
+    if (entries.length === 0) {
+      return false;
+    }
+
+    try {
+      const persistedHeads = await Promise.all(
+        entries.map(async ({ stores }) =>
+          this.recordValue(await stores.heads.get?.(key)),
+        ),
+      );
+
+      return persistedHeads.every(
+        (head) => head !== undefined && this.isSameHeadContent(head, value),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private hasSameCachedHeadContent(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): boolean {
+    return current !== undefined && this.isSameHeadContent(current, candidate);
+  }
+
+  private async shouldSkipHeadWrite(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[],
+    force: boolean,
+    hasSameCachedContent: boolean,
+  ): Promise<boolean> {
+    if (force || !hasSameCachedContent) {
+      return false;
+    }
+
+    return this.isSameHeadContentPersisted(key, value, networkIds);
+  }
+
+  private async targetNetworkIdsForHeadWrite(
+    value: Record<string, unknown>,
+    networkIds: string[],
+  ): Promise<string[]> {
+    if (networkIds.length > 0) {
+      return networkIds;
+    }
+
+    return this.targetNetworkIdsForDocument(value, networkIds);
+  }
+
+  private nextHeadWriteValue(
+    key: string,
+    value: Record<string, unknown>,
+    current: Record<string, unknown> | undefined,
+    hasSameCachedContent: boolean,
+  ): Record<string, unknown> | undefined {
+    return (
+      this.cacheHead(key, value) ?? (hasSameCachedContent ? current : undefined)
+    );
+  }
+
   private isNewerOrEqualDocument(
     current: Record<string, unknown>,
     candidate: Record<string, unknown>,
@@ -1076,22 +1145,43 @@ export default class OrbitDBReplicatedStateRegistry {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
     const currentValue = this.cachedHeads.get(key);
+    const hasSameCachedContent = this.hasSameCachedHeadContent(
+      currentValue,
+      cleanValue,
+    );
 
-    if (
-      !options.force &&
-      currentValue &&
-      this.isSameHeadContent(currentValue, cleanValue)
-    ) {
-      return;
+    if (!options.force && hasSameCachedContent) {
+      const targetDocument = currentValue ?? cleanValue;
+      const skipTargetNetworkIds = await this.targetNetworkIdsForHeadWrite(
+        targetDocument,
+        networkIds,
+      );
+
+      if (
+        await this.shouldSkipHeadWrite(
+          key,
+          cleanValue,
+          skipTargetNetworkIds,
+          false,
+          hasSameCachedContent,
+        )
+      ) {
+        return;
+      }
     }
 
-    const cachedValue = this.cacheHead(key, cleanValue);
+    const cachedValue = this.nextHeadWriteValue(
+      key,
+      cleanValue,
+      currentValue,
+      hasSameCachedContent,
+    );
 
     if (!cachedValue) {
       return;
     }
 
-    const targetNetworkIds = await this.targetNetworkIdsForDocument(
+    const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
       cachedValue,
       networkIds,
     );

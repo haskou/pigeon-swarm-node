@@ -360,6 +360,41 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
   });
 
+  it('retries an unchanged index head when the previous replicated write failed', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const head = {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 1,
+    };
+
+    await registry.register('network-1', network.stores);
+    network.heads.put.mockRejectedValueOnce(new Error('temporary failure'));
+
+    await expect(
+      registry.putHead('messages:conversation-1', head),
+    ).rejects.toThrow('temporary failure');
+
+    await registry.putHead('messages:conversation-1', {
+      ...head,
+      updatedAt: 2,
+    });
+
+    expect(network.heads.put).toHaveBeenCalledTimes(2);
+    await expect(network.heads.get('messages:conversation-1')).resolves.toEqual(
+      {
+        ...head,
+        updatedAt: 2,
+      },
+    );
+  });
+
   it('rewrites index heads when indexed records change', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const network = createStores();

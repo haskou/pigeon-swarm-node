@@ -15,7 +15,7 @@ export default class CallSignalRateLimiter {
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
-  private cleanupExpiredBucketsInBackground(now: number): void {
+  private async cleanupExpiredBuckets(now: number): Promise<void> {
     if (now < CallSignalRateLimiter.nextCleanupAt) {
       return;
     }
@@ -23,13 +23,11 @@ export default class CallSignalRateLimiter {
     CallSignalRateLimiter.nextCleanupAt =
       now + CallSignalRateLimiter.CLEANUP_INTERVAL_MS;
 
-    void Promise.resolve(
-      this.database.deleteMany(
-        CallSignalRateLimiter.NAMESPACE,
-        (document) =>
-          typeof document.resetAt === 'number' && document.resetAt <= now,
-      ),
-    ).catch((): undefined => undefined);
+    await this.database.deleteMany(
+      CallSignalRateLimiter.NAMESPACE,
+      (document) =>
+        typeof document.resetAt === 'number' && document.resetAt <= now,
+    );
   }
 
   private id(callId: CallId, senderIdentityId: IdentityId): string {
@@ -69,7 +67,7 @@ export default class CallSignalRateLimiter {
     const id = this.id(callId, senderIdentityId);
     const now = Date.now();
 
-    this.cleanupExpiredBucketsInBackground(now);
+    await this.cleanupExpiredBuckets(now);
 
     const current = await this.database.findOne(
       CallSignalRateLimiter.NAMESPACE,
