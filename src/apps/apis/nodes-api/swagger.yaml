@@ -181,7 +181,7 @@ paths:
       tags:
         - nodes
       summary: Get active peers
-      description: Returns nodes seen through heartbeat events during the active peer window. Network private keys are never included.
+      description: Returns nodes seen through heartbeat events during the active peer window plus live IPFS transport peers currently connected through libp2p. Network private keys are never included.
       responses:
         '200':
           description: Active peers.
@@ -382,11 +382,46 @@ components:
           type: string
         name:
           type: string
+    ConnectedIpfsPeerNetworkResource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - private
+            - public
+    ConnectedIpfsPeerResource:
+      type: object
+      required:
+        - id
+        - networks
+      properties:
+        id:
+          type: string
+          description: Connected libp2p peer id. This is not necessarily the node id because the peer may not have sent a node heartbeat yet.
+        networks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectedIpfsPeerNetworkResource'
     PeersResource:
       type: object
       required:
+        - ipfsPeers
         - peers
       properties:
+        ipfsPeers:
+          type: array
+          description: Live IPFS transport peers grouped by connected network.
+          items:
+            $ref: '#/components/schemas/ConnectedIpfsPeerResource'
         peers:
           type: array
           items:

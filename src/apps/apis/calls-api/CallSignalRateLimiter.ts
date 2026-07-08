@@ -7,11 +7,28 @@ import { CallSignalRateLimitExceededError } from './errors/CallSignalRateLimitEx
 
 export default class CallSignalRateLimiter {
   private static readonly NAMESPACE = 'call_signal_rate_limits';
+  private static readonly CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
+  private static nextCleanupAt = 0;
 
   private readonly policy: CallSignalRatePolicy =
     CallSignalRatePolicy.fromEnvironment();
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
+
+  private async cleanupExpiredBuckets(now: number): Promise<void> {
+    if (now < CallSignalRateLimiter.nextCleanupAt) {
+      return;
+    }
+
+    CallSignalRateLimiter.nextCleanupAt =
+      now + CallSignalRateLimiter.CLEANUP_INTERVAL_MS;
+
+    await this.database.deleteMany(
+      CallSignalRateLimiter.NAMESPACE,
+      (document) =>
+        typeof document.resetAt === 'number' && document.resetAt <= now,
+    );
+  }
 
   private id(callId: CallId, senderIdentityId: IdentityId): string {
     return `${callId.valueOf()}:${senderIdentityId.valueOf()}`;
@@ -49,6 +66,9 @@ export default class CallSignalRateLimiter {
 
     const id = this.id(callId, senderIdentityId);
     const now = Date.now();
+
+    await this.cleanupExpiredBuckets(now);
+
     const current = await this.database.findOne(
       CallSignalRateLimiter.NAMESPACE,
       id,

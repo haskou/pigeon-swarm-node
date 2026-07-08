@@ -150,6 +150,54 @@ export default class OrbitDBCallIndex {
     );
   }
 
+  private hasStaleActiveDocuments(
+    indexedDocuments: OrbitDBCallDocument[],
+    freshDocuments: OrbitDBCallDocument[],
+  ): boolean {
+    const freshDocumentsById = new Map(
+      freshDocuments.map((document) => [document.id, document]),
+    );
+
+    return indexedDocuments.some((document) => {
+      const freshDocument = freshDocumentsById.get(document.id);
+
+      return (
+        document.status === 'active' &&
+        freshDocument !== undefined &&
+        (!this.isActive(freshDocument) ||
+          this.freshness(document) < this.freshness(freshDocument))
+      );
+    });
+  }
+
+  private repairActiveIndexInBackground(
+    documents: OrbitDBCallDocument[],
+  ): void {
+    void this.putIndex(this.activeIndexHeadKey(), documents, (call) =>
+      this.isActive(call),
+    ).catch((error) => {
+      Kernel.logger.warn?.(
+        `Call active index repair failed: error=${String(error)}`,
+      );
+    });
+  }
+
+  private async activeDocumentsForTimeoutChecks(): Promise<
+    OrbitDBCallDocument[]
+  > {
+    const indexedDocuments = await this.callDocumentsFromIndexAndCache(
+      this.activeIndexHeadKey(),
+      (document) => document.status === 'active',
+    );
+    const freshDocuments = await this.freshPrimaryDocuments(indexedDocuments);
+
+    if (this.hasStaleActiveDocuments(indexedDocuments, freshDocuments)) {
+      this.repairActiveIndexInBackground(freshDocuments);
+    }
+
+    return freshDocuments.filter((document) => document.status === 'active');
+  }
+
   private cachedCommunityChannelCallDocument(
     communityId: CommunityId,
     channelId: CommunityChannelId,
@@ -416,16 +464,8 @@ export default class OrbitDBCallIndex {
   public async findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
   ): Promise<OrbitDBCallDocument[]> {
-    return (
-      await this.freshPrimaryDocuments(
-        await this.callDocumentsFromIndexAndCache(
-          this.activeIndexHeadKey(),
-          (document) => document.status === 'active',
-        ),
-      )
-    ).filter(
+    return (await this.activeDocumentsForTimeoutChecks()).filter(
       (document) =>
-        document.status === 'active' &&
         document.createdAt <= timeoutThreshold.valueOf() &&
         document.participants.some(
           (participant) => participant.status === 'ringing',
@@ -436,22 +476,13 @@ export default class OrbitDBCallIndex {
   public async findTimedOutJoinedCalls(
     timeoutThreshold: Timestamp,
   ): Promise<OrbitDBCallDocument[]> {
-    return (
-      await this.freshPrimaryDocuments(
-        await this.callDocumentsFromIndexAndCache(
-          this.activeIndexHeadKey(),
-          (document) => document.status === 'active',
-        ),
-      )
-    ).filter(
-      (document) =>
-        document.status === 'active' &&
-        document.participants.some(
-          (participant) =>
-            participant.status === 'joined' &&
-            participant.lastSeenAt !== undefined &&
-            participant.lastSeenAt <= timeoutThreshold.valueOf(),
-        ),
+    return (await this.activeDocumentsForTimeoutChecks()).filter((document) =>
+      document.participants.some(
+        (participant) =>
+          participant.status === 'joined' &&
+          participant.lastSeenAt !== undefined &&
+          participant.lastSeenAt <= timeoutThreshold.valueOf(),
+      ),
     );
   }
 

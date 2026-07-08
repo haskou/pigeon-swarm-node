@@ -86,8 +86,54 @@ describe('HeliaPinningStrategy', () => {
       undefined,
     );
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
-      'Skipped IPFS content pinning for local availability: bafymockcid',
+      'Skipped IPFS content pinning for local availability: bafymockcid error=Error: pin failed',
     );
+  });
+
+  it('should back off repeated pin attempts after a failure', async () => {
+    jest.mocked(heliaCore.pins.add).mockImplementation(() => {
+      throw new Error('pin failed');
+    });
+
+    await strategy.ensurePinned(heliaCore, cid);
+    await strategy.ensurePinned(heliaCore, cid);
+
+    expect(heliaCore.pins.isPinned).toHaveBeenCalledTimes(1);
+    expect(heliaCore.pins.add).toHaveBeenCalledTimes(1);
+    expect(Kernel.logger.debug).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry failed pin attempts after the retry interval', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    jest.mocked(heliaCore.pins.add).mockImplementation(() => {
+      throw new Error('pin failed');
+    });
+
+    await strategy.ensurePinned(heliaCore, cid);
+    now.mockReturnValue(61_001);
+    await strategy.ensurePinned(heliaCore, cid);
+    now.mockRestore();
+
+    expect(heliaCore.pins.isPinned).toHaveBeenCalledTimes(2);
+    expect(heliaCore.pins.add).toHaveBeenCalledTimes(2);
+  });
+
+  it('should share concurrent pin attempts for the same cid', async () => {
+    let resolvePinCheck: (pinned: boolean) => void = () => undefined;
+    const pinCheck = new Promise<boolean>((resolve) => {
+      resolvePinCheck = resolve;
+    });
+
+    jest.mocked(heliaCore.pins.isPinned).mockReturnValue(pinCheck);
+
+    const first = strategy.ensurePinned(heliaCore, cid);
+    const second = strategy.ensurePinned(heliaCore, cid);
+
+    resolvePinCheck(false);
+    await Promise.all([first, second]);
+
+    expect(heliaCore.pins.isPinned).toHaveBeenCalledTimes(1);
+    expect(heliaCore.pins.add).toHaveBeenCalledTimes(1);
   });
 
   it('should unpin pinned content before local removal', async () => {
@@ -119,7 +165,7 @@ describe('HeliaPinningStrategy', () => {
       undefined,
     );
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
-      'Skipped IPFS content unpinning before local removal: bafymockcid',
+      'Skipped IPFS content unpinning before local removal: bafymockcid error=Error: unpin failed',
     );
   });
 });

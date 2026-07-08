@@ -13,7 +13,10 @@ const mockHeliaNode = {
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
 const mockBitswap = jest.fn().mockReturnValue('mock-bitswap');
 const mockBootstrap = jest.fn().mockReturnValue('mock-bootstrap');
+const mockFsBlockstore = jest.fn();
+const mockFsDatastore = jest.fn();
 const mockLibp2pRouting = jest.fn().mockReturnValue('mock-libp2p-routing');
+const mockMemoryDatastore = jest.fn();
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockLibp2pDefaults = jest.fn().mockReturnValue({
   connectionEncrypters: [],
@@ -86,7 +89,7 @@ jest.mock(
 jest.mock(
   'blockstore-fs',
   () => ({
-    FsBlockstore: jest.fn(),
+    FsBlockstore: mockFsBlockstore,
   }),
   { virtual: true },
 );
@@ -94,7 +97,7 @@ jest.mock(
 jest.mock(
   'datastore-core',
   () => ({
-    MemoryDatastore: jest.fn(),
+    MemoryDatastore: mockMemoryDatastore,
   }),
   { virtual: true },
 );
@@ -102,7 +105,7 @@ jest.mock(
 jest.mock(
   'datastore-fs',
   () => ({
-    FsDatastore: jest.fn(),
+    FsDatastore: mockFsDatastore,
   }),
   { virtual: true },
 );
@@ -267,6 +270,28 @@ describe('PrivateIPFS', () => {
           tagName: 'pigeon-relay-bootstrap',
         }),
       );
+    });
+
+    it('should not configure public bootstrap peers for filesystem private networks', async () => {
+      await PrivateIPFS.create({
+        ...defaultOptions,
+        storageLocation: '/tmp/pigeon-private-ipfs-test',
+      });
+
+      expect(mockBootstrap).not.toHaveBeenCalled();
+    });
+
+    it('should keep filesystem private network peer routing state in memory', async () => {
+      await PrivateIPFS.create({
+        ...defaultOptions,
+        storageLocation: '/tmp/pigeon-private-ipfs-test',
+      });
+
+      expect(mockFsBlockstore).toHaveBeenCalledWith(
+        '/tmp/pigeon-private-ipfs-test/blockstore',
+      );
+      expect(mockMemoryDatastore).toHaveBeenCalled();
+      expect(mockFsDatastore).not.toHaveBeenCalled();
     });
 
     it('should register peer connection event listeners for deferred provider publication', async () => {

@@ -6,6 +6,8 @@ import { LinkPreviewCacheDocument } from './documents/LinkPreviewCacheDocument';
 export default class LinkPreviewCacheRepository {
   private static readonly NAMESPACE = 'link_preview_cache';
   private static readonly TTL_MS = 60 * 60 * 1000;
+  private static readonly CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+  private static nextCleanupAt = 0;
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
@@ -17,6 +19,21 @@ export default class LinkPreviewCacheRepository {
       typeof document.finalUrl === 'string' &&
       typeof document.url === 'string' &&
       typeof document.expiresAt === 'number'
+    );
+  }
+
+  private async cleanupExpiredPreviews(now: number): Promise<void> {
+    if (now < LinkPreviewCacheRepository.nextCleanupAt) {
+      return;
+    }
+
+    LinkPreviewCacheRepository.nextCleanupAt =
+      now + LinkPreviewCacheRepository.CLEANUP_INTERVAL_MS;
+
+    await this.database.deleteMany(
+      LinkPreviewCacheRepository.NAMESPACE,
+      (document) =>
+        typeof document.expiresAt === 'number' && document.expiresAt <= now,
     );
   }
 
@@ -39,12 +56,16 @@ export default class LinkPreviewCacheRepository {
   }
 
   public async save(preview: LinkPreviewResource): Promise<void> {
+    const now = Date.now();
+
+    await this.cleanupExpiredPreviews(now);
+
     await this.database.save(
       LinkPreviewCacheRepository.NAMESPACE,
       preview.url,
       {
         ...preview,
-        expiresAt: Date.now() + LinkPreviewCacheRepository.TTL_MS,
+        expiresAt: now + LinkPreviewCacheRepository.TTL_MS,
       },
     );
   }

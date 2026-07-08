@@ -444,6 +444,126 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.numberValue(document, 'version') || 0;
   }
 
+  private canonicalValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.canonicalValue(item));
+    }
+
+    if (!this.isRecord(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, this.canonicalValue(value[key])]),
+    );
+  }
+
+  private headComparableValue(
+    document: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const value = { ...document };
+
+    if (this.headRecordCollectionNames(value).length > 0) {
+      delete value.updatedAt;
+    }
+
+    return value;
+  }
+
+  private isSameHeadContent(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): boolean {
+    const currentCollections = this.headRecordCollectionNames(current);
+    const candidateCollections = this.headRecordCollectionNames(candidate);
+
+    if (
+      currentCollections.length === 0 ||
+      currentCollections.length !== candidateCollections.length ||
+      currentCollections.some(
+        (collectionName) => !candidateCollections.includes(collectionName),
+      )
+    ) {
+      return false;
+    }
+
+    return (
+      JSON.stringify(this.canonicalValue(this.headComparableValue(current))) ===
+      JSON.stringify(this.canonicalValue(this.headComparableValue(candidate)))
+    );
+  }
+
+  private async isSameHeadContentPersisted(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[],
+  ): Promise<boolean> {
+    const entries = this.networkStoreEntriesForNetworkIds(networkIds);
+
+    if (entries.length === 0) {
+      return false;
+    }
+
+    try {
+      const persistedHeads = await Promise.all(
+        entries.map(async ({ stores }) =>
+          this.recordValue(await stores.heads.get?.(key)),
+        ),
+      );
+
+      return persistedHeads.every(
+        (head) => head !== undefined && this.isSameHeadContent(head, value),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private hasSameCachedHeadContent(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): boolean {
+    return current !== undefined && this.isSameHeadContent(current, candidate);
+  }
+
+  private async shouldSkipHeadWrite(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[],
+    force: boolean,
+    hasSameCachedContent: boolean,
+  ): Promise<boolean> {
+    if (force || !hasSameCachedContent) {
+      return false;
+    }
+
+    return this.isSameHeadContentPersisted(key, value, networkIds);
+  }
+
+  private async targetNetworkIdsForHeadWrite(
+    value: Record<string, unknown>,
+    networkIds: string[],
+  ): Promise<string[]> {
+    if (networkIds.length > 0) {
+      return networkIds;
+    }
+
+    return this.targetNetworkIdsForDocument(value, networkIds);
+  }
+
+  private nextHeadWriteValue(
+    key: string,
+    value: Record<string, unknown>,
+    current: Record<string, unknown> | undefined,
+    hasSameCachedContent: boolean,
+  ): Record<string, unknown> | undefined {
+    return (
+      this.cacheHead(key, value) ?? (hasSameCachedContent ? current : undefined)
+    );
+  }
+
   private isNewerOrEqualDocument(
     current: Record<string, unknown>,
     candidate: Record<string, unknown>,
@@ -1007,27 +1127,61 @@ export default class OrbitDBReplicatedStateRegistry {
     networkIds: string[] = [],
   ): void {
     this.cacheHeadLocally(key, value, networkIds);
-    void this.putHead(key, value, networkIds).catch((error) => {
-      Kernel.logger.warn?.(
-        `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
-      );
-    });
+    void this.putHead(key, value, networkIds, { force: true }).catch(
+      (error) => {
+        Kernel.logger.warn?.(
+          `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
+        );
+      },
+    );
   }
 
   public async putHead(
     key: string,
     value: Record<string, unknown>,
     networkIds: string[] = [],
+    options: { force?: boolean } = {},
   ): Promise<void> {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
-    const cachedValue = this.cacheHead(key, cleanValue);
+    const currentValue = this.cachedHeads.get(key);
+    const hasSameCachedContent = this.hasSameCachedHeadContent(
+      currentValue,
+      cleanValue,
+    );
+
+    if (!options.force && hasSameCachedContent) {
+      const targetDocument = currentValue ?? cleanValue;
+      const skipTargetNetworkIds = await this.targetNetworkIdsForHeadWrite(
+        targetDocument,
+        networkIds,
+      );
+
+      if (
+        await this.shouldSkipHeadWrite(
+          key,
+          cleanValue,
+          skipTargetNetworkIds,
+          false,
+          hasSameCachedContent,
+        )
+      ) {
+        return;
+      }
+    }
+
+    const cachedValue = this.nextHeadWriteValue(
+      key,
+      cleanValue,
+      currentValue,
+      hasSameCachedContent,
+    );
 
     if (!cachedValue) {
       return;
     }
 
-    const targetNetworkIds = await this.targetNetworkIdsForDocument(
+    const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
       cachedValue,
       networkIds,
     );

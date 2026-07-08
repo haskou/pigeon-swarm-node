@@ -322,6 +322,20 @@ describe('PublicIPFS', () => {
         },
       );
     });
+
+    it('should not republish provider records on repeated read-through fetches', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+      const cid = new IPFSId('bafymockcid');
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.routing.provide.mockResolvedValue(undefined);
+
+      await connection.getJSON(cid);
+      await connection.getJSON(cid);
+      await flushPromises();
+
+      expect(mockHeliaNode.routing.provide).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getBytes', () => {

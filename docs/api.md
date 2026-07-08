@@ -750,6 +750,18 @@ Response:
 
 ```json
 {
+  "ipfsPeers": [
+    {
+      "id": "<libp2pPeerId>",
+      "networks": [
+        {
+          "id": "<networkId>",
+          "name": "public",
+          "type": "public"
+        }
+      ]
+    }
+  ],
   "peers": [
     {
       "capabilities": {
@@ -781,7 +793,9 @@ Implemented:
 - publish a local node heartbeat every 5 minutes through the consumer bus
 - store heartbeats received from remote nodes as active peers
 - return peers seen during the active peer window
+- return live IPFS transport peers from the currently connected libp2p networks
 - include node id, owner, network id/name, IPFS capabilities, shared-network summary and inferred node type
+- expose live IPFS peer ids separately from node ids because transport peers may not have sent a node heartbeat yet
 - never expose private network keys in peer heartbeat payloads
 
 ## IPFS HTTP API

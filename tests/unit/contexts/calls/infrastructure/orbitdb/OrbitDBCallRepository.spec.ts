@@ -220,6 +220,12 @@ describe('OrbitDBCallRepository', () => {
           new Timestamp(1780000060000),
         ),
       ).resolves.toEqual([]);
+      await flushBackgroundTasks();
+      await expect(replicatedHeads.get('call-active-index')).resolves.toEqual(
+        expect.objectContaining({
+          calls: [],
+        }),
+      );
     } finally {
       replicatedRegistry.clear();
     }

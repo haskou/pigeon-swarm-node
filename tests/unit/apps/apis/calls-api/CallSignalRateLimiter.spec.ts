@@ -26,6 +26,9 @@ describe('CallSignalRateLimiter', () => {
   beforeEach(() => {
     process.env.CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE = '1';
     database = mock<EmbeddedLocalDatabase>();
+    (
+      CallSignalRateLimiter as unknown as { nextCleanupAt: number }
+    ).nextCleanupAt = 0;
   });
 
   afterEach(() => {
@@ -48,6 +51,9 @@ describe('CallSignalRateLimiter', () => {
         count: 1,
         resetAt: expect.any(Number),
       },
+    );
+    expect(database.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
+      database.save.mock.invocationCallOrder[0],
     );
   });
 

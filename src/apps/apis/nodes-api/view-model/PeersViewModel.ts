@@ -2,6 +2,7 @@ import { ActiveNodePeers } from '@app/contexts/nodes/application/find-peers/Acti
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import { NodePeerNetworkType } from '@app/contexts/nodes/domain/value-objects/NodePeerNetworkType';
 
+import { ConnectedIpfsPeerResource } from '../resources/ConnectedIpfsPeerResource';
 import { PeerCapabilitiesResource } from '../resources/PeerCapabilitiesResource';
 import { PeerConnectionSummaryResource } from '../resources/PeerConnectionSummaryResource';
 import { PeerNetworkResource } from '../resources/PeerNetworkResource';
@@ -10,7 +11,10 @@ import { PeerResource } from '../resources/PeerResource';
 import { PeersResource } from '../resources/PeersResource';
 
 export class PeersViewModel {
-  constructor(private readonly activePeers: ActiveNodePeers) {}
+  public constructor(
+    private readonly activePeers: ActiveNodePeers,
+    private readonly connectedIpfsPeers: ConnectedIpfsPeerResource[] = [],
+  ) {}
 
   private capabilitiesFor(
     localNetworkTypes: Map<string, string>,
@@ -110,6 +114,7 @@ export class PeersViewModel {
     );
 
     return {
+      ipfsPeers: this.connectedIpfsPeers,
       peers: this.activePeers
         .getPeers()
         .map((peer) =>

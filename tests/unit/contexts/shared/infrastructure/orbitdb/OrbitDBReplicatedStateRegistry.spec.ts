@@ -316,6 +316,117 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await write;
   });
 
+  it('does not rewrite index heads when only the technical head timestamp changes', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+
+    await registry.register('network-1', network.stores);
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 1,
+    });
+    network.heads.put.mockClear();
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 2,
+    });
+
+    expect(network.heads.put).not.toHaveBeenCalled();
+    await expect(registry.findHead('messages:conversation-1')).resolves.toEqual(
+      {
+        id: 'messages:conversation-1',
+        messages: [
+          {
+            id: 'message-1',
+            receivedAt: 1,
+          },
+        ],
+        updatedAt: 1,
+      },
+    );
+  });
+
+  it('retries an unchanged index head when the previous replicated write failed', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const head = {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 1,
+    };
+
+    await registry.register('network-1', network.stores);
+    network.heads.put.mockRejectedValueOnce(new Error('temporary failure'));
+
+    await expect(
+      registry.putHead('messages:conversation-1', head),
+    ).rejects.toThrow('temporary failure');
+
+    await registry.putHead('messages:conversation-1', {
+      ...head,
+      updatedAt: 2,
+    });
+
+    expect(network.heads.put).toHaveBeenCalledTimes(2);
+    await expect(network.heads.get('messages:conversation-1')).resolves.toEqual(
+      {
+        ...head,
+        updatedAt: 2,
+      },
+    );
+  });
+
+  it('rewrites index heads when indexed records change', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+
+    await registry.register('network-1', network.stores);
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 1,
+    });
+    network.heads.put.mockClear();
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 2,
+        },
+      ],
+      updatedAt: 2,
+    });
+
+    expect(network.heads.put).toHaveBeenCalledTimes(1);
+  });
+
   it('caches heads locally without writing to replicated heads', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const network = createStores();

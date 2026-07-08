@@ -574,6 +574,7 @@ export class HeliaRuntimeAdapter {
 
   public async getLibp2pDefaults(options?: {
     offline?: boolean;
+    publicBootstrap?: boolean;
   }): Promise<Libp2pDefaults> {
     const heliaModule = await this.loadHeliaModule();
 
@@ -585,6 +586,10 @@ export class HeliaRuntimeAdapter {
 
     if (options?.offline) {
       return this.withGossipsub(this.withoutNetwork(defaults));
+    }
+
+    if (options?.publicBootstrap === false) {
+      return this.withGossipsub(defaults);
     }
 
     return this.withGossipsub(await this.withPublicBootstrap(defaults));

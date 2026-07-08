@@ -1315,14 +1315,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJQb2xsUmVwb3NpdG9yeV9fT3JiaXREQlBvbGxSZXBvc2l0b3J5:
-    class: /contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1BvbGxSZXBvc2l0b3J5X19Qb2xsUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wdXNoLW5vdGlmaWNhdGlvbnNfX2FwcGxpY2F0aW9uX190ZXN0X19QdXNoVGVzdE5vdGlmaWNhdGlvblNlbmRlcl9fUHVzaFRlc3ROb3RpZmljYXRpb25TZW5kZXI=:
     class: /contexts/push-notifications/application/test/PushTestNotificationSender
     arguments:
@@ -2508,6 +2500,18 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJQb2xsUmVwb3NpdG9yeV9fT3JiaXREQlBvbGxSZXBvc2l0b3J5:
+    class: /contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uUmVwb3NpdG9yeV9fQ29udmVyc2F0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: >-
+      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1BvbGxSZXBvc2l0b3J5X19Qb2xsUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX2xpYnAycF9fTGlicDJwR29zc2lwc3ViTWVzc2FnZUJ1c0FkYXB0ZXJfX0xpYnAycEdvc3NpcHN1YkFkYXB0ZXI=:
     class: /shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter
     arguments:
