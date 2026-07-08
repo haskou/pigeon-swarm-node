@@ -6,11 +6,30 @@ import { LinkPreviewRatePolicy } from './LinkPreviewRatePolicy';
 
 export default class LinkPreviewRateLimiter {
   private static readonly NAMESPACE = 'link_preview_rate_limits';
+  private static readonly CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
+  private static nextCleanupAt = 0;
 
   private readonly policy: LinkPreviewRatePolicy =
     LinkPreviewRatePolicy.fromEnvironment();
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
+
+  private cleanupExpiredBucketsInBackground(now: number): void {
+    if (now < LinkPreviewRateLimiter.nextCleanupAt) {
+      return;
+    }
+
+    LinkPreviewRateLimiter.nextCleanupAt =
+      now + LinkPreviewRateLimiter.CLEANUP_INTERVAL_MS;
+
+    void Promise.resolve(
+      this.database.deleteMany(
+        LinkPreviewRateLimiter.NAMESPACE,
+        (document) =>
+          typeof document.resetAt === 'number' && document.resetAt <= now,
+      ),
+    ).catch((): undefined => undefined);
+  }
 
   private id(identityId: IdentityId, ipAddress: string): string {
     return `${identityId.valueOf()}:${ipAddress}`;
@@ -48,6 +67,9 @@ export default class LinkPreviewRateLimiter {
 
     const id = this.id(identityId, ipAddress);
     const now = Date.now();
+
+    this.cleanupExpiredBucketsInBackground(now);
+
     const current = await this.database.findOne(
       LinkPreviewRateLimiter.NAMESPACE,
       id,

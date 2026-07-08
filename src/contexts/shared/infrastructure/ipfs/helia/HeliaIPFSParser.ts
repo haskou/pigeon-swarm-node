@@ -18,6 +18,9 @@ export class HeliaIPFSParser {
 
   private static async parseStorageLocationOptions(
     options: IPFSOptions,
+    parserOptions?: {
+      persistentDatastore?: boolean;
+    },
   ): Promise<{
     blockstore: RuntimeBlockstore;
     datastore: RuntimeDatastore;
@@ -33,9 +36,12 @@ export class HeliaIPFSParser {
       blockstore: await heliaRuntimeAdapter.createFsBlockstore(
         `${options.storageLocation}/blockstore`,
       ),
-      datastore: await heliaRuntimeAdapter.createFsDatastore(
-        `${options.storageLocation}/datastore`,
-      ),
+      datastore:
+        parserOptions?.persistentDatastore === false
+          ? await heliaRuntimeAdapter.createMemoryDatastore()
+          : await heliaRuntimeAdapter.createFsDatastore(
+              `${options.storageLocation}/datastore`,
+            ),
     };
   }
 
@@ -175,12 +181,17 @@ export class HeliaIPFSParser {
 
   public static async parseOptions(
     options: IPFSOptions,
+    parserOptions?: {
+      persistentDatastore?: boolean;
+      publicBootstrap?: boolean;
+    },
   ): Promise<ParsedHeliaIPFSOptions> {
     const { connectionGater } = HeliaIPFSParser.parseBlockedPeers(options);
     let libp2pConfig = (await heliaRuntimeAdapter.getLibp2pDefaults({
       offline: HeliaIPFSParser.isInMemoryStorageLocation(
         options.storageLocation,
       ),
+      publicBootstrap: parserOptions?.publicBootstrap,
     })) as ParsedHeliaIPFSOptions['libp2p'];
     libp2pConfig = HeliaIPFSParser.applyAddressOptions(
       libp2pConfig,
@@ -192,7 +203,10 @@ export class HeliaIPFSParser {
     )) as ParsedHeliaIPFSOptions['libp2p'];
 
     return {
-      ...(await HeliaIPFSParser.parseStorageLocationOptions(options)),
+      ...(await HeliaIPFSParser.parseStorageLocationOptions(
+        options,
+        parserOptions,
+      )),
       ...(HeliaIPFSParser.usesLimitedConnections(options)
         ? {
             blockBrokers: await heliaRuntimeAdapter.createRelayBlockBrokers(),
@@ -210,7 +224,10 @@ export class HeliaIPFSParser {
     options: IPFSOptions,
     networkKey: NetworkPrivateKey,
   ): Promise<Libp2pDefaults> {
-    return HeliaIPFSParser.parseOptions(options).then((parsedOptions) =>
+    return HeliaIPFSParser.parseOptions(options, {
+      persistentDatastore: false,
+      publicBootstrap: false,
+    }).then((parsedOptions) =>
       Promise.resolve(parsedOptions.libp2p).then((libp2pConfig) => {
         const privateLibp2pConfig = libp2pConfig as unknown as {
           connectionGater?: unknown;

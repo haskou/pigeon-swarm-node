@@ -316,6 +316,82 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await write;
   });
 
+  it('does not rewrite index heads when only the technical head timestamp changes', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+
+    await registry.register('network-1', network.stores);
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 1,
+    });
+    network.heads.put.mockClear();
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 2,
+    });
+
+    expect(network.heads.put).not.toHaveBeenCalled();
+    await expect(registry.findHead('messages:conversation-1')).resolves.toEqual(
+      {
+        id: 'messages:conversation-1',
+        messages: [
+          {
+            id: 'message-1',
+            receivedAt: 1,
+          },
+        ],
+        updatedAt: 1,
+      },
+    );
+  });
+
+  it('rewrites index heads when indexed records change', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+
+    await registry.register('network-1', network.stores);
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 1,
+        },
+      ],
+      updatedAt: 1,
+    });
+    network.heads.put.mockClear();
+
+    await registry.putHead('messages:conversation-1', {
+      id: 'messages:conversation-1',
+      messages: [
+        {
+          id: 'message-1',
+          receivedAt: 2,
+        },
+      ],
+      updatedAt: 2,
+    });
+
+    expect(network.heads.put).toHaveBeenCalledTimes(1);
+  });
+
   it('caches heads locally without writing to replicated heads', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const network = createStores();

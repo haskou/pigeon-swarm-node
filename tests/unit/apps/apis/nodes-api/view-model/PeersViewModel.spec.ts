@@ -41,6 +41,7 @@ describe('PeersViewModel', () => {
     expect(
       new PeersViewModel(new ActiveNodePeers(localNode, [peer])).toResource(),
     ).toEqual({
+      ipfsPeers: [],
       peers: [
         {
           capabilities: {
@@ -104,6 +105,7 @@ describe('PeersViewModel', () => {
     expect(
       new PeersViewModel(new ActiveNodePeers(localNode, [peer])).toResource(),
     ).toEqual({
+      ipfsPeers: [],
       peers: [
         {
           capabilities: {
@@ -130,6 +132,51 @@ describe('PeersViewModel', () => {
           nodeType: 'reachable',
         },
       ],
+    });
+  });
+
+  it('should expose live IPFS transport peers separately from node peers', () => {
+    const publicNetworkId = '550e8400-e29b-41d4-a716-446655440011';
+    const localNode = Node.fromPrimitives({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      networks: {
+        [publicNetworkId]: {
+          id: publicNetworkId,
+          key: undefined,
+          name: 'public_0',
+        },
+      },
+      owner: undefined,
+      relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
+    });
+
+    expect(
+      new PeersViewModel(new ActiveNodePeers(localNode, []), [
+        {
+          id: '12D3KooWConnectedPeer',
+          networks: [
+            {
+              id: publicNetworkId,
+              name: 'public_0',
+              type: 'public',
+            },
+          ],
+        },
+      ]).toResource(),
+    ).toEqual({
+      ipfsPeers: [
+        {
+          id: '12D3KooWConnectedPeer',
+          networks: [
+            {
+              id: publicNetworkId,
+              name: 'public_0',
+              type: 'public',
+            },
+          ],
+        },
+      ],
+      peers: [],
     });
   });
 });

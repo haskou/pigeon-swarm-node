@@ -444,6 +444,57 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.numberValue(document, 'version') || 0;
   }
 
+  private canonicalValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.canonicalValue(item));
+    }
+
+    if (!this.isRecord(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, this.canonicalValue(value[key])]),
+    );
+  }
+
+  private headComparableValue(
+    document: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const value = { ...document };
+
+    if (this.headRecordCollectionNames(value).length > 0) {
+      delete value.updatedAt;
+    }
+
+    return value;
+  }
+
+  private isSameHeadContent(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): boolean {
+    const currentCollections = this.headRecordCollectionNames(current);
+    const candidateCollections = this.headRecordCollectionNames(candidate);
+
+    if (
+      currentCollections.length === 0 ||
+      currentCollections.length !== candidateCollections.length ||
+      currentCollections.some(
+        (collectionName) => !candidateCollections.includes(collectionName),
+      )
+    ) {
+      return false;
+    }
+
+    return (
+      JSON.stringify(this.canonicalValue(this.headComparableValue(current))) ===
+      JSON.stringify(this.canonicalValue(this.headComparableValue(candidate)))
+    );
+  }
+
   private isNewerOrEqualDocument(
     current: Record<string, unknown>,
     candidate: Record<string, unknown>,
@@ -1007,20 +1058,33 @@ export default class OrbitDBReplicatedStateRegistry {
     networkIds: string[] = [],
   ): void {
     this.cacheHeadLocally(key, value, networkIds);
-    void this.putHead(key, value, networkIds).catch((error) => {
-      Kernel.logger.warn?.(
-        `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
-      );
-    });
+    void this.putHead(key, value, networkIds, { force: true }).catch(
+      (error) => {
+        Kernel.logger.warn?.(
+          `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
+        );
+      },
+    );
   }
 
   public async putHead(
     key: string,
     value: Record<string, unknown>,
     networkIds: string[] = [],
+    options: { force?: boolean } = {},
   ): Promise<void> {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
+    const currentValue = this.cachedHeads.get(key);
+
+    if (
+      !options.force &&
+      currentValue &&
+      this.isSameHeadContent(currentValue, cleanValue)
+    ) {
+      return;
+    }
+
     const cachedValue = this.cacheHead(key, cleanValue);
 
     if (!cachedValue) {

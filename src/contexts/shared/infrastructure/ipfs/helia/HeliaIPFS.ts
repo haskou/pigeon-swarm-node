@@ -30,6 +30,9 @@ import { ContentRetrievalProgressEvent } from './types/ContentRetrievalProgressE
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
 export abstract class HeliaIPFS implements IPFSConnection {
+  private static readonly automaticProviderPublicationWindowMs = 5 * 60_000;
+  private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
+
   private static readonly CONTENT_RETRIEVAL_DEBUG_EVENTS = new Set([
     'bitswap:block',
     'bitswap:found-provider',
@@ -43,6 +46,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   private readonly pinningStrategy: HeliaPinningStrategy;
   private readonly pendingContentProviderCids = new Map<string, IPFSId>();
+  private readonly automaticProviderPublicationAttempts = new Map<
+    string,
+    number
+  >();
+
   private publishingPendingContentProviders = false;
 
   private static getRoutingRecordTimeoutMs(): number {
@@ -189,7 +197,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     networkName: string,
   ): Promise<HeliaInstance> {
     const baseOptions: ParsedHeliaIPFSOptions =
-      await HeliaIPFSParser.parseOptions(options);
+      await HeliaIPFSParser.parseOptions(options, {
+        persistentDatastore: false,
+        publicBootstrap: false,
+      });
     const libp2pConfig = await HeliaIPFSParser.parsePrivateLibp2pConfig(
       options,
       networkKey,
@@ -673,7 +684,45 @@ export abstract class HeliaIPFS implements IPFSConnection {
       });
   }
 
+  private shouldPublishAutomaticProvider(cid: IPFSId): boolean {
+    const now = Date.now();
+    const key = cid.valueOf();
+    const lastAttemptAt = this.automaticProviderPublicationAttempts.get(key);
+
+    if (
+      lastAttemptAt !== undefined &&
+      now - lastAttemptAt < HeliaIPFS.automaticProviderPublicationWindowMs
+    ) {
+      return false;
+    }
+
+    this.automaticProviderPublicationAttempts.set(key, now);
+    this.pruneAutomaticProviderPublicationAttempts(now);
+
+    return true;
+  }
+
+  private pruneAutomaticProviderPublicationAttempts(now: number): void {
+    if (
+      this.automaticProviderPublicationAttempts.size <=
+      HeliaIPFS.maxAutomaticProviderPublicationAttempts
+    ) {
+      return;
+    }
+
+    for (const [key, attemptedAt] of this
+      .automaticProviderPublicationAttempts) {
+      if (now - attemptedAt >= HeliaIPFS.automaticProviderPublicationWindowMs) {
+        this.automaticProviderPublicationAttempts.delete(key);
+      }
+    }
+  }
+
   private provideContentInBackground(cid: IPFSId): void {
+    if (!this.shouldPublishAutomaticProvider(cid)) {
+      return;
+    }
+
     void this.provideContent(cid).catch((): undefined => undefined);
   }
 
