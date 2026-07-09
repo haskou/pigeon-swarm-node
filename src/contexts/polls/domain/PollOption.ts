@@ -26,6 +26,10 @@ export class PollOption {
     return this.id;
   }
 
+  public isIdentifiedBy(optionId: PollOptionId): boolean {
+    return this.id.isEqual(optionId);
+  }
+
   public toPrimitives() {
     return {
       id: this.id.valueOf(),

@@ -27,14 +27,17 @@ export class PollContent {
     assert(this.options.length >= 2, new InvalidPollOptionError());
     assert(this.options.length <= 10, new InvalidPollOptionError());
 
-    const optionIds = this.options.map((option) => option.getId().valueOf());
-    const uniqueIds = new Set(optionIds);
+    const hasDuplicateOptions = this.options.some((option, index) =>
+      this.options
+        .slice(index + 1)
+        .some((candidate) => candidate.isIdentifiedBy(option.getId())),
+    );
 
-    assert(uniqueIds.size === optionIds.length, new InvalidPollOptionError());
+    assert(!hasDuplicateOptions, new InvalidPollOptionError());
   }
 
   public hasOption(optionId: PollOptionId): boolean {
-    return this.options.some((option) => option.getId().isEqual(optionId));
+    return this.options.some((option) => option.isIdentifiedBy(optionId));
   }
 
   public toPrimitives() {

@@ -1,3 +1,4 @@
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
@@ -250,6 +251,16 @@ export class Call extends AggregateRoot {
 
   public getId(): CallId {
     return this.id;
+  }
+
+  public getCommunityChannelId(): CommunityChannelId | undefined {
+    return this.scope.getCommunityChannelId();
+  }
+
+  public getJoinedParticipantIds(): IdentityId[] {
+    return this.participants
+      .filter((participant) => participant.isJoined())
+      .map((participant) => participant.getIdentityId());
   }
 
   public hasParticipant(identityId: IdentityId): boolean {

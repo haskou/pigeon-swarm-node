@@ -698,6 +698,10 @@ export class Community extends AggregateRoot {
     return this.id;
   }
 
+  public getNetworkId(): NetworkId {
+    return this.networkId;
+  }
+
   public isIdentifiedBy(communityId: CommunityId): boolean {
     return this.id.isEqual(communityId);
   }

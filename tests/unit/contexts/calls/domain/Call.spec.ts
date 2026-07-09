@@ -11,6 +11,8 @@ import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedE
 import { InactiveCallError } from '@app/contexts/calls/domain/errors/InactiveCallError';
 import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
 import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -86,6 +88,26 @@ describe('Call', () => {
         lateParticipant.valueOf(),
       ],
     });
+  });
+
+  it('exposes joined participants through domain behavior', () => {
+    const call = Call.start(creator, networkId, scope, [recipient]);
+
+    call.join(recipient);
+
+    expect(call.getJoinedParticipantIds()).toEqual([creator, recipient]);
+  });
+
+  it('exposes the community channel id without serializing the call', () => {
+    const channelId = new CommunityChannelId('voice-channel');
+    const call = Call.start(
+      creator,
+      networkId,
+      CallScope.communityChannel(new CommunityId('community'), channelId),
+      [],
+    );
+
+    expect(call.getCommunityChannelId()?.isEqual(channelId)).toBe(true);
   });
 
   it('should not emit a joined event when the participant is already joined', () => {

@@ -10,12 +10,11 @@ export class NodeRelayMultiaddrs {
   constructor(private readonly multiaddrs: NodeRelayMultiaddr[] = []) {}
 
   public isEqual(other: NodeRelayMultiaddrs): boolean {
-    const current = this.toPrimitives();
-    const next = other.toPrimitives();
-
     return (
-      current.length === next.length &&
-      current.every((multiaddr, index) => multiaddr === next[index])
+      this.multiaddrs.length === other.multiaddrs.length &&
+      this.multiaddrs.every((multiaddr, index) =>
+        multiaddr.isEqual(other.multiaddrs[index]),
+      )
     );
   }
 

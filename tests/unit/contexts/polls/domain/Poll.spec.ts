@@ -2,6 +2,7 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { PollDuplicateOptionVoteError } from '@app/contexts/polls/domain/errors/PollDuplicateOptionVoteError';
 import { PollAlreadyClosedError } from '@app/contexts/polls/domain/errors/PollAlreadyClosedError';
+import { InvalidPollOptionError } from '@app/contexts/polls/domain/errors/InvalidPollOptionError';
 import { PollMultipleVotesNotAllowedError } from '@app/contexts/polls/domain/errors/PollMultipleVotesNotAllowedError';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollAudience } from '@app/contexts/polls/domain/PollAudience';
@@ -117,6 +118,29 @@ describe('Poll', () => {
     expect(() =>
       poll.castVote(voter, [new PollOptionId('a'), new PollOptionId('a')]),
     ).toThrow(PollDuplicateOptionVoteError);
+  });
+
+  it('rejects duplicate option ids in the poll content', () => {
+    const duplicateOptions = [
+      PollOption.create(
+        new PollOptionId('duplicate'),
+        new PollOptionText('First'),
+      ),
+      PollOption.create(
+        new PollOptionId('duplicate'),
+        new PollOptionText('Second'),
+      ),
+    ];
+
+    expect(() =>
+      Poll.create(
+        creator,
+        scope,
+        new PollQuestion('Choose one'),
+        duplicateOptions,
+        false,
+      ),
+    ).toThrow(InvalidPollOptionError);
   });
 
   it('rejects votes after the expiration time', () => {

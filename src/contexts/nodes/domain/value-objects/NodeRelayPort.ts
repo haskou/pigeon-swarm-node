@@ -14,12 +14,12 @@ export class NodeRelayPort extends Integer {
 
   private isValid(): boolean {
     return (
-      this.valueOf() >= NodeRelayPort.MIN_PORT &&
-      this.valueOf() <= NodeRelayPort.MAX_PORT
+      this.isGreaterOrEqualThan(NodeRelayPort.MIN_PORT) &&
+      this.isLessOrEqualThan(NodeRelayPort.MAX_PORT)
     );
   }
 
   public isBefore(port: NodeRelayPort): boolean {
-    return this.valueOf() < port.valueOf();
+    return this.isLessThan(port);
   }
 }

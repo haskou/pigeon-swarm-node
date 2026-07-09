@@ -90,9 +90,7 @@ describe('CallStarter', () => {
     });
     communityRepository.findById.mockResolvedValue({
       authorizeVoiceChannelCall,
-      toPrimitives: () => ({
-        networkId: networkId.valueOf(),
-      }),
+      getNetworkId: () => networkId,
     } as never);
 
     const starter = new CallStarter(

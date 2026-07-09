@@ -24,18 +24,17 @@ export default class CommunityChannelsFinder {
     const connectedIdentityIdsByChannelId = new Map<string, string[]>();
 
     for (const call of calls) {
-      const primitives = call.toPrimitives();
-      const channelId = primitives.scope.channelId;
+      const channelId = call.getCommunityChannelId();
 
       if (!channelId) {
         continue;
       }
 
       connectedIdentityIdsByChannelId.set(
-        channelId,
-        primitives.participants
-          .filter((participant) => participant.status === 'joined')
-          .map((participant) => participant.identityId),
+        channelId.valueOf(),
+        call
+          .getJoinedParticipantIds()
+          .map((participantId) => participantId.valueOf()),
       );
     }
 
