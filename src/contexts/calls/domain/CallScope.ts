@@ -58,6 +58,10 @@ export class CallScope {
     return this.type.isCommunityChannel();
   }
 
+  public getCommunityChannelId(): CommunityChannelId | undefined {
+    return this.channelId;
+  }
+
   public toPrimitives() {
     return {
       channelId: this.channelId?.valueOf(),
