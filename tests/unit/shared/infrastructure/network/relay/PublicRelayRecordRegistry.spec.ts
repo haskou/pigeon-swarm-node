@@ -1,4 +1,5 @@
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { defaultRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
@@ -110,7 +111,10 @@ describe('PublicRelayRecordRegistry', () => {
       Date.now() + 60_000,
     );
     const networkRegistry = mock<IPFSNetworkRegistry>();
-    const runtime = new PublicRelayRuntime(networkRegistry);
+    const runtime = new PublicRelayRuntime(
+      networkRegistry,
+      mock<PrivateNetworkRelayRecordDirectory>(),
+    );
 
     networkRegistry.getRelaySettings.mockReturnValue(
       defaultRelayRuntimeSettings(),

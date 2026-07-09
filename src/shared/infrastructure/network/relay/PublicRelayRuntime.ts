@@ -1,18 +1,22 @@
+import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import {
   libp2pKeyAdapter,
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { PublicRelayPeerAnnouncer } from '@app/shared/infrastructure/pubsub/libp2p/PublicRelayPeerAnnouncer';
 import Kernel from '@haskou/ddd-kernel';
 
+import PrivateNetworkRelayRecordDirectory from './PrivateNetworkRelayRecordDirectory';
 import { PublicRelayAddressFactory } from './PublicRelayAddressFactory';
 import { PublicRelayConfiguration } from './PublicRelayConfiguration';
+import { PublicRelayConnectionOptions } from './PublicRelayConnectionOptions';
 import { PublicRelayDebugState } from './PublicRelayDebugState';
 import { PublicRelayRecordDiscovery } from './PublicRelayRecordDiscovery';
 import { PublicRelayRecordPayload } from './PublicRelayRecordPayload';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 import { PublicRelayRecordSigner } from './PublicRelayRecordSigner';
-import { PublicRelayRuntimeAdapter } from './PublicRelayRuntimeAdapter';
 import { PublicRelayRuntimeNode } from './PublicRelayRuntimeNode';
 
 export default class PublicRelayRuntime {
@@ -27,8 +31,11 @@ export default class PublicRelayRuntime {
     this.relayRecordRegistry,
   );
 
+  private readonly peerAnnouncer = new PublicRelayPeerAnnouncer(true);
+
   private get state(): {
     failoverInterval?: NodeJS.Timeout;
+    connection?: IPFSConnection;
     node?: PublicRelayRuntimeNode;
     relaySettingsListenerRegistered?: boolean;
     relayRecordRefreshInterval?: NodeJS.Timeout;
@@ -40,6 +47,7 @@ export default class PublicRelayRuntime {
     const globalState = globalThis as typeof globalThis & {
       [PublicRelayRuntime.globalStateKey]?: {
         failoverInterval?: NodeJS.Timeout;
+        connection?: IPFSConnection;
         node?: PublicRelayRuntimeNode;
         relaySettingsListenerRegistered?: boolean;
         relayRecordRefreshInterval?: NodeJS.Timeout;
@@ -60,7 +68,10 @@ export default class PublicRelayRuntime {
     return state;
   }
 
-  public constructor(private readonly networkRegistry: IPFSNetworkRegistry) {}
+  public constructor(
+    private readonly networkRegistry: IPFSNetworkRegistry,
+    private readonly relayRecordDirectory: PrivateNetworkRelayRecordDirectory,
+  ) {}
 
   private getConfiguration(): PublicRelayConfiguration {
     return PublicRelayConfiguration.fromRuntimeSettings(
@@ -74,11 +85,29 @@ export default class PublicRelayRuntime {
     return new PublicRelayAddressFactory(configuration);
   }
 
-  private getAdapter(
+  private publicConnectionOptions(
     configuration: PublicRelayConfiguration,
     addressFactory: PublicRelayAddressFactory,
-  ): PublicRelayRuntimeAdapter {
-    return new PublicRelayRuntimeAdapter(configuration, addressFactory);
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+    enableRelayServer: boolean,
+  ): PublicRelayConnectionOptions {
+    const peerId = libp2pKeyAdapter.peerIdFromPrivateKey(sharedPrivateKey);
+    const announceAddresses = enableRelayServer
+      ? [
+          addressFactory.relayAdvertiseAddress(peerId),
+          addressFactory.libp2pAdvertiseAddress(peerId),
+        ].filter((address): address is string => Boolean(address))
+      : [];
+
+    return {
+      ...(announceAddresses.length > 0 ? { announceAddresses } : {}),
+      enableRelayServer,
+      ...(enableRelayServer
+        ? { listenAddresses: [addressFactory.relayListenAddress()] }
+        : {}),
+      relayDataLimitBytes: pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES,
+      sharedPrivateKey,
+    };
   }
 
   private registerRelaySettingsListener(): void {
@@ -186,9 +215,9 @@ export default class PublicRelayRuntime {
   }
 
   private async publishCurrentRelayRecord(): Promise<void> {
-    const peerId = this.state.node?.peerId?.toString();
+    const peerId = this.state.connection?.getPeerId();
 
-    if (!this.state.node || !peerId) {
+    if (!this.state.connection || !peerId) {
       return;
     }
 
@@ -206,7 +235,10 @@ export default class PublicRelayRuntime {
     }
 
     try {
-      await this.discovery.publish(this.state.node, this.state.relayRecord);
+      await this.discovery.publishConnection(
+        this.state.connection,
+        this.state.relayRecord,
+      );
     } catch (error: unknown) {
       Kernel.logger.warn(
         `Public relay record publication failed: ${String(error)}`,
@@ -285,7 +317,7 @@ export default class PublicRelayRuntime {
     );
   }
 
-  private async stopCurrentNode(stopFailoverMonitor = true): Promise<void> {
+  private stopCurrentNode(stopFailoverMonitor = true): void {
     if (stopFailoverMonitor && this.state.failoverInterval) {
       clearInterval(this.state.failoverInterval);
       this.state.failoverInterval = undefined;
@@ -296,18 +328,18 @@ export default class PublicRelayRuntime {
       this.state.relayRecordRefreshInterval = undefined;
     }
 
-    await this.state.node?.stop?.();
+    this.peerAnnouncer.stop();
     this.state.node = undefined;
     this.state.relayRecord = undefined;
     this.state.relayStateLogged = false;
   }
 
-  private async applyConfigurationKey(configurationKey: string): Promise<void> {
+  private applyConfigurationKey(configurationKey: string): void {
     if (
       this.state.configurationKey &&
       this.state.configurationKey !== configurationKey
     ) {
-      await this.stopCurrentNode();
+      this.stopCurrentNode();
     }
 
     this.state.configurationKey = configurationKey;
@@ -318,10 +350,22 @@ export default class PublicRelayRuntime {
     sharedPeerPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<string | undefined> {
     const addressFactory = this.getAddressFactory(configuration);
-    const adapter = this.getAdapter(configuration, addressFactory);
+    this.state.connection =
+      await this.relayRecordDirectory.configurePublicConnection(
+        this.publicConnectionOptions(
+          configuration,
+          addressFactory,
+          sharedPeerPrivateKey,
+          true,
+        ),
+      );
+    this.state.node = this.state.connection.getHeliaCore()
+      .libp2p as unknown as PublicRelayRuntimeNode;
+    const peerId = this.state.connection.getPeerId();
 
-    this.state.node = await adapter.createNode(sharedPeerPrivateKey);
-    const peerId = this.state.node.peerId?.toString();
+    if (configuration.isRelayDiscoveryEnabled()) {
+      await this.peerAnnouncer.start(this.state.node);
+    }
 
     if (peerId) {
       this.state.localPeerId = peerId;
@@ -337,6 +381,25 @@ export default class PublicRelayRuntime {
     return peerId;
   }
 
+  private async disableRelayServer(
+    configuration: PublicRelayConfiguration,
+    sharedPeerPrivateKey: Libp2pPrivateKeyLike,
+  ): Promise<void> {
+    if (!this.state.connection) {
+      return;
+    }
+
+    this.state.connection =
+      await this.relayRecordDirectory.configurePublicConnection(
+        this.publicConnectionOptions(
+          configuration,
+          this.getAddressFactory(configuration),
+          sharedPeerPrivateKey,
+          false,
+        ),
+      );
+  }
+
   public async start(): Promise<void> {
     this.registerRelaySettingsListener();
 
@@ -345,11 +408,12 @@ export default class PublicRelayRuntime {
       await this.networkRegistry.getSharedPeerPrivateKey();
     const localPeerId = this.rememberLocalPeerId(sharedPeerPrivateKey);
 
-    await this.applyConfigurationKey(configuration.toKey());
+    this.applyConfigurationKey(configuration.toKey());
     this.startFailoverMonitor();
 
     if (!this.shouldStartRelay(configuration, localPeerId)) {
-      await this.stopCurrentNode(false);
+      this.stopCurrentNode(false);
+      await this.disableRelayServer(configuration, sharedPeerPrivateKey);
       this.logRelayState(configuration, localPeerId);
 
       return;
