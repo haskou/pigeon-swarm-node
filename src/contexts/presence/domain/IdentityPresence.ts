@@ -1,9 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
-import { DisconnectedPresenceCannotBeSelectedError } from './errors/DisconnectedPresenceCannotBeSelectedError';
 import { IdentityPresenceWasUpdatedEvent } from './events/IdentityPresenceWasUpdatedEvent';
+import { IdentityPresencePreference } from './IdentityPresencePreference';
 import { PresenceCustomMessage } from './value-objects/PresenceCustomMessage';
 import { PresenceStatus } from './value-objects/PresenceStatus';
 
@@ -11,9 +12,24 @@ export class IdentityPresence extends AggregateRoot {
   private static readonly HEARTBEAT_TIMEOUT_MS = 20_000;
   private static readonly IDLE_TIMEOUT_MS = 300_000;
 
-  public static disconnected(identityId: IdentityId): IdentityPresence {
+  public static disconnected(
+    identityId: IdentityId,
+    ownerNodeId: NodeId,
+  ): IdentityPresence {
     return new IdentityPresence(
       identityId,
+      ownerNodeId,
+      new IdentityPresencePreference(PresenceStatus.AVAILABLE, Timestamp.now()),
+      PresenceStatus.DISCONNECTED,
+      Timestamp.now(),
+    );
+  }
+
+  public static unobserved(identityId: IdentityId): IdentityPresence {
+    return new IdentityPresence(
+      identityId,
+      undefined,
+      new IdentityPresencePreference(PresenceStatus.AVAILABLE, Timestamp.now()),
       PresenceStatus.DISCONNECTED,
       Timestamp.now(),
     );
@@ -24,11 +40,14 @@ export class IdentityPresence extends AggregateRoot {
   ): IdentityPresence {
     return new IdentityPresence(
       new IdentityId(primitives.identityId),
+      primitives.ownerNodeId ? new NodeId(primitives.ownerNodeId) : undefined,
+      IdentityPresencePreference.fromPrimitives(
+        primitives.selectedStatus,
+        primitives.preferenceUpdatedAt,
+        primitives.customMessage,
+      ),
       new PresenceStatus(primitives.status),
       new Timestamp(primitives.updatedAt),
-      primitives.customMessage
-        ? new PresenceCustomMessage(primitives.customMessage)
-        : undefined,
       primitives.lastHeartbeatAt
         ? new Timestamp(primitives.lastHeartbeatAt)
         : undefined,
@@ -40,9 +59,10 @@ export class IdentityPresence extends AggregateRoot {
 
   constructor(
     private readonly identityId: IdentityId,
+    private readonly ownerNodeId: NodeId | undefined,
+    private readonly preference: IdentityPresencePreference,
     private status: PresenceStatus,
     private updatedAt: Timestamp,
-    private customMessage?: PresenceCustomMessage,
     private lastHeartbeatAt?: Timestamp,
     private lastActivityAt?: Timestamp,
   ) {
@@ -58,8 +78,8 @@ export class IdentityPresence extends AggregateRoot {
       return PresenceStatus.DISCONNECTED;
     }
 
-    if (this.status.blocksDerivedStatus()) {
-      return this.status;
+    if (this.preference.blocksDerivedStatus()) {
+      return this.preference.selected();
     }
 
     if (this.lastActivityAt?.isBeforeOrEqual(this.idleThreshold(now))) {
@@ -74,15 +94,23 @@ export class IdentityPresence extends AggregateRoot {
   }
 
   private recordUpdated(networkIds: string[]): void {
+    assert(
+      this.ownerNodeId,
+      new Error('Presence lease requires an owner node'),
+    );
     const primitives = this.toPrimitives();
+    const preference = this.preference.toPrimitives();
 
     this.record(
       new IdentityPresenceWasUpdatedEvent(primitives.identityId, {
-        customMessage: primitives.customMessage,
+        customMessage: preference.customMessage,
         identityId: primitives.identityId,
         lastActivityAt: primitives.lastActivityAt,
         lastHeartbeatAt: primitives.lastHeartbeatAt,
         networkIds,
+        ownerNodeId: this.ownerNodeId.valueOf(),
+        preferenceUpdatedAt: preference.updatedAt,
+        selectedStatus: preference.selectedStatus,
         status: primitives.status,
         updatedAt: primitives.updatedAt,
       }),
@@ -93,47 +121,29 @@ export class IdentityPresence extends AggregateRoot {
     return new Timestamp(now.valueOf() - IdentityPresence.HEARTBEAT_TIMEOUT_MS);
   }
 
-  private applyCustomMessage(
-    customMessage: PresenceCustomMessage | undefined,
-    customMessageWasProvided: boolean,
-  ): void {
-    if (customMessageWasProvided) {
-      this.customMessage = customMessage;
-    }
-  }
-
-  private applySelectedStatus(status: PresenceStatus | undefined): void {
-    if (!status) {
-      return;
-    }
-
-    assert(
-      status.canBeSelected(),
-      new DisconnectedPresenceCannotBeSelectedError(),
-    );
-    this.status = status;
-  }
-
-  private customMessageChangedFrom(
-    previousCustomMessage: PresenceCustomMessage | undefined,
-    customMessage: PresenceCustomMessage | undefined,
-    customMessageWasProvided: boolean,
-  ): boolean {
-    return (
-      customMessageWasProvided &&
-      (previousCustomMessage?.isNotEqual(customMessage) ||
-        previousCustomMessage !== customMessage)
-    );
-  }
-
   public clearCustomMessage(networkIds: string[]): void {
-    this.customMessage = undefined;
     this.updatedAt = Timestamp.now();
-    this.recordUpdated(networkIds);
+
+    if (this.preference.clearCustomMessage(this.updatedAt)) {
+      this.recordUpdated(networkIds);
+    }
   }
 
   public getIdentityId(): IdentityId {
     return this.identityId;
+  }
+
+  public belongsToNode(nodeId: NodeId): boolean {
+    return this.ownerNodeId?.isEqual(nodeId) === true;
+  }
+
+  public isConnected(): boolean {
+    return !this.status.isDisconnected();
+  }
+
+  public mergePreferenceFrom(presence: IdentityPresence): void {
+    this.preference.mergeFrom(presence.preference);
+    this.status = this.derivedStatus(this.updatedAt);
   }
 
   public isVisibleTo(identityId: IdentityId): boolean {
@@ -149,8 +159,6 @@ export class IdentityPresence extends AggregateRoot {
     networkIds: string[],
     now: Timestamp = Timestamp.now(),
   ): void {
-    const previous = this.status;
-
     this.lastHeartbeatAt = now;
 
     if (activityDetected) {
@@ -160,9 +168,7 @@ export class IdentityPresence extends AggregateRoot {
     this.status = this.derivedStatus(now);
     this.updatedAt = now;
 
-    if (this.changedFrom(previous)) {
-      this.recordUpdated(networkIds);
-    }
+    this.recordUpdated(networkIds);
   }
 
   public refreshDerivedStatus(
@@ -191,46 +197,33 @@ export class IdentityPresence extends AggregateRoot {
     now: Timestamp = Timestamp.now(),
   ): void {
     const previous = this.status;
-    const previousCustomMessage = this.customMessage;
-
-    this.applySelectedStatus(status);
-    this.applyCustomMessage(customMessage, customMessageWasProvided);
+    const preferenceChanged = this.preference.update(
+      status,
+      customMessage,
+      customMessageWasProvided,
+      now,
+    );
 
     this.lastHeartbeatAt = now;
     this.lastActivityAt = now;
     this.status = this.derivedStatus(now);
     this.updatedAt = now;
 
-    const customMessageChanged = this.customMessageChangedFrom(
-      previousCustomMessage,
-      customMessage,
-      customMessageWasProvided,
-    );
-
-    if (this.changedFrom(previous) || customMessageChanged) {
+    if (this.changedFrom(previous) || preferenceChanged) {
       this.recordUpdated(networkIds);
     }
   }
 
-  public visiblePrimitivesFor(viewerIdentityId: IdentityId): object {
-    const primitives = this.toPrimitives();
-
-    if (this.isVisibleTo(viewerIdentityId)) {
-      return primitives;
-    }
-
-    return {
-      identityId: primitives.identityId,
-      status: PresenceStatus.DISCONNECTED.valueOf(),
-      updatedAt: primitives.updatedAt,
-    };
-  }
-
   public toPrimitives() {
+    const preference = this.preference.toPrimitives();
+
     return {
       identityId: this.identityId.valueOf(),
-      ...(this.customMessage
-        ? { customMessage: this.customMessage.valueOf() }
+      ...(this.ownerNodeId ? { ownerNodeId: this.ownerNodeId.valueOf() } : {}),
+      preferenceUpdatedAt: preference.updatedAt,
+      selectedStatus: preference.selectedStatus,
+      ...(preference.customMessage
+        ? { customMessage: preference.customMessage }
         : {}),
       ...(this.lastActivityAt
         ? { lastActivityAt: this.lastActivityAt.valueOf() }

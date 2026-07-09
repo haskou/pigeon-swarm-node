@@ -2,6 +2,7 @@ import { IdentityPresenceWasUpdatedEvent } from '@app/contexts/presence/domain/e
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '@app/contexts/presence/domain/value-objects/PresenceStatus';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -41,6 +42,8 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
         )
       : [];
 
+    const ownerNodeId = new NodeId(String(event.attributes.ownerNodeId));
+
     await this.repository.save(
       IdentityPresence.fromPrimitives({
         customMessage:
@@ -56,6 +59,11 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
           typeof event.attributes.lastHeartbeatAt === 'number'
             ? event.attributes.lastHeartbeatAt
             : undefined,
+        ownerNodeId: ownerNodeId.valueOf(),
+        preferenceUpdatedAt: Number(event.attributes.preferenceUpdatedAt),
+        selectedStatus: PresenceStatus.fromPrimitives(
+          String(event.attributes.selectedStatus),
+        ).valueOf(),
         status: PresenceStatus.fromPrimitives(
           String(event.attributes.status),
         ).valueOf(),

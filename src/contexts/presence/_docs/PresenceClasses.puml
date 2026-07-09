@@ -5,8 +5,9 @@ skinparam classAttributeIconSize 0
 package "presence/domain" {
   class IdentityPresence {
     - identityId: IdentityId
+    - ownerNodeId: NodeId
+    - preference: IdentityPresencePreference
     - status: PresenceStatus
-    - customMessage: PresenceCustomMessage
     - lastHeartbeatAt: Timestamp
     - lastActivityAt: Timestamp
     - updatedAt: Timestamp
@@ -14,7 +15,12 @@ package "presence/domain" {
     + update(status, customMessage, networkIds)
     + clearCustomMessage(networkIds)
     + refreshDerivedStatus(networkIds)
-    + visiblePrimitivesFor(viewerIdentityId)
+  }
+
+  class IdentityPresencePreference {
+    - selectedStatus: PresenceStatus
+    - customMessage: PresenceCustomMessage
+    - updatedAt: Timestamp
   }
 
   class PresenceStatus {
@@ -32,7 +38,7 @@ package "presence/domain" {
   }
 
   class IdentityPresenceWasUpdatedEvent {
-    + EVENT_NAME: presence.v1.identity_presence.was_updated
+    + EVENT_NAME: presence.v2.identity_presence.was_updated
   }
 }
 
@@ -56,7 +62,9 @@ package "presence/infrastructure" {
 }
 
 IdentityPresence --> PresenceStatus
-IdentityPresence --> PresenceCustomMessage
+IdentityPresence --> IdentityPresencePreference
+IdentityPresencePreference --> PresenceStatus
+IdentityPresencePreference --> PresenceCustomMessage
 IdentityPresence --> IdentityPresenceWasUpdatedEvent
 IdentityPresenceFinder --> InMemoryIdentityPresenceRepository
 IdentityPresenceUpdater --> InMemoryIdentityPresenceRepository

@@ -8,6 +8,9 @@ describe('IdentityPresence', () => {
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const presence = IdentityPresence.fromPrimitives({
       identityId: identityId.valueOf(),
+      ownerNodeId: '550e8400-e29b-41d4-a716-446655440002',
+      preferenceUpdatedAt: 1770000000000,
+      selectedStatus: 'available',
       lastActivityAt: 1770000000000,
       lastHeartbeatAt: 1770000000000,
       status: 'available',
@@ -27,6 +30,9 @@ describe('IdentityPresence', () => {
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const presence = IdentityPresence.fromPrimitives({
       identityId: identityId.valueOf(),
+      ownerNodeId: '550e8400-e29b-41d4-a716-446655440002',
+      preferenceUpdatedAt: 1770000000000,
+      selectedStatus: 'available',
       lastActivityAt: 1770000000000,
       lastHeartbeatAt: 1770000000000,
       status: 'available',

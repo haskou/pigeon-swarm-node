@@ -238,11 +238,6 @@ services:
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJTdGlja2VyUGFja1JlcG9zaXRvcnlfX09yYml0REJTdGlja2VyUGFja1JlcG9zaXRvcnk=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnk=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJTdGlja2VyVXNlckxpYnJhcnlSZXBvc2l0b3J5X19PcmJpdERCU3RpY2tlclVzZXJMaWJyYXJ5UmVwb3NpdG9yeQ==
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2RpYWdub3N0aWNzX19SdW50aW1lRGlhZ25vc3RpY3NfX1J1bnRpbWVEaWFnbm9zdGljcw==:
-    class: /shared/infrastructure/diagnostics/RuntimeDiagnostics
-    arguments: []
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2V4cHJlc3NfX0h0dHBSZXF1ZXN0Q29udGV4dF9fSHR0cFJlcXVlc3RDb250ZXh0:
     class: /shared/infrastructure/express/HttpRequestContext
     arguments: []
@@ -316,8 +311,6 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fT2JzZXJ2ZWRTY2hlZHVsZXJfX09ic2VydmVkU2NoZWR1bGVy: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0NhbGxUaW1lb3V0U2NoZWR1bGVyX19DYWxsVGltZW91dFNjaGVkdWxlcg==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2NhbGxzLWFwaV9fQ2FsbFNpZ25hbFJhdGVMaW1pdGVyX19DYWxsU2lnbmFsUmF0ZUxpbWl0ZXI=:
     class: /apps/apis/calls-api/CallSignalRateLimiter
     arguments:
@@ -840,6 +833,27 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0NvbnRlbnRSZXBsaWNhdGlvbk1haW50ZW5hbmNlU2NoZWR1bGVyX19Db250ZW50UmVwbGljYXRpb25NYWludGVuYW5jZVNjaGVkdWxlcg==:
+    class: /apps/schedulers/ContentReplicationMaintenanceScheduler
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19hcHBsaWNhdGlvbl9fbWFpbnRhaW5fX0NvbnRlbnRSZXBsaWNhdGlvbk1haW50YWluZXJfX0NvbnRlbnRSZXBsaWNhdGlvbk1haW50YWluZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0lkZW50aXR5UHJlc2VuY2VFeHBpcmF0aW9uU2NoZWR1bGVyX19JZGVudGl0eVByZXNlbmNlRXhwaXJhdGlvblNjaGVkdWxlcg==:
+    class: /apps/schedulers/IdentityPresenceExpirationScheduler
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX2V4cGlyZV9fSWRlbnRpdHlQcmVzZW5jZUV4cGlyYXRpb25SZWdpc3RyYXJfX0lkZW50aXR5UHJlc2VuY2VFeHBpcmF0aW9uUmVnaXN0cmFy
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX05vZGVIZWFydGJlYXRTY2hlZHVsZXJfX05vZGVIZWFydGJlYXRTY2hlZHVsZXI=:
+    class: /apps/schedulers/NodeHeartbeatScheduler
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fYXBwbGljYXRpb25fX3NlbmQtaGVhcnRiZWF0X19Ob2RlSGVhcnRiZWF0U2VuZGVyX19Ob2RlSGVhcnRiZWF0U2VuZGVy
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2NhbGxzLWFwaV9fQ2FsbFJlbGF5UmVjb3JkRGlzY292ZXJ5X19DYWxsUmVsYXlSZWNvcmREaXNjb3Zlcnk=:
     class: /apps/apis/calls-api/CallRelayRecordDiscovery
     arguments:
@@ -859,30 +873,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19zZXJ2aWNlc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVNpZ25hdHVyZURvbWFpblNlcnZpY2U=
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0NvbnRlbnRSZXBsaWNhdGlvbk1haW50ZW5hbmNlU2NoZWR1bGVyX19Db250ZW50UmVwbGljYXRpb25NYWludGVuYW5jZVNjaGVkdWxlcg==:
-    class: /apps/schedulers/ContentReplicationMaintenanceScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb250ZW50LXJlcGxpY2F0aW9uX19hcHBsaWNhdGlvbl9fbWFpbnRhaW5fX0NvbnRlbnRSZXBsaWNhdGlvbk1haW50YWluZXJfX0NvbnRlbnRSZXBsaWNhdGlvbk1haW50YWluZXI=
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fT2JzZXJ2ZWRTY2hlZHVsZXJfX09ic2VydmVkU2NoZWR1bGVy
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0lkZW50aXR5UHJlc2VuY2VFeHBpcmF0aW9uU2NoZWR1bGVyX19JZGVudGl0eVByZXNlbmNlRXhwaXJhdGlvblNjaGVkdWxlcg==:
-    class: /apps/schedulers/IdentityPresenceExpirationScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX2V4cGlyZV9fSWRlbnRpdHlQcmVzZW5jZUV4cGlyYXRpb25SZWdpc3RyYXJfX0lkZW50aXR5UHJlc2VuY2VFeHBpcmF0aW9uUmVnaXN0cmFy
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fT2JzZXJ2ZWRTY2hlZHVsZXJfX09ic2VydmVkU2NoZWR1bGVy
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX05vZGVIZWFydGJlYXRTY2hlZHVsZXJfX05vZGVIZWFydGJlYXRTY2hlZHVsZXI=:
-    class: /apps/schedulers/NodeHeartbeatScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fYXBwbGljYXRpb25fX3NlbmQtaGVhcnRiZWF0X19Ob2RlSGVhcnRiZWF0U2VuZGVyX19Ob2RlSGVhcnRiZWF0U2VuZGVy
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fT2JzZXJ2ZWRTY2hlZHVsZXJfX09ic2VydmVkU2NoZWR1bGVy
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2VuZC1jYWxsX19DYWxsRW5kZXJfX0NhbGxFbmRlcg==:
     class: /contexts/calls/application/end-call/CallEnder
     arguments:
@@ -1577,6 +1567,15 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVk: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5Ob3RpZmljYXRpb25DcmVhdGVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5Ob3RpZmljYXRpb25DcmVhdGVk
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0xvY2FsUm91dGluZ1JlY29yZFJlcHVibGlzaGVyU2NoZWR1bGVyX19Mb2NhbFJvdXRpbmdSZWNvcmRSZXB1Ymxpc2hlclNjaGVkdWxlcg==:
+    class: /apps/schedulers/LocalRoutingRecordRepublisherScheduler
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5Um91dGluZ19fSXBmc0lkZW50aXR5Um91dGluZw==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2NhbGxzLWFwaV9fQ2FsbFJlbGF5UnVudGltZV9fQ2FsbFJlbGF5UnVudGltZQ==:
     class: /apps/apis/calls-api/CallRelayRuntime
     arguments:
@@ -1652,16 +1651,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0xvY2FsUm91dGluZ1JlY29yZFJlcHVibGlzaGVyU2NoZWR1bGVyX19Mb2NhbFJvdXRpbmdSZWNvcmRSZXB1Ymxpc2hlclNjaGVkdWxlcg==:
-    class: /apps/schedulers/LocalRoutingRecordRepublisherScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5Um91dGluZ19fSXBmc0lkZW50aXR5Um91dGluZw==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fT2JzZXJ2ZWRTY2hlZHVsZXJfX09ic2VydmVkU2NoZWR1bGVy
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3N0YXJ0LWNhbGxfX0NhbGxTdGFydGVyX19DYWxsU3RhcnRlcg==:
     class: /contexts/calls/application/start-call/CallStarter
     arguments:
@@ -1964,40 +1953,6 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTm90aWZpY2F0aW9uUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uUmVwb3NpdG9yeQ==
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX2V4cGlyZV9fSWRlbnRpdHlQcmVzZW5jZUV4cGlyYXRpb25SZWdpc3RyYXJfX0lkZW50aXR5UHJlc2VuY2VFeHBpcmF0aW9uUmVnaXN0cmFy:
-    class: /contexts/presence/application/expire/IdentityPresenceExpirationRegistrar
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3Jlc29sdmUtbmV0d29ya19fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcl9fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3JlY29yZC1oZWFydGJlYXRfX0lkZW50aXR5UHJlc2VuY2VIZWFydGJlYXRSZWNvcmRlcl9fSWRlbnRpdHlQcmVzZW5jZUhlYXJ0YmVhdFJlY29yZGVy:
-    class: >-
-      /contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3Jlc29sdmUtbmV0d29ya19fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcl9fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3VwZGF0ZV9fSWRlbnRpdHlQcmVzZW5jZVVwZGF0ZXJfX0lkZW50aXR5UHJlc2VuY2VVcGRhdGVy:
-    class: /contexts/presence/application/update/IdentityPresenceUpdater
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3Jlc29sdmUtbmV0d29ya19fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcl9fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2NyZWF0ZS1wYWNrX19TdGlja2VyUGFja0NyZWF0b3JfX1N0aWNrZXJQYWNrQ3JlYXRvcg==:
     class: /contexts/stickers/application/create-pack/StickerPackCreator
     arguments:
@@ -2055,6 +2010,17 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19jb21tdW5pdGllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VDYW5kaWRhdGVSZWdpc3RyYXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlQ2FuZGlkYXRlUmVnaXN0cmFy
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0NhbGxUaW1lb3V0U2NoZWR1bGVyX19DYWxsVGltZW91dFNjaGVkdWxlcg==:
+    class: /apps/schedulers/CallTimeoutScheduler
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTm90aWZpY2F0aW9uUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3J1bnRpbWVzX19vcmJpdGRiLXJ1bnRpbWVfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSdW50aW1lX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUnVudGltZQ==:
     class: /apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime
     arguments:
@@ -2068,18 +2034,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fYXBwbGljYXRpb25fX2ZpbmQtbmV0d29yay1zeW5jaHJvbml6YXRpb25fX05vZGVOZXR3b3JrU3luY2hyb25pemF0aW9uTW9uaXRvcl9fTm9kZU5ldHdvcmtTeW5jaHJvbml6YXRpb25Nb25pdG9y
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0NhbGxUaW1lb3V0U2NoZWR1bGVyX19DYWxsVGltZW91dFNjaGVkdWxlcg==:
-    class: /apps/schedulers/CallTimeoutScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTm90aWZpY2F0aW9uUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uUmVwb3NpdG9yeQ==
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX3NjaGVkdWxlcl9fT2JzZXJ2ZWRTY2hlZHVsZXJfX09ic2VydmVkU2NoZWR1bGVy
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2FjY2VwdC1pbnZpdGVfX0NvbW11bml0eUludml0ZUFjY2VwdGVyX19Db21tdW5pdHlJbnZpdGVBY2NlcHRlcg==:
     class: /contexts/communities/application/accept-invite/CommunityInviteAccepter
     arguments:
@@ -2545,6 +2499,46 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wb2xsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1BvbGxSZXBvc2l0b3J5X19Qb2xsUmVwb3NpdG9yeQ==
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX2V4cGlyZV9fSWRlbnRpdHlQcmVzZW5jZUV4cGlyYXRpb25SZWdpc3RyYXJfX0lkZW50aXR5UHJlc2VuY2VFeHBpcmF0aW9uUmVnaXN0cmFy:
+    class: /contexts/presence/application/expire/IdentityPresenceExpirationRegistrar
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3Jlc29sdmUtbmV0d29ya19fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcl9fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3JlY29yZC1oZWFydGJlYXRfX0lkZW50aXR5UHJlc2VuY2VIZWFydGJlYXRSZWNvcmRlcl9fSWRlbnRpdHlQcmVzZW5jZUhlYXJ0YmVhdFJlY29yZGVy:
+    class: >-
+      /contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3Jlc29sdmUtbmV0d29ya19fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcl9fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3VwZGF0ZV9fSWRlbnRpdHlQcmVzZW5jZVVwZGF0ZXJfX0lkZW50aXR5UHJlc2VuY2VVcGRhdGVy:
+    class: /contexts/presence/application/update/IdentityPresenceUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fZG9tYWluX19yZXBvc2l0b3JpZXNfX0lkZW50aXR5UHJlc2VuY2VSZXBvc2l0b3J5X19JZGVudGl0eVByZXNlbmNlUmVwb3NpdG9yeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19wcmVzZW5jZV9fYXBwbGljYXRpb25fX3Jlc29sdmUtbmV0d29ya19fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcl9fSWRlbnRpdHlQcmVzZW5jZU5ldHdvcmtSZXNvbHZlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX2xpYnAycF9fTGlicDJwR29zc2lwc3ViTWVzc2FnZUJ1c0FkYXB0ZXJfX0xpYnAycEdvc3NpcHN1YkFkYXB0ZXI=:
     class: /shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter
     arguments:

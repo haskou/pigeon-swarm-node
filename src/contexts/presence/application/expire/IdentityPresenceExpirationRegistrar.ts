@@ -1,3 +1,4 @@
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -11,6 +12,7 @@ export default class IdentityPresenceExpirationRegistrar {
     private readonly repository: IdentityPresenceRepository,
     private readonly networkResolver: IdentityPresenceNetworkResolver,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly nodeRepository: NodeRepository,
   ) {}
 
   public async expire(): Promise<void> {
@@ -19,6 +21,7 @@ export default class IdentityPresenceExpirationRegistrar {
       now.valueOf() - IdentityPresenceExpirationRegistrar.HEARTBEAT_TIMEOUT_MS,
     );
     const presences = await this.repository.findPotentiallyExpired(threshold);
+    const localNodeId = await this.nodeRepository.loadLocalNodeId();
 
     for (const presence of presences) {
       const networkIds = await this.networkResolver.resolve(
@@ -31,7 +34,12 @@ export default class IdentityPresenceExpirationRegistrar {
       }
 
       await this.repository.save(presence, networkIds);
-      await this.eventPublisher.publish(presence.pullDomainEvents());
+
+      if (presence.belongsToNode(localNodeId)) {
+        await this.eventPublisher.publish(presence.pullDomainEvents());
+      } else {
+        presence.pullDomainEvents();
+      }
     }
   }
 }
