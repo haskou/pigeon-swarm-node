@@ -134,10 +134,4 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
       networkId.valueOf(),
     );
   }
-
-  public async findNetworkIds(): Promise<NetworkId[]> {
-    return (await this.ipfs.getNetworks()).map(
-      (network) => new NetworkId(network.getId()),
-    );
-  }
 }

@@ -9,8 +9,8 @@ export default class SendPushNotificationWhenNotificationCreated extends SendPus
   public static QUEUE_NAME = 'pigeon-swarm.send-push-when-notification-created';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
-    private readonly notificationDispatcher: PushNotificationDispatcher,
+    eventConsumer: DomainEventConsumer,
+    notificationDispatcher: PushNotificationDispatcher,
   ) {
     super(eventConsumer, notificationDispatcher);
   }

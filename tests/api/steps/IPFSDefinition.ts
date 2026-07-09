@@ -32,7 +32,6 @@ export default class IPFSDefinition {
 
   private storedIPFSCid: string | undefined;
   private scenarioSuffix: string = '';
-  private readonly ipfsNetworkAliases: Record<string, string> = {};
   private readonly ipfsNetworkIdAliases: Record<string, string> = {};
   private registeredNetworkIds: string[] = [];
 
@@ -40,18 +39,6 @@ export default class IPFSDefinition {
     IPFSDefinition.scenarioCount += 1;
 
     return `${IPFSDefinition.scenarioCount}`;
-  }
-
-  private resolveRegisteredIPFSNetworkName(networkAlias: string): string {
-    const networkName = this.ipfsNetworkAliases[networkAlias];
-
-    if (!networkName) {
-      throw new Error(
-        `IPFS network alias "${networkAlias}" is not registered in this scenario`,
-      );
-    }
-
-    return networkName;
   }
 
   private resolveRegisteredIPFSNetworkId(networkAlias: string): string {
@@ -119,9 +106,6 @@ export default class IPFSDefinition {
     this.scenarioSuffix = IPFSDefinition.nextScenarioSuffix();
     this.registeredNetworkIds = [];
 
-    Object.keys(this.ipfsNetworkAliases).forEach((alias) => {
-      delete this.ipfsNetworkAliases[alias];
-    });
     Object.keys(this.ipfsNetworkIdAliases).forEach((alias) => {
       delete this.ipfsNetworkIdAliases[alias];
     });
@@ -190,7 +174,6 @@ export default class IPFSDefinition {
     );
 
     await ipfs.registerNetwork(networkConfig);
-    this.ipfsNetworkAliases[networkAlias] = scenarioNetworkName;
     this.ipfsNetworkIdAliases[networkAlias] = networkId;
     this.registeredNetworkIds.push(networkId);
 
@@ -209,7 +192,6 @@ export default class IPFSDefinition {
     );
 
     await ipfs.registerNetwork(networkConfig);
-    this.ipfsNetworkAliases[networkName] = scenarioNetworkName;
     this.ipfsNetworkIdAliases[networkName] = networkId;
     this.registeredNetworkIds.push(networkId);
 

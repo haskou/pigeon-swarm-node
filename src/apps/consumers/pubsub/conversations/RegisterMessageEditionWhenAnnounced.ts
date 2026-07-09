@@ -11,7 +11,7 @@ export default class RegisterMessageEditionWhenAnnounced extends Consumer {
     'pigeon-swarm.register-message-edition-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
   ) {
     super(eventConsumer);

@@ -12,7 +12,7 @@ export default class RegisterIdentityPresenceWhenUpdated extends Consumer {
     'pigeon-swarm.register-identity-presence-when-updated';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly repository: IdentityPresenceRepository,
   ) {
     super(eventConsumer);

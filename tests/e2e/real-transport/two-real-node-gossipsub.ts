@@ -8,7 +8,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { KeyPair } from '@haskou/value-objects';
 import axios, { AxiosError } from 'axios';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { generateKeyPairSync, randomUUID } from 'crypto';
+import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
 import WebSocket from 'ws';

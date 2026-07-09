@@ -10,7 +10,7 @@ export default class RegisterContentReplicaClaimWhenClaimed extends Consumer {
     'pigeon-swarm.register-content-replica-claim-when-claimed';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: ContentReplicaClaimRegistrar,
   ) {
     super(eventConsumer);

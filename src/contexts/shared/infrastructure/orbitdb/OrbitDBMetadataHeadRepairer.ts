@@ -11,21 +11,6 @@ export default class OrbitDBMetadataHeadRepairer {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
-  private recordArrayValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): Record<string, unknown>[] {
-    const value = document[attribute];
-
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value.filter((item): item is Record<string, unknown> =>
-      this.isRecord(item),
-    );
-  }
-
   private stringValue(
     document: Record<string, unknown>,
     attribute: string,

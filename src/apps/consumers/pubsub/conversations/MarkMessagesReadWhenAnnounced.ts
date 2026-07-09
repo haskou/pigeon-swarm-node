@@ -10,7 +10,7 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.mark-messages-read-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: MessagesReadRegistrar,
   ) {
     super(eventConsumer);

@@ -9,8 +9,8 @@ export default class SendPushNotificationWhenCallStarted extends SendPushNotific
   public static QUEUE_NAME = 'pigeon-swarm.send-push-when-call-started';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
-    private readonly notificationDispatcher: PushNotificationDispatcher,
+    eventConsumer: DomainEventConsumer,
+    notificationDispatcher: PushNotificationDispatcher,
   ) {
     super(eventConsumer, notificationDispatcher);
   }

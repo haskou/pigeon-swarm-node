@@ -41,13 +41,6 @@ const TCP_REACHABILITY_TIMEOUT_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_TCP_REACHABILITY_TIMEOUT_MS || 5000,
 );
 
-type TestLogger = {
-  debug(message: string): void;
-  error(message: string): void;
-  info(message: string): void;
-  warn(message: string): void;
-};
-
 type Command = {
   type: string;
   [key: string]: unknown;

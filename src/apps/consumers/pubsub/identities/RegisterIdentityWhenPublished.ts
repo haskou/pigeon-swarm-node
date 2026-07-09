@@ -10,7 +10,7 @@ export default class RegisterIdentityWhenPublished extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-identity-when-published';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: RegisterPublishedIdentity,
   ) {
     super(eventConsumer);

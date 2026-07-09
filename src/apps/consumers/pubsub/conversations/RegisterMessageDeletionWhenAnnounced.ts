@@ -11,7 +11,7 @@ export default class RegisterMessageDeletionWhenAnnounced extends Consumer {
     'pigeon-swarm.register-message-deletion-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
   ) {
     super(eventConsumer);

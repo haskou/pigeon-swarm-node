@@ -46,6 +46,4 @@ export default abstract class ReplicatedContentStorage {
     contentId: ContentId,
     networkId: NetworkId,
   ): Promise<void>;
-
-  public abstract findNetworkIds(): Promise<NetworkId[]>;
 }

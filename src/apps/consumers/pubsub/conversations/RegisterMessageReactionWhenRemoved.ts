@@ -11,7 +11,7 @@ export default class RegisterMessageReactionWhenRemoved extends Consumer {
     'pigeon-swarm.register-message-reaction-when-removed';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: MessageReactionRegistrar,
   ) {
     super(eventConsumer);
