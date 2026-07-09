@@ -19,7 +19,7 @@ export default class IdentityPresenceFinder {
           existingIdentityId.isNotEqual(identityId),
         ),
       )
-      .map((identityId) => IdentityPresence.disconnected(identityId));
+      .map((identityId) => IdentityPresence.unobserved(identityId));
 
     return [...existing, ...missing];
   }

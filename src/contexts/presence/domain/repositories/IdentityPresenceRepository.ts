@@ -1,4 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityPresence } from '../IdentityPresence';
@@ -11,6 +12,11 @@ export default abstract class IdentityPresenceRepository {
   public abstract findByIdentityIds(
     identityIds: IdentityId[],
   ): Promise<IdentityPresence[]>;
+
+  public abstract findByIdentityIdAndNodeId(
+    identityId: IdentityId,
+    nodeId: NodeId,
+  ): Promise<IdentityPresence | undefined>;
 
   public abstract findPotentiallyExpired(
     threshold: Timestamp,

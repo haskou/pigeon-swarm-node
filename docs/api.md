@@ -1082,9 +1082,11 @@ Implemented security rules:
 
 ## Identity Presence HTTP API
 
-Presence is runtime state kept in node memory. Selected status, custom messages,
-heartbeat fields and derived states are replicated through domain events, are
-not written to OrbitDB/IPFS, and reset when the node restarts.
+Presence is runtime state kept in node memory. Each node maintains an independent
+lease for every identity connected through it. Heartbeats renew that node's
+lease through domain events; another node may expire its local copy but never
+broadcast an expiration on behalf of the lease owner. Leases are aggregated for
+reads, are not written to OrbitDB/IPFS, and reset when the node restarts.
 
 Statuses:
 
@@ -1178,7 +1180,7 @@ refreshed, backend emits:
 {
   "type": "domain_event",
   "event": {
-    "type": "presence.v1.identity_presence.was_updated",
+    "type": "presence.v2.identity_presence.was_updated",
     "aggregate_id": "<identityId>",
     "attributes": {
       "identityId": "<identityId>",
@@ -1186,6 +1188,9 @@ refreshed, backend emits:
       "customMessage": "Back soon",
       "lastHeartbeatAt": 1770000000000,
       "lastActivityAt": 1770000000000,
+      "ownerNodeId": "550e8400-e29b-41d4-a716-446655440001",
+      "preferenceUpdatedAt": 1770000000000,
+      "selectedStatus": "away",
       "updatedAt": 1770000000000,
       "networkIds": ["<networkId>"]
     }

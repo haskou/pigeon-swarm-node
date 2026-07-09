@@ -1,11 +1,16 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
+import { PresenceStatus } from '../../domain/value-objects/PresenceStatus';
 
 export default class InMemoryIdentityPresenceRepository extends IdentityPresenceRepository {
-  private readonly presences = new Map<string, PrimitiveOf<IdentityPresence>>();
+  private readonly presences = new Map<
+    string,
+    Map<string, PrimitiveOf<IdentityPresence>>
+  >();
 
   private clone(presence: IdentityPresence): IdentityPresence {
     return IdentityPresence.fromPrimitives(presence.toPrimitives());
@@ -27,8 +32,39 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
   public findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityPresence | undefined> {
+    const leases = [
+      ...(this.presences.get(identityId.valueOf())?.values() ?? []),
+    ];
+    const connected = leases.filter(
+      (lease) =>
+        PresenceStatus.fromPrimitives(lease.status).isDisconnected() === false,
+    );
+    const candidates = connected.length > 0 ? connected : leases;
+    const latest = candidates.sort(
+      (left, right) => right.updatedAt - left.updatedAt,
+    )[0];
+    const latestPreference = leases.sort(
+      (left, right) => right.preferenceUpdatedAt - left.preferenceUpdatedAt,
+    )[0];
+    const effectivePresence = this.presenceFrom(latest);
+
+    if (effectivePresence && latestPreference) {
+      effectivePresence.mergePreferenceFrom(
+        IdentityPresence.fromPrimitives(latestPreference),
+      );
+    }
+
+    return Promise.resolve(effectivePresence);
+  }
+
+  public findByIdentityIdAndNodeId(
+    identityId: IdentityId,
+    nodeId: NodeId,
+  ): Promise<IdentityPresence | undefined> {
     return Promise.resolve(
-      this.presenceFrom(this.presences.get(identityId.valueOf())),
+      this.presenceFrom(
+        this.presences.get(identityId.valueOf())?.get(nodeId.valueOf()),
+      ),
     );
   }
 
@@ -49,6 +85,7 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
   ): Promise<IdentityPresence[]> {
     return Promise.resolve(
       [...this.presences.values()]
+        .flatMap((leases) => [...leases.values()])
         .filter(
           (presence) =>
             (typeof presence.lastHeartbeatAt === 'number' &&
@@ -63,12 +100,22 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
     const snapshot = this.clone(presence);
     const primitives = snapshot.toPrimitives();
     const identityId = snapshot.getIdentityId().valueOf();
+    const ownerNodeId = primitives.ownerNodeId;
 
-    if (this.isOlderThanCurrent(primitives, this.presences.get(identityId))) {
+    if (!ownerNodeId) {
+      return Promise.reject(new Error('Presence lease requires an owner node'));
+    }
+
+    const leases =
+      this.presences.get(identityId) ??
+      new Map<string, PrimitiveOf<IdentityPresence>>();
+
+    if (this.isOlderThanCurrent(primitives, leases.get(ownerNodeId))) {
       return Promise.resolve();
     }
 
-    this.presences.set(identityId, primitives);
+    leases.set(ownerNodeId, primitives);
+    this.presences.set(identityId, leases);
 
     return Promise.resolve();
   }

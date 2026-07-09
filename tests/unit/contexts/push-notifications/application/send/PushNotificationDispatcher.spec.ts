@@ -241,6 +241,8 @@ function createSubscription(identityId: IdentityId): PushSubscription {
 function createBusyPresence(identityId: string): IdentityPresence {
   return IdentityPresence.fromPrimitives({
     identityId,
+    preferenceUpdatedAt: 1770000000000,
+    selectedStatus: 'busy',
     status: 'busy',
     updatedAt: 1770000000000,
   });
@@ -251,6 +253,8 @@ function createAvailablePresence(identityId: string): IdentityPresence {
     identityId,
     lastActivityAt: 1770000000000,
     lastHeartbeatAt: 1770000000000,
+    preferenceUpdatedAt: 1770000000000,
+    selectedStatus: 'available',
     status: 'available',
     updatedAt: 1770000000000,
   });

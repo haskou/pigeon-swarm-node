@@ -1,3 +1,4 @@
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
@@ -10,15 +11,17 @@ export default class IdentityPresenceHeartbeatRecorder {
     private readonly repository: IdentityPresenceRepository,
     private readonly networkResolver: IdentityPresenceNetworkResolver,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly nodeRepository: NodeRepository,
   ) {}
 
   public async record(
     message: IdentityPresenceHeartbeatMessage,
   ): Promise<IdentityPresence> {
     const identityId = message.getIdentityId();
+    const nodeId = await this.nodeRepository.loadLocalNodeId();
     const presence =
-      (await this.repository.findByIdentityId(identityId)) ||
-      IdentityPresence.disconnected(identityId);
+      (await this.repository.findByIdentityIdAndNodeId(identityId, nodeId)) ||
+      IdentityPresence.disconnected(identityId, nodeId);
     const networkIds = await this.networkResolver.resolve(identityId);
 
     presence.recordHeartbeat(message.activityDetected, networkIds);
