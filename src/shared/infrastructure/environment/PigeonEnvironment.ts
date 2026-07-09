@@ -31,6 +31,10 @@ export const pigeonEnvironmentSchema = {
   LOG_LEVEL: { type: 'string' },
   LOG_URL: { defaultValue: 'logs', type: 'string' },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
+  PIGEON_EVENT_LOOP_DELAY_WARNING_MS: {
+    defaultValue: 2_000,
+    type: 'number',
+  },
   PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS: { type: 'number' },
   PIGEON_LOCAL_DB_PATH: { type: 'string' },
   PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS: { type: 'number' },
@@ -65,6 +69,10 @@ export const pigeonEnvironmentSchema = {
   },
   PIGEON_RELAY_RECORD_TTL_SECONDS: {
     defaultValue: 2 * 60 * 60,
+    type: 'number',
+  },
+  PIGEON_SCHEDULER_STUCK_WARNING_MS: {
+    defaultValue: 5_000,
     type: 'number',
   },
   PIGEON_STORED_RELAY_FALLBACK_MS: {

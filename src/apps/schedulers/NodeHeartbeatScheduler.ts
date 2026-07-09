@@ -1,14 +1,14 @@
 import NodeHeartbeatSender from '@app/contexts/nodes/application/send-heartbeat/NodeHeartbeatSender';
+import ObservedScheduler from '@app/shared/infrastructure/scheduler/ObservedScheduler';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
-import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
-export default class NodeHeartbeatScheduler extends Scheduler {
+export default class NodeHeartbeatScheduler extends ObservedScheduler {
   constructor(private readonly sender: NodeHeartbeatSender) {
     super(new ReplicatedStateSchedulerErrorPolicy());
   }
 
-  public async execute(): Promise<void> {
+  protected async executeObserved(): Promise<void> {
     await this.sender.send();
   }
 
