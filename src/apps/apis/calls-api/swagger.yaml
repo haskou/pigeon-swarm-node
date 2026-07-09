@@ -129,9 +129,15 @@ paths:
       tags:
         - calls
       summary: Refresh the authenticated participant heartbeat
-      description: Joined participants should call this endpoint while media is active. If no heartbeat is received for roughly 5 seconds, the scheduler marks the participant as left and emits calls.v1.participant.left.
+      description: Joined participants should call this endpoint while media is active. The response exposes runtime connected and lastHeartbeatAt fields; heartbeat state is not persisted in OrbitDB.
       parameters:
         - $ref: '#/components/parameters/CallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCallParticipantHeartbeatBody'
       responses:
         '200':
           description: Participant heartbeat recorded.
@@ -171,6 +177,39 @@ components:
         type: string
         format: uuid
   schemas:
+    PostCallParticipantHeartbeatBody:
+      type: object
+      required:
+        - mediaConnections
+      properties:
+        mediaConnections:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/CallParticipantMediaConnectionInput'
+    CallParticipantMediaConnectionInput:
+      type: object
+      required:
+        - remoteIdentityId
+        - state
+      properties:
+        remoteIdentityId:
+          type: string
+        state:
+          type: string
+          enum: [new, connecting, connected, disconnected, failed, closed]
+        localCandidateType:
+          type: string
+          enum: [host, srflx, prflx, relay]
+        remoteCandidateType:
+          type: string
+          enum: [host, srflx, prflx, relay]
+        relayUrl:
+          type: string
+        protocol:
+          type: string
+        relayProtocol:
+          type: string
     PostCallBody:
       type: object
       required:
@@ -316,9 +355,14 @@ components:
     CallParticipant:
       type: object
       required:
+        - connected
         - identityId
+        - mediaConnections
         - status
       properties:
+        connected:
+          type: boolean
+          description: Whether at least one replicated runtime lease for this participant is active.
         identityId:
           type: string
         status:
@@ -331,11 +375,24 @@ components:
             - missed
         joinedAt:
           type: number
-        lastSeenAt:
+        lastHeartbeatAt:
           type: number
+        mediaConnections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallParticipantMediaConnection'
         leftAt:
           type: number
         declinedAt:
           type: number
         missedAt:
           type: number
+    CallParticipantMediaConnection:
+      allOf:
+        - $ref: '#/components/schemas/CallParticipantMediaConnectionInput'
+        - type: object
+          required:
+            - usesRelay
+          properties:
+            usesRelay:
+              type: boolean

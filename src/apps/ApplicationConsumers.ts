@@ -1,3 +1,5 @@
+import RegisterCallParticipantLeaseWhenUpdated from '@app/apps/consumers/pubsub/calls/RegisterCallParticipantLeaseWhenUpdated';
+import RegisterCallWhenStarted from '@app/apps/consumers/pubsub/calls/RegisterCallWhenStarted';
 import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced';
 import RegisterCommunityChannelMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced';
 import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
@@ -28,6 +30,8 @@ import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 
 export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
+  RegisterCallParticipantLeaseWhenUpdated,
+  RegisterCallWhenStarted,
   RegisterIdentityWhenPublished,
   SynchronizeIdentityWhenUpdated,
   RegisterKeychainWhenPublished,

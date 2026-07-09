@@ -31,4 +31,7 @@ Feature: Join call participant
     And the other identity signs the current call heartbeat request
     When I POST a participant heartbeat to the current call
     Then response code is equal to 200
-    And response body should contain "lastSeenAt"
+    And response body should contain "lastHeartbeatAt"
+    And response body should contain "connected"
+    And response body should contain "turn:relay.example:3478?transport=udp"
+    And response body should contain "usesRelay"

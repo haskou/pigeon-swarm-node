@@ -1720,7 +1720,19 @@ export default class Definitions {
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
-    this.body = undefined;
+    this.body = JSON.stringify({
+      mediaConnections: [
+        {
+          localCandidateType: 'relay',
+          protocol: 'udp',
+          relayProtocol: 'udp',
+          relayUrl: 'turn:relay.example:3478?transport=udp',
+          remoteCandidateType: 'relay',
+          remoteIdentityId: this.ownerIdentityId?.valueOf(),
+          state: 'connected',
+        },
+      ],
+    });
     await this.signCurrentRequest(
       'POST',
       `/calls/${this.callId}/participants/me/heartbeat`,

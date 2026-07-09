@@ -45,9 +45,10 @@ export class PostCallSignalRoute extends CallRouteSupport {
         await this.rateLimiter.consume(new CallId(callId), senderIdentityId);
       },
     );
+    const leases = await this.findParticipantLeases([call]);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallViewModel(call).toResource());
+      .send(new CallViewModel(call, leases).toResource());
   }
 }

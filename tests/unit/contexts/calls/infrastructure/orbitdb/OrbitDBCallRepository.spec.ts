@@ -86,7 +86,6 @@ describe('OrbitDBCallRepository', () => {
         {
           identityId: creatorIdentityId,
           joinedAt: 1780000000000,
-          lastSeenAt: 1780000000000,
           status: 'joined',
         },
         {
@@ -133,6 +132,18 @@ describe('OrbitDBCallRepository', () => {
       heads,
     } as never);
     repository = new OrbitDBCallRepository(registry);
+  });
+
+  it('registers a gossip replica for immediate reads without writing OrbitDB', async () => {
+    const call = communityCall();
+
+    await repository.registerReplica(call);
+
+    await expect(repository.findById(new CallId(callId))).resolves.toEqual(
+      expect.objectContaining({ getId: expect.any(Function) }),
+    );
+    expect(calls.put).not.toHaveBeenCalled();
+    expect(heads.put).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -189,7 +200,6 @@ describe('OrbitDBCallRepository', () => {
         {
           identityId: creatorIdentityId,
           joinedAt: 1780000000000,
-          lastSeenAt: 1780000000000,
           status: 'joined',
         },
         {
@@ -239,13 +249,11 @@ describe('OrbitDBCallRepository', () => {
         {
           identityId: creatorIdentityId,
           joinedAt: 1780000000000,
-          lastSeenAt: 1780000060000,
           status: 'joined',
         },
         {
           identityId: participantIdentityId,
           joinedAt: 1780000060000,
-          lastSeenAt: 1780000060000,
           status: 'joined',
         },
       ],

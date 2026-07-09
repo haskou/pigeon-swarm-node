@@ -80,6 +80,14 @@ export class WebSocketEventHub {
   private getEventRecipients(event: DomainEvent): Set<string> {
     const recipients = new Set<string>();
 
+    if (
+      this.isCallParticipantLeaseEvent(event) &&
+      event.attributes.connectionChanged !== true &&
+      event.attributes.mediaConnectionsChanged !== true
+    ) {
+      return recipients;
+    }
+
     if (this.isCallSignalEvent(event)) {
       this.collectIdentityValues(
         event.attributes.recipientIdentityId,
@@ -122,6 +130,10 @@ export class WebSocketEventHub {
 
   private isCallSignalEvent(event: DomainEvent): boolean {
     return event.eventName() === 'calls.v1.signal.sent';
+  }
+
+  private isCallParticipantLeaseEvent(event: DomainEvent): boolean {
+    return event.eventName() === 'calls.v1.participant_lease.was_updated';
   }
 
   private isNodeWideEvent(event: DomainEvent): boolean {

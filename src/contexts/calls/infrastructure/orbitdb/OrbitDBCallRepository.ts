@@ -148,19 +148,22 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
   }
 
-  public async findTimedOutJoinedCalls(
-    timeoutThreshold: Timestamp,
-  ): Promise<Call[]> {
-    return this.toDomainList(
-      await this.callIndex.findTimedOutJoinedCalls(timeoutThreshold),
-    );
-  }
-
   public save(call: Call): Promise<void> {
     const document = this.toDocument(call);
 
     this.replicateDocumentInBackground(document);
     this.callIndex.put(document);
+
+    return Promise.resolve();
+  }
+
+  public registerReplica(call: Call): Promise<void> {
+    const document = this.toDocument(call);
+
+    this.callIndex.registerReplica({
+      ...document,
+      updatedAt: document.createdAt,
+    });
 
     return Promise.resolve();
   }

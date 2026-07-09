@@ -1,6 +1,8 @@
 import CallScopeResolver from '@app/contexts/calls/application/start-call/CallScopeResolver';
 import CallStarter from '@app/contexts/calls/application/start-call/CallStarter';
 import { CallStartMessage } from '@app/contexts/calls/application/start-call/messages/CallStartMessage';
+import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer';
+import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
@@ -40,6 +42,8 @@ describe('CallStarter', () => {
       mock<CommunityRepository>();
     const eventPublisher: MockProxy<DomainEventPublisher> =
       mock<DomainEventPublisher>();
+    const leaseRenewer = mock<CallParticipantLeaseRenewer>();
+    const lease = mock<CallParticipantLease>();
     let savedCall: Awaited<Parameters<CallRepository['save']>[0]> | undefined;
 
     repository.findActiveByCommunityChannel.mockResolvedValue(undefined);
@@ -49,11 +53,14 @@ describe('CallStarter', () => {
       return Promise.resolve();
     });
     conversationRepository.findMetadataById.mockResolvedValue(conversation);
+    lease.pullDomainEvents.mockReturnValue([]);
+    leaseRenewer.renew.mockResolvedValue(lease);
 
     const starter = new CallStarter(
       repository,
       new CallScopeResolver(conversationRepository, communityRepository),
       eventPublisher,
+      leaseRenewer,
     );
 
     const call = await starter.start(
@@ -79,6 +86,8 @@ describe('CallStarter', () => {
       mock<CommunityRepository>();
     const eventPublisher: MockProxy<DomainEventPublisher> =
       mock<DomainEventPublisher>();
+    const leaseRenewer = mock<CallParticipantLeaseRenewer>();
+    const lease = mock<CallParticipantLease>();
     const authorizeVoiceChannelCall = jest.fn();
     let savedCall: Awaited<Parameters<CallRepository['save']>[0]> | undefined;
 
@@ -92,11 +101,14 @@ describe('CallStarter', () => {
       authorizeVoiceChannelCall,
       getNetworkId: () => networkId,
     } as never);
+    lease.pullDomainEvents.mockReturnValue([]);
+    leaseRenewer.renew.mockResolvedValue(lease);
 
     const starter = new CallStarter(
       repository,
       new CallScopeResolver(conversationRepository, communityRepository),
       eventPublisher,
+      leaseRenewer,
     );
 
     const call = await starter.start(

@@ -286,6 +286,7 @@ Event contracts used by frontend:
 | `calls.v1.call.ended`                                 | call id           | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status`                                      |
 | `calls.v1.call.missed`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status`                                      |
 | `calls.v1.signal.sent`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `calls.v1.participant_lease.was_updated`              | call lease id     | `callId`, `networkId`, `participantIds`, `participantIdentityId`, `ownerNodeId`, `connectionChanged`, `mediaConnectionsChanged`, `mediaConnections`, `status` |
 | `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
 | `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
 | `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
@@ -318,10 +319,12 @@ For `conversations.v1.message.*`, use `event.aggregate_id` as
 For `conversations.v1.messages.were_read`, use `event.aggregate_id` as
 `conversationId` and refresh the conversation unread counters if needed.
 
-For `calls.v1.*`, use `event.aggregate_id` as `callId`. Calls are signalling
-only: audio/video media is negotiated by frontend with WebRTC. The backend
-stores active call state and routes lifecycle/signalling events to the
-authenticated participants.
+For call lifecycle and signalling events, use `event.aggregate_id` as
+`callId`. For `calls.v1.participant_lease.was_updated`, the aggregate id
+identifies one node-owned lease; use `event.attributes.callId` instead. Calls
+are signalling only: audio/video media is negotiated by frontend with WebRTC.
+The backend stores active call state and routes lifecycle/signalling events to
+the authenticated participants.
 
 ## Calls HTTP API
 
@@ -476,13 +479,26 @@ Implemented:
 - joining requires the authenticated identity to be an allowed participant for
   the call scope
 - joined participants should send a signed heartbeat while media is active
-- heartbeat updates `participants[].lastSeenAt`
-- participants with no heartbeat for about 5 seconds are marked as `left` by
-  the call timeout scheduler
+- heartbeat body contains one `mediaConnections` entry per remote
+  `RTCPeerConnection`; an empty array is valid before ICE selects a pair
+- heartbeat renews an in-memory lease owned by the node serving that client and
+  replicates it through `calls.v1.participant_lease.was_updated`
+- heartbeat never writes the call document or its indexes to OrbitDB
+- `participants[].connected` is true while at least one replicated lease for
+  that identity remains active; `lastHeartbeatAt` is runtime-only
+- `participants[].mediaConnections` reports the latest selected ICE path for
+  each remote participant, including candidate types, TURN URL/protocol when
+  available and the derived `usesRelay` flag
+- remote nodes expire stale lease copies locally, while only the owner node may
+  announce its lease as disconnected
+- WebSocket clients receive lease events when `connectionChanged` or
+  `mediaConnectionsChanged` is true; unchanged heartbeat renewals are not
+  forwarded to frontend clients
+- after a lease connection event, refetch `GET /calls/{callId}` to obtain the
+  aggregated `connected` and `lastHeartbeatAt` participant projection
 - leaving removes the authenticated identity from the active call
 - deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
-- heartbeat timeout emits `calls.v1.participant.left`
 - leaves emit `calls.v1.participant.left`
 - declines emit `calls.v1.participant.declined`
 

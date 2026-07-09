@@ -29,9 +29,10 @@ export class PostCallRoute extends CallRouteSupport {
         body.invitedParticipantIds,
       ),
     );
+    const leases = await this.findParticipantLeases([call]);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallViewModel(call).toResource());
+      .send(new CallViewModel(call, leases).toResource());
   }
 }
