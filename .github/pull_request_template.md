@@ -12,6 +12,7 @@
 - [ ] Unit tests
 - [ ] Acceptance/integration tests
 - [ ] `yarn lint`
+- [ ] `yarn typecheck`
 - [ ] `yarn build`
 - [ ] Other:
 

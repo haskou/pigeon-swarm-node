@@ -2,11 +2,10 @@ import type { Config } from '@jest/types';
 
 const config: Config.InitialOptions = {
   maxWorkers: '50%',
-  preset: 'ts-jest',
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   transform: {
-    '^.+\\.[tj]s$': 'ts-jest',
+    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
   },
   transformIgnorePatterns: ['node_modules/(?!(@noble|@haskou|@faker-js)/)'],
   moduleNameMapper: {
@@ -21,11 +20,6 @@ const config: Config.InitialOptions = {
   roots: ['<rootDir>/src/', '<rootDir>/tests/'],
   moduleDirectories: ['node_modules', '<rootDir>/src'],
   setupFiles: ['reflect-metadata'],
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.jest.json',
-    },
-  },
   coverageReporters: ['json'],
   coverageDirectory: '<rootDir>/coverage/unit',
   collectCoverageFrom: ['<rootDir>/src/**/*.ts'],

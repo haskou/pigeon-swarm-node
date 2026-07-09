@@ -13,13 +13,12 @@
       "node",
       "jest"
     ],
-    "baseUrl": "./",
     "paths": {
       "@app/*": [
-        "src/*"
+        "./src/*"
       ],
       "@tests/*": [
-        "tests/*"
+        "./tests/*"
       ],
     }
   },

@@ -386,7 +386,7 @@ async function writeOrbit(command: Command): Promise<void> {
 
   const document = command.document;
 
-  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+  if (!isRecord(document)) {
     throw new Error('Invalid OrbitDB document command payload.');
   }
 
@@ -607,16 +607,20 @@ function fail(error: unknown): void {
   });
   process.stderr.write(`${normalizedError.stack || normalizedError.message}\n`);
   stopResources()
-    .catch(() => undefined)
+    .catch((): void => {})
     .finally(() => process.exit(1));
 }
 
 process.on('SIGTERM', () => {
   stopResources()
-    .catch(() => undefined)
+    .catch((): void => {})
     .finally(() => process.exit(0));
 });
 process.on('uncaughtException', fail);
 process.on('unhandledRejection', fail);
 
 main().catch(fail);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
