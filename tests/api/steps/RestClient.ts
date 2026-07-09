@@ -1,7 +1,11 @@
-import axios, { Axios, AxiosError, AxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+} from 'axios';
 
 export default class RestClient {
-  private readonly client: Axios;
+  private readonly client: AxiosInstance;
   public bearerToken: string = null;
 
   constructor() {

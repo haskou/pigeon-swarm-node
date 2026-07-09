@@ -179,7 +179,7 @@ class E2EInstanceProcess {
 
     await Promise.race([
       this.waitFor('stop', (event) => event.type === 'stopped', 15000).catch(
-        () => undefined,
+        (): void => {},
       ),
       new Promise((resolve) => setTimeout(resolve, 15000)),
     ]);

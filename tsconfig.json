@@ -5,14 +5,12 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "target": "es6",
-    "ignoreDeprecations": "6.0",
     "strict": false,
     "strictNullChecks": false,
     "strictPropertyInitialization": false,
     "noImplicitAny": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "inlineSourceMap": true,
-    "baseUrl": "./",
     "importHelpers": true,
     "allowSyntheticDefaultImports": true,
     "emitDecoratorMetadata": true,
@@ -30,7 +28,7 @@
     ],
     "paths": {
       "@app/*": [
-        "src/*",
+        "./src/*",
       ]
     }
   },
