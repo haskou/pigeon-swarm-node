@@ -53,6 +53,7 @@ export default class RuntimeDiagnostics {
 
     try {
       mkdirSync(reportDirectory, { recursive: true });
+      process.report.directory = reportDirectory;
     } catch (error) {
       Kernel.logger.warn?.(
         `Node report directory could not be created: path=${reportDirectory} error=${String(error)}`,
