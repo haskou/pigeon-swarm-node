@@ -1,15 +1,15 @@
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
+import ObservedScheduler from '@app/shared/infrastructure/scheduler/ObservedScheduler';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Kernel from '@haskou/ddd-kernel';
-import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 
-export default class ContentReplicationMaintenanceScheduler extends Scheduler {
+export default class ContentReplicationMaintenanceScheduler extends ObservedScheduler {
   constructor(private readonly maintainer: ContentReplicationMaintainer) {
     super(new ReplicatedStateSchedulerErrorPolicy());
   }
 
-  public async execute(): Promise<void> {
+  protected async executeObserved(): Promise<void> {
     const result = await this.maintainer.maintain();
     const message = [
       `Maintained content replication: claimed=${result.claimedReplicas}`,
