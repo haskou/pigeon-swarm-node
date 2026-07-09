@@ -12,7 +12,6 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import '@app/contexts/content-replication/infrastructure/ipfs/IpfsContentStorage';
 import '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
-import RuntimeDiagnostics from '@app/shared/infrastructure/diagnostics/RuntimeDiagnostics';
 
 async function init() {
   console.time('Kernel');
@@ -22,7 +21,6 @@ async function init() {
   console.time('Environment variables');
   application.loadEnvironmentVariables();
   console.timeEnd('Environment variables');
-  RuntimeDiagnostics.start();
 
   console.time('Dependency Injection');
   await application.dependencyInjection();

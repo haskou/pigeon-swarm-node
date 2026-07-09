@@ -3,15 +3,15 @@ import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCall
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
-import ObservedScheduler from '@app/shared/infrastructure/scheduler/ObservedScheduler';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
+import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 import { Timestamp } from '@haskou/value-objects';
 
 const callRingingTimeoutMs = 60_000;
 const callParticipantHeartbeatTimeoutMs = 5_000;
 
-export default class CallTimeoutScheduler extends ObservedScheduler {
+export default class CallTimeoutScheduler extends Scheduler {
   constructor(
     private readonly callRepository: CallRepository,
     private readonly eventPublisher: DomainEventPublisher,
@@ -69,7 +69,7 @@ export default class CallTimeoutScheduler extends ObservedScheduler {
     }
   }
 
-  protected async executeObserved(): Promise<void> {
+  public async execute(): Promise<void> {
     await this.markTimedOutJoinedParticipants();
     await this.markTimedOutRingingParticipants();
   }
