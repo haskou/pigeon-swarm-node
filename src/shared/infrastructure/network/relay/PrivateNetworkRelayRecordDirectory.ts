@@ -12,6 +12,7 @@ import PrivateNetworkRelayRecordCodec from './PrivateNetworkRelayRecordCodec';
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
 import { PrivateRelayRecordCacheDocument } from './PrivateRelayRecordCacheDocument';
 import { PrivateRelayRecordDirectoryOptions } from './PrivateRelayRecordDirectoryOptions';
+import { PublicRelayConnectionOptions } from './PublicRelayConnectionOptions';
 import { PublicRelayRecordDiscovery } from './PublicRelayRecordDiscovery';
 import { PublicRelayRecordRegistry } from './PublicRelayRecordRegistry';
 
@@ -101,6 +102,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   );
 
   private publicConnection?: Promise<IPFSConnection>;
+
+  private publicConnectionConfigurationKey?: string;
 
   constructor(private readonly localDatabase: EmbeddedLocalDatabase) {}
 
@@ -307,16 +310,45 @@ export default class PrivateNetworkRelayRecordDirectory {
     return { signal: controller.signal, timeout };
   }
 
-  private getPublicConnection(
-    sharedPrivateKey: Libp2pPrivateKeyLike,
+  private publicConnectionKey(options: PublicRelayConnectionOptions): string {
+    return JSON.stringify({
+      announceAddresses: options.announceAddresses || [],
+      enableRelayServer: options.enableRelayServer,
+      listenAddresses: options.listenAddresses || [],
+      peerId: libp2pKeyAdapter.peerIdFromPrivateKey(options.sharedPrivateKey),
+      relayDataLimitBytes: options.relayDataLimitBytes,
+    });
+  }
+
+  private createPublicConnection(
+    options: PublicRelayConnectionOptions,
   ): Promise<IPFSConnection> {
-    this.publicConnection ??= PublicIPFS.create({
-      privateKey: sharedPrivateKey,
+    return PublicIPFS.create({
+      announceAddresses: options.announceAddresses,
+      enableRelayServer: options.enableRelayServer,
+      listenAddresses: options.listenAddresses,
+      privateKey: options.sharedPrivateKey,
+      relayDataLimitBytes: options.relayDataLimitBytes,
       storageLocation: this.getPublicRelayDirectoryStorageLocation(),
     }).then(async (connection) => {
       await this.publicRelayDiscovery.startConnection(connection);
 
       return connection;
+    });
+  }
+
+  private getPublicConnection(
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): Promise<IPFSConnection> {
+    this.publicConnection ??= this.createPublicConnection({
+      enableRelayServer: false,
+      relayDataLimitBytes: pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES,
+      sharedPrivateKey,
+    });
+    this.publicConnectionConfigurationKey ??= this.publicConnectionKey({
+      enableRelayServer: false,
+      relayDataLimitBytes: pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES,
+      sharedPrivateKey,
     });
 
     return this.publicConnection;
@@ -1711,6 +1743,28 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  public async configurePublicConnection(
+    options: PublicRelayConnectionOptions,
+  ): Promise<IPFSConnection> {
+    const configurationKey = this.publicConnectionKey(options);
+
+    if (
+      this.publicConnection &&
+      this.publicConnectionConfigurationKey === configurationKey
+    ) {
+      return this.publicConnection;
+    }
+
+    const previousConnection = await this.publicConnection;
+
+    await previousConnection?.stop();
+    this.subscribedRelayRecordTopics.clear();
+    this.publicConnectionConfigurationKey = configurationKey;
+    this.publicConnection = this.createPublicConnection(options);
+
+    return this.publicConnection;
+  }
+
   public async publish(
     network: IPFSNetwork,
     relayOptions: PrivateRelayListenOptions,
@@ -1825,5 +1879,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     const publicConnection = await this.publicConnection;
 
     await publicConnection?.stop();
+    this.publicConnection = undefined;
+    this.publicConnectionConfigurationKey = undefined;
+    this.subscribedRelayRecordTopics.clear();
   }
 }

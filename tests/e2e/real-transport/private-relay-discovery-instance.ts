@@ -144,7 +144,10 @@ async function startRelay(): Promise<void> {
     relayOptions,
     getPublicPrivateKey(),
   );
-  getDirectory().start(getNetwork(), relayOptions, getPublicPrivateKey());
+  getDirectory().start(getNetwork(), relayOptions, getPublicPrivateKey(), {
+    discoveryEnabled: true,
+    publicationEnabled: true,
+  });
 
   emit('relay-ready', {
     advertisedRelayAddress: relayAddress,
@@ -281,7 +284,15 @@ async function startDiscovery(command: Command): Promise<void> {
     throw new Error('Unexpected relay peer id for discovery command.');
   }
 
-  getDirectory().start(getNetwork(), undefined, getPublicPrivateKey());
+  getDirectory().start(
+    getNetwork(),
+    undefined,
+    getPublicPrivateKey(),
+    {
+      discoveryEnabled: true,
+      publicationEnabled: false,
+    },
+  );
   await waitFor(
     () =>
       getNetwork().getPeers().includes(relayPeerId)

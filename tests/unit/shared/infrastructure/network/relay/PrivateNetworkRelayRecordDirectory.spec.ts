@@ -1,6 +1,11 @@
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
+import {
+  libp2pKeyAdapter,
+  Libp2pPrivateKeyLike,
+} from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
+import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import Kernel from '@haskou/ddd-kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
@@ -603,6 +608,35 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     await directory.discover(network, mock());
 
     expect(privateConnection.dial).not.toHaveBeenCalled();
+  });
+
+  it('should reuse the configured public connection for the same relay configuration', async () => {
+    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const publicConnection = mock<IPFSConnection>();
+    const sharedPrivateKey = {} as Libp2pPrivateKeyLike;
+    const createPublicConnection = jest
+      .spyOn(PublicIPFS, 'create')
+      .mockResolvedValue(publicConnection);
+    const options = {
+      enableRelayServer: true,
+      listenAddresses: ['/ip4/0.0.0.0/tcp/4011'],
+      relayDataLimitBytes: 67_108_864,
+      sharedPrivateKey,
+    };
+
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    jest
+      .spyOn(libp2pKeyAdapter, 'peerIdFromPrivateKey')
+      .mockReturnValue('peer-local');
+
+    const firstConnection = await directory.configurePublicConnection(options);
+    const secondConnection =
+      await directory.configurePublicConnection(options);
+
+    expect(firstConnection).toBe(publicConnection);
+    expect(secondConnection).toBe(publicConnection);
+    expect(createPublicConnection).toHaveBeenCalledTimes(1);
+    expect(publicConnection.stop).not.toHaveBeenCalled();
   });
 });
 
