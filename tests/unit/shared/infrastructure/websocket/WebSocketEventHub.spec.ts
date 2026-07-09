@@ -119,6 +119,32 @@ describe('WebSocketEventHub', () => {
     expect(client.send).not.toHaveBeenCalled();
   });
 
+  it('forwards call signal acknowledgements with the authenticated identity', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const signalId = '68da3440-c60e-4fe3-b86a-2b8931ea345f';
+
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          signalId,
+          type: 'call_signal_ack',
+        }),
+      ),
+    );
+    await Promise.resolve();
+
+    expect(
+      clientMessageHandler.acknowledgeCallSignal,
+    ).toHaveBeenCalledWith(identityId.valueOf(), signalId);
+  });
+
   it('relays conversation typing indicators to other participants', async () => {
     const hub = new WebSocketEventHub();
     const senderIdentityId = await generateIdentityId();
@@ -569,6 +595,31 @@ describe('WebSocketEventHub', () => {
     );
   });
 
+  it('does not forward internal signal acknowledgements to clients', async () => {
+    const hub = new WebSocketEventHub();
+    const senderIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const senderClient = buildClient();
+    const recipientClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      senderIdentityId: senderIdentityId.valueOf(),
+      signalId: '68da3440-c60e-4fe3-b86a-2b8931ea345f',
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('calls.v1.signal.acknowledged');
+    hub.register(senderIdentityId, senderClient);
+    hub.register(recipientIdentityId, recipientClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(senderClient.send).not.toHaveBeenCalled();
+    expect(recipientClient.send).not.toHaveBeenCalled();
+  });
+
   it('emits conversation call events as timeline system items', async () => {
     const hub = new WebSocketEventHub();
     const participantIdentityId = await generateIdentityId();
@@ -817,6 +868,7 @@ function getClientMessageHandler(client: WebSocket): (message: Buffer) => void {
 
 function buildClientMessageHandler(): jest.Mocked<WebSocketClientMessageHandler> {
   return {
+    acknowledgeCallSignal: jest.fn().mockResolvedValue(undefined),
     findCommunityChannelEventRecipients: jest.fn().mockResolvedValue([]),
     findCommunityChannelTypingRecipients: jest.fn().mockResolvedValue([]),
     findConversationTypingRecipients: jest.fn().mockResolvedValue([]),

@@ -15,8 +15,7 @@ Feature: Send call signal
     And I sign the current call signal request
     When I POST a signal to the current call
     Then response code is equal to 200
-    And response contains a valid resource with the following fields
-      | status | active |
+    And response contains a pending call signal delivery
 
   Scenario: Reject signalling to an identity outside the call
     Given I register a test IPFS network "api-calls-invalid-signal-network"

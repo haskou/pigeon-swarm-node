@@ -1,13 +1,13 @@
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
-import { CallSignalSentAttributes } from './CallSignalSentAttributes';
+import { CallSignalAcknowledgedAttributes } from './CallSignalAcknowledgedAttributes';
 
-export class CallSignalSentEvent extends DomainEvent {
-  public static EVENT_NAME = 'calls.v1.signal.sent';
+export class CallSignalAcknowledgedEvent extends DomainEvent {
+  public static EVENT_NAME = 'calls.v1.signal.acknowledged';
 
   constructor(
     aggregateId: string,
-    attributes: CallSignalSentAttributes,
+    attributes: CallSignalAcknowledgedAttributes,
     eventId?: string,
     occurredOn?: Date,
     correlationId?: string,
@@ -24,6 +24,6 @@ export class CallSignalSentEvent extends DomainEvent {
   }
 
   public eventName(): string {
-    return CallSignalSentEvent.EVENT_NAME;
+    return CallSignalAcknowledgedEvent.EVENT_NAME;
   }
 }

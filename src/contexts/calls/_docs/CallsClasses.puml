@@ -18,6 +18,11 @@ package "calls" {
     class CallParticipantLeaseFinder
     class CallParticipantLeaseExpirationRegistrar
     class CallSignalSender
+    class CallSignalAcknowledger
+    class CallSignalDeliveryRegistrar
+    class CallSignalAcknowledgementRegistrar
+    class CallSignalDeliveryRetrier
+    class CallSignalDeliveryExpirationRegistrar
 
     CallStarter --> CallScopeResolver
   }
@@ -33,7 +38,7 @@ package "calls" {
       +join(identityId: IdentityId): void
       +leave(identityId: IdentityId): void
       +end(identityId: IdentityId): void
-      +sendSignal(senderIdentityId: IdentityId, recipientIdentityId: IdentityId, signalType: CallSignalType, payload: unknown): void
+      +sendSignal(signalId: CallSignalId, ownerNodeId: NodeId, senderIdentityId: IdentityId, recipientIdentityId: IdentityId, signalType: CallSignalType, payload: unknown): CallSignalDelivery
       +markTimedOut(timeout: Timestamp): IdentityId[]
       +toPrimitives(): object
     }
@@ -89,6 +94,18 @@ package "calls" {
       -channelId?: CommunityChannelId
     }
 
+    class CallSignalDelivery <AggregateRoot> {
+      -signalId: CallSignalId
+      -callId: CallId
+      -ownerNodeId: NodeId
+      -attempt: CallSignalDeliveryAttempt
+      -expiresAt: Timestamp
+      -acknowledgedAt?: Timestamp
+      +acknowledge(recipientIdentityId: IdentityId): boolean
+      +retry(now: Timestamp): boolean
+      +isRetryableAt(now: Timestamp): boolean
+    }
+
     interface CallRepository {
       +findById(id: CallId): Promise<Call?>
       +findActiveByParticipant(participantId: IdentityId): Promise<Call[]>
@@ -103,6 +120,13 @@ package "calls" {
       +save(lease: CallParticipantLease): Promise<void>
     }
 
+    interface CallSignalDeliveryRepository {
+      +findById(signalId: CallSignalId): Promise<CallSignalDelivery?>
+      +findRetryableOwnedBy(ownerNodeId: NodeId, now: Timestamp): Promise<CallSignalDelivery[]>
+      +purgeExpired(now: Timestamp): Promise<void>
+      +save(delivery: CallSignalDelivery): Promise<void>
+    }
+
     Call *--> CallParticipant
     Call *--> CallLifecycle
     Call *--> CallScope
@@ -110,6 +134,7 @@ package "calls" {
     CallParticipantLeaseRepository o--> CallParticipantLease
     CallParticipantLease *--> CallParticipantLeaseRoute
     CallParticipantLease *--> CallParticipantMediaConnection
+    CallSignalDeliveryRepository o--> CallSignalDelivery
   }
 
   package "events" {
@@ -122,6 +147,7 @@ package "calls" {
     class CallMissedEvent
     class CallSignalSentEvent
     class CallParticipantLeaseWasUpdatedEvent
+    class CallSignalAcknowledgedEvent
   }
 
   note right of Call
@@ -136,9 +162,11 @@ package "calls" {
 package "calls/infrastructure" {
   class OrbitDBCallRepository
   class InMemoryCallParticipantLeaseRepository
+  class InMemoryCallSignalDeliveryRepository
 
   OrbitDBCallRepository ..|> CallRepository
   InMemoryCallParticipantLeaseRepository ..|> CallParticipantLeaseRepository
+  InMemoryCallSignalDeliveryRepository ..|> CallSignalDeliveryRepository
 }
 
 CallStarter ..> CallRepository
@@ -155,5 +183,11 @@ CallParticipantLeaseReleaser ..> CallParticipantLeaseRepository
 CallParticipantLeaseFinder ..> CallParticipantLeaseRepository
 CallParticipantLeaseExpirationRegistrar ..> CallParticipantLeaseRepository
 CallSignalSender ..> CallRepository
+CallSignalSender ..> CallSignalDeliveryRepository
+CallSignalAcknowledger ..> CallSignalDeliveryRepository
+CallSignalDeliveryRegistrar ..> CallSignalDeliveryRepository
+CallSignalAcknowledgementRegistrar ..> CallSignalDeliveryRepository
+CallSignalDeliveryRetrier ..> CallSignalDeliveryRepository
+CallSignalDeliveryExpirationRegistrar ..> CallSignalDeliveryRepository
 
 @enduml

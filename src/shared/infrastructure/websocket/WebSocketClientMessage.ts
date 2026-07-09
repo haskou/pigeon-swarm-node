@@ -4,5 +4,6 @@ export type WebSocketClientMessage = {
   communityId?: string;
   conversationId?: string;
   scope?: string;
+  signalId?: string;
   type?: string;
 };

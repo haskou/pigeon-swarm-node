@@ -86,3 +86,56 @@ describe the selected ICE path observed by the browser for each remote
 participant. A report change is forwarded to participant WebSockets; identical
 heartbeat snapshots remain node-to-node only. Reports are cleared when the
 lease disconnects and are never persisted in OrbitDB/IPFS.
+
+## Call signal delivery
+
+`calls.v1.signal.sent` carries ephemeral WebRTC offers, answers and ICE
+candidates. Every node subscribes to the event so a recipient connected to a
+different node receives it immediately. The event is routed only through the
+call network selected by `networkId`; it is never persisted in OrbitDB or IPFS.
+
+The sender node retains a bounded in-memory delivery until the recipient
+acknowledges it or its 20-second TTL expires. It republishes the signal after
+1, 2, 4 and 8 seconds. Every attempt has a new domain event id but retains the
+same `signalId`, allowing recipients to acknowledge duplicates without
+applying SDP or ICE twice.
+
+Signal event attributes are:
+
+```json
+{
+  "attempt": 1,
+  "callId": "<callId>",
+  "expiresAt": 1770000020000,
+  "networkId": "<networkId>",
+  "ownerNodeId": "<nodeId>",
+  "participantIds": ["<senderIdentityId>", "<recipientIdentityId>"],
+  "payload": {},
+  "recipientIdentityId": "<recipientIdentityId>",
+  "senderIdentityId": "<senderIdentityId>",
+  "sentAt": 1770000000000,
+  "signalId": "<signalId>",
+  "signalType": "offer"
+}
+```
+
+After successfully applying the signal, the recipient sends
+`{"type":"call_signal_ack","signalId":"<signalId>"}` through its
+authenticated WebSocket. Its node verifies that the authenticated identity is
+the intended recipient and publishes `calls.v1.signal.acknowledged`:
+
+```json
+{
+  "acknowledgedAt": 1770000000500,
+  "callId": "<callId>",
+  "networkId": "<networkId>",
+  "ownerNodeId": "<senderNodeId>",
+  "recipientIdentityId": "<recipientIdentityId>",
+  "senderIdentityId": "<senderIdentityId>",
+  "signalId": "<signalId>"
+}
+```
+
+Acknowledgements are internal node-to-node events and are not forwarded to
+frontend WebSockets. If an acknowledgement is lost, the next signal retry
+causes the frontend to acknowledge the same `signalId` again.

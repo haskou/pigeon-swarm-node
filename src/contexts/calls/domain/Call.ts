@@ -1,12 +1,16 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CallLifecycle } from './CallLifecycle';
 import { CallParticipant } from './CallParticipant';
 import { CallScope } from './CallScope';
+import { CallSignal } from './CallSignal';
+import { CallSignalDelivery } from './CallSignalDelivery';
+import { CallSignalDeliveryRoute } from './CallSignalDeliveryRoute';
 import { CallParticipantNotFoundError } from './errors/CallParticipantNotFoundError';
 import { InactiveCallError } from './errors/InactiveCallError';
 import { CallEndedEvent } from './events/CallEndedEvent';
@@ -15,9 +19,9 @@ import { CallParticipantDeclinedEvent } from './events/CallParticipantDeclinedEv
 import { CallParticipantJoinedEvent } from './events/CallParticipantJoinedEvent';
 import { CallParticipantLeftEvent } from './events/CallParticipantLeftEvent';
 import { CallParticipantMissedEvent } from './events/CallParticipantMissedEvent';
-import { CallSignalSentEvent } from './events/CallSignalSentEvent';
 import { CallStartedEvent } from './events/CallStartedEvent';
 import { CallId } from './value-objects/CallId';
+import { CallSignalId } from './value-objects/CallSignalId';
 import { CallSignalType } from './value-objects/CallSignalType';
 import { CallStatus } from './value-objects/CallStatus';
 
@@ -216,25 +220,36 @@ export class Call extends AggregateRoot {
   }
 
   public sendSignal(
+    signalId: CallSignalId,
+    ownerNodeId: NodeId,
     senderIdentityId: IdentityId,
     recipientIdentityId: IdentityId,
     signalType: CallSignalType,
     payload: unknown,
-  ): void {
+    sentAt: Timestamp = Timestamp.now(),
+  ): CallSignalDelivery {
     this.assertActive();
     const sender = this.findParticipant(senderIdentityId);
     const recipient = this.findParticipant(recipientIdentityId);
 
     assert(sender?.isJoined(), new CallParticipantNotFoundError());
     assert(recipient?.canReceiveSignal(), new CallParticipantNotFoundError());
-    this.record(
-      new CallSignalSentEvent(this.id.valueOf(), {
-        ...this.baseEventAttributes(),
+
+    return CallSignalDelivery.send(
+      signalId,
+      new CallSignalDeliveryRoute(
+        this.id,
+        ownerNodeId,
+        this.networkId,
+        this.participants.map((participant) => participant.getIdentityId()),
+      ),
+      new CallSignal(
+        senderIdentityId,
+        recipientIdentityId,
+        signalType,
         payload,
-        recipientIdentityId: recipientIdentityId.valueOf(),
-        senderIdentityId: senderIdentityId.valueOf(),
-        signalType: signalType.valueOf(),
-      }),
+      ),
+      sentAt,
     );
   }
 

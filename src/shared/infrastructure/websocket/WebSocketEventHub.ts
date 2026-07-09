@@ -136,6 +136,10 @@ export class WebSocketEventHub {
     return event.eventName() === 'calls.v1.participant_lease.was_updated';
   }
 
+  private isCallSignalAcknowledgementEvent(event: DomainEvent): boolean {
+    return event.eventName() === 'calls.v1.signal.acknowledged';
+  }
+
   private isNodeWideEvent(event: DomainEvent): boolean {
     return event.eventName().startsWith('nodes.');
   }
@@ -179,6 +183,18 @@ export class WebSocketEventHub {
           `WebSocket typing indicator failed for "${identityId}": ${String(error)}`,
         );
       });
+
+      return;
+    }
+
+    if (message.type === 'call_signal_ack') {
+      this.acknowledgeCallSignal(identityId, message).catch(
+        (error: unknown) => {
+          Kernel.logger?.error(
+            `WebSocket call signal acknowledgement failed for "${identityId}": ${String(error)}`,
+          );
+        },
+      );
 
       return;
     }
@@ -412,6 +428,20 @@ export class WebSocketEventHub {
     );
   }
 
+  private async acknowledgeCallSignal(
+    identityId: string,
+    message: WebSocketClientMessage,
+  ): Promise<void> {
+    if (typeof message.signalId !== 'string') {
+      return;
+    }
+
+    await this.clientMessageHandler?.acknowledgeCallSignal(
+      identityId,
+      message.signalId,
+    );
+  }
+
   private parseClientMessage(
     rawMessage: RawData,
   ): WebSocketClientMessage | undefined {
@@ -435,25 +465,37 @@ export class WebSocketEventHub {
   private toClientMessage(
     message: Record<string, unknown>,
   ): WebSocketClientMessage | undefined {
-    if (message.type !== 'typing' && message.type !== 'identity_heartbeat') {
-      return undefined;
+    switch (message.type) {
+      case 'call_signal_ack':
+        return {
+          signalId: this.optionalString(message.signalId),
+          type: message.type,
+        };
+      case 'identity_heartbeat':
+        return {
+          active: this.optionalBoolean(message.active),
+          type: message.type,
+        };
+      case 'typing':
+        return {
+          active: this.optionalBoolean(message.active),
+          channelId: this.optionalString(message.channelId),
+          communityId: this.optionalString(message.communityId),
+          conversationId: this.optionalString(message.conversationId),
+          scope: this.optionalString(message.scope),
+          type: message.type,
+        };
+      default:
+        return undefined;
     }
+  }
 
-    return {
-      active: typeof message.active === 'boolean' ? message.active : undefined,
-      channelId:
-        typeof message.channelId === 'string' ? message.channelId : undefined,
-      communityId:
-        typeof message.communityId === 'string'
-          ? message.communityId
-          : undefined,
-      conversationId:
-        typeof message.conversationId === 'string'
-          ? message.conversationId
-          : undefined,
-      scope: typeof message.scope === 'string' ? message.scope : undefined,
-      type: message.type,
-    };
+  private optionalBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  private optionalString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
   }
 
   private unregister(identityId: string, client: WebSocket): void {
@@ -497,6 +539,10 @@ export class WebSocketEventHub {
 
   public publish(events: DomainEvent[]): void {
     for (const event of events) {
+      if (this.isCallSignalAcknowledgementEvent(event)) {
+        continue;
+      }
+
       const domainEventMessage: WebSocketRealtimeMessage = {
         event: JSON.parse(event.decode()),
         type: 'domain_event',

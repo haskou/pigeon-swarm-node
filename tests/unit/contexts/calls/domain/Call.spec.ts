@@ -11,11 +11,13 @@ import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedE
 import { InactiveCallError } from '@app/contexts/calls/domain/errors/InactiveCallError';
 import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
 import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
+import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('Call', () => {
@@ -29,6 +31,10 @@ describe('Call', () => {
     'MCowBQYDK2VwAyEACQNoYYTvUcCZYb3jBDUqqp/ZrcLEhWy0pYsEZ1kkgJg=',
   );
   const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
+  const nodeId = new NodeId('9278e9db-bc4d-4a8f-9577-7cad4386512f');
+  const signalId = new CallSignalId(
+    '68da3440-c60e-4fe3-b86a-2b8931ea345f',
+  );
   const scope = CallScope.conversation(
     new ConversationId('one-to-one:call-test'),
   );
@@ -123,14 +129,16 @@ describe('Call', () => {
     const call = Call.start(creator, networkId, scope, [recipient]);
 
     call.pullDomainEvents();
-    call.sendSignal(
+    const delivery = call.sendSignal(
+      signalId,
+      nodeId,
       creator,
       recipient,
       new CallSignalType('offer'),
       { sdp: 'offer-sdp' },
     );
 
-    const events = call.pullDomainEvents();
+    const events = delivery.pullDomainEvents();
 
     expect(events[0]).toBeInstanceOf(CallSignalSentEvent);
     expect(events[0].attributes).toMatchObject({
@@ -138,6 +146,7 @@ describe('Call', () => {
       recipientIdentityId: recipient.valueOf(),
       senderIdentityId: creator.valueOf(),
       signalType: 'offer',
+      signalId: signalId.valueOf(),
     });
   });
 
@@ -151,6 +160,8 @@ describe('Call', () => {
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallEndedEvent);
     expect(() =>
       call.sendSignal(
+        signalId,
+        nodeId,
         creator,
         recipient,
         new CallSignalType('answer'),

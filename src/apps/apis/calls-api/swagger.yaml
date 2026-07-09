@@ -160,13 +160,15 @@ paths:
               $ref: '#/components/schemas/PostCallSignalBody'
       responses:
         '200':
-          description: Signal accepted.
+          description: Signal accepted for retryable delivery.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CallResource'
+                $ref: '#/components/schemas/CallSignalDeliveryResource'
         '429':
           description: Signal rate limit exceeded.
+        '413':
+          description: Signal payload exceeds 64 KiB.
 components:
   parameters:
     CallId:
@@ -253,6 +255,19 @@ components:
             - ice_candidate
         payload:
           type: object
+    CallSignalDeliveryResource:
+      type: object
+      required:
+        - expiresAt
+        - signalId
+      properties:
+        expiresAt:
+          type: integer
+          format: int64
+          description: Epoch milliseconds after which retries stop.
+        signalId:
+          type: string
+          format: uuid
           additionalProperties: true
     CallResource:
       type: object

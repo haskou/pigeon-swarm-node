@@ -36,6 +36,12 @@ type SignedHeaders = {
   'x-timestamp': string;
 };
 
+type CallSignalDeliveryResult = {
+  attempts: number[];
+  expiresAt: number;
+  signalId: string;
+};
+
 const ROOT = path.resolve(__dirname, '../../..');
 const TMP_ROOT = path.join(ROOT, '.tmp', 'two-real-node-gossipsub-e2e');
 const NODE_COMMAND = process.execPath;
@@ -88,6 +94,40 @@ async function main(): Promise<void> {
       nodeAKeychain,
     );
     await waitForConversation(nodeB, nodeBIdentity, conversation.id);
+
+    const call = await request(
+      nodeA,
+      'POST',
+      '/calls/',
+      {
+        conversationId: conversation.id,
+        scopeType: 'conversation',
+      },
+      nodeAIdentity,
+    );
+    const callSignal = await receiveAndAcknowledgeCallSignal(
+      nodeB,
+      nodeBIdentity,
+      call.id,
+      () =>
+        request(
+          nodeA,
+          'POST',
+          `/calls/${call.id}/signals`,
+          {
+            payload: { sdp: 'node-a-offer-sdp' },
+            recipientIdentityId: nodeBIdentity?.id,
+            signalType: 'offer',
+          },
+          nodeAIdentity,
+        ),
+    );
+
+    if (new Set(callSignal.attempts).size !== 1 || callSignal.attempts[0] !== 1) {
+      throw new Error(
+        `Call signal retried after acknowledgement: attempts=${callSignal.attempts.join(',')}`,
+      );
+    }
 
     const nodeBMessages = listenForDomainEvents(
       nodeB,
@@ -160,6 +200,8 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           conversationId: conversation.id,
+          callId: call.id,
+          callSignalId: callSignal.signalId,
           messageFromA: messageFromA.id,
           offlineMessageFromA: offlineMessageFromA.id,
           messageFromB: messageFromB.id,
@@ -290,7 +332,16 @@ async function publishIdentity(
   const version = 1;
   const signaturePayload = {
     encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+    encryptedMasterKey: 'v1.e2e.encrypted-master-key',
     id,
+    masterKeyDerivation: {
+      passkeyPrf: {
+        algorithm: 'webauthn-prf',
+        credentialId: `${handle}-credential-id`,
+        salt: `${handle}-salt`,
+        version: 1,
+      },
+    },
     networks: [NETWORK_ID],
     previousIdentityExternalIdentifier: undefined as string | undefined,
     profile: {
@@ -532,6 +583,108 @@ async function listenForDomainEvents(
   });
 }
 
+async function receiveAndAcknowledgeCallSignal(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  callId: string,
+  sendSignal: () => Promise<{ expiresAt: number; signalId: string }>,
+): Promise<CallSignalDeliveryResult> {
+  const timestamp = String(Date.now());
+  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, {});
+  const query = new URLSearchParams({
+    identityId: identity.id,
+    signature,
+    timestamp,
+  });
+  const ws = new WebSocket(
+    `ws://127.0.0.1:${node.port}/ws?${query.toString()}`,
+  );
+
+  return new Promise<CallSignalDeliveryResult>((resolve, reject) => {
+    const attempts: number[] = [];
+    let delivery: { expiresAt: number; signalId: string } | undefined;
+    let settleTimeout: ReturnType<typeof setTimeout> | undefined;
+    let sent = false;
+    const timeout = setTimeout(() => {
+      ws.close();
+      reject(new Error(`${node.name} did not receive a signal for ${callId}`));
+    }, WAIT_TIMEOUT_MS);
+    const fail = (error: unknown): void => {
+      clearTimeout(timeout);
+
+      if (settleTimeout) {
+        clearTimeout(settleTimeout);
+      }
+
+      ws.close();
+      reject(error);
+    };
+
+    ws.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+
+      if (message.type === 'connection_ack' && !sent) {
+        sent = true;
+        sendSignal()
+          .then((result) => {
+            delivery = result;
+          })
+          .catch(fail);
+
+        return;
+      }
+
+      if (
+        message.type !== 'domain_event' ||
+        message.event?.type !== 'calls.v1.signal.sent' ||
+        message.event?.aggregate_id !== callId
+      ) {
+        return;
+      }
+
+      const attributes = message.event.attributes;
+
+      if (attributes.recipientIdentityId !== identity.id) {
+        return;
+      }
+
+      attempts.push(Number(attributes.attempt));
+      ws.send(
+        JSON.stringify({
+          signalId: attributes.signalId,
+          type: 'call_signal_ack',
+        }),
+      );
+
+      if (settleTimeout) {
+        return;
+      }
+
+      settleTimeout = setTimeout(() => {
+        clearTimeout(timeout);
+        ws.close();
+
+        if (!delivery || delivery.signalId !== attributes.signalId) {
+          reject(
+            new Error(
+              `Signal response/event mismatch: response=${delivery?.signalId} event=${attributes.signalId}`,
+            ),
+          );
+
+          return;
+        }
+
+        resolve({
+          attempts,
+          expiresAt: delivery.expiresAt,
+          signalId: delivery.signalId,
+        });
+      }, 3_000);
+    });
+    ws.on('error', fail);
+  });
+}
+
 async function request(
   node: NodeRuntime,
   method: string,
@@ -542,9 +695,12 @@ async function request(
   const canonicalPath = requestPath.split('?')[0];
   const response = await axios.request({
     data: body,
-    headers: signer
-      ? signHeaders(signer, method, canonicalPath, body ?? {})
-      : {},
+    headers: {
+      Connection: 'close',
+      ...(signer
+        ? signHeaders(signer, method, canonicalPath, body ?? {})
+        : {}),
+    },
     method,
     timeout: REQUEST_TIMEOUT_MS,
     url: `${node.baseUrl}${requestPath}`,
