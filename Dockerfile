@@ -1,7 +1,6 @@
 FROM node:24.15-bullseye AS base
-ENV NODE_OPTIONS="--max_old_space_size=4096 --report-on-fatalerror --report-on-signal --report-signal=SIGUSR1 --report-directory=/data/local_storage/node-reports --perf-basic-prof --interpreted-frames-native-stack"
+ENV NODE_OPTIONS=--max_old_space_size=4096
 WORKDIR /var/www/
-RUN mkdir -p /data/local_storage/node-reports && chown -R node:node /data
 COPY package.json yarn.lock ./
 # COPY .npmrc .
 
