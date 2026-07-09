@@ -1238,7 +1238,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
     await pubsub.subscribe(topic);
     pubsub.addEventListener('message', listener);
-    pubsub.addEventListener('gossipsub:message', listener);
   }
 
   public async blockPeer(peerId: string): Promise<void> {
