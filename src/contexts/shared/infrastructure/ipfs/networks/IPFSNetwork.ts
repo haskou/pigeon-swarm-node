@@ -156,6 +156,12 @@ export class IPFSNetwork {
     this.connection.onPeerConnected(listener);
   }
 
+  public onPeerDisconnected(
+    listener: (peerId: string) => Promise<void> | void,
+  ): void {
+    this.connection.onPeerDisconnected(listener);
+  }
+
   public getPeerId(): string {
     return this.connection.getPeerId();
   }

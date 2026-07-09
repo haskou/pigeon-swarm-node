@@ -10,7 +10,7 @@ export default class NodePeersFinder {
     private readonly nodeRepository: NodeRepository,
   ) {}
 
-  public async findActive(): Promise<ActiveNodePeers> {
+  public async find(): Promise<ActiveNodePeers> {
     const [localNode, peers] = await Promise.all([
       this.nodeRepository.loadLocalNode(),
       this.repository.findActive(

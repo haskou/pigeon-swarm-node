@@ -1,10 +1,16 @@
 import { PeersViewModel } from '@app/apps/apis/nodes-api/view-model/PeersViewModel';
 import { ActiveNodePeers } from '@app/contexts/nodes/application/find-peers/ActiveNodePeers';
+import { NodeNetworkSynchronizationStatus } from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationStatus';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 
 describe('PeersViewModel', () => {
+  const synchronizationStatus = new NodeNetworkSynchronizationStatus({
+    changedAt: 1780000000000,
+    networks: [],
+  });
+
   it('should expose peer capabilities, connection summary and node type', () => {
     const publicNetworkId = '550e8400-e29b-41d4-a716-446655440011';
     const privateNetworkId = '550e8400-e29b-41d4-a716-446655440012';
@@ -39,9 +45,16 @@ describe('PeersViewModel', () => {
     });
 
     expect(
-      new PeersViewModel(new ActiveNodePeers(localNode, [peer])).toResource(),
+      new PeersViewModel(
+        new ActiveNodePeers(localNode, [peer]),
+        synchronizationStatus,
+      ).toResource(),
     ).toEqual({
       ipfsPeers: [],
+      networkSynchronization: {
+        changedAt: 1780000000000,
+        networks: [],
+      },
       peers: [
         {
           capabilities: {
@@ -103,9 +116,16 @@ describe('PeersViewModel', () => {
     });
 
     expect(
-      new PeersViewModel(new ActiveNodePeers(localNode, [peer])).toResource(),
+      new PeersViewModel(
+        new ActiveNodePeers(localNode, [peer]),
+        synchronizationStatus,
+      ).toResource(),
     ).toEqual({
       ipfsPeers: [],
+      networkSynchronization: {
+        changedAt: 1780000000000,
+        networks: [],
+      },
       peers: [
         {
           capabilities: {
@@ -151,18 +171,25 @@ describe('PeersViewModel', () => {
     });
 
     expect(
-      new PeersViewModel(new ActiveNodePeers(localNode, []), [
-        {
-          id: '12D3KooWConnectedPeer',
-          networks: [
-            {
-              id: publicNetworkId,
-              name: 'public_0',
-              type: 'public',
-            },
-          ],
-        },
-      ]).toResource(),
+      new PeersViewModel(
+        new ActiveNodePeers(localNode, []),
+        new NodeNetworkSynchronizationStatus({
+            changedAt: 1780000000000,
+            networks: [
+              {
+                connectedPeerIds: ['12D3KooWConnectedPeer'],
+                convergedStoreCount: 0,
+                id: publicNetworkId,
+                name: 'public_0',
+                replicationPeerIds: [],
+                state: 'waiting_for_peers',
+                stores: [],
+                totalStoreCount: 0,
+                type: 'public',
+              },
+            ],
+          }),
+      ).toResource(),
     ).toEqual({
       ipfsPeers: [
         {
@@ -176,6 +203,22 @@ describe('PeersViewModel', () => {
           ],
         },
       ],
+      networkSynchronization: {
+        changedAt: 1780000000000,
+        networks: [
+          {
+            connectedPeerIds: ['12D3KooWConnectedPeer'],
+            convergedStoreCount: 0,
+            id: publicNetworkId,
+            name: 'public_0',
+            replicationPeerIds: [],
+            state: 'waiting_for_peers',
+            stores: [],
+            totalStoreCount: 0,
+            type: 'public',
+          },
+        ],
+      },
       peers: [],
     });
   });

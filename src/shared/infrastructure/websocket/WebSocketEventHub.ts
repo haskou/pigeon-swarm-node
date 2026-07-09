@@ -45,6 +45,8 @@ export class WebSocketEventHub {
 
   private readonly clients = new Map<string, Set<WebSocket>>();
 
+  private networkSynchronizationStatusProvider?: () => unknown;
+
   private debug(message: string): void {
     Kernel.logger?.debug(message);
   }
@@ -464,6 +466,23 @@ export class WebSocketEventHub {
     this.clientMessageHandler = handler;
   }
 
+  public setNetworkSynchronizationStatusProvider(
+    provider: () => unknown,
+  ): void {
+    this.networkSynchronizationStatusProvider = provider;
+  }
+
+  public publishNetworkSynchronizationStatus(status: unknown): void {
+    for (const identityClients of this.clients.values()) {
+      for (const client of identityClients) {
+        this.send(client, {
+          status,
+          type: 'network_synchronization_status',
+        });
+      }
+    }
+  }
+
   public publish(events: DomainEvent[]): void {
     for (const event of events) {
       const domainEventMessage: WebSocketRealtimeMessage = {
@@ -518,6 +537,13 @@ export class WebSocketEventHub {
       identityId: identityIdValue,
       type: 'connection_ack',
     });
+
+    if (this.networkSynchronizationStatusProvider) {
+      this.send(client, {
+        status: this.networkSynchronizationStatusProvider(),
+        type: 'network_synchronization_status',
+      });
+    }
   }
 }
 

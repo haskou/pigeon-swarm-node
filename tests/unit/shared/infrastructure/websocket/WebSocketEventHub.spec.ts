@@ -41,6 +41,47 @@ describe('WebSocketEventHub', () => {
     );
   });
 
+  it('sends the current network synchronization status when registering', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const status: { changedAt: number; networks: unknown[] } = {
+      changedAt: 1770000000000,
+      networks: [],
+    };
+
+    hub.setNetworkSynchronizationStatusProvider(() => status);
+    hub.register(identityId, client);
+
+    expect(client.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        status,
+        type: 'network_synchronization_status',
+      }),
+    );
+  });
+
+  it('broadcasts network synchronization changes to authenticated clients', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const status: { changedAt: number; networks: unknown[] } = {
+      changedAt: 1770000000000,
+      networks: [],
+    };
+
+    hub.register(identityId, client);
+    jest.clearAllMocks();
+    hub.publishNetworkSynchronizationStatus(status);
+
+    expect(client.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        status,
+        type: 'network_synchronization_status',
+      }),
+    );
+  });
+
   it('answers identity heartbeat messages on the same websocket client', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();

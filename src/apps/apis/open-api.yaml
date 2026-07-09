@@ -25,7 +25,7 @@ paths:
         - realtime
       summary: Open a signed WebSocket realtime connection
       description: |
-        WebSocket upgrade endpoint for realtime domain events.
+        WebSocket upgrade endpoint for realtime domain events and live network synchronization status.
 
         Browser clients authenticate with query parameters because custom
         WebSocket headers are not available in browsers. Non-browser clients may
@@ -40,6 +40,16 @@ paths:
         On success the server sends:
 
         `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
+
+        The server then sends the current network synchronization snapshot and
+        publishes a new one whenever libp2p connectivity or OrbitDB store
+        membership changes:
+
+        `{ "type": "network_synchronization_status", "status": { "changedAt": 1770000000000, "networks": [] } }`
+
+        `converged` describes all stores against peers currently known to this
+        node. It is not a global percentage because future and disconnected
+        peers cannot be known in an eventually consistent network.
 
         Clients may send `{ "type": "identity_heartbeat" }` over the open
         socket every 10 seconds. Include `"active": true` when the user has

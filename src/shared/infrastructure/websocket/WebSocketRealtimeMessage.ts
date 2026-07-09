@@ -13,6 +13,10 @@ export type WebSocketRealtimeMessage =
       type: 'domain_event';
     }
   | {
+      status: unknown;
+      type: 'network_synchronization_status';
+    }
+  | {
       active: boolean;
       conversationId: string;
       identityId: string;

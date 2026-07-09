@@ -60,7 +60,29 @@ describe('OrbitDBPrivateNetworkStores', () => {
       .spyOn(orbitDBRuntimeAdapter, 'createOrbitDB')
       .mockResolvedValue(orbitdb);
 
-    await OrbitDBPrivateNetworkStores.open(network);
+    const stores = await OrbitDBPrivateNetworkStores.open(network);
+
+    expect(
+      stores.getSynchronizationStores().map(({ name }) => name),
+    ).toEqual([
+      'calls',
+      'communities',
+      'contentReplication',
+      'conversations',
+      'heads',
+      'identities',
+      'keychains',
+      'messages',
+      'moderationLogs',
+      'notifications',
+      'notificationSettings',
+      'pins',
+      'polls',
+      'reactions',
+      'requests',
+      'stickerPacks',
+      'stickerUserLibraries',
+    ]);
 
     expect(() => {
       (openedDatabases[0].events as EventEmitter).emit(

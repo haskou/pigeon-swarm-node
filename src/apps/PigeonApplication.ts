@@ -10,6 +10,7 @@ import Scheduler from '@haskou/ddd-kernel/scheduler';
 import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
+import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
@@ -165,9 +166,22 @@ export default class PigeonApplication {
   }
 
   public configureWebSocketEventHub(): void {
+    const networkSynchronizationMonitor =
+      this.kernel.di.getService<NodeNetworkSynchronizationMonitor>(
+        NodeNetworkSynchronizationMonitor,
+      );
+
     webSocketEventHub.setClientMessageHandler(
       this.kernel.di.getService<WebSocketClientMessageHandler>(
         WebSocketClientMessageHandler,
+      ),
+    );
+    webSocketEventHub.setNetworkSynchronizationStatusProvider(() =>
+      networkSynchronizationMonitor.read().toPrimitives(),
+    );
+    networkSynchronizationMonitor.onChanged((status) =>
+      webSocketEventHub.publishNetworkSynchronizationStatus(
+        status.toPrimitives(),
       ),
     );
   }

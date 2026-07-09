@@ -181,7 +181,7 @@ paths:
       tags:
         - nodes
       summary: Get active peers
-      description: Returns nodes seen through heartbeat events during the active peer window plus live IPFS transport peers currently connected through libp2p. Network private keys are never included.
+      description: Returns nodes seen through heartbeat events, live IPFS transport peers, and per-store OrbitDB convergence against currently known replication peers. Network private keys are never included. Convergence is not a global percentage because future or disconnected peers are unknowable.
       responses:
         '200':
           description: Active peers.
@@ -411,10 +411,88 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ConnectedIpfsPeerNetworkResource'
+    NetworkSynchronizationStoreResource:
+      type: object
+      required:
+        - name
+        - peerIds
+        - state
+      properties:
+        name:
+          type: string
+        peerIds:
+          type: array
+          description: OrbitDB peers that completed the head exchange for this store.
+          items:
+            type: string
+        state:
+          $ref: '#/components/schemas/NetworkSynchronizationState'
+    NetworkSynchronizationState:
+      type: string
+      enum:
+        - converged
+        - syncing
+        - waiting_for_peers
+    NetworkSynchronizationNetworkResource:
+      type: object
+      required:
+        - connectedPeerIds
+        - convergedStoreCount
+        - id
+        - name
+        - replicationPeerIds
+        - state
+        - stores
+        - totalStoreCount
+        - type
+      properties:
+        connectedPeerIds:
+          type: array
+          description: Peers currently connected through libp2p transport.
+          items:
+            type: string
+        convergedStoreCount:
+          type: integer
+        id:
+          type: string
+        name:
+          type: string
+        replicationPeerIds:
+          type: array
+          description: Peers observed by at least one OrbitDB store.
+          items:
+            type: string
+        state:
+          $ref: '#/components/schemas/NetworkSynchronizationState'
+        stores:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkSynchronizationStoreResource'
+        totalStoreCount:
+          type: integer
+        type:
+          type: string
+          enum:
+            - private
+            - public
+    NetworkSynchronizationStatusResource:
+      type: object
+      required:
+        - changedAt
+        - networks
+      properties:
+        changedAt:
+          type: number
+          description: Unix timestamp in milliseconds for the last observed peer or OrbitDB membership change.
+        networks:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkSynchronizationNetworkResource'
     PeersResource:
       type: object
       required:
         - ipfsPeers
+        - networkSynchronization
         - peers
       properties:
         ipfsPeers:
@@ -422,6 +500,8 @@ components:
           description: Live IPFS transport peers grouped by connected network.
           items:
             $ref: '#/components/schemas/ConnectedIpfsPeerResource'
+        networkSynchronization:
+          $ref: '#/components/schemas/NetworkSynchronizationStatusResource'
         peers:
           type: array
           items:

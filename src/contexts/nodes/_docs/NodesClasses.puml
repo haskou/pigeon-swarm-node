@@ -150,13 +150,19 @@ package "nodes" {
     }
 
     class NodePeersFinder {
-      +findActive(): Promise<ActiveNodePeers>
+      +find(): Promise<ActiveNodePeers>
     }
 
     class ActiveNodePeers {
       +getLocalNode(): Node
       +getPeers(): NodePeer[]
     }
+
+    class NodeNetworkSynchronizationFinder {
+      +find(): NodeNetworkSynchronizationStatus
+    }
+
+    abstract class NodeNetworkSynchronizationMonitor
 
     NodeNetworkAdder --> NodeLoaderService
     NodeNetworkAdder --> NodeSaverService
@@ -175,7 +181,7 @@ package "nodes" {
     NodePeerRegistrar --> NodePeerRepository
     NodePeersFinder --> NodePeerRepository
     NodePeersFinder --> NodeRepository
-    NodePeersFinder ..> ActiveNodePeers
+    NodeNetworkSynchronizationFinder --> NodeNetworkSynchronizationMonitor
   }
 
   package "infrastructure" {

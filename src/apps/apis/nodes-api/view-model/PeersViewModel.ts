@@ -1,3 +1,4 @@
+import { NodeNetworkSynchronizationStatus } from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationStatus';
 import { ActiveNodePeers } from '@app/contexts/nodes/application/find-peers/ActiveNodePeers';
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import { NodePeerNetworkType } from '@app/contexts/nodes/domain/value-objects/NodePeerNetworkType';
@@ -13,8 +14,28 @@ import { PeersResource } from '../resources/PeersResource';
 export class PeersViewModel {
   public constructor(
     private readonly activePeers: ActiveNodePeers,
-    private readonly connectedIpfsPeers: ConnectedIpfsPeerResource[] = [],
+    private readonly networkSynchronization: NodeNetworkSynchronizationStatus,
   ) {}
+
+  private connectedIpfsPeers(): ConnectedIpfsPeerResource[] {
+    const peers = new Map<string, ConnectedIpfsPeerResource>();
+    const synchronization = this.networkSynchronization.toPrimitives();
+
+    for (const network of synchronization.networks) {
+      for (const peerId of network.connectedPeerIds) {
+        const peer = peers.get(peerId) ?? { id: peerId, networks: [] };
+
+        peer.networks.push({
+          id: network.id,
+          name: network.name,
+          type: network.type,
+        });
+        peers.set(peerId, peer);
+      }
+    }
+
+    return [...peers.values()];
+  }
 
   private capabilitiesFor(
     localNetworkTypes: Map<string, string>,
@@ -114,7 +135,8 @@ export class PeersViewModel {
     );
 
     return {
-      ipfsPeers: this.connectedIpfsPeers,
+      ipfsPeers: this.connectedIpfsPeers(),
+      networkSynchronization: this.networkSynchronization.toPrimitives(),
       peers: this.activePeers
         .getPeers()
         .map((peer) =>

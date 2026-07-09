@@ -6,6 +6,7 @@ import path from 'path';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBInstance } from './OrbitDBInstance';
 import { OrbitDBPrivateNetworkStoreAddresses } from './OrbitDBPrivateNetworkStoreAddresses';
+import { OrbitDBPrivateNetworkStoreName } from './OrbitDBPrivateNetworkStoreName';
 import { OrbitDBPrivateNetworkStoreSet } from './OrbitDBPrivateNetworkStoreSet';
 import { orbitDBRuntimeAdapter } from './OrbitDBRuntimeAdapter';
 
@@ -280,6 +281,37 @@ export class OrbitDBPrivateNetworkStores {
       stickerPacks: this.stickerPacks.address,
       stickerUserLibraries: this.stickerUserLibraries.address,
     };
+  }
+
+  public getSynchronizationStores(): Array<{
+    database: OrbitDBDatabase;
+    name: OrbitDBPrivateNetworkStoreName;
+  }> {
+    return [
+      { database: this.calls, name: 'calls' },
+      { database: this.communities, name: 'communities' },
+      { database: this.contentReplication, name: 'contentReplication' },
+      { database: this.conversations, name: 'conversations' },
+      { database: this.heads, name: 'heads' },
+      { database: this.identities, name: 'identities' },
+      { database: this.keychains, name: 'keychains' },
+      { database: this.messages, name: 'messages' },
+      { database: this.moderationLogs, name: 'moderationLogs' },
+      { database: this.notifications, name: 'notifications' },
+      {
+        database: this.notificationSettings,
+        name: 'notificationSettings',
+      },
+      { database: this.pins, name: 'pins' },
+      { database: this.polls, name: 'polls' },
+      { database: this.reactions, name: 'reactions' },
+      { database: this.requests, name: 'requests' },
+      { database: this.stickerPacks, name: 'stickerPacks' },
+      {
+        database: this.stickerUserLibraries,
+        name: 'stickerUserLibraries',
+      },
+    ];
   }
 
   public async stop(): Promise<void> {
