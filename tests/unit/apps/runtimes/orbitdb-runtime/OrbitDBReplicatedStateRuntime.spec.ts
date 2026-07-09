@@ -1,4 +1,5 @@
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
+import NodeNetworkSynchronizationMonitor from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -26,6 +27,7 @@ function fakeStores(): OrbitDBPrivateNetworkStores {
     communities: fakeStore(),
     contentReplication: fakeStore(),
     conversations: fakeStore(),
+    getSynchronizationStores: jest.fn().mockReturnValue([]),
     heads: fakeStore(),
     identities: fakeStore(),
     keychains: fakeStore(),
@@ -36,6 +38,15 @@ function fakeStores(): OrbitDBPrivateNetworkStores {
   };
 
   return stores as unknown as OrbitDBPrivateNetworkStores;
+}
+
+function fakeSynchronizationMonitor(): NodeNetworkSynchronizationMonitor {
+  return {
+    observe: jest.fn(),
+    onChanged: jest.fn(),
+    read: jest.fn(),
+    remove: jest.fn(),
+  } as unknown as NodeNetworkSynchronizationMonitor;
 }
 
 describe('OrbitDBReplicatedStateRuntime', () => {
@@ -72,6 +83,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
         repairCritical: jest.fn().mockResolvedValue({}),
         repairSecondary: jest.fn().mockResolvedValue({}),
       } as unknown as OrbitDBMetadataHeadRepairer,
+      fakeSynchronizationMonitor(),
     );
     await runtime.run();
 
@@ -85,7 +97,13 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     const stores = fakeStores();
     const network = {
       getId: jest.fn().mockReturnValue('network-1'),
+      getName: jest.fn().mockReturnValue('Private network'),
       getPeerId: jest.fn().mockReturnValue('peer-1'),
+      getPeers: jest.fn().mockReturnValue([]),
+      getType: jest.fn().mockReturnValue('private'),
+      isPrivate: jest.fn().mockReturnValue(true),
+      onPeerConnected: jest.fn(),
+      onPeerDisconnected: jest.fn(),
     };
     const networkRegistry = {
       getAll: jest.fn().mockReturnValue([network]),
@@ -103,6 +121,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
         repairCritical: jest.fn().mockResolvedValue({}),
         repairSecondary: jest.fn().mockResolvedValue({}),
       } as unknown as OrbitDBMetadataHeadRepairer,
+      fakeSynchronizationMonitor(),
     );
     const open = jest
       .spyOn(OrbitDBPrivateNetworkStores, 'open')
@@ -128,7 +147,13 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     const stores = fakeStores();
     const network = {
       getId: jest.fn().mockReturnValue('network-1'),
+      getName: jest.fn().mockReturnValue('Private network'),
       getPeerId: jest.fn().mockReturnValue('peer-1'),
+      getPeers: jest.fn().mockReturnValue([]),
+      getType: jest.fn().mockReturnValue('private'),
+      isPrivate: jest.fn().mockReturnValue(true),
+      onPeerConnected: jest.fn(),
+      onPeerDisconnected: jest.fn(),
     };
     const networkRegistry = {
       getAll: jest.fn().mockReturnValue([network]),
@@ -149,6 +174,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
         repairStore,
         repairSecondary: jest.fn().mockResolvedValue({}),
       } as unknown as OrbitDBMetadataHeadRepairer,
+      fakeSynchronizationMonitor(),
     );
 
     jest.spyOn(OrbitDBPrivateNetworkStores, 'open').mockResolvedValue(stores);

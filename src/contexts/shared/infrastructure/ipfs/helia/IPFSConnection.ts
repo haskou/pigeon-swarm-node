@@ -39,6 +39,7 @@ export interface IPFSConnection {
   getMultiaddrs(): string[];
   getHeliaCore(): HeliaInstance;
   onPeerConnected(listener: (peerId: string) => Promise<void> | void): void;
+  onPeerDisconnected(listener: (peerId: string) => Promise<void> | void): void;
   getPeers(): string[];
   getPeerId(): string;
   waitForPeers(timeoutMs?: number, signal?: AbortSignal): Promise<boolean>;

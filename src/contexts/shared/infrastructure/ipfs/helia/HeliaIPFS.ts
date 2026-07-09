@@ -29,6 +29,21 @@ import { ContentRetrievalProgressDetail } from './types/ContentRetrievalProgress
 import { ContentRetrievalProgressEvent } from './types/ContentRetrievalProgressEvent';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
+function peerIdFromConnectionEvent(event: Event): string {
+  const peerConnectionEvent = event as Event & {
+    detail?: {
+      peer?: { toString(): string };
+      remotePeer?: { toString(): string };
+    };
+  };
+
+  return (
+    peerConnectionEvent.detail?.remotePeer?.toString() ||
+    peerConnectionEvent.detail?.peer?.toString() ||
+    ''
+  );
+}
+
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly automaticProviderPublicationWindowMs = 5 * 60_000;
   private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
@@ -1247,20 +1262,25 @@ export abstract class HeliaIPFS implements IPFSConnection {
     listener: (peerId: string) => Promise<void> | void,
   ): void {
     this.heliaCore.libp2p.addEventListener('peer:connect', (event) => {
-      const peerConnectEvent = event as Event & {
-        detail?: {
-          peer?: { toString(): string };
-          remotePeer?: { toString(): string };
-        };
-      };
-      const peerId =
-        peerConnectEvent.detail?.remotePeer?.toString() ||
-        peerConnectEvent.detail?.peer?.toString() ||
-        '';
+      const peerId = peerIdFromConnectionEvent(event);
 
       void Promise.resolve(listener(peerId)).catch((error: unknown) => {
         Kernel.logger.warn(
           `IPFS peer connection listener failed: peerId=${peerId} error=${String(error)}`,
+        );
+      });
+    });
+  }
+
+  public onPeerDisconnected(
+    listener: (peerId: string) => Promise<void> | void,
+  ): void {
+    this.heliaCore.libp2p.addEventListener('peer:disconnect', (event) => {
+      const peerId = peerIdFromConnectionEvent(event);
+
+      void Promise.resolve(listener(peerId)).catch((error: unknown) => {
+        Kernel.logger.warn(
+          `IPFS peer disconnection listener failed: peerId=${peerId} error=${String(error)}`,
         );
       });
     });

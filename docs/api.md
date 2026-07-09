@@ -116,6 +116,26 @@ Connection acknowledgement:
 }
 ```
 
+The server immediately follows the acknowledgement with the current live
+network synchronization snapshot. It publishes the same message again whenever
+libp2p connectivity or OrbitDB store membership changes:
+
+```json
+{
+  "type": "network_synchronization_status",
+  "status": {
+    "changedAt": 1770000000000,
+    "networks": []
+  }
+}
+```
+
+The status is runtime telemetry and is not persisted. `converged` means that
+every OrbitDB store has completed its head exchange with every replication peer
+currently known to this node. It cannot represent a global percentage: peers
+that are offline, disconnected, or have not yet been discovered are unknowable
+in an eventually consistent network.
+
 The acknowledged `identityId` is normalized without PEM headers, footers or
 newlines. WebSocket routing uses that same normalized value for byte-for-byte
 recipient matching against event attributes such as `participantIds`,
@@ -762,6 +782,33 @@ Response:
       ]
     }
   ],
+  "networkSynchronization": {
+    "changedAt": 1773848829055,
+    "networks": [
+      {
+        "connectedPeerIds": ["<libp2pPeerId>"],
+        "convergedStoreCount": 16,
+        "id": "<networkId>",
+        "name": "private",
+        "replicationPeerIds": ["<libp2pPeerId>"],
+        "state": "syncing",
+        "stores": [
+          {
+            "name": "identities",
+            "peerIds": ["<libp2pPeerId>"],
+            "state": "converged"
+          },
+          {
+            "name": "messages",
+            "peerIds": [],
+            "state": "syncing"
+          }
+        ],
+        "totalStoreCount": 17,
+        "type": "private"
+      }
+    ]
+  },
   "peers": [
     {
       "capabilities": {
@@ -787,6 +834,17 @@ Response:
   ]
 }
 ```
+
+`connectedPeerIds` comes from live libp2p connections.
+`replicationPeerIds` is the union of peers observed by OrbitDB stores. Public
+libp2p DHT peers are not treated as database peers until OrbitDB observes them.
+For private networks, a newly connected transport peer keeps the state at
+`syncing` until it has joined every store. The three states are:
+
+- `waiting_for_peers`: no replication peer is currently known
+- `syncing`: at least one currently known peer has not joined every store
+- `converged`: every store has completed its head exchange with all currently
+  known replication peers
 
 Implemented:
 

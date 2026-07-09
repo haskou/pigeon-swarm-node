@@ -1,3 +1,4 @@
+import NodeNetworkSynchronizationMonitor from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
@@ -42,6 +43,7 @@ export default class OrbitDBReplicatedStateRuntime {
     private readonly networkRegistry: IPFSNetworkRegistry,
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly headRepairer: OrbitDBMetadataHeadRepairer,
+    private readonly synchronizationMonitor: NodeNetworkSynchronizationMonitor,
   ) {}
 
   private replicatedDocumentStores(stores: OrbitDBPrivateNetworkStores): Array<{
@@ -175,6 +177,21 @@ export default class OrbitDBReplicatedStateRuntime {
       stores,
     });
     await this.registry.register(networkId, stores);
+    this.synchronizationMonitor.observe({
+      getConnectedPeerIds: () => network.getPeers(),
+      id: network.getId(),
+      isPrivate: network.isPrivate(),
+      name: network.getName(),
+      onPeerConnected: (listener) => network.onPeerConnected(listener),
+      onPeerDisconnected: (listener) => network.onPeerDisconnected(listener),
+      stores: stores.getSynchronizationStores().map(({ database, name }) => ({
+        getPeerIds: () => [...(database.peers ?? new Set<string>())],
+        name,
+        onPeerJoined: (listener) => database.events.on('join', listener),
+        onPeerLeft: (listener) => database.events.on('leave', listener),
+      })),
+      type: network.getType(),
+    });
     this.subscribeToDocumentUpdates(networkId, stores);
     this.repairHeads(networkId);
     Kernel.logger.info(
@@ -269,6 +286,7 @@ export default class OrbitDBReplicatedStateRuntime {
     });
     this.networkRegistry.onNetworkRemoved(async (networkId) => {
       this.registeredNetworks.delete(networkId);
+      this.synchronizationMonitor.remove(networkId);
       for (const [repairKey, timeout] of [
         ...this.scheduledDocumentUpdateRepairTimeouts.entries(),
       ]) {
