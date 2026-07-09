@@ -38,10 +38,6 @@ export default class ContentPublisher {
     };
   }
 
-  private async networkIds(): Promise<NetworkId[]> {
-    return this.contentStorage.findNetworkIds();
-  }
-
   private async ownerNetworkIds(
     ownerIdentityId: IdentityId,
   ): Promise<NetworkId[]> {
@@ -119,31 +115,6 @@ export default class ContentPublisher {
           `Content replication upload completion registration failed: cid=${params.cid} error=${String(error)}`,
         );
       });
-  }
-
-  private async publish(
-    message: ContentPublishMessage,
-    document: ContentDocument,
-    context: string,
-  ): Promise<PublishedContent> {
-    const cid = await this.contentStorage.publishDocument(document);
-
-    await this.registerReplication({
-      cid: cid.valueOf(),
-      contentType: document.contentType,
-      context,
-      filename: message.filename,
-      message,
-      networkIds: await this.networkIds(),
-    });
-
-    return {
-      cid: cid.valueOf(),
-      contentType: document.contentType,
-      encrypted: document.encrypted,
-      filename: message.filename,
-      size: message.body.length,
-    };
   }
 
   private async publishBytes(

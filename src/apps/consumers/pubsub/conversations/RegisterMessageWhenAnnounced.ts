@@ -21,7 +21,7 @@ export default class RegisterMessageWhenAnnounced extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-message-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationMessageRegistrar,
   ) {
     super(eventConsumer);

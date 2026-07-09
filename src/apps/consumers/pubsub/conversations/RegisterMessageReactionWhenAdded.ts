@@ -11,7 +11,7 @@ export default class RegisterMessageReactionWhenAdded extends Consumer {
     'pigeon-swarm.register-message-reaction-when-added';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: MessageReactionRegistrar,
   ) {
     super(eventConsumer);

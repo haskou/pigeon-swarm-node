@@ -10,7 +10,7 @@ export default class RegisterKeychainWhenPublished extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-keychain-when-published';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly finder: CurrentKeychainFinder,
   ) {
     super(eventConsumer);

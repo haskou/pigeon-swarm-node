@@ -23,7 +23,7 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
     'pigeon-swarm.register-community-channel-message-reaction-when-removed';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly reactionRepository: CommunityMessageReactionRepository,

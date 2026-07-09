@@ -10,8 +10,8 @@ export default class SendPushNotificationWhenConversationMessageSent extends Sen
     'pigeon-swarm.send-push-when-conversation-message-sent';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
-    private readonly notificationDispatcher: PushNotificationDispatcher,
+    eventConsumer: DomainEventConsumer,
+    notificationDispatcher: PushNotificationDispatcher,
   ) {
     super(eventConsumer, notificationDispatcher);
   }

@@ -8,7 +8,6 @@ import { IdentitySigningKey } from '@app/contexts/identities/domain/value-object
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
-import { EncryptedKeyPair } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 

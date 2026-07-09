@@ -15,7 +15,7 @@ export default class RegisterCommunityMessageEdition extends Consumer {
     'pigeon-swarm.register-community-channel-message-edition-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
 
     private readonly messageRegistrar: CommunityChannelMessageCandidateRegistrar,

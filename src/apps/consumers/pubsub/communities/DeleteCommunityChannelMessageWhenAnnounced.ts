@@ -23,7 +23,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     'pigeon-swarm.delete-community-channel-message-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
 

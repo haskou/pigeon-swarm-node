@@ -23,7 +23,7 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
     'pigeon-swarm.register-community-channel-message-reaction-when-added';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly reactionRepository: CommunityMessageReactionRepository,

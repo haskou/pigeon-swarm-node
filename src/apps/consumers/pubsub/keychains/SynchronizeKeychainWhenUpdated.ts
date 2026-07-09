@@ -10,7 +10,7 @@ export default class SynchronizeKeychainWhenUpdated extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.synchronize-keychain-when-updated';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly finder: CurrentKeychainFinder,
   ) {
     super(eventConsumer);

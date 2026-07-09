@@ -10,8 +10,8 @@ export default class SendPushNotificationWhenCommunityMessageSent extends SendPu
     'pigeon-swarm.send-push-when-community-message-sent';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
-    private readonly notificationDispatcher: PushNotificationDispatcher,
+    eventConsumer: DomainEventConsumer,
+    notificationDispatcher: PushNotificationDispatcher,
   ) {
     super(eventConsumer, notificationDispatcher);
   }

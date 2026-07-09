@@ -26,12 +26,6 @@ export default class OrbitDBCommunityChannelMessageIndex {
     return fields.every((field) => typeof value[field] === 'string');
   }
 
-  private isStringArray(value: unknown): value is string[] {
-    return (
-      Array.isArray(value) && value.every((item) => typeof item === 'string')
-    );
-  }
-
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityChannelMessageDocument {

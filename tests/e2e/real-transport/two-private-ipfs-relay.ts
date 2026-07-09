@@ -22,13 +22,6 @@ type PrivateIPFSNode = {
   name: string;
 };
 
-type TestLogger = {
-  debug(message: string): void;
-  error(message: string): void;
-  info(message: string): void;
-  warn(message: string): void;
-};
-
 async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
   configureTestLogger();

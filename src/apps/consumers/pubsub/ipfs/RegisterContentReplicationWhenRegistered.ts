@@ -10,7 +10,7 @@ export default class RegisterContentReplicationWhenRegistered extends Consumer {
     'pigeon-swarm.register-content-replication-when-registered';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: ContentReplicationMetadataRegistrar,
   ) {
     super(eventConsumer);

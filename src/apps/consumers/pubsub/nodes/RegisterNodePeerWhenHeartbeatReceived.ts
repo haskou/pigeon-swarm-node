@@ -17,7 +17,7 @@ export default class RegisterNodePeerWhenHeartbeatReceived extends Consumer {
     'pigeon-swarm.register-node-peer-when-heartbeat-received';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: NodePeerRegistrar,
   ) {
     super(eventConsumer);

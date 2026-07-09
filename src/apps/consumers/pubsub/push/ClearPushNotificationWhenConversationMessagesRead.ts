@@ -10,8 +10,8 @@ export default class ClearPushNotificationWhenConversationMessagesRead extends S
     'pigeon-swarm.clear-push-when-conversation-messages-read';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
-    private readonly notificationDispatcher: PushNotificationDispatcher,
+    eventConsumer: DomainEventConsumer,
+    notificationDispatcher: PushNotificationDispatcher,
   ) {
     super(eventConsumer, notificationDispatcher);
   }

@@ -18,7 +18,7 @@ export default class RegisterConversationWhenAnnounced extends Consumer {
     'pigeon-swarm.register-conversation-when-announced';
 
   constructor(
-    private readonly eventConsumer: DomainEventConsumer,
+    eventConsumer: DomainEventConsumer,
     private readonly registrar: ConversationRegistrar,
   ) {
     super(eventConsumer);
