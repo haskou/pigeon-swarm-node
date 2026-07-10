@@ -45,6 +45,7 @@ export class PostCallSignalRoute extends CallRouteSupport {
         await this.rateLimiter.consume(new CallId(callId), senderIdentityId);
       },
     );
+
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(new CallSignalDeliveryViewModel(delivery).toResource());

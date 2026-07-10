@@ -255,6 +255,7 @@ components:
             - ice_candidate
         payload:
           type: object
+          additionalProperties: true
     CallSignalDeliveryResource:
       type: object
       required:
@@ -268,7 +269,6 @@ components:
         signalId:
           type: string
           format: uuid
-          additionalProperties: true
     CallResource:
       type: object
       required:

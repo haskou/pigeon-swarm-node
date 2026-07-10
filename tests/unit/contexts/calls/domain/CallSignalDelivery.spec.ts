@@ -96,6 +96,24 @@ describe('CallSignalDelivery', () => {
     expect(delivery.retry(new Timestamp(1_770_000_001_000))).toBe(false);
   });
 
+  it('records repeated acknowledgements without changing delivery state', () => {
+    const delivery = send();
+    const firstAcknowledgement = new Timestamp(1_770_000_000_500);
+    const repeatedAcknowledgement = new Timestamp(1_770_000_000_600);
+
+    delivery.pullDomainEvents();
+    delivery.acknowledge(recipientIdentityId, firstAcknowledgement);
+    delivery.pullDomainEvents();
+
+    expect(
+      delivery.acknowledge(recipientIdentityId, repeatedAcknowledgement),
+    ).toBe(true);
+    expect(delivery.pullDomainEvents()[0]).toBeInstanceOf(
+      CallSignalAcknowledgedEvent,
+    );
+    expect(delivery.isAcknowledged()).toBe(true);
+  });
+
   it('rejects acknowledgement from another identity', () => {
     const delivery = send();
 

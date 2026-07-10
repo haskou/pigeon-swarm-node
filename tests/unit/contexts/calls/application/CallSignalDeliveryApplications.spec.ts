@@ -89,6 +89,27 @@ describe('Call signal delivery applications', () => {
     ).toBe(true);
   });
 
+  it('republishes an acknowledgement when the recipient repeats it', async () => {
+    const repository = new InMemoryCallSignalDeliveryRepository();
+    const eventPublisher = mock<DomainEventPublisher>();
+    const registrar = new CallSignalDeliveryRegistrar(repository);
+    const acknowledger = new CallSignalAcknowledger(
+      repository,
+      eventPublisher,
+    );
+    const message = new CallSignalAcknowledgeMessage(
+      signalId,
+      recipientIdentityId,
+    );
+
+    jest.spyOn(Date, 'now').mockReturnValue(1_770_000_000_500);
+    await registrar.register(registerMessage());
+    await acknowledger.acknowledge(message);
+    await acknowledger.acknowledge(message);
+
+    expect(eventPublisher.publish).toHaveBeenCalledTimes(2);
+  });
+
   it('registers a remote acknowledgement idempotently', async () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const deliveryRegistrar = new CallSignalDeliveryRegistrar(repository);

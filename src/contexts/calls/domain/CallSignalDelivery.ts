@@ -102,16 +102,7 @@ export class CallSignalDelivery extends AggregateRoot {
     );
   }
 
-  public acknowledge(
-    recipientIdentityId: IdentityId,
-    acknowledgedAt: Timestamp = Timestamp.now(),
-  ): boolean {
-    this.assertRecipient(recipientIdentityId);
-
-    if (!this.schedule.acknowledge(acknowledgedAt)) {
-      return false;
-    }
-
+  private recordAcknowledged(acknowledgedAt: Timestamp): void {
     const primitives = this.toPrimitives();
 
     this.record(
@@ -125,6 +116,25 @@ export class CallSignalDelivery extends AggregateRoot {
         signalId: primitives.signalId,
       }),
     );
+  }
+
+  public acknowledge(
+    recipientIdentityId: IdentityId,
+    acknowledgedAt: Timestamp = Timestamp.now(),
+  ): boolean {
+    this.assertRecipient(recipientIdentityId);
+
+    if (this.schedule.isAcknowledged()) {
+      this.recordAcknowledged(acknowledgedAt);
+
+      return true;
+    }
+
+    if (!this.schedule.acknowledge(acknowledgedAt)) {
+      return false;
+    }
+
+    this.recordAcknowledged(acknowledgedAt);
 
     return true;
   }
