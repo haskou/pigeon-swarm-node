@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
+const runtimeFile =
+  'node_modules/@libp2p/kad-dht/dist/src/routing-table/k-bucket.js';
 const files = [
-  'node_modules/@libp2p/kad-dht/dist/src/routing-table/k-bucket.js',
+  runtimeFile,
   'node_modules/@libp2p/kad-dht/src/routing-table/k-bucket.ts',
 ];
 
@@ -73,11 +75,17 @@ const guardedTypeScriptTraversal = `  * toIterable (): Generator<Peer, void, und
     }
   }`;
 
+let runtimeFileWasFound = false;
+
 for (const relativePath of files) {
   const filePath = path.join(process.cwd(), relativePath);
 
   if (!fs.existsSync(filePath)) {
     continue;
+  }
+
+  if (relativePath === runtimeFile) {
+    runtimeFileWasFound = true;
   }
 
   const current = fs.readFileSync(filePath, 'utf8');
@@ -106,4 +114,8 @@ for (const relativePath of files) {
 
   fs.writeFileSync(filePath, next);
   console.log(`Patched ${relativePath}`);
+}
+
+if (!runtimeFileWasFound) {
+  throw new Error(`Unable to find Kademlia runtime file: ${runtimeFile}`);
 }
