@@ -1,3 +1,4 @@
+import OrbitDBIdentityMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBIdentityMetadataHeadRepairer';
 import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -45,7 +46,10 @@ describe('OrbitDBMetadataHeadRepairer', () => {
         reactions,
       }),
     );
-    repairer = new OrbitDBMetadataHeadRepairer(registry);
+    repairer = new OrbitDBMetadataHeadRepairer(
+      registry,
+      new OrbitDBIdentityMetadataHeadRepairer(registry),
+    );
   });
 
   afterEach(() => {

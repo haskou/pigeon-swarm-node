@@ -728,8 +728,9 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCTWV0YWRhdGFIZWFkUmVwYWlyZXJfX09yYml0REJNZXRhZGF0YUhlYWRSZXBhaXJlcg==:
-    class: /contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCSWRlbnRpdHlNZXRhZGF0YUhlYWRSZXBhaXJlcl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFIZWFkUmVwYWlyZXI=:
+    class: >-
+      /contexts/shared/infrastructure/orbitdb/OrbitDBIdentityMetadataHeadRepairer
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
@@ -1402,6 +1403,15 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZEhlYWRDYWNoZV9fT3JiaXREQlJlcGxpY2F0ZWRIZWFkQ2FjaGU=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCTWV0YWRhdGFIZWFkUmVwYWlyZXJfX09yYml0REJNZXRhZGF0YUhlYWRSZXBhaXJlcg==:
+    class: /contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCSWRlbnRpdHlNZXRhZGF0YUhlYWRSZXBhaXJlcl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFIZWFkUmVwYWlyZXI=
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2Zhdm9yaXRlLXN0aWNrZXJfX1N0aWNrZXJGYXZvcml0ZXJfX1N0aWNrZXJGYXZvcml0ZXI=:
     class: /contexts/stickers/application/favorite-sticker/StickerFavoriter
     arguments:

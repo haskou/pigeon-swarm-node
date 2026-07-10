@@ -1,11 +1,15 @@
 import { CriticalRepairResult } from './CriticalRepairResult';
+import OrbitDBIdentityMetadataHeadRepairer from './OrbitDBIdentityMetadataHeadRepairer';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 import { RepairResult } from './RepairResult';
 import { SecondaryRepairResult } from './SecondaryRepairResult';
 
 export default class OrbitDBMetadataHeadRepairer {
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {}
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly identityHeadRepairer: OrbitDBIdentityMetadataHeadRepairer,
+  ) {}
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -29,15 +33,6 @@ export default class OrbitDBMetadataHeadRepairer {
     return typeof value === 'number' ? value : undefined;
   }
 
-  private hasConflictingIdentityIds(
-    identityId: string | undefined,
-    embeddedIdentityId: string | undefined,
-  ): boolean {
-    return Boolean(
-      identityId && embeddedIdentityId && identityId !== embeddedIdentityId,
-    );
-  }
-
   private isStringArray(value: unknown): value is string[] {
     return (
       Array.isArray(value) && value.every((item) => typeof item === 'string')
@@ -51,37 +46,6 @@ export default class OrbitDBMetadataHeadRepairer {
     const value = document[attribute];
 
     return this.isStringArray(value) ? value : [];
-  }
-
-  private identityIdFrom(
-    document: Record<string, unknown>,
-  ): string | undefined {
-    const identityId = this.stringValue(document, 'identityId');
-    const identity = this.isRecord(document.identity)
-      ? document.identity
-      : undefined;
-    const embeddedIdentityId = identity
-      ? this.stringValue(identity, 'id')
-      : undefined;
-    const projectedIdentityId = this.isProjectedIdentityRecord(document)
-      ? this.stringValue(document, 'id')
-      : undefined;
-
-    if (this.hasConflictingIdentityIds(identityId, embeddedIdentityId)) {
-      return undefined;
-    }
-
-    return identityId || embeddedIdentityId || projectedIdentityId;
-  }
-
-  private isProjectedIdentityRecord(
-    document: Record<string, unknown>,
-  ): boolean {
-    return (
-      Boolean(this.stringValue(document, 'cid')) &&
-      Boolean(this.stringValue(document, 'id')) &&
-      Boolean(this.stringValue(document, 'lastEventId'))
-    );
   }
 
   private ownerIdentityIdFrom(
@@ -231,47 +195,6 @@ export default class OrbitDBMetadataHeadRepairer {
       Boolean(this.stringValue(document, 'id')) &&
       typeof document.createdAt === 'number'
     );
-  }
-
-  private async repairIdentityHeads(): Promise<number> {
-    const documents = await this.queryRepairDocuments(
-      'identities',
-      (document) =>
-        this.isLiveDocument(document) && Boolean(this.identityIdFrom(document)),
-      'OrbitDBMetadataHeadRepairer.repairIdentityHeads',
-    );
-
-    const latestDocuments = this.deduplicateBy(documents, (document) =>
-      this.identityIdFrom(document),
-    );
-
-    for (const document of latestDocuments) {
-      const identityId = this.identityIdFrom(document);
-
-      if (!identityId) {
-        continue;
-      }
-
-      const networkIds = this.networkIdsFrom(document);
-
-      await this.registry.putHead(
-        `identity:${identityId}`,
-        document,
-        networkIds,
-      );
-
-      const handle = this.stringValue(document, 'handle');
-
-      if (handle) {
-        await this.registry.putHead(
-          `identity-handle:${handle}`,
-          document,
-          networkIds,
-        );
-      }
-    }
-
-    return latestDocuments.length;
   }
 
   private communityDocumentsFromIndex(
@@ -1398,7 +1321,7 @@ export default class OrbitDBMetadataHeadRepairer {
       }),
       conversations: () => this.repairConversationStore(),
       identities: async () => ({
-        identities: await this.repairIdentityHeads(),
+        identities: await this.identityHeadRepairer.repair(),
       }),
       keychains: async () => ({
         keychains: await this.repairKeychainHeads(),
@@ -1418,7 +1341,7 @@ export default class OrbitDBMetadataHeadRepairer {
     const [communities, identities, keychains, notificationIndexes] =
       await Promise.all([
         this.repairCommunityHeads(),
-        this.repairIdentityHeads(),
+        this.identityHeadRepairer.repair(),
         this.repairKeychainHeads(),
         this.repairNotificationIndexes(),
       ]);
