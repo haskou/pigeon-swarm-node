@@ -576,6 +576,22 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return identity;
   }
 
+  public async findCandidateByExternalIdentifier(
+    id: IdentityId,
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<IdentityCandidate> {
+    const candidate = await this.findCandidateFromCid(
+      id,
+      new IPFSId(externalIdentifier.valueOf()),
+    );
+
+    if (!candidate) {
+      throw new IdentityNotFoundError(externalIdentifier.valueOf());
+    }
+
+    return new IdentityCandidate(externalIdentifier, candidate);
+  }
+
   public async findCandidateReferencesById(
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {

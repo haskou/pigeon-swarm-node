@@ -322,8 +322,8 @@ Event contracts used by frontend:
 | `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                        |
 | `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                |
 | `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                |
-| `identities.v1.identity.was_created`                  | identity id       | `networkIds`                                                                                                         |
-| `identities.v1.identity.was_updated`                  | identity id       | `networkIds`                                                                                                         |
+| `identities.v1.identity.was_created`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                |
+| `identities.v1.identity.was_updated`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                |
 | `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                            |
 | `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                      |
 | `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                |

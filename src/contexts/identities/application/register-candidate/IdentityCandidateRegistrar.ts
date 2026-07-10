@@ -7,6 +7,9 @@ export default class IdentityCandidateRegistrar {
   public async register(
     message: RegisterIdentityCandidateMessage,
   ): Promise<void> {
-    await this.repository.findByExternalIdentifier(message.externalIdentifier);
+    await this.repository.findCandidateByExternalIdentifier(
+      message.identityId,
+      message.externalIdentifier,
+    );
   }
 }

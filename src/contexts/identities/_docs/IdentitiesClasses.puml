@@ -73,6 +73,7 @@ package "identities.domain" {
     +findByHandle(handle: ProfileHandle): Promise<Identity>
     +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
     +findCandidateReferencesById(id): Promise<IdentityCandidate[]>
+    +findCandidateByExternalIdentifier(id, externalIdentifier): Promise<IdentityCandidate>
     +findCandidateByHandle(handle): Promise<IdentityCandidate>
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
@@ -96,10 +97,6 @@ package "identities.domain" {
     network are rejected.
   end note
 
-  class IdentityRegistrarService {
-    +register(identityId): Promise<Identity>
-  }
-
   Identity *--> Profile
   Identity o--> NetworkId
   Identity --> IdentityExternalIdentifier
@@ -115,8 +112,6 @@ package "identities.domain" {
   IdentitySaverService --> IdentityRepository
   IdentityFinderService --> IdentityRepository
   IdentityFinderService --> IdentityResolutionDomainService
-  IdentityRegistrarService --> IdentityRepository
-  IdentityRegistrarService --> IdentityResolutionDomainService
 }
 
 package "identities.application" {
@@ -129,8 +124,8 @@ package "identities.application" {
     +publish(message: IdentityPublishMessage): Promise<Identity>
   }
 
-  class RegisterPublishedIdentity {
-    +register(message: RegisterPublishedIdentityMessage): Promise<Identity>
+  class IdentityCandidateRegistrar {
+    +register(message: RegisterIdentityCandidateMessage): Promise<void>
   }
 
   class IdentityNetworksFinder {
@@ -140,7 +135,7 @@ package "identities.application" {
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
   IdentityFinder --> IdentityFinderService
-  RegisterPublishedIdentity --> IdentityRegistrarService
+  IdentityCandidateRegistrar --> IdentityRepository
   IdentityNetworksFinder --> IdentityNetworkRepository
 }
 
@@ -190,6 +185,7 @@ package "identities.infrastructure" {
     +findById(id: IdentityId): Promise<Identity>
     +findByHandle(handle: ProfileHandle): Promise<Identity>
     +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
+    +findCandidateByExternalIdentifier(id, externalIdentifier): Promise<IdentityCandidate>
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 
