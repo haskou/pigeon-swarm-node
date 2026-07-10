@@ -11,7 +11,9 @@ import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 import CallParticipantLeaseRepository from '../contexts/calls/domain/repositories/CallParticipantLeaseRepository';
+import CallSignalDeliveryRepository from '../contexts/calls/domain/repositories/CallSignalDeliveryRepository';
 import InMemoryCallParticipantLeaseRepository from '../contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
+import InMemoryCallSignalDeliveryRepository from '../contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
@@ -148,6 +150,10 @@ export default class PigeonApplication {
     await this.kernel.dependencyInjection({
       containerBuild: this.kernel.environment.CONTAINER_BUILD,
       overrides: [
+        {
+          token: CallSignalDeliveryRepository,
+          useClass: InMemoryCallSignalDeliveryRepository,
+        },
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },
         {

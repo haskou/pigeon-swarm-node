@@ -176,6 +176,21 @@ messages are ignored. Recommended client interval: 10 seconds, reconnecting
 with a fresh signed WebSocket URL if no `heartbeat_ack` arrives within 2
 intervals.
 
+Call signal acknowledgement:
+
+```json
+{
+  "signalId": "<signalId>",
+  "type": "call_signal_ack"
+}
+```
+
+Send it only after the corresponding `calls.v1.signal.sent` payload has been
+successfully applied to the local `RTCPeerConnection`. The backend derives the
+recipient from the authenticated WebSocket and ignores client-supplied identity
+fields. A retry uses the same `signalId`: acknowledge it again, but do not
+apply its SDP or ICE payload twice.
+
 Ephemeral typing indicators:
 
 ```json
@@ -285,7 +300,8 @@ Event contracts used by frontend:
 | `calls.v1.participant.missed`                         | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status`                                       |
 | `calls.v1.call.ended`                                 | call id           | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status`                                      |
 | `calls.v1.call.missed`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status`                                      |
-| `calls.v1.signal.sent`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload` |
+| `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `networkId`, `ownerNodeId`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
+| `calls.v1.signal.acknowledged`                        | call id           | `signalId`, `callId`, `networkId`, `ownerNodeId`, `senderIdentityId`, `recipientIdentityId`, `acknowledgedAt` |
 | `calls.v1.participant_lease.was_updated`              | call lease id     | `callId`, `networkId`, `participantIds`, `participantIdentityId`, `ownerNodeId`, `connectionChanged`, `mediaConnectionsChanged`, `mediaConnections`, `status` |
 | `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
 | `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
@@ -534,11 +550,23 @@ Implemented:
 - `signalType` is one of `offer`, `answer` or `ice_candidate`
 - sender and recipient must both be current call participants
 - backend does not inspect SDP/ICE payloads
+- signal request bodies are limited to 64 KiB
 - signalling is rate-limited per `(callId, senderIdentityId)` with
   `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; `0` disables the
   limit for local/debug runs
-- sending a signal emits `calls.v1.signal.sent` only to
-  `recipientIdentityId`
+- the response contains `signalId` and `expiresAt`; it no longer serializes the
+  entire call for every SDP or ICE message
+- sending subscribes all network nodes to `calls.v1.signal.sent`, while
+  WebSocket delivery remains restricted to `recipientIdentityId`
+- unacknowledged signals are retried after 1, 2, 4 and 8 seconds with the same
+  `signalId` and a new event id; delivery expires after 20 seconds
+- the recipient acknowledges successful processing over the authenticated
+  WebSocket with `{ "type": "call_signal_ack", "signalId": "<uuid>" }`
+- acknowledgements emit the internal
+  `calls.v1.signal.acknowledged` event; they stop retries but are not forwarded
+  to frontend WebSockets
+- pending deliveries, acknowledgement state and retry schedules live only in
+  bounded in-memory state and never write to OrbitDB
 
 ### Missed calls
 

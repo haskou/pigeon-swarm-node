@@ -1,5 +1,7 @@
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
+import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/acknowledge-signal/messages/CallSignalAcknowledgeMessage';
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
@@ -13,16 +15,19 @@ describe('WebSocketClientMessageHandler', () => {
   let conversationRepository: MockProxy<ConversationRepository>;
   let communityRepository: MockProxy<CommunityRepository>;
   let heartbeatRecorder: MockProxy<IdentityPresenceHeartbeatRecorder>;
+  let signalAcknowledger: MockProxy<CallSignalAcknowledger>;
   let handler: WebSocketClientMessageHandler;
 
   beforeEach(() => {
     conversationRepository = mock<ConversationRepository>();
     communityRepository = mock<CommunityRepository>();
     heartbeatRecorder = mock<IdentityPresenceHeartbeatRecorder>();
+    signalAcknowledger = mock<CallSignalAcknowledger>();
     handler = new WebSocketClientMessageHandler(
       conversationRepository,
       communityRepository,
       heartbeatRecorder,
+      signalAcknowledger,
     );
   });
 
@@ -155,6 +160,18 @@ describe('WebSocketClientMessageHandler', () => {
 
     expect(heartbeatRecorder.record).toHaveBeenCalledWith(
       new IdentityPresenceHeartbeatMessage(identityId, true),
+    );
+  });
+
+  it('should acknowledge call signals as the authenticated identity', async () => {
+    const identityId =
+      'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    const signalId = '68da3440-c60e-4fe3-b86a-2b8931ea345f';
+
+    await handler.acknowledgeCallSignal(identityId, signalId);
+
+    expect(signalAcknowledger.acknowledge).toHaveBeenCalledWith(
+      new CallSignalAcknowledgeMessage(signalId, identityId),
     );
   });
 });

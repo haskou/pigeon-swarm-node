@@ -60,6 +60,14 @@ paths:
         Heartbeat messages are not signed because the WebSocket upgrade already
         authenticated the connection.
 
+        After successfully applying a `calls.v1.signal.sent` domain event,
+        clients must send
+        `{ "type": "call_signal_ack", "signalId": "<signalId>" }`.
+        The authenticated socket identity must match the event
+        `recipientIdentityId`. Retries retain the same `signalId`, so clients
+        must acknowledge every duplicate while applying its SDP/ICE payload
+        only once.
+
         Clients may also send ephemeral typing indicators. Conversation typing:
         `{ "type": "typing", "scope": "conversation", "conversationId": "<conversationId>", "active": true }`.
         Community text channel typing:

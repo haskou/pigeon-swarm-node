@@ -1,3 +1,5 @@
+import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
+import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/acknowledge-signal/messages/CallSignalAcknowledgeMessage';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -14,6 +16,7 @@ export default class WebSocketClientMessageHandler {
     private readonly conversationRepository: ConversationRepository,
     private readonly communityRepository: CommunityRepository,
     private readonly heartbeatRecorder: IdentityPresenceHeartbeatRecorder,
+    private readonly signalAcknowledger: CallSignalAcknowledger,
   ) {}
 
   private excludeIdentity(
@@ -128,6 +131,15 @@ export default class WebSocketClientMessageHandler {
   ): Promise<void> {
     await this.heartbeatRecorder.record(
       new IdentityPresenceHeartbeatMessage(identityId, active),
+    );
+  }
+
+  public async acknowledgeCallSignal(
+    identityId: string,
+    signalId: string,
+  ): Promise<void> {
+    await this.signalAcknowledger.acknowledge(
+      new CallSignalAcknowledgeMessage(signalId, identityId),
     );
   }
 }

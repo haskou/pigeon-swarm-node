@@ -3596,6 +3596,14 @@ export default class Definitions {
     expect(this.response.data).to.equal('');
   }
 
+  @then('response contains a pending call signal delivery')
+  public responseContainsPendingCallSignalDelivery(): void {
+    expect(this.response.data.signalId).to.match(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(this.response.data.expiresAt).to.be.greaterThan(Date.now());
+  }
+
   @then('response contains a valid resource with the following fields')
   public responseContainsValidResource(table: DataTable): void {
     const rows = table.rows();

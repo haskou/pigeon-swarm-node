@@ -14,7 +14,7 @@ import {
 
 import { PostCallSignalBody } from '../bodies/PostCallSignalBody';
 import CallSignalRateLimiter from '../CallSignalRateLimiter';
-import { CallViewModel } from '../view-model/CallViewModel';
+import { CallSignalDeliveryViewModel } from '../view-model/CallSignalDeliveryViewModel';
 import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
@@ -28,12 +28,12 @@ export class PostCallSignalRoute extends CallRouteSupport {
   @Post('/:callId/signals')
   public async sendSignal(
     @Param('callId') callId: string,
-    @Body() body: PostCallSignalBody,
+    @Body({ options: { limit: '64kb' } }) body: PostCallSignalBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const senderIdentityId = await this.authenticate(request);
-    const call = await this.sender.send(
+    const delivery = await this.sender.send(
       new CallSignalSendMessage(
         callId,
         senderIdentityId.valueOf(),
@@ -45,10 +45,9 @@ export class PostCallSignalRoute extends CallRouteSupport {
         await this.rateLimiter.consume(new CallId(callId), senderIdentityId);
       },
     );
-    const leases = await this.findParticipantLeases([call]);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallViewModel(call, leases).toResource());
+      .send(new CallSignalDeliveryViewModel(delivery).toResource());
   }
 }
