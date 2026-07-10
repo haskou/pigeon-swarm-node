@@ -1,3 +1,5 @@
+import { CallParticipantMediaConnectionResource } from './CallParticipantMediaConnectionResource';
+
 export interface CallResource {
   createdAt: number;
   creatorIdentityId: string;
@@ -7,11 +9,13 @@ export interface CallResource {
   networkId: string;
   participantIds: string[];
   participants: Array<{
+    connected: boolean;
     declinedAt?: number;
     identityId: string;
     joinedAt?: number;
-    lastSeenAt?: number;
+    lastHeartbeatAt?: number;
     leftAt?: number;
+    mediaConnections: CallParticipantMediaConnectionResource[];
     missedAt?: number;
     status: string;
   }>;

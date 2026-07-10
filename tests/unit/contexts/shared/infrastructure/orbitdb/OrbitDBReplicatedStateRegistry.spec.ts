@@ -1023,7 +1023,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         {
           identityId: 'identity-1',
           joinedAt: 20,
-          lastSeenAt: 20,
           status: 'joined',
         },
       ],
@@ -1036,7 +1035,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         {
           identityId: 'identity-1',
           joinedAt: 20,
-          lastSeenAt: 20,
           status: 'joined',
         },
       ],

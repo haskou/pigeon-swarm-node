@@ -495,6 +495,80 @@ describe('WebSocketEventHub', () => {
     expect(otherParticipantClient.send).not.toHaveBeenCalled();
   });
 
+  it('sends call lease connection transitions to call participants', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-lease-id', {
+      connectionChanged: true,
+      participantIds: [participantIdentityId.valueOf()],
+      status: 'disconnected',
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('calls.v1.participant_lease.was_updated');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(participantClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+  });
+
+  it('does not send unchanged call lease heartbeat renewals to clients', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-lease-id', {
+      connectionChanged: false,
+      participantIds: [participantIdentityId.valueOf()],
+      status: 'connected',
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('calls.v1.participant_lease.was_updated');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(participantClient.send).not.toHaveBeenCalled();
+  });
+
+  it('sends call media connection changes to call participants', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-lease-id', {
+      connectionChanged: false,
+      mediaConnectionsChanged: true,
+      participantIds: [participantIdentityId.valueOf()],
+      status: 'connected',
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('calls.v1.participant_lease.was_updated');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(participantClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+  });
+
   it('emits conversation call events as timeline system items', async () => {
     const hub = new WebSocketEventHub();
     const participantIdentityId = await generateIdentityId();

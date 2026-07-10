@@ -9,7 +9,6 @@ import { CronExpression } from '@haskou/ddd-kernel/scheduler';
 import { Timestamp } from '@haskou/value-objects';
 
 const callRingingTimeoutMs = 60_000;
-const callParticipantHeartbeatTimeoutMs = 5_000;
 
 export default class CallTimeoutScheduler extends Scheduler {
   constructor(
@@ -18,24 +17,6 @@ export default class CallTimeoutScheduler extends Scheduler {
     private readonly notificationRepository: NotificationRepository,
   ) {
     super(new ReplicatedStateSchedulerErrorPolicy());
-  }
-
-  private async markTimedOutJoinedParticipants(): Promise<void> {
-    const threshold = new Timestamp(
-      Date.now() - callParticipantHeartbeatTimeoutMs,
-    );
-    const calls = await this.callRepository.findTimedOutJoinedCalls(threshold);
-
-    for (const call of calls) {
-      const leftParticipants = call.markInactiveParticipants(threshold);
-
-      if (leftParticipants.length === 0) {
-        continue;
-      }
-
-      await this.callRepository.save(call);
-      await this.eventPublisher.publish(call.pullDomainEvents());
-    }
   }
 
   private async markTimedOutRingingParticipants(): Promise<void> {
@@ -70,7 +51,6 @@ export default class CallTimeoutScheduler extends Scheduler {
   }
 
   public async execute(): Promise<void> {
-    await this.markTimedOutJoinedParticipants();
     await this.markTimedOutRingingParticipants();
   }
 

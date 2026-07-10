@@ -151,17 +151,6 @@ export class Call extends AggregateRoot {
     );
   }
 
-  public recordParticipantHeartbeat(identityId: IdentityId): void {
-    this.assertActive();
-    const participant = this.findParticipant(identityId);
-
-    assert(
-      participant !== undefined && participant.isJoined(),
-      new CallParticipantNotFoundError(),
-    );
-    participant.recordHeartbeat();
-  }
-
   public joinOrAdd(identityId: IdentityId): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
@@ -253,6 +242,10 @@ export class Call extends AggregateRoot {
     return this.id;
   }
 
+  public getNetworkId(): NetworkId {
+    return this.networkId;
+  }
+
   public getCommunityChannelId(): CommunityChannelId | undefined {
     return this.scope.getCommunityChannelId();
   }
@@ -263,8 +256,28 @@ export class Call extends AggregateRoot {
       .map((participant) => participant.getIdentityId());
   }
 
+  public getParticipantIds(): IdentityId[] {
+    return this.participants.map((participant) => participant.getIdentityId());
+  }
+
   public hasParticipant(identityId: IdentityId): boolean {
     return Boolean(this.findParticipant(identityId));
+  }
+
+  public isActive(): boolean {
+    return this.lifecycle.getStatus().isActive();
+  }
+
+  public hasJoinedParticipant(identityId: IdentityId): boolean {
+    return this.findParticipant(identityId)?.isJoined() === true;
+  }
+
+  public assertParticipantCanHeartbeat(identityId: IdentityId): void {
+    this.assertActive();
+    assert(
+      this.hasJoinedParticipant(identityId),
+      new CallParticipantNotFoundError(),
+    );
   }
 
   public markTimedOut(timeout: Timestamp): IdentityId[] {
@@ -296,28 +309,6 @@ export class Call extends AggregateRoot {
     }
 
     return missedParticipants.map((participant) => participant.getIdentityId());
-  }
-
-  public markInactiveParticipants(timeoutThreshold: Timestamp): IdentityId[] {
-    this.assertActive();
-    const inactiveParticipants = this.participants.filter((participant) =>
-      participant.hasTimedOut(timeoutThreshold),
-    );
-    const leftAt = Timestamp.now();
-
-    for (const participant of inactiveParticipants) {
-      participant.leave(leftAt);
-      this.record(
-        new CallParticipantLeftEvent(this.id.valueOf(), {
-          ...this.baseEventAttributes(),
-          leftIdentityId: participant.getIdentityId().valueOf(),
-        }),
-      );
-    }
-
-    return inactiveParticipants.map((participant) =>
-      participant.getIdentityId(),
-    );
   }
 
   public shouldRecordMissedCall(): boolean {

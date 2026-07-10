@@ -33,9 +33,7 @@ export default abstract class CallRepository {
   public abstract findById(id: CallId): Promise<Call | undefined>;
   public abstract findByParticipant(participantId: IdentityId): Promise<Call[]>;
 
-  public abstract findTimedOutJoinedCalls(
-    timeoutThreshold: Timestamp,
-  ): Promise<Call[]>;
+  public abstract registerReplica(call: Call): Promise<void>;
 
   public abstract findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,

@@ -2,6 +2,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
+import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import CallScopeResolver from './CallScopeResolver';
 import { CallStartMessage } from './messages/CallStartMessage';
 
@@ -10,6 +11,7 @@ export default class CallStarter {
     private readonly repository: CallRepository,
     private readonly scopeResolver: CallScopeResolver,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly leaseRenewer: CallParticipantLeaseRenewer,
   ) {}
 
   private async findActiveCommunityChannelCall(
@@ -32,7 +34,14 @@ export default class CallStarter {
     if (activeCall) {
       activeCall.joinOrAdd(message.requesterIdentityId);
       await this.repository.save(activeCall);
-      await this.eventPublisher.publish(activeCall.pullDomainEvents());
+      const lease = await this.leaseRenewer.renew(
+        activeCall,
+        message.requesterIdentityId,
+      );
+      await this.eventPublisher.publish([
+        ...activeCall.pullDomainEvents(),
+        ...lease.pullDomainEvents(),
+      ]);
 
       return activeCall;
     }
@@ -48,7 +57,14 @@ export default class CallStarter {
     );
 
     await this.repository.save(call);
-    await this.eventPublisher.publish(call.pullDomainEvents());
+    const lease = await this.leaseRenewer.renew(
+      call,
+      message.requesterIdentityId,
+    );
+    await this.eventPublisher.publish([
+      ...call.pullDomainEvents(),
+      ...lease.pullDomainEvents(),
+    ]);
 
     return call;
   }

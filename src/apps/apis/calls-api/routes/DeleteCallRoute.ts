@@ -21,9 +21,10 @@ export class DeleteCallRoute extends CallRouteSupport {
     const call = await this.ender.end(
       new CallEndMessage(callId, participantIdentityId.valueOf()),
     );
+    const leases = await this.findParticipantLeases([call]);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallViewModel(call).toResource());
+      .send(new CallViewModel(call, leases).toResource());
   }
 }

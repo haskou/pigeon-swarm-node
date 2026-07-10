@@ -13,6 +13,10 @@ package "calls" {
     class CallLeaver
     class CallEnder
     class CallParticipantHeartbeatRecorder
+    class CallParticipantLeaseRenewer
+    class CallParticipantLeaseReleaser
+    class CallParticipantLeaseFinder
+    class CallParticipantLeaseExpirationRegistrar
     class CallSignalSender
 
     CallStarter --> CallScopeResolver
@@ -48,6 +52,28 @@ package "calls" {
       +canReceiveSignal(): boolean
     }
 
+    class CallParticipantLease <AggregateRoot> {
+      -participantIdentityId: IdentityId
+      -route: CallParticipantLeaseRoute
+      -status: CallParticipantConnectionStatus
+      -lastHeartbeatAt: Timestamp
+      -mediaConnections: CallParticipantMediaConnection[]
+      +renew(mediaConnections: CallParticipantMediaConnection[]): void
+      +disconnect(): boolean
+    }
+
+    class CallParticipantLeaseRoute {
+      -callId: CallId
+      -ownerNodeId: NodeId
+      -networkId: NetworkId
+      -participantIds: IdentityId[]
+    }
+
+    class CallParticipantMediaConnection <ValueObject> {
+      +isFor(identityId: IdentityId): boolean
+      +usesRelay(): boolean
+    }
+
     class CallLifecycle {
       -status: CallStatus
       -createdAt: Timestamp
@@ -71,10 +97,19 @@ package "calls" {
       +save(call: Call): Promise<void>
     }
 
+    interface CallParticipantLeaseRepository {
+      +findByCallIds(callIds: CallId[]): Promise<CallParticipantLease[]>
+      +findPotentiallyExpired(threshold: Timestamp): Promise<CallParticipantLease[]>
+      +save(lease: CallParticipantLease): Promise<void>
+    }
+
     Call *--> CallParticipant
     Call *--> CallLifecycle
     Call *--> CallScope
     CallRepository o--> Call
+    CallParticipantLeaseRepository o--> CallParticipantLease
+    CallParticipantLease *--> CallParticipantLeaseRoute
+    CallParticipantLease *--> CallParticipantMediaConnection
   }
 
   package "events" {
@@ -86,10 +121,12 @@ package "calls" {
     class CallEndedEvent
     class CallMissedEvent
     class CallSignalSentEvent
+    class CallParticipantLeaseWasUpdatedEvent
   }
 
   note right of Call
     Calls are persisted in OrbitDB replicated state.
+    Participant heartbeat leases remain in memory and replicate through gossip.
     They do not publish media or signalling payloads to IPFS.
     Frontend uses these records to drive ringing,
     active call UI, missed calls and call history.
@@ -98,8 +135,10 @@ package "calls" {
 
 package "calls/infrastructure" {
   class OrbitDBCallRepository
+  class InMemoryCallParticipantLeaseRepository
 
   OrbitDBCallRepository ..|> CallRepository
+  InMemoryCallParticipantLeaseRepository ..|> CallParticipantLeaseRepository
 }
 
 CallStarter ..> CallRepository
@@ -110,6 +149,11 @@ CallJoiner ..> CallRepository
 CallLeaver ..> CallRepository
 CallEnder ..> CallRepository
 CallParticipantHeartbeatRecorder ..> CallRepository
+CallParticipantHeartbeatRecorder --> CallParticipantLeaseRenewer
+CallParticipantLeaseRenewer ..> CallParticipantLeaseRepository
+CallParticipantLeaseReleaser ..> CallParticipantLeaseRepository
+CallParticipantLeaseFinder ..> CallParticipantLeaseRepository
+CallParticipantLeaseExpirationRegistrar ..> CallParticipantLeaseRepository
 CallSignalSender ..> CallRepository
 
 @enduml

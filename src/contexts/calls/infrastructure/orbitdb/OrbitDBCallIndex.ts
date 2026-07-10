@@ -18,6 +18,8 @@ export default class OrbitDBCallIndex {
     OrbitDBCallDocument
   >();
 
+  private readonly eventCallCache = new Map<string, OrbitDBCallDocument>();
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     this.index = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'calls',
@@ -113,11 +115,14 @@ export default class OrbitDBCallIndex {
   }
 
   private cachedCallDocuments(): OrbitDBCallDocument[] {
-    return this.registry
-      .findCachedHeadsByPrefix('call:')
-      .filter((document): document is OrbitDBCallDocument =>
-        this.isDocument(document),
-      );
+    return this.index.deduplicate([
+      ...this.eventCallCache.values(),
+      ...this.registry
+        .findCachedHeadsByPrefix('call:')
+        .filter((document): document is OrbitDBCallDocument =>
+          this.isDocument(document),
+        ),
+    ]);
   }
 
   private async callDocumentsFromIndexAndCache(
@@ -344,8 +349,26 @@ export default class OrbitDBCallIndex {
 
   public async findById(id: CallId): Promise<OrbitDBCallDocument | undefined> {
     const head = await this.registry.findHead(this.callHeadKey(id.valueOf()));
+    const eventReplica = this.eventCallCache.get(id.valueOf());
 
-    return head && this.isDocument(head) ? head : undefined;
+    if (
+      head &&
+      this.isDocument(head) &&
+      (!eventReplica || this.freshness(head) >= this.freshness(eventReplica))
+    ) {
+      return head;
+    }
+
+    return eventReplica;
+  }
+
+  public registerReplica(document: OrbitDBCallDocument): void {
+    const current = this.eventCallCache.get(document.id);
+
+    if (!current || this.freshness(current) <= this.freshness(document)) {
+      this.eventCallCache.set(document.id, document);
+      this.cacheCommunityChannelCall(document);
+    }
   }
 
   public async findActiveByParticipant(
@@ -470,19 +493,6 @@ export default class OrbitDBCallIndex {
         document.participants.some(
           (participant) => participant.status === 'ringing',
         ),
-    );
-  }
-
-  public async findTimedOutJoinedCalls(
-    timeoutThreshold: Timestamp,
-  ): Promise<OrbitDBCallDocument[]> {
-    return (await this.activeDocumentsForTimeoutChecks()).filter((document) =>
-      document.participants.some(
-        (participant) =>
-          participant.status === 'joined' &&
-          participant.lastSeenAt !== undefined &&
-          participant.lastSeenAt <= timeoutThreshold.valueOf(),
-      ),
     );
   }
 

@@ -42,3 +42,47 @@ The event attributes are:
 `customMessage`, `lastHeartbeatAt`, `lastActivityAt`, and `networkIds` may be
 absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
 `status`, and `updatedAt` are required.
+
+## Call participant leases
+
+`calls.v1.participant_lease.was_updated` replicates ephemeral call membership
+connectivity without writing heartbeat timestamps to OrbitDB. Leases are keyed
+by `(callId, participantIdentityId, ownerNodeId)`, allowing a direct call to be
+created on one node while another participant joins and renews from a different
+node.
+
+Every heartbeat publishes a connected snapshot. After the timeout, all nodes
+remove their stale local copy, but only the owner publishes the disconnected
+snapshot. Durable call documents retain call lifecycle and participant history;
+they contain no heartbeat timestamp.
+
+```json
+{
+  "callId": "550e8400-e29b-41d4-a716-446655440010",
+  "connectionChanged": true,
+  "mediaConnectionsChanged": true,
+  "mediaConnections": [
+    {
+      "localCandidateType": "relay",
+      "protocol": "udp",
+      "relayProtocol": "udp",
+      "relayUrl": "turn:relay.example:3478?transport=udp",
+      "remoteCandidateType": "relay",
+      "remoteIdentityId": "<remoteIdentityId>",
+      "state": "connected"
+    }
+  ],
+  "participantIdentityId": "<identityId>",
+  "participantIds": ["<creatorIdentityId>", "<participantIdentityId>"],
+  "ownerNodeId": "550e8400-e29b-41d4-a716-446655440012",
+  "networkId": "550e8400-e29b-41d4-a716-446655440011",
+  "lastHeartbeatAt": 1770000000000,
+  "status": "connected"
+}
+```
+
+Media connection reports are replaced on every participant heartbeat. They
+describe the selected ICE path observed by the browser for each remote
+participant. A report change is forwarded to participant WebSockets; identical
+heartbeat snapshots remain node-to-node only. Reports are cleared when the
+lease disconnects and are never persisted in OrbitDB/IPFS.

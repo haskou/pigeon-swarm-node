@@ -20,9 +20,10 @@ export class GetCallHistoryRoute extends CallRouteSupport {
     const calls = await this.finder.find(
       new CallHistoryFindMessage(requesterIdentityId.valueOf()),
     );
+    const leases = await this.findParticipantLeases(calls);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallsViewModel(calls).toResource());
+      .send(new CallsViewModel(calls, leases).toResource());
   }
 }

@@ -20,9 +20,10 @@ export class GetCallsRoute extends CallRouteSupport {
     const calls = await this.finder.find(
       new ActiveCallsFindMessage(requesterIdentityId.valueOf()),
     );
+    const leases = await this.findParticipantLeases(calls);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallsViewModel(calls).toResource());
+      .send(new CallsViewModel(calls, leases).toResource());
   }
 }
