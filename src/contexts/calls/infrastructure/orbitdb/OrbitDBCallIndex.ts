@@ -20,6 +20,17 @@ export default class OrbitDBCallIndex {
 
   private readonly eventCallCache = new Map<string, OrbitDBCallDocument>();
 
+  private readonly pendingCallHeads = new Map<string, OrbitDBCallDocument>();
+
+  private readonly replicatingCallHeadIds = new Set<string>();
+
+  private readonly pendingIndexDocuments = new Map<
+    string,
+    OrbitDBCallDocument
+  >();
+
+  private readonly refreshingIndexCallIds = new Set<string>();
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     this.index = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'calls',
@@ -269,8 +280,8 @@ export default class OrbitDBCallIndex {
     return document.status === 'active';
   }
 
-  private replicateCallHeadInBackground(document: OrbitDBCallDocument): void {
-    this.registry.replicateHeadInBackground(
+  private cacheCallHead(document: OrbitDBCallDocument): void {
+    this.registry.cacheHeadLocally(
       this.callHeadKey(document.id),
       { ...document },
       [document.networkId],
@@ -321,12 +332,75 @@ export default class OrbitDBCallIndex {
     }
   }
 
+  private replicateCallHeadInBackground(document: OrbitDBCallDocument): void {
+    this.pendingCallHeads.set(document.id, document);
+
+    if (this.replicatingCallHeadIds.has(document.id)) {
+      return;
+    }
+
+    this.replicatingCallHeadIds.add(document.id);
+    void this.replicateLatestCallHead(document.id);
+  }
+
+  private async replicateLatestCallHead(callId: string): Promise<void> {
+    while (this.pendingCallHeads.has(callId)) {
+      const document = this.pendingCallHeads.get(callId);
+
+      this.pendingCallHeads.delete(callId);
+
+      if (!document) {
+        continue;
+      }
+
+      try {
+        await this.registry.putHead(
+          this.callHeadKey(document.id),
+          { ...document },
+          [document.networkId],
+          { force: true },
+        );
+      } catch (error) {
+        Kernel.logger.warn?.(
+          `Call head replication failed: callId=${document.id} error=${String(error)}`,
+        );
+      }
+    }
+
+    this.replicatingCallHeadIds.delete(callId);
+  }
+
   private refreshIndexesInBackground(document: OrbitDBCallDocument): void {
-    void this.putIndexes(document).catch((error) => {
-      Kernel.logger.warn?.(
-        `Call indexes refresh failed: callId=${document.id} error=${String(error)}`,
-      );
-    });
+    this.pendingIndexDocuments.set(document.id, document);
+
+    if (this.refreshingIndexCallIds.has(document.id)) {
+      return;
+    }
+
+    this.refreshingIndexCallIds.add(document.id);
+    void this.refreshLatestIndexes(document.id);
+  }
+
+  private async refreshLatestIndexes(callId: string): Promise<void> {
+    while (this.pendingIndexDocuments.has(callId)) {
+      const document = this.pendingIndexDocuments.get(callId);
+
+      this.pendingIndexDocuments.delete(callId);
+
+      if (!document) {
+        continue;
+      }
+
+      try {
+        await this.putIndexes(document);
+      } catch (error) {
+        Kernel.logger.warn?.(
+          `Call secondary index refresh failed: callId=${document.id} error=${String(error)}`,
+        );
+      }
+    }
+
+    this.refreshingIndexCallIds.delete(callId);
   }
 
   private cacheCommunityChannelCall(document: OrbitDBCallDocument): void {
@@ -497,8 +571,9 @@ export default class OrbitDBCallIndex {
   }
 
   public put(document: OrbitDBCallDocument): void {
-    this.replicateCallHeadInBackground(document);
+    this.cacheCallHead(document);
     this.cacheCommunityChannelCall(document);
+    this.replicateCallHeadInBackground(document);
     this.refreshIndexesInBackground(document);
   }
 }
