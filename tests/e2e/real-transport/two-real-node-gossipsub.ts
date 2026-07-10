@@ -87,6 +87,17 @@ async function main(): Promise<void> {
     await waitForIdentity(nodeA, nodeBIdentity.id);
     await waitForKeychain(nodeA, nodeBIdentity);
 
+    for (let version = 2; version <= 4; version++) {
+      nodeAIdentity = await updateIdentity(
+        nodeA,
+        nodeAIdentity,
+        version,
+        `Node A v${version}`,
+        'node-a',
+      );
+    }
+    await waitForIdentityVersion(nodeB, 'node-a', 4, 'node-a');
+
     const conversation = await createOneToOneConversation(
       nodeA,
       nodeAIdentity,
@@ -143,7 +154,12 @@ async function main(): Promise<void> {
       'node-a-message-payload',
     );
     await nodeBMessages;
-    await waitForMessage(nodeB, nodeBIdentity, conversation.id, messageFromA.id);
+    await waitForMessage(
+      nodeB,
+      nodeBIdentity,
+      conversation.id,
+      messageFromA.id,
+    );
 
     await stopNode(nodeB);
     const offlineMessageFromA = await sendConversationMessage(
@@ -161,12 +177,10 @@ async function main(): Promise<void> {
       conversation.id,
       offlineMessageFromA.id,
     );
-    await waitForConversationTimeline(
-      nodeB,
-      nodeBIdentity,
-      conversation.id,
-      [messageFromA.id, offlineMessageFromA.id],
-    );
+    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+    ]);
 
     const nodeAMessages = listenForDomainEvents(
       nodeA,
@@ -182,19 +196,22 @@ async function main(): Promise<void> {
       'node-b-reply-payload',
     );
     await nodeAMessages;
-    await waitForMessage(nodeA, nodeAIdentity, conversation.id, messageFromB.id);
-    await waitForConversationTimeline(
+    await waitForMessage(
       nodeA,
       nodeAIdentity,
       conversation.id,
-      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
+      messageFromB.id,
     );
-    await waitForConversationTimeline(
-      nodeB,
-      nodeBIdentity,
-      conversation.id,
-      [messageFromA.id, offlineMessageFromA.id, messageFromB.id],
-    );
+    await waitForConversationTimeline(nodeA, nodeAIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+      messageFromB.id,
+    ]);
+    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+      messageFromA.id,
+      offlineMessageFromA.id,
+      messageFromB.id,
+    ]);
 
     console.info(
       JSON.stringify(
@@ -367,6 +384,59 @@ async function publishIdentity(
   };
 }
 
+async function updateIdentity(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  version: number,
+  name: string,
+  handle: string,
+): Promise<IdentityFixture> {
+  const encryptedKeyPair = await identity.keyPair.encryptKeyPair(PASSWORD);
+  const signaturePayload = {
+    encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+    encryptedMasterKey: 'v1.test.encrypted-master-key',
+    id: identity.id,
+    masterKeyDerivation: {
+      passkeyPrf: {
+        algorithm: 'webauthn-prf',
+        credentialId: 'test-credential-id',
+        salt: 'test-salt',
+        version: 1,
+      },
+    },
+    networks: [NETWORK_ID],
+    previousIdentityExternalIdentifier: identity.externalIdentifier,
+    profile: {
+      banner: undefined as string | undefined,
+      biography: undefined as string | undefined,
+      handle,
+      name,
+      picture: undefined as string | undefined,
+    },
+    timestamp: Date.now(),
+    version,
+  };
+  const body = {
+    ...signaturePayload,
+    signature: identity.keyPair
+      .sign(JSON.stringify(signaturePayload))
+      .valueOf(),
+  };
+  const response = await request(
+    node,
+    'PUT',
+    `/identities/${encodeURIComponent(identity.id)}`,
+    body,
+    identity,
+  );
+
+  return {
+    externalIdentifier: response.identityExternalIdentifier,
+    id: response.id,
+    keyPair: identity.keyPair,
+  };
+}
+
 async function publishKeychain(
   node: NodeRuntime,
   identity: IdentityFixture,
@@ -391,7 +461,9 @@ async function publishKeychain(
   };
   const body = {
     ...bodyWithoutSignature,
-    signature: identity.keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    signature: identity.keyPair
+      .sign(JSON.stringify(signaturePayload))
+      .valueOf(),
   };
   const response = await request(node, 'POST', '/keychains/', body, identity);
 
@@ -452,7 +524,27 @@ async function waitForIdentity(
 ): Promise<void> {
   const path = `/identities/${encodeURIComponent(identityId)}`;
 
-  await waitFor(async () => (await requestMaybe(node, 'GET', path)) !== undefined, `${node.name} to sync identity`);
+  await waitFor(
+    async () => (await requestMaybe(node, 'GET', path)) !== undefined,
+    `${node.name} to sync identity`,
+  );
+}
+
+async function waitForIdentityVersion(
+  node: NodeRuntime,
+  identityReference: string,
+  version: number,
+  handle: string,
+): Promise<void> {
+  const requestPath = `/identities/${encodeURIComponent(identityReference)}`;
+
+  await waitFor(async () => {
+    const identity = await requestMaybe(node, 'GET', requestPath);
+
+    return (
+      identity?.version === version && identity?.profile?.handle === handle
+    );
+  }, `${node.name} to sync identity version ${version}`);
 }
 
 async function waitForKeychain(
@@ -462,7 +554,9 @@ async function waitForKeychain(
   const path = `/keychains/${encodeURIComponent(identity.id)}`;
 
   await waitFor(
-    async () => (await requestMaybe(node, 'GET', path, undefined, identity)) !== undefined,
+    async () =>
+      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
+      undefined,
     `${node.name} to sync keychain`,
   );
 }
@@ -485,7 +579,9 @@ async function waitForConversation(
       : response?.data;
 
     return Array.isArray(conversations)
-      ? conversations.some((conversation: { id: string }) => conversation.id === conversationId)
+      ? conversations.some(
+          (conversation: { id: string }) => conversation.id === conversationId,
+        )
       : false;
   }, `${node.name} to sync conversation`);
 }
@@ -501,7 +597,9 @@ async function waitForMessage(
   )}/messages/${encodeURIComponent(messageId)}`;
 
   await waitFor(
-    async () => (await requestMaybe(node, 'GET', path, undefined, identity)) !== undefined,
+    async () =>
+      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
+      undefined,
     `${node.name} to sync message ${messageId}`,
   );
 }

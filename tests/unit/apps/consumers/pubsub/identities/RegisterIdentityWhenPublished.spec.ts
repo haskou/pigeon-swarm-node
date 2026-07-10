@@ -1,7 +1,9 @@
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
-import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
-import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
+import IdentityCandidateRegistrar from '@app/contexts/identities/application/register-candidate/IdentityCandidateRegistrar';
+import { RegisterIdentityCandidateMessage } from '@app/contexts/identities/application/register-candidate/messages/RegisterIdentityCandidateMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -9,13 +11,13 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('RegisterIdentityWhenPublished', () => {
   let eventConsumer: MockProxy<DomainEventConsumer>;
-  let registrar: MockProxy<RegisterPublishedIdentity>;
+  let registrar: MockProxy<IdentityCandidateRegistrar>;
   let consumer: RegisterIdentityWhenPublished;
 
   beforeEach(() => {
     process.env.SERVICE_NAME = 'pigeon-swarm';
     eventConsumer = mock<DomainEventConsumer>();
-    registrar = mock<RegisterPublishedIdentity>();
+    registrar = mock<IdentityCandidateRegistrar>();
     consumer = new RegisterIdentityWhenPublished(eventConsumer, registrar);
   });
 
@@ -33,15 +35,23 @@ describe('RegisterIdentityWhenPublished', () => {
 
   it('should register the published identity through the application boundary', async () => {
     const identityId = new IdentityMother().id.valueOf();
-    const event = new IdentityWasCreatedEvent(identityId);
+    const externalIdentifier = 'bafy-created-identity';
+    const event = new IdentityWasCreatedEvent(identityId, {
+      externalIdentifier,
+    });
 
     await consumer.handler(event);
 
     expect(registrar.register).toHaveBeenCalledWith(
-      expect.any(RegisterPublishedIdentityMessage),
+      expect.any(RegisterIdentityCandidateMessage),
     );
-    expect(registrar.register.mock.calls[0][0].identityId.valueOf()).toBe(
-      identityId,
-    );
+    const message = registrar.register.mock.calls[0][0];
+
+    expect(message.identityId.isEqual(new IdentityId(identityId))).toBe(true);
+    expect(
+      message.externalIdentifier.isEqual(
+        new IdentityExternalIdentifier(externalIdentifier),
+      ),
+    ).toBe(true);
   });
 });

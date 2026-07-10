@@ -567,14 +567,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlSZXBvc2l0b3J5X19JZGVudGl0eVJlcG9zaXRvcnk=
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItcHVibGlzaGVkX19SZWdpc3RlclB1Ymxpc2hlZElkZW50aXR5X19SZWdpc3RlclB1Ymxpc2hlZElkZW50aXR5:
-    class: >-
-      /contexts/identities/application/register-published/RegisterPublishedIdentity
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVJlZ2lzdHJhclNlcnZpY2VfX0lkZW50aXR5UmVnaXN0cmFyU2VydmljZQ==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVNhdmVyU2VydmljZV9fSWRlbnRpdHlTYXZlclNlcnZpY2U=:
     class: /contexts/identities/domain/services/IdentitySaverService
     arguments:
@@ -1221,15 +1213,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVJlc29sdXRpb25Eb21haW5TZXJ2aWNlX19JZGVudGl0eVJlc29sdXRpb25Eb21haW5TZXJ2aWNl
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVJlZ2lzdHJhclNlcnZpY2VfX0lkZW50aXR5UmVnaXN0cmFyU2VydmljZQ==:
-    class: /contexts/identities/domain/services/IdentityRegistrarService
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlSZXBvc2l0b3J5X19JZGVudGl0eVJlcG9zaXRvcnk=
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eVJlc29sdXRpb25Eb21haW5TZXJ2aWNlX19JZGVudGl0eVJlc29sdXRpb25Eb21haW5TZXJ2aWNl
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX01ldGFkYXRhSWRlbnRpdHlOZXR3b3JrUmVwb3NpdG9yeV9fTWV0YWRhdGFJZGVudGl0eU5ldHdvcmtSZXBvc2l0b3J5:
     class: >-
       /contexts/identities/infrastructure/metadata/MetadataIdentityNetworkRepository
@@ -1585,7 +1568,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50Q29uc3VtZXJfX0RvbWFpbkV2ZW50Q29uc3VtZXI=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItcHVibGlzaGVkX19SZWdpc3RlclB1Ymxpc2hlZElkZW50aXR5X19SZWdpc3RlclB1Ymxpc2hlZElkZW50aXR5
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItY2FuZGlkYXRlX19JZGVudGl0eUNhbmRpZGF0ZVJlZ2lzdHJhcl9fSWRlbnRpdHlDYW5kaWRhdGVSZWdpc3RyYXI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19pZGVudGl0aWVzX19TeW5jaHJvbml6ZUlkZW50aXR5V2hlblVwZGF0ZWRfX1N5bmNocm9uaXplSWRlbnRpdHlXaGVuVXBkYXRlZA==:
@@ -1594,7 +1577,7 @@ services:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50Q29uc3VtZXJfX0RvbWFpbkV2ZW50Q29uc3VtZXI=
       - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItcHVibGlzaGVkX19SZWdpc3RlclB1Ymxpc2hlZElkZW50aXR5X19SZWdpc3RlclB1Ymxpc2hlZElkZW50aXR5
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItY2FuZGlkYXRlX19JZGVudGl0eUNhbmRpZGF0ZVJlZ2lzdHJhcl9fSWRlbnRpdHlDYW5kaWRhdGVSZWdpc3RyYXI=
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19pcGZzX19SZWdpc3RlckNvbnRlbnRSZXBsaWNhQ2xhaW1XaGVuQ2xhaW1lZF9fUmVnaXN0ZXJDb250ZW50UmVwbGljYUNsYWltV2hlbkNsYWltZWQ=:

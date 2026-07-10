@@ -375,6 +375,58 @@ describe('IpfsIdentityRepository', () => {
     });
   });
 
+  describe('findCandidateByExternalIdentifier', () => {
+    it('should validate and register the exact announced identity candidate', async () => {
+      const identity = await mother.build();
+      const identityId = mother.id;
+      const externalIdentifier = new IdentityExternalIdentifier(
+        'bafy-announced-identity',
+      );
+
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(identity));
+
+      const candidate = await repository.findCandidateByExternalIdentifier(
+        identityId,
+        externalIdentifier,
+      );
+
+      expect(candidate.getIdentity().toPrimitives()).toEqual(
+        identity.toPrimitives(),
+      );
+      expect(
+        candidate.getExternalIdentifier().isEqual(externalIdentifier),
+      ).toBe(true);
+      expect(metadataRepository.save).toHaveBeenCalledWith(
+        identity,
+        new IPFSId(externalIdentifier.valueOf()),
+      );
+      expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
+    });
+
+    it('should reject an announced candidate belonging to another identity', async () => {
+      const announcedIdentity = await mother.build();
+      const otherIdentity = await createSignedIdentityForNetwork(
+        announcedIdentity.toPrimitives().networks[0],
+      );
+      const externalIdentifier = new IdentityExternalIdentifier(
+        'bafy-wrong-announced-identity',
+      );
+
+      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(otherIdentity));
+
+      await expect(
+        repository.findCandidateByExternalIdentifier(
+          mother.id,
+          externalIdentifier,
+        ),
+      ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+      expect(
+        metadataRepository.deleteByExternalIdentifier,
+      ).toHaveBeenCalledWith(new IPFSId(externalIdentifier.valueOf()));
+    });
+  });
+
   describe('findById', () => {
     it('should find identity using metadata before DHT fallback', async () => {
       const identity = await mother.build();
@@ -951,8 +1003,9 @@ describe('IpfsIdentityRepository', () => {
           version: primitives.version + 1,
         },
       ]);
-      ipfsManager.getJSONFromNetworks
-        .mockRejectedValueOnce(new Error('broken latest identity'));
+      ipfsManager.getJSONFromNetworks.mockRejectedValueOnce(
+        new Error('broken latest identity'),
+      );
       ipfsManager.getJSON.mockResolvedValueOnce(mapper.toDocument(identity));
 
       const result = await repository.findCandidateByHandle(handle);

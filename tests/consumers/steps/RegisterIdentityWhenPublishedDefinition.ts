@@ -28,6 +28,8 @@ export default class RegisterIdentityWhenPublishedDefinition {
 
   private identity: Identity | undefined;
 
+  private externalIdentifier: IdentityExternalIdentifier | undefined;
+
   private cleanupStorageFolder(): void {
     const storagePath = process.env.IPFS_STORAGE_PATH;
 
@@ -56,8 +58,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
     }
 
     const deadline = Date.now() + 5000;
-    const metadataIndex =
-      Kernel.di.getService<IdentityMetadataIndex>(IdentityMetadataIndex);
+    const metadataIndex = Kernel.di.getService<IdentityMetadataIndex>(
+      IdentityMetadataIndex,
+    );
     const identityId = new IdentityId(this.identity.toPrimitives().id);
 
     while (Date.now() < deadline) {
@@ -77,6 +80,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
   public async startKernel(): Promise<void> {
     this.consumer = undefined;
     this.identity = undefined;
+    this.externalIdentifier = undefined;
 
     if (!application) {
       application = new PigeonApplication();
@@ -114,8 +118,14 @@ export default class RegisterIdentityWhenPublishedDefinition {
       throw new Error('Register identity consumer is not initialized.');
     }
 
+    if (!this.externalIdentifier) {
+      throw new Error('Identity external identifier is not initialized.');
+    }
+
     await this.consumer.handler(
-      new IdentityWasCreatedEvent(this.identity.toPrimitives().id),
+      new IdentityWasCreatedEvent(this.identity.toPrimitives().id, {
+        externalIdentifier: this.externalIdentifier.valueOf(),
+      }),
     );
   }
 
@@ -164,14 +174,15 @@ export default class RegisterIdentityWhenPublishedDefinition {
     };
 
     await ipfs.registerNetwork(new IPFSNetworkConfig(networkId, networkName));
-    this.identity = (
-      await publisher.publish(
-        new IdentityPublishMessage({
-          ...signaturePayload,
-          signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
-        }),
-      )
-    ).getIdentity();
+    const candidate = await publisher.publish(
+      new IdentityPublishMessage({
+        ...signaturePayload,
+        signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+      }),
+    );
+
+    this.identity = candidate.getIdentity();
+    this.externalIdentifier = candidate.getExternalIdentifier();
   }
 
   @given('the local identity registration metadata is missing')
@@ -180,20 +191,15 @@ export default class RegisterIdentityWhenPublishedDefinition {
       throw new Error('Identity is not initialized.');
     }
 
-    const ipfs = Kernel.di.getService<IPFS>(IPFS);
-    const metadataIndex =
-      Kernel.di.getService<IdentityMetadataIndex>(IdentityMetadataIndex);
-    const [externalIdentifier] = await ipfs.getRecordCandidates(
-      `pigeon-swarm_identity-${this.identity.toPrimitives().id}`,
+    const metadataIndex = Kernel.di.getService<IdentityMetadataIndex>(
+      IdentityMetadataIndex,
     );
 
-    if (!externalIdentifier) {
-      throw new Error('Identity external identifier was not published.');
+    if (!this.externalIdentifier) {
+      throw new Error('Identity external identifier is not initialized.');
     }
 
-    await metadataIndex.deleteByExternalIdentifier(
-      new IdentityExternalIdentifier(externalIdentifier),
-    );
+    await metadataIndex.deleteByExternalIdentifier(this.externalIdentifier);
   }
 
   @then('the published identity should be registered locally')

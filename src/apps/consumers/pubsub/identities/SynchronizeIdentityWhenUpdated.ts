@@ -1,5 +1,5 @@
-import { RegisterPublishedIdentityMessage } from '@app/contexts/identities/application/register-published/messages/RegisterPublishedIdentityMessage';
-import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
+import IdentityCandidateRegistrar from '@app/contexts/identities/application/register-candidate/IdentityCandidateRegistrar';
+import { RegisterIdentityCandidateMessage } from '@app/contexts/identities/application/register-candidate/messages/RegisterIdentityCandidateMessage';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
@@ -11,7 +11,7 @@ export default class SynchronizeIdentityWhenUpdated extends Consumer {
 
   constructor(
     eventConsumer: DomainEventConsumer,
-    private readonly registrar: RegisterPublishedIdentity,
+    private readonly registrar: IdentityCandidateRegistrar,
   ) {
     super(eventConsumer);
   }
@@ -33,8 +33,17 @@ export default class SynchronizeIdentityWhenUpdated extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
+    const externalIdentifier = event.attributes.externalIdentifier;
+
+    if (typeof externalIdentifier !== 'string') {
+      throw new Error('Identity publication external identifier is required.');
+    }
+
     await this.registrar.register(
-      new RegisterPublishedIdentityMessage(event.aggregateId),
+      new RegisterIdentityCandidateMessage(
+        event.aggregateId,
+        externalIdentifier,
+      ),
     );
   }
 }

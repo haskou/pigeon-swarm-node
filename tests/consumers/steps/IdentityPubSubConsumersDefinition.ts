@@ -1,5 +1,5 @@
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
-import RegisterPublishedIdentity from '@app/contexts/identities/application/register-published/RegisterPublishedIdentity';
+import IdentityCandidateRegistrar from '@app/contexts/identities/application/register-candidate/IdentityCandidateRegistrar';
 import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
@@ -17,19 +17,26 @@ export default class IdentityPubSubConsumersDefinition extends PubSubConsumerTes
   public async identityUpdatedConsumerHandlesAnIdentityUpdate(): Promise<void> {
     const consumer = new SynchronizeIdentityWhenUpdated(
       this.eventConsumer(),
-      this.fakeUseCase<RegisterPublishedIdentity>('register'),
+      this.fakeUseCase<IdentityCandidateRegistrar>('register'),
     );
 
-    await consumer.handler(new IdentityWasUpdatedEvent(this.ownerIdentityId()));
+    await consumer.handler(
+      new IdentityWasUpdatedEvent(this.ownerIdentityId(), {
+        externalIdentifier: this.externalIdentifier,
+      }),
+    );
   }
 
-  @then('the published identity registrar should receive that identity')
-  public publishedIdentityRegistrarShouldReceiveThatIdentity(): void {
+  @then('the identity candidate registrar should receive that publication')
+  public identityCandidateRegistrarShouldReceiveThatPublication(): void {
     const message = this.lastMessage<{
+      externalIdentifier: { valueOf(): string };
       identityId: { valueOf(): string };
     }>();
 
     expect(message.identityId.valueOf()).to.equal(this.ownerIdentityId());
+    expect(message.externalIdentifier.valueOf()).to.equal(
+      this.externalIdentifier,
+    );
   }
-
 }

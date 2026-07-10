@@ -1,5 +1,18 @@
 # Pub/sub synchronization protocol
 
+## Identity publications
+
+`identities.v1.identity.was_created` and
+`identities.v1.identity.was_updated` include the exact
+`externalIdentifier` CID produced by the signed publication. Consumers fetch
+and validate that candidate directly against the event aggregate identity and
+its previous-version chain. They must not resolve the event through the DHT
+routing record because routing publication can legitimately lag behind the
+domain event.
+
+The remaining attributes describe the published identity metadata:
+`handle`, `networkIds`, `previousExternalIdentifier`, and `version`.
+
 ## Identity presence leases
 
 `presence.v1.identity_presence.was_updated` replicates ephemeral presence over
