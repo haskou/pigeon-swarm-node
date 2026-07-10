@@ -97,6 +97,7 @@ export default class ContentReplicationMaintainer {
       await this.contentStorage.findJSONInNetwork<unknown>(cid, networkId);
     }
 
+    await this.contentStorage.provideInNetwork(cid, networkId);
     await this.claimReplica({
       cid: content.cid,
       localNodeId,

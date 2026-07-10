@@ -611,7 +611,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     if (!this.hasPeers()) {
       this.queueContentProviderRetry(cid);
 
-      return;
+      throw new Error('No IPFS peers available for provider publication.');
     }
 
     const routingAbort = this.createRoutingAbortSignal(signal);
@@ -630,15 +630,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
         signal: routingAbort.signal,
       });
     } catch (error: unknown) {
-      if (!this.hasPeers()) {
-        this.queueContentProviderRetry(cid);
-      }
+      this.queueContentProviderRetry(cid);
 
       Kernel.logger.debug?.(
-        `IPFS provider publication skipped for cid="${cid.valueOf()}": ${String(
+        `IPFS provider publication failed for cid="${cid.valueOf()}": ${String(
           error,
         )}`,
       );
+
+      throw error;
     } finally {
       clearTimeout(routingAbort.timeout);
     }
@@ -692,10 +692,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
       })
       .finally(() => {
         this.publishingPendingContentProviders = false;
-
-        if (this.pendingContentProviderCids.size > 0 && this.hasPeers()) {
-          this.publishPendingContentProviders();
-        }
       });
   }
 
@@ -739,19 +735,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     void this.provideContent(cid).catch((): undefined => undefined);
-  }
-
-  private pinReadThroughContent(
-    parsedCid: ParsedCidLike,
-    signal?: AbortSignal,
-  ): void {
-    this.pinningStrategy
-      .ensurePinned(this.heliaCore, parsedCid, signal)
-      .catch(() => {
-        Kernel.logger.debug?.(
-          `Skipped IPFS content pinning for local availability: ${parsedCid.toString()}`,
-        );
-      });
   }
 
   private async localDagDescendantCids(
@@ -896,8 +879,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
       chunks.push(
         ...(await this.collectRawBlockBytes(parsedCid, retrievalOptions)),
       );
-      this.pinReadThroughContent(parsedCid, signal);
-      this.provideContentInBackground(cid);
 
       return Buffer.concat(chunks);
     }
@@ -916,9 +897,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     )) {
       chunks.push(chunk);
     }
-
-    this.pinReadThroughContent(parsedCid, signal);
-    this.provideContentInBackground(cid);
 
     return Buffer.concat(chunks);
   }
@@ -995,9 +973,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
       (await this.createContentRetrievalOptions(cid, signal)) as never,
     );
 
-    this.pinReadThroughContent(parsedCid, signal);
-    this.provideContentInBackground(cid);
-
     return json;
   }
 
@@ -1009,6 +984,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       cid.valueOf(),
     );
 
+    await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
     await this.publishContentProvider(parsedCid, cid, signal);
   }
 

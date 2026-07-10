@@ -34,7 +34,7 @@ describe('HeliaPinningStrategy', () => {
     jest.clearAllMocks();
   });
 
-  it('should pin unpinned content with read-through metadata', async () => {
+  it('should pin explicitly retained content with retention metadata', async () => {
     await strategy.ensurePinned(heliaCore, cid);
 
     expect(heliaCore.pins.isPinned).toHaveBeenCalledWith(cid, {
@@ -42,7 +42,7 @@ describe('HeliaPinningStrategy', () => {
     });
     expect(heliaCore.pins.add).toHaveBeenCalledWith(cid, {
       metadata: {
-        strategy: 'read-through-cache',
+        strategy: 'retained-content',
       },
       signal: undefined,
     });
@@ -59,7 +59,7 @@ describe('HeliaPinningStrategy', () => {
     expect(heliaCore.pins.add).not.toHaveBeenCalled();
   });
 
-  it('should cache successful pin checks for repeated reads', async () => {
+  it('should cache successful pin checks for repeated retention', async () => {
     await strategy.ensurePinned(heliaCore, cid);
     await strategy.ensurePinned(heliaCore, cid);
 
@@ -67,7 +67,7 @@ describe('HeliaPinningStrategy', () => {
     expect(heliaCore.pins.add).toHaveBeenCalledTimes(1);
   });
 
-  it('should cache already pinned content for repeated reads', async () => {
+  it('should cache already pinned content for repeated retention', async () => {
     jest.mocked(heliaCore.pins.isPinned).mockResolvedValue(true);
 
     await strategy.ensurePinned(heliaCore, cid);
@@ -77,45 +77,34 @@ describe('HeliaPinningStrategy', () => {
     expect(heliaCore.pins.add).not.toHaveBeenCalled();
   });
 
-  it('should not fail reads when pinning fails', async () => {
+  it('should fail retention when pinning fails', async () => {
     jest.mocked(heliaCore.pins.add).mockImplementation(() => {
       throw new Error('pin failed');
     });
 
-    await expect(strategy.ensurePinned(heliaCore, cid)).resolves.toBe(
-      undefined,
+    await expect(strategy.ensurePinned(heliaCore, cid)).rejects.toThrow(
+      'pin failed',
     );
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
       'Skipped IPFS content pinning for local availability: bafymockcid error=Error: pin failed',
     );
   });
 
-  it('should back off repeated pin attempts after a failure', async () => {
+  it('should retry pinning after a failure', async () => {
     jest.mocked(heliaCore.pins.add).mockImplementation(() => {
       throw new Error('pin failed');
     });
 
-    await strategy.ensurePinned(heliaCore, cid);
-    await strategy.ensurePinned(heliaCore, cid);
-
-    expect(heliaCore.pins.isPinned).toHaveBeenCalledTimes(1);
-    expect(heliaCore.pins.add).toHaveBeenCalledTimes(1);
-    expect(Kernel.logger.debug).toHaveBeenCalledTimes(1);
-  });
-
-  it('should retry failed pin attempts after the retry interval', async () => {
-    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
-    jest.mocked(heliaCore.pins.add).mockImplementation(() => {
-      throw new Error('pin failed');
-    });
-
-    await strategy.ensurePinned(heliaCore, cid);
-    now.mockReturnValue(61_001);
-    await strategy.ensurePinned(heliaCore, cid);
-    now.mockRestore();
+    await expect(strategy.ensurePinned(heliaCore, cid)).rejects.toThrow(
+      'pin failed',
+    );
+    await expect(strategy.ensurePinned(heliaCore, cid)).rejects.toThrow(
+      'pin failed',
+    );
 
     expect(heliaCore.pins.isPinned).toHaveBeenCalledTimes(2);
     expect(heliaCore.pins.add).toHaveBeenCalledTimes(2);
+    expect(Kernel.logger.debug).toHaveBeenCalledTimes(2);
   });
 
   it('should share concurrent pin attempts for the same cid', async () => {

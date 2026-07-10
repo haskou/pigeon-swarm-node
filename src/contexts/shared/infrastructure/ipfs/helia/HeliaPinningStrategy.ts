@@ -3,11 +3,9 @@ import Kernel from '@haskou/ddd-kernel';
 import { HeliaInstance, ParsedCidLike } from './adapters/HeliaRuntimeAdapter';
 
 export default class HeliaPinningStrategy {
-  private static readonly FAILED_PIN_RETRY_INTERVAL_MS = 60_000;
+  private static readonly RETENTION_STRATEGY = 'retained-content';
 
   private readonly locallyPinnedCids = new Set<string>();
-
-  private readonly failedPinRetryAt = new Map<string, number>();
 
   private readonly pinningOperations = new Map<string, Promise<void>>();
 
@@ -27,23 +25,6 @@ export default class HeliaPinningStrategy {
     return cid.toString();
   }
 
-  private shouldSkipFailedPin(cacheKey: string): boolean {
-    const retryAt = this.failedPinRetryAt.get(cacheKey);
-
-    return retryAt !== undefined && Date.now() < retryAt;
-  }
-
-  private rememberFailedPin(cacheKey: string): void {
-    this.failedPinRetryAt.set(
-      cacheKey,
-      Date.now() + HeliaPinningStrategy.FAILED_PIN_RETRY_INTERVAL_MS,
-    );
-  }
-
-  private forgetFailedPin(cacheKey: string): void {
-    this.failedPinRetryAt.delete(cacheKey);
-  }
-
   private errorMessage(error: unknown): string {
     return String(error);
   }
@@ -57,7 +38,6 @@ export default class HeliaPinningStrategy {
     try {
       if (await heliaCore.pins.isPinned(cid, { signal })) {
         this.locallyPinnedCids.add(cacheKey);
-        this.forgetFailedPin(cacheKey);
 
         return;
       }
@@ -65,21 +45,21 @@ export default class HeliaPinningStrategy {
       await this.consumePinOperation(
         heliaCore.pins.add(cid, {
           metadata: {
-            strategy: 'read-through-cache',
+            strategy: HeliaPinningStrategy.RETENTION_STRATEGY,
           },
           signal,
         }),
       );
 
       this.locallyPinnedCids.add(cacheKey);
-      this.forgetFailedPin(cacheKey);
       this.debug(`Pinned IPFS content for local availability: ${cid}`);
     } catch (error) {
-      this.rememberFailedPin(cacheKey);
       this.debug(
         `Skipped IPFS content pinning for local availability: ${cid}` +
           ` error=${this.errorMessage(error)}`,
       );
+
+      throw error;
     }
   }
 
@@ -90,10 +70,7 @@ export default class HeliaPinningStrategy {
   ): Promise<void> {
     const cacheKey = this.cacheKey(cid);
 
-    if (
-      this.locallyPinnedCids.has(cacheKey) ||
-      this.shouldSkipFailedPin(cacheKey)
-    ) {
+    if (this.locallyPinnedCids.has(cacheKey)) {
       return;
     }
 
@@ -123,7 +100,6 @@ export default class HeliaPinningStrategy {
     try {
       if (!(await heliaCore.pins.isPinned(cid, { signal }))) {
         this.locallyPinnedCids.delete(cacheKey);
-        this.forgetFailedPin(cacheKey);
 
         return;
       }
@@ -131,7 +107,6 @@ export default class HeliaPinningStrategy {
       await this.consumePinOperation(heliaCore.pins.rm(cid, { signal }));
 
       this.locallyPinnedCids.delete(cacheKey);
-      this.forgetFailedPin(cacheKey);
       this.debug(`Unpinned IPFS content before local removal: ${cid}`);
     } catch (error) {
       this.debug(
