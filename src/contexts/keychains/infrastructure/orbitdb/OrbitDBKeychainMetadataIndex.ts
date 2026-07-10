@@ -9,8 +9,6 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMetadataDocument';
 
 export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex {
-  private readonly activeHeadRepairs = new Set<string>();
-
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -145,97 +143,6 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     return document ? this.toRecord(document) : undefined;
   }
 
-  private async findStoredRecordsByOwnerIdentityId(
-    ownerIdentityId: string,
-  ): Promise<KeychainMetadataRecord[]> {
-    const documents = await this.registry.queryDocuments(
-      'keychains',
-      (document) =>
-        document.deleted !== true &&
-        Boolean(this.stringValue(document, 'cid')) &&
-        this.ownerIdentityIdFrom(document) === ownerIdentityId,
-      {
-        mode: 'fallback',
-        operation:
-          'OrbitDBKeychainMetadataIndex.findStoredRecordsByOwnerIdentityId',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is KeychainMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
-  private async findStoredRecordByCid(
-    cid: string,
-  ): Promise<KeychainMetadataRecord | undefined> {
-    const documents = await this.registry.queryDocuments(
-      'keychains',
-      (document) =>
-        document.deleted !== true && this.stringValue(document, 'cid') === cid,
-      {
-        mode: 'fallback',
-        operation: 'OrbitDBKeychainMetadataIndex.findStoredRecordByCid',
-      },
-    );
-
-    return documents
-      .map((document) => this.toRecord(document))
-      .find(
-        (document): document is KeychainMetadataRecord =>
-          document !== undefined,
-      );
-  }
-
-  private readRepairHead(
-    head: KeychainMetadataRecord | undefined,
-    latest: KeychainMetadataRecord,
-  ): void {
-    if (head?.cid === latest.cid) {
-      return;
-    }
-
-    this.replicateHeadInBackground(this.toStorageDocument(latest));
-  }
-
-  private repairHeadInBackground(
-    repairKey: string,
-    repair: () => Promise<void>,
-  ): void {
-    if (this.activeHeadRepairs.has(repairKey)) {
-      return;
-    }
-
-    this.activeHeadRepairs.add(repairKey);
-    void repair()
-      .catch((): undefined => undefined)
-      .finally(() => {
-        this.activeHeadRepairs.delete(repairKey);
-      });
-  }
-
-  private repairOwnerHeadInBackground(
-    ownerIdentityId: string,
-    head: KeychainMetadataRecord | undefined,
-  ): void {
-    this.repairHeadInBackground(
-      this.ownerHeadKey(ownerIdentityId),
-      async () => {
-        const latest = this.sortByFreshness([
-          ...(head ? [head] : []),
-          ...(await this.findStoredRecordsByOwnerIdentityId(ownerIdentityId)),
-        ])[0];
-
-        if (latest) {
-          this.readRepairHead(head, latest);
-        }
-      },
-    );
-  }
-
   private deduplicate(
     records: KeychainMetadataRecord[],
   ): KeychainMetadataRecord[] {
@@ -261,16 +168,13 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       );
   }
 
-  private replicateHeadInBackground(
+  private async putHeads(
     document: OrbitDBKeychainMetadataDocument,
-  ): void {
-    this.registry.replicateHeadInBackground(
-      this.ownerHeadKey(document.ownerIdentityId),
-      {
-        ...document,
-      },
-    );
-    this.registry.replicateHeadInBackground(this.cidHeadKey(document.cid), {
+  ): Promise<void> {
+    await this.registry.putHead(this.ownerHeadKey(document.ownerIdentityId), {
+      ...document,
+    });
+    await this.registry.putHead(this.cidHeadKey(document.cid), {
       ...document,
     });
   }
@@ -299,13 +203,10 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       return head;
     }
 
-    return (
-      (await this.findStoredRecordByCid(cid)) ||
-      this.registry
-        .findCachedHeadsByPrefix('keychain:')
-        .map((document) => this.toRecord(document))
-        .find((document) => document?.cid === cid)
-    );
+    return this.registry
+      .findCachedHeadsByPrefix('keychain:')
+      .map((document) => this.toRecord(document))
+      .find((document) => document?.cid === cid);
   }
 
   public async findByOwnerIdentityId(
@@ -319,25 +220,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       ...this.findCachedCidRecordsByOwner(ownerIdentityId),
     ]);
 
-    if (cachedRecords.length > 0) {
-      this.repairOwnerHeadInBackground(ownerIdentityId.valueOf(), head);
-
-      return this.sortByFreshness(cachedRecords);
-    }
-
-    const records = this.deduplicate([
-      ...(await this.findStoredRecordsByOwnerIdentityId(
-        ownerIdentityId.valueOf(),
-      )),
-    ]);
-    const sortedRecords = this.sortByFreshness(records);
-    const latest = sortedRecords[0];
-
-    if (latest) {
-      this.readRepairHead(head, latest);
-    }
-
-    return sortedRecords;
+    return this.sortByFreshness(cachedRecords);
   }
 
   public async save(
@@ -359,7 +242,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       version: primitives.version,
     };
 
+    await this.putHeads(document);
     await this.registry.putDocument('keychains', document);
-    this.replicateHeadInBackground(document);
   }
 }

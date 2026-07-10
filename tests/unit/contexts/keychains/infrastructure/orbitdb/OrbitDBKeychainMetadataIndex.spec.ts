@@ -58,7 +58,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     );
   });
 
-  it('should not wait for keychain head persistence when saving metadata', async () => {
+  it('should persist keychain heads before their metadata document', async () => {
     const mother = await KeychainMother.create();
     const keychain = mother.withVersion(2).build();
     const delayedHead = deferred<string>();
@@ -88,8 +88,11 @@ describe('OrbitDBKeychainMetadataIndex', () => {
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('saved');
-    expect(heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`)).toBeUndefined();
+    expect(result).toBe('blocked');
+    expect(
+      heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`),
+    ).toBeUndefined();
+    expect(documents).toEqual([]);
     await expect(
       repository.findByOwnerIdentityId(mother.ownerIdentityId),
     ).resolves.toEqual([
@@ -100,7 +103,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     ]);
 
     delayedHead.resolve('ok');
-    await flushBackgroundTasks();
+    await save;
 
     expect(heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`)).toEqual(
       expect.objectContaining({
@@ -252,7 +255,7 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     expect(records[0].keychain?.toPrimitives()).toEqual(latest.toPrimitives());
   });
 
-  it('should repair stale keychain owner heads in background', async () => {
+  it('should not scan stored keychains to repair stale owner heads', async () => {
     const mother = await KeychainMother.create();
     const ownerIdentityId = mother.ownerIdentityId.valueOf();
 
@@ -281,11 +284,10 @@ describe('OrbitDBKeychainMetadataIndex', () => {
         version: 1,
       }),
     );
-    await flushBackgroundTasks();
     expect(heads.get(`keychain:${ownerIdentityId}`)).toEqual(
       expect.objectContaining({
-        cid: 'bafykeychain-v2',
-        version: 2,
+        cid: 'bafykeychain-v1',
+        version: 1,
       }),
     );
   });

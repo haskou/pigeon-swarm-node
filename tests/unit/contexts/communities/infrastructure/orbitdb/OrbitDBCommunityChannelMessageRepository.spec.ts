@@ -15,6 +15,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
   const heads = new Map<string, Record<string, unknown>>();
   let headsGet: jest.Mock;
   let headsPut: jest.Mock;
+  let messagesPut: jest.Mock;
   let query: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityChannelMessageRepository;
@@ -32,6 +33,11 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
       return 'ok';
     });
+    messagesPut = jest.fn(async (storedDocument) => {
+      upsertDocument(documents, storedDocument);
+
+      return 'ok';
+    });
     query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
@@ -41,11 +47,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         put: headsPut,
       },
       messages: {
-        put: jest.fn(async (document) => {
-          upsertDocument(documents, document);
-
-          return 'ok';
-        }),
+        put: messagesPut,
         query,
       },
     } as never);
@@ -224,7 +226,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     ]);
   });
 
-  it('should not wait for cold channel message index reads when saving a message', async () => {
+  it('should persist the readable message head before its document', async () => {
     const message = CommunityChannelMessage.fromPrimitives(
       document({
         channelId: 'channel-1',
@@ -232,16 +234,32 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         id: 'message-1',
       }) as never,
     );
+    let releaseDocumentWrite: () => void = () => undefined;
+    const documentWrite = new Promise<void>((resolve) => {
+      releaseDocumentWrite = resolve;
+    });
 
-    headsGet
-      .mockImplementationOnce(async () => undefined)
-      .mockImplementationOnce(
-        () =>
-          new Promise<Record<string, unknown> | undefined>(() => undefined),
-      );
+    messagesPut.mockImplementationOnce(async (storedDocument) => {
+      await documentWrite;
+      upsertDocument(documents, storedDocument);
 
-    await expect(repository.save(message)).resolves.toBeUndefined();
-    expect(documents).toEqual([expect.objectContaining({ id: 'message-1' })]);
+      return 'ok';
+    });
+
+    const save = repository.save(message);
+    await flushBackgroundTasks();
+
+    expect(
+      heads.get('community-channel-message-index:community-1:channel-1'),
+    ).toEqual(
+      expect.objectContaining({
+        messages: [expect.objectContaining({ id: 'message-1' })],
+      }),
+    );
+    expect(documents).toEqual([]);
+
+    releaseDocumentWrite();
+    await expect(save).resolves.toBeUndefined();
   });
 
   it('should remove deleted messages from the channel message index', async () => {

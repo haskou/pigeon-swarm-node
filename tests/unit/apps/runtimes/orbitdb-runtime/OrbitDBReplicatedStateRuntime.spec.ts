@@ -1,7 +1,6 @@
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import NodeNetworkSynchronizationMonitor from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import Kernel from '@haskou/ddd-kernel';
@@ -24,6 +23,7 @@ function fakeStore(): FakeStore {
 
 function fakeStores(): OrbitDBPrivateNetworkStores {
   const stores = {
+    calls: fakeStore(),
     communities: fakeStore(),
     contentReplication: fakeStore(),
     conversations: fakeStore(),
@@ -53,10 +53,10 @@ describe('OrbitDBReplicatedStateRuntime', () => {
   beforeEach(() => {
     new Kernel({
       logger: {
-      debug: jest.fn(),
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
+        debug: jest.fn(),
+        error: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
       },
     });
   });
@@ -79,10 +79,6 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     const runtime = new OrbitDBReplicatedStateRuntime(
       networkRegistry,
       replicatedStateRegistry,
-      {
-        repairCritical: jest.fn().mockResolvedValue({}),
-        repairSecondary: jest.fn().mockResolvedValue({}),
-      } as unknown as OrbitDBMetadataHeadRepairer,
       fakeSynchronizationMonitor(),
     );
     await runtime.run();
@@ -117,10 +113,6 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     const runtime = new OrbitDBReplicatedStateRuntime(
       networkRegistry,
       replicatedStateRegistry,
-      {
-        repairCritical: jest.fn().mockResolvedValue({}),
-        repairSecondary: jest.fn().mockResolvedValue({}),
-      } as unknown as OrbitDBMetadataHeadRepairer,
       fakeSynchronizationMonitor(),
     );
     const open = jest
@@ -141,9 +133,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     );
   });
 
-  it('debounces targeted read-index repair for replicated document updates', async () => {
-    jest.useFakeTimers();
-
+  it('does not scan document stores after replicated updates', async () => {
     const stores = fakeStores();
     const network = {
       getId: jest.fn().mockReturnValue('network-1'),
@@ -164,53 +154,26 @@ describe('OrbitDBReplicatedStateRuntime', () => {
       register: jest.fn(),
       unregister: jest.fn(),
     } as unknown as OrbitDBReplicatedStateRegistry;
-    const repairCritical = jest.fn().mockResolvedValue({});
-    const repairStore = jest.fn().mockResolvedValue({ identities: 1 });
     const runtime = new OrbitDBReplicatedStateRuntime(
       networkRegistry,
       replicatedStateRegistry,
-      {
-        repairCritical,
-        repairStore,
-        repairSecondary: jest.fn().mockResolvedValue({}),
-      } as unknown as OrbitDBMetadataHeadRepairer,
       fakeSynchronizationMonitor(),
     );
 
     jest.spyOn(OrbitDBPrivateNetworkStores, 'open').mockResolvedValue(stores);
 
     await runtime.run();
-    await jest.advanceTimersByTimeAsync(1_000);
 
-    const updateHandler = (
-      stores.identities as unknown as FakeStore
-    ).events.on.mock.calls.find(([event]) => event === 'update')?.[1] as
-      | (() => void)
-      | undefined;
-
-    expect(updateHandler).toBeDefined();
-    expect(repairCritical).toHaveBeenCalledTimes(1);
-
-    updateHandler?.();
-    updateHandler?.();
-    await jest.advanceTimersByTimeAsync(29_999);
-
-    expect(repairStore).not.toHaveBeenCalled();
-    expect(repairCritical).toHaveBeenCalledTimes(1);
-
-    await jest.advanceTimersByTimeAsync(1);
-
-    expect(repairStore).toHaveBeenCalledTimes(1);
-    expect(repairStore).toHaveBeenCalledWith('identities');
-    expect(repairCritical).toHaveBeenCalledTimes(1);
-
-    updateHandler?.();
-    await jest.advanceTimersByTimeAsync(30_000);
-
-    expect(repairStore).toHaveBeenCalledTimes(1);
-
-    await jest.advanceTimersByTimeAsync(15 * 60_000);
-
-    expect(repairStore).toHaveBeenCalledTimes(2);
+    for (const store of [
+      stores.calls,
+      stores.communities,
+      stores.conversations,
+      stores.identities,
+      stores.keychains,
+      stores.messages,
+    ]) {
+      expect((store as unknown as FakeStore).events.on).not.toHaveBeenCalled();
+      expect((store as unknown as FakeStore).all).not.toHaveBeenCalled();
+    }
   });
 });

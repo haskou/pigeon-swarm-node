@@ -57,7 +57,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     );
   });
 
-  it('should not wait for identity head persistence when saving metadata', async () => {
+  it('should persist identity heads before their metadata document', async () => {
     const mother = new IdentityMother();
     const identity = mother.build();
     const networkId = mother.networks[0].valueOf();
@@ -87,8 +87,9 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('saved');
+    expect(result).toBe('blocked');
     expect(heads.get(`identity:${mother.id.valueOf()}`)).toBeUndefined();
+    expect(documents).toEqual([]);
     await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([
       expect.objectContaining({
         cid: 'bafyidentity-fast-head',
@@ -97,7 +98,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     ]);
 
     delayedHead.resolve('ok');
-    await flushBackgroundTasks();
+    await save;
 
     expect(heads.get(`identity:${mother.id.valueOf()}`)).toEqual(
       expect.objectContaining({
