@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "local": "nodemon",
     "local:start": "node --inspect=0.0.0.0:9229 -r ts-node/register -r tsconfig-paths/register src/index.ts",
-    "postinstall": "node scripts/patch-helia-bitswap-limited-connections.js && node scripts/patch-orbitdb-limited-connections.js",
+    "postinstall": "node scripts/patch-helia-bitswap-limited-connections.js && node scripts/patch-orbitdb-limited-connections.js && node scripts/patch-libp2p-kad-dht-routing-table.js",
     "test": "npm-run-all lint test:unit test:api test:consumer test:scheduler",
     "test:unit": "jest --passWithNoTests",
     "test:api": "NODE_ENV=test cucumber-js -p api --publish-quiet",
