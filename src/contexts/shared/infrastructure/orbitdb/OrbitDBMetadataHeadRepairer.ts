@@ -1,5 +1,6 @@
 import { CriticalRepairResult } from './CriticalRepairResult';
 import OrbitDBIdentityMetadataHeadRepairer from './OrbitDBIdentityMetadataHeadRepairer';
+import OrbitDBKeychainMetadataHeadRepairer from './OrbitDBKeychainMetadataHeadRepairer';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 import { RepairResult } from './RepairResult';
@@ -9,6 +10,7 @@ export default class OrbitDBMetadataHeadRepairer {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly identityHeadRepairer: OrbitDBIdentityMetadataHeadRepairer,
+    private readonly keychainHeadRepairer: OrbitDBKeychainMetadataHeadRepairer,
   ) {}
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,15 +48,6 @@ export default class OrbitDBMetadataHeadRepairer {
     const value = document[attribute];
 
     return this.isStringArray(value) ? value : [];
-  }
-
-  private ownerIdentityIdFrom(
-    document: Record<string, unknown>,
-  ): string | undefined {
-    return (
-      this.stringValue(document, 'ownerIdentityId') ||
-      this.stringValue(document, 'id')
-    );
   }
 
   private communityIdFrom(
@@ -291,42 +284,6 @@ export default class OrbitDBMetadataHeadRepairer {
     }
 
     return latestDocuments.length;
-  }
-
-  private async repairKeychainHeads(): Promise<number> {
-    const documents = await this.queryRepairDocuments(
-      'keychains',
-      (document) =>
-        this.isLiveDocument(document) &&
-        Boolean(this.ownerIdentityIdFrom(document)),
-      'OrbitDBMetadataHeadRepairer.repairKeychainHeads',
-    );
-
-    for (const document of documents) {
-      const cid = this.stringValue(document, 'cid');
-
-      if (!cid) {
-        continue;
-      }
-
-      await this.registry.putHead(`keychain-cid:${cid}`, document);
-    }
-
-    const latestDocuments = this.deduplicateBy(documents, (document) =>
-      this.ownerIdentityIdFrom(document),
-    );
-
-    for (const document of latestDocuments) {
-      const ownerIdentityId = this.ownerIdentityIdFrom(document);
-
-      if (!ownerIdentityId) {
-        continue;
-      }
-
-      await this.registry.putHead(`keychain:${ownerIdentityId}`, document);
-    }
-
-    return documents.length;
   }
 
   private isConversationDocument(document: Record<string, unknown>): boolean {
@@ -1324,7 +1281,7 @@ export default class OrbitDBMetadataHeadRepairer {
         identities: await this.identityHeadRepairer.repair(),
       }),
       keychains: async () => ({
-        keychains: await this.repairKeychainHeads(),
+        keychains: await this.keychainHeadRepairer.repair(),
       }),
       messages: () => this.repairMessageStore(),
       notifications: async () => ({
@@ -1342,7 +1299,7 @@ export default class OrbitDBMetadataHeadRepairer {
       await Promise.all([
         this.repairCommunityHeads(),
         this.identityHeadRepairer.repair(),
-        this.repairKeychainHeads(),
+        this.keychainHeadRepairer.repair(),
         this.repairNotificationIndexes(),
       ]);
 
