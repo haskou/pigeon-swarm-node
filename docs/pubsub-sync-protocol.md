@@ -2,7 +2,7 @@
 
 ## Identity presence leases
 
-`presence.v2.identity_presence.was_updated` replicates ephemeral presence over
+`presence.v1.identity_presence.was_updated` replicates ephemeral presence over
 the domain-event pub/sub transport. It is never persisted in OrbitDB or IPFS.
 
 Each event identifies the lease owner with `ownerNodeId`. Nodes keep leases by

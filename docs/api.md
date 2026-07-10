@@ -1180,7 +1180,7 @@ refreshed, backend emits:
 {
   "type": "domain_event",
   "event": {
-    "type": "presence.v2.identity_presence.was_updated",
+    "type": "presence.v1.identity_presence.was_updated",
     "aggregate_id": "<identityId>",
     "attributes": {
       "identityId": "<identityId>",
