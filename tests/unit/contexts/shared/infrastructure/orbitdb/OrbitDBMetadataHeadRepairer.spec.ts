@@ -1,4 +1,5 @@
 import OrbitDBIdentityMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBIdentityMetadataHeadRepairer';
+import OrbitDBKeychainMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBKeychainMetadataHeadRepairer';
 import OrbitDBMetadataHeadRepairer from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMetadataHeadRepairer';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -49,6 +50,7 @@ describe('OrbitDBMetadataHeadRepairer', () => {
     repairer = new OrbitDBMetadataHeadRepairer(
       registry,
       new OrbitDBIdentityMetadataHeadRepairer(registry),
+      new OrbitDBKeychainMetadataHeadRepairer(registry),
     );
   });
 
