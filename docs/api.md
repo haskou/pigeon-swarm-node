@@ -964,7 +964,8 @@ resolved from the replication metadata created during upload or received through
 network sync. If metadata is unknown, the endpoint falls back to
 `application/octet-stream`. If the CID points to existing JSON content, the
 endpoint still returns that JSON document for compatibility with identities,
-keychains and private upload documents.
+keychains and private upload documents. Reading a CID may populate Helia's local
+block cache, but it does not pin the content or advertise this node as a provider.
 
 ### Publish private content
 
@@ -1073,6 +1074,8 @@ Implemented:
   only a few nodes
 - periodically pin missing local responsibilities and release safe extra local
   replicas
+- pin and advertise only content published by this node or replicas explicitly
+  assigned to it; ordinary IPFS and OrbitDB reads do not create replica ownership
 - keep per-CID responsibility data internal to the maintenance scheduler
 
 ## Link Preview HTTP API

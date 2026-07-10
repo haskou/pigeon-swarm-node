@@ -2,6 +2,7 @@ import ReplicatedContentStorage from '@app/contexts/content-replication/applicat
 import ContentReplicationStatusFinder from '@app/contexts/content-replication/application/find-status/ContentReplicationStatusFinder';
 import ContentReplicationMaintainer from '@app/contexts/content-replication/application/maintain/ContentReplicationMaintainer';
 import ContentReplicaClaimRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicaClaimRepository';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 
@@ -61,6 +62,7 @@ describe('ContentReplicationMaintainer', () => {
 
   it('continues maintaining replicas when one responsible CID cannot be fetched', async () => {
     const publishedEvents: DomainEvent[][] = [];
+    const providedReplicas: ContentId[] = [];
     const savedClaims: unknown[] = [];
     const claimRepository: ContentReplicaClaimRepository = {
       findByCids: async () => [],
@@ -78,7 +80,9 @@ describe('ContentReplicationMaintainer', () => {
         return {};
       },
       findBytesInNetwork: async () => Buffer.from([]),
-      provideInNetwork: async (): Promise<void> => undefined,
+      provideInNetwork: async (_cid: ContentId): Promise<void> => {
+        providedReplicas.push(_cid);
+      },
       removeFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
@@ -102,10 +106,15 @@ describe('ContentReplicationMaintainer', () => {
     });
     expect(savedClaims).toHaveLength(1);
     expect(publishedEvents).toHaveLength(1);
+    expect(providedReplicas).toHaveLength(1);
+    expect(providedReplicas[0].isEqual(new ContentId('bafy-success'))).toBe(
+      true,
+    );
   });
 
   it('fetches public upload replicas as bytes', async () => {
     const fetchedBytes: string[] = [];
+    const providedReplicas: ContentId[] = [];
     const claimRepository: ContentReplicaClaimRepository = {
       findByCids: async () => [],
       save: async () => undefined,
@@ -120,7 +129,9 @@ describe('ContentReplicationMaintainer', () => {
       findJSONInNetwork: async () => {
         throw new Error('Public uploads must not be fetched as JSON.');
       },
-      provideInNetwork: async (): Promise<void> => undefined,
+      provideInNetwork: async (_cid: ContentId): Promise<void> => {
+        providedReplicas.push(_cid);
+      },
       removeFromNetwork: async (): Promise<void> => undefined,
     };
     const eventPublisher: DomainEventPublisher = {
@@ -165,6 +176,75 @@ describe('ContentReplicationMaintainer', () => {
     expect(result.failedClaims).toBe(0);
     expect(result.claimedReplicas).toBe(1);
     expect(fetchedBytes).toEqual(['bafy-public']);
+    expect(providedReplicas).toHaveLength(1);
+    expect(providedReplicas[0].isEqual(new ContentId('bafy-public'))).toBe(
+      true,
+    );
+  });
+
+  it('does not claim a replica when retaining it fails', async () => {
+    const claimRepository: ContentReplicaClaimRepository = {
+      findByCids: async () => [],
+      save: async () => {
+        throw new Error('An unretained replica must not be claimed.');
+      },
+      withdraw: async () => undefined,
+    };
+    const contentStorage = {
+      findBytesInNetwork: async () => Buffer.from('public'),
+      findJSONInNetwork: async () => ({}),
+      provideInNetwork: async (): Promise<void> => {
+        throw new Error('pin failed');
+      },
+      removeFromNetwork: async (): Promise<void> => undefined,
+    };
+    const eventPublisher: DomainEventPublisher = {
+      publish: async () => {
+        throw new Error('An unretained replica must not be announced.');
+      },
+    };
+
+    const result = await new ContentReplicationMaintainer(
+      {
+        find: async () => ({
+          contents: [
+            {
+              cid: 'bafy-unretained',
+              contentType: 'image/png',
+              context: 'ipfs_public_upload',
+              createdAt: 1770000000000,
+              filename: 'avatar.png',
+              networks: [
+                {
+                  activeNodeCount: 2,
+                  desiredReplicas: 2,
+                  knownReplicaNodeIds: [] as string[],
+                  knownReplicas: 0,
+                  localResponsible: true,
+                  networkId,
+                  releaseLocalReplica: false,
+                  responsibleNodeIds: [localNodeId],
+                },
+              ],
+              priority: 'normal',
+              sizeBytes: 128,
+              updatedAt: 1770000000000,
+            },
+          ],
+          localNodeId,
+        }),
+      } as unknown as ContentReplicationStatusFinder,
+      claimRepository,
+      contentStorage as unknown as ReplicatedContentStorage,
+      eventPublisher,
+    ).maintain();
+
+    expect(result).toEqual({
+      claimedReplicas: 0,
+      failedClaims: 1,
+      failedReleases: 0,
+      releasedReplicas: 0,
+    });
   });
 
   it('releases extra local replicas marked by replication status', async () => {

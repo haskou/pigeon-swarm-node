@@ -305,36 +305,35 @@ describe('PublicIPFS', () => {
   });
 
   describe('getJSON', () => {
-    it('should pin fetched JSON content for local availability', async () => {
+    it('should not retain or advertise content that is only read', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
       const cid = new IPFSId('bafymockcid');
 
       const result = await connection.getJSON(cid);
+      await flushPromises();
 
       expect(result).toEqual({ test: true });
+      expect(mockHeliaNode.pins.add).not.toHaveBeenCalled();
+      expect(mockHeliaNode.routing.provide).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addJSON', () => {
+    it('should retain content created by this node', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      await connection.addJSON({ test: true });
+      await flushPromises();
+
       expect(mockHeliaNode.pins.add).toHaveBeenCalledWith(
         expect.objectContaining({ toString: expect.any(Function) }),
         {
           metadata: {
-            strategy: 'read-through-cache',
+            strategy: 'retained-content',
           },
           signal: undefined,
         },
       );
-    });
-
-    it('should not republish provider records on repeated read-through fetches', async () => {
-      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
-      const cid = new IPFSId('bafymockcid');
-
-      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
-      mockHeliaNode.routing.provide.mockResolvedValue(undefined);
-
-      await connection.getJSON(cid);
-      await connection.getJSON(cid);
-      await flushPromises();
-
-      expect(mockHeliaNode.routing.provide).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -360,10 +359,48 @@ describe('PublicIPFS', () => {
         providers: ['connected-peer'],
         signal,
       });
+      expect(mockHeliaNode.pins.add).not.toHaveBeenCalled();
+      expect(mockHeliaNode.routing.provide).not.toHaveBeenCalled();
     });
   });
 
   describe('provideContent', () => {
+    it('should retain content before advertising it', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.routing.provide.mockResolvedValue(undefined);
+
+      await connection.provideContent(new IPFSId('bafymockcid'));
+
+      expect(mockHeliaNode.pins.add).toHaveBeenCalledWith(
+        expect.objectContaining({ toString: expect.any(Function) }),
+        {
+          metadata: {
+            strategy: 'retained-content',
+          },
+          signal: undefined,
+        },
+      );
+      expect(mockHeliaNode.pins.add.mock.invocationCallOrder[0]).toBeLessThan(
+        mockHeliaNode.routing.provide.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('should fail instead of advertising content that cannot be retained', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.pins.add.mockImplementation(() => {
+        throw new Error('pin failed');
+      });
+
+      await expect(
+        connection.provideContent(new IPFSId('bafymockcid')),
+      ).rejects.toThrow('pin failed');
+      expect(mockHeliaNode.routing.provide).not.toHaveBeenCalled();
+    });
+
     it('should defer provider publication when there are no connected peers', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 

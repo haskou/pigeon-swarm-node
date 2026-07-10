@@ -741,19 +741,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     void this.provideContent(cid).catch((): undefined => undefined);
   }
 
-  private pinReadThroughContent(
-    parsedCid: ParsedCidLike,
-    signal?: AbortSignal,
-  ): void {
-    this.pinningStrategy
-      .ensurePinned(this.heliaCore, parsedCid, signal)
-      .catch(() => {
-        Kernel.logger.debug?.(
-          `Skipped IPFS content pinning for local availability: ${parsedCid.toString()}`,
-        );
-      });
-  }
-
   private async localDagDescendantCids(
     cid: ParsedCidLike,
     signal?: AbortSignal,
@@ -896,8 +883,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
       chunks.push(
         ...(await this.collectRawBlockBytes(parsedCid, retrievalOptions)),
       );
-      this.pinReadThroughContent(parsedCid, signal);
-      this.provideContentInBackground(cid);
 
       return Buffer.concat(chunks);
     }
@@ -916,9 +901,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     )) {
       chunks.push(chunk);
     }
-
-    this.pinReadThroughContent(parsedCid, signal);
-    this.provideContentInBackground(cid);
 
     return Buffer.concat(chunks);
   }
@@ -995,9 +977,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
       (await this.createContentRetrievalOptions(cid, signal)) as never,
     );
 
-    this.pinReadThroughContent(parsedCid, signal);
-    this.provideContentInBackground(cid);
-
     return json;
   }
 
@@ -1009,6 +988,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       cid.valueOf(),
     );
 
+    await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
     await this.publishContentProvider(parsedCid, cid, signal);
   }
 
