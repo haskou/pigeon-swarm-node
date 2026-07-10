@@ -611,7 +611,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     if (!this.hasPeers()) {
       this.queueContentProviderRetry(cid);
 
-      return;
+      throw new Error('No IPFS peers available for provider publication.');
     }
 
     const routingAbort = this.createRoutingAbortSignal(signal);
@@ -630,15 +630,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
         signal: routingAbort.signal,
       });
     } catch (error: unknown) {
-      if (!this.hasPeers()) {
-        this.queueContentProviderRetry(cid);
-      }
+      this.queueContentProviderRetry(cid);
 
       Kernel.logger.debug?.(
-        `IPFS provider publication skipped for cid="${cid.valueOf()}": ${String(
+        `IPFS provider publication failed for cid="${cid.valueOf()}": ${String(
           error,
         )}`,
       );
+
+      throw error;
     } finally {
       clearTimeout(routingAbort.timeout);
     }
@@ -692,10 +692,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
       })
       .finally(() => {
         this.publishingPendingContentProviders = false;
-
-        if (this.pendingContentProviderCids.size > 0 && this.hasPeers()) {
-          this.publishPendingContentProviders();
-        }
       });
   }
 

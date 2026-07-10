@@ -404,7 +404,9 @@ describe('PublicIPFS', () => {
     it('should defer provider publication when there are no connected peers', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 
-      await connection.provideContent(new IPFSId('bafymockcid'));
+      await expect(
+        connection.provideContent(new IPFSId('bafymockcid')),
+      ).rejects.toThrow('No IPFS peers available for provider publication.');
 
       expect(mockHeliaNode.routing.provide).not.toHaveBeenCalled();
     });
@@ -412,8 +414,12 @@ describe('PublicIPFS', () => {
     it('should publish deferred provider records when a peer connects', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
 
-      await connection.provideContent(new IPFSId('bafymockcid'));
-      await connection.provideContent(new IPFSId('bafymockcid'));
+      await expect(
+        connection.provideContent(new IPFSId('bafymockcid')),
+      ).rejects.toThrow('No IPFS peers available for provider publication.');
+      await expect(
+        connection.provideContent(new IPFSId('bafymockcid')),
+      ).rejects.toThrow('No IPFS peers available for provider publication.');
       mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
       mockHeliaNode.routing.provide.mockResolvedValue(undefined);
 
@@ -425,6 +431,25 @@ describe('PublicIPFS', () => {
         expect.objectContaining({ toString: expect.any(Function) }),
         { signal: expect.any(AbortSignal) },
       );
+    });
+
+    it('should fail and queue a retry when provider publication fails', async () => {
+      const connection = await PublicIPFS.create({ storageLocation: 'memory' });
+
+      mockHeliaNode.libp2p.getPeers.mockReturnValue(['peer-id']);
+      mockHeliaNode.routing.provide.mockRejectedValueOnce(
+        new Error('routing timeout'),
+      );
+
+      await expect(
+        connection.provideContent(new IPFSId('bafymockcid')),
+      ).rejects.toThrow('routing timeout');
+
+      mockHeliaNode.routing.provide.mockResolvedValue(undefined);
+      emitPeerConnect();
+      await flushPromises();
+
+      expect(mockHeliaNode.routing.provide).toHaveBeenCalledTimes(2);
     });
 
     it('should publish content provider records when peers are connected', async () => {
