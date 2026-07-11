@@ -972,6 +972,7 @@ async function request<T = unknown>(
       body: body === undefined ? undefined : JSON.stringify(body),
       headers: {
         Connection: 'close',
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         ...(signer
           ? signHeaders(signer, method, canonicalPath, body ?? {})
           : {}),
