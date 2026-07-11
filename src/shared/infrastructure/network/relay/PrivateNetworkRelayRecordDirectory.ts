@@ -3,10 +3,10 @@ import { libp2pKeyAdapter } from '@app/contexts/shared/infrastructure/ipfs/netwo
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
-import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
 
+import PrivateNetworkRelayDirectorySettings from './PrivateNetworkRelayDirectorySettings';
 import { PrivateNetworkRelayRecord } from './PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from './PrivateNetworkRelayRecordCodec';
 import { PrivateNetworkRelayRecordEnvelope } from './PrivateNetworkRelayRecordEnvelope';
@@ -23,10 +23,6 @@ export type PrivateRelayListenOptions = {
 };
 
 export default class PrivateNetworkRelayRecordDirectory {
-  private static readonly defaultRelayRecordPublicationIntervalMs = 60 * 60_000;
-
-  private static readonly failedRelayRecordPublicationRetryMs = 15_000;
-
   private static readonly maxCachedRelayRecordDialFailures = 3;
 
   private static readonly inlineIPNSValuePrefix =
@@ -37,8 +33,6 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   public static readonly relayRecordCacheNamespace =
     'private_relay_record_cache';
-
-  private readonly storagePath: string = pigeonEnvironment().IPFS_STORAGE_PATH;
 
   private readonly discoveryIntervals: Record<
     string,
@@ -105,72 +99,10 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private publicConnectionConfigurationKey?: string;
 
-  constructor(private readonly localDatabase: EmbeddedLocalDatabase) {}
-
-  private getPublicRelayDirectoryStorageLocation(): string {
-    return `${this.storagePath}/public-relay-record-directory`;
-  }
-
-  private getRelayRecordTtlMs(): number {
-    return pigeonEnvironment().PIGEON_RELAY_RECORD_TTL_MS;
-  }
-
-  private getRelayRecordDiscoveryIntervalMs(): number {
-    return pigeonEnvironment().PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS;
-  }
-
-  private getActiveRelayRecordDiscoveryIntervalMs(): number {
-    const environment = pigeonEnvironment();
-    const configuredIntervalMs =
-      environment.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS ||
-      environment.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
-
-    if (Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0) {
-      return configuredIntervalMs;
-    }
-
-    return 5 * 60_000;
-  }
-
-  private getActiveRelayConnectionGraceMs(): number {
-    const configuredGraceMs =
-      pigeonEnvironment().PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS;
-
-    if (Number.isFinite(configuredGraceMs) && configuredGraceMs > 0) {
-      return configuredGraceMs;
-    }
-
-    return 60_000;
-  }
-
-  private getRelayRecordPublicationIntervalMs(): number {
-    const environment = pigeonEnvironment();
-    const configuredIntervalMs =
-      environment.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS;
-
-    if (Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0) {
-      return configuredIntervalMs;
-    }
-
-    const configuredRefreshSeconds =
-      environment.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
-
-    if (
-      Number.isFinite(configuredRefreshSeconds) &&
-      configuredRefreshSeconds > 0
-    ) {
-      return configuredRefreshSeconds * 1000;
-    }
-
-    const Directory = PrivateNetworkRelayRecordDirectory;
-    const defaultInterval = Directory.defaultRelayRecordPublicationIntervalMs;
-
-    return defaultInterval;
-  }
-
-  private getFailedRelayRecordPublicationRetryMs(): number {
-    return PrivateNetworkRelayRecordDirectory.failedRelayRecordPublicationRetryMs;
-  }
+  constructor(
+    private readonly localDatabase: EmbeddedLocalDatabase,
+    private readonly settings: PrivateNetworkRelayDirectorySettings,
+  ) {}
 
   private ensureActivePublicationGeneration(networkId: string): number {
     const currentGeneration = this.activePublicationGenerations[networkId];
@@ -200,58 +132,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     return this.activePublicationGenerations[networkId] === generation;
   }
 
-  private getPublicPeerWaitMs(): number {
-    const configuredWaitMs =
-      pigeonEnvironment().PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS;
-
-    if (!Number.isFinite(configuredWaitMs) || configuredWaitMs < 0) {
-      return 8000;
-    }
-
-    return Math.min(configuredWaitMs, 10_000);
-  }
-
-  private getRelayRecordIPNSWindowMs(): number {
-    return pigeonEnvironment().PIGEON_RELAY_RECORD_IPNS_WINDOW_MS;
-  }
-
-  private getRoutingRecordTimeoutMs(): number {
-    const environment = pigeonEnvironment();
-    const configuredTimeoutMs =
-      environment.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
-      environment.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS;
-
-    if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
-      return configuredTimeoutMs;
-    }
-
-    return 15_000;
-  }
-
-  private getPrivateRelayDialTimeoutMs(): number {
-    const environment = pigeonEnvironment();
-    const configuredTimeoutMs =
-      environment.PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS ||
-      environment.PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS ||
-      environment.PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS;
-
-    if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
-      return configuredTimeoutMs;
-    }
-
-    return 15_000;
-  }
-
-  private isPubSubRecordEnabled(): boolean {
-    return true;
-  }
-
-  private isGenericDHTRecordEnabled(): boolean {
-    return true;
-  }
-
   private getCurrentIPNSWindowId(): number {
-    return Math.floor(Date.now() / this.getRelayRecordIPNSWindowMs());
+    return Math.floor(Date.now() / this.settings.getIPNSWindowMs());
   }
 
   private getDiscoveryIPNSWindowIds(): number[] {
@@ -287,7 +169,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      this.getRoutingRecordTimeoutMs(),
+      this.settings.getRoutingTimeoutMs(),
     );
 
     return { signal: controller.signal, timeout };
@@ -298,7 +180,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     timeout: ReturnType<typeof setTimeout>;
   } {
     const controller = new AbortController();
-    const timeoutMs = this.getPrivateRelayDialTimeoutMs();
+    const timeoutMs = this.settings.getPrivateRelayDialTimeoutMs();
     const timeout = setTimeout(
       () =>
         controller.abort(
@@ -329,7 +211,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       listenAddresses: options.listenAddresses,
       privateKey: options.sharedPrivateKey,
       relayDataLimitBytes: options.relayDataLimitBytes,
-      storageLocation: this.getPublicRelayDirectoryStorageLocation(),
+      storageLocation: this.settings.getPublicRelayStorageLocation(),
     }).then(async (connection) => {
       await this.publicRelayDiscovery.startConnection(connection);
 
@@ -342,12 +224,12 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): Promise<IPFSConnection> {
     this.publicConnection ??= this.createPublicConnection({
       enableRelayServer: false,
-      relayDataLimitBytes: pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES,
+      relayDataLimitBytes: this.settings.getRelayDataLimitBytes(),
       sharedPrivateKey,
     });
     this.publicConnectionConfigurationKey ??= this.publicConnectionKey({
       enableRelayServer: false,
-      relayDataLimitBytes: pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES,
+      relayDataLimitBytes: this.settings.getRelayDataLimitBytes(),
       sharedPrivateKey,
     });
 
@@ -385,7 +267,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     publicConnection: IPFSConnection,
   ): Promise<boolean> {
     const hasPeers = await publicConnection.waitForPeers(
-      this.getPublicPeerWaitMs(),
+      this.settings.getPublicPeerWaitMs(),
     );
 
     if (!hasPeers) {
@@ -646,7 +528,9 @@ export default class PrivateNetworkRelayRecordDirectory {
     const lastObservedAt =
       this.activeRelayRecordObservedAt[network.getId()] || 0;
 
-    return Date.now() - lastObservedAt < this.getActiveRelayConnectionGraceMs();
+    return (
+      Date.now() - lastObservedAt < this.settings.getActiveConnectionGraceMs()
+    );
   }
 
   private findActiveRelayRecord(
@@ -704,8 +588,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       this.activeRelayDiscoveryAttempts[network.getId()] || 0;
 
     return (
-      Date.now() - lastAttemptAt >=
-      this.getActiveRelayRecordDiscoveryIntervalMs()
+      Date.now() - lastAttemptAt >= this.settings.getActiveDiscoveryIntervalMs()
     );
   }
 
@@ -1137,24 +1020,20 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): Promise<boolean> {
     let published = false;
 
-    if (this.isPubSubRecordEnabled()) {
-      published =
-        (await this.publishRelayPubSubRecord(
-          publicConnection,
-          network,
-          envelope,
-        )) || published;
-    }
+    published =
+      (await this.publishRelayPubSubRecord(
+        publicConnection,
+        network,
+        envelope,
+      )) || published;
 
-    if (this.isGenericDHTRecordEnabled()) {
-      published =
-        (await this.publishGenericDHTRelayRecord(
-          publicConnection,
-          network,
-          lookupKey,
-          envelope,
-        )) || published;
-    }
+    published =
+      (await this.publishGenericDHTRelayRecord(
+        publicConnection,
+        network,
+        lookupKey,
+        envelope,
+      )) || published;
 
     return (
       (await this.publishRelayIPNSRecord(
@@ -1223,12 +1102,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
     connectRelayRecord: boolean,
   ): Promise<void> {
-    if (!this.isGenericDHTRecordEnabled()) {
-      this.infoWhenRelayRecordIsMissing(publicConnection, network);
-
-      return;
-    }
-
     const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const routingAbort = this.createRoutingAbortSignal();
 
@@ -1329,11 +1202,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      if (
-        connectRelayRecords &&
-        this.isPubSubRecordEnabled() &&
-        (await this.dialCachedRelayRecord(network))
-      ) {
+      if (connectRelayRecords && (await this.dialCachedRelayRecord(network))) {
         return;
       }
 
@@ -1483,7 +1352,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         sharedPrivateKey,
         publicationGeneration,
       );
-    }, this.getFailedRelayRecordPublicationRetryMs());
+    }, this.settings.getPublicationRetryMs());
 
     timeout.unref?.();
     this.publicationRetryTimeouts[networkId] = timeout;
@@ -1594,7 +1463,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     const issuedAt = Date.now();
     const relayRecord: PrivateNetworkRelayRecord = {
-      expiresAt: issuedAt + this.getRelayRecordTtlMs(),
+      expiresAt: issuedAt + this.settings.getRelayRecordTtlMs(),
       issuedAt,
       multiaddrs,
       peerId: network.getPeerId(),
@@ -1687,7 +1556,7 @@ export default class PrivateNetworkRelayRecordDirectory {
           sharedPrivateKey,
           publicationGeneration,
         ),
-      this.getRelayRecordPublicationIntervalMs(),
+      this.settings.getPublicationIntervalMs(),
     );
 
     publicationInterval.unref?.();
@@ -1730,7 +1599,7 @@ export default class PrivateNetworkRelayRecordDirectory {
             ` error=${String(error)}`,
         );
       });
-    }, this.getRelayRecordDiscoveryIntervalMs());
+    }, this.settings.getDiscoveryIntervalMs());
 
     interval.unref?.();
     this.discoveryIntervals[networkId] = interval;
@@ -1790,9 +1659,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
 
-    if (this.isPubSubRecordEnabled()) {
-      await this.subscribeRelayRecordTopic(publicConnection, network);
-    }
+    await this.subscribeRelayRecordTopic(publicConnection, network);
 
     if (
       discoveryState.shouldConnectRelayRecords &&

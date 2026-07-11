@@ -277,6 +277,11 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5RGlyZWN0b3J5U2V0dGluZ3NfX1ByaXZhdGVOZXR3b3JrUmVsYXlEaXJlY3RvcnlTZXR0aW5ncw==:
+    class: /shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings
+    arguments: []
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkQ29kZWNfX1ByaXZhdGVOZXR3b3JrUmVsYXlSZWNvcmRDb2RlYw==:
     class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec
     arguments: []
@@ -847,13 +852,6 @@ services:
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0xvY2FsUHJvY2Vzc2VkRG9tYWluRXZlbnRJZGVtcG90ZW5jeVN0b3JlX19Mb2NhbFByb2Nlc3NlZERvbWFpbkV2ZW50SWRlbXBvdGVuY3lTdG9yZQ==:
     class: >-
       /shared/infrastructure/messageBus/LocalProcessedDomainEventIdempotencyStore
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5:
-    class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
@@ -1437,6 +1435,15 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX21lbW9yeV9fTWVtb3J5TWVzc2FnZUJ1c0FkYXB0ZXJfX01lbW9yeU1lc3NhZ2VCdXNBZGFwdGVy
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX2xpYnAycF9fTGlicDJwR29zc2lwc3ViTWVzc2FnZUJ1c0FkYXB0ZXJfX0xpYnAycEdvc3NpcHN1YkFkYXB0ZXI=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5X19Qcml2YXRlTmV0d29ya1JlbGF5UmVjb3JkRGlyZWN0b3J5:
+    class: /shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19FbWJlZGRlZExvY2FsRGF0YWJhc2VfX0VtYmVkZGVkTG9jYWxEYXRhYmFzZQ==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19Qcml2YXRlTmV0d29ya1JlbGF5RGlyZWN0b3J5U2V0dGluZ3NfX1ByaXZhdGVOZXR3b3JrUmVsYXlEaXJlY3RvcnlTZXR0aW5ncw==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX25ldHdvcmtfX3JlbGF5X19QdWJsaWNSZWxheVJ1bnRpbWVfX1B1YmxpY1JlbGF5UnVudGltZQ==:
