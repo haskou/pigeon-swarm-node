@@ -1,4 +1,3 @@
-/* eslint-disable max-params */
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
@@ -17,18 +16,16 @@ import { IdentityMustHaveAtLeastOneNetworkError } from './errors/IdentityMustHav
 import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignatureError';
 import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
+import { IdentityPublication } from './IdentityPublication';
 import { IdentitySignaturePayload } from './IdentitySignaturePayload';
 import { Profile } from './Profile';
 import { EncryptedMasterKey } from './value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentitySigningKey } from './value-objects/IdentitySigningKey';
-import { IdentityVersion } from './value-objects/IdentityVersion';
 import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class Identity extends AggregateRoot {
-  private readonly previousIdentityExternalIdentifier?: IdentityExternalIdentifier;
-
   public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
     return new Identity(
       new IdentityId(primitives.id),
@@ -38,15 +35,7 @@ export class Identity extends AggregateRoot {
       UniqueObjectArray.fromArray(
         primitives.networks.map((networkId) => new NetworkId(networkId)),
       ),
-      Profile.fromPrimitives(primitives.profile),
-      new Timestamp(primitives.timestamp),
-      new Signature(primitives.signature),
-      new IdentityVersion(primitives.version),
-      primitives.previousIdentityExternalIdentifier
-        ? new IdentityExternalIdentifier(
-            primitives.previousIdentityExternalIdentifier,
-          )
-        : undefined,
+      IdentityPublication.fromPrimitives(primitives),
     );
   }
 
@@ -68,21 +57,15 @@ export class Identity extends AggregateRoot {
     return identity;
   }
 
-  // eslint-disable-next-line no-restricted-syntax
   constructor(
     private readonly id: IdentityId,
     private readonly signingKey: IdentitySigningKey,
     private readonly encryptedMasterKey: EncryptedMasterKey,
     private readonly masterKeyDerivation: MasterKeyDerivation,
     private readonly networks: UniqueObjectArray<NetworkId>,
-    private profile: Profile,
-    private timestamp: Timestamp,
-    private signature: Signature,
-    private readonly version: IdentityVersion,
-    previousReference?: IdentityExternalIdentifier,
+    private readonly publication: IdentityPublication,
   ) {
     super();
-    this.previousIdentityExternalIdentifier = previousReference;
 
     assert(
       this.signingKey.identifies(this.id),
@@ -92,7 +75,7 @@ export class Identity extends AggregateRoot {
       new IdentitySignatureDomainService().isValidSignature(
         this.id,
         IdentitySignaturePayload.fromPrimitives(this.toPrimitives()),
-        this.signature,
+        this.publication.getSignature(),
       ),
       new InvalidIdentitySignatureError(),
     );
@@ -125,7 +108,7 @@ export class Identity extends AggregateRoot {
   }
 
   public hasHandle(handle: ProfileHandle): boolean {
-    return this.profile.hasHandle(handle);
+    return this.publication.hasHandle(handle);
   }
 
   public getNetworkIds(): NetworkId[] {
@@ -133,15 +116,15 @@ export class Identity extends AggregateRoot {
   }
 
   public hasNoPreviousReference(): boolean {
-    return this.previousIdentityExternalIdentifier === undefined;
+    return this.publication.hasNoPreviousReference();
   }
 
   public getPreviousReference(): IdentityExternalIdentifier | undefined {
-    return this.previousIdentityExternalIdentifier;
+    return this.publication.getPreviousReference();
   }
 
   public isFirstVersion(): boolean {
-    return this.version.isFirst();
+    return this.publication.isFirstVersion();
   }
 
   public isIdentifiedBy(id: IdentityId): boolean {
@@ -149,11 +132,11 @@ export class Identity extends AggregateRoot {
   }
 
   public isNewerThan(other: Identity): boolean {
-    return this.version.isGreaterThan(other.version);
+    return this.publication.isNewerThan(other.publication);
   }
 
   public isNextVersionAfter(previous: Identity): boolean {
-    return this.version.isNextAfter(previous.version);
+    return this.publication.isNextVersionAfter(previous.publication);
   }
 
   public usesSameSigningKeyAs(previous: Identity): boolean {
@@ -177,12 +160,7 @@ export class Identity extends AggregateRoot {
       id: this.id.valueOf(),
       masterKeyDerivation: this.masterKeyDerivation.toPrimitives(),
       networks: this.networks.toArray().map((networkId) => networkId.valueOf()),
-      previousIdentityExternalIdentifier:
-        this.previousIdentityExternalIdentifier?.valueOf(),
-      profile: this.profile.toPrimitives(),
-      signature: this.signature.valueOf(),
-      timestamp: this.timestamp.valueOf(),
-      version: this.version.valueOf(),
+      ...this.publication.toPrimitives(),
     };
   }
 
@@ -200,7 +178,7 @@ export class Identity extends AggregateRoot {
         previousIdentityExternalIdentifier.valueOf(),
       signature: '',
       timestamp: Timestamp.now().valueOf(),
-      version: this.version.next().valueOf(),
+      version: this.publication.nextVersion().valueOf(),
     };
     const signature = await this.signPublication(
       IdentitySignaturePayload.fromPrimitives(unsignedPublication),
@@ -233,7 +211,7 @@ export class Identity extends AggregateRoot {
       profile: profile.toPrimitives(),
       signature: '',
       timestamp: Timestamp.now().valueOf(),
-      version: this.version.next().valueOf(),
+      version: this.publication.nextVersion().valueOf(),
     };
     const signature = await this.signPublication(
       IdentitySignaturePayload.fromPrimitives(unsignedPublication),

@@ -109,20 +109,18 @@ export class HeliaIPFSParser {
 
     return {
       connectionGater: {
-        // eslint-disable-next-line @typescript-eslint/require-await
-        denyDialPeer: async (peerId: PeerId): Promise<boolean> => {
-          return HeliaIPFSParser.blockedPeers.includes(peerId.toString());
-        },
-        // eslint-disable-next-line @typescript-eslint/require-await
-        denyInboundEncryptedConnection: async (
-          peerId: PeerId,
-        ): Promise<boolean> => {
-          return HeliaIPFSParser.blockedPeers.includes(peerId.toString());
-        },
-        // eslint-disable-next-line @typescript-eslint/require-await
-        denyOutboundConnection: async (peerId: PeerId): Promise<boolean> => {
-          return HeliaIPFSParser.blockedPeers.includes(peerId.toString());
-        },
+        denyDialPeer: (peerId: PeerId): Promise<boolean> =>
+          Promise.resolve(
+            HeliaIPFSParser.blockedPeers.includes(peerId.toString()),
+          ),
+        denyInboundEncryptedConnection: (peerId: PeerId): Promise<boolean> =>
+          Promise.resolve(
+            HeliaIPFSParser.blockedPeers.includes(peerId.toString()),
+          ),
+        denyOutboundConnection: (peerId: PeerId): Promise<boolean> =>
+          Promise.resolve(
+            HeliaIPFSParser.blockedPeers.includes(peerId.toString()),
+          ),
       },
     };
   }
@@ -222,44 +220,34 @@ export class HeliaIPFSParser {
     };
   }
 
-  public static parsePrivateLibp2pConfig(
+  public static async parsePrivateLibp2pConfig(
     options: IPFSOptions,
     networkKey: NetworkPrivateKey,
   ): Promise<Libp2pDefaults> {
-    return HeliaIPFSParser.parseOptions(options, {
+    const parsedOptions = await HeliaIPFSParser.parseOptions(options, {
       persistentDatastore: false,
       privateNetwork: true,
       publicBootstrap: false,
-    }).then((parsedOptions) =>
-      Promise.resolve(parsedOptions.libp2p).then((libp2pConfig) => {
-        const privateLibp2pConfig = libp2pConfig as unknown as {
-          connectionGater?: unknown;
-          connectionProtector?: (components: unknown) => unknown;
-          privateKey?: unknown;
-        };
+    });
+    const libp2pConfig = parsedOptions.libp2p;
+    const privateLibp2pConfig = libp2pConfig as unknown as {
+      connectionGater?: unknown;
+      connectionProtector?: (components: unknown) => unknown;
+      privateKey?: unknown;
+    };
 
-        privateLibp2pConfig.connectionGater =
-          parsedOptions.libp2p.connectionGater;
-        privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
+    privateLibp2pConfig.connectionGater = parsedOptions.libp2p.connectionGater;
+    privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
+    privateLibp2pConfig.connectionProtector =
+      await heliaRuntimeAdapter.createPreSharedKey({
+        psk: HeliaIPFSParser.toSwarmPsk(
+          HeliaIPFSParser.extractPskSeed(networkKey),
+        ),
+      });
 
-        return (
-          heliaRuntimeAdapter
-            .createPreSharedKey({
-              psk: HeliaIPFSParser.toSwarmPsk(
-                HeliaIPFSParser.extractPskSeed(networkKey),
-              ),
-            })
-            // eslint-disable-next-line max-nested-callbacks
-            .then((connectionProtector) => {
-              privateLibp2pConfig.connectionProtector = connectionProtector;
-
-              return heliaRuntimeAdapter.withBootstrapRelays(
-                libp2pConfig,
-                options.manualRelayMultiaddrs,
-              );
-            })
-        );
-      }),
+    return heliaRuntimeAdapter.withBootstrapRelays(
+      libp2pConfig,
+      options.manualRelayMultiaddrs,
     );
   }
 }
