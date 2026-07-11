@@ -1,8 +1,4 @@
-import axios from 'axios';
-import * as https from 'https';
-
 import { BaseHeaders } from './BaseHeaders';
-import { BaseOptions } from './BaseOptions';
 import { BaseResponse } from './BaseResponse';
 import { HttpMethod } from './HttpMethod';
 import { Requester } from './Requester';
@@ -11,11 +7,52 @@ import { ResponseType, responses } from './ResponseType';
 export class BaseRequester implements Requester {
   constructor(
     private readonly url: string,
-    private readonly debug: boolean = false,
-    private readonly addRejectUnauthorizedAgent: boolean = false,
     private readonly responseType: ResponseType = responses.JSON,
   ) {
     this.url = url;
+  }
+
+  private buildUrl(route: string, qs?: Record<string, unknown>): URL {
+    let routeUrl = route !== '' ? `/${route}` : route;
+    routeUrl = routeUrl.replace(/\/\//g, '/');
+    const url = new URL(routeUrl, this.url);
+
+    for (const [key, value] of Object.entries(qs || {})) {
+      url.searchParams.set(key, String(value));
+    }
+
+    return url;
+  }
+
+  private buildHeaders(
+    headers: BaseHeaders | undefined,
+    hasBody: boolean,
+  ): Headers {
+    const requestHeaders = new Headers();
+
+    for (const [key, value] of Object.entries(headers || {})) {
+      requestHeaders.set(key, String(value));
+    }
+
+    if (hasBody) {
+      requestHeaders.set('content-type', 'application/json');
+    }
+
+    return requestHeaders;
+  }
+
+  private async parseResponse(response: Response): Promise<unknown> {
+    if (this.responseType === responses.ARRAYBUFFER) {
+      return response.arrayBuffer();
+    }
+
+    const text = await response.text();
+
+    if (this.responseType === responses.JSON && text.length > 0) {
+      return JSON.parse(text);
+    }
+
+    return text;
   }
 
   public async request<R = unknown>(
@@ -25,44 +62,18 @@ export class BaseRequester implements Requester {
     qs?: Record<string, unknown>,
     body?: Record<string, unknown>,
   ): Promise<BaseResponse<R>> {
-    let routeUrl = route !== '' ? `/${route}` : route;
-    routeUrl = routeUrl.replace(/\/\//g, '/');
-    const url = `${this.url}${routeUrl}`;
-    const requestConfig: BaseOptions = {
-      data: body,
-      headers,
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
+    const url = this.buildUrl(route, qs);
+    const response = await fetch(url, {
+      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: this.buildHeaders(headers, body !== undefined),
       method,
-      params: qs,
-      responseType: this.responseType,
-      url,
+    });
+
+    return {
+      data: (await this.parseResponse(response)) as R,
+      status: response.status,
+      statusText: response.statusText,
     };
-
-    if (this.debug) {
-      // Kernel.info(`Requester Config`, { requestConfig });
-    }
-
-    if (this.addRejectUnauthorizedAgent) {
-      requestConfig.httpsAgent = new https.Agent({
-        rejectUnauthorized: false,
-      });
-    }
-
-    try {
-      return await axios.request<R>(requestConfig);
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        // Return the error response instead of throwing
-        return {
-          data: error.response.data as R,
-          status: error.response.status,
-          statusText: error.response.statusText,
-        };
-      }
-      // For network errors or other non-response errors, still throw
-      throw error;
-    }
   }
 
   public async get<R = unknown>(

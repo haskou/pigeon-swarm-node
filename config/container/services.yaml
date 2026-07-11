@@ -253,7 +253,7 @@ services:
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2h0dHBfX0F4aW9zSHR0cENsaWVudF9fQXhpb3NIdHRwQ2xpZW50:
-    class: /shared/infrastructure/http/AxiosHttpClient
+    class: /shared/infrastructure/http/FetchHttpClient
     arguments: []
     abstract: false
     parent: null

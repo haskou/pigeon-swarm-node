@@ -1,12 +1,10 @@
 import 'reflect-metadata';
 import 'module-alias/register';
-
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/value-objects';
-import axios, { AxiosError } from 'axios';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
@@ -40,6 +38,75 @@ type CallSignalDeliveryResult = {
   attempts: number[];
   expiresAt: number;
   signalId: string;
+};
+
+type CallSignalMessage = {
+  event?: {
+    aggregate_id?: unknown;
+    attributes?: Record<string, unknown>;
+    type?: unknown;
+  };
+  type?: unknown;
+};
+
+type CallSignalAttributes = {
+  attempt: unknown;
+  recipientIdentityId: unknown;
+  signalId: string;
+};
+
+type CallSignalReceiver = {
+  attempts: number[];
+  delivery?: { expiresAt: number; signalId: string };
+  sent: boolean;
+  settleTimeout?: ReturnType<typeof setTimeout>;
+};
+
+type CallSignalReceiverContext = {
+  callId: string;
+  fail: (error: unknown) => void;
+  identityId: string;
+  sendSignal: () => Promise<{ expiresAt: number; signalId: string }>;
+  timeout: ReturnType<typeof setTimeout>;
+  ws: WebSocket;
+};
+
+type IdentityResponse = {
+  identityExternalIdentifier: string;
+  id: string;
+  profile?: {
+    handle?: string;
+  };
+  version?: number;
+};
+
+type KeychainResponse = {
+  keychainExternalIdentifier: string;
+};
+
+type ConversationResponse = {
+  id: string;
+};
+
+type CallResponse = {
+  id: string;
+};
+
+type ConversationListResponse = {
+  conversations?: ConversationResponse[];
+  data?: ConversationResponse[];
+};
+
+type MessageListResponse = {
+  data?: Array<{ id: string }>;
+  messages?: Array<{ id: string }>;
+};
+
+type HttpRequestError = Error & {
+  response: {
+    data: unknown;
+    status: number;
+  };
 };
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -106,7 +173,7 @@ async function main(): Promise<void> {
     );
     await waitForConversation(nodeB, nodeBIdentity, conversation.id);
 
-    const call = await request(
+    const call = await request<CallResponse>(
       nodeA,
       'POST',
       '/calls/',
@@ -134,7 +201,10 @@ async function main(): Promise<void> {
         ),
     );
 
-    if (new Set(callSignal.attempts).size !== 1 || callSignal.attempts[0] !== 1) {
+    if (
+      new Set(callSignal.attempts).size !== 1 ||
+      callSignal.attempts[0] !== 1
+    ) {
       throw new Error(
         `Call signal retried after acknowledgement: attempts=${callSignal.attempts.join(',')}`,
       );
@@ -216,14 +286,14 @@ async function main(): Promise<void> {
     console.info(
       JSON.stringify(
         {
-          conversationId: conversation.id,
           callId: call.id,
           callSignalId: callSignal.signalId,
+          conversationId: conversation.id,
           messageFromA: messageFromA.id,
-          offlineMessageFromA: offlineMessageFromA.id,
           messageFromB: messageFromB.id,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
+          offlineMessageFromA: offlineMessageFromA.id,
           result: 'PASS',
           transportDsn: 'libp2p-gossipsub://',
         },
@@ -375,7 +445,12 @@ async function publishIdentity(
     ...signaturePayload,
     signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
   };
-  const response = await request(node, 'POST', '/identities/', body);
+  const response = await request<IdentityResponse>(
+    node,
+    'POST',
+    '/identities/',
+    body,
+  );
 
   return {
     externalIdentifier: response.identityExternalIdentifier,
@@ -422,7 +497,7 @@ async function updateIdentity(
       .sign(JSON.stringify(signaturePayload))
       .valueOf(),
   };
-  const response = await request(
+  const response = await request<IdentityResponse>(
     node,
     'PUT',
     `/identities/${encodeURIComponent(identity.id)}`,
@@ -465,7 +540,13 @@ async function publishKeychain(
       .sign(JSON.stringify(signaturePayload))
       .valueOf(),
   };
-  const response = await request(node, 'POST', '/keychains/', body, identity);
+  const response = await request<KeychainResponse>(
+    node,
+    'POST',
+    '/keychains/',
+    body,
+    identity,
+  );
 
   return response.keychainExternalIdentifier;
 }
@@ -483,7 +564,13 @@ async function createOneToOneConversation(
     type: 'one-to-one',
   };
 
-  return request(node, 'POST', '/conversations/', body, owner);
+  return request<ConversationResponse>(
+    node,
+    'POST',
+    '/conversations/',
+    body,
+    owner,
+  );
 }
 
 async function sendConversationMessage(
@@ -515,7 +602,7 @@ async function sendConversationMessage(
   };
   const path = `/conversations/${encodeURIComponent(conversationId)}/messages`;
 
-  return request(node, 'POST', path, body, author);
+  return request<ConversationResponse>(node, 'POST', path, body, author);
 }
 
 async function waitForIdentity(
@@ -539,7 +626,11 @@ async function waitForIdentityVersion(
   const requestPath = `/identities/${encodeURIComponent(identityReference)}`;
 
   await waitFor(async () => {
-    const identity = await requestMaybe(node, 'GET', requestPath);
+    const identity = await requestMaybe<IdentityResponse>(
+      node,
+      'GET',
+      requestPath,
+    );
 
     return (
       identity?.version === version && identity?.profile?.handle === handle
@@ -567,7 +658,7 @@ async function waitForConversation(
   conversationId: string,
 ): Promise<void> {
   await waitFor(async () => {
-    const response = await requestMaybe(
+    const response = await requestMaybe<ConversationListResponse>(
       node,
       'GET',
       `/conversations/?limit=30`,
@@ -615,7 +706,13 @@ async function waitForConversationTimeline(
   )}/messages?limit=30`;
 
   await waitFor(async () => {
-    const response = await requestMaybe(node, 'GET', path, undefined, identity);
+    const response = await requestMaybe<MessageListResponse>(
+      node,
+      'GET',
+      path,
+      undefined,
+      identity,
+    );
     const messages = Array.isArray(response?.messages)
       ? response.messages
       : response?.data;
@@ -719,119 +816,251 @@ async function receiveAndAcknowledgeCallSignal(
     };
 
     ws.on('message', (data) => {
-      const message = JSON.parse(data.toString());
-
-      if (message.type === 'connection_ack' && !sent) {
-        sent = true;
-        sendSignal()
-          .then((result) => {
-            delivery = result;
-          })
-          .catch(fail);
-
-        return;
-      }
-
-      if (
-        message.type !== 'domain_event' ||
-        message.event?.type !== 'calls.v1.signal.sent' ||
-        message.event?.aggregate_id !== callId
-      ) {
-        return;
-      }
-
-      const attributes = message.event.attributes;
-
-      if (attributes.recipientIdentityId !== identity.id) {
-        return;
-      }
-
-      attempts.push(Number(attributes.attempt));
-      ws.send(
-        JSON.stringify({
-          signalId: attributes.signalId,
-          type: 'call_signal_ack',
-        }),
+      const receiver: CallSignalReceiver = {
+        attempts,
+        delivery,
+        sent,
+        settleTimeout,
+      };
+      handleCallSignalMessage(
+        JSON.parse(data.toString()) as CallSignalMessage,
+        receiver,
+        {
+          callId,
+          fail,
+          identityId: identity.id,
+          sendSignal,
+          timeout,
+          ws,
+        },
+        resolve,
+        reject,
       );
-
-      if (settleTimeout) {
-        return;
-      }
-
-      settleTimeout = setTimeout(() => {
-        clearTimeout(timeout);
-        ws.close();
-
-        if (!delivery || delivery.signalId !== attributes.signalId) {
-          reject(
-            new Error(
-              `Signal response/event mismatch: response=${delivery?.signalId} event=${attributes.signalId}`,
-            ),
-          );
-
-          return;
-        }
-
-        resolve({
-          attempts,
-          expiresAt: delivery.expiresAt,
-          signalId: delivery.signalId,
-        });
-      }, 3_000);
+      delivery = receiver.delivery;
+      sent = receiver.sent;
+      settleTimeout = receiver.settleTimeout;
     });
     ws.on('error', fail);
   });
 }
 
-async function request(
-  node: NodeRuntime,
-  method: string,
-  requestPath: string,
-  body?: unknown,
-  signer?: IdentityFixture,
-): Promise<any> {
-  const canonicalPath = requestPath.split('?')[0];
-  const response = await axios.request({
-    data: body,
-    headers: {
-      Connection: 'close',
-      ...(signer
-        ? signHeaders(signer, method, canonicalPath, body ?? {})
-        : {}),
-    },
-    method,
-    timeout: REQUEST_TIMEOUT_MS,
-    url: `${node.baseUrl}${requestPath}`,
-  });
+function handleCallSignalMessage(
+  message: CallSignalMessage,
+  receiver: CallSignalReceiver,
+  context: CallSignalReceiverContext,
+  resolve: (result: CallSignalDeliveryResult) => void,
+  reject: (error: unknown) => void,
+): void {
+  if (message.type === 'connection_ack' && !receiver.sent) {
+    receiver.sent = true;
+    void context
+      .sendSignal()
+      .then((result) => {
+        receiver.delivery = result;
+      })
+      .catch(context.fail);
 
-  return response.data;
+    return;
+  }
+
+  const attributes = callSignalAttributes(message, context);
+
+  if (!attributes) {
+    return;
+  }
+
+  receiver.attempts.push(Number(attributes.attempt));
+  context.ws.send(
+    JSON.stringify({
+      signalId: attributes.signalId,
+      type: 'call_signal_ack',
+    }),
+  );
+
+  if (!receiver.settleTimeout) {
+    receiver.settleTimeout = setTimeout(
+      () =>
+        settleCallSignalDelivery(
+          receiver,
+          attributes.signalId,
+          context,
+          resolve,
+          reject,
+        ),
+      3_000,
+    );
+  }
 }
 
-async function requestMaybe(
+function callSignalAttributes(
+  message: CallSignalMessage,
+  context: CallSignalReceiverContext,
+): CallSignalAttributes | undefined {
+  const event = message.event;
+  const attributes = event?.attributes;
+
+  if (!isCallSignalEvent(message, context)) {
+    return undefined;
+  }
+
+  if (attributes?.recipientIdentityId !== context.identityId) {
+    return undefined;
+  }
+
+  if (typeof attributes?.signalId !== 'string') {
+    return undefined;
+  }
+
+  return {
+    attempt: attributes.attempt,
+    recipientIdentityId: attributes.recipientIdentityId,
+    signalId: attributes.signalId,
+  };
+}
+
+function isCallSignalEvent(
+  message: CallSignalMessage,
+  context: CallSignalReceiverContext,
+): boolean {
+  return (
+    message.type === 'domain_event' &&
+    message.event?.type === 'calls.v1.signal.sent' &&
+    message.event.aggregate_id === context.callId
+  );
+}
+
+function settleCallSignalDelivery(
+  receiver: CallSignalReceiver,
+  signalId: string,
+  context: CallSignalReceiverContext,
+  resolve: (result: CallSignalDeliveryResult) => void,
+  reject: (error: unknown) => void,
+): void {
+  clearTimeout(context.timeout);
+  context.ws.close();
+
+  if (!receiver.delivery || receiver.delivery.signalId !== signalId) {
+    reject(
+      new Error(
+        `Signal response/event mismatch: response=${receiver.delivery?.signalId} event=${signalId}`,
+      ),
+    );
+
+    return;
+  }
+
+  resolve({
+    attempts: receiver.attempts,
+    expiresAt: receiver.delivery.expiresAt,
+    signalId: receiver.delivery.signalId,
+  });
+}
+
+async function request<T = unknown>(
   node: NodeRuntime,
   method: string,
   requestPath: string,
   body?: unknown,
   signer?: IdentityFixture,
-): Promise<any | undefined> {
+): Promise<T> {
+  const canonicalPath = requestPath.split('?')[0];
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT_MS);
+
   try {
-    return await request(node, method, requestPath, body, signer);
-  } catch (error) {
-    if (error instanceof AxiosError && error.response?.status === 404) {
-      return undefined;
+    const response = await fetch(`${node.baseUrl}${requestPath}`, {
+      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: {
+        Connection: 'close',
+        ...(signer
+          ? signHeaders(signer, method, canonicalPath, body ?? {})
+          : {}),
+      },
+      method,
+      signal: abortController.signal,
+    });
+    const responseData = await readResponseData(response);
+
+    if (!response.ok) {
+      const error = new Error(
+        `HTTP ${response.status} ${response.statusText}`,
+      ) as HttpRequestError;
+      error.response = {
+        data: responseData,
+        status: response.status,
+      };
+      throw error;
     }
 
-    if (
-      error instanceof AxiosError &&
-      error.response?.status === 409 &&
-      typeof error.response.data?.code === 'string' &&
-      error.response.data.code.endsWith('NotFoundError')
-    ) {
+    return responseData as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function requestMaybe<T = unknown>(
+  node: NodeRuntime,
+  method: string,
+  requestPath: string,
+  body?: unknown,
+  signer?: IdentityFixture,
+): Promise<T | undefined> {
+  try {
+    return await request<T>(node, method, requestPath, body, signer);
+  } catch (error) {
+    if (isIgnorableNotFoundError(error)) {
       return undefined;
     }
 
     throw error;
   }
+}
+
+function isIgnorableNotFoundError(error: unknown): boolean {
+  if (!isHttpRequestError(error)) {
+    return false;
+  }
+
+  if (error.response.status === 404) {
+    return true;
+  }
+
+  const responseData = error.response.data;
+
+  return (
+    error.response.status === 409 &&
+    isRecord(responseData) &&
+    typeof responseData.code === 'string' &&
+    responseData.code.endsWith('NotFoundError')
+  );
+}
+
+async function readResponseData(response: Response): Promise<unknown> {
+  const text = await response.text();
+
+  if (!text) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isHttpRequestError(value: unknown): value is HttpRequestError {
+  return (
+    value instanceof Error &&
+    isRecord(value) &&
+    isRecord(value.response) &&
+    typeof value.response.status === 'number' &&
+    'data' in value.response
+  );
 }
 
 function signHeaders(
