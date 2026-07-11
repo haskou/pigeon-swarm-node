@@ -24,6 +24,10 @@ Feature: Delete community member API
     When I DELETE my membership from the current community
     Then response code is equal to 200
     And response body should not contain the other identity id
+    Given the community member signs the current communities request
+    When I GET current communities
+    Then response code is equal to 200
+    And response body should not contain the current community id
 
   Scenario: Owner leaves a private community when they are the only member
     Given I am an anonymous user
