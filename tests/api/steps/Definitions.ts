@@ -2388,6 +2388,20 @@ export default class Definitions {
     });
   }
 
+  @given('I set an updated sticker body')
+  public iSetAnUpdatedStickerBody(): void {
+    this.body = JSON.stringify({
+      assetCid: 'bafkreicupdatedstickerassetcid000000000000000000000000000000000',
+      contentType: 'image/webp',
+      dimensions: {
+        height: 256,
+        width: 256,
+      },
+      sizeBytes: 49152,
+      type: 'static',
+    });
+  }
+
   @given('I set an oversized animated sticker body')
   public iSetAnOversizedAnimatedStickerBody(): void {
     this.body = JSON.stringify({
@@ -2407,6 +2421,40 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       `/stickers/packs/${this.stickerPackId}/stickers`,
+    );
+  }
+
+  @given('I sign the current sticker pack request')
+  public async iSignTheCurrentStickerPackRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/stickers/packs/${this.stickerPackId}`,
+    );
+  }
+
+  @given('I sign the current sticker pack update request')
+  public async iSignTheCurrentStickerPackUpdateRequest(): Promise<void> {
+    await this.signCurrentRequest(
+      'PATCH',
+      `/stickers/packs/${this.stickerPackId}`,
+    );
+  }
+
+  @given('I sign the current sticker update request')
+  public async iSignTheCurrentStickerUpdateRequest(): Promise<void> {
+    await this.signCurrentRequest(
+      'PATCH',
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}`,
+    );
+  }
+
+  @given('I sign the current sticker removal request')
+  public async iSignTheCurrentStickerRemovalRequest(): Promise<void> {
+    this.body = JSON.stringify({});
+    await this.signCurrentRequest(
+      'DELETE',
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}`,
     );
   }
 
@@ -2471,6 +2519,41 @@ export default class Definitions {
   public async iPostToTheCurrentStickerPackStickers(): Promise<void> {
     this.response = await this.restClient.post(
       `/stickers/packs/${this.stickerPackId}/stickers`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET the current sticker pack')
+  public async iGETTheCurrentStickerPack(): Promise<void> {
+    this.response = await this.restClient.get(
+      `/stickers/packs/${this.stickerPackId}`,
+      this.headers,
+    );
+  }
+
+  @when('I PATCH the current sticker pack')
+  public async iPATCHTheCurrentStickerPack(): Promise<void> {
+    this.response = await this.restClient.patch(
+      `/stickers/packs/${this.stickerPackId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PATCH the current sticker')
+  public async iPATCHTheCurrentSticker(): Promise<void> {
+    this.response = await this.restClient.patch(
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current sticker')
+  public async iDELETETheCurrentSticker(): Promise<void> {
+    this.response = await this.restClient.delete(
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

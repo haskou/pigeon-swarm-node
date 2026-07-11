@@ -741,6 +741,13 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2RlbGV0ZS1zdGlja2VyX19TdGlja2VyRGVsZXRlcl9fU3RpY2tlckRlbGV0ZXI=:
+    class: /contexts/stickers/application/delete-sticker/StickerDeleter
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX2ZpbmQtbGlicmFyeV9fU3RpY2tlclVzZXJMaWJyYXJ5RmluZGVyX19TdGlja2VyVXNlckxpYnJhcnlGaW5kZXI=:
     class: /contexts/stickers/application/find-library/StickerUserLibraryFinder
     arguments:
@@ -774,6 +781,20 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnlfX1N0aWNrZXJVc2VyTGlicmFyeVJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX3VwZGF0ZS1wYWNrX19TdGlja2VyUGFja1VwZGF0ZXJfX1N0aWNrZXJQYWNrVXBkYXRlcg==:
+    class: /contexts/stickers/application/update-pack/StickerPackUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fYXBwbGljYXRpb25fX3VwZGF0ZS1zdGlja2VyX19TdGlja2VyVXBkYXRlcl9fU3RpY2tlclVwZGF0ZXI=:
+    class: /contexts/stickers/application/update-sticker/StickerUpdater
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zdGlja2Vyc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX1N0aWNrZXJQYWNrUmVwb3NpdG9yeV9fU3RpY2tlclBhY2tSZXBvc2l0b3J5
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2Vycm9yc19fQ3VzdG9tSHR0cEVycm9yX19DdXN0b21IdHRwRXJyb3I=: >-

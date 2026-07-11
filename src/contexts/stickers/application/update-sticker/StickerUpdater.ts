@@ -3,7 +3,7 @@ import StickerPackRepository from '../../domain/repositories/StickerPackReposito
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerUpdateMessage } from './messages/StickerUpdateMessage';
 
-export class StickerUpdater {
+export default class StickerUpdater {
   constructor(private readonly repository: StickerPackRepository) {}
 
   public async update(message: StickerUpdateMessage): Promise<StickerPack> {

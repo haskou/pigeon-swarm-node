@@ -3,7 +3,7 @@ import StickerPackRepository from '../../domain/repositories/StickerPackReposito
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerDeleteMessage } from './messages/StickerDeleteMessage';
 
-export class StickerDeleter {
+export default class StickerDeleter {
   constructor(private readonly repository: StickerPackRepository) {}
 
   public async delete(message: StickerDeleteMessage): Promise<StickerPack> {
