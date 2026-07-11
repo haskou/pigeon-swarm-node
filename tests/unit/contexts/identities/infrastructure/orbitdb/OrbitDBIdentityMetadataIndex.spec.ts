@@ -126,6 +126,48 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(records).toEqual([]);
   });
 
+  it('should tombstone persisted handle aliases when deleting identity metadata', async () => {
+    const identityMother = new IdentityMother();
+    const handle = new ProfileHandle('hasko');
+    const identity = await identityMother
+      .build()
+      .updateProfile(
+        new Profile(
+          new ProfileName('Hasko'),
+          undefined,
+          undefined,
+          undefined,
+          handle,
+        ),
+        identityMother.password,
+        new IdentityExternalIdentifier('bafypreviousidentity'),
+      );
+    const networkId = identityMother.networks[0];
+    await registry.register(
+      networkId.valueOf(),
+      identityStores(documents, heads),
+    );
+
+    await repository.save(
+      identity,
+      new IdentityExternalIdentifier('bafyidentity-handle-delete'),
+    );
+    await registry.putHead(
+      `identity-handle:${handle.valueOf()}`,
+      heads.get(`identity:${identityMother.id.valueOf()}`) || {},
+      [networkId.valueOf()],
+    );
+
+    await repository.deleteByExternalIdentifier(
+      new IdentityExternalIdentifier('bafyidentity-handle-delete'),
+    );
+
+    expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
+      expect.objectContaining({ deleted: true }),
+    );
+    await expect(repository.findByHandle(handle)).resolves.toEqual([]);
+  });
+
   it('should read identity metadata by identity id from the head index', async () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];

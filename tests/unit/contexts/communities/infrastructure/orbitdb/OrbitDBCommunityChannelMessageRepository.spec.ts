@@ -146,7 +146,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     ]);
   });
 
-  it('should reuse the channel message index', async () => {
+  it('should read channel messages from the replicated document store', async () => {
     await saveDocuments(
       document({
         channelId: 'channel-1',
@@ -171,20 +171,13 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       1,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
     expect(firstPage.map((message) => message.toPrimitives())).toEqual([
       expect.objectContaining({ id: 'message-2' }),
     ]);
     expect(
       heads.get('community-channel-message-index:community-1:channel-1'),
-    ).toEqual(
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({ id: 'message-1' }),
-          expect.objectContaining({ id: 'message-2' }),
-        ]),
-      }),
-    );
+    ).toBeUndefined();
 
     query.mockClear();
 
@@ -194,14 +187,14 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       50,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
     expect(secondPage.map((message) => message.toPrimitives())).toEqual([
       expect.objectContaining({ id: 'message-1' }),
       expect.objectContaining({ id: 'message-2' }),
     ]);
   });
 
-  it('should update the channel message index when saving a message', async () => {
+  it('should read a newly saved message from the replicated document store', async () => {
     const message = CommunityChannelMessage.fromPrimitives(
       document({
         channelId: 'channel-1',
@@ -220,13 +213,13 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       50,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
     expect(messages.map((current) => current.toPrimitives())).toEqual([
       expect.objectContaining({ id: 'message-1' }),
     ]);
   });
 
-  it('should persist the readable message head before its document', async () => {
+  it('should persist the document before returning from save', async () => {
     const message = CommunityChannelMessage.fromPrimitives(
       document({
         channelId: 'channel-1',
@@ -251,15 +244,12 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
     expect(
       heads.get('community-channel-message-index:community-1:channel-1'),
-    ).toEqual(
-      expect.objectContaining({
-        messages: [expect.objectContaining({ id: 'message-1' })],
-      }),
-    );
+    ).toBeUndefined();
     expect(documents).toEqual([]);
 
     releaseDocumentWrite();
     await expect(save).resolves.toBeUndefined();
+    expect(documents).toHaveLength(1);
   });
 
   it('should remove deleted messages from the channel message index', async () => {
@@ -427,7 +417,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       2,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalled();
     expect(
       summaries.get('channel-1')?.map((summary) => summary.toPrimitives()),
     ).toEqual([
@@ -502,7 +492,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       2,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalled();
     expect(
       summaries.get('channel-1')?.map((summary) => summary.toPrimitives()),
     ).toEqual([
@@ -550,7 +540,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       2,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalled();
     expect(summaries.get('channel-1')).toEqual([]);
   });
 });

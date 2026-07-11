@@ -11,9 +11,17 @@ import { OrbitDBPrivateNetworkStoreSet } from './OrbitDBPrivateNetworkStoreSet';
 import { orbitDBRuntimeAdapter } from './OrbitDBRuntimeAdapter';
 
 export class OrbitDBPrivateNetworkStores {
+  private static readonly SYNCHRONIZATION_START_BATCH_SIZE = 2;
+
   private static readonly syncErrorWarningKeys = new Set<string>();
 
   private readonly orbitdb: OrbitDBInstance;
+
+  private readonly synchronizedPeerIds = new Map<
+    OrbitDBPrivateNetworkStoreName,
+    Set<string>
+  >();
+
   public readonly calls: OrbitDBDatabase;
   public readonly communities: OrbitDBDatabase;
   public readonly conversations: OrbitDBDatabase;
@@ -53,6 +61,7 @@ export class OrbitDBPrivateNetworkStores {
     const database = await orbitdb.open(this.getStoreName(networkId, store), {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
       type: 'documents',
     });
 
@@ -128,6 +137,7 @@ export class OrbitDBPrivateNetworkStores {
       this.getStoreName(networkId, 'keyvalue/heads'),
       {
         AccessController,
+        sync: false,
         type: 'keyvalue',
       },
     );
@@ -259,6 +269,21 @@ export class OrbitDBPrivateNetworkStores {
     this.requests = stores.requests;
     this.stickerPacks = stores.stickerPacks;
     this.stickerUserLibraries = stores.stickerUserLibraries;
+    this.registerSynchronizationPeerTracking();
+  }
+
+  private registerSynchronizationPeerTracking(): void {
+    for (const { database, name } of this.getSynchronizationStores()) {
+      const peerIds = new Set<string>();
+
+      database.events.on('join', (peerId) => {
+        peerIds.add(peerId);
+      });
+      database.events.on('leave', (peerId) => {
+        peerIds.delete(peerId);
+      });
+      this.synchronizedPeerIds.set(name, peerIds);
+    }
   }
 
   public getAddresses(): OrbitDBPrivateNetworkStoreAddresses {
@@ -286,8 +311,12 @@ export class OrbitDBPrivateNetworkStores {
   public getSynchronizationStores(): Array<{
     database: OrbitDBDatabase;
     name: OrbitDBPrivateNetworkStoreName;
+    getSynchronizedPeerIds: () => string[];
   }> {
-    return [
+    const stores: Array<{
+      database: OrbitDBDatabase;
+      name: OrbitDBPrivateNetworkStoreName;
+    }> = [
       { database: this.calls, name: 'calls' },
       { database: this.communities, name: 'communities' },
       { database: this.contentReplication, name: 'contentReplication' },
@@ -312,6 +341,31 @@ export class OrbitDBPrivateNetworkStores {
         name: 'stickerUserLibraries',
       },
     ];
+
+    return stores.map(({ database, name }) => ({
+      database,
+      getSynchronizedPeerIds: () =>
+        [...(this.synchronizedPeerIds.get(name) ?? new Set())].sort(),
+      name,
+    }));
+  }
+
+  public async startSynchronization(): Promise<void> {
+    const synchronizationStores = this.getSynchronizationStores();
+
+    for (
+      let index = 0;
+      index < synchronizationStores.length;
+      index += OrbitDBPrivateNetworkStores.SYNCHRONIZATION_START_BATCH_SIZE
+    ) {
+      const batch = synchronizationStores.slice(
+        index,
+        index + OrbitDBPrivateNetworkStores.SYNCHRONIZATION_START_BATCH_SIZE,
+      );
+
+      await Promise.all(batch.map(({ database }) => database.sync?.start()));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
   }
 
   public async stop(): Promise<void> {

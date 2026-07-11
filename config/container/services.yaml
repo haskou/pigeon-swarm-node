@@ -1218,16 +1218,6 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29udmVyc2F0aW9uTWVzc2FnZVBpblJlcG9zaXRvcnlfX0NvbnZlcnNhdGlvbk1lc3NhZ2VQaW5SZXBvc2l0b3J5
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNvbnZlcnNhdGlvbk1lc3NhZ2VTdW1tYXJ5SW5kZXhfX09yYml0REJDb252ZXJzYXRpb25NZXNzYWdlU3VtbWFyeUluZGV4:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessageSummaryIndex
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb252ZXJzYXRpb25zX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNvbnZlcnNhdGlvbk1lc3NhZ2VJbmRleF9fT3JiaXREQkNvbnZlcnNhdGlvbk1lc3NhZ2VJbmRleA==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3NlcnZpY2VzX19JZGVudGl0eUZpbmRlclNlcnZpY2VfX0lkZW50aXR5RmluZGVyU2VydmljZQ==:
     class: /contexts/identities/domain/services/IdentityFinderService
     arguments:

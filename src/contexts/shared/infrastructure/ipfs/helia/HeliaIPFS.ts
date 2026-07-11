@@ -47,6 +47,7 @@ function peerIdFromConnectionEvent(event: Event): string {
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly automaticProviderPublicationWindowMs = 5 * 60_000;
   private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
+  private static readonly routingPublicationRetryDelayMs = 30_000;
 
   private static readonly CONTENT_RETRIEVAL_DEBUG_EVENTS = new Set([
     'bitswap:block',
@@ -65,6 +66,14 @@ export abstract class HeliaIPFS implements IPFSConnection {
     string,
     number
   >();
+
+  private readonly pendingRoutingRecords = new Map<string, string>();
+
+  private publishingRoutingRecords = false;
+
+  private routingPublicationRetryTimeout?: ReturnType<typeof setTimeout>;
+
+  private providerPublicationQueue: Promise<void> = Promise.resolve();
 
   private publishingPendingContentProviders = false;
 
@@ -85,32 +94,24 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return heliaCore.libp2p.peerId?.toString();
   }
 
-  private static async dialConfiguredBootstrapRelays(
-    heliaCore: HeliaInstance,
-    networkName: string,
-    multiaddrs: string[],
-  ): Promise<void> {
-    await HeliaIPFS.dialMultiaddrs(
-      heliaCore,
-      networkName,
-      multiaddrs,
-      'configured bootstrap relay',
-    );
-  }
-
   private static async dialKnownPublicRelayRecords(
     heliaCore: HeliaInstance,
     networkName: string,
   ): Promise<void> {
     const localPeerId = HeliaIPFS.localPeerId(heliaCore);
+    const records =
+      HeliaIPFS.publicRelayRecordRegistry.fallbackAllExceptPeer(localPeerId);
 
-    await Promise.all(
-      HeliaIPFS.publicRelayRecordRegistry
-        .fallbackAllExceptPeer(localPeerId)
-        .map((record) =>
-          HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
-        ),
-    );
+    for (let index = 0; index < records.length; index += 2) {
+      await Promise.all(
+        records
+          .slice(index, index + 2)
+          .map((record) =>
+            HeliaIPFS.dialPublicRelayRecord(heliaCore, networkName, record),
+          ),
+      );
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
   }
 
   private static dialPublicRelayRecordsWhenDiscovered(
@@ -235,11 +236,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
-    );
-    await HeliaIPFS.dialConfiguredBootstrapRelays(
-      heliaCore,
-      networkName,
-      options.manualRelayMultiaddrs || [],
     );
 
     if (options.publicRelayDiscoveryEnabled) {
@@ -584,7 +580,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     key: string,
     value: string,
     signal?: AbortSignal,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    if (!this.hasPeers()) {
+      return false;
+    }
+
     const encoder = new TextEncoder();
     const routingAbort = this.createRoutingAbortSignal(signal);
 
@@ -596,14 +596,75 @@ export abstract class HeliaIPFS implements IPFSConnection {
           signal: routingAbort.signal,
         },
       );
+
+      return true;
     } catch {
       Kernel.logger.debug?.(`DHT record publication skipped for key: ${key}`);
+
+      return false;
     } finally {
       clearTimeout(routingAbort.timeout);
     }
   }
 
-  private async publishContentProvider(
+  private scheduleRoutingPublicationRetry(): void {
+    if (this.routingPublicationRetryTimeout) {
+      return;
+    }
+
+    this.routingPublicationRetryTimeout = setTimeout(() => {
+      this.routingPublicationRetryTimeout = undefined;
+      this.publishPendingRoutingRecords();
+    }, HeliaIPFS.routingPublicationRetryDelayMs);
+    this.routingPublicationRetryTimeout.unref?.();
+  }
+
+  private async publishPendingRoutingRecordsNow(): Promise<void> {
+    while (this.hasPeers() && this.pendingRoutingRecords.size > 0) {
+      const next = this.pendingRoutingRecords.entries().next().value as
+        [string, string] | undefined;
+
+      if (!next) {
+        return;
+      }
+
+      const [key, value] = next;
+      this.pendingRoutingRecords.delete(key);
+
+      if (!(await this.publishRoutingRecord(key, value))) {
+        this.pendingRoutingRecords.set(key, value);
+        this.scheduleRoutingPublicationRetry();
+
+        return;
+      }
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  }
+
+  private publishPendingRoutingRecords(): void {
+    if (
+      this.publishingRoutingRecords ||
+      this.pendingRoutingRecords.size === 0 ||
+      !this.hasPeers()
+    ) {
+      return;
+    }
+
+    this.publishingRoutingRecords = true;
+    void this.publishPendingRoutingRecordsNow()
+      .catch((error: unknown) => {
+        Kernel.logger.debug?.(
+          `IPFS pending DHT record publication failed: ${String(error)}`,
+        );
+        this.scheduleRoutingPublicationRetry();
+      })
+      .finally(() => {
+        this.publishingRoutingRecords = false;
+      });
+  }
+
+  private async publishContentProviderNow(
     parsedCid: ParsedCidLike,
     cid: IPFSId,
     signal?: AbortSignal,
@@ -641,6 +702,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
       throw error;
     } finally {
       clearTimeout(routingAbort.timeout);
+    }
+  }
+
+  private async publishContentProvider(
+    parsedCid: ParsedCidLike,
+    cid: IPFSId,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const previousPublication = this.providerPublicationQueue;
+    let release: () => void = () => undefined;
+
+    this.providerPublicationQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await previousPublication;
+
+    try {
+      await this.publishContentProviderNow(parsedCid, cid, signal);
+    } finally {
+      release();
     }
   }
 
@@ -1001,13 +1083,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     });
 
-    this.publishRoutingRecord(key, value, signal).catch(
-      (error: unknown): void => {
-        Kernel.logger.debug?.(
-          `DHT record publication skipped for key: ${key} error=${String(error)}`,
-        );
-      },
-    );
+    this.pendingRoutingRecords.set(key, value);
+    this.publishPendingRoutingRecords();
   }
 
   public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {
@@ -1244,6 +1321,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
           `IPFS peer connection listener failed: peerId=${peerId} error=${String(error)}`,
         );
       });
+
+      this.publishPendingRoutingRecords();
     });
   }
 

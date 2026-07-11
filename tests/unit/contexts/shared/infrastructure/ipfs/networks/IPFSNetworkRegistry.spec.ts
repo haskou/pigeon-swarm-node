@@ -133,7 +133,6 @@ jest.mock('@haskou/ddd-kernel', () => ({
 
 import Kernel from '@haskou/ddd-kernel';
 
-import { IPFSConnection } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -431,81 +430,6 @@ describe('IPFSNetworkRegistry', () => {
       );
     });
 
-    it('should parse configured private relay bootstrap multiaddrs', () => {
-      const registry = createRegistry();
-
-      registry.configureRelaySettings({
-        manualRelayMultiaddrs: [
-          '/dns4/relay-1.example.com/tcp/4100/p2p/12D3KooWRelay1',
-          '/dns4/relay-2.example.com/tcp/4101/p2p/12D3KooWRelay2',
-        ],
-      });
-      const multiaddrs = (
-        registry as unknown as {
-          getPrivateRelayBootstrapMultiaddrs: () => string[];
-        }
-      ).getPrivateRelayBootstrapMultiaddrs();
-
-      expect(multiaddrs).toEqual([
-        '/dns4/relay-1.example.com/tcp/4100/p2p/12D3KooWRelay1',
-        '/dns4/relay-2.example.com/tcp/4101/p2p/12D3KooWRelay2',
-      ]);
-    });
-
-    it('should dial configured private relay bootstrap multiaddrs', async () => {
-      const registry = createRegistry();
-      const connection = mock<IPFSConnection>();
-
-      registry.configureRelaySettings({
-        manualRelayMultiaddrs: [
-          '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay',
-        ],
-      });
-      connection.dial.mockResolvedValue(undefined);
-      connection.getPeers.mockReturnValue(['12D3KooWRelay']);
-
-      (
-        registry as unknown as {
-          dialPrivateRelayBootstraps: (
-            networkId: string,
-            connection: IPFSConnection,
-          ) => void;
-        }
-      ).dialPrivateRelayBootstraps('network-1', connection);
-
-      await Promise.resolve();
-
-      expect(connection.dial).toHaveBeenCalledWith(
-        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay',
-      );
-    });
-
-    it('should log disabled private relay bootstrap only once per network', () => {
-      const registry = createRegistry();
-      const connection = mock<IPFSConnection>();
-      const infoLogger = Kernel.logger.info as jest.Mock;
-
-      infoLogger.mockClear();
-
-      (
-        registry as unknown as {
-          dialPrivateRelayBootstraps: (
-            networkId: string,
-            connection: IPFSConnection,
-          ) => void;
-        }
-      ).dialPrivateRelayBootstraps('network-1', connection);
-      (
-        registry as unknown as {
-          dialPrivateRelayBootstraps: (
-            networkId: string,
-            connection: IPFSConnection,
-          ) => void;
-        }
-      ).dialPrivateRelayBootstraps('network-1', connection);
-
-      expect(infoLogger).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('deleteNetwork', () => {

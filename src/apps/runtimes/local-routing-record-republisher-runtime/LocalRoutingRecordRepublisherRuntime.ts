@@ -6,8 +6,11 @@ import { Runtime } from '@app/shared/infrastructure/lifecycle/Runtime';
 import Kernel from '@haskou/ddd-kernel';
 
 export default class LocalRoutingRecordRepublisherRuntime implements Runtime {
+  private static readonly REPUBLISH_COOLDOWN_MS = 5 * 60_000;
+
   private readonly registeredNetworkIds = new Set<string>();
   private readonly republishingNetworkIds = new Set<string>();
+  private readonly lastRepublishedAt = new Map<string, number>();
 
   public constructor(
     private readonly networkRegistry: IPFSNetworkRegistry,
@@ -16,7 +19,17 @@ export default class LocalRoutingRecordRepublisherRuntime implements Runtime {
   ) {}
 
   private shouldRepublishForPeerConnection(network: IPFSNetwork): boolean {
-    return network.getPeers().length <= 1;
+    if (network.getPeers().length > 1) {
+      return false;
+    }
+
+    const lastRepublishedAt = this.lastRepublishedAt.get(network.getId());
+
+    return (
+      lastRepublishedAt === undefined ||
+      Date.now() - lastRepublishedAt >=
+        LocalRoutingRecordRepublisherRuntime.REPUBLISH_COOLDOWN_MS
+    );
   }
 
   private async republish(network: IPFSNetwork, peerId: string): Promise<void> {
@@ -27,6 +40,7 @@ export default class LocalRoutingRecordRepublisherRuntime implements Runtime {
     }
 
     this.republishingNetworkIds.add(networkId);
+    this.lastRepublishedAt.set(networkId, Date.now());
 
     try {
       const [identities, keychains] = await Promise.all([
@@ -86,6 +100,7 @@ export default class LocalRoutingRecordRepublisherRuntime implements Runtime {
     this.networkRegistry.onNetworkRemoved((networkId) => {
       this.registeredNetworkIds.delete(networkId);
       this.republishingNetworkIds.delete(networkId);
+      this.lastRepublishedAt.delete(networkId);
     });
 
     return Promise.resolve();

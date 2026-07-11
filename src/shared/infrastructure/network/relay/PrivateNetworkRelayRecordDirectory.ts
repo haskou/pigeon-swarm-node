@@ -86,6 +86,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly activePrivateRelayDialKeys: Set<string> = new Set();
 
+  private readonly activeDiscoveries = new Map<string, Promise<void>>();
+
   private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
     new Map();
 
@@ -1612,42 +1614,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
-  public async configurePublicConnection(
-    options: PublicRelayConnectionOptions,
-  ): Promise<IPFSConnection> {
-    const configurationKey = this.publicConnectionKey(options);
-
-    if (
-      this.publicConnection &&
-      this.publicConnectionConfigurationKey === configurationKey
-    ) {
-      return this.publicConnection;
-    }
-
-    const previousConnection = await this.publicConnection;
-
-    await previousConnection?.stop();
-    this.subscribedRelayRecordTopics.clear();
-    this.publicConnectionConfigurationKey = configurationKey;
-    this.publicConnection = this.createPublicConnection(options);
-
-    return this.publicConnection;
-  }
-
-  public async publish(
-    network: IPFSNetwork,
-    relayOptions: PrivateRelayListenOptions,
-    sharedPrivateKey: Libp2pPrivateKeyLike,
-  ): Promise<boolean> {
-    return this.publishRelayRecord(
-      network,
-      relayOptions,
-      sharedPrivateKey,
-      () => true,
-    );
-  }
-
-  public async discover(
+  private async discoverNow(
     network: IPFSNetwork,
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): Promise<void> {
@@ -1683,6 +1650,65 @@ export default class PrivateNetworkRelayRecordDirectory {
       network,
       discoveryState.shouldConnectRelayRecords,
     );
+  }
+
+  public async configurePublicConnection(
+    options: PublicRelayConnectionOptions,
+  ): Promise<IPFSConnection> {
+    const configurationKey = this.publicConnectionKey(options);
+
+    if (
+      this.publicConnection &&
+      this.publicConnectionConfigurationKey === configurationKey
+    ) {
+      return this.publicConnection;
+    }
+
+    const previousConnection = await this.publicConnection;
+
+    await previousConnection?.stop();
+    this.subscribedRelayRecordTopics.clear();
+    this.publicConnectionConfigurationKey = configurationKey;
+    this.publicConnection = this.createPublicConnection(options);
+
+    return this.publicConnection;
+  }
+
+  public async publish(
+    network: IPFSNetwork,
+    relayOptions: PrivateRelayListenOptions,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): Promise<boolean> {
+    return this.publishRelayRecord(
+      network,
+      relayOptions,
+      sharedPrivateKey,
+      () => true,
+    );
+  }
+
+  public discover(
+    network: IPFSNetwork,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): Promise<void> {
+    const networkId = network.getId();
+    const activeDiscovery = this.activeDiscoveries.get(networkId);
+
+    if (activeDiscovery) {
+      return activeDiscovery;
+    }
+
+    const discovery = this.discoverNow(network, sharedPrivateKey).finally(
+      () => {
+        if (this.activeDiscoveries.get(networkId) === discovery) {
+          this.activeDiscoveries.delete(networkId);
+        }
+      },
+    );
+
+    this.activeDiscoveries.set(networkId, discovery);
+
+    return discovery;
   }
 
   public start(

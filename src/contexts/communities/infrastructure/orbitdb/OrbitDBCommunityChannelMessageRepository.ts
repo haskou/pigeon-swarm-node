@@ -71,9 +71,6 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     }));
 
     await Promise.all(
-      deletedDocuments.map((document) => this.messageIndex.putRecord(document)),
-    );
-    await Promise.all(
       deletedDocuments.map((document) =>
         this.registry.putDocument('messages', document),
       ),
@@ -131,12 +128,10 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    const documents = this.messageIndex.allByCommunity(communityId);
+    const documents = await this.messageIndex.allByCommunity(communityId);
 
-    return Promise.resolve(
-      this.toDomain(
-        this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
-      ),
+    return this.toDomain(
+      this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
     );
   }
 
@@ -144,14 +139,12 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    const documents = this.messageIndex
-      .allByCommunity(communityId)
-      .filter((document) => !document.plaintextPayload);
+    const documents = (
+      await this.messageIndex.allByCommunity(communityId)
+    ).filter((document) => !document.plaintextPayload);
 
-    return Promise.resolve(
-      this.toDomain(
-        this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
-      ),
+    return this.toDomain(
+      this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
     );
   }
 
@@ -207,26 +200,23 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     const channelIdValues = new Set(
       channelIds.map((channelId) => channelId.valueOf()),
     );
-    const documents = this.messageIndex
-      .allByCommunity(communityId)
-      .filter(
-        (document) =>
-          channelIdValues.has(document.channelId) &&
-          typeof document.plaintextPayload === 'string' &&
-          regex.test(document.plaintextPayload),
-      );
+    const documents = (
+      await this.messageIndex.allByCommunity(communityId)
+    ).filter(
+      (document) =>
+        channelIdValues.has(document.channelId) &&
+        typeof document.plaintextPayload === 'string' &&
+        regex.test(document.plaintextPayload),
+    );
 
-    return Promise.resolve(
-      this.toDomain(
-        this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
-      ),
+    return this.toDomain(
+      this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
     );
   }
 
   public async save(message: CommunityChannelMessage): Promise<void> {
     const document = this.mapper.toDocument(message);
 
-    await this.messageIndex.putRecord(document);
     await this.registry.putDocument('messages', document);
 
     if (document.replyToMessageId) {
@@ -262,6 +252,6 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    await this.tombstone(this.messageIndex.allByCommunity(communityId));
+    await this.tombstone(await this.messageIndex.allByCommunity(communityId));
   }
 }

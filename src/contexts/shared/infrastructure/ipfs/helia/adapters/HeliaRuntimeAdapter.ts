@@ -307,6 +307,42 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private withoutPublicNetworkDefaults(
+    defaults: Libp2pDefaults,
+  ): Libp2pDefaults {
+    const config = defaults as unknown as {
+      connectionManager?: Record<string, unknown>;
+      peerDiscovery?: unknown[];
+      services?: Record<string, unknown>;
+    };
+
+    config.connectionManager = {
+      ...(config.connectionManager || {}),
+      maxConnections: 32,
+      maxDialQueueLength: 64,
+      maxIncomingPendingConnections: 4,
+      maxParallelDials: 8,
+    };
+    // Helia's defaults contain mDNS followed by its public bootstrapper.
+    // Keep only the local discovery mechanism; configured private relays are
+    // appended explicitly by withBootstrapRelays.
+    config.peerDiscovery = (config.peerDiscovery || []).slice(0, 1);
+
+    if (config.services) {
+      for (const serviceName of [
+        'autoNAT',
+        'autoTLS',
+        'delegatedRouting',
+        'relay',
+        'upnp',
+      ]) {
+        delete config.services[serviceName];
+      }
+    }
+
+    return defaults;
+  }
+
   private async withGossipsub(
     defaults: Libp2pDefaults,
   ): Promise<Libp2pDefaults> {
@@ -574,6 +610,7 @@ export class HeliaRuntimeAdapter {
 
   public async getLibp2pDefaults(options?: {
     offline?: boolean;
+    privateNetwork?: boolean;
     publicBootstrap?: boolean;
   }): Promise<Libp2pDefaults> {
     const heliaModule = await this.loadHeliaModule();
@@ -586,6 +623,10 @@ export class HeliaRuntimeAdapter {
 
     if (options?.offline) {
       return this.withGossipsub(this.withoutNetwork(defaults));
+    }
+
+    if (options?.privateNetwork) {
+      return this.withGossipsub(this.withoutPublicNetworkDefaults(defaults));
     }
 
     if (options?.publicBootstrap === false) {

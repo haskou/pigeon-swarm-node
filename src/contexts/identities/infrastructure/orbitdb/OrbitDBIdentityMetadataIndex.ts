@@ -210,14 +210,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       storageDocument,
       networkIds,
     );
-
-    if (document.handle) {
-      await this.registry.putHead(
-        this.handleHeadKey(document.handle),
-        storageDocument,
-        networkIds,
-      );
-    }
   }
 
   private async putTombstoneHeads(

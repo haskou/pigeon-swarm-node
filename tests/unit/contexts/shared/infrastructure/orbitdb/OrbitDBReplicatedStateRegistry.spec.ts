@@ -56,11 +56,14 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
 
 type Store = {
   all: jest.Mock<Promise<Entry[]>>;
-  emitUpdate(entry: { payload?: { value?: unknown } }): void;
+  emitUpdate(entry: { payload?: { key?: string; value?: unknown } }): void;
   events: {
     on: jest.Mock<
       void,
-      ['update', (entry: { payload?: { value?: unknown } }) => void]
+      [
+        'update',
+        (entry: { payload?: { key?: string; value?: unknown } }) => void,
+      ]
     >;
   };
   get: jest.Mock<Promise<Record<string, unknown> | undefined>, [string]>;
@@ -74,7 +77,7 @@ type Store = {
 function createStore(): Store {
   const entries: Entry[] = [];
   const updateHandlers: Array<
-    (entry: { payload?: { value?: unknown } }) => void
+    (entry: { payload?: { key?: string; value?: unknown } }) => void
   > = [];
 
   return {
@@ -663,13 +666,11 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.register('network-1', firstNetwork.stores);
     firstNetwork.heads.emitUpdate({
       payload: {
+        key: 'conversation:conversation-1',
         value: {
-          key: 'conversation:conversation-1',
-          value: {
-            id: 'conversation:conversation-1',
-            networkId: 'network-1',
-            updatedAt: 1,
-          },
+          id: 'conversation:conversation-1',
+          networkId: 'network-1',
+          updatedAt: 1,
         },
       },
     });
@@ -819,6 +820,31 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
   });
 
+  it('caches canonical keychain heads from OrbitDB update payloads', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        key: 'keychain:identity-1',
+        value: {
+          cid: 'keychain-v2',
+          ownerIdentityId: 'identity-1',
+          receivedAt: 200,
+          version: 2,
+        },
+      },
+    });
+
+    await expect(registry.findHead('keychain:identity-1')).resolves.toEqual(
+      expect.objectContaining({
+        cid: 'keychain-v2',
+        version: 2,
+      }),
+    );
+  });
+
   it('does not replace a newer cached head with an older replicated update', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
@@ -832,13 +858,11 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
     firstNetwork.heads.emitUpdate({
       payload: {
+        key: 'community:community-1',
         value: {
-          key: 'community:community-1',
-          value: {
-            id: 'community-1',
-            name: 'old',
-            updatedAt: 1,
-          },
+          id: 'community-1',
+          name: 'old',
+          updatedAt: 1,
         },
       },
     });
@@ -890,24 +914,22 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
     firstNetwork.heads.emitUpdate({
       payload: {
+        key,
         value: {
-          key,
-          value: {
-            id: key,
-            messages: [
-              {
-                encryptedPayload: 'encrypted-community-channel-message-payload',
-                id: 'message-1',
-                receivedAt: 10,
-              },
-              {
-                id: 'message-deleted-1',
-                receivedAt: 20,
-                targetMessageId: 'message-1',
-              },
-            ],
-            updatedAt: 40,
-          },
+          id: key,
+          messages: [
+            {
+              encryptedPayload: 'encrypted-community-channel-message-payload',
+              id: 'message-1',
+              receivedAt: 10,
+            },
+            {
+              id: 'message-deleted-1',
+              receivedAt: 20,
+              targetMessageId: 'message-1',
+            },
+          ],
+          updatedAt: 40,
         },
       },
     });
@@ -957,18 +979,16 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       );
       firstNetwork.heads.emitUpdate({
         payload: {
+          key,
           value: {
-            key,
-            value: {
-              id: key,
-              [collectionName]: [
-                {
-                  createdAt: 10,
-                  id: `${collectionName}-1`,
-                },
-              ],
-              updatedAt: 40,
-            },
+            id: key,
+            [collectionName]: [
+              {
+                createdAt: 10,
+                id: `${collectionName}-1`,
+              },
+            ],
+            updatedAt: 40,
           },
         },
       });
@@ -1041,19 +1061,17 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
     firstNetwork.heads.emitUpdate({
       payload: {
+        key,
         value: {
-          key,
-          value: {
-            id: key,
-            messages: [
-              {
-                encryptedPayload: 'encrypted-community-channel-message-payload',
-                id: 'message-1',
-                receivedAt: 20,
-              },
-            ],
-            updatedAt: 40,
-          },
+          id: key,
+          messages: [
+            {
+              encryptedPayload: 'encrypted-community-channel-message-payload',
+              id: 'message-1',
+              receivedAt: 20,
+            },
+          ],
+          updatedAt: 40,
         },
       },
     });
@@ -1086,15 +1104,13 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
     firstNetwork.heads.emitUpdate({
       payload: {
+        key: 'identity:identity-1',
         value: {
-          key: 'identity:identity-1',
-          value: {
-            cid: 'identity-v1',
-            id: 'identity-1',
-            identityId: 'identity-1',
-            receivedAt: 200,
-            version: 1,
-          },
+          cid: 'identity-v1',
+          id: 'identity-1',
+          identityId: 'identity-1',
+          receivedAt: 200,
+          version: 1,
         },
       },
     });
@@ -1108,12 +1124,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
-  it('restores heads from the local cache before rebuilding OrbitDB heads', async () => {
+  it('restores warm heads without rebuilding the replicated head log', async () => {
     const headCache = new InMemoryOrbitDBReplicatedHeadCache();
     const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
     const firstNetwork = createStores();
-    let releaseHeadScan = (): void => undefined;
-    let headScanResolved = false;
 
     await headCache.save('network-1', 'community:community-1', {
       id: 'community-1',
@@ -1121,24 +1135,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       updatedAt: 1,
     });
     await headCache.markWarm('network-1');
-    firstNetwork.heads.all.mockImplementation(
-      async () =>
-        new Promise<Entry[]>((resolve) => {
-          releaseHeadScan = () => {
-            headScanResolved = true;
-            resolve([
-              {
-                key: 'community:community-2',
-                value: {
-                  id: 'community-2',
-                  networkId: 'network-1',
-                  updatedAt: 1,
-                },
-              },
-            ]);
-          };
-        }),
-    );
 
     await registry.register('network-1', firstNetwork.stores);
 
@@ -1149,12 +1145,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         updatedAt: 1,
       },
     ]);
-    expect(firstNetwork.heads.all).toHaveBeenCalledTimes(1);
-    expect(headScanResolved).toBe(false);
-
-    releaseHeadScan();
-    await Promise.resolve();
-    await Promise.resolve();
+    expect(firstNetwork.heads.all).not.toHaveBeenCalled();
   });
 
   it('restores derived identity handle heads from the local cache', async () => {

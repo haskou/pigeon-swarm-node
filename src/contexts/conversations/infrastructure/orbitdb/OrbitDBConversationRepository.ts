@@ -16,14 +16,11 @@ import OrbitDBConversationMapper from './mappers/OrbitDBConversationMapper';
 import OrbitDBConversationMessageMapper from './mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationIndex from './OrbitDBConversationIndex';
 import OrbitDBConversationMessageIndex from './OrbitDBConversationMessageIndex';
-import OrbitDBConversationMessageSummaryIndex from './OrbitDBConversationMessageSummaryIndex';
 
 export default class OrbitDBConversationRepository implements ConversationRepository {
   private readonly conversationIndex: OrbitDBConversationIndex;
 
   private readonly messageIndex: OrbitDBConversationMessageIndex;
-
-  private readonly messageSummaryIndex: OrbitDBConversationMessageSummaryIndex;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -32,10 +29,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   ) {
     this.conversationIndex = new OrbitDBConversationIndex(this.registry);
     this.messageIndex = new OrbitDBConversationMessageIndex(this.registry);
-    this.messageSummaryIndex = new OrbitDBConversationMessageSummaryIndex(
-      this.registry,
-      this.messageIndex,
-    );
   }
 
   private numberValue(
@@ -93,18 +86,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     record: Record<string, unknown>,
   ): Promise<void> {
     await this.registry.putDocument('messages', { ...record });
-
-    const conversationId = this.stringValue(record, 'conversationId');
-
-    if (conversationId) {
-      await Promise.all([
-        this.messageIndex.replicateRecordInBackground(conversationId, record),
-        this.messageSummaryIndex.replicateRecordInBackground(
-          conversationId,
-          record,
-        ),
-      ]);
-    }
   }
 
   private deduplicateMessages(
@@ -116,14 +97,33 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   private async findMessageDocumentsByConversationId(
     conversationId: ConversationId,
   ): Promise<OrbitDBConversationMessageDocument[]> {
-    const indexedDocuments =
-      await this.messageIndex.findByConversationId(conversationId);
+    return this.messageIndex.findByConversationId(conversationId);
+  }
 
-    if (indexedDocuments !== undefined) {
-      return indexedDocuments;
-    }
+  private async unreadCountForConversation(
+    recipientIdentityId: IdentityId,
+    conversationId: ConversationId,
+  ): Promise<[string, number]> {
+    const [marker, documents] = await Promise.all([
+      this.registry.findHead(
+        this.readMarkerHeadKey(conversationId, recipientIdentityId),
+      ),
+      this.findMessageDocumentsByConversationId(conversationId),
+    ]);
+    const messageId = marker
+      ? this.stringValue(marker, 'messageId')
+      : undefined;
+    const readUntil =
+      (marker ? this.numberValue(marker, 'messageCreatedAt') : undefined) ??
+      documents.find(
+        (document) =>
+          document.id === messageId || document.messageId === messageId,
+      )?.createdAt;
+    const unreadCount = documents.filter((document) =>
+      this.isUnreadFor(document, recipientIdentityId, readUntil),
+    ).length;
 
-    return [];
+    return [conversationId.valueOf(), unreadCount];
   }
 
   private async readMarkerMessageCreatedAt(
@@ -345,66 +345,15 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       return counts;
     }
 
-    const readMarkers = await Promise.all(
-      conversationIds.map(async (conversationId) => {
-        const marker = await this.registry.findHead(
-          this.readMarkerHeadKey(conversationId, recipientIdentityId),
-        );
-
-        return {
-          conversationId: conversationId.valueOf(),
-          messageCreatedAt: marker
-            ? this.numberValue(marker, 'messageCreatedAt')
-            : undefined,
-          messageId: marker ? this.stringValue(marker, 'messageId') : undefined,
-        };
-      }),
-    );
-    const summaries = await Promise.all(
-      conversationIds.map(async (conversationId) => ({
-        conversationId: conversationId.valueOf(),
-        documents: await this.messageSummaryIndex.findRecords(
-          conversationId.valueOf(),
-        ),
-      })),
-    );
-    const summariesByConversationId = new Map(
-      summaries.map((summary) => [summary.conversationId, summary.documents]),
-    );
-    const readUntilByConversationId = new Map<string, number | undefined>(
-      readMarkers.map((marker) => {
-        const documents =
-          summariesByConversationId.get(marker.conversationId) || [];
-
-        return [
-          marker.conversationId,
-          marker.messageCreatedAt ??
-            this.messageSummaryIndex.messageCreatedAtFrom(
-              documents,
-              marker.messageId,
-            ),
-        ];
-      }),
+    const unreadCounts = await Promise.all(
+      conversationIds.map((conversationId) =>
+        this.unreadCountForConversation(recipientIdentityId, conversationId),
+      ),
     );
 
-    for (const summary of summaries) {
-      const readUntil = readUntilByConversationId.get(summary.conversationId);
-
-      for (const document of summary.documents) {
-        if (
-          this.messageSummaryIndex.isUnreadFor(
-            document,
-            recipientIdentityId,
-            readUntil,
-          ) === false
-        ) {
-          continue;
-        }
-
-        counts.set(
-          summary.conversationId,
-          (counts.get(summary.conversationId) || 0) + 1,
-        );
+    for (const [conversationId, unreadCount] of unreadCounts) {
+      if (unreadCount > 0) {
+        counts.set(conversationId, unreadCount);
       }
     }
 
