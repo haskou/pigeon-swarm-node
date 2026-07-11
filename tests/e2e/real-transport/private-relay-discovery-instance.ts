@@ -12,6 +12,7 @@ import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/Orb
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { PrivateKey } from '@haskou/value-objects';
 import { createHash, randomBytes } from 'crypto';
@@ -121,7 +122,10 @@ async function createPrivateNetwork(): Promise<void> {
   });
 
   network = new IPFSNetwork(config, connection);
-  directory = new PrivateNetworkRelayRecordDirectory(new EmbeddedLocalDatabase());
+  directory = new PrivateNetworkRelayRecordDirectory(
+    new EmbeddedLocalDatabase(),
+    new PrivateNetworkRelayDirectorySettings(),
+  );
 }
 
 async function startRelay(): Promise<void> {

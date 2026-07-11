@@ -43,6 +43,7 @@ package "shared/infrastructure/ipfs" {
 
 package "shared/infrastructure/network/relay" {
   class PrivateNetworkRelayRecordDirectory
+  class PrivateNetworkRelayDirectorySettings
   class PrivateNetworkRelayRecord
 }
 
@@ -80,6 +81,7 @@ HeliaIPFS ..> IPFSConnection
 HeliaIPFS ..> IPFSContentRacer
 IPFSConnection ..> IPFSNetwork
 PrivateNetworkRelayRecordDirectory ..> EmbeddedLocalDatabase
+PrivateNetworkRelayRecordDirectory ..> PrivateNetworkRelayDirectorySettings
 PrivateNetworkRelayRecordDirectory ..> PrivateNetworkRelayRecord
 
 DomainEventPublisher ..> MessageBus

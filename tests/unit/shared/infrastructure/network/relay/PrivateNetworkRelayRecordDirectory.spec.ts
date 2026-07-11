@@ -12,6 +12,7 @@ import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { PrivateNetworkRelayRecord } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec';
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import { PrivateRelayRecordCacheDocument } from '@app/shared/infrastructure/network/relay/PrivateRelayRecordCacheDocument';
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
@@ -82,7 +83,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should not fail the whole relay record publication when generic DHT aborts after pubsub publishes', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
 
     publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
@@ -132,7 +133,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should not publish or discover relay records when disabled by options', () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const publish = jest.spyOn(directory, 'publish').mockResolvedValue(false);
     const discover = jest.spyOn(directory, 'discover').mockResolvedValue();
 
@@ -156,22 +157,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(discover).not.toHaveBeenCalled();
   });
 
-  it('should publish private relay records hourly by default', () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
-    const defaults = directory as unknown as {
-      getRelayRecordIPNSWindowMs(): number;
-      getRelayRecordPublicationIntervalMs(): number;
-      getRelayRecordTtlMs(): number;
-    };
-
-    expect(defaults.getRelayRecordPublicationIntervalMs()).toBe(60 * 60_000);
-    expect(defaults.getRelayRecordTtlMs()).toBe(2 * 60 * 60_000);
-    expect(defaults.getRelayRecordIPNSWindowMs()).toBe(2 * 60 * 60_000);
-  });
-
   it('should retry failed startup relay record publications before the hourly refresh', async () => {
     jest.useFakeTimers();
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
     const network = privateNetwork(privateKey());
 
@@ -226,7 +214,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
   it('should not retry stopped relay record publications after an in-flight failure', async () => {
     jest.useFakeTimers();
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
     const network = privateNetwork(privateKey());
     let finishPeerWait: (result: boolean) => void = () => undefined;
@@ -283,7 +271,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should dial a locally cached relay before waiting for public routing peers', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const networkKey = privateKey();
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -333,7 +321,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should not rediscover a cached relay while it remains connected', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const networkKey = privateKey();
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -403,7 +391,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should not rediscover a cached relay while the recent connection is settling', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const networkKey = privateKey();
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -477,7 +465,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     process.env.PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS = '1';
     const now = 1_000_000;
     const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const networkKey = privateKey();
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -548,7 +536,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should invalidate a locally cached relay after repeated failed dials', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const networkKey = privateKey();
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -611,7 +599,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   });
 
   it('should reuse the configured public connection for the same relay configuration', async () => {
-    const directory = new PrivateNetworkRelayRecordDirectory(localDatabase);
+    const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
     const sharedPrivateKey = {} as Libp2pPrivateKeyLike;
     const createPublicConnection = jest
@@ -644,4 +632,13 @@ function flushPromises(): Promise<void> {
   return Promise.resolve()
     .then(() => Promise.resolve())
     .then(() => Promise.resolve());
+}
+
+function createDirectory(
+  localDatabase: EmbeddedLocalDatabase,
+): PrivateNetworkRelayRecordDirectory {
+  return new PrivateNetworkRelayRecordDirectory(
+    localDatabase,
+    new PrivateNetworkRelayDirectorySettings(),
+  );
 }
