@@ -25,6 +25,11 @@ services:
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsUmVwb3NpdG9yeV9fT3JiaXREQkNhbGxSZXBvc2l0b3J5
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxTaWduYWxEZWxpdmVyeVJlcG9zaXRvcnlfX0NhbGxTaWduYWxEZWxpdmVyeVJlcG9zaXRvcnk=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX21lbW9yeV9fSW5NZW1vcnlDYWxsU2lnbmFsRGVsaXZlcnlSZXBvc2l0b3J5X19Jbk1lbW9yeUNhbGxTaWduYWxEZWxpdmVyeVJlcG9zaXRvcnk=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX21hcHBlcnNfX09yYml0REJDYWxsTWFwcGVyX19PcmJpdERCQ2FsbE1hcHBlcg==:
+    class: /contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper
+    arguments: []
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnk=: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19Mb2NhbENvbW11bml0eUNoYW5uZWxEcmFmdFJlcG9zaXRvcnlfX0xvY2FsQ29tbXVuaXR5Q2hhbm5lbERyYWZ0UmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUGluUmVwb3NpdG9yeV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VQaW5SZXBvc2l0b3J5: >-
@@ -416,6 +421,13 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxTaWduYWxEZWxpdmVyeVJlcG9zaXRvcnlfX0NhbGxTaWduYWxEZWxpdmVyeVJlcG9zaXRvcnk=
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsRG9jdW1lbnRSZXBsaWNhdG9yX19PcmJpdERCQ2FsbERvY3VtZW50UmVwbGljYXRvcg==:
+    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
+    abstract: false
+    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsSW5kZXhfX09yYml0REJDYWxsSW5kZXg=:
     class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallIndex
     arguments:
@@ -953,14 +965,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NvbW11bml0eVJlcG9zaXRvcnlfX0NvbW11bml0eVJlcG9zaXRvcnk=
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsUmVwb3NpdG9yeV9fT3JiaXREQkNhbGxSZXBvc2l0b3J5:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnlfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSZWdpc3RyeQ==
-    abstract: false
-    parent: >-
-      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2NyZWF0ZS1jb21tdW5pdHlfX0NvbW11bml0eUNyZWF0b3JfX0NvbW11bml0eUNyZWF0b3I=:
     class: /contexts/communities/application/create-community/CommunityCreator
     arguments:
@@ -2165,6 +2169,18 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3JlbmV3LXBhcnRpY2lwYW50LWxlYXNlX19DYWxsUGFydGljaXBhbnRMZWFzZVJlbmV3ZXJfX0NhbGxQYXJ0aWNpcGFudExlYXNlUmVuZXdlcg==
     abstract: false
     parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsUmVwb3NpdG9yeV9fT3JiaXREQkNhbGxSZXBvc2l0b3J5:
+    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX21hcHBlcnNfX09yYml0REJDYWxsTWFwcGVyX19PcmJpdERCQ2FsbE1hcHBlcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsRG9jdW1lbnRSZXBsaWNhdG9yX19PcmJpdERCQ2FsbERvY3VtZW50UmVwbGljYXRvcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDYWxsSW5kZXhfX09yYml0REJDYWxsSW5kZXg=
+    abstract: false
+    parent: >-
+      X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX0NhbGxSZXBvc2l0b3J5X19DYWxsUmVwb3NpdG9yeQ==
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jb21tdW5pdGllc19fYXBwbGljYXRpb25fX2FjY2VwdC1pbnZpdGVfX0NvbW11bml0eUludml0ZUFjY2VwdGVyX19Db21tdW5pdHlJbnZpdGVBY2NlcHRlcg==:
     class: /contexts/communities/application/accept-invite/CommunityInviteAccepter
     arguments:

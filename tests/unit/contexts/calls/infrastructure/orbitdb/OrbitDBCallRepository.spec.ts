@@ -1,5 +1,8 @@
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
+import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
+import OrbitDBCallDocumentReplicator from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator';
+import OrbitDBCallIndex from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallIndex';
 import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -131,7 +134,7 @@ describe('OrbitDBCallRepository', () => {
       calls,
       heads,
     } as never);
-    repository = new OrbitDBCallRepository(registry);
+    repository = createRepository(registry);
   });
 
   it('registers a gossip replica for immediate reads without writing OrbitDB', async () => {
@@ -222,7 +225,7 @@ describe('OrbitDBCallRepository', () => {
       heads: replicatedHeads,
     } as never);
 
-    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+    const replicatedRepository = createRepository(replicatedRegistry);
 
     try {
       await expect(
@@ -273,7 +276,7 @@ describe('OrbitDBCallRepository', () => {
       heads: replicatedHeads,
     } as never);
 
-    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+    const replicatedRepository = createRepository(replicatedRegistry);
 
     try {
       await expect(
@@ -579,7 +582,7 @@ describe('OrbitDBCallRepository', () => {
       heads: replicatedHeads,
     } as never);
 
-    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+    const replicatedRepository = createRepository(replicatedRegistry);
     const findCachedHeadsByPrefix = jest.spyOn(
       replicatedRegistry,
       'findCachedHeadsByPrefix',
@@ -605,7 +608,7 @@ describe('OrbitDBCallRepository', () => {
       heads: replicatedHeads,
     } as never);
 
-    const replicatedRepository = new OrbitDBCallRepository(replicatedRegistry);
+    const replicatedRepository = createRepository(replicatedRegistry);
     const findCachedHeadsByPrefix = jest.spyOn(
       replicatedRegistry,
       'findCachedHeadsByPrefix',
@@ -623,4 +626,14 @@ describe('OrbitDBCallRepository', () => {
 
 function flushBackgroundTasks(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
+}
+
+function createRepository(
+  registry: OrbitDBReplicatedStateRegistry,
+): OrbitDBCallRepository {
+  return new OrbitDBCallRepository(
+    new OrbitDBCallMapper(),
+    new OrbitDBCallDocumentReplicator(registry),
+    new OrbitDBCallIndex(registry),
+  );
 }

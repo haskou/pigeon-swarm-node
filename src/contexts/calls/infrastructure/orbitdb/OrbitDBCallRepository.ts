@@ -5,116 +5,37 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
-import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
+import OrbitDBCallMapper from './mappers/OrbitDBCallMapper';
+import OrbitDBCallDocumentReplicator from './OrbitDBCallDocumentReplicator';
 import OrbitDBCallIndex from './OrbitDBCallIndex';
 
 export default class OrbitDBCallRepository extends CallRepository {
-  private readonly callIndex: OrbitDBCallIndex;
-
-  private readonly pendingCallDocuments = new Map<
-    string,
-    OrbitDBCallDocument
-  >();
-
-  private readonly replicatingCallIds = new Set<string>();
-
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+  constructor(
+    private readonly mapper: OrbitDBCallMapper,
+    private readonly documentReplicator: OrbitDBCallDocumentReplicator,
+    private readonly callIndex: OrbitDBCallIndex,
+  ) {
     super();
-    this.callIndex = new OrbitDBCallIndex(this.registry);
-  }
-
-  private toDocument(call: Call): OrbitDBCallDocument {
-    const primitives = call.toPrimitives();
-
-    return {
-      createdAt: primitives.createdAt,
-      creatorIdentityId: primitives.creatorIdentityId,
-      endedAt: primitives.endedAt,
-      endedByIdentityId: primitives.endedByIdentityId,
-      id: primitives.id,
-      networkId: primitives.networkId,
-      participantIds: primitives.participantIds,
-      participants: primitives.participants,
-      scope: primitives.scope,
-      status: primitives.status,
-      updatedAt: Date.now(),
-    };
-  }
-
-  private toDomain(document: OrbitDBCallDocument): Call {
-    return Call.fromPrimitives({
-      createdAt: document.createdAt,
-      creatorIdentityId: document.creatorIdentityId,
-      endedAt: document.endedAt,
-      endedByIdentityId: document.endedByIdentityId,
-      id: document.id,
-      networkId: document.networkId,
-      participantIds: document.participantIds,
-      participants: document.participants,
-      scope: document.scope,
-      status: document.status,
-    });
-  }
-
-  private toDomainList(documents: OrbitDBCallDocument[]): Call[] {
-    return documents.map((document) => this.toDomain(document));
-  }
-
-  private async replicateLatestDocuments(callId: string): Promise<void> {
-    while (this.pendingCallDocuments.has(callId)) {
-      const document = this.pendingCallDocuments.get(callId);
-
-      this.pendingCallDocuments.delete(callId);
-
-      if (!document) {
-        continue;
-      }
-
-      try {
-        await this.registry.putDocument('calls', document, [
-          document.networkId,
-        ]);
-      } catch (error) {
-        Kernel.logger.warn?.(
-          `Call document replication failed: callId=${document.id} error=${String(error)}`,
-        );
-      }
-    }
-
-    this.replicatingCallIds.delete(callId);
-  }
-
-  private replicateDocumentInBackground(document: OrbitDBCallDocument): void {
-    this.pendingCallDocuments.set(document.id, document);
-
-    if (this.replicatingCallIds.has(document.id)) {
-      return;
-    }
-
-    this.replicatingCallIds.add(document.id);
-    void this.replicateLatestDocuments(document.id);
   }
 
   public async findById(id: CallId): Promise<Call | undefined> {
     const document = await this.callIndex.findById(id);
 
-    return document ? this.toDomain(document) : undefined;
+    return document ? this.mapper.toDomain(document) : undefined;
   }
 
   public async findActiveByParticipant(
     participantId: IdentityId,
   ): Promise<Call[]> {
-    return this.toDomainList(
+    return this.mapper.toDomainList(
       await this.callIndex.findActiveByParticipant(participantId),
     );
   }
 
   public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
-    return this.toDomainList(
+    return this.mapper.toDomainList(
       await this.callIndex.findByParticipant(participantId),
     );
   }
@@ -122,7 +43,7 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findByConversationId(
     conversationId: ConversationId,
   ): Promise<Call[]> {
-    return this.toDomainList(
+    return this.mapper.toDomainList(
       await this.callIndex.findByConversationId(conversationId),
     );
   }
@@ -131,7 +52,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call[]> {
-    return this.toDomainList(
+    return this.mapper.toDomainList(
       await this.callIndex.findByCommunityChannel(communityId, channelId),
     );
   }
@@ -145,13 +66,13 @@ export default class OrbitDBCallRepository extends CallRepository {
       channelId,
     );
 
-    return document ? this.toDomain(document) : undefined;
+    return document ? this.mapper.toDomain(document) : undefined;
   }
 
   public async findActiveByCommunity(
     communityId: CommunityId,
   ): Promise<Call[]> {
-    return this.toDomainList(
+    return this.mapper.toDomainList(
       await this.callIndex.findActiveByCommunity(communityId),
     );
   }
@@ -159,22 +80,22 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
   ): Promise<Call[]> {
-    return this.toDomainList(
+    return this.mapper.toDomainList(
       await this.callIndex.findTimedOutRingingCalls(timeoutThreshold),
     );
   }
 
   public save(call: Call): Promise<void> {
-    const document = this.toDocument(call);
+    const document = this.mapper.toDocument(call);
 
-    this.replicateDocumentInBackground(document);
+    this.documentReplicator.replicate(document);
     this.callIndex.put(document);
 
     return Promise.resolve();
   }
 
   public registerReplica(call: Call): Promise<void> {
-    const document = this.toDocument(call);
+    const document = this.mapper.toDocument(call);
 
     this.callIndex.registerReplica({
       ...document,
