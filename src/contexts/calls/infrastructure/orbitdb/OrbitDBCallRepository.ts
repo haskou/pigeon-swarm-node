@@ -14,10 +14,13 @@ import OrbitDBCallIndex from './OrbitDBCallIndex';
 
 export default class OrbitDBCallRepository extends CallRepository {
   private readonly callIndex: OrbitDBCallIndex;
-  private readonly callDocumentReplicationQueues = new Map<
+
+  private readonly pendingCallDocuments = new Map<
     string,
-    Promise<void>
+    OrbitDBCallDocument
   >();
+
+  private readonly replicatingCallIds = new Set<string>();
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
@@ -61,26 +64,39 @@ export default class OrbitDBCallRepository extends CallRepository {
     return documents.map((document) => this.toDomain(document));
   }
 
-  private replicateDocumentInBackground(document: OrbitDBCallDocument): void {
-    const previous =
-      this.callDocumentReplicationQueues.get(document.id) ?? Promise.resolve();
-    const next = previous
-      .catch((): void => undefined)
-      .then(() =>
-        this.registry.putDocument('calls', document, [document.networkId]),
-      )
-      .catch((error) => {
+  private async replicateLatestDocuments(callId: string): Promise<void> {
+    while (this.pendingCallDocuments.has(callId)) {
+      const document = this.pendingCallDocuments.get(callId);
+
+      this.pendingCallDocuments.delete(callId);
+
+      if (!document) {
+        continue;
+      }
+
+      try {
+        await this.registry.putDocument('calls', document, [
+          document.networkId,
+        ]);
+      } catch (error) {
         Kernel.logger.warn?.(
           `Call document replication failed: callId=${document.id} error=${String(error)}`,
         );
-      });
-
-    this.callDocumentReplicationQueues.set(document.id, next);
-    void next.finally(() => {
-      if (this.callDocumentReplicationQueues.get(document.id) === next) {
-        this.callDocumentReplicationQueues.delete(document.id);
       }
-    });
+    }
+
+    this.replicatingCallIds.delete(callId);
+  }
+
+  private replicateDocumentInBackground(document: OrbitDBCallDocument): void {
+    this.pendingCallDocuments.set(document.id, document);
+
+    if (this.replicatingCallIds.has(document.id)) {
+      return;
+    }
+
+    this.replicatingCallIds.add(document.id);
+    void this.replicateLatestDocuments(document.id);
   }
 
   public async findById(id: CallId): Promise<Call | undefined> {

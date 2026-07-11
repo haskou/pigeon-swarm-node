@@ -315,6 +315,42 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toBeDefined();
   });
 
+  it('keeps replicating call heads while secondary indexes are blocked', async () => {
+    const putHead = heads.put.getMockImplementation();
+    const replicatedStatuses: string[] = [];
+
+    heads.put.mockImplementation(
+      async (keyOrDocument: string | Record<string, unknown>, value) => {
+        const key =
+          typeof keyOrDocument === 'string'
+            ? keyOrDocument
+            : String(keyOrDocument.id);
+        const document =
+          typeof keyOrDocument === 'string'
+            ? (value as Record<string, unknown>)
+            : keyOrDocument;
+
+        if (key !== `call:${callId}`) {
+          return new Promise(() => undefined);
+        }
+
+        replicatedStatuses.push(String(document.status));
+
+        return putHead?.(keyOrDocument, value) ?? key;
+      },
+    );
+
+    await repository.save(communityCall());
+    await flushBackgroundTasks();
+    await repository.save(communityCall('ended'));
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active', 'ended']);
+    await expect(heads.get(`call:${callId}`)).resolves.toEqual(
+      expect.objectContaining({ status: 'ended' }),
+    );
+  });
+
   it('does not wait for call document replication when saving calls', async () => {
     calls.put.mockImplementationOnce(() => new Promise(() => undefined));
 
@@ -367,6 +403,96 @@ describe('OrbitDBCallRepository', () => {
     expect(replicatedStatuses).toEqual(['active', 'ended']);
     await expect(calls.get(callId)).resolves.toEqual(
       expect.objectContaining({ status: 'ended' }),
+    );
+  });
+
+  it('coalesces obsolete call documents while replication is slow', async () => {
+    const putCall = calls.put.getMockImplementation();
+    const replicatedStatuses: string[] = [];
+    let releaseFirstWrite: () => void = () => undefined;
+    const firstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+
+    calls.put.mockImplementation(
+      async (keyOrDocument: string | Record<string, unknown>, value) => {
+        const document =
+          typeof keyOrDocument === 'string'
+            ? (value as Record<string, unknown>)
+            : keyOrDocument;
+
+        replicatedStatuses.push(String(document.status));
+
+        if (replicatedStatuses.length === 1) {
+          await firstWrite;
+        }
+
+        return putCall?.(keyOrDocument, value) ?? String(document.id);
+      },
+    );
+
+    await repository.save(communityCall());
+    await repository.save(communityCall('ended'));
+    await repository.save(communityCall());
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active']);
+
+    releaseFirstWrite();
+    await flushBackgroundTasks();
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active', 'active']);
+    await expect(calls.get(callId)).resolves.toEqual(
+      expect.objectContaining({ status: 'active' }),
+    );
+  });
+
+  it('coalesces obsolete call index refreshes while persistence is slow', async () => {
+    const putHead = heads.put.getMockImplementation();
+    const replicatedStatuses: string[] = [];
+    let releaseFirstWrite: () => void = () => undefined;
+    const firstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+
+    heads.put.mockImplementation(
+      async (keyOrDocument: string | Record<string, unknown>, value) => {
+        const key =
+          typeof keyOrDocument === 'string'
+            ? keyOrDocument
+            : String(keyOrDocument.id);
+        const document =
+          typeof keyOrDocument === 'string'
+            ? (value as Record<string, unknown>)
+            : keyOrDocument;
+
+        if (key === `call:${callId}`) {
+          replicatedStatuses.push(String(document.status));
+
+          if (replicatedStatuses.length === 1) {
+            await firstWrite;
+          }
+        }
+
+        return putHead?.(keyOrDocument, value) ?? key;
+      },
+    );
+
+    await repository.save(communityCall());
+    await repository.save(communityCall('ended'));
+    await repository.save(communityCall());
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active']);
+
+    releaseFirstWrite();
+    await flushBackgroundTasks();
+    await flushBackgroundTasks();
+
+    expect(replicatedStatuses).toEqual(['active', 'active']);
+    await expect(heads.get(`call:${callId}`)).resolves.toEqual(
+      expect.objectContaining({ status: 'active' }),
     );
   });
 
