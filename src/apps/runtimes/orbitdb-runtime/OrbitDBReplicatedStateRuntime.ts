@@ -41,14 +41,17 @@ export default class OrbitDBReplicatedStateRuntime {
       name: network.getName(),
       onPeerConnected: (listener) => network.onPeerConnected(listener),
       onPeerDisconnected: (listener) => network.onPeerDisconnected(listener),
-      stores: stores.getSynchronizationStores().map(({ database, name }) => ({
-        getPeerIds: () => [...(database.peers ?? new Set<string>())],
-        name,
-        onPeerJoined: (listener) => database.events.on('join', listener),
-        onPeerLeft: (listener) => database.events.on('leave', listener),
-      })),
+      stores: stores
+        .getSynchronizationStores()
+        .map(({ database, getSynchronizedPeerIds, name }) => ({
+          getPeerIds: getSynchronizedPeerIds,
+          name,
+          onPeerJoined: (listener) => database.events.on('join', listener),
+          onPeerLeft: (listener) => database.events.on('leave', listener),
+        })),
       type: network.getType(),
     });
+    await stores.startSynchronization();
     Kernel.logger.info(
       `OrbitDB private network stores registered: networkId=${networkId}` +
         ` peerId=${localPeerId}`,

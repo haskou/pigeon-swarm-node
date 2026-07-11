@@ -46,12 +46,19 @@ export default class OrbitDBReplicatedStateRegistry {
     'summaries',
   ]);
 
+  private static readonly HYDRATION_BATCH_SIZE = 16;
+
   private readonly storesByNetworkId = new Map<
     string,
     OrbitDBPrivateNetworkStores
   >();
 
   private readonly cachedHeads = new Map<string, Record<string, unknown>>();
+
+  private readonly persistedHeadKeysByNetworkId = new Map<
+    string,
+    Set<string>
+  >();
 
   private readonly documentUpdateListeners = new Map<
     OrbitDBReplicatedDocumentStoreName,
@@ -176,6 +183,15 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  private async notifyBootstrappedDocument(
+    listeners: Set<(document: Record<string, unknown>) => void | Promise<void>>,
+    document: Record<string, unknown>,
+  ): Promise<void> {
+    for (const listener of listeners) {
+      await listener(document);
+    }
+  }
+
   private async bootstrapDocumentUpdateListeners(
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
@@ -186,12 +202,49 @@ export default class OrbitDBReplicatedStateRegistry {
         continue;
       }
 
-      for (const record of await this.allRecords(store)) {
-        for (const listener of listeners) {
-          await listener(record.value);
+      const records = await this.allRecords(store);
+
+      for (let index = 0; index < records.length; index++) {
+        const record = records[index];
+
+        await this.notifyBootstrappedDocument(listeners, record.value);
+
+        if (
+          (index + 1) % OrbitDBReplicatedStateRegistry.HYDRATION_BATCH_SIZE ===
+          0
+        ) {
+          await new Promise<void>((resolve) => setImmediate(resolve));
         }
       }
     }
+  }
+
+  private async hydrateHeadRecord(
+    networkId: string,
+    record: { key?: string; value: Record<string, unknown> },
+  ): Promise<boolean> {
+    if (!record.key) {
+      return true;
+    }
+
+    this.markPersistedHeadKey(networkId, record.key);
+
+    let persisted = true;
+
+    for (const key of this.headKeyDeriver.cachedKeys(
+      record.key,
+      record.value,
+    )) {
+      const cachedHead = this.cacheHead(key, record.value);
+
+      if (cachedHead) {
+        persisted =
+          (await this.persistHeadCache(networkId, key, cachedHead)) &&
+          persisted;
+      }
+    }
+
+    return persisted;
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -317,9 +370,25 @@ export default class OrbitDBReplicatedStateRegistry {
     return undefined;
   }
 
+  private headKeysFromUpdate(
+    networkId: string,
+    entry: { payload?: { key?: string } },
+    record: Record<string, unknown>,
+  ): string[] {
+    const explicitKey = entry.payload?.key;
+
+    if (explicitKey) {
+      this.markPersistedHeadKey(networkId, explicitKey);
+
+      return this.headKeyDeriver.cachedKeys(explicitKey, record);
+    }
+
+    return this.headKeyDeriver.implicitKeys(record);
+  }
+
   private cacheHeadUpdate(
     networkId: string,
-    entry: { payload?: { value?: unknown } },
+    entry: { payload?: { key?: string; value?: unknown } },
   ): void {
     const payloadValue = entry.payload?.value;
 
@@ -328,15 +397,12 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     const record = this.recordValue(payloadValue);
-    const explicitKey = this.stringValue(payloadValue, 'key');
 
     if (!record) {
       return;
     }
 
-    const keys = explicitKey
-      ? this.headKeyDeriver.cachedKeys(explicitKey, record)
-      : this.headKeyDeriver.implicitKeys(record);
+    const keys = this.headKeysFromUpdate(networkId, entry, record);
 
     for (const key of keys) {
       const cachedHead = this.cacheHead(key, record);
@@ -354,21 +420,16 @@ export default class OrbitDBReplicatedStateRegistry {
     const records = await this.allRecords(stores.heads);
     let persistedAllHeads = true;
 
-    for (const record of records) {
-      if (!record.key) {
-        continue;
-      }
+    for (let index = 0; index < records.length; index++) {
+      persistedAllHeads =
+        (await this.hydrateHeadRecord(networkId, records[index])) &&
+        persistedAllHeads;
 
-      const keys = this.headKeyDeriver.cachedKeys(record.key, record.value);
-
-      for (const key of keys) {
-        const cachedHead = this.cacheHead(key, record.value);
-
-        if (cachedHead) {
-          persistedAllHeads =
-            (await this.persistHeadCache(networkId, key, cachedHead)) &&
-            persistedAllHeads;
-        }
+      if (
+        (index + 1) % OrbitDBReplicatedStateRegistry.HYDRATION_BATCH_SIZE ===
+        0
+      ) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
       }
     }
 
@@ -377,23 +438,6 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     return records.length;
-  }
-
-  private hydrateOrbitDBHeadCacheInBackground(
-    networkId: string,
-    stores: OrbitDBPrivateNetworkStores,
-  ): void {
-    void this.hydrateHeadCache(networkId, stores)
-      .then((heads) => {
-        Kernel.logger.debug?.(
-          `OrbitDB replicated head cache rebuilt: networkId=${networkId} heads=${heads}`,
-        );
-      })
-      .catch((error) => {
-        Kernel.logger.warn?.(
-          `OrbitDB replicated head cache rebuild failed: networkId=${networkId} error=${String(error)}`,
-        );
-      });
   }
 
   private async hydratePersistedHeadCache(
@@ -408,6 +452,8 @@ export default class OrbitDBReplicatedStateRegistry {
       const warm = await this.headCache.isWarm(networkId);
 
       heads.forEach((head) => {
+        this.markPersistedHeadKey(networkId, head.key);
+
         for (const key of this.headKeyDeriver.cachedKeys(
           head.key,
           head.value,
@@ -430,6 +476,17 @@ export default class OrbitDBReplicatedStateRegistry {
 
       return { heads: 0, warm: false };
     }
+  }
+
+  private markPersistedHeadKey(networkId: string, key: string): void {
+    const keys = this.persistedHeadKeysByNetworkId.get(networkId) ?? new Set();
+
+    keys.add(key);
+    this.persistedHeadKeysByNetworkId.set(networkId, keys);
+  }
+
+  private hasPersistedHeadKey(networkId: string, key: string): boolean {
+    return this.persistedHeadKeysByNetworkId.get(networkId)?.has(key) ?? false;
   }
 
   private async persistHeadCache(
@@ -558,7 +615,6 @@ export default class OrbitDBReplicatedStateRegistry {
     const candidateCollections = this.headRecordCollectionNames(candidate);
 
     if (
-      currentCollections.length === 0 ||
       currentCollections.length !== candidateCollections.length ||
       currentCollections.some(
         (collectionName) => !candidateCollections.includes(collectionName),
@@ -573,30 +629,16 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
-  private async isSameHeadContentPersisted(
+  private isPersistedForAllTargetNetworks(
     key: string,
-    value: Record<string, unknown>,
     networkIds: string[],
-  ): Promise<boolean> {
+  ): boolean {
     const entries = this.networkStoreEntriesForNetworkIds(networkIds);
 
-    if (entries.length === 0) {
-      return false;
-    }
-
-    try {
-      const persistedHeads = await Promise.all(
-        entries.map(async ({ stores }) =>
-          this.recordValue(await stores.heads.get?.(key)),
-        ),
-      );
-
-      return persistedHeads.every(
-        (head) => head !== undefined && this.isSameHeadContent(head, value),
-      );
-    } catch {
-      return false;
-    }
+    return (
+      entries.length > 0 &&
+      entries.every(({ networkId }) => this.hasPersistedHeadKey(networkId, key))
+    );
   }
 
   private hasSameCachedHeadContent(
@@ -606,18 +648,15 @@ export default class OrbitDBReplicatedStateRegistry {
     return current !== undefined && this.isSameHeadContent(current, candidate);
   }
 
-  private async shouldSkipHeadWrite(
+  private shouldSkipHeadWrite(
     key: string,
-    value: Record<string, unknown>,
     networkIds: string[],
-    force: boolean,
     hasSameCachedContent: boolean,
-  ): Promise<boolean> {
-    if (force || !hasSameCachedContent) {
-      return false;
-    }
-
-    return this.isSameHeadContentPersisted(key, value, networkIds);
+  ): boolean {
+    return (
+      hasSameCachedContent &&
+      this.isPersistedForAllTargetNetworks(key, networkIds)
+    );
   }
 
   private async targetNetworkIdsForHeadWrite(
@@ -903,7 +942,6 @@ export default class OrbitDBReplicatedStateRegistry {
       : { heads: 0, warm: false };
 
     if (persistedHeadCache.warm && persistedHeadCache.heads > 0) {
-      this.hydrateOrbitDBHeadCacheInBackground(networkId, stores);
       await this.bootstrapDocumentUpdateListeners(stores);
 
       return;
@@ -917,6 +955,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const stores = this.storesByNetworkId.get(networkId);
 
     this.storesByNetworkId.delete(networkId);
+    this.persistedHeadKeysByNetworkId.delete(networkId);
     this.cachedHeads.clear();
 
     await stores?.stop();
@@ -924,6 +963,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   public clear(): void {
     this.storesByNetworkId.clear();
+    this.persistedHeadKeysByNetworkId.clear();
     this.cachedHeads.clear();
   }
 
@@ -970,6 +1010,36 @@ export default class OrbitDBReplicatedStateRegistry {
         },
       ),
     );
+  }
+
+  public async queryDocuments(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    matcher: (document: Record<string, unknown>) => boolean,
+    networkIds: string[] = [],
+  ): Promise<Record<string, unknown>[]> {
+    this.assertReady();
+
+    const results = await Promise.all(
+      this.networkStoreEntriesForNetworkIds(networkIds).map(
+        async ({ stores }) => {
+          const store = this.getStore(stores, storeName);
+
+          if (!store) {
+            return [];
+          }
+
+          if (store.query) {
+            return store.query(matcher);
+          }
+
+          return (await this.allRecords(store))
+            .map((record) => record.value)
+            .filter(matcher);
+        },
+      ),
+    );
+
+    return results.flat();
   }
 
   public async replicateDocumentInBackground(
@@ -1052,21 +1122,17 @@ export default class OrbitDBReplicatedStateRegistry {
     value: Record<string, unknown>,
     networkIds: string[] = [],
   ): void {
-    this.cacheHeadLocally(key, value, networkIds);
-    void this.putHead(key, value, networkIds, { force: true }).catch(
-      (error) => {
-        Kernel.logger.warn?.(
-          `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
-        );
-      },
-    );
+    void this.putHead(key, value, networkIds).catch((error) => {
+      Kernel.logger.warn?.(
+        `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
+      );
+    });
   }
 
   public async putHead(
     key: string,
     value: Record<string, unknown>,
     networkIds: string[] = [],
-    options: { force?: boolean } = {},
   ): Promise<void> {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
@@ -1076,7 +1142,7 @@ export default class OrbitDBReplicatedStateRegistry {
       cleanValue,
     );
 
-    if (!options.force && hasSameCachedContent) {
+    if (hasSameCachedContent) {
       const targetDocument = currentValue ?? cleanValue;
       const skipTargetNetworkIds = await this.targetNetworkIdsForHeadWrite(
         targetDocument,
@@ -1084,11 +1150,9 @@ export default class OrbitDBReplicatedStateRegistry {
       );
 
       if (
-        await this.shouldSkipHeadWrite(
+        this.shouldSkipHeadWrite(
           key,
-          cleanValue,
           skipTargetNetworkIds,
-          false,
           hasSameCachedContent,
         )
       ) {
@@ -1116,6 +1180,7 @@ export default class OrbitDBReplicatedStateRegistry {
       this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
         async ({ networkId, stores }) => {
           await stores.heads.put?.(key, cachedValue);
+          this.markPersistedHeadKey(networkId, key);
           await this.persistHeadCache(networkId, key, cachedValue);
         },
       ),

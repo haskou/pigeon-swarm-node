@@ -35,6 +35,7 @@ function fakeStores(): OrbitDBPrivateNetworkStores {
     notifications: fakeStore(),
     reactions: fakeStore(),
     requests: fakeStore(),
+    startSynchronization: jest.fn().mockResolvedValue(undefined),
   };
 
   return stores as unknown as OrbitDBPrivateNetworkStores;

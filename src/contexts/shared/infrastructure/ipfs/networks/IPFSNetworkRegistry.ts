@@ -15,7 +15,6 @@ import { createHash, createPrivateKey } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
-import { IPFSConnection } from '../helia/IPFSConnection';
 import { libp2pKeyAdapter } from './adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from './adapters/types/Libp2pPrivateKeyLike';
 import { IPFSNetwork } from './IPFSNetwork';
@@ -149,10 +148,6 @@ export default class IPFSNetworkRegistry {
     return pigeonEnvironment().PIGEON_RELAY_DATA_LIMIT_BYTES;
   }
 
-  private getPrivateRelayBootstrapMultiaddrs(): string[] {
-    return this.getRelaySettings().manualRelayMultiaddrs;
-  }
-
   private getPrivateRelayPort(networkId: string): number | undefined {
     const state = this.getState();
     const existingPort = state.privateRelayPorts[networkId];
@@ -232,71 +227,6 @@ export default class IPFSNetworkRegistry {
         ` announceAddresses="${(relayOptions.announceAddresses || []).join(',')}"` +
         ` relayDataLimitBytes=${relayOptions.relayDataLimitBytes}`,
     );
-  }
-
-  private logPrivateRelayBootstrapState(
-    networkId: string,
-    bootstrapMultiaddrs: string[],
-  ): void {
-    if (bootstrapMultiaddrs.length === 0) {
-      const state = this.getState();
-
-      if (state.disabledBootstrapLoggedNetworkIds.includes(networkId)) {
-        return;
-      }
-
-      state.disabledBootstrapLoggedNetworkIds.push(networkId);
-      Kernel.logger.info(
-        `Private IPFS relay bootstrap disabled: networkId=${networkId}` +
-          ' reason="No manual relay multiaddrs configured on the node."',
-      );
-
-      return;
-    }
-
-    Kernel.logger.info(
-      `Private IPFS relay bootstrap configured: networkId=${networkId}` +
-        ` relayCount=${bootstrapMultiaddrs.length}`,
-    );
-  }
-
-  private async dialPrivateRelayBootstrap(
-    networkId: string,
-    connection: IPFSConnection,
-    multiaddr: string,
-  ): Promise<void> {
-    try {
-      await connection.dial(multiaddr);
-      Kernel.logger.info(
-        `Private IPFS relay bootstrap connected: networkId=${networkId}` +
-          ` multiaddr="${multiaddr}" peers=${connection.getPeers().length}`,
-      );
-    } catch (error) {
-      Kernel.logger.warn(
-        `Private IPFS relay bootstrap failed: networkId=${networkId}` +
-          ` multiaddr="${multiaddr}" error=${String(error)}`,
-      );
-    }
-  }
-
-  private dialPrivateRelayBootstraps(
-    networkId: string,
-    connection: IPFSConnection,
-  ): void {
-    const bootstrapMultiaddrs = this.getPrivateRelayBootstrapMultiaddrs();
-
-    this.logPrivateRelayBootstrapState(networkId, bootstrapMultiaddrs);
-
-    for (const multiaddr of bootstrapMultiaddrs) {
-      this.dialPrivateRelayBootstrap(networkId, connection, multiaddr).catch(
-        (error: unknown) => {
-          Kernel.logger.warn(
-            `Private IPFS relay bootstrap crashed: networkId=${networkId}` +
-              ` multiaddr="${multiaddr}" error=${String(error)}`,
-          );
-        },
-      );
-    }
   }
 
   private async loadOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
@@ -394,7 +324,6 @@ export default class IPFSNetworkRegistry {
           : {}),
         storageLocation,
       });
-      this.dialPrivateRelayBootstraps(config.getId(), connection);
       const network = new IPFSNetwork(config, connection);
 
       this.relayRecordDirectory.start(network, relayOptions, sharedPrivateKey, {

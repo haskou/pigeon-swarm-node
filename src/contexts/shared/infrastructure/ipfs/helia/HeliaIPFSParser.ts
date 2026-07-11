@@ -182,6 +182,7 @@ export class HeliaIPFSParser {
   public static async parseOptions(
     options: IPFSOptions,
     parserOptions?: {
+      privateNetwork?: boolean;
       persistentDatastore?: boolean;
       publicBootstrap?: boolean;
     },
@@ -191,6 +192,7 @@ export class HeliaIPFSParser {
       offline: HeliaIPFSParser.isInMemoryStorageLocation(
         options.storageLocation,
       ),
+      privateNetwork: parserOptions?.privateNetwork,
       publicBootstrap: parserOptions?.publicBootstrap,
     })) as ParsedHeliaIPFSOptions['libp2p'];
     libp2pConfig = HeliaIPFSParser.applyAddressOptions(
@@ -226,6 +228,7 @@ export class HeliaIPFSParser {
   ): Promise<Libp2pDefaults> {
     return HeliaIPFSParser.parseOptions(options, {
       persistentDatastore: false,
+      privateNetwork: true,
       publicBootstrap: false,
     }).then((parsedOptions) =>
       Promise.resolve(parsedOptions.libp2p).then((libp2pConfig) => {

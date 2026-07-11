@@ -382,8 +382,11 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[] = [],
   ): Promise<void> {
+    const cachedHead = this.registry.findCachedHead(key);
     const records = this.mergeRecords(
-      this.recordsFromHead(await this.registry.findPersistedHead(key)),
+      this.recordsFromHead(
+        cachedHead ?? (await this.registry.findPersistedHead(key)),
+      ),
       record,
     );
 

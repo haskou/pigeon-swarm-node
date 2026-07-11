@@ -23,4 +23,8 @@ export type OrbitDBDatabase = {
   query?(
     matcher: (document: Record<string, unknown>) => boolean,
   ): Promise<Array<Record<string, unknown>>>;
+  sync?: {
+    start(): Promise<void>;
+    stop(): Promise<void>;
+  };
 };

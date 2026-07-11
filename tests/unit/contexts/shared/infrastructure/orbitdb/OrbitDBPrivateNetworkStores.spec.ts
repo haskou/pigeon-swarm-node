@@ -3,8 +3,8 @@ import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/Orb
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
-import Kernel from '@haskou/ddd-kernel';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
+import Kernel from '@haskou/ddd-kernel';
 import { EventEmitter } from 'events';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -17,6 +17,10 @@ function orbitDBDatabase(): OrbitDBDatabase {
     get: jest.fn().mockResolvedValue(undefined),
     put: jest.fn().mockResolvedValue('ok'),
     query: jest.fn().mockResolvedValue([]),
+    sync: {
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+    },
   };
 }
 
@@ -62,9 +66,27 @@ describe('OrbitDBPrivateNetworkStores', () => {
 
     const stores = await OrbitDBPrivateNetworkStores.open(network);
 
+    expect(orbitdb.open).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ sync: false }),
+    );
+
+    await stores.startSynchronization();
+    expect(openedDatabases.every((database) => database.sync?.start)).toBe(
+      true,
+    );
     expect(
-      stores.getSynchronizationStores().map(({ name }) => name),
-    ).toEqual([
+      openedDatabases.every(
+        (database) => (database.sync?.start as jest.Mock).mock.calls.length,
+      ),
+    ).toBe(true);
+
+    (stores.calls.events as EventEmitter).emit('join', 'peer-2');
+    expect(
+      stores.getSynchronizationStores()[0].getSynchronizedPeerIds(),
+    ).toEqual(['peer-2']);
+
+    expect(stores.getSynchronizationStores().map(({ name }) => name)).toEqual([
       'calls',
       'communities',
       'contentReplication',

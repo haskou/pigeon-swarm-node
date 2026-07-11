@@ -2,8 +2,8 @@ import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/valu
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMapper';
+import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Signature, Timestamp } from '@haskou/value-objects';
@@ -118,21 +118,11 @@ describe('OrbitDBConversationRepository', () => {
       }),
     ]);
     expect(participantConversations).toHaveLength(1);
-    const summary = heads.get(
-      `conversation-message-summary:${conversation.getId().valueOf()}`,
-    );
-
-    expect(summary?.messages).toHaveLength(2);
-    expect(summary?.messages).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: firstMessage.getId().valueOf() }),
-      ]),
-    );
     expect(
-      (summary?.messages as Record<string, unknown>[]).every(
-        (message) => message.encryptedPayload === undefined,
+      heads.get(
+        `conversation-message-summary:${conversation.getId().valueOf()}`,
       ),
-    ).toBe(true);
+    ).toBeUndefined();
   });
 
   it('should compute unread counts from OrbitDB read markers', async () => {
@@ -302,7 +292,7 @@ describe('OrbitDBConversationRepository', () => {
       [firstConversation.getId(), secondConversation.getId()],
     );
 
-    expect(messagesQuery).not.toHaveBeenCalled();
+    expect(messagesQuery).toHaveBeenCalledTimes(2);
     expect(unreadCounts.get(firstConversation.getId().valueOf())).toBe(1);
     expect(unreadCounts.get(secondConversation.getId().valueOf())).toBe(1);
   });
@@ -353,7 +343,7 @@ describe('OrbitDBConversationRepository', () => {
     ]);
   });
 
-  it('should not read the message index once per existing message when saving', async () => {
+  it('should not rebuild a replicated message index when saving', async () => {
     const conversation = mother.build();
 
     for (let index = 0; index < 5; index += 1) {
@@ -382,7 +372,7 @@ describe('OrbitDBConversationRepository', () => {
         key === `conversation-message-index:${conversation.getId().valueOf()}`,
     );
 
-    expect(messageIndexReads).toHaveLength(1);
+    expect(messageIndexReads).toHaveLength(0);
   });
 });
 
