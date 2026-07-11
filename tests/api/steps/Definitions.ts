@@ -3,6 +3,7 @@
 /* eslint-disable no-case-declarations */
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
+import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -102,7 +103,10 @@ export default class Definitions {
       await application.dependencyInjection();
       await application.runServer();
       application.logs();
-      await application.runRuntimes(OrbitDBReplicatedStateRuntime);
+      await application.runRuntimes(
+        OrbitDBReplicatedStateRuntime,
+        OrbitDBCallProjectionRuntime,
+      );
     }
   }
 

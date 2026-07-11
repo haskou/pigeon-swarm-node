@@ -16,10 +16,29 @@ type PersistedHeadCacheHydration = {
 };
 
 export default class OrbitDBReplicatedStateRegistry {
+  private static readonly DOCUMENT_STORE_NAMES: OrbitDBReplicatedDocumentStoreName[] =
+    [
+      'calls',
+      'communities',
+      'conversations',
+      'identities',
+      'contentReplication',
+      'keychains',
+      'messages',
+      'moderationLogs',
+      'notificationSettings',
+      'notifications',
+      'pins',
+      'polls',
+      'reactions',
+      'requests',
+      'stickerPacks',
+      'stickerUserLibraries',
+    ];
+
   // TODO: Move indexed head merge policy to OrbitDBHeadIndex before adding
   // per-index record identity or freshness rules here.
   private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
-    'calls',
     'conversations',
     'messages',
     'pins',
@@ -33,6 +52,16 @@ export default class OrbitDBReplicatedStateRegistry {
   >();
 
   private readonly cachedHeads = new Map<string, Record<string, unknown>>();
+
+  private readonly documentUpdateListeners = new Map<
+    OrbitDBReplicatedDocumentStoreName,
+    Set<(document: Record<string, unknown>) => void | Promise<void>>
+  >();
+
+  private readonly documentUpdateListenerStores = new Map<
+    OrbitDBReplicatedDocumentStoreName,
+    WeakSet<OrbitDBDatabase>
+  >();
 
   private headCache?: OrbitDBReplicatedHeadCache;
 
@@ -96,6 +125,73 @@ export default class OrbitDBReplicatedStateRegistry {
         key: entry.key,
         value: entry.value,
       }));
+  }
+
+  private notifyDocumentUpdated(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    value: unknown,
+  ): void {
+    const document = this.recordValue(value);
+
+    if (!document) {
+      return;
+    }
+
+    for (const listener of this.documentUpdateListeners.get(storeName) ?? []) {
+      void Promise.resolve(listener(document)).catch((error) => {
+        Kernel.logger.warn?.(
+          `OrbitDB document projection failed: store=${storeName} error=${String(error)}`,
+        );
+      });
+    }
+  }
+
+  private registerDocumentUpdateListener(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): void {
+    const registeredStores =
+      this.documentUpdateListenerStores.get(storeName) ?? new WeakSet();
+
+    if (registeredStores.has(store)) {
+      return;
+    }
+
+    store.events?.on?.('update', (entry) =>
+      this.notifyDocumentUpdated(storeName, entry.payload?.value),
+    );
+    registeredStores.add(store);
+    this.documentUpdateListenerStores.set(storeName, registeredStores);
+  }
+
+  private registerDocumentUpdateListeners(
+    stores: OrbitDBPrivateNetworkStores,
+  ): void {
+    for (const storeName of this.documentUpdateListeners.keys()) {
+      const store = this.getStore(stores, storeName);
+
+      if (store) {
+        this.registerDocumentUpdateListener(storeName, store);
+      }
+    }
+  }
+
+  private async bootstrapDocumentUpdateListeners(
+    stores: OrbitDBPrivateNetworkStores,
+  ): Promise<void> {
+    for (const [storeName, listeners] of this.documentUpdateListeners) {
+      const store = this.getStore(stores, storeName);
+
+      if (!store) {
+        continue;
+      }
+
+      for (const record of await this.allRecords(store)) {
+        for (const listener of listeners) {
+          await listener(record.value);
+        }
+      }
+    }
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -797,6 +893,7 @@ export default class OrbitDBReplicatedStateRegistry {
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
     this.storesByNetworkId.set(networkId, stores);
+    this.registerDocumentUpdateListeners(stores);
     stores.heads.events?.on?.('update', (entry) =>
       this.cacheHeadUpdate(networkId, entry),
     );
@@ -807,11 +904,13 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (persistedHeadCache.warm && persistedHeadCache.heads > 0) {
       this.hydrateOrbitDBHeadCacheInBackground(networkId, stores);
+      await this.bootstrapDocumentUpdateListeners(stores);
 
       return;
     }
 
     await this.hydrateHeadCache(networkId, stores);
+    await this.bootstrapDocumentUpdateListeners(stores);
   }
 
   public async unregister(networkId: string): Promise<void> {
@@ -826,6 +925,30 @@ export default class OrbitDBReplicatedStateRegistry {
   public clear(): void {
     this.storesByNetworkId.clear();
     this.cachedHeads.clear();
+  }
+
+  public async onDocumentUpdated(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    listener: (document: Record<string, unknown>) => void | Promise<void>,
+  ): Promise<void> {
+    const listeners = this.documentUpdateListeners.get(storeName) ?? new Set();
+
+    listeners.add(listener);
+    this.documentUpdateListeners.set(storeName, listeners);
+
+    for (const stores of this.storesByNetworkId.values()) {
+      const store = this.getStore(stores, storeName);
+
+      if (!store) {
+        continue;
+      }
+
+      this.registerDocumentUpdateListener(storeName, store);
+
+      for (const record of await this.allRecords(store)) {
+        await listener(record.value);
+      }
+    }
   }
 
   public async putDocument(
@@ -994,25 +1117,6 @@ export default class OrbitDBReplicatedStateRegistry {
         async ({ networkId, stores }) => {
           await stores.heads.put?.(key, cachedValue);
           await this.persistHeadCache(networkId, key, cachedValue);
-
-          for (const derivedKey of this.headKeyDeriver.explicitKeys(
-            key,
-            cachedValue,
-          )) {
-            if (derivedKey === key) {
-              continue;
-            }
-
-            const cachedDerivedHead = this.cacheHead(derivedKey, cachedValue);
-
-            if (cachedDerivedHead) {
-              await this.persistHeadCache(
-                networkId,
-                derivedKey,
-                cachedDerivedHead,
-              );
-            }
-          }
         },
       ),
     );

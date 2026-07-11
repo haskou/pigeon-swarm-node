@@ -121,6 +121,7 @@ function createStore(): Store {
 }
 
 function createStores(): {
+  calls: Store;
   communities: Store;
   contentReplication: Store;
   identities: Store;
@@ -130,6 +131,7 @@ function createStores(): {
   notifications: Store;
   stores: OrbitDBPrivateNetworkStores;
 } {
+  const calls = createStore();
   const communities = createStore();
   const contentReplication = createStore();
   const identities = createStore();
@@ -138,6 +140,7 @@ function createStores(): {
   const notifications = createStore();
   const heads = createStore();
   const storeSet = {
+    calls,
     communities,
     conversations: createStore(),
     heads,
@@ -151,6 +154,7 @@ function createStores(): {
   };
 
   return {
+    calls,
     communities,
     contentReplication,
     identities,
@@ -1250,6 +1254,80 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         },
       },
     ]);
+  });
+
+  it('bootstraps document projections from canonical stores', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await firstNetwork.calls.put({
+      id: 'call-1',
+      networkId: 'network-1',
+    });
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('calls', listener);
+
+    expect(listener).toHaveBeenCalledWith({
+      id: 'call-1',
+      networkId: 'network-1',
+    });
+  });
+
+  it('subscribes only stores with active document projections', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(firstNetwork.calls.events.on).not.toHaveBeenCalled();
+    expect(firstNetwork.communities.events.on).not.toHaveBeenCalled();
+
+    await registry.onDocumentUpdated('calls', jest.fn());
+
+    expect(firstNetwork.calls.events.on).toHaveBeenCalledTimes(1);
+    expect(firstNetwork.communities.events.on).not.toHaveBeenCalled();
+  });
+
+  it('projects documents received through OrbitDB updates', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await registry.onDocumentUpdated('calls', listener);
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.calls.emitUpdate({
+      payload: {
+        value: {
+          id: 'call-1',
+          networkId: 'network-1',
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(listener).toHaveBeenCalledWith({
+      id: 'call-1',
+      networkId: 'network-1',
+    });
+  });
+
+  it('bootstraps projections when a network is registered later', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await firstNetwork.calls.put({
+      id: 'call-1',
+      networkId: 'network-1',
+    });
+    await registry.onDocumentUpdated('calls', listener);
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(listener).toHaveBeenCalledWith({
+      id: 'call-1',
+      networkId: 'network-1',
+    });
   });
 
 });

@@ -76,44 +76,11 @@ export default class OrbitDBReplicatedHeadKeyDeriver {
     return [...keys];
   }
 
-  private derivedKeysFromRecord(record: Record<string, unknown>): string[] {
-    const keys = new Set<string>();
-    const scope = record.scope;
-
-    if (
-      this.isRecord(scope) &&
-      scope.type === 'community_channel' &&
-      typeof scope.communityId === 'string' &&
-      typeof scope.channelId === 'string'
-    ) {
-      keys.add(
-        `call-community-channel-head:${scope.communityId}:${scope.channelId}`,
-      );
-    }
-
-    return [...keys];
-  }
-
   public implicitKeys(record: Record<string, unknown>): string[] {
-    return [
-      ...new Set([
-        ...this.aliasKeysFromRecord(record),
-        ...this.derivedKeysFromRecord(record),
-      ]),
-    ];
-  }
-
-  public explicitKeys(key: string, record: Record<string, unknown>): string[] {
-    return [...new Set([key, ...this.derivedKeysFromRecord(record)])];
+    return [...new Set(this.aliasKeysFromRecord(record))];
   }
 
   public cachedKeys(key: string, record: Record<string, unknown>): string[] {
-    return [
-      ...new Set([
-        key,
-        ...this.aliasKeysFromRecord(record),
-        ...this.derivedKeysFromRecord(record),
-      ]),
-    ];
+    return [...new Set([key, ...this.aliasKeysFromRecord(record)])];
   }
 }
