@@ -152,6 +152,12 @@ export class CallSignalDelivery extends AggregateRoot {
     return this.signalId;
   }
 
+  public getNextMaintenanceAt(ownerNodeId: NodeId): Timestamp | undefined {
+    return this.isOwnedBy(ownerNodeId)
+      ? this.schedule.getNextMaintenanceAt()
+      : this.schedule.getExpirationAt();
+  }
+
   public hasExpiredAt(now: Timestamp): boolean {
     return this.schedule.hasExpiredAt(now);
   }

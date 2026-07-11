@@ -57,6 +57,24 @@ export class CallSignalDeliverySchedule {
     );
   }
 
+  public getNextMaintenanceAt(): Timestamp | undefined {
+    if (this.isAcknowledged()) {
+      return undefined;
+    }
+
+    if (!this.attempt.canRetry()) {
+      return this.expiresAt;
+    }
+
+    return this.nextRetryAt.isBefore(this.expiresAt)
+      ? this.nextRetryAt
+      : this.expiresAt;
+  }
+
+  public getExpirationAt(): Timestamp | undefined {
+    return this.isAcknowledged() ? undefined : this.expiresAt;
+  }
+
   public retry(now: Timestamp): boolean {
     if (!this.isRetryableAt(now)) {
       return false;
