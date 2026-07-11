@@ -79,7 +79,7 @@
     "@libp2p/interface": "3.2.4",
     "interface-datastore": "10.0.1",
     "wrap-ansi": "7.0.0",
-    "string-width": "4.1.0"
+    "string-width": "4.2.3"
   },
   "devDependencies": {
     "@cucumber/cucumber": "7.3.2",
