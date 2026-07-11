@@ -1661,15 +1661,6 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVk: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5Ob3RpZmljYXRpb25DcmVhdGVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5Ob3RpZmljYXRpb25DcmVhdGVk
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0NhbGxTaWduYWxEZWxpdmVyeU1haW50ZW5hbmNlU2NoZWR1bGVyX19DYWxsU2lnbmFsRGVsaXZlcnlNYWludGVuYW5jZVNjaGVkdWxlcg==:
-    class: /apps/schedulers/CallSignalDeliveryMaintenanceScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3JldHJ5LXNpZ25hbC1kZWxpdmVyaWVzX19DYWxsU2lnbmFsRGVsaXZlcnlSZXRyaWVyX19DYWxsU2lnbmFsRGVsaXZlcnlSZXRyaWVy
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2V4cGlyZS1zaWduYWwtZGVsaXZlcmllc19fQ2FsbFNpZ25hbERlbGl2ZXJ5RXhwaXJhdGlvblJlZ2lzdHJhcl9fQ2FsbFNpZ25hbERlbGl2ZXJ5RXhwaXJhdGlvblJlZ2lzdHJhcg==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0xvY2FsUm91dGluZ1JlY29yZFJlcHVibGlzaGVyU2NoZWR1bGVyX19Mb2NhbFJvdXRpbmdSZWNvcmRSZXB1Ymxpc2hlclNjaGVkdWxlcg==:
     class: /apps/schedulers/LocalRoutingRecordRepublisherScheduler
     arguments:
@@ -2169,6 +2160,20 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX0RvbWFpbkV2ZW50UHVibGlzaGVyX19Eb21haW5FdmVudFB1Ymxpc2hlcg==
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub3RpZmljYXRpb25zX19kb21haW5fX3JlcG9zaXRvcmllc19fTm90aWZpY2F0aW9uUmVwb3NpdG9yeV9fTm90aWZpY2F0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3J1bnRpbWVzX19jYWxsLXNpZ25hbC1kZWxpdmVyeS1tYWludGVuYW5jZS1ydW50aW1lX19DYWxsU2lnbmFsRGVsaXZlcnlNYWludGVuYW5jZVJ1bnRpbWVfX0NhbGxTaWduYWxEZWxpdmVyeU1haW50ZW5hbmNlUnVudGltZQ==:
+    class: >-
+      /apps/runtimes/call-signal-delivery-maintenance-runtime/CallSignalDeliveryMaintenanceRuntime
+    arguments:
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19faW5mcmFzdHJ1Y3R1cmVfX21lbW9yeV9fSW5NZW1vcnlDYWxsU2lnbmFsRGVsaXZlcnlSZXBvc2l0b3J5X19Jbk1lbW9yeUNhbGxTaWduYWxEZWxpdmVyeVJlcG9zaXRvcnk=
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3JldHJ5LXNpZ25hbC1kZWxpdmVyaWVzX19DYWxsU2lnbmFsRGVsaXZlcnlSZXRyaWVyX19DYWxsU2lnbmFsRGVsaXZlcnlSZXRyaWVy
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX2V4cGlyZS1zaWduYWwtZGVsaXZlcmllc19fQ2FsbFNpZ25hbERlbGl2ZXJ5RXhwaXJhdGlvblJlZ2lzdHJhcl9fQ2FsbFNpZ25hbERlbGl2ZXJ5RXhwaXJhdGlvblJlZ2lzdHJhcg==
+      - >-
+        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fZG9tYWluX19yZXBvc2l0b3JpZXNfX05vZGVSZXBvc2l0b3J5X19Ob2RlUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19jYWxsc19fYXBwbGljYXRpb25fX3NlbmQtc2lnbmFsX19DYWxsU2lnbmFsU2VuZGVyX19DYWxsU2lnbmFsU2VuZGVy:

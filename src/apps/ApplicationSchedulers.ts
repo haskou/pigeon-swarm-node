@@ -1,5 +1,4 @@
 import CallParticipantLeaseExpirationScheduler from '@app/apps/schedulers/CallParticipantLeaseExpirationScheduler';
-import CallSignalDeliveryMaintenanceScheduler from '@app/apps/schedulers/CallSignalDeliveryMaintenanceScheduler';
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/ContentReplicationMaintenanceScheduler';
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
@@ -13,7 +12,6 @@ export const recurringSchedulers: ApplicationServiceClass<Scheduler>[] = [
   NodeHeartbeatScheduler,
   IdentityPresenceExpirationScheduler,
   CallParticipantLeaseExpirationScheduler,
-  CallSignalDeliveryMaintenanceScheduler,
   CallTimeoutScheduler,
   ContentReplicationMaintenanceScheduler,
 ];
