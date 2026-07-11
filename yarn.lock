@@ -1593,10 +1593,10 @@
     "@multiformats/multiaddr" "^13.0.3"
     progress-events "^1.0.1"
 
-"@libp2p/interface@3.2.4", "@libp2p/interface@^3.0.0", "@libp2p/interface@^3.0.2", "@libp2p/interface@^3.1.0", "@libp2p/interface@^3.2.0", "@libp2p/interface@^3.2.3", "@libp2p/interface@^3.2.4":
-  version "3.2.4"
-  resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.2.4.tgz#2140d626889e11897c748dc89ff14b17834551c6"
-  integrity sha512-o/ZMbsplniVQhz0AW1CinZcfZPEfr7ttu4w7aivrFAs6xDpnJYmN3FTeEgTt93EHs+AEOcIT76V3KMFDZmIEcQ==
+"@libp2p/interface@3.2.5", "@libp2p/interface@^3.0.0", "@libp2p/interface@^3.0.2", "@libp2p/interface@^3.1.0", "@libp2p/interface@^3.2.0", "@libp2p/interface@^3.2.3", "@libp2p/interface@^3.2.4":
+  version "3.2.5"
+  resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.2.5.tgz#fe951a4f864f9012e5b9ae9495ebebdf20c0e4b7"
+  integrity sha512-RdTchTdakBBc4ShKKsvoME/bJYsrCoVDpdYQVdd4TQ30TCb8QwWKGClqAtw7gfLNuaUKm41xz06kASW6AZpbDA==
   dependencies:
     "@multiformats/dns" "^1.0.6"
     "@multiformats/multiaddr" "^13.0.3"
