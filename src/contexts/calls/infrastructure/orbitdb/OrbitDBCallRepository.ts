@@ -9,19 +9,19 @@ import { Timestamp } from '@haskou/value-objects';
 
 import OrbitDBCallMapper from './mappers/OrbitDBCallMapper';
 import OrbitDBCallDocumentReplicator from './OrbitDBCallDocumentReplicator';
-import OrbitDBCallIndex from './OrbitDBCallIndex';
+import OrbitDBCallProjection from './OrbitDBCallProjection';
 
 export default class OrbitDBCallRepository extends CallRepository {
   constructor(
     private readonly mapper: OrbitDBCallMapper,
     private readonly documentReplicator: OrbitDBCallDocumentReplicator,
-    private readonly callIndex: OrbitDBCallIndex,
+    private readonly callProjection: OrbitDBCallProjection,
   ) {
     super();
   }
 
   public async findById(id: CallId): Promise<Call | undefined> {
-    const document = await this.callIndex.findById(id);
+    const document = await this.callProjection.findById(id);
 
     return document ? this.mapper.toDomain(document) : undefined;
   }
@@ -30,13 +30,13 @@ export default class OrbitDBCallRepository extends CallRepository {
     participantId: IdentityId,
   ): Promise<Call[]> {
     return this.mapper.toDomainList(
-      await this.callIndex.findActiveByParticipant(participantId),
+      await this.callProjection.findActiveByParticipant(participantId),
     );
   }
 
   public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
     return this.mapper.toDomainList(
-      await this.callIndex.findByParticipant(participantId),
+      await this.callProjection.findByParticipant(participantId),
     );
   }
 
@@ -44,7 +44,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     conversationId: ConversationId,
   ): Promise<Call[]> {
     return this.mapper.toDomainList(
-      await this.callIndex.findByConversationId(conversationId),
+      await this.callProjection.findByConversationId(conversationId),
     );
   }
 
@@ -53,7 +53,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     channelId: CommunityChannelId,
   ): Promise<Call[]> {
     return this.mapper.toDomainList(
-      await this.callIndex.findByCommunityChannel(communityId, channelId),
+      await this.callProjection.findByCommunityChannel(communityId, channelId),
     );
   }
 
@@ -61,7 +61,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call | undefined> {
-    const document = await this.callIndex.findActiveByCommunityChannel(
+    const document = await this.callProjection.findActiveByCommunityChannel(
       communityId,
       channelId,
     );
@@ -73,7 +73,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
   ): Promise<Call[]> {
     return this.mapper.toDomainList(
-      await this.callIndex.findActiveByCommunity(communityId),
+      await this.callProjection.findActiveByCommunity(communityId),
     );
   }
 
@@ -81,7 +81,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     timeoutThreshold: Timestamp,
   ): Promise<Call[]> {
     return this.mapper.toDomainList(
-      await this.callIndex.findTimedOutRingingCalls(timeoutThreshold),
+      await this.callProjection.findTimedOutRingingCalls(timeoutThreshold),
     );
   }
 
@@ -89,7 +89,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     const document = this.mapper.toDocument(call);
 
     this.documentReplicator.replicate(document);
-    this.callIndex.put(document);
+    this.callProjection.project(document);
 
     return Promise.resolve();
   }
@@ -97,7 +97,7 @@ export default class OrbitDBCallRepository extends CallRepository {
   public registerReplica(call: Call): Promise<void> {
     const document = this.mapper.toDocument(call);
 
-    this.callIndex.registerReplica({
+    this.callProjection.project({
       ...document,
       updatedAt: document.createdAt,
     });
