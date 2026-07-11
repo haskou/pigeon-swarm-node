@@ -1,5 +1,5 @@
 import { StickerUpdateMessage } from '@app/contexts/stickers/application/update-sticker/messages/StickerUpdateMessage';
-import { StickerUpdater } from '@app/contexts/stickers/application/update-sticker/StickerUpdater';
+import StickerUpdater from '@app/contexts/stickers/application/update-sticker/StickerUpdater';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {

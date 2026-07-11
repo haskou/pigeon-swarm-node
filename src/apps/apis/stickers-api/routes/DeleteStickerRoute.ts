@@ -1,5 +1,5 @@
 import { StickerDeleteMessage } from '@app/contexts/stickers/application/delete-sticker/messages/StickerDeleteMessage';
-import { StickerDeleter } from '@app/contexts/stickers/application/delete-sticker/StickerDeleter';
+import StickerDeleter from '@app/contexts/stickers/application/delete-sticker/StickerDeleter';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
