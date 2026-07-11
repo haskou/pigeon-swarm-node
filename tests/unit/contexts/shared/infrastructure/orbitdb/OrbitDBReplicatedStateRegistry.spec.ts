@@ -1,13 +1,8 @@
-import Kernel from '@haskou/ddd-kernel';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
-import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
-import { Request } from 'express';
-import { mock, MockProxy } from 'jest-mock-extended';
 
 type Entry = {
   key?: string;
@@ -168,28 +163,9 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
-  let logger: MockProxy<WinstonLogger>;
-
-  beforeEach(() => {
-    logger = mock<WinstonLogger>();
-    jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger);
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
   it('throws when replicated state is not ready yet', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
 
-    await expect(
-      registry.queryDocuments('communities', () => true),
-    ).rejects.toMatchObject({
-      code: 503020,
-      httpCode: 503,
-      message:
-        'Replicated state is not ready yet. Retry after the node finishes opening and synchronizing replicated state.',
-    });
     await expect(
       registry.putDocument('communities', { id: 'community-1' }),
     ).rejects.toMatchObject({
@@ -1276,73 +1252,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     ]);
   });
 
-  it('warns when an HTTP request performs a slow document query', async () => {
-    const registry = new OrbitDBReplicatedStateRegistry();
-    const firstNetwork = createStores();
-    const request = {
-      method: 'GET',
-      originalUrl: '/communities?limit=30',
-      path: '/communities',
-      url: '/communities?limit=30',
-    } as Request;
-
-    jest.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(1150);
-    registry.register('network-1', firstNetwork.stores);
-    await registry.putDocument('communities', {
-      id: 'community-1',
-      networkId: 'network-1',
-    });
-
-    await HttpRequestContext.run(request, () =>
-      registry.queryDocuments(
-        'communities',
-        (document) => document.id === 'community-1',
-        {
-          operation: 'test.communities.list',
-        },
-      ),
-    );
-
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('OrbitDB queryDocuments slow: store=communities'),
-    );
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('httpRequest="GET /communities?limit=30"'),
-    );
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('operation="test.communities.list"'),
-    );
-  });
-
-  it('does not warn for fast HTTP document queries', async () => {
-    const registry = new OrbitDBReplicatedStateRegistry();
-    const firstNetwork = createStores();
-    const request = {
-      method: 'GET',
-      originalUrl: '/communities?limit=30',
-      path: '/communities',
-      url: '/communities?limit=30',
-    } as Request;
-
-    jest.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(1020);
-    registry.register('network-1', firstNetwork.stores);
-    await registry.putDocument('communities', {
-      id: 'community-1',
-      networkId: 'network-1',
-    });
-
-    await HttpRequestContext.run(request, () =>
-      registry.queryDocuments(
-        'communities',
-        (document) => document.id === 'community-1',
-        {
-          operation: 'test.communities.list',
-        },
-      ),
-    );
-
-    expect(logger.warn).not.toHaveBeenCalled();
-  });
 });
 
 function deferred<T>(): {

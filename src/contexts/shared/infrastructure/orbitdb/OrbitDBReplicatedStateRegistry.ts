@@ -1,13 +1,10 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
-import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
 
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
-import { OrbitDBQueryDocumentsMode } from './OrbitDBQueryDocumentsMode';
-import { OrbitDBQueryDocumentsOptions } from './OrbitDBQueryDocumentsOptions';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedHeadKeyDeriver from './OrbitDBReplicatedHeadKeyDeriver';
@@ -19,8 +16,6 @@ type PersistedHeadCacheHydration = {
 };
 
 export default class OrbitDBReplicatedStateRegistry {
-  private static readonly HTTP_QUERY_WARNING_THRESHOLD_MS = 100;
-  private static readonly BACKGROUND_QUERY_LOG_THRESHOLD_MS = 1000;
   // TODO: Move indexed head merge policy to OrbitDBHeadIndex before adding
   // per-index record identity or freshness rules here.
   private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
@@ -75,19 +70,6 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
   ): OrbitDBDatabase | undefined {
     return stores[storeName];
-  }
-
-  private async allDocuments(
-    store: OrbitDBDatabase,
-  ): Promise<Array<Record<string, unknown>>> {
-    const entries = await store.all?.();
-
-    return (entries || [])
-      .map((entry) => entry.value)
-      .filter(
-        (value): value is Record<string, unknown> =>
-          typeof value === 'object' && value !== null && !Array.isArray(value),
-      );
   }
 
   private async allRecords(store: OrbitDBDatabase): Promise<
@@ -578,31 +560,6 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.documentFreshness(current) <= this.documentFreshness(candidate);
   }
 
-  private deduplicateDocuments(
-    documents: Array<Record<string, unknown>>,
-  ): Array<Record<string, unknown>> {
-    const deduplicated = new Map<string, Record<string, unknown>>();
-    const withoutId: Array<Record<string, unknown>> = [];
-
-    for (const document of documents) {
-      const id = this.stringValue(document, 'id');
-
-      if (!id) {
-        withoutId.push(document);
-
-        continue;
-      }
-
-      const current = deduplicated.get(id);
-
-      if (!current || this.isNewerOrEqualDocument(current, document)) {
-        deduplicated.set(id, document);
-      }
-    }
-
-    return [...withoutId, ...deduplicated.values()];
-  }
-
   private stringValue(
     document: Record<string, unknown>,
     attribute: string,
@@ -667,112 +624,6 @@ export default class OrbitDBReplicatedStateRegistry {
     const head = await this.findHead(headKey);
 
     return head ? this.networkIdsFromDocument(head) : [];
-  }
-
-  private queryCaller(): string {
-    const stack = new Error().stack || '';
-    const callerLine = stack
-      .split('\n')
-      .map((line) => line.trim())
-      .find(
-        (line) =>
-          line.startsWith('at ') &&
-          !line.includes('OrbitDBReplicatedStateRegistry') &&
-          !line.includes('Error'),
-      );
-
-    return callerLine || 'unknown';
-  }
-
-  private slowQueryThresholdMs(isHttpRequest: boolean): number {
-    return isHttpRequest
-      ? OrbitDBReplicatedStateRegistry.HTTP_QUERY_WARNING_THRESHOLD_MS
-      : OrbitDBReplicatedStateRegistry.BACKGROUND_QUERY_LOG_THRESHOLD_MS;
-  }
-
-  private shouldWarnSlowQuery(
-    isHttpRequest: boolean,
-    mode: OrbitDBQueryDocumentsMode,
-  ): boolean {
-    return isHttpRequest || mode === 'read' || mode === 'fallback';
-  }
-
-  private slowQueryMessage(params: {
-    deduplicatedDocuments: number;
-    durationMs: number;
-    matchedDocuments: number;
-    mode: OrbitDBQueryDocumentsMode;
-    operation: string;
-    request: string;
-    scannedDocuments: number | string;
-    storeName: OrbitDBReplicatedDocumentStoreName;
-  }): string {
-    return (
-      `OrbitDB queryDocuments slow: store=${params.storeName}` +
-      ` mode=${params.mode}` +
-      ` operation="${params.operation}"` +
-      ` durationMs=${params.durationMs}` +
-      ` scannedDocuments=${params.scannedDocuments}` +
-      ` matchedDocuments=${params.matchedDocuments}` +
-      ` returnedDocuments=${params.deduplicatedDocuments}` +
-      ` httpRequest="${params.request}"`
-    );
-  }
-
-  private slowQueryRequestLabel(
-    requestContext: ReturnType<typeof HttpRequestContext.current>,
-  ): string {
-    return requestContext
-      ? `${requestContext.method} ${requestContext.originalUrl}`
-      : 'none';
-  }
-
-  private writeSlowQueryLog(
-    message: string,
-    isHttpRequest: boolean,
-    mode: OrbitDBQueryDocumentsMode,
-  ): void {
-    if (this.shouldWarnSlowQuery(isHttpRequest, mode)) {
-      Kernel.logger?.warn(message);
-
-      return;
-    }
-
-    Kernel.logger?.info(message);
-  }
-
-  private logSlowQuery(
-    storeName: OrbitDBReplicatedDocumentStoreName,
-    durationMs: number,
-    matchedDocuments: number,
-    deduplicatedDocuments: number,
-    scannedDocuments: number | undefined,
-    options: OrbitDBQueryDocumentsOptions,
-  ): void {
-    const requestContext = HttpRequestContext.current();
-    const isHttpRequest = requestContext !== undefined;
-    const thresholdMs = this.slowQueryThresholdMs(isHttpRequest);
-
-    if (durationMs < thresholdMs) {
-      return;
-    }
-
-    const mode = options.mode || 'read';
-    const operation = options.operation || this.queryCaller();
-    const scanned = scannedDocuments ?? 'unknown';
-    const request = this.slowQueryRequestLabel(requestContext);
-    const message = this.slowQueryMessage({
-      deduplicatedDocuments,
-      durationMs,
-      matchedDocuments,
-      mode,
-      operation,
-      request,
-      scannedDocuments: scanned,
-      storeName,
-    });
-
-    this.writeSlowQueryLog(message, isHttpRequest, mode);
   }
 
   private relatedIdentityIds(document: Record<string, unknown>): string[] {
@@ -975,54 +826,6 @@ export default class OrbitDBReplicatedStateRegistry {
   public clear(): void {
     this.storesByNetworkId.clear();
     this.cachedHeads.clear();
-  }
-
-  public async queryDocuments(
-    storeName: OrbitDBReplicatedDocumentStoreName,
-    matcher: (document: Record<string, unknown>) => boolean,
-    options: OrbitDBQueryDocumentsOptions = {},
-  ): Promise<Array<Record<string, unknown>>> {
-    this.assertReady();
-    const startedAt = Date.now();
-    const documents: Array<Record<string, unknown>> = [];
-    let scannedDocuments: number | undefined = 0;
-
-    for (const stores of this.storesByNetworkId.values()) {
-      const store = this.getStore(stores, storeName);
-
-      if (!store) {
-        continue;
-      }
-      let matches: Array<Record<string, unknown>>;
-
-      if (store.query) {
-        matches = await store.query(matcher);
-        scannedDocuments = undefined;
-      } else {
-        const storeDocuments = await this.allDocuments(store);
-
-        if (scannedDocuments !== undefined) {
-          scannedDocuments += storeDocuments.length;
-        }
-
-        matches = storeDocuments.filter(matcher);
-      }
-
-      documents.push(...matches);
-    }
-
-    const deduplicatedDocuments = this.deduplicateDocuments(documents);
-
-    this.logSlowQuery(
-      storeName,
-      Date.now() - startedAt,
-      documents.length,
-      deduplicatedDocuments.length,
-      scannedDocuments,
-      options,
-    );
-
-    return deduplicatedDocuments;
   }
 
   public async putDocument(
