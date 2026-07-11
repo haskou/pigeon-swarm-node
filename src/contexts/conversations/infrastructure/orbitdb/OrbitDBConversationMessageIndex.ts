@@ -99,13 +99,11 @@ export default class OrbitDBConversationMessageIndex {
       recipientIds: this.stringArrayValue(record, 'recipientIds'),
       replyToMessageId: this.stringValue(record, 'replyToMessageId'),
       scopeType: this.stringValue(record, 'scopeType') as
-        | OrbitDBConversationMessageDocument['scopeType']
-        | undefined,
+        OrbitDBConversationMessageDocument['scopeType'] | undefined,
       signature: this.stringValue(record, 'signature'),
       targetMessageId: this.stringValue(record, 'targetMessageId'),
       type: this.stringValue(record, 'type') as
-        | OrbitDBConversationMessageDocument['type']
-        | undefined,
+        OrbitDBConversationMessageDocument['type'] | undefined,
       valid: this.booleanValue(record, 'valid'),
     };
 

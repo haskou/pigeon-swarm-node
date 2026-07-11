@@ -12,8 +12,7 @@ export class KeychainPublishMessage {
   public readonly ownerIdentityId: IdentityId;
 
   public readonly previousKeychainExternalIdentifier:
-    | KeychainExternalIdentifier
-    | undefined;
+    KeychainExternalIdentifier | undefined;
 
   public readonly signature: Signature;
 

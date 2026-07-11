@@ -39,8 +39,7 @@ export class PublicRelayRecordRegistry {
   private get records(): Map<string, PublicRelayRecordPrimitives> {
     const globalState = globalThis as typeof globalThis & {
       [PublicRelayRecordRegistry.globalStateKey]?:
-        | Map<string, PublicRelayRecordPrimitives>
-        | undefined;
+        Map<string, PublicRelayRecordPrimitives> | undefined;
     };
 
     let records = globalState[PublicRelayRecordRegistry.globalStateKey];
@@ -72,8 +71,7 @@ export class PublicRelayRecordRegistry {
   private get listeners(): RelayRecordHandler[] {
     const globalState = globalThis as typeof globalThis & {
       [PublicRelayRecordRegistry.globalListenersKey]?:
-        | RelayRecordHandler[]
-        | undefined;
+        RelayRecordHandler[] | undefined;
     };
 
     let listeners = globalState[PublicRelayRecordRegistry.globalListenersKey];

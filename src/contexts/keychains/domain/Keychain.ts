@@ -68,8 +68,7 @@ export class Keychain extends AggregateRoot {
   }
 
   public getPreviousKeychainExternalIdentifier():
-    | KeychainExternalIdentifier
-    | undefined {
+    KeychainExternalIdentifier | undefined {
     return this.previousKeychainExternalIdentifier;
   }
 

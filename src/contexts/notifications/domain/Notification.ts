@@ -148,8 +148,7 @@ export class Notification extends AggregateRoot {
 
   private recordUpdated(
     EventClass:
-      | typeof NotificationWasAcceptedEvent
-      | typeof NotificationWasDeclinedEvent,
+      typeof NotificationWasAcceptedEvent | typeof NotificationWasDeclinedEvent,
   ): void {
     const primitives = this.toPrimitives();
 
