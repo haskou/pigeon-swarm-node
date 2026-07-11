@@ -37,11 +37,9 @@ export class CommunityChannelMessagePayload {
 
   constructor(
     private readonly encryptedPayload:
-      | CommunityChannelMessageEncryptedPayload
-      | undefined,
+      CommunityChannelMessageEncryptedPayload | undefined,
     private readonly plaintextPayload:
-      | CommunityChannelMessagePlaintextPayload
-      | undefined,
+      CommunityChannelMessagePlaintextPayload | undefined,
   ) {
     assert(
       Boolean(encryptedPayload) !== Boolean(plaintextPayload),

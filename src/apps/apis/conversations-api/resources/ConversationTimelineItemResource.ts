@@ -4,6 +4,4 @@ import { ConversationCallEventResource } from './ConversationCallEventResource';
 import { MessageResource } from './MessageResource';
 
 export type ConversationTimelineItemResource =
-  | ConversationCallEventResource
-  | MessageResource
-  | PollResource;
+  ConversationCallEventResource | MessageResource | PollResource;

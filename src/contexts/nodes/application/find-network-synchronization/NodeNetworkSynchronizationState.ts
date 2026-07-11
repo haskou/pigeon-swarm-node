@@ -1,4 +1,2 @@
 export type NodeNetworkSynchronizationState =
-  | 'converged'
-  | 'syncing'
-  | 'waiting_for_peers';
+  'converged' | 'syncing' | 'waiting_for_peers';

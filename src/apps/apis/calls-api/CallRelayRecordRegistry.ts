@@ -6,8 +6,7 @@ export default class CallRelayRecordRegistry {
   private get records(): Map<string, CallRelayRecordPrimitives> {
     const globalState = globalThis as typeof globalThis & {
       [CallRelayRecordRegistry.globalStateKey]?:
-        | Map<string, CallRelayRecordPrimitives>
-        | undefined;
+        Map<string, CallRelayRecordPrimitives> | undefined;
     };
 
     globalState[CallRelayRecordRegistry.globalStateKey] ??= new Map();

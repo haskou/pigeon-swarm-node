@@ -84,9 +84,10 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   ): Record<string, unknown>[] {
     return heads
       .flatMap((head) => this.recordsFromHead(head))
-      .reduce<
-        Record<string, unknown>[]
-      >((records, record) => this.mergeRecords(records, record), []);
+      .reduce<Record<string, unknown>[]>(
+        (records, record) => this.mergeRecords(records, record),
+        [],
+      );
   }
 
   private addPendingRecord(key: string, record: Record<string, unknown>): void {

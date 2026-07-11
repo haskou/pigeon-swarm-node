@@ -78,8 +78,7 @@ export default class OrbitDBConversationIndex {
       participantIds: this.stringArrayValue(record, 'participantIds'),
       receivedAt: this.numberValue(record, 'receivedAt'),
       type: this.stringValue(record, 'type') as
-        | OrbitDBConversationDocument['type']
-        | undefined,
+        OrbitDBConversationDocument['type'] | undefined,
       updatedAt: this.numberValue(record, 'updatedAt'),
     };
 

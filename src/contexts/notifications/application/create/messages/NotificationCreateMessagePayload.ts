@@ -11,8 +11,7 @@ export class NotificationCreateMessagePayload {
     | 'group_conversation_invitation';
 
   public readonly payload!:
-    | CommunityInvitationPayload
-    | ConversationInvitationPayload;
+    CommunityInvitationPayload | ConversationInvitationPayload;
 
   public readonly type!:
     | typeof NotificationType.COMMUNITY_INVITATION
