@@ -299,9 +299,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       network.getId(),
     );
     this.forgetCachedRelayDialFailures(network, relayRecord);
-    this.relayRecordEnvelopeCache.delete(
-      PrivateNetworkRelayRecordCodec.lookupKey(network),
-    );
+    this.relayRecordEnvelopeCache.delete(network.getId());
     this.forgetActiveRelayRecord(network.getId());
     Kernel.logger.warn(
       `Private IPFS relay cached record invalidated: networkId=${network.getId()}` +
@@ -746,10 +744,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      this.relayRecordEnvelopeCache.set(
-        PrivateNetworkRelayRecordCodec.lookupKey(network),
-        payload,
-      );
+      this.relayRecordEnvelopeCache.set(network.getId(), payload);
       this.infoWhenRelayPubSubRecordIsDiscovered(
         publicConnection,
         network,
@@ -772,9 +767,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     await publicConnection.subscribePubSub(topic, async () => {
-      const envelope = this.relayRecordEnvelopeCache.get(
-        PrivateNetworkRelayRecordCodec.lookupKey(network),
-      );
+      if (this.activePublicationGenerations[network.getId()] === undefined) {
+        return;
+      }
+
+      const envelope = this.relayRecordEnvelopeCache.get(network.getId());
 
       if (!envelope) {
         return;
@@ -822,9 +819,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private async dialCachedRelayRecord(network: IPFSNetwork): Promise<boolean> {
-    const cachedEnvelope = this.relayRecordEnvelopeCache.get(
-      PrivateNetworkRelayRecordCodec.lookupKey(network),
-    );
+    const cachedEnvelope = this.relayRecordEnvelopeCache.get(network.getId());
 
     if (!cachedEnvelope) {
       return false;
@@ -1132,10 +1127,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
     const serializedEnvelope = JSON.stringify(envelope);
 
-    this.relayRecordEnvelopeCache.set(
-      PrivateNetworkRelayRecordCodec.lookupKey(network),
-      serializedEnvelope,
-    );
+    this.relayRecordEnvelopeCache.set(network.getId(), serializedEnvelope);
 
     try {
       await this.subscribeRelayRecordRequestTopic(publicConnection, network);
@@ -1387,6 +1379,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   public stop(networkId: string): void {
     this.forgetActiveRelayRecord(networkId);
     this.deactivatePublicationGeneration(networkId);
+    this.relayRecordEnvelopeCache.delete(networkId);
     delete this.activeRelayDiscoveryAttempts[networkId];
 
     const interval = this.discoveryIntervals[networkId];

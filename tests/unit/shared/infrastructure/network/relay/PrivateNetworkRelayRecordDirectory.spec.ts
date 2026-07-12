@@ -116,6 +116,45 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
+  it('should stop answering relay record requests after publication stops', async () => {
+    const directory = createDirectory(localDatabase);
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(privateKey());
+    let requestHandler: ((payload: string) => Promise<void>) | undefined;
+
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockImplementation(async (topic, handler) => {
+      if (topic.endsWith('.request')) {
+        requestHandler = handler;
+      }
+    });
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    await directory.publish(
+      network,
+      {
+        announceAddresses: [
+          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+        ],
+        listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+        relayDataLimitBytes: 67_108_864,
+      },
+      mock(),
+    );
+
+    expect(requestHandler).toBeDefined();
+    directory.stop(network.getId());
+    await requestHandler?.('');
+
+    expect(publicConnection.publishPubSub).toHaveBeenCalledTimes(1);
+  });
+
   it('should not publish or discover relay records when disabled by options', () => {
     const directory = createDirectory(localDatabase);
     const publish = jest.spyOn(directory, 'publish').mockResolvedValue(false);
