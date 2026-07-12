@@ -193,6 +193,7 @@ export class HeliaIPFSParser {
       ),
       privateNetwork: parserOptions?.privateNetwork,
       publicBootstrap: parserOptions?.publicBootstrap,
+      relayRecordRoutingEnabled: options.relayRecordRoutingEnabled,
     })) as ParsedHeliaIPFSOptions['libp2p'];
     libp2pConfig = HeliaIPFSParser.applyAddressOptions(
       libp2pConfig,

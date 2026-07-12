@@ -10,5 +10,6 @@ export type IPFSOptions = {
   storageLocation: 'memory' | string;
   privateKey?: Libp2pPrivateKeyLike;
   publicRelayDiscoveryEnabled?: boolean;
+  relayRecordRoutingEnabled?: boolean;
   relayDataLimitBytes?: number;
 };

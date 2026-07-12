@@ -6,14 +6,14 @@ import {
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
-import Kernel from '@haskou/ddd-kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
+import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import { PrivateNetworkRelayRecord } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec';
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
-import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import { PrivateRelayRecordCacheDocument } from '@app/shared/infrastructure/network/relay/PrivateRelayRecordCacheDocument';
+import Kernel from '@haskou/ddd-kernel';
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
@@ -90,20 +90,23 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     jest.restoreAllMocks();
   });
 
-  it('should publish relay records through gossipsub without querying the DHT', async () => {
+  it('should publish relay records through gossipsub and announce their providers', async () => {
     const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
 
     publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.provideRecord.mockResolvedValue(true);
     (
       directory as unknown as {
         getPublicConnection: () => Promise<IPFSConnection>;
       }
     ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+    const network = privateNetwork(privateKey());
+
     await directory.publish(
-      privateNetwork(privateKey()),
+      network,
       {
         announceAddresses: [
           '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
@@ -115,6 +118,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
 
     expect(publicConnection.publishPubSub).toHaveBeenCalled();
+    expect(publicConnection.provideRecord).toHaveBeenCalledWith(
+      PrivateNetworkRelayRecordCodec.lookupKey(network),
+    );
     expect(publicConnection.putRecord).not.toHaveBeenCalled();
     expect(publicConnection.publishIPNSRecord).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalledWith(
@@ -125,6 +131,40 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
+  it('should fail publication when the relay provider announcement fails', async () => {
+    const directory = createDirectory(localDatabase);
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(privateKey());
+
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.provideRecord.mockResolvedValue(false);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    await expect(
+      directory.publish(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+      ),
+    ).resolves.toBe(false);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('The DHT provider announcement failed.'),
+    );
+  });
+
   it('should stop answering relay record requests after publication stops', async () => {
     const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
@@ -132,12 +172,15 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     let requestHandler: ((payload: string) => Promise<void>) | undefined;
 
     publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.provideRecord.mockResolvedValue(true);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
-    publicConnection.subscribePubSub.mockImplementation(async (topic, handler) => {
+    publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
       if (topic.endsWith('.request')) {
         requestHandler = handler;
       }
+
+      return Promise.resolve();
     });
     (
       directory as unknown as {
@@ -252,6 +295,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     try {
       publicConnection.getPeers.mockReturnValue([]);
       publicConnection.waitForPeers.mockResolvedValueOnce(false);
+      publicConnection.provideRecord.mockResolvedValue(true);
       publicConnection.publishPubSub.mockResolvedValue(undefined);
       publicConnection.putRecord.mockResolvedValue(undefined);
       (
@@ -404,6 +448,45 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       expect.any(AbortSignal),
     );
     expect(publicConnection.waitForPeers).not.toHaveBeenCalled();
+  });
+
+  it('should connect routed relay providers before requesting a relay record', async () => {
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    const publicConnection = mock<IPFSConnection>();
+    const providerMultiaddr =
+      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+
+    publicConnection.dial.mockResolvedValue(undefined);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
+      providerMultiaddr,
+    ]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    await directory.discover(network, mock());
+
+    expect(publicConnection.findRecordProviderMultiaddrs).toHaveBeenCalledWith(
+      PrivateNetworkRelayRecordCodec.lookupKey(network),
+    );
+    expect(publicConnection.dial).toHaveBeenCalledWith(
+      providerMultiaddr,
+      expect.any(AbortSignal),
+    );
+    expect(publicConnection.publishPubSub).toHaveBeenCalledWith(
+      expect.stringContaining('.request'),
+      '',
+    );
+    expect(publicConnection.dial.mock.invocationCallOrder[0]).toBeLessThan(
+      publicConnection.publishPubSub.mock.invocationCallOrder[0],
+    );
   });
 
   it('should not rediscover a cached relay while it remains connected', async () => {
@@ -704,8 +787,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       .mockReturnValue('peer-local');
 
     const firstConnection = await directory.configurePublicConnection(options);
-    const secondConnection =
-      await directory.configurePublicConnection(options);
+    const secondConnection = await directory.configurePublicConnection(options);
 
     expect(firstConnection).toBe(publicConnection);
     expect(secondConnection).toBe(publicConnection);

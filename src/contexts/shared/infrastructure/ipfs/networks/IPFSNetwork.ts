@@ -108,7 +108,10 @@ export class IPFSNetwork {
     return this.connection.getRecord(key, signal);
   }
 
-  public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {
+  public async provideRecord(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     return this.connection.provideRecord(key, signal);
   }
 
