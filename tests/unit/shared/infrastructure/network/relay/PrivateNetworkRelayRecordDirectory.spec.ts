@@ -46,6 +46,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   let localDatabase: EmbeddedLocalDatabase;
   let localDatabasePath: string;
   let logger: MockProxy<WinstonLogger>;
+  let previousIPFSStoragePath: string | undefined;
   let previousLocalDatabasePath: string | undefined;
 
   beforeEach(async () => {
@@ -58,10 +59,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     delete process.env.PIGEON_RELAY_RECORD_TTL_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
     previousLocalDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
+    previousIPFSStoragePath = process.env.IPFS_STORAGE_PATH;
     localDatabasePath = await fs.mkdtemp(
       path.join(os.tmpdir(), 'pigeon-relay-cache-'),
     );
     process.env.PIGEON_LOCAL_DB_PATH = localDatabasePath;
+    process.env.IPFS_STORAGE_PATH = localDatabasePath;
     localDatabase = new EmbeddedLocalDatabase();
 
     logger = mock<WinstonLogger>();
@@ -75,6 +78,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       delete process.env.PIGEON_LOCAL_DB_PATH;
     } else {
       process.env.PIGEON_LOCAL_DB_PATH = previousLocalDatabasePath;
+    }
+
+    if (previousIPFSStoragePath === undefined) {
+      delete process.env.IPFS_STORAGE_PATH;
+    } else {
+      process.env.IPFS_STORAGE_PATH = previousIPFSStoragePath;
     }
 
     await fs.rm(localDatabasePath, { force: true, recursive: true });
@@ -702,6 +711,30 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(secondConnection).toBe(publicConnection);
     expect(createPublicConnection).toHaveBeenCalledTimes(1);
     expect(publicConnection.stop).not.toHaveBeenCalled();
+  });
+
+  it('should preserve blocked public peers while resetting the peer cache', async () => {
+    const directory = createDirectory(localDatabase);
+    const storageLocation = path.join(
+      localDatabasePath,
+      'public-relay-record-directory',
+    );
+    const blockedPeersPath = path.join(storageLocation, 'blockedPeers.json');
+
+    await fs.mkdir(path.join(storageLocation, 'datastore'), { recursive: true });
+    await fs.writeFile(blockedPeersPath, '["blocked-peer"]');
+    await fs.writeFile(path.join(storageLocation, 'datastore', 'stale'), 'cache');
+
+    await (
+      directory as unknown as {
+        preparePublicConnectionStorage(): Promise<void>;
+      }
+    ).preparePublicConnectionStorage();
+
+    await expect(fs.readFile(blockedPeersPath, 'utf8')).resolves.toBe(
+      '["blocked-peer"]',
+    );
+    await expect(fs.access(path.join(storageLocation, 'datastore'))).rejects.toThrow();
   });
 });
 

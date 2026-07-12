@@ -1,3 +1,5 @@
+import type { Dirent } from 'fs';
+
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { libp2pKeyAdapter } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
@@ -5,6 +7,8 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
+import * as fs from 'fs/promises';
+import path from 'path';
 
 import PrivateNetworkRelayDirectorySettings from './PrivateNetworkRelayDirectorySettings';
 import { PrivateNetworkRelayRecord } from './PrivateNetworkRelayRecord';
@@ -102,6 +106,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private publicConnectionConfigurationKey?: string;
 
+  private publicConnectionStoragePrepared = false;
+
   constructor(
     private readonly localDatabase: EmbeddedLocalDatabase,
     private readonly settings: PrivateNetworkRelayDirectorySettings,
@@ -162,10 +168,36 @@ export default class PrivateNetworkRelayRecordDirectory {
     });
   }
 
-  private createPublicConnection(
+  private async preparePublicConnectionStorage(): Promise<void> {
+    if (this.publicConnectionStoragePrepared) {
+      return;
+    }
+
+    const storageLocation = this.settings.getPublicRelayStorageLocation();
+    const entries = await fs
+      .readdir(storageLocation, {
+        withFileTypes: true,
+      })
+      .catch((): Dirent[] => []);
+
+    await Promise.all(
+      entries
+        .filter((entry) => entry.name !== 'blockedPeers.json')
+        .map((entry) =>
+          fs.rm(path.join(storageLocation, entry.name), {
+            force: true,
+            recursive: true,
+          }),
+        ),
+    );
+    this.publicConnectionStoragePrepared = true;
+  }
+
+  private async createPublicConnection(
     options: PublicRelayConnectionOptions,
   ): Promise<IPFSConnection> {
-    return PublicIPFS.create({
+    await this.preparePublicConnectionStorage();
+    const connection = await PublicIPFS.create({
       announceAddresses: options.announceAddresses,
       contentRoutingEnabled: false,
       distributedHashTableEnabled: false,
@@ -174,11 +206,11 @@ export default class PrivateNetworkRelayRecordDirectory {
       privateKey: options.sharedPrivateKey,
       relayDataLimitBytes: options.relayDataLimitBytes,
       storageLocation: this.settings.getPublicRelayStorageLocation(),
-    }).then(async (connection) => {
-      await this.publicRelayDiscovery.startConnection(connection);
-
-      return connection;
     });
+
+    await this.publicRelayDiscovery.startConnection(connection);
+
+    return connection;
   }
 
   private getPublicConnection(
@@ -1369,6 +1401,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     await previousConnection?.stop();
     this.subscribedRelayRecordTopics.clear();
     this.subscribedRelayRecordRequestTopics.clear();
+    this.publicConnectionStoragePrepared = false;
     this.publicConnectionConfigurationKey = configurationKey;
     this.publicConnection = this.createPublicConnection(options);
 
@@ -1484,6 +1517,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     await publicConnection?.stop();
     this.publicConnection = undefined;
     this.publicConnectionConfigurationKey = undefined;
+    this.publicConnectionStoragePrepared = false;
     this.subscribedRelayRecordTopics.clear();
   }
 }
