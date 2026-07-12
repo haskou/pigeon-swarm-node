@@ -233,6 +233,24 @@ The node-to-node discovery protocol is documented in
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
 
+### Dependency compatibility patches
+
+`yarn` runs three idempotent compatibility patches from `postinstall`. They
+modify installed dependency files only; application source remains independent
+of those implementation details.
+
+| Script | Dependency behavior corrected | Why it remains enabled |
+| --- | --- | --- |
+| `patch-helia-bitswap-limited-connections.js` | Makes Bitswap reuse an existing circuit connection and allow its queues, dials and topology notifications on limited relay connections. | A private node must be able to exchange UnixFS blocks through `/p2p-circuit` without opening a second stream that the relay rejects. |
+| `patch-orbitdb-limited-connections.js` | Lets OrbitDB fetch blocks from already-connected peers and exchange heads through limited relay connections. | OrbitDB replication must work for nodes that can only reach each other through a circuit relay. |
+| `patch-libp2p-kad-dht-routing-table.js` | Replaces recursive Kademlia routing-table traversal with an iterative traversal that ignores already-visited buckets. | Public IPFS still uses Kademlia for content routing. The patch prevents a malformed or cyclic routing table from monopolizing the Node main thread. Private IPFS and private-relay discovery do not run Kademlia. |
+
+The scripts intentionally fail when an upstream dependency changes its source
+shape without already containing the expected correction. Treat that failure as
+a dependency-review signal: inspect the new implementation, update the patch
+and its test, or remove the patch only after verifying that upstream has fixed
+the behavior. Do not bypass the failure by making the script silently succeed.
+
 ### Important note about `IPFS_STORAGE_PATH=memory`
 
 `memory` is supported at Helia connection level only when the exact connection option is `storageLocation: 'memory'`.
