@@ -450,7 +450,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.waitForPeers).not.toHaveBeenCalled();
   });
 
-  it('should connect routed relay providers through the private network', async () => {
+  it('should connect routed private relay providers through the private network', async () => {
     const directory = createDirectory(localDatabase);
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -462,7 +462,6 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const providerMultiaddr =
       '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
 
-    privateConnection.dial.mockResolvedValue(undefined);
     privateConnection.getMultiaddrs.mockReturnValue([]);
     privateConnection.getPeers.mockReturnValue([]);
     privateConnection.listen.mockResolvedValue(undefined);
@@ -521,6 +520,10 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
     await directory.discover(network, mock());
 
+    expect(publicConnection.dial).toHaveBeenCalledWith(
+      expect.stringContaining('relay.example.com'),
+      expect.any(AbortSignal),
+    );
     expect(publicConnection.publishPubSub).toHaveBeenCalledWith(
       expect.stringContaining('.request'),
       '',

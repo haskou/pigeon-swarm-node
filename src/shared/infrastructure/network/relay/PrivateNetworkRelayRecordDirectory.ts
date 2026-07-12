@@ -145,12 +145,34 @@ export default class PrivateNetworkRelayRecordDirectory {
     signal: AbortSignal;
     timeout: ReturnType<typeof setTimeout>;
   } {
+    return this.createDialAbortSignal(
+      this.settings.getPrivateRelayDialTimeoutMs(),
+      'Private relay',
+    );
+  }
+
+  private createRelayProviderDialAbortSignal(): {
+    signal: AbortSignal;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
+    return this.createDialAbortSignal(
+      this.settings.getRoutingTimeoutMs(),
+      'Relay provider',
+    );
+  }
+
+  private createDialAbortSignal(
+    timeoutMs: number,
+    operation: string,
+  ): {
+    signal: AbortSignal;
+    timeout: ReturnType<typeof setTimeout>;
+  } {
     const controller = new AbortController();
-    const timeoutMs = this.settings.getPrivateRelayDialTimeoutMs();
     const timeout = setTimeout(
       () =>
         controller.abort(
-          new Error(`Private relay dial timed out after ${timeoutMs}ms.`),
+          new Error(`${operation} dial timed out after ${timeoutMs}ms.`),
         ),
       timeoutMs,
     );
@@ -163,6 +185,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       announceAddresses: options.announceAddresses || [],
       enableRelayServer: options.enableRelayServer,
       listenAddresses: options.listenAddresses || [],
+      localAddressRoutingEnabled: options.localAddressRoutingEnabled,
       peerId: libp2pKeyAdapter.peerIdFromPrivateKey(options.sharedPrivateKey),
       relayDataLimitBytes: options.relayDataLimitBytes,
     });
@@ -203,6 +226,8 @@ export default class PrivateNetworkRelayRecordDirectory {
       distributedHashTableEnabled: false,
       enableRelayServer: options.enableRelayServer,
       listenAddresses: options.listenAddresses,
+      localAddressRoutingEnabled: options.localAddressRoutingEnabled,
+      localPeerDiscoveryEnabled: false,
       privateKey: options.sharedPrivateKey,
       relayDataLimitBytes: options.relayDataLimitBytes,
       relayRecordRoutingEnabled: true,
@@ -914,33 +939,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
-  private providerRelayRecord(
-    network: IPFSNetwork,
-    multiaddr: string,
-  ): PrivateNetworkRelayRecord | undefined {
-    const peerId = multiaddr.match(/\/p2p\/([^/]+)$/)?.[1];
-
-    if (!peerId) {
-      Kernel.logger.debug(
-        `Private IPFS relay provider ignored: networkId=${network.getId()}` +
-          ` multiaddr="${multiaddr}" reason="Missing peer ID."`,
-      );
-
-      return undefined;
-    }
-
-    const issuedAt = Date.now();
-
-    return {
-      expiresAt: issuedAt + this.settings.getRelayRecordTtlMs(),
-      issuedAt,
-      multiaddrs: [multiaddr],
-      peerId,
-      role: 'relay',
-      version: 1,
-    };
-  }
-
   private async connectToRelayRecordProviders(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -974,9 +972,66 @@ export default class PrivateNetworkRelayRecordDirectory {
 
         return true;
       }
+
+      await this.connectToPublicRelayRecordProvider(
+        publicConnection,
+        network,
+        multiaddr,
+      );
     }
 
     return false;
+  }
+
+  private providerRelayRecord(
+    network: IPFSNetwork,
+    multiaddr: string,
+  ): PrivateNetworkRelayRecord | undefined {
+    const peerId = multiaddr.match(/\/p2p\/([^/]+)$/)?.[1];
+
+    if (!peerId) {
+      Kernel.logger.debug(
+        `Private IPFS relay provider ignored: networkId=${network.getId()}` +
+          ` multiaddr="${multiaddr}" reason="Missing peer ID."`,
+      );
+
+      return undefined;
+    }
+
+    const issuedAt = Date.now();
+
+    return {
+      expiresAt: issuedAt + this.settings.getRelayRecordTtlMs(),
+      issuedAt,
+      multiaddrs: [multiaddr],
+      peerId,
+      role: 'relay',
+      version: 1,
+    };
+  }
+
+  private async connectToPublicRelayRecordProvider(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+    multiaddr: string,
+  ): Promise<void> {
+    const providerDial = this.createRelayProviderDialAbortSignal();
+
+    try {
+      await publicConnection.dial(multiaddr, providerDial.signal);
+      Kernel.logger.debug(
+        `Private IPFS relay record provider connected: networkId=${network.getId()}` +
+          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+          ` multiaddr="${multiaddr}"`,
+      );
+    } catch (error: unknown) {
+      Kernel.logger.debug(
+        `Private IPFS relay record provider dial skipped: networkId=${network.getId()}` +
+          ` multiaddr="${multiaddr}" error=${String(error)}`,
+      );
+    } finally {
+      clearTimeout(providerDial.timeout);
+    }
   }
 
   private async dialDiscoveredPrivateRelay(

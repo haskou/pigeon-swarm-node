@@ -402,8 +402,29 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private withoutLocalPeerDiscovery(defaults: Libp2pDefaults): Libp2pDefaults {
+    const config = defaults as unknown as {
+      peerDiscovery?: unknown[];
+    };
+
+    // @helia/libp2p defaults put mDNS before the public bootstrap discovery.
+    config.peerDiscovery = (config.peerDiscovery || []).slice(1);
+
+    return defaults;
+  }
+
+  private localPeerDiscoveryDefaults(
+    defaults: Libp2pDefaults,
+    enabled: boolean | undefined,
+  ): Libp2pDefaults {
+    return enabled === false
+      ? this.withoutLocalPeerDiscovery(defaults)
+      : defaults;
+  }
+
   private async withRelayRecordRouting(
     defaults: Libp2pDefaults,
+    localAddressRoutingEnabled: boolean = false,
   ): Promise<Libp2pDefaults> {
     const kadDHTModule = await this.loadKadDHTModule();
     const config = defaults as unknown as {
@@ -425,6 +446,9 @@ export class HeliaRuntimeAdapter {
         clientMode: true,
         initialQuerySelfInterval: 1_000,
         kBucketSize: 4,
+        ...(localAddressRoutingEnabled
+          ? { peerInfoMapper: kadDHTModule.passthroughMapper }
+          : {}),
         querySelfInterval: 60 * 60_000,
       }) as unknown,
     };
@@ -432,6 +456,57 @@ export class HeliaRuntimeAdapter {
     delete config.services.delegatedPeerRouting;
 
     return defaults;
+  }
+
+  private async withDistributedHashTableServer(
+    defaults: Libp2pDefaults,
+    localAddressRoutingEnabled: boolean = false,
+  ): Promise<Libp2pDefaults> {
+    const kadDHTModule = await this.loadKadDHTModule();
+    const config = defaults as unknown as {
+      services?: Record<string, unknown>;
+    };
+
+    config.services = {
+      ...(config.services || {}),
+      dht: kadDHTModule.kadDHT({
+        clientMode: false,
+        kBucketSize: 4,
+        ...(localAddressRoutingEnabled
+          ? { peerInfoMapper: kadDHTModule.passthroughMapper }
+          : {}),
+      }) as unknown,
+    };
+
+    return defaults;
+  }
+
+  private async routingDefaults(
+    defaults: Libp2pDefaults,
+    options?: {
+      distributedHashTableEnabled?: boolean;
+      distributedHashTableServerEnabled?: boolean;
+      localAddressRoutingEnabled?: boolean;
+      relayRecordRoutingEnabled?: boolean;
+    },
+  ): Promise<Libp2pDefaults> {
+    if (options?.relayRecordRoutingEnabled) {
+      return this.withRelayRecordRouting(
+        this.withoutDistributedHashTable(defaults),
+        options.localAddressRoutingEnabled,
+      );
+    }
+
+    if (options?.distributedHashTableServerEnabled) {
+      return this.withDistributedHashTableServer(
+        defaults,
+        options.localAddressRoutingEnabled,
+      );
+    }
+
+    return options?.distributedHashTableEnabled === false
+      ? this.withoutDistributedHashTable(defaults)
+      : defaults;
   }
 
   private async withGossipsub(
@@ -483,8 +558,10 @@ export class HeliaRuntimeAdapter {
       peerDiscovery?: unknown[];
     };
 
+    // An explicit bootstrap list is authoritative. Keep mDNS as the first
+    // Helia discovery mechanism; callers can remove it independently.
     config.peerDiscovery = [
-      ...(config.peerDiscovery || []),
+      ...(config.peerDiscovery || []).slice(0, 1),
       bootstrapModule.bootstrap({
         list: bootstrapMultiaddrs,
         tagName: 'pigeon-public-bootstrap',
@@ -753,6 +830,9 @@ export class HeliaRuntimeAdapter {
 
   public async getLibp2pDefaults(options?: {
     distributedHashTableEnabled?: boolean;
+    distributedHashTableServerEnabled?: boolean;
+    localAddressRoutingEnabled?: boolean;
+    localPeerDiscoveryEnabled?: boolean;
     offline?: boolean;
     privateNetwork?: boolean;
     publicBootstrap?: boolean;
@@ -768,14 +848,15 @@ export class HeliaRuntimeAdapter {
     }
 
     const networkDefaults = await this.networkDefaults(defaults, options);
+    const discoveryDefaults = this.localPeerDiscoveryDefaults(
+      networkDefaults,
+      options?.localPeerDiscoveryEnabled,
+    );
 
-    const routingDefaults = options?.relayRecordRoutingEnabled
-      ? await this.withRelayRecordRouting(
-          this.withoutDistributedHashTable(networkDefaults),
-        )
-      : options?.distributedHashTableEnabled === false
-        ? this.withoutDistributedHashTable(networkDefaults)
-        : networkDefaults;
+    const routingDefaults = await this.routingDefaults(
+      discoveryDefaults,
+      options,
+    );
 
     return this.withGossipsub(routingDefaults);
   }
