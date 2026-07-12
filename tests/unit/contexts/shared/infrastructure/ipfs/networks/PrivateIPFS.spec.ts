@@ -246,6 +246,23 @@ describe('PrivateIPFS', () => {
       expect(mockLibp2pDefaults).toHaveBeenCalled();
     });
 
+    it('should not start a Kademlia DHT in a private network', async () => {
+      mockLibp2pDefaults.mockReturnValueOnce({
+        connectionEncrypters: [],
+        services: { dht: 'mock-dht' },
+        streamMuxers: [],
+        transports: [],
+      });
+
+      await PrivateIPFS.create(defaultOptions);
+
+      const [configuration] = mockCreateLibp2p.mock.calls[0];
+
+      expect(
+        (configuration as { services: Record<string, unknown> }).services.dht,
+      ).toBeUndefined();
+    });
+
     it('should pass created libp2p instance to createHelia', async () => {
       await PrivateIPFS.create(defaultOptions);
 

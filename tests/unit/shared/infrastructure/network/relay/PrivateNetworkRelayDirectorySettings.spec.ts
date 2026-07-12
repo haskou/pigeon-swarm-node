@@ -16,11 +16,9 @@ describe('PrivateNetworkRelayDirectorySettings', () => {
     delete process.env.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
     delete process.env.PIGEON_RELAY_RECORD_TTL_MS;
-    delete process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS;
 
     expect(settings.getPublicationIntervalMs()).toBe(60 * 60_000);
     expect(settings.getRelayRecordTtlMs()).toBe(2 * 60 * 60_000);
-    expect(settings.getIPNSWindowMs()).toBe(2 * 60 * 60_000);
   });
 
   it('prefers the publication interval in milliseconds', () => {

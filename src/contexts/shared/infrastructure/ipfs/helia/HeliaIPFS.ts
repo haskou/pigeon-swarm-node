@@ -812,6 +812,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
   }
 
   private provideContentInBackground(cid: IPFSId): void {
+    if (this.options.contentRoutingEnabled === false) {
+      return;
+    }
+
     if (!this.shouldPublishAutomaticProvider(cid)) {
       return;
     }
@@ -1067,6 +1071,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     );
 
     await this.pinningStrategy.ensurePinned(this.heliaCore, parsedCid, signal);
+
+    if (this.options.contentRoutingEnabled === false) {
+      return;
+    }
+
     await this.publishContentProvider(parsedCid, cid, signal);
   }
 
@@ -1082,6 +1091,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await this.heliaCore.datastore.put(datastoreKey, encoder.encode(value), {
       signal,
     });
+
+    if (this.options.distributedHashTableEnabled === false) {
+      return;
+    }
 
     this.pendingRoutingRecords.set(key, value);
     this.publishPendingRoutingRecords();
@@ -1155,6 +1168,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
     if (localValue !== undefined) {
       return localValue;
+    }
+
+    if (this.options.distributedHashTableEnabled === false) {
+      return undefined;
     }
 
     const decoder = new TextDecoder();

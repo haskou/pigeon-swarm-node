@@ -189,18 +189,13 @@ package "identities.infrastructure" {
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }
 
-  class IpfsIdentityRouting {
-    +republish(): Promise<number>
-  }
-
   note right of IpfsIdentityRepository
-    Encapsulates IPFS documents and DHT
-    head hints. Uses the metadata index
-    as infrastructure cache/read model.
+    Encapsulates IPFS documents. The replicated
+    metadata index is the canonical read model
+    for identity heads.
   end note
 
   IpfsIdentityRepository ..|> IdentityRepository
-  IpfsIdentityRouting --> IpfsIdentityRepository
   MetadataIdentityNetworkRepository ..|> IdentityNetworkRepository
   OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
   IpfsIdentityRepository --> IpfsIdentityDocument

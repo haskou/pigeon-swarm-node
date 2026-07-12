@@ -187,6 +187,7 @@ export class HeliaIPFSParser {
   ): Promise<ParsedHeliaIPFSOptions> {
     const { connectionGater } = HeliaIPFSParser.parseBlockedPeers(options);
     let libp2pConfig = (await heliaRuntimeAdapter.getLibp2pDefaults({
+      distributedHashTableEnabled: options.distributedHashTableEnabled,
       offline: HeliaIPFSParser.isInMemoryStorageLocation(
         options.storageLocation,
       ),

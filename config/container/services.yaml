@@ -599,13 +599,6 @@ services:
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fSWRlbnRpdHlSZXBvc2l0b3J5X19JZGVudGl0eVJlcG9zaXRvcnk=
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5Um91dGluZ19fSXBmc0lkZW50aXR5Um91dGluZw==:
-    class: /contexts/identities/infrastructure/ipfs/IpfsIdentityRouting
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5UmVwb3NpdG9yeV9fSXBmc0lkZW50aXR5UmVwb3NpdG9yeQ==
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2RvbWFpbl9fc2VydmljZXNfX0tleWNoYWluQ2FuZGlkYXRlVmFsaWRhdGlvbkRvbWFpblNlcnZpY2VfX0tleWNoYWluQ2FuZGlkYXRlVmFsaWRhdGlvbkRvbWFpblNlcnZpY2U=:
     class: >-
       /contexts/keychains/domain/services/KeychainCandidateValidationDomainService
@@ -619,13 +612,6 @@ services:
     arguments:
       - >-
         @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19LZXljaGFpblJlcG9zaXRvcnlfX0tleWNoYWluUmVwb3NpdG9yeQ==
-    abstract: false
-    parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n:
-    class: /contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5SZXBvc2l0b3J5X19JcGZzS2V5Y2hhaW5SZXBvc2l0b3J5
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19ub2Rlc19fYXBwbGljYXRpb25fX2ZpbmQtbmV0d29yay1zeW5jaHJvbml6YXRpb25fX05vZGVOZXR3b3JrU3luY2hyb25pemF0aW9uRmluZGVyX19Ob2RlTmV0d29ya1N5bmNocm9uaXphdGlvbkZpbmRlcg==:
@@ -1659,15 +1645,6 @@ services:
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVk: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5Ob3RpZmljYXRpb25DcmVhdGVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5Ob3RpZmljYXRpb25DcmVhdGVk
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3NjaGVkdWxlcnNfX0xvY2FsUm91dGluZ1JlY29yZFJlcHVibGlzaGVyU2NoZWR1bGVyX19Mb2NhbFJvdXRpbmdSZWNvcmRSZXB1Ymxpc2hlclNjaGVkdWxlcg==:
-    class: /apps/schedulers/LocalRoutingRecordRepublisherScheduler
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5Um91dGluZ19fSXBmc0lkZW50aXR5Um91dGluZw==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2FwaXNfX2NhbGxzLWFwaV9fQ2FsbFJlbGF5UnVudGltZV9fQ2FsbFJlbGF5UnVudGltZQ==:
     class: /apps/apis/calls-api/CallRelayRuntime
     arguments:
@@ -1731,18 +1708,6 @@ services:
     abstract: false
     parent: >-
       X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX2NvbnN1bWVyc19fcHVic3ViX19wdXNoX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVkX19TZW5kUHVzaE5vdGlmaWNhdGlvbldoZW5FdmVudFJlY2VpdmVk
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3J1bnRpbWVzX19sb2NhbC1yb3V0aW5nLXJlY29yZC1yZXB1Ymxpc2hlci1ydW50aW1lX19Mb2NhbFJvdXRpbmdSZWNvcmRSZXB1Ymxpc2hlclJ1bnRpbWVfX0xvY2FsUm91dGluZ1JlY29yZFJlcHVibGlzaGVyUnVudGltZQ==:
-    class: >-
-      /apps/runtimes/local-routing-record-republisher-runtime/LocalRoutingRecordRepublisherRuntime
-    arguments:
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19pcGZzX19uZXR3b3Jrc19fSVBGU05ldHdvcmtSZWdpc3RyeV9fSVBGU05ldHdvcmtSZWdpc3RyeQ==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19pZGVudGl0aWVzX19pbmZyYXN0cnVjdHVyZV9faXBmc19fSXBmc0lkZW50aXR5Um91dGluZ19fSXBmc0lkZW50aXR5Um91dGluZw==
-      - >-
-        @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2NvbnRleHRzX19rZXljaGFpbnNfX2luZnJhc3RydWN0dXJlX19pcGZzX19JcGZzS2V5Y2hhaW5Sb3V0aW5nX19JcGZzS2V5Y2hhaW5Sb3V0aW5n
-    abstract: false
-    parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX2FwcHNfX3J1bnRpbWVzX19vcmJpdGRiLXJ1bnRpbWVfX09yYml0REJSZXBsaWNhdGVkU3RhdGVSdW50aW1lX19PcmJpdERCUmVwbGljYXRlZFN0YXRlUnVudGltZQ==:
     class: /apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime
     arguments:

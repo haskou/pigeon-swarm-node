@@ -343,6 +343,21 @@ export class HeliaRuntimeAdapter {
     return defaults;
   }
 
+  private withoutDistributedHashTable(
+    defaults: Libp2pDefaults,
+  ): Libp2pDefaults {
+    const config = defaults as unknown as {
+      services?: Record<string, unknown>;
+    };
+
+    if (config.services) {
+      delete config.services.dht;
+      delete config.services.delegatedRouting;
+    }
+
+    return defaults;
+  }
+
   private async withGossipsub(
     defaults: Libp2pDefaults,
   ): Promise<Libp2pDefaults> {
@@ -402,6 +417,26 @@ export class HeliaRuntimeAdapter {
     ];
 
     return defaults;
+  }
+
+  private async networkDefaults(
+    defaults: Libp2pDefaults,
+    options?: {
+      privateNetwork?: boolean;
+      publicBootstrap?: boolean;
+    },
+  ): Promise<Libp2pDefaults> {
+    if (options?.privateNetwork) {
+      return this.withoutDistributedHashTable(
+        this.withoutPublicNetworkDefaults(defaults),
+      );
+    }
+
+    if (options?.publicBootstrap === false) {
+      return defaults;
+    }
+
+    return this.withPublicBootstrap(defaults);
   }
 
   public async withBootstrapRelays(
@@ -614,6 +649,7 @@ export class HeliaRuntimeAdapter {
   }
 
   public async getLibp2pDefaults(options?: {
+    distributedHashTableEnabled?: boolean;
     offline?: boolean;
     privateNetwork?: boolean;
     publicBootstrap?: boolean;
@@ -630,15 +666,13 @@ export class HeliaRuntimeAdapter {
       return this.withGossipsub(this.withoutNetwork(defaults));
     }
 
-    if (options?.privateNetwork) {
-      return this.withGossipsub(this.withoutPublicNetworkDefaults(defaults));
-    }
+    const networkDefaults = await this.networkDefaults(defaults, options);
 
-    if (options?.publicBootstrap === false) {
-      return this.withGossipsub(defaults);
-    }
-
-    return this.withGossipsub(await this.withPublicBootstrap(defaults));
+    return this.withGossipsub(
+      options?.distributedHashTableEnabled === false
+        ? this.withoutDistributedHashTable(networkDefaults)
+        : networkDefaults,
+    );
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {
