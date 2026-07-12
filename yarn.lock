@@ -4092,22 +4092,6 @@ cucumber-tsflow@^4.6.1:
     source-map-support "^0.5.19"
     underscore "^1.8.3"
 
-datastore-core@^11.0.0:
-  version "11.0.2"
-  resolved "https://registry.yarnpkg.com/datastore-core/-/datastore-core-11.0.2.tgz#a2b117705ee8a8c911c2a610d2028ab14359490c"
-  integrity sha512-0pN4hMcaCWcnUBo5OL/8j14Lt1l/p1v2VvzryRYeJAKRLqnFrzy2FhAQ7y0yTA63ki760ImQHfm2XlZrfIdFpQ==
-  dependencies:
-    "@libp2p/logger" "^6.0.0"
-    interface-datastore "^9.0.0"
-    interface-store "^7.0.0"
-    it-drain "^3.0.9"
-    it-filter "^3.1.3"
-    it-map "^3.1.3"
-    it-merge "^3.0.11"
-    it-pipe "^3.0.1"
-    it-sort "^3.0.8"
-    it-take "^3.0.8"
-
 datastore-core@^11.0.3:
   version "11.0.4"
   resolved "https://registry.yarnpkg.com/datastore-core/-/datastore-core-11.0.4.tgz#3d7ba0493fc4a3572b1812153e9fc8fea6f22006"
@@ -4124,7 +4108,7 @@ datastore-core@^11.0.3:
     it-sort "^3.0.9"
     it-take "^3.0.9"
 
-datastore-core@^12.0.1:
+datastore-core@^12.0.0, datastore-core@^12.0.1:
   version "12.0.1"
   resolved "https://registry.yarnpkg.com/datastore-core/-/datastore-core-12.0.1.tgz#00f7d8ce22abef0443a0ad78e2a38a0615f45898"
   integrity sha512-pfgIE5LG0Z5oyc6TxiLaF/0j4Gh1Yrs2+Ck/qssf9Oxw4s4YKC3zpqifuzThnKakAFWONr/vRv+66Koc0yJvyA==
@@ -4141,14 +4125,15 @@ datastore-core@^12.0.1:
     it-sort "^3.0.9"
     it-take "^3.0.9"
 
-datastore-fs@^11.0.4:
-  version "11.0.4"
-  resolved "https://registry.yarnpkg.com/datastore-fs/-/datastore-fs-11.0.4.tgz#04af706b7ece1f86ca64d23a8a9617e2702d3de9"
-  integrity sha512-kCvC2mFqr+jETEUedDFyICRLQrBRPzHqVSW7Rlb7WUvXeQNNy0zBsmxexi1HR1XY+E//bOZmOeP2xlj8uA/0tw==
+datastore-fs@^12.0.1:
+  version "12.0.1"
+  resolved "https://registry.yarnpkg.com/datastore-fs/-/datastore-fs-12.0.1.tgz#b0755478f12cf373c59a0feb3a9fa5dbf9174ec2"
+  integrity sha512-e9Hp6h/STYxaUFIbJHTavXze2kMGeKHHVqfdqqjzolB0K7CspBsgqZ9ePEGSyghWzeZMlLSqmSCLUokkVj9p0A==
   dependencies:
-    datastore-core "^11.0.0"
-    interface-datastore "^9.0.0"
-    interface-store "^7.0.0"
+    abort-error "^1.0.2"
+    datastore-core "^12.0.0"
+    interface-datastore "^10.0.0"
+    interface-store "^8.0.0"
     it-glob "^3.0.4"
     it-map "^3.1.4"
     it-parallel-batch "^3.0.9"
@@ -5876,7 +5861,7 @@ it-byte-stream@^2.0.0:
     race-signal "^2.0.0"
     uint8arraylist "^2.4.8"
 
-it-drain@^3.0.10, it-drain@^3.0.9:
+it-drain@^3.0.10:
   version "3.0.10"
   resolved "https://registry.yarnpkg.com/it-drain/-/it-drain-3.0.10.tgz#23b4584482576712fd57d546629a8204bec958e7"
   integrity sha512-0w/bXzudlyKIyD1+rl0xUKTI7k4cshcS43LTlBiGFxI8K1eyLydNPxGcsVLsFVtKh1/ieS8AnVWt6KwmozxyEA==
@@ -6095,13 +6080,6 @@ it-reader@^7.0.0:
     it-stream-types "^2.0.1"
     uint8arraylist "^3.0.1"
 
-it-sort@^3.0.8:
-  version "3.0.9"
-  resolved "https://registry.yarnpkg.com/it-sort/-/it-sort-3.0.9.tgz#2a1ffca46c1a947b1f230f6249a2e5484bd9c2cf"
-  integrity sha512-jsM6alGaPiQbcAJdzMsuMh00uJcI+kD9TBoScB8TR75zUFOmHvhSsPi+Dmh2zfVkcoca+14EbfeIZZXTUGH63w==
-  dependencies:
-    it-all "^3.0.0"
-
 it-sort@^3.0.9:
   version "3.0.11"
   resolved "https://registry.yarnpkg.com/it-sort/-/it-sort-3.0.11.tgz#663aadd9e7a8e68df0bf0fcd32ce69bbca3b7df8"
@@ -6119,7 +6097,7 @@ it-take@^3.0.10:
   resolved "https://registry.yarnpkg.com/it-take/-/it-take-3.0.11.tgz#46b709b01a77cecabd30bf3d3f3b0f4d56404f0a"
   integrity sha512-zvoeEjLViGFyhYT5KNCgmcIH90Si8lCve4aTMvgej/ZQRfB9YzrcJW3UHIJjbQ9TiAnsT4vsWDImEFQNk5xmnA==
 
-it-take@^3.0.8, it-take@^3.0.9:
+it-take@^3.0.9:
   version "3.0.9"
   resolved "https://registry.yarnpkg.com/it-take/-/it-take-3.0.9.tgz#50c99ef24991f87bc4351a9a537db292e7facfe2"
   integrity sha512-XMeUbnjOcgrhFXPUqa7H0VIjYSV/BvyxxjCp76QHVAFDJw2LmR1SHxUFiqyGeobgzJr7P2ZwSRRJQGn4D2BVlA==
