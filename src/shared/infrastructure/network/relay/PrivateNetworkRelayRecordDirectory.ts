@@ -914,10 +914,37 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private providerRelayRecord(
+    network: IPFSNetwork,
+    multiaddr: string,
+  ): PrivateNetworkRelayRecord | undefined {
+    const peerId = multiaddr.match(/\/p2p\/([^/]+)$/)?.[1];
+
+    if (!peerId) {
+      Kernel.logger.debug(
+        `Private IPFS relay provider ignored: networkId=${network.getId()}` +
+          ` multiaddr="${multiaddr}" reason="Missing peer ID."`,
+      );
+
+      return undefined;
+    }
+
+    const issuedAt = Date.now();
+
+    return {
+      expiresAt: issuedAt + this.settings.getRelayRecordTtlMs(),
+      issuedAt,
+      multiaddrs: [multiaddr],
+      peerId,
+      role: 'relay',
+      version: 1,
+    };
+  }
+
   private async connectToRelayRecordProviders(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const routingKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
 
     Kernel.logger.debug(
@@ -933,27 +960,23 @@ export default class PrivateNetworkRelayRecordDirectory {
         ` providers=${providerMultiaddrs.length}`,
     );
 
-    await Promise.all(
-      providerMultiaddrs.slice(0, 2).map(async (multiaddr) => {
-        const relayDial = this.createPrivateRelayDialAbortSignal();
+    for (const multiaddr of providerMultiaddrs.slice(0, 2)) {
+      const relayRecord = this.providerRelayRecord(network, multiaddr);
 
-        try {
-          await publicConnection.dial(multiaddr, relayDial.signal);
-          Kernel.logger.debug(
-            `Private IPFS relay record provider connected: networkId=${network.getId()}` +
-              ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-              ` multiaddr="${multiaddr}"`,
-          );
-        } catch (error: unknown) {
-          Kernel.logger.debug(
-            `Private IPFS relay record provider dial skipped: networkId=${network.getId()}` +
-              ` multiaddr="${multiaddr}" error=${String(error)}`,
-          );
-        } finally {
-          clearTimeout(relayDial.timeout);
-        }
-      }),
-    );
+      if (
+        relayRecord &&
+        (await this.dialPrivateRelayRecord(network, relayRecord))
+      ) {
+        await this.saveRelayRecordEnvelope(
+          network,
+          PrivateNetworkRelayRecordCodec.seal(network, relayRecord),
+        );
+
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private async dialDiscoveredPrivateRelay(
@@ -1422,16 +1445,16 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
-    const publicConnection = await this.getPublicConnection(sharedPrivateKey);
-
-    await this.subscribeRelayRecordTopic(publicConnection, network);
-
     if (
       discoveryState.shouldConnectRelayRecords &&
       (await this.dialCachedLocalRelayRecord(network))
     ) {
       return;
     }
+
+    const publicConnection = await this.getPublicConnection(sharedPrivateKey);
+
+    await this.subscribeRelayRecordTopic(publicConnection, network);
 
     if (
       !(await this.waitForPublicConnectionPeers(
@@ -1443,7 +1466,10 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
-    await this.connectToRelayRecordProviders(publicConnection, network);
+    if (await this.connectToRelayRecordProviders(publicConnection, network)) {
+      return;
+    }
+
     await this.requestRelayRecord(publicConnection, network);
   }
 

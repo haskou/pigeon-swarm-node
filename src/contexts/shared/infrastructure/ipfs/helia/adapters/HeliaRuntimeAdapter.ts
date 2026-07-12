@@ -413,8 +413,8 @@ export class HeliaRuntimeAdapter {
 
     config.connectionManager = {
       ...(config.connectionManager || {}),
-      maxConnections: 16,
-      maxDialQueueLength: 16,
+      maxConnections: 24,
+      maxDialQueueLength: 24,
       maxIncomingPendingConnections: 4,
       maxParallelDials: 2,
     };
@@ -423,9 +423,9 @@ export class HeliaRuntimeAdapter {
       ...(config.services || {}),
       dht: kadDHTModule.kadDHT({
         clientMode: true,
-        initialQuerySelfInterval: 24 * 60 * 60_000,
+        initialQuerySelfInterval: 1_000,
         kBucketSize: 4,
-        querySelfInterval: 24 * 60 * 60_000,
+        querySelfInterval: 60 * 60_000,
       }) as unknown,
     };
     delete config.services.delegatedContentRouting;
