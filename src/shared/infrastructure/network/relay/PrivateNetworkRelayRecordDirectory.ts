@@ -903,8 +903,10 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     await Promise.all(
       providerMultiaddrs.slice(0, 2).map(async (multiaddr) => {
+        const relayDial = this.createPrivateRelayDialAbortSignal();
+
         try {
-          await publicConnection.dial(multiaddr);
+          await publicConnection.dial(multiaddr, relayDial.signal);
           Kernel.logger.debug(
             `Private IPFS relay record provider connected: networkId=${network.getId()}` +
               ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
@@ -915,6 +917,8 @@ export default class PrivateNetworkRelayRecordDirectory {
             `Private IPFS relay record provider dial skipped: networkId=${network.getId()}` +
               ` multiaddr="${multiaddr}" error=${String(error)}`,
           );
+        } finally {
+          clearTimeout(relayDial.timeout);
         }
       }),
     );
@@ -1197,9 +1201,19 @@ export default class PrivateNetworkRelayRecordDirectory {
         envelope,
       );
 
-      await publicConnection.provideRecord(
+      const providerAnnounced = await publicConnection.provideRecord(
         PrivateNetworkRelayRecordCodec.lookupKey(network),
       );
+
+      if (!providerAnnounced) {
+        Kernel.logger.warn(
+          `Private IPFS relay record not published: networkId=${network.getId()}` +
+            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+            ' reason="The DHT provider announcement failed."',
+        );
+
+        return false;
+      }
 
       Kernel.logger.debug(
         `Private IPFS relay record provider announced: networkId=${network.getId()}` +

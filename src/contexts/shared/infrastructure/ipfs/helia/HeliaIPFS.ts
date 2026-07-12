@@ -1100,7 +1100,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     this.publishPendingRoutingRecords();
   }
 
-  public async provideRecord(key: string, signal?: AbortSignal): Promise<void> {
+  public async provideRecord(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     const cid = await heliaRuntimeAdapter.createRawSha256Cid(key);
     const routingAbort = this.createRoutingAbortSignal(signal);
 
@@ -1117,10 +1120,14 @@ export abstract class HeliaIPFS implements IPFSConnection {
       await this.heliaCore.routing.provide(cid, {
         signal: routingAbort.signal,
       });
+
+      return true;
     } catch (error: unknown) {
       Kernel.logger.debug?.(
         `DHT provider publication skipped for key="${key}": ${String(error)}`,
       );
+
+      return false;
     } finally {
       clearTimeout(routingAbort.timeout);
     }

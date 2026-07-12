@@ -14,7 +14,7 @@ export interface IPFSConnection {
   putRecord(key: string, value: string, signal?: AbortSignal): Promise<void>;
   getRecord(key: string, signal?: AbortSignal): Promise<string | undefined>;
   provideContent(cid: IPFSId, signal?: AbortSignal): Promise<void>;
-  provideRecord(key: string, signal?: AbortSignal): Promise<void>;
+  provideRecord(key: string, signal?: AbortSignal): Promise<boolean>;
   findRecordProviderMultiaddrs(
     key: string,
     signal?: AbortSignal,
