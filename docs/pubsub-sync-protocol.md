@@ -6,12 +6,22 @@
 `identities.v1.identity.was_updated` include the exact
 `externalIdentifier` CID produced by the signed publication. Consumers fetch
 and validate that candidate directly against the event aggregate identity and
-its previous-version chain. They must not resolve the event through the DHT
-routing record because routing publication can legitimately lag behind the
-domain event.
+its previous-version chain. They must not resolve the event through a DHT
+routing record: OrbitDB metadata is the canonical discovery index.
 
 The remaining attributes describe the published identity metadata:
 `handle`, `networkIds`, `previousExternalIdentifier`, and `version`.
+
+## Private relay records
+
+Private relay records use two gossipsub topics derived from the private network
+key: `pigeon-swarm.private-relay-records.v1.<scope>` for encrypted records and
+the same topic with `.request` appended for record requests. A node subscribes
+to the record topic, publishes an empty request payload, and an active relay
+replies on the record topic with its current encrypted record.
+
+The request and reply are node-to-node transport messages. They have no
+frontend consumer and never use IPNS or the public Kademlia DHT.
 
 ## Identity presence leases
 

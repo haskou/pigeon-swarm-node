@@ -114,9 +114,8 @@ installed `web-push` module path.
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
 | `PIGEON_RELAY_RECORD_TTL_MS` | `7200000` | No | Private relay record lifetime. Defaults to 2 hours. |
-| `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `15000` | No | How often private networks refresh public relay record discovery. |
-| `PIGEON_RELAY_RECORD_IPNS_WINDOW_MS` | `7200000` | No | Deterministic IPNS key rotation window for private relay records. Discovery checks the current and previous windows. |
-| `PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS` | `8000` | No | Maximum time to wait for public IPFS peers before publishing or discovering private relay records. Values above 10 seconds are capped. |
+| `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `60000` | No | Fallback interval for requesting a private relay record over gossipsub. The initial request is immediate. |
+| `PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS` | `8000` | No | Maximum time to wait for public IPFS peers before publishing or requesting private relay records. Values above 10 seconds are capped. |
 | `PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS` | `3600000` | No | How often private relay nodes refresh their public relay record publication after the initial publish. |
 | `PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS` | `15000` | No | Maximum time to wait when dialing a discovered private relay multiaddr before logging the failure and retrying later. |
 | `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
@@ -165,9 +164,11 @@ Operational rules:
   relay more than one private network;
 - each private network gets a stable port from the range;
 - nodes with `privateRelay.enabled` and `privateRelay.publicationEnabled`
-  publish an encrypted private relay record through the public IPFS routing
-  layer for each private network;
-- the relay record lookup key and encrypted payload are derived from the private
+  publish an encrypted private relay record through a private-network-scoped
+  gossipsub topic;
+- a node requesting that topic receives the current encrypted relay record from
+  an active relay without querying the public DHT;
+- the relay topic suffix and encrypted payload are derived from the private
   network key, so nodes outside the private network cannot read the relay
   multiaddrs;
 - nodes without `privateRelay.enabled` do not start relay servers; they can

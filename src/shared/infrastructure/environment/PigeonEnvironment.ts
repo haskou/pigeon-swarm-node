@@ -50,11 +50,7 @@ export const pigeonEnvironmentSchema = {
   PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS: { type: 'number' },
   PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS: { type: 'number' },
   PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS: {
-    defaultValue: 15 * 1000,
-    type: 'number',
-  },
-  PIGEON_RELAY_RECORD_IPNS_WINDOW_MS: {
-    defaultValue: 2 * 60 * 60_000,
+    defaultValue: 60 * 1000,
     type: 'number',
   },
   PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS: { type: 'number' },

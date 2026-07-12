@@ -56,7 +56,6 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     delete process.env.PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS;
     delete process.env.PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS;
     delete process.env.PIGEON_RELAY_RECORD_TTL_MS;
-    delete process.env.PIGEON_RELAY_RECORD_IPNS_WINDOW_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
     previousLocalDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
     localDatabasePath = await fs.mkdtemp(
@@ -82,29 +81,18 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     jest.restoreAllMocks();
   });
 
-  it('should not fail the whole relay record publication when generic DHT aborts after pubsub publishes', async () => {
+  it('should publish relay records through gossipsub without querying the DHT', async () => {
     const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
 
     publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
-    publicConnection.putRecord.mockRejectedValue(
-      new Error('PutFailedError: AbortError: This operation was aborted'),
-    );
-    publicConnection.publishIPNSRecord.mockResolvedValue(undefined);
-
     (
       directory as unknown as {
         getPublicConnection: () => Promise<IPFSConnection>;
       }
     ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
-    (
-      directory as unknown as {
-        publishRelayIPNSRecord: () => Promise<boolean>;
-      }
-    ).publishRelayIPNSRecord = jest.fn().mockResolvedValue(false);
-
     await directory.publish(
       privateNetwork(privateKey()),
       {
@@ -118,12 +106,8 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
 
     expect(publicConnection.publishPubSub).toHaveBeenCalled();
-    expect(publicConnection.putRecord).toHaveBeenCalled();
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Private IPFS relay generic DHT record publication failed',
-      ),
-    );
+    expect(publicConnection.putRecord).not.toHaveBeenCalled();
+    expect(publicConnection.publishIPNSRecord).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalledWith(
       expect.stringContaining('Private IPFS relay record publication failed'),
     );

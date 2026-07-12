@@ -25,9 +25,6 @@ export type PrivateRelayListenOptions = {
 export default class PrivateNetworkRelayRecordDirectory {
   private static readonly maxCachedRelayRecordDialFailures = 3;
 
-  private static readonly inlineIPNSValuePrefix =
-    '/pigeon-swarm/private-relay/v1/';
-
   private static readonly relayRecordPubSubTopicPrefix =
     'pigeon-swarm.private-relay-records.v1';
 
@@ -59,19 +56,15 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly discoveredRelayInfoKeys: Set<string> = new Set();
 
-  private readonly missingRelayInfoKeys: Set<string> = new Set();
-
-  private readonly fallbackRelayInfoKeys: Set<string> = new Set();
-
   private readonly cachedRelayInfoKeys: Set<string> = new Set();
 
   private readonly pubSubRelayInfoKeys: Set<string> = new Set();
 
   private readonly connectedRelayInfoKeys: Set<string> = new Set();
 
-  private readonly ipnsPublicationFailureWarningKeys: Set<string> = new Set();
-
   private readonly subscribedRelayRecordTopics: Set<string> = new Set();
+
+  private readonly subscribedRelayRecordRequestTopics: Set<string> = new Set();
 
   private readonly relayRecordEnvelopeCache: Map<string, string> = new Map();
 
@@ -87,9 +80,6 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly activePrivateRelayDialKeys: Set<string> = new Set();
 
   private readonly activeDiscoveries = new Map<string, Promise<void>>();
-
-  private readonly ipnsPrivateKeys: Map<string, Promise<Libp2pPrivateKeyLike>> =
-    new Map();
 
   private readonly publicRelayRecordRegistry = new PublicRelayRecordRegistry();
 
@@ -134,49 +124,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     return this.activePublicationGenerations[networkId] === generation;
   }
 
-  private getCurrentIPNSWindowId(): number {
-    return Math.floor(Date.now() / this.settings.getIPNSWindowMs());
-  }
-
-  private getDiscoveryIPNSWindowIds(): number[] {
-    const currentWindowId = this.getCurrentIPNSWindowId();
-
-    return [currentWindowId, currentWindowId - 1];
-  }
-
-  private getIPNSPrivateKey(
-    network: IPFSNetwork,
-    windowId: number,
-  ): Promise<Libp2pPrivateKeyLike> {
-    const cacheKey = `${PrivateNetworkRelayRecordCodec.fingerprint(
-      network,
-    )}:${windowId}`;
-
-    if (!this.ipnsPrivateKeys.has(cacheKey)) {
-      this.ipnsPrivateKeys.set(
-        cacheKey,
-        libp2pKeyAdapter.generateEd25519KeyPairFromSeed(
-          PrivateNetworkRelayRecordCodec.ipnsSeed(network, windowId),
-        ),
-      );
-    }
-
-    return this.ipnsPrivateKeys.get(cacheKey) as Promise<Libp2pPrivateKeyLike>;
-  }
-
-  private createRoutingAbortSignal(): {
-    signal: AbortSignal;
-    timeout: ReturnType<typeof setTimeout>;
-  } {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      this.settings.getRoutingTimeoutMs(),
-    );
-
-    return { signal: controller.signal, timeout };
-  }
-
   private createPrivateRelayDialAbortSignal(): {
     signal: AbortSignal;
     timeout: ReturnType<typeof setTimeout>;
@@ -209,6 +156,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): Promise<IPFSConnection> {
     return PublicIPFS.create({
       announceAddresses: options.announceAddresses,
+      contentRoutingEnabled: false,
+      distributedHashTableEnabled: false,
       enableRelayServer: options.enableRelayServer,
       listenAddresses: options.listenAddresses,
       privateKey: options.sharedPrivateKey,
@@ -380,46 +329,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     await this.invalidateCachedRelayRecord(network, relayRecord);
   }
 
-  private infoWhenRelayIPNSRecordIsDiscovered(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    relayRecord: PrivateNetworkRelayRecord,
-  ): void {
-    const infoKey = `${network.getId()}:ipns:${relayRecord.peerId}`;
-
-    if (this.discoveredRelayInfoKeys.has(infoKey)) {
-      return;
-    }
-
-    this.discoveredRelayInfoKeys.add(infoKey);
-    Kernel.logger.info(
-      `Private IPFS relay IPNS record discovered: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-        ` peerId=${relayRecord.peerId}` +
-        ` publicPeers=${publicConnection.getPeers().length}`,
-    );
-  }
-
-  private infoWhenRelayFallbackRecordIsDiscovered(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    relayRecord: PrivateNetworkRelayRecord,
-  ): void {
-    const infoKey = `${network.getId()}:fallback:${relayRecord.peerId}`;
-
-    if (this.fallbackRelayInfoKeys.has(infoKey)) {
-      return;
-    }
-
-    this.fallbackRelayInfoKeys.add(infoKey);
-    Kernel.logger.info(
-      `Private IPFS relay fallback record discovered: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-        ` peerId=${relayRecord.peerId}` +
-        ` publicPeers=${publicConnection.getPeers().length}`,
-    );
-  }
-
   private infoWhenRelayPubSubRecordIsDiscovered(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -456,25 +365,6 @@ export default class PrivateNetworkRelayRecordDirectory {
       `Private IPFS relay record connected: networkId=${network.getId()}` +
         ` peerId=${relayRecord.peerId}` +
         ` multiaddr="${multiaddr}" peers=${network.getPeers().length}`,
-    );
-  }
-
-  private infoWhenRelayRecordIsMissing(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-  ): void {
-    const infoKey = network.getId();
-
-    if (this.missingRelayInfoKeys.has(infoKey)) {
-      return;
-    }
-
-    this.missingRelayInfoKeys.add(infoKey);
-    Kernel.logger.info(
-      `Private IPFS relay record not found yet: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-        ` publicPeerId=${publicConnection.getPeerId()}` +
-        ` publicPeers=${publicConnection.getPeers().length}`,
     );
   }
 
@@ -690,39 +580,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
   }
 
-  private getInlineIPNSValue(
-    envelope: PrivateNetworkRelayRecordEnvelope,
-  ): string {
-    return `${PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix}${Buffer.from(
-      JSON.stringify(envelope),
-    ).toString('base64url')}`;
-  }
-
-  private getEnvelopeFromIPNSValue(
-    value: string,
-  ): PrivateNetworkRelayRecordEnvelope | undefined {
-    if (
-      !value.startsWith(
-        PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix,
-      )
-    ) {
-      return undefined;
-    }
-
-    try {
-      return this.decodeEnvelope(
-        Buffer.from(
-          value.slice(
-            PrivateNetworkRelayRecordDirectory.inlineIPNSValuePrefix.length,
-          ),
-          'base64url',
-        ).toString('utf8'),
-      );
-    } catch {
-      return undefined;
-    }
-  }
-
   private getRelayRecordFromEnvelope(
     network: IPFSNetwork,
     envelope: PrivateNetworkRelayRecordEnvelope,
@@ -862,6 +719,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     ].join('.');
   }
 
+  private getRelayRecordRequestTopic(network: IPFSNetwork): string {
+    return `${this.getRelayRecordTopic(network)}.request`;
+  }
+
   private async subscribeRelayRecordTopic(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -900,6 +761,33 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.subscribedRelayRecordTopics.add(topic);
   }
 
+  private async subscribeRelayRecordRequestTopic(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    const topic = this.getRelayRecordRequestTopic(network);
+
+    if (this.subscribedRelayRecordRequestTopics.has(topic)) {
+      return;
+    }
+
+    await publicConnection.subscribePubSub(topic, async () => {
+      const envelope = this.relayRecordEnvelopeCache.get(
+        PrivateNetworkRelayRecordCodec.lookupKey(network),
+      );
+
+      if (!envelope) {
+        return;
+      }
+
+      await publicConnection.publishPubSub(
+        this.getRelayRecordTopic(network),
+        envelope,
+      );
+    });
+    this.subscribedRelayRecordRequestTopics.add(topic);
+  }
+
   private async publishRelayPubSubRecord(
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
@@ -920,131 +808,6 @@ export default class PrivateNetworkRelayRecordDirectory {
 
       return false;
     }
-  }
-
-  private async publishRelayIPNSRecord(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    envelope: PrivateNetworkRelayRecordEnvelope,
-    relayRecord: PrivateNetworkRelayRecord,
-  ): Promise<boolean> {
-    const ipnsPrivateKey = await this.getIPNSPrivateKey(
-      network,
-      this.getCurrentIPNSWindowId(),
-    );
-    const lifetimeMs = Math.max(60_000, relayRecord.expiresAt - Date.now());
-    const ipnsName = await publicConnection.publishIPNSRecord(
-      ipnsPrivateKey,
-      this.getInlineIPNSValue(envelope),
-      Date.now(),
-      lifetimeMs,
-    );
-
-    if (!ipnsName) {
-      const warningKey = `${network.getId()}:${this.getCurrentIPNSWindowId()}`;
-
-      if (!this.ipnsPublicationFailureWarningKeys.has(warningKey)) {
-        this.ipnsPublicationFailureWarningKeys.add(warningKey);
-        Kernel.logger.warn(
-          `Private IPFS relay IPNS record not published: networkId=${network.getId()}` +
-            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-            ` publicPeers=${publicConnection.getPeers().length}`,
-        );
-      }
-
-      return false;
-    }
-
-    Kernel.logger.debug(
-      `Private IPFS relay IPNS record published: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-        ` ipnsName=${ipnsName}` +
-        ` publicPeers=${publicConnection.getPeers().length}`,
-    );
-
-    return true;
-  }
-
-  private async provideRelayRecord(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    lookupKey: string,
-  ): Promise<void> {
-    const routingAbort = this.createRoutingAbortSignal();
-
-    try {
-      await publicConnection.provideRecord(lookupKey, routingAbort.signal);
-    } catch (error) {
-      Kernel.logger.debug(
-        `Private IPFS relay record provider publication skipped: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
-      );
-    } finally {
-      clearTimeout(routingAbort.timeout);
-    }
-  }
-
-  private async publishGenericDHTRelayRecord(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    lookupKey: string,
-    envelope: PrivateNetworkRelayRecordEnvelope,
-  ): Promise<boolean> {
-    const routingAbort = this.createRoutingAbortSignal();
-
-    try {
-      await publicConnection.putRecord(
-        lookupKey,
-        JSON.stringify(envelope),
-        routingAbort.signal,
-      );
-      await this.provideRelayRecord(publicConnection, network, lookupKey);
-
-      return true;
-    } catch (error) {
-      Kernel.logger.warn(
-        `Private IPFS relay generic DHT record publication failed: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
-      );
-
-      return false;
-    } finally {
-      clearTimeout(routingAbort.timeout);
-    }
-  }
-
-  private async publishRelayRecordChannels(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    lookupKey: string,
-    envelope: PrivateNetworkRelayRecordEnvelope,
-    relayRecord: PrivateNetworkRelayRecord,
-  ): Promise<boolean> {
-    let published = false;
-
-    published =
-      (await this.publishRelayPubSubRecord(
-        publicConnection,
-        network,
-        envelope,
-      )) || published;
-
-    published =
-      (await this.publishGenericDHTRelayRecord(
-        publicConnection,
-        network,
-        lookupKey,
-        envelope,
-      )) || published;
-
-    return (
-      (await this.publishRelayIPNSRecord(
-        publicConnection,
-        network,
-        envelope,
-        relayRecord,
-      )) || published
-    );
   }
 
   private async dialRelayRecordWhenAvailable(
@@ -1092,133 +855,14 @@ export default class PrivateNetworkRelayRecordDirectory {
     return false;
   }
 
-  private logIgnoredRelayRecord(network: IPFSNetwork, reason: string): void {
-    Kernel.logger.debug(
-      `Private IPFS relay record ignored: networkId=${network.getId()}` +
-        ` reason="${reason}"`,
+  private async requestRelayRecord(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    await publicConnection.publishPubSub(
+      this.getRelayRecordRequestTopic(network),
+      '',
     );
-  }
-
-  private async discoverFallbackRelayRecord(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    connectRelayRecord: boolean,
-  ): Promise<void> {
-    const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
-    const routingAbort = this.createRoutingAbortSignal();
-
-    try {
-      const value = await publicConnection.getRecord(
-        lookupKey,
-        routingAbort.signal,
-      );
-
-      if (!value) {
-        this.infoWhenRelayRecordIsMissing(publicConnection, network);
-
-        return;
-      }
-
-      const envelope = this.decodeEnvelope(value);
-
-      if (!envelope) {
-        this.logIgnoredRelayRecord(network, 'Invalid envelope.');
-
-        return;
-      }
-
-      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
-
-      if (!relayRecord) {
-        this.logIgnoredRelayRecord(network, 'Expired or not decryptable.');
-
-        return;
-      }
-
-      this.infoWhenRelayFallbackRecordIsDiscovered(
-        publicConnection,
-        network,
-        relayRecord,
-      );
-      await this.saveRelayRecordEnvelope(network, envelope);
-
-      if (connectRelayRecord) {
-        await this.dialPrivateRelayRecord(network, relayRecord);
-      }
-    } finally {
-      clearTimeout(routingAbort.timeout);
-    }
-  }
-
-  private async discoverRelayIPNSRecord(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-  ): Promise<PrivateNetworkRelayRecord | undefined> {
-    for (const windowId of this.getDiscoveryIPNSWindowIds()) {
-      const ipnsPrivateKey = await this.getIPNSPrivateKey(network, windowId);
-      const ipnsValue =
-        await publicConnection.resolveIPNSRecord(ipnsPrivateKey);
-
-      if (!ipnsValue) {
-        continue;
-      }
-
-      const envelope = this.getEnvelopeFromIPNSValue(ipnsValue);
-
-      if (!envelope) {
-        continue;
-      }
-
-      const relayRecord = this.getRelayRecordFromEnvelope(network, envelope);
-
-      if (relayRecord) {
-        await this.saveRelayRecordEnvelope(network, envelope);
-        this.infoWhenRelayIPNSRecordIsDiscovered(
-          publicConnection,
-          network,
-          relayRecord,
-        );
-
-        return relayRecord;
-      }
-    }
-
-    return undefined;
-  }
-
-  private async discoverRemoteRelayRecords(
-    publicConnection: IPFSConnection,
-    network: IPFSNetwork,
-    connectRelayRecords: boolean,
-  ): Promise<void> {
-    try {
-      const ipnsRelayRecord = await this.discoverRelayIPNSRecord(
-        publicConnection,
-        network,
-      );
-
-      if (
-        connectRelayRecords &&
-        (await this.dialRelayRecordWhenAvailable(network, ipnsRelayRecord))
-      ) {
-        return;
-      }
-
-      if (connectRelayRecords && (await this.dialCachedRelayRecord(network))) {
-        return;
-      }
-
-      await this.discoverFallbackRelayRecord(
-        publicConnection,
-        network,
-        connectRelayRecords,
-      );
-    } catch (error) {
-      Kernel.logger.debug(
-        `Private IPFS relay record discovery failed: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
-      );
-    }
   }
 
   private async dialDiscoveredPrivateRelay(
@@ -1485,16 +1129,20 @@ export default class PrivateNetworkRelayRecordDirectory {
       return false;
     }
 
-    const lookupKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
     const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
+    const serializedEnvelope = JSON.stringify(envelope);
+
+    this.relayRecordEnvelopeCache.set(
+      PrivateNetworkRelayRecordCodec.lookupKey(network),
+      serializedEnvelope,
+    );
 
     try {
-      const published = await this.publishRelayRecordChannels(
+      await this.subscribeRelayRecordRequestTopic(publicConnection, network);
+      const published = await this.publishRelayPubSubRecord(
         publicConnection,
         network,
-        lookupKey,
         envelope,
-        relayRecord,
       );
 
       if (!shouldContinue()) {
@@ -1645,11 +1293,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
-    await this.discoverRemoteRelayRecords(
-      publicConnection,
-      network,
-      discoveryState.shouldConnectRelayRecords,
-    );
+    await this.requestRelayRecord(publicConnection, network);
   }
 
   public async configurePublicConnection(
@@ -1668,6 +1312,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     await previousConnection?.stop();
     this.subscribedRelayRecordTopics.clear();
+    this.subscribedRelayRecordRequestTopics.clear();
     this.publicConnectionConfigurationKey = configurationKey;
     this.publicConnection = this.createPublicConnection(options);
 

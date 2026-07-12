@@ -119,10 +119,6 @@ package "keychains.infrastructure" {
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
   }
 
-  class IpfsKeychainRouting {
-    +republish(): Promise<number>
-  }
-
   class IpfsKeychainMapper {
     +toDocument(keychain: Keychain): IpfsKeychainDocument
     +toDomain(document: IpfsKeychainDocument): Keychain
@@ -149,8 +145,8 @@ package "keychains.infrastructure" {
   }
 
   note right of IpfsKeychainRepository
-    Encapsulates IPFS documents, metadata indexes,
-    DHT record candidates and content addressing.
+    Encapsulates IPFS documents, metadata indexes
+    and content addressing.
     New keychain versions are published only in
     the owner's identity networks.
     The domain only receives Keychain objects and
@@ -158,7 +154,6 @@ package "keychains.infrastructure" {
   end note
 
   IpfsKeychainRepository ..|> KeychainRepository
-  IpfsKeychainRouting --> IpfsKeychainRepository
   IpfsKeychainRepository --> IpfsKeychainMapper
   IpfsKeychainRepository --> KeychainMetadataIndex
   IpfsKeychainRepository --> IpfsKeychainDocument

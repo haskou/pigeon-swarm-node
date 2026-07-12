@@ -10,7 +10,8 @@ contract.
 ## Principles
 
 - Clients talk to their selected node through HTTP and WebSocket.
-- Nodes talk to other nodes through PubSub, DHT and IPFS/Helia.
+- Nodes talk to other nodes through PubSub and IPFS/Helia. Private-network
+  metadata discovery is replicated by OrbitDB, not by the public DHT.
 - The browser/mobile client must not subscribe directly to the node-to-node
   PubSub mesh.
 - The node filters permissions before pushing realtime events to a client.
@@ -1530,7 +1531,7 @@ Response:
 Implemented:
 
 - only return the authenticated identity keychain
-- resolve latest valid candidate from OrbitDB metadata and DHT candidates
+- resolve the latest valid candidate from OrbitDB metadata
 - return encrypted payload as-is for client-side unlock/decryption
 
 ## Conversation HTTP API

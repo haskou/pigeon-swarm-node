@@ -95,10 +95,6 @@ export default class PrivateNetworkRelayDirectorySettings {
     );
   }
 
-  public getIPNSWindowMs(): number {
-    return pigeonEnvironment().PIGEON_RELAY_RECORD_IPNS_WINDOW_MS;
-  }
-
   public getRoutingTimeoutMs(): number {
     const environment = pigeonEnvironment();
 

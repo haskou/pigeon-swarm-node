@@ -9,8 +9,6 @@ import {
 } from '@app/apps/ApplicationSchedulers';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import '@app/contexts/content-replication/infrastructure/ipfs/IpfsContentStorage';
-import '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
-import '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
 import Kernel from '@haskou/ddd-kernel';
 
 const startupTimers = new Map<string, bigint>();
