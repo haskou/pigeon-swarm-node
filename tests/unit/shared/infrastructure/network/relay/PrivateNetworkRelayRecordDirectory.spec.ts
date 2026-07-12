@@ -46,6 +46,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
   let localDatabase: EmbeddedLocalDatabase;
   let localDatabasePath: string;
   let logger: MockProxy<WinstonLogger>;
+  let previousIPFSStoragePath: string | undefined;
   let previousLocalDatabasePath: string | undefined;
 
   beforeEach(async () => {
@@ -58,10 +59,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     delete process.env.PIGEON_RELAY_RECORD_TTL_MS;
     delete process.env.PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS;
     previousLocalDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
+    previousIPFSStoragePath = process.env.IPFS_STORAGE_PATH;
     localDatabasePath = await fs.mkdtemp(
       path.join(os.tmpdir(), 'pigeon-relay-cache-'),
     );
     process.env.PIGEON_LOCAL_DB_PATH = localDatabasePath;
+    process.env.IPFS_STORAGE_PATH = localDatabasePath;
     localDatabase = new EmbeddedLocalDatabase();
 
     logger = mock<WinstonLogger>();
@@ -75,6 +78,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       delete process.env.PIGEON_LOCAL_DB_PATH;
     } else {
       process.env.PIGEON_LOCAL_DB_PATH = previousLocalDatabasePath;
+    }
+
+    if (previousIPFSStoragePath === undefined) {
+      delete process.env.IPFS_STORAGE_PATH;
+    } else {
+      process.env.IPFS_STORAGE_PATH = previousIPFSStoragePath;
     }
 
     await fs.rm(localDatabasePath, { force: true, recursive: true });
