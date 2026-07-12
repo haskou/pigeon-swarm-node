@@ -252,8 +252,8 @@ services:
     arguments: []
     abstract: false
     parent: null
-  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2h0dHBfX0F4aW9zSHR0cENsaWVudF9fQXhpb3NIdHRwQ2xpZW50:
-    class: /shared/infrastructure/http/AxiosHttpClient
+  X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2h0dHBfX0ZldGNoSHR0cENsaWVudF9fRmV0Y2hIdHRwQ2xpZW50:
+    class: /shared/infrastructure/http/FetchHttpClient
     arguments: []
     abstract: false
     parent: null
@@ -2915,7 +2915,7 @@ services:
     abstract: false
     parent: null
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2h0dHBfX0h0dHBDbGllbnRfX0h0dHBDbGllbnQ=: >-
-    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2h0dHBfX0F4aW9zSHR0cENsaWVudF9fQXhpb3NIdHRwQ2xpZW50
+    @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2h0dHBfX0ZldGNoSHR0cENsaWVudF9fRmV0Y2hIdHRwQ2xpZW50
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvZ3NfX0xvZ19fTG9n: >-
     @X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX2xvZ3NfX1dpbnN0b25Mb2dnZXJfX1dpbnN0b25Mb2dnZXI=
   X19ob21lX19oYXNrb19fUHJvamVjdHNfX3BpZ2Vvbi1zd2FybS1ub2RlX19zcmNfX3NoYXJlZF9faW5mcmFzdHJ1Y3R1cmVfX21lc3NhZ2VCdXNfX01lc3NhZ2VCdXNBZGFwdGVyX19NZXNzYWdlQnVzQWRhcHRlcg==: >-

@@ -155,12 +155,15 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   private replicateCommunityHeadInBackground(
     document: OrbitDBCommunityDocument,
   ): void {
+    const key = this.communityHeadKey(document.id);
+    this.registry.cacheHeadLocally(key, { ...document }, [document.networkId]);
     this.registry.replicateHeadInBackground(
-      this.communityHeadKey(document.id),
+      key,
       {
         ...document,
       },
       [document.networkId],
+      true,
     );
   }
 
@@ -173,9 +176,17 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   private toFreshDocument(community: Community): OrbitDBCommunityDocument {
+    const currentHead = this.registry.findCachedHead(
+      this.communityHeadKey(community.getId().valueOf()),
+    );
+    const nextUpdatedAt =
+      typeof currentHead?.updatedAt === 'number'
+        ? currentHead.updatedAt + 1
+        : 0;
+
     return {
       ...this.mapper.toDocument(community),
-      updatedAt: Date.now(),
+      updatedAt: Math.max(Date.now(), nextUpdatedAt),
     };
   }
 
@@ -231,13 +242,14 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
-    const indexedDocuments = await this.communityIndex.find(
-      this.memberIndexHeadKey(identityId.valueOf()),
-    );
-    const cachedDocuments = this.cachedStoredCommunityDocuments().filter(
-      (document) => document.memberIds.includes(identityId.valueOf()),
-    );
-    const documents = [...(indexedDocuments || []), ...cachedDocuments];
+    const indexedDocuments =
+      (await this.communityIndex.find(
+        this.memberIndexHeadKey(identityId.valueOf()),
+      )) || [];
+    const documents = [
+      ...indexedDocuments,
+      ...this.cachedStoredCommunityDocuments(),
+    ];
 
     return this.freshestDocumentsFirst(documents)
       .filter(

@@ -1,18 +1,15 @@
-/* eslint-disable sonarjs/cognitive-complexity */
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-/* eslint-disable no-case-declarations */
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
+import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import PigeonApplication from '@app/apps/PigeonApplication';
-import { Kernel } from '@haskou/ddd-kernel';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
+import { Kernel } from '@haskou/ddd-kernel';
 import { KeyPair } from '@haskou/value-objects';
 import { expect } from 'chai';
 import * as chai from 'chai';
@@ -23,6 +20,7 @@ import FormData from 'form-data';
 
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
+import { RestResponse } from './RestResponse';
 
 chai.use(chaiSubset);
 
@@ -56,133 +54,11 @@ export default class Definitions {
   private otherIdentityKeyPair: KeyPair | undefined;
 
   private ownerIdentityId: IdentityId | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private response: any = null;
+  private response: RestResponse = null;
   private restClient: RestClient = new RestClient();
   private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
   private stickerPackId: string | undefined;
   private stickerId: string | undefined;
-
-  @before()
-  public resetScenarioState(): void {
-    this.binaryBody = undefined;
-    this.body = undefined;
-    this.callId = undefined;
-    this.communityChannelId = undefined;
-    this.communityChannelMessageId = undefined;
-    this.communityThreadRootMessageId = undefined;
-    this.communityId = undefined;
-    this.communityInviteToken = undefined;
-    this.communityMembershipRequestId = undefined;
-    this.communityRoleId = undefined;
-    this.formData = undefined;
-    this.headers = {};
-    this.identityKeyPair = undefined;
-    this.conversationId = undefined;
-    this.currentNetworkId = undefined;
-    this.createdIdentityId = undefined;
-    this.keychainExternalIdentifier = undefined;
-    this.messageId = undefined;
-    this.notificationId = undefined;
-    this.otherIdentityId = undefined;
-    this.otherIdentityKeyPair = undefined;
-    this.ownerIdentityId = undefined;
-    this.response = null;
-    this.stickerPackId = undefined;
-    this.stickerId = undefined;
-    this.ipfsDefinition.resetScenarioState();
-  }
-
-  @before()
-  public async startKernel(): Promise<void> {
-    if (!application) {
-      application = new PigeonApplication();
-      application.loadEnvironmentVariables('test');
-      this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
-
-      await application.dependencyInjection();
-      await application.runServer();
-      application.logs();
-      await application.runRuntimes(
-        OrbitDBReplicatedStateRuntime,
-        OrbitDBCallProjectionRuntime,
-      );
-    }
-  }
-
-  @after()
-  public async cleanupScenarioStorage(): Promise<void> {
-    const database =
-      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
-    const callRelayRecordRegistry =
-      Kernel.di.getService<CallRelayRecordRegistry>(CallRelayRecordRegistry);
-
-    await database.clear();
-    callRelayRecordRegistry.clear();
-    await this.ipfsDefinition.cleanupRegisteredNetworks();
-    this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
-  }
-
-  @given('I am an anonymous user')
-  public iAmAnAnonymousUser(): void {
-    return;
-  }
-
-  @given('the local node has no owner and no networks')
-  public async theLocalNodeHasNoOwnerAndNoNetworks(): Promise<void> {
-    const database =
-      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
-
-    await database.delete('node_metadata', 'local');
-    await this.ipfsDefinition.cleanupRegisteredNetworks();
-  }
-
-  @given('a node peer heartbeat has been received')
-  public async aNodePeerHeartbeatHasBeenReceived(): Promise<void> {
-    const database =
-      Kernel.di.getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase);
-    const ownerKeyPair = await KeyPair.generate();
-    const ownerIdentityId = new IdentityId(
-      ownerKeyPair.toPrimitives().publicKey,
-    );
-
-    await database.deleteMany('node_peers', () => true);
-    await database.save('node_peers', '550e8400-e29b-41d4-a716-446655440010', {
-      lastSeenAt: Date.now(),
-      networks: [
-        {
-          id: '550e8400-e29b-41d4-a716-446655440011',
-          name: 'public',
-          type: 'public',
-        },
-      ],
-      owner: ownerIdentityId.valueOf(),
-    });
-  }
-
-  @given('I set json body')
-  public iSetJsonBody(body: string): void {
-    this.body = body;
-  }
-
-  @given('I set header {string} to {string}')
-  public iSetHeaderTo(header: string, value: string): void {
-    this.headers[header] = value;
-  }
-
-  @given('I clear request headers')
-  public iClearRequestHeaders(): void {
-    this.headers = {};
-  }
-
-  @given('I spoof the current node owner identity header')
-  public iSpoofTheCurrentNodeOwnerIdentityHeader(): void {
-    if (!this.ownerIdentityId) {
-      throw new Error('Node owner identity must be initialized first.');
-    }
-
-    this.headers['x-identity-id'] = this.ownerIdentityId.valueOf();
-  }
 
   private async ensureIdentityKeyPair(): Promise<KeyPair> {
     if (!this.identityKeyPair) {
@@ -233,11 +109,11 @@ export default class Definitions {
       name,
       picture: undefined,
     };
-	    const signaturePayload = {
-	      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-	      encryptedMasterKey: 'v1.test.encrypted-master-key',
-	      id: ownerIdentityId.valueOf(),
-	      masterKeyDerivation: {
+    const signaturePayload = {
+      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
+      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      id: ownerIdentityId.valueOf(),
+      masterKeyDerivation: {
         passkeyPrf: {
           algorithm: 'webauthn-prf',
           credentialId: 'test-credential-id',
@@ -245,7 +121,7 @@ export default class Definitions {
           version: 1,
         },
       },
-	      networks,
+      networks,
       previousIdentityExternalIdentifier,
       profile,
       timestamp: 1773848829055 + version,
@@ -321,6 +197,46 @@ export default class Definitions {
     return externalIdentifier;
   }
 
+  private async resolveSignerKeyPair(
+    keyPair: KeyPair | undefined,
+  ): Promise<KeyPair> {
+    return keyPair ?? (await this.ensureIdentityKeyPair());
+  }
+
+  private resolveSignerIdentityId(
+    identityId: IdentityId | undefined,
+  ): IdentityId | undefined {
+    return identityId ?? this.ownerIdentityId;
+  }
+
+  private getCurrentRequestBody(): unknown {
+    if (this.binaryBody) {
+      return this.binaryBody;
+    }
+
+    return this.body ? JSON.parse(this.body) : {};
+  }
+
+  private getPostBody(): unknown {
+    if (this.formData) {
+      return this.formData;
+    }
+
+    return this.binaryBody ?? (this.body ? JSON.parse(this.body) : undefined);
+  }
+
+  private getPostHeaders(): Record<string, string> {
+    return this.formData?.getHeaders() || this.headers;
+  }
+
+  private rememberCreatedIdentityFromResponse(): void {
+    const identityId = this.response?.data?.id;
+
+    if (identityId) {
+      this.createdIdentityId = identityId;
+    }
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -328,14 +244,14 @@ export default class Definitions {
     keyPair: KeyPair | undefined = undefined,
     identityId: IdentityId | undefined = undefined,
   ): Promise<void> {
-    const signerKeyPair = keyPair ?? (await this.ensureIdentityKeyPair());
-    const signerIdentityId = identityId ?? this.ownerIdentityId;
+    const signerKeyPair = await this.resolveSignerKeyPair(keyPair);
+    const signerIdentityId = this.resolveSignerIdentityId(identityId);
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
       path,
       timestamp,
-      this.binaryBody ?? (this.body ? JSON.parse(this.body) : {}),
+      this.getCurrentRequestBody(),
     );
 
     this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
@@ -343,6 +259,154 @@ export default class Definitions {
     this.headers['x-signature'] = signerKeyPair
       .sign(JSON.stringify(signedRequestPayload))
       .valueOf();
+  }
+
+  private resolveResponsePath(value: unknown, path: string): unknown {
+    const arrayPath = /^(.*)\[(\d+)\]$/.exec(path);
+
+    if (arrayPath) {
+      const [, propertyName, indexValue] = arrayPath;
+      const collection = propertyName
+        ? (value as Record<string, unknown>)[propertyName]
+        : value;
+      const index = Number(indexValue);
+
+      if (!Array.isArray(collection)) {
+        throw new Error(`Response path ${path} does not contain an array.`);
+      }
+
+      return collection[index];
+    }
+
+    if (typeof value !== 'object' || value === null) {
+      throw new Error(`Response path ${path} does not contain an object.`);
+    }
+
+    return (value as Record<string, unknown>)[path];
+  }
+
+  @before()
+  public resetScenarioState(): void {
+    this.binaryBody = undefined;
+    this.body = undefined;
+    this.callId = undefined;
+    this.communityChannelId = undefined;
+    this.communityChannelMessageId = undefined;
+    this.communityThreadRootMessageId = undefined;
+    this.communityId = undefined;
+    this.communityInviteToken = undefined;
+    this.communityMembershipRequestId = undefined;
+    this.communityRoleId = undefined;
+    this.formData = undefined;
+    this.headers = {};
+    this.identityKeyPair = undefined;
+    this.conversationId = undefined;
+    this.currentNetworkId = undefined;
+    this.createdIdentityId = undefined;
+    this.keychainExternalIdentifier = undefined;
+    this.messageId = undefined;
+    this.notificationId = undefined;
+    this.otherIdentityId = undefined;
+    this.otherIdentityKeyPair = undefined;
+    this.ownerIdentityId = undefined;
+    this.response = null;
+    this.stickerPackId = undefined;
+    this.stickerId = undefined;
+    this.ipfsDefinition.resetScenarioState();
+  }
+
+  @before()
+  public async startKernel(): Promise<void> {
+    if (!application) {
+      application = new PigeonApplication();
+      application.loadEnvironmentVariables('test');
+      this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
+
+      await application.dependencyInjection();
+      await application.runServer();
+      application.logs();
+      await application.runRuntimes(
+        OrbitDBReplicatedStateRuntime,
+        OrbitDBCallProjectionRuntime,
+      );
+    }
+  }
+
+  @after()
+  public async cleanupScenarioStorage(): Promise<void> {
+    const database = Kernel.di.getService<EmbeddedLocalDatabase>(
+      EmbeddedLocalDatabase,
+    );
+    const callRelayRecordRegistry =
+      Kernel.di.getService<CallRelayRecordRegistry>(CallRelayRecordRegistry);
+
+    await database.clear();
+    callRelayRecordRegistry.clear();
+    await this.ipfsDefinition.cleanupRegisteredNetworks();
+    this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
+  }
+
+  @given('I am an anonymous user')
+  public iAmAnAnonymousUser(): void {
+    return;
+  }
+
+  @given('the local node has no owner and no networks')
+  public async theLocalNodeHasNoOwnerAndNoNetworks(): Promise<void> {
+    const database = Kernel.di.getService<EmbeddedLocalDatabase>(
+      EmbeddedLocalDatabase,
+    );
+
+    await database.delete('node_metadata', 'local');
+    await this.ipfsDefinition.cleanupRegisteredNetworks();
+  }
+
+  @given('a node peer heartbeat has been received')
+  public async aNodePeerHeartbeatHasBeenReceived(): Promise<void> {
+    const database = Kernel.di.getService<EmbeddedLocalDatabase>(
+      EmbeddedLocalDatabase,
+    );
+    const ownerKeyPair = await KeyPair.generate();
+    const ownerIdentityId = new IdentityId(
+      ownerKeyPair.toPrimitives().publicKey,
+    );
+
+    await database.deleteMany('node_peers', () => true);
+    await database.save('node_peers', '550e8400-e29b-41d4-a716-446655440010', {
+      lastSeenAt: Date.now(),
+      networks: [
+        {
+          id: '550e8400-e29b-41d4-a716-446655440011',
+          name: 'public',
+          type: 'public',
+        },
+      ],
+      owner: ownerIdentityId.valueOf(),
+    });
+  }
+
+  @given('I set json body')
+  public iSetJsonBody(body: string): void {
+    this.body = body;
+  }
+
+  @given('I set header {string} to {string}')
+  public iSetHeaderTo(header: string, value: string): void {
+    this.headers[header] = value;
+  }
+
+  @given('I clear request headers')
+  public iClearRequestHeaders(): void {
+    this.headers = {};
+  }
+
+  @given('I spoof the current node owner identity header')
+  public iSpoofTheCurrentNodeOwnerIdentityHeader(): void {
+    if (!this.ownerIdentityId) {
+      throw new Error('Node owner identity must be initialized first.');
+    }
+
+    this.headers['x-identity-id'] = this.ownerIdentityId.valueOf();
   }
 
   @given('I sign the current keychain publication request')
@@ -2034,7 +2098,9 @@ export default class Definitions {
     await this.signCurrentRequest('GET', '/ipfs/replication/status');
   }
 
-  @given('another identity signs the current content replication status request')
+  @given(
+    'another identity signs the current content replication status request',
+  )
   @given('another identity signs the current IPFS replication status request')
   public async anotherIdentitySignsTheCurrentContentReplicationStatusRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
@@ -2104,10 +2170,10 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequestWithAnExpiredTimestamp(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest(
-	      'GET',
-	      '/conversations/',
-	      String(Date.now() - 31_000),
-	    );
+      'GET',
+      '/conversations/',
+      String(Date.now() - 31_000),
+    );
   }
 
   @given('I sign the current node owner request')
@@ -2395,7 +2461,8 @@ export default class Definitions {
   @given('I set an updated sticker body')
   public iSetAnUpdatedStickerBody(): void {
     this.body = JSON.stringify({
-      assetCid: 'bafkreicupdatedstickerassetcid000000000000000000000000000000000',
+      assetCid:
+        'bafkreicupdatedstickerassetcid000000000000000000000000000000000',
       contentType: 'image/webp',
       dimensions: {
         height: 256,
@@ -2825,18 +2892,15 @@ export default class Definitions {
     this.currentNetworkId = randomUUID();
   }
 
-  @given(
-    'I register a test IPFS network with id {string} and name {string}',
-  )
+  @given('I register a test IPFS network with id {string} and name {string}')
   public async iRegisterATestIPFSNetworkWithIdAndName(
     networkId: string,
     networkName: string,
   ): Promise<void> {
-    this.currentNetworkId =
-      await this.ipfsDefinition.registerTestNetworkWithId(
-        networkId,
-        networkName,
-      );
+    this.currentNetworkId = await this.ipfsDefinition.registerTestNetworkWithId(
+      networkId,
+      networkName,
+    );
   }
 
   @given('I store the following json in IPFS network {string}')
@@ -2871,22 +2935,13 @@ export default class Definitions {
 
   @when('I POST to {string}')
   public async iPOSTTo(path: string): Promise<void> {
-    const isFormData = this.formData !== undefined;
     this.response = await this.restClient.post(
       path,
-      isFormData
-        ? this.formData
-        : (this.binaryBody ?? (this.body && JSON.parse(this.body))),
-      isFormData
-        ? { headers: this.formData?.getHeaders() }
-        : {
-            headers: this.headers,
-          },
+      this.getPostBody(),
+      this.getPostHeaders(),
     );
 
-    if (this.response?.data?.id) {
-      this.createdIdentityId = this.response.data.id;
-    }
+    this.rememberCreatedIdentityFromResponse();
   }
 
   @when('I POST to the current IPFS network')
@@ -3615,7 +3670,9 @@ export default class Definitions {
 
   @then('binary response body should be {string}')
   public binaryResponseBodyShouldBe(expectedBody: string): void {
-    expect(Buffer.from(this.response.data).toString()).to.equal(expectedBody);
+    expect(
+      Buffer.from(this.response.data as unknown as Uint8Array).toString(),
+    ).to.equal(expectedBody);
   }
 
   @then('response body should contain the current call')
@@ -3699,26 +3756,10 @@ export default class Definitions {
       const expectedValue = row[1];
 
       const pathParts = fieldPath.split('.');
-      let actualValue = this.response.data;
+      let actualValue: unknown = this.response.data;
 
       for (const part of pathParts) {
-        if (part.includes('[') && part.includes(']')) {
-          const index = parseInt(
-            part.substring(part.indexOf('[') + 1, part.indexOf(']')),
-            10,
-          );
-
-          // Handle case where path starts with [index] (direct array access)
-          if (part.startsWith('[')) {
-            actualValue = actualValue[index];
-          } else {
-            // Handle case where path is arrayName[index]
-            const arrayName = part.substring(0, part.indexOf('['));
-            actualValue = actualValue[arrayName][index];
-          }
-        } else {
-          actualValue = actualValue[part];
-        }
+        actualValue = this.resolveResponsePath(actualValue, part);
       }
 
       // Convert to string for comparison to handle type differences

@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPublication } from '@app/contexts/identities/domain/IdentityPublication';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { EncryptedMasterKey } from '@app/contexts/identities/domain/value-objects/EncryptedMasterKey';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
@@ -62,8 +63,7 @@ export class IdentityMother {
   public version: IdentityVersion = new IdentityVersion(1);
 
   public previousIdentityExternalIdentifier:
-    | IdentityExternalIdentifier
-    | undefined = undefined;
+    IdentityExternalIdentifier | undefined = undefined;
 
   public withId(id: IdentityId): this {
     this.id = id;
@@ -137,11 +137,13 @@ export class IdentityMother {
       this.encryptedMasterKey,
       this.masterKeyDerivation,
       UniqueObjectArray.fromArray(this.networks),
-      this.profile,
-      this.timestamp,
-      this.signature,
-      this.version,
-      this.previousIdentityExternalIdentifier,
+      new IdentityPublication(
+        this.profile,
+        this.timestamp,
+        this.signature,
+        this.version,
+        this.previousIdentityExternalIdentifier,
+      ),
     );
   }
 }

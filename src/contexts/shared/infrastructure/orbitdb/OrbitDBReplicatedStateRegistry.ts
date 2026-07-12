@@ -652,8 +652,10 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
     networkIds: string[],
     hasSameCachedContent: boolean,
+    force: boolean = false,
   ): boolean {
     return (
+      !force &&
       hasSameCachedContent &&
       this.isPersistedForAllTargetNetworks(key, networkIds)
     );
@@ -675,7 +677,12 @@ export default class OrbitDBReplicatedStateRegistry {
     value: Record<string, unknown>,
     current: Record<string, unknown> | undefined,
     hasSameCachedContent: boolean,
+    force: boolean = false,
   ): Record<string, unknown> | undefined {
+    if (force) {
+      return this.cacheHead(key, value) ?? current;
+    }
+
     return (
       this.cacheHead(key, value) ?? (hasSameCachedContent ? current : undefined)
     );
@@ -1121,8 +1128,9 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
     value: Record<string, unknown>,
     networkIds: string[] = [],
+    force: boolean = false,
   ): void {
-    void this.putHead(key, value, networkIds).catch((error) => {
+    void this.putHead(key, value, networkIds, force).catch((error) => {
       Kernel.logger.warn?.(
         `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
       );
@@ -1133,6 +1141,7 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
     value: Record<string, unknown>,
     networkIds: string[] = [],
+    force: boolean = false,
   ): Promise<void> {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
@@ -1142,7 +1151,7 @@ export default class OrbitDBReplicatedStateRegistry {
       cleanValue,
     );
 
-    if (hasSameCachedContent) {
+    if (!force && hasSameCachedContent) {
       const targetDocument = currentValue ?? cleanValue;
       const skipTargetNetworkIds = await this.targetNetworkIdsForHeadWrite(
         targetDocument,
@@ -1154,6 +1163,7 @@ export default class OrbitDBReplicatedStateRegistry {
           key,
           skipTargetNetworkIds,
           hasSameCachedContent,
+          force,
         )
       ) {
         return;
@@ -1165,6 +1175,7 @@ export default class OrbitDBReplicatedStateRegistry {
       cleanValue,
       currentValue,
       hasSameCachedContent,
+      force,
     );
 
     if (!cachedValue) {

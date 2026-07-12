@@ -1,8 +1,9 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { PrimitiveOf } from '@haskou/value-objects';
 
@@ -18,28 +19,28 @@ describe('OrbitDBCommunityRepository', () => {
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     documents.splice(0);
     heads.clear();
-    communitiesPut = jest.fn(async (document) => {
+    communitiesPut = jest.fn((document) => {
       upsertDocument(documents, document);
 
       return 'ok';
     });
-    headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
+    headsPut = jest.fn((key: string, value: Record<string, unknown>) => {
       heads.set(key, value);
 
       return 'ok';
     });
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register(networkId, {
+    await registry.register(networkId, {
       communities: {
         put: communitiesPut,
-        query: jest.fn(async (matcher) => documents.filter(matcher)),
+        query: jest.fn((matcher) => documents.filter(matcher)),
       },
       heads: {
-        get: jest.fn(async (key: string) => {
+        get: jest.fn((key: string) => {
           const value = heads.get(key);
 
           return value ? { key, value } : undefined;
@@ -105,6 +106,7 @@ describe('OrbitDBCommunityRepository', () => {
       new CommunityChannelName('updates'),
     );
     await repository.save(community);
+    await flushBackgroundTasks();
 
     const byId = await repository.findById(new CommunityId('community-1'));
 
@@ -150,9 +152,9 @@ describe('OrbitDBCommunityRepository', () => {
     expect(
       heads.get(`community-member-index:${identityMother.id.valueOf()}`),
     ).toBeUndefined();
-    await expect(repository.findByMember(identityMother.id)).resolves.toHaveLength(
-      1,
-    );
+    await expect(
+      repository.findByMember(identityMother.id),
+    ).resolves.toHaveLength(1);
 
     delayedMemberIndex.resolve('ok');
     await flushBackgroundTasks();
@@ -207,8 +209,29 @@ describe('OrbitDBCommunityRepository', () => {
     expect(
       byMember
         .find((community) => community.getId().valueOf() === 'community-1')
-        ?.toPrimitives().textChannels.map((channel) => channel.name),
+        ?.toPrimitives()
+        .textChannels.map((channel) => channel.name),
     ).toEqual(['general', 'updates']);
+  });
+
+  it('should expose membership removals before background replication settles', async () => {
+    const memberId = new IdentityId(
+      'MCowBQYDK2VwAyEAe0LjQOVZBAN7CbruJPg6LKFMzEJR4FEbB3ySIDpSVV4=',
+    );
+    const community = Community.fromPrimitives(communityPrimitives());
+
+    community.addMember(identityMother.id, memberId);
+    await repository.save(community);
+
+    community.leave(memberId);
+    await repository.save(community);
+
+    expect(registry.findCachedHead('community:community-1')).toEqual(
+      expect.objectContaining({
+        memberIds: [identityMother.id.valueOf()],
+      }),
+    );
+    await expect(repository.findByMember(memberId)).resolves.toEqual([]);
   });
 
   it('should prefer fresh community heads over stale member indexes on timestamp ties', async () => {
@@ -239,7 +262,8 @@ describe('OrbitDBCommunityRepository', () => {
     expect(
       byMember
         .find((community) => community.getId().valueOf() === 'community-1')
-        ?.toPrimitives().textChannels.map((channel) => channel.name),
+        ?.toPrimitives()
+        .textChannels.map((channel) => channel.name),
     ).toEqual(['general', 'updates']);
   });
 
@@ -373,5 +397,5 @@ function upsertDocument(
     return;
   }
 
-  currentDocuments[existingIndex] = newDocument;
+  currentDocuments.splice(existingIndex, 1, newDocument);
 }

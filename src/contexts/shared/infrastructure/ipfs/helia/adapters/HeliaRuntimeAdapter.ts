@@ -564,8 +564,13 @@ export class HeliaRuntimeAdapter {
     lifetimeMs: number,
   ): Promise<Uint8Array> {
     const ipnsModule = await this.loadIPNSModule();
+    // IPNS and libp2p can resolve different copies of their shared key
+    // interface in an application install. This is the external SDK boundary.
+    const ipnsPrivateKey = privateKey as Parameters<
+      typeof ipnsModule.createIPNSRecord
+    >[0];
     const record = await ipnsModule.createIPNSRecord(
-      privateKey,
+      ipnsPrivateKey,
       value,
       sequence,
       lifetimeMs,

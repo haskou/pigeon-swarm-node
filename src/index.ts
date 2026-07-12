@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import 'module-alias/register';
 import 'reflect-metadata';
 import { applicationConsumers } from '@app/apps/ApplicationConsumers';
@@ -12,64 +11,93 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import '@app/contexts/content-replication/infrastructure/ipfs/IpfsContentStorage';
 import '@app/contexts/identities/infrastructure/ipfs/IpfsIdentityRouting';
 import '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRouting';
+import Kernel from '@haskou/ddd-kernel';
+
+const startupTimers = new Map<string, bigint>();
+
+function startTimer(label: string): void {
+  startupTimers.set(label, process.hrtime.bigint());
+}
+
+function endTimer(label: string): void {
+  const startedAt = startupTimers.get(label);
+
+  if (startedAt === undefined) {
+    return;
+  }
+
+  startupTimers.delete(label);
+  const elapsedMilliseconds =
+    Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+  Kernel.logger.info(`${label}: ${elapsedMilliseconds.toFixed(3)}ms`);
+}
+
+function logInfo(message: string): void {
+  Kernel.logger.info(message);
+}
+
+function logError(message: string, error: unknown): void {
+  const details =
+    error instanceof Error ? error.stack || error.message : String(error);
+  Kernel.logger.error(details ? `${message}: ${details}` : message);
+}
 
 async function init() {
-  console.time('Kernel');
+  startTimer('Kernel');
   const application = new PigeonApplication();
-  console.timeEnd('Kernel');
+  endTimer('Kernel');
 
-  console.time('Environment variables');
+  startTimer('Environment variables');
   application.loadEnvironmentVariables();
-  console.timeEnd('Environment variables');
+  endTimer('Environment variables');
 
-  console.time('Dependency Injection');
+  startTimer('Dependency Injection');
   await application.dependencyInjection();
-  console.timeEnd('Dependency Injection');
+  endTimer('Dependency Injection');
 
   application.configureWebSocketEventHub();
 
-  console.time('Run server');
+  startTimer('Run server');
   await application.runServer();
-  console.timeEnd('Run server');
+  endTimer('Run server');
 
-  console.time('Run consumers');
+  startTimer('Run consumers');
   application.addConsumers(...applicationConsumers);
   await application.runInitializers(...applicationInitializers);
   await application.runConsumers();
-  console.timeEnd('Run consumers');
+  endTimer('Run consumers');
 
-  console.time('Run Schedulers');
+  startTimer('Run Schedulers');
   application.addSchedulers(...recurringSchedulers);
   await application.runSchedulers();
-  console.timeEnd('Run Schedulers');
+  endTimer('Run Schedulers');
 
-  console.time('Logs');
+  startTimer('Logs');
   application.logs();
-  console.timeEnd('Logs');
+  endTimer('Logs');
 
-  console.time('Load local node state');
+  startTimer('Load local node state');
   await application.loadLocalNodeState();
-  console.timeEnd('Load local node state');
+  endTimer('Load local node state');
 
-  console.time('Run runtimes');
+  startTimer('Run runtimes');
   await application.runRuntimes(...applicationRuntimes);
-  console.timeEnd('Run runtimes');
+  endTimer('Run runtimes');
 
-  console.time('Republish local routing records');
+  startTimer('Republish local routing records');
   for (const scheduler of startupSchedulers) {
     await application.runSchedulerNowAndSchedule(scheduler);
   }
-  console.timeEnd('Republish local routing records');
-
-  console.info('Ready!');
+  endTimer('Republish local routing records');
+  logInfo('Ready!');
 }
 
 if (require.main === module) {
   init()
     .then(() => {
-      console.info('Application started');
+      logInfo('Application started');
     })
     .catch((error) => {
-      console.error('Application error', error);
+      logError('Application error', error);
     });
 }
