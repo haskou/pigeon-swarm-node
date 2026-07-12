@@ -3506,17 +3506,18 @@ blockstore-core@^7.0.1:
     it-merge "^3.0.12"
     multiformats "^14.0.0"
 
-blockstore-fs@^3.0.3:
-  version "3.0.3"
-  resolved "https://registry.yarnpkg.com/blockstore-fs/-/blockstore-fs-3.0.3.tgz#e36b3168817430ccddc771aeb4ea001320abca9e"
-  integrity sha512-DW8VzZWuWsggCDLrA9dxE6ZpaFrBYyDaYADF1VdCYfRy8JR/7w+g7lFhj0yCO81ljUmx8ofvw4fKXkcxKxqlBQ==
+blockstore-fs@^4.0.1:
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/blockstore-fs/-/blockstore-fs-4.0.1.tgz#0684f12e4a4d57266809294d9757b47247118db5"
+  integrity sha512-UXTG85jT+b4xumiHwqyZBnAqfxCqGgGl5ZszSGpnje7yEIrv2pO3NzttAz9DHwzaZxE2nBPMaPlg+SJ8VGlPrg==
   dependencies:
-    interface-blockstore "^6.0.0"
-    interface-store "^7.0.0"
+    abort-error "^1.0.2"
+    interface-blockstore "^7.0.0"
+    interface-store "^8.0.0"
     it-glob "^3.0.4"
     it-map "^3.1.4"
     it-parallel-batch "^3.0.9"
-    multiformats "^13.4.2"
+    multiformats "^14.0.0"
     race-signal "^2.0.0"
     steno "^4.0.2"
 
