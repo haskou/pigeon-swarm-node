@@ -4,6 +4,6 @@ export type ContentRetrievalOptions = {
   maxProviders?: number;
   minProviders?: number;
   onProgress?: (event: { detail?: unknown; type: string }) => void;
-  providers?: Array<NonNullable<HeliaUnixfsCatOptions['providers']>[number]>;
+  providers?: HeliaUnixfsCatOptions['providers'];
   signal?: AbortSignal;
 };

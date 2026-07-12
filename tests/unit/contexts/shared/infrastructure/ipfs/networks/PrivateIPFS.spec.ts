@@ -1,4 +1,7 @@
 const mockHeliaNode = {
+  addRouter: jest.fn(),
+  addMixin: jest.fn(),
+  start: jest.fn().mockResolvedValue(undefined),
   datastore: { get: jest.fn(), put: jest.fn() },
   libp2p: {
     addEventListener: jest.fn(),
@@ -11,11 +14,9 @@ const mockHeliaNode = {
 };
 
 const mockCreateHelia = jest.fn().mockResolvedValue(mockHeliaNode);
-const mockBitswap = jest.fn().mockReturnValue('mock-bitswap');
 const mockBootstrap = jest.fn().mockReturnValue('mock-bootstrap');
 const mockFsBlockstore = jest.fn();
 const mockFsDatastore = jest.fn();
-const mockLibp2pRouting = jest.fn().mockReturnValue('mock-libp2p-routing');
 const mockMemoryDatastore = jest.fn();
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockLibp2pDefaults = jest.fn().mockReturnValue({
@@ -25,15 +26,47 @@ const mockLibp2pDefaults = jest.fn().mockReturnValue({
   transports: [],
 });
 const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
+const mockWithHTTP = jest.fn().mockImplementation((helia: unknown) => helia);
 
 jest.mock(
   'helia',
   () => ({
-    createHelia: mockCreateHelia,
-    libp2pDefaults: mockLibp2pDefaults,
+    createHeliaLight: mockCreateHelia,
   }),
   { virtual: true },
 );
+
+jest.mock(
+  '@helia/libp2p',
+  () => ({
+    libp2pDefaults: mockLibp2pDefaults,
+    withLibp2p: jest.fn().mockResolvedValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/bitswap',
+  () => ({
+    withBitswap: jest.fn().mockReturnValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/http',
+  () => ({
+    withHTTP: mockWithHTTP,
+  }),
+  { virtual: true },
+);
+
+jest.mock('@ipld/dag-cbor', () => ({}), { virtual: true });
+jest.mock('@ipld/dag-json', () => ({}), { virtual: true });
+jest.mock('multiformats/codecs/json', () => ({}), { virtual: true });
+jest.mock('multiformats/hashes/sha2', () => ({ sha512: {} }), {
+  virtual: true,
+});
 
 jest.mock(
   'libp2p',
@@ -50,22 +83,6 @@ jest.mock(
       add: jest.fn().mockResolvedValue({ toString: () => 'bafymockcid' }),
       get: jest.fn().mockResolvedValue({ test: true }),
     }),
-  }),
-  { virtual: true },
-);
-
-jest.mock(
-  '@helia/block-brokers',
-  () => ({
-    bitswap: mockBitswap,
-  }),
-  { virtual: true },
-);
-
-jest.mock(
-  '@helia/routers',
-  () => ({
-    libp2pRouting: mockLibp2pRouting,
   }),
   { virtual: true },
 );
@@ -220,6 +237,12 @@ describe('PrivateIPFS', () => {
       expect(result).toBeInstanceOf(PrivateIPFS);
     });
 
+    it('should not configure public HTTP routing or gateways', async () => {
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockWithHTTP).not.toHaveBeenCalled();
+    });
+
     it('should use preSharedKey with the provided key', async () => {
       await PrivateIPFS.create(defaultOptions);
 
@@ -263,12 +286,36 @@ describe('PrivateIPFS', () => {
       ).toBeUndefined();
     });
 
-    it('should pass created libp2p instance to createHelia', async () => {
+    it('should not expose private CIDs to delegated public routers', async () => {
+      mockLibp2pDefaults.mockReturnValueOnce({
+        connectionEncrypters: [],
+        services: {
+          delegatedContentRouting: 'mock-content-routing',
+          delegatedPeerRouting: 'mock-peer-routing',
+          dht: 'mock-dht',
+        },
+        streamMuxers: [],
+        transports: [],
+      });
+
+      await PrivateIPFS.create(defaultOptions);
+
+      const [configuration] = mockCreateLibp2p.mock.calls[0];
+      const services = (configuration as { services: Record<string, unknown> })
+        .services;
+
+      expect(services.dht).toBeUndefined();
+      expect(services.delegatedContentRouting).toBeUndefined();
+      expect(services.delegatedPeerRouting).toBeUndefined();
+    });
+
+    it('should create Helia with the configured storage', async () => {
       await PrivateIPFS.create(defaultOptions);
 
       expect(mockCreateHelia).toHaveBeenCalledWith(
         expect.objectContaining({
-          libp2p: mockHeliaNode.libp2p,
+          blockstore: expect.anything(),
+          datastore: expect.anything(),
         }),
       );
     });

@@ -221,14 +221,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
       options,
       networkKey,
     );
-
     const libp2p = await heliaRuntimeAdapter.createLibp2p(
       libp2pConfig as unknown as HeliaLibp2pConfig,
     );
+
     const heliaCore = await heliaRuntimeAdapter.createPrivateHelia({
-      ...(baseOptions.blockBrokers
-        ? { blockBrokers: baseOptions.blockBrokers }
-        : {}),
+      ...(baseOptions.bitswap ? { bitswap: baseOptions.bitswap } : {}),
       blockstore: baseOptions.blockstore,
       datastore: baseOptions.datastore,
       libp2p,
@@ -338,10 +336,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return services.pubsub;
   }
 
-  private getConnectedPeerIds(): ReturnType<
-    HeliaInstance['libp2p']['getPeers']
+  private getConnectedPeerCids(): Array<
+    ReturnType<ReturnType<HeliaInstance['libp2p']['getPeers']>[number]['toCID']>
   > {
-    return this.heliaCore.libp2p.getPeers?.() || [];
+    return (this.heliaCore.libp2p.getPeers?.() || []).map((peer) =>
+      peer.toCID(),
+    );
   }
 
   private isAsyncIterableBytes(
@@ -393,7 +393,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     NonNullable<ContentRetrievalOptions['providers']>
   > {
     return [
-      ...this.getConnectedPeerIds(),
+      ...this.getConnectedPeerCids(),
       ...(await this.knownRelayProviderMultiaddrs()),
     ];
   }

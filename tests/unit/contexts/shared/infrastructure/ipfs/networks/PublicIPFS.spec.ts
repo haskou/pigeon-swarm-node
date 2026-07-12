@@ -1,6 +1,9 @@
 let peerConnectListeners: Array<(event: Event) => void> = [];
 
 const mockHeliaNode = {
+  addRouter: jest.fn(),
+  addMixin: jest.fn(),
+  start: jest.fn().mockResolvedValue(undefined),
   blockstore: {
     delete: jest.fn(),
     get: jest.fn(),
@@ -65,14 +68,68 @@ const mockUnixfsRm = jest
   .fn()
   .mockResolvedValue({ toString: () => 'bafymockcid' });
 const mockDagPbDecode = jest.fn();
+const mockWithHTTP = jest.fn().mockImplementation((helia: unknown) => helia);
 
 jest.mock(
   'helia',
   () => ({
-    createHelia: mockCreateHelia,
+    createHeliaLight: mockCreateHelia,
   }),
   { virtual: true },
 );
+
+jest.mock(
+  '@helia/libp2p',
+  () => ({
+    libp2pDefaults: jest.fn().mockReturnValue({
+      connectionEncrypters: [],
+      services: {},
+      streamMuxers: [],
+      transports: [],
+    }),
+    withLibp2p: jest.fn().mockResolvedValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/bitswap',
+  () => ({
+    withBitswap: jest.fn().mockReturnValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/http',
+  () => ({
+    withHTTP: mockWithHTTP,
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@libp2p/gossipsub',
+  () => ({
+    gossipsub: jest.fn().mockReturnValue('mock-gossipsub'),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@libp2p/bootstrap',
+  () => ({
+    bootstrap: jest.fn().mockReturnValue('mock-bootstrap'),
+  }),
+  { virtual: true },
+);
+
+jest.mock('@ipld/dag-cbor', () => ({}), { virtual: true });
+jest.mock('@ipld/dag-json', () => ({}), { virtual: true });
+jest.mock('multiformats/codecs/json', () => ({}), { virtual: true });
+jest.mock('multiformats/hashes/sha2', () => ({ sha512: {} }), {
+  virtual: true,
+});
 
 jest.mock(
   '@helia/json',
@@ -231,6 +288,12 @@ describe('PublicIPFS', () => {
       expect(result).toBeInstanceOf(PublicIPFS);
     });
 
+    it('should configure HTTP routing and gateway fallbacks', async () => {
+      await PublicIPFS.create({ storageLocation: 'memory' });
+
+      expect(mockWithHTTP).toHaveBeenCalledWith(mockHeliaNode);
+    });
+
     it('should reuse connection from pool on second call with same options', async () => {
       const options = { storageLocation: 'memory' as const };
 
@@ -344,7 +407,10 @@ describe('PublicIPFS', () => {
       const signal = new AbortController().signal;
 
       mockParseCid.mockReturnValue(parsedCid);
-      mockHeliaNode.libp2p.getPeers.mockReturnValue(['connected-peer']);
+      const connectedPeer = {
+        toCID: jest.fn().mockReturnValue('connected-peer-cid'),
+      };
+      mockHeliaNode.libp2p.getPeers.mockReturnValue([connectedPeer]);
       mockHeliaNode.blockstore.get.mockResolvedValue(new Uint8Array([1, 2, 3]));
 
       const result = await connection.getBytes(
@@ -356,7 +422,7 @@ describe('PublicIPFS', () => {
       expect(mockHeliaNode.blockstore.get).toHaveBeenCalledWith(parsedCid, {
         maxProviders: 1,
         minProviders: 1,
-        providers: ['connected-peer'],
+        providers: ['connected-peer-cid'],
         signal,
       });
       expect(mockHeliaNode.pins.add).not.toHaveBeenCalled();

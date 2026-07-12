@@ -34,7 +34,7 @@ const files = [
       AbortSignal.timeout(timeout ?? DefaultTimeout),
       signal
     ])
-    const providers = ipfs.libp2p?.getPeers?.() || []
+    const providers = (ipfs.libp2p?.getPeers?.() || []).map(peer => peer.toCID())
 
     try {
       const chunks = []
