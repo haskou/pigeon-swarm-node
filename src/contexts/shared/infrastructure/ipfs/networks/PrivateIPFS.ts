@@ -18,15 +18,23 @@ export class PrivateIPFS extends HeliaIPFS {
   public static async create(
     options: PrivateIPFSOptions,
   ): Promise<IPFSConnection> {
-    const optionKey = JSON.stringify(options);
+    const privateNetworkOptions: PrivateIPFSOptions = {
+      ...options,
+      contentRoutingEnabled: false,
+      distributedHashTableEnabled: false,
+    };
+    const optionKey = JSON.stringify(privateNetworkOptions);
 
     if (this.connectionPool[optionKey]) {
-      return new PrivateIPFS(this.connectionPool[optionKey], options);
+      return new PrivateIPFS(
+        this.connectionPool[optionKey],
+        privateNetworkOptions,
+      );
     }
-    const heliaCore = await this.createHeliaCore(options);
+    const heliaCore = await this.createHeliaCore(privateNetworkOptions);
     this.connectionPool[optionKey] = heliaCore;
 
-    return new PrivateIPFS(heliaCore, options);
+    return new PrivateIPFS(heliaCore, privateNetworkOptions);
   }
 
   public async stop(): Promise<void> {

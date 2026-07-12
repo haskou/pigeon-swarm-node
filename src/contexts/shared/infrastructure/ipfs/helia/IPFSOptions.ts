@@ -2,6 +2,8 @@ import type { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPriv
 
 export type IPFSOptions = {
   announceAddresses?: string[];
+  contentRoutingEnabled?: boolean;
+  distributedHashTableEnabled?: boolean;
   enableRelayServer?: boolean;
   listenAddresses?: string[];
   manualRelayMultiaddrs?: string[];
