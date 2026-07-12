@@ -180,6 +180,60 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(discover).not.toHaveBeenCalled();
   });
 
+  it('should retry initial relay record discovery while pubsub peers join', async () => {
+    jest.useFakeTimers();
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    const discover = jest.spyOn(directory, 'discover').mockResolvedValue();
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+
+      expect(discover).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(1_000);
+      await flushPromises();
+
+      expect(discover).toHaveBeenCalledTimes(2);
+
+      jest.advanceTimersByTime(5_000);
+      await flushPromises();
+
+      expect(discover).toHaveBeenCalledTimes(3);
+    } finally {
+      directory.stop(network.getId());
+      jest.useRealTimers();
+    }
+  });
+
+  it('should stop scheduled initial discovery retries with the network', async () => {
+    jest.useFakeTimers();
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    const discover = jest.spyOn(directory, 'discover').mockResolvedValue();
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+
+      directory.stop(network.getId());
+      jest.advanceTimersByTime(21_000);
+      await flushPromises();
+
+      expect(discover).toHaveBeenCalledTimes(1);
+    } finally {
+      directory.stop(network.getId());
+      jest.useRealTimers();
+    }
+  });
+
   it('should retry failed startup relay record publications before the hourly refresh', async () => {
     jest.useFakeTimers();
     const directory = createDirectory(localDatabase);

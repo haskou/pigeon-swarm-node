@@ -23,6 +23,10 @@ export type PrivateRelayListenOptions = {
 };
 
 export default class PrivateNetworkRelayRecordDirectory {
+  private static readonly initialDiscoveryRetryDelaysMs = [
+    1_000, 5_000, 15_000,
+  ];
+
   private static readonly maxCachedRelayRecordDialFailures = 3;
 
   private static readonly relayRecordPubSubTopicPrefix =
@@ -34,6 +38,13 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly discoveryIntervals: Record<
     string,
     ReturnType<typeof setInterval>
+  > = {};
+
+  private readonly discoveryRetryAttempts: Record<string, number> = {};
+
+  private readonly discoveryRetryTimeouts: Record<
+    string,
+    ReturnType<typeof setTimeout>
   > = {};
 
   private readonly publicationIntervals: Record<
@@ -777,6 +788,11 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
+      Kernel.logger.debug(
+        `Private IPFS relay record request received: networkId=${network.getId()}` +
+          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+      );
+
       await publicConnection.publishPubSub(
         this.getRelayRecordTopic(network),
         envelope,
@@ -854,6 +870,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
   ): Promise<void> {
+    Kernel.logger.debug(
+      `Private IPFS relay record requested: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` publicPeers=${publicConnection.getPeers().length}`,
+    );
     await publicConnection.publishPubSub(
       this.getRelayRecordRequestTopic(network),
       '',
@@ -1229,6 +1250,7 @@ export default class PrivateNetworkRelayRecordDirectory {
           ` error=${String(error)}`,
       );
     });
+    this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey);
 
     if (this.discoveryIntervals[networkId]) {
       return;
@@ -1245,6 +1267,48 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     interval.unref?.();
     this.discoveryIntervals[networkId] = interval;
+  }
+
+  private scheduleInitialDiscoveryRetry(
+    network: IPFSNetwork,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+  ): void {
+    const networkId = network.getId();
+
+    if (this.discoveryRetryTimeouts[networkId]) {
+      return;
+    }
+
+    const attempt = this.discoveryRetryAttempts[networkId] || 0;
+    const delay =
+      PrivateNetworkRelayRecordDirectory.initialDiscoveryRetryDelaysMs[attempt];
+
+    if (delay === undefined) {
+      return;
+    }
+
+    this.discoveryRetryAttempts[networkId] = attempt + 1;
+    const timeout = setTimeout(() => {
+      delete this.discoveryRetryTimeouts[networkId];
+
+      if (this.findActiveRelayRecord(network)) {
+        return;
+      }
+
+      this.discover(network, sharedPrivateKey)
+        .catch((error: unknown) => {
+          Kernel.logger.debug(
+            `Private IPFS relay record initial discovery retry crashed: networkId=${networkId}` +
+              ` error=${String(error)}`,
+          );
+        })
+        .finally(() => {
+          this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey);
+        });
+    }, delay);
+
+    timeout.unref?.();
+    this.discoveryRetryTimeouts[networkId] = timeout;
   }
 
   private logDiscoveryDisabled(networkId: string): void {
@@ -1381,6 +1445,14 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.deactivatePublicationGeneration(networkId);
     this.relayRecordEnvelopeCache.delete(networkId);
     delete this.activeRelayDiscoveryAttempts[networkId];
+    delete this.discoveryRetryAttempts[networkId];
+
+    const discoveryRetryTimeout = this.discoveryRetryTimeouts[networkId];
+
+    if (discoveryRetryTimeout) {
+      clearTimeout(discoveryRetryTimeout);
+      delete this.discoveryRetryTimeouts[networkId];
+    }
 
     const interval = this.discoveryIntervals[networkId];
 
