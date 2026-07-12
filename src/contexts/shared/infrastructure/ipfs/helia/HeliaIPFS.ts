@@ -147,26 +147,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     );
   }
 
-  private static async dialManualRelayMultiaddrs(
-    heliaCore: HeliaInstance,
-    networkName: string,
-    multiaddrs: string[] = [],
-  ): Promise<void> {
-    await HeliaIPFS.dialMultiaddrs(
-      heliaCore,
-      networkName,
-      multiaddrs,
-      'configured relay',
-      true,
-    );
-  }
-
   private static async dialMultiaddrs(
     heliaCore: HeliaInstance,
     networkName: string,
     multiaddrs: string[],
     source: string,
-    logAttempts = false,
   ): Promise<void> {
     const dialer = heliaCore.libp2p as unknown as {
       dial?: (address: unknown) => Promise<unknown>;
@@ -183,11 +168,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await Promise.all(
       multiaddrs.map(async (address) => {
         try {
-          if (logAttempts) {
-            Kernel.logger.info(
-              `Private network "${networkName}" connecting to ${source} "${address}"`,
-            );
-          }
           await connectedDialer.dial(
             await heliaRuntimeAdapter.createMultiaddr(address),
           );
@@ -254,12 +234,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
     Kernel.logger.info(
       `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
-    );
-
-    void HeliaIPFS.dialManualRelayMultiaddrs(
-      heliaCore,
-      networkName,
-      options.manualRelayMultiaddrs,
     );
 
     if (options.publicRelayDiscoveryEnabled) {
