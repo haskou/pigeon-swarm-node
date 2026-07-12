@@ -173,6 +173,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       listenAddresses: options.listenAddresses,
       privateKey: options.sharedPrivateKey,
       relayDataLimitBytes: options.relayDataLimitBytes,
+      relayRecordRoutingEnabled: true,
       storageLocation: this.settings.getPublicRelayStorageLocation(),
     }).then(async (connection) => {
       await this.publicRelayDiscovery.startConnection(connection);
@@ -881,6 +882,44 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private async connectToRelayRecordProviders(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    const routingKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
+
+    Kernel.logger.debug(
+      `Private IPFS relay record provider lookup started: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+    );
+    const providerMultiaddrs =
+      await publicConnection.findRecordProviderMultiaddrs(routingKey);
+
+    Kernel.logger.debug(
+      `Private IPFS relay record provider lookup completed: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` providers=${providerMultiaddrs.length}`,
+    );
+
+    await Promise.all(
+      providerMultiaddrs.slice(0, 2).map(async (multiaddr) => {
+        try {
+          await publicConnection.dial(multiaddr);
+          Kernel.logger.debug(
+            `Private IPFS relay record provider connected: networkId=${network.getId()}` +
+              ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+              ` multiaddr="${multiaddr}"`,
+          );
+        } catch (error: unknown) {
+          Kernel.logger.debug(
+            `Private IPFS relay record provider dial skipped: networkId=${network.getId()}` +
+              ` multiaddr="${multiaddr}" error=${String(error)}`,
+          );
+        }
+      }),
+    );
+  }
+
   private async dialDiscoveredPrivateRelay(
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
@@ -1158,6 +1197,15 @@ export default class PrivateNetworkRelayRecordDirectory {
         envelope,
       );
 
+      await publicConnection.provideRecord(
+        PrivateNetworkRelayRecordCodec.lookupKey(network),
+      );
+
+      Kernel.logger.debug(
+        `Private IPFS relay record provider announced: networkId=${network.getId()}` +
+          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+      );
+
       if (!shouldContinue()) {
         return false;
       }
@@ -1349,6 +1397,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
+    await this.connectToRelayRecordProviders(publicConnection, network);
     await this.requestRelayRecord(publicConnection, network);
   }
 

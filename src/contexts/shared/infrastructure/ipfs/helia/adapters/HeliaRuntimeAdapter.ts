@@ -8,6 +8,7 @@ import type * as IpldDagPbModule from '@ipld/dag-pb';
 import type * as CircuitRelayModule from '@libp2p/circuit-relay-v2';
 import type * as GossipsubModule from '@libp2p/gossipsub';
 import type { PrivateKey as Libp2pPrivateKey } from '@libp2p/interface';
+import type * as KadDHTModule from '@libp2p/kad-dht';
 import type { preSharedKey } from '@libp2p/pnet';
 import type { multiaddr } from '@multiformats/multiaddr';
 import type { MemoryBlockstore } from 'blockstore-core';
@@ -63,6 +64,7 @@ export class HeliaRuntimeAdapter {
   >;
 
   private heliaLibp2pModulePromise?: Promise<typeof HeliaLibp2pModule>;
+  private kadDHTModulePromise?: Promise<typeof KadDHTModule>;
   private circuitRelayModulePromise?: Promise<typeof CircuitRelayModule>;
   private heliaModulePromise?: Promise<typeof HeliaCore>;
   private heliaJsonModulePromise?: Promise<typeof import('@helia/json')>;
@@ -127,6 +129,13 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof HeliaLibp2pModule>('@helia/libp2p');
 
     return this.heliaLibp2pModulePromise;
+  }
+
+  private loadKadDHTModule(): Promise<typeof KadDHTModule> {
+    this.kadDHTModulePromise ??=
+      this.nativeImport<typeof KadDHTModule>('@libp2p/kad-dht');
+
+    return this.kadDHTModulePromise;
   }
 
   private loadHeliaUnixfsModule(): Promise<typeof import('@helia/unixfs')> {
@@ -389,6 +398,38 @@ export class HeliaRuntimeAdapter {
       delete config.services.delegatedContentRouting;
       delete config.services.delegatedPeerRouting;
     }
+
+    return defaults;
+  }
+
+  private async withRelayRecordRouting(
+    defaults: Libp2pDefaults,
+  ): Promise<Libp2pDefaults> {
+    const kadDHTModule = await this.loadKadDHTModule();
+    const config = defaults as unknown as {
+      connectionManager?: Record<string, unknown>;
+      services?: Record<string, unknown>;
+    };
+
+    config.connectionManager = {
+      ...(config.connectionManager || {}),
+      maxConnections: 16,
+      maxDialQueueLength: 16,
+      maxIncomingPendingConnections: 4,
+      maxParallelDials: 2,
+    };
+
+    config.services = {
+      ...(config.services || {}),
+      dht: kadDHTModule.kadDHT({
+        clientMode: true,
+        initialQuerySelfInterval: 24 * 60 * 60_000,
+        kBucketSize: 4,
+        querySelfInterval: 24 * 60 * 60_000,
+      }) as unknown,
+    };
+    delete config.services.delegatedContentRouting;
+    delete config.services.delegatedPeerRouting;
 
     return defaults;
   }
@@ -715,6 +756,7 @@ export class HeliaRuntimeAdapter {
     offline?: boolean;
     privateNetwork?: boolean;
     publicBootstrap?: boolean;
+    relayRecordRoutingEnabled?: boolean;
   }): Promise<Libp2pDefaults> {
     const heliaLibp2pModule = await this.loadHeliaLibp2pModule();
     const defaults = this.withoutWebRtcTransports(
@@ -727,11 +769,15 @@ export class HeliaRuntimeAdapter {
 
     const networkDefaults = await this.networkDefaults(defaults, options);
 
-    return this.withGossipsub(
-      options?.distributedHashTableEnabled === false
+    const routingDefaults = options?.relayRecordRoutingEnabled
+      ? await this.withRelayRecordRouting(
+          this.withoutDistributedHashTable(networkDefaults),
+        )
+      : options?.distributedHashTableEnabled === false
         ? this.withoutDistributedHashTable(networkDefaults)
-        : networkDefaults,
-    );
+        : networkDefaults;
+
+    return this.withGossipsub(routingDefaults);
   }
 
   public async createDatastoreKey(path: string): Promise<DatastoreKey> {
