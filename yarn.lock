@@ -794,7 +794,18 @@
   dependencies:
     "@haskou/value-objects" "^2.13.1"
 
-"@haskou/value-objects@2.13.1", "@haskou/value-objects@^2.13.1":
+"@haskou/value-objects@3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-3.0.1.tgz#d62e30c91425f873874f14c0b9c47df643f3a666"
+  integrity sha512-ofPcdZeOsj1lOP+eftkrYJ7jIGGlOYzBNbGuezv6RM0D15G+GFWM4gqxB0iMS1MFR9SYCo6rkQi2hI4779Q+/w==
+  dependencies:
+    "@noble/ciphers" "^2.2.0"
+    "@noble/curves" "^2.2.0"
+    "@noble/hashes" "^2.2.0"
+    buffer "^6.0.3"
+    tslib "^2.8.1"
+
+"@haskou/value-objects@^2.13.1":
   version "2.13.1"
   resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.13.1.tgz#7ceaa3fbea5adf36c161b0b243467abe29ebfb45"
   integrity sha512-stGgWXh3l0Xoj+xyf2wPmEuezc3pS1BxIMH3fl/6p9jx3Asc4KABwHN0eqmQ0o5mpNgaFmER758I4GFf0leLfQ==
@@ -2353,7 +2364,7 @@
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.0.1.tgz#fc1a928061d1232b0a52bb754393c37a5216c89e"
   integrity sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==
 
-"@noble/hashes@2.2.0":
+"@noble/hashes@2.2.0", "@noble/hashes@^2.2.0":
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.2.0.tgz#22da1d16a469954fce877055d559900a6c73b63b"
   integrity sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==
