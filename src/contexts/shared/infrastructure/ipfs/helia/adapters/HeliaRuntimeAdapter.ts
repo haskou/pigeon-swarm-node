@@ -369,13 +369,7 @@ export class HeliaRuntimeAdapter {
     config.peerDiscovery = (config.peerDiscovery || []).slice(0, 1);
 
     if (config.services) {
-      for (const serviceName of [
-        'autoNAT',
-        'autoTLS',
-        'delegatedRouting',
-        'relay',
-        'upnp',
-      ]) {
+      for (const serviceName of ['autoNAT', 'autoTLS', 'relay', 'upnp']) {
         delete config.services[serviceName];
       }
     }
@@ -392,7 +386,8 @@ export class HeliaRuntimeAdapter {
 
     if (config.services) {
       delete config.services.dht;
-      delete config.services.delegatedRouting;
+      delete config.services.delegatedContentRouting;
+      delete config.services.delegatedPeerRouting;
     }
 
     return defaults;

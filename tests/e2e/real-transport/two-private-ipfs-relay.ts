@@ -46,13 +46,12 @@ async function main(): Promise<void> {
 
     provider = await createNode('provider', networkKey, {
       listenAddresses: [`${relayAddress}/p2p-circuit`],
+      manualRelayMultiaddrs: [relayAddress],
     });
     requester = await createNode('requester', networkKey, {
       listenAddresses: [`${relayAddress}/p2p-circuit`],
+      manualRelayMultiaddrs: [relayAddress],
     });
-
-    await provider.connection.dial(relayAddress);
-    await requester.connection.dial(relayAddress);
 
     const providerCircuitAddress = await waitForMultiaddr(
       provider.connection,
@@ -118,6 +117,7 @@ async function createNode(
   options: {
     enableRelayServer?: boolean;
     listenAddresses: string[];
+    manualRelayMultiaddrs?: string[];
     relayDataLimitBytes?: number;
   },
 ): Promise<PrivateIPFSNode> {

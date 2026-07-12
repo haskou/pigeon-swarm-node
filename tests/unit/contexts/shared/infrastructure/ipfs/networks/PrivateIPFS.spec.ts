@@ -18,6 +18,9 @@ const mockBootstrap = jest.fn().mockReturnValue('mock-bootstrap');
 const mockFsBlockstore = jest.fn();
 const mockFsDatastore = jest.fn();
 const mockMemoryDatastore = jest.fn();
+const mockMultiaddr = jest
+  .fn()
+  .mockImplementation((address: string) => ({ toString: () => address }));
 const mockPreSharedKey = jest.fn().mockReturnValue('mock-connection-protector');
 const mockLibp2pDefaults = jest.fn().mockReturnValue({
   connectionEncrypters: [],
@@ -141,6 +144,14 @@ jest.mock(
     CID: {
       parse: jest.fn().mockReturnValue({ toString: () => 'bafymockcid' }),
     },
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@multiformats/multiaddr',
+  () => ({
+    multiaddr: mockMultiaddr,
   }),
   { virtual: true },
 );
@@ -286,6 +297,29 @@ describe('PrivateIPFS', () => {
       ).toBeUndefined();
     });
 
+    it('should not expose private CIDs to delegated public routers', async () => {
+      mockLibp2pDefaults.mockReturnValueOnce({
+        connectionEncrypters: [],
+        services: {
+          delegatedContentRouting: 'mock-content-routing',
+          delegatedPeerRouting: 'mock-peer-routing',
+          dht: 'mock-dht',
+        },
+        streamMuxers: [],
+        transports: [],
+      });
+
+      await PrivateIPFS.create(defaultOptions);
+
+      const [configuration] = mockCreateLibp2p.mock.calls[0];
+      const services = (configuration as { services: Record<string, unknown> })
+        .services;
+
+      expect(services.dht).toBeUndefined();
+      expect(services.delegatedContentRouting).toBeUndefined();
+      expect(services.delegatedPeerRouting).toBeUndefined();
+    });
+
     it('should create Helia with the configured storage', async () => {
       await PrivateIPFS.create(defaultOptions);
 
@@ -298,7 +332,8 @@ describe('PrivateIPFS', () => {
     });
 
     it('should configure manual relay multiaddrs as bootstrap relays', async () => {
-      const multiaddr = '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay';
+      const multiaddr =
+        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWJgsZGNZehLiSQsQUxt8ZUdWfxmtB7QTaBnXeoedwdpKL';
 
       await PrivateIPFS.create({
         ...defaultOptions,
@@ -310,6 +345,27 @@ describe('PrivateIPFS', () => {
           list: [multiaddr],
           tagName: 'pigeon-relay-bootstrap',
         }),
+      );
+    });
+
+    it('should immediately dial manually configured relays', async () => {
+      const multiaddr =
+        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWJgsZGNZehLiSQsQUxt8ZUdWfxmtB7QTaBnXeoedwdpKL';
+
+      await PrivateIPFS.create({
+        ...defaultOptions,
+        manualRelayMultiaddrs: [multiaddr],
+      });
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(mockHeliaNode.libp2p.dial).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toString: expect.any(Function),
+        }),
+      );
+      expect(mockHeliaNode.libp2p.dial.mock.calls[0][0].toString()).toBe(
+        multiaddr,
       );
     });
 
