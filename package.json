@@ -43,7 +43,7 @@
     "@haskou/ddd-kernel": "2.0.6",
     "@haskou/value-objects": "2.13.1",
     "@helia/block-brokers": "^5.2.4",
-    "@helia/json": "^5.1.1",
+    "@helia/json": "^6.0.4",
     "@helia/routers": "^5.1.1",
     "@helia/unixfs": "^7.2.1",
     "@libp2p/bootstrap": "12.0.26",
