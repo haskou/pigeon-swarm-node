@@ -209,9 +209,7 @@ export class HeliaIPFSParser {
         parserOptions,
       )),
       ...(HeliaIPFSParser.usesLimitedConnections(options)
-        ? {
-            blockBrokers: await heliaRuntimeAdapter.createRelayBlockBrokers(),
-          }
+        ? { bitswap: heliaRuntimeAdapter.createRelayBitswapOptions() }
         : {}),
       libp2p: {
         ...libp2pConfig,

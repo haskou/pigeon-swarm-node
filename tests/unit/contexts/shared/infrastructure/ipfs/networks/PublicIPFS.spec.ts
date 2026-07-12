@@ -1,6 +1,9 @@
 let peerConnectListeners: Array<(event: Event) => void> = [];
 
 const mockHeliaNode = {
+  addRouter: jest.fn(),
+  addMixin: jest.fn(),
+  start: jest.fn().mockResolvedValue(undefined),
   blockstore: {
     delete: jest.fn(),
     get: jest.fn(),
@@ -69,10 +72,55 @@ const mockDagPbDecode = jest.fn();
 jest.mock(
   'helia',
   () => ({
-    createHelia: mockCreateHelia,
+    createHeliaLight: mockCreateHelia,
   }),
   { virtual: true },
 );
+
+jest.mock(
+  '@helia/libp2p',
+  () => ({
+    libp2pDefaults: jest.fn().mockReturnValue({
+      connectionEncrypters: [],
+      services: {},
+      streamMuxers: [],
+      transports: [],
+    }),
+    withLibp2p: jest.fn().mockResolvedValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/bitswap',
+  () => ({
+    withBitswap: jest.fn().mockReturnValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@libp2p/gossipsub',
+  () => ({
+    gossipsub: jest.fn().mockReturnValue('mock-gossipsub'),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@libp2p/bootstrap',
+  () => ({
+    bootstrap: jest.fn().mockReturnValue('mock-bootstrap'),
+  }),
+  { virtual: true },
+);
+
+jest.mock('@ipld/dag-cbor', () => ({}), { virtual: true });
+jest.mock('@ipld/dag-json', () => ({}), { virtual: true });
+jest.mock('multiformats/codecs/json', () => ({}), { virtual: true });
+jest.mock('multiformats/hashes/sha2', () => ({ sha512: {} }), {
+  virtual: true,
+});
 
 jest.mock(
   '@helia/json',
@@ -344,7 +392,10 @@ describe('PublicIPFS', () => {
       const signal = new AbortController().signal;
 
       mockParseCid.mockReturnValue(parsedCid);
-      mockHeliaNode.libp2p.getPeers.mockReturnValue(['connected-peer']);
+      const connectedPeer = {
+        toCID: jest.fn().mockReturnValue('connected-peer-cid'),
+      };
+      mockHeliaNode.libp2p.getPeers.mockReturnValue([connectedPeer]);
       mockHeliaNode.blockstore.get.mockResolvedValue(new Uint8Array([1, 2, 3]));
 
       const result = await connection.getBytes(
@@ -356,7 +407,7 @@ describe('PublicIPFS', () => {
       expect(mockHeliaNode.blockstore.get).toHaveBeenCalledWith(parsedCid, {
         maxProviders: 1,
         minProviders: 1,
-        providers: ['connected-peer'],
+        providers: ['connected-peer-cid'],
         signal,
       });
       expect(mockHeliaNode.pins.add).not.toHaveBeenCalled();

@@ -1,7 +1,7 @@
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 
 export default class Libp2pGossipsubRuntimeAdapter {
-  private heliaModulePromise?: Promise<typeof import('helia')>;
+  private heliaLibp2pModulePromise?: Promise<typeof import('@helia/libp2p')>;
   private libp2pModulePromise?: Promise<typeof import('libp2p')>;
   private gossipsubModulePromise?: Promise<typeof import('@libp2p/gossipsub')>;
 
@@ -17,11 +17,11 @@ export default class Libp2pGossipsubRuntimeAdapter {
     return importer(modulePath);
   }
 
-  private loadHeliaModule(): Promise<typeof import('helia')> {
-    this.heliaModulePromise ??=
-      this.nativeImport<typeof import('helia')>('helia');
+  private loadHeliaLibp2pModule(): Promise<typeof import('@helia/libp2p')> {
+    this.heliaLibp2pModulePromise ??=
+      this.nativeImport<typeof import('@helia/libp2p')>('@helia/libp2p');
 
-    return this.heliaModulePromise;
+    return this.heliaLibp2pModulePromise;
   }
 
   private loadLibp2pModule(): Promise<typeof import('libp2p')> {
@@ -63,13 +63,14 @@ export default class Libp2pGossipsubRuntimeAdapter {
   }
 
   public async createNode(): Promise<Libp2pPubSubNode> {
-    const [heliaModule, libp2pModule, gossipsubModule] = await Promise.all([
-      this.loadHeliaModule(),
-      this.loadLibp2pModule(),
-      this.loadGossipsubModule(),
-    ]);
+    const [heliaLibp2pModule, libp2pModule, gossipsubModule] =
+      await Promise.all([
+        this.loadHeliaLibp2pModule(),
+        this.loadLibp2pModule(),
+        this.loadGossipsubModule(),
+      ]);
     const libp2pConfig = this.withoutWebRtcTransports(
-      heliaModule.libp2pDefaults(),
+      heliaLibp2pModule.libp2pDefaults(),
     );
     const configWithServices = libp2pConfig as unknown as {
       services: Record<string, unknown>;

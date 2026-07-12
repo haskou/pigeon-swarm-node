@@ -76,6 +76,7 @@ function configureEnvironment(): void {
   delete process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED;
   delete process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS;
   process.env.IPFS_STORAGE_PATH = path.join(STORAGE_ROOT, 'public-ipfs');
+  process.env.PIGEON_LOCAL_DB_PATH = path.join(STORAGE_ROOT, 'local-db');
   process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH = path.join(
     STORAGE_ROOT,
     'publicRelayRecords.json',
