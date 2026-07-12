@@ -63,7 +63,7 @@
     "express": "^5.2.1",
     "express-winston": "^4.2.0",
     "fs-extra": "^11.3.6",
-    "helia": "^6.1.4",
+    "helia": "^7.1.0",
     "ipns": "11.0.0",
     "level": "^10.0.0",
     "module-alias": "^2.3.4",
