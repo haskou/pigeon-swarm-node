@@ -1,5 +1,6 @@
 import type { BitswapBlockBrokerInit } from '@helia/bitswap';
 import type * as HeliaBitswapModule from '@helia/bitswap';
+import type * as HeliaHttpModule from '@helia/http';
 import type * as HeliaLibp2pModule from '@helia/libp2p';
 import type * as DagCborModule from '@ipld/dag-cbor';
 import type * as DagJsonModule from '@ipld/dag-json';
@@ -54,6 +55,7 @@ export class HeliaRuntimeAdapter {
 
   private bootstrapModulePromise?: Promise<typeof import('@libp2p/bootstrap')>;
   private heliaBitswapModulePromise?: Promise<typeof HeliaBitswapModule>;
+  private heliaHttpModulePromise?: Promise<typeof HeliaHttpModule>;
   private dagCborModulePromise?: Promise<typeof DagCborModule>;
   private dagJsonModulePromise?: Promise<typeof DagJsonModule>;
   private jsonCodecModulePromise?: Promise<
@@ -146,6 +148,13 @@ export class HeliaRuntimeAdapter {
       this.nativeImport<typeof HeliaBitswapModule>('@helia/bitswap');
 
     return this.heliaBitswapModulePromise;
+  }
+
+  private loadHeliaHttpModule(): Promise<typeof HeliaHttpModule> {
+    this.heliaHttpModulePromise ??=
+      this.nativeImport<typeof HeliaHttpModule>('@helia/http');
+
+    return this.heliaHttpModulePromise;
   }
 
   private loadDagCborModule(): Promise<typeof DagCborModule> {
@@ -548,12 +557,14 @@ export class HeliaRuntimeAdapter {
     options: Parameters<typeof HeliaCore.createHelia>[0] & {
       libp2p?: HeliaLibp2pConfig | Awaited<ReturnType<typeof createLibp2p>>;
       bitswap?: BitswapBlockBrokerInit;
+      http?: boolean;
     },
   ): Promise<HeliaInstance> {
     const [
       heliaModule,
       heliaLibp2pModule,
       heliaBitswapModule,
+      heliaHttpModule,
       dagCborModule,
       dagJsonModule,
       jsonCodecModule,
@@ -562,13 +573,14 @@ export class HeliaRuntimeAdapter {
       this.loadHeliaModule(),
       this.loadHeliaLibp2pModule(),
       this.loadHeliaBitswapModule(),
+      this.loadHeliaHttpModule(),
       this.loadDagCborModule(),
       this.loadDagJsonModule(),
       this.loadJsonCodecModule(),
       this.loadSha2Module(),
     ]);
-    const { bitswap, libp2p, ...heliaOptions } = options;
-    const helia = await heliaModule.createHeliaLight({
+    const { bitswap, http = true, libp2p, ...heliaOptions } = options;
+    const heliaLight = await heliaModule.createHeliaLight({
       ...heliaOptions,
       codecs: [
         dagCborModule,
@@ -578,6 +590,8 @@ export class HeliaRuntimeAdapter {
       ],
       hashers: [sha2Module.sha512, ...(heliaOptions.hashers ?? [])],
     } as Parameters<typeof HeliaCore.createHelia>[0]);
+
+    const helia = http ? heliaHttpModule.withHTTP(heliaLight) : heliaLight;
 
     if (!libp2p) {
       throw new Error('Helia requires a libp2p configuration.');
@@ -602,7 +616,7 @@ export class HeliaRuntimeAdapter {
     libp2p: HeliaLibp2pConfig | Awaited<ReturnType<typeof createLibp2p>>;
     bitswap?: BitswapBlockBrokerInit;
   }): Promise<HeliaInstance> {
-    return this.createHelia(options);
+    return this.createHelia({ ...options, http: false });
   }
 
   public async createLibp2p(

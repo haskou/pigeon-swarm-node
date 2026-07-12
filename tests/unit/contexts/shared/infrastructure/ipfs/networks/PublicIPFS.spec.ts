@@ -68,6 +68,7 @@ const mockUnixfsRm = jest
   .fn()
   .mockResolvedValue({ toString: () => 'bafymockcid' });
 const mockDagPbDecode = jest.fn();
+const mockWithHTTP = jest.fn().mockImplementation((helia: unknown) => helia);
 
 jest.mock(
   'helia',
@@ -95,6 +96,14 @@ jest.mock(
   '@helia/bitswap',
   () => ({
     withBitswap: jest.fn().mockReturnValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/http',
+  () => ({
+    withHTTP: mockWithHTTP,
   }),
   { virtual: true },
 );
@@ -277,6 +286,12 @@ describe('PublicIPFS', () => {
       const result = await PublicIPFS.create(options);
 
       expect(result).toBeInstanceOf(PublicIPFS);
+    });
+
+    it('should configure HTTP routing and gateway fallbacks', async () => {
+      await PublicIPFS.create({ storageLocation: 'memory' });
+
+      expect(mockWithHTTP).toHaveBeenCalledWith(mockHeliaNode);
     });
 
     it('should reuse connection from pool on second call with same options', async () => {

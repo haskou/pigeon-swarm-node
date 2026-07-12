@@ -43,6 +43,7 @@
     "@haskou/ddd-kernel": "2.0.6",
     "@haskou/value-objects": "3.0.1",
     "@helia/bitswap": "^4.0.6",
+    "@helia/http": "^4.0.5",
     "@helia/libp2p": "^1.0.6",
     "@helia/json": "^6.0.4",
     "@helia/unixfs": "^8.0.4",

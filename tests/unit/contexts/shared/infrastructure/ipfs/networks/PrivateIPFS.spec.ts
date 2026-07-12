@@ -26,6 +26,7 @@ const mockLibp2pDefaults = jest.fn().mockReturnValue({
   transports: [],
 });
 const mockCreateLibp2p = jest.fn().mockResolvedValue(mockHeliaNode.libp2p);
+const mockWithHTTP = jest.fn().mockImplementation((helia: unknown) => helia);
 
 jest.mock(
   'helia',
@@ -48,6 +49,14 @@ jest.mock(
   '@helia/bitswap',
   () => ({
     withBitswap: jest.fn().mockReturnValue(mockHeliaNode),
+  }),
+  { virtual: true },
+);
+
+jest.mock(
+  '@helia/http',
+  () => ({
+    withHTTP: mockWithHTTP,
   }),
   { virtual: true },
 );
@@ -226,6 +235,12 @@ describe('PrivateIPFS', () => {
       const result = await PrivateIPFS.create(defaultOptions);
 
       expect(result).toBeInstanceOf(PrivateIPFS);
+    });
+
+    it('should not configure public HTTP routing or gateways', async () => {
+      await PrivateIPFS.create(defaultOptions);
+
+      expect(mockWithHTTP).not.toHaveBeenCalled();
     });
 
     it('should use preSharedKey with the provided key', async () => {
