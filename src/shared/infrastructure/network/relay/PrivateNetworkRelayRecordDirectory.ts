@@ -1,3 +1,5 @@
+import type { Dirent } from 'fs';
+
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { libp2pKeyAdapter } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/types/Libp2pPrivateKeyLike';
@@ -6,6 +8,7 @@ import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/Pu
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
 import * as fs from 'fs/promises';
+import path from 'path';
 
 import PrivateNetworkRelayDirectorySettings from './PrivateNetworkRelayDirectorySettings';
 import { PrivateNetworkRelayRecord } from './PrivateNetworkRelayRecord';
@@ -170,10 +173,23 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
-    await fs.rm(this.settings.getPublicRelayStorageLocation(), {
-      force: true,
-      recursive: true,
-    });
+    const storageLocation = this.settings.getPublicRelayStorageLocation();
+    const entries = await fs
+      .readdir(storageLocation, {
+        withFileTypes: true,
+      })
+      .catch((): Dirent[] => []);
+
+    await Promise.all(
+      entries
+        .filter((entry) => entry.name !== 'blockedPeers.json')
+        .map((entry) =>
+          fs.rm(path.join(storageLocation, entry.name), {
+            force: true,
+            recursive: true,
+          }),
+        ),
+    );
     this.publicConnectionStoragePrepared = true;
   }
 
