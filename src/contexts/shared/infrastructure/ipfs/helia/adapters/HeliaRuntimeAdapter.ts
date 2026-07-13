@@ -565,7 +565,6 @@ export class HeliaRuntimeAdapter {
       bootstrapModule.bootstrap({
         list: bootstrapMultiaddrs,
         tagName: 'pigeon-public-bootstrap',
-        tagTTL: Infinity,
       }),
     ];
 
@@ -657,7 +656,6 @@ export class HeliaRuntimeAdapter {
       bootstrapModule.bootstrap({
         list: relayMultiaddrs,
         tagName: 'pigeon-relay-bootstrap',
-        tagTTL: Infinity,
       }),
     ];
 

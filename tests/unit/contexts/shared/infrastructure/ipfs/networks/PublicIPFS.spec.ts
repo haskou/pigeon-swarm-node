@@ -75,6 +75,7 @@ const mockMemoryBlockstore = jest.fn();
 const mockFsBlockstore = jest.fn();
 const mockMemoryDatastore = jest.fn();
 const mockFsDatastore = jest.fn();
+const mockBootstrap = jest.fn().mockReturnValue('mock-bootstrap');
 
 jest.mock(
   'helia',
@@ -125,7 +126,7 @@ jest.mock(
 jest.mock(
   '@libp2p/bootstrap',
   () => ({
-    bootstrap: jest.fn().mockReturnValue('mock-bootstrap'),
+    bootstrap: mockBootstrap,
   }),
   { virtual: true },
 );
@@ -351,6 +352,18 @@ describe('PublicIPFS', () => {
       expect(Kernel.logger.info).toHaveBeenCalledWith(
         expect.stringContaining('mock-peer-id'),
       );
+    });
+
+    it('should configure valid permanent public bootstrap tags', async () => {
+      await PublicIPFS.create({ storageLocation: '/tmp/public-ipfs' });
+
+      expect(mockBootstrap).toHaveBeenCalledWith(
+        expect.objectContaining({
+          list: expect.any(Array),
+          tagName: 'pigeon-public-bootstrap',
+        }),
+      );
+      expect(mockBootstrap.mock.calls[0][0]).not.toHaveProperty('tagTTL');
     });
   });
 

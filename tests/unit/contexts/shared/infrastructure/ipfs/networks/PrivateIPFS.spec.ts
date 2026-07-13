@@ -334,6 +334,7 @@ describe('PrivateIPFS', () => {
           tagName: 'pigeon-relay-bootstrap',
         }),
       );
+      expect(mockBootstrap.mock.calls[0][0]).not.toHaveProperty('tagTTL');
     });
 
     it('should not configure public bootstrap peers for filesystem private networks', async () => {
