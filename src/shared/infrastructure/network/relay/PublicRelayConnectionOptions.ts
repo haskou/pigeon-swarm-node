@@ -4,6 +4,7 @@ export type PublicRelayConnectionOptions = {
   announceAddresses?: string[];
   enableRelayServer: boolean;
   listenAddresses?: string[];
+  localAddressRoutingEnabled?: boolean;
   relayDataLimitBytes: number;
   sharedPrivateKey: Libp2pPrivateKeyLike;
 };

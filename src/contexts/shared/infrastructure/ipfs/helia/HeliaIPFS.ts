@@ -1137,7 +1137,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
         throw new Error('No public IPFS peers available for DHT provide.');
       }
 
-      await this.heliaCore.routing.provide(cid, {
+      await this.heliaCore.libp2p.contentRouting.provide(cid, {
         signal: routingAbort.signal,
       });
 
@@ -1171,9 +1171,12 @@ export abstract class HeliaIPFS implements IPFSConnection {
         throw new Error('No public IPFS peers available for DHT providers.');
       }
 
-      for await (const provider of this.heliaCore.routing.findProviders(cid, {
-        signal: routingAbort.signal,
-      })) {
+      for await (const provider of this.heliaCore.libp2p.contentRouting.findProviders(
+        cid,
+        {
+          signal: routingAbort.signal,
+        },
+      )) {
         multiaddrs.push(...this.providerMultiaddrWithPeerId(provider));
       }
     } catch (error: unknown) {

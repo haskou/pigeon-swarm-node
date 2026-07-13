@@ -450,13 +450,21 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.waitForPeers).not.toHaveBeenCalled();
   });
 
-  it('should connect routed relay providers before requesting a relay record', async () => {
+  it('should connect routed private relay providers through the private network', async () => {
     const directory = createDirectory(localDatabase);
-    const network = privateNetwork(privateKey());
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWLeaf',
+    );
     const publicConnection = mock<IPFSConnection>();
     const providerMultiaddr =
       '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
 
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.listen.mockResolvedValue(undefined);
     publicConnection.dial.mockResolvedValue(undefined);
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
       providerMultiaddr,
@@ -476,16 +484,49 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.findRecordProviderMultiaddrs).toHaveBeenCalledWith(
       PrivateNetworkRelayRecordCodec.lookupKey(network),
     );
-    expect(publicConnection.dial).toHaveBeenCalledWith(
+    expect(privateConnection.dial).toHaveBeenCalledWith(
       providerMultiaddr,
+      expect.any(AbortSignal),
+    );
+    expect(publicConnection.dial).not.toHaveBeenCalled();
+    expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
+  });
+
+  it('should request a relay record when routed private relay dials fail', async () => {
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+
+    privateConnection.dial.mockRejectedValue(new Error('private dial failed'));
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.getPeers.mockReturnValue([]);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
+      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+    ]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    (
+      directory as unknown as {
+        getPublicConnection: () => Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    await directory.discover(network, mock());
+
+    expect(publicConnection.dial).toHaveBeenCalledWith(
+      expect.stringContaining('relay.example.com'),
       expect.any(AbortSignal),
     );
     expect(publicConnection.publishPubSub).toHaveBeenCalledWith(
       expect.stringContaining('.request'),
       '',
-    );
-    expect(publicConnection.dial.mock.invocationCallOrder[0]).toBeLessThan(
-      publicConnection.publishPubSub.mock.invocationCallOrder[0],
     );
   });
 
@@ -694,7 +735,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       PrivateNetworkRelayRecordDirectory.relayRecordCacheNamespace,
       network.getId(),
     );
-    expect(getPublicConnection).toHaveBeenCalled();
+    expect(getPublicConnection).not.toHaveBeenCalled();
     expect(privateConnection.dial).toHaveBeenCalledWith(
       relayRecord.multiaddrs[0],
       expect.any(AbortSignal),

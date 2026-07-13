@@ -239,7 +239,7 @@ The node-to-node discovery protocol is documented in
 
 ### Dependency compatibility patches
 
-`yarn` runs three idempotent compatibility patches from `postinstall`. They
+`yarn` runs four idempotent compatibility patches from `postinstall`. They
 modify installed dependency files only; application source remains independent
 of those implementation details.
 
@@ -248,6 +248,7 @@ of those implementation details.
 | `patch-helia-bitswap-limited-connections.js` | Makes Bitswap reuse an existing circuit connection and allow its queues, dials and topology notifications on limited relay connections. | A private node must be able to exchange UnixFS blocks through `/p2p-circuit` without opening a second stream that the relay rejects. |
 | `patch-orbitdb-limited-connections.js` | Lets OrbitDB fetch blocks from already-connected peers and exchange heads through limited relay connections. | OrbitDB replication must work for nodes that can only reach each other through a circuit relay. |
 | `patch-libp2p-kad-dht-routing-table.js` | Replaces recursive Kademlia routing-table traversal with an iterative traversal that ignores already-visited buckets. | Public IPFS still uses Kademlia for content routing. The patch prevents a malformed or cyclic routing table from monopolizing the Node main thread. Private IPFS and private-relay discovery do not run Kademlia. |
+| `patch-libp2p-progress-dispatch.js` | Deduplicates each progress event across the complete graph of joined libp2p queue jobs. | `@libp2p/utils@7.2.4` prevents direct re-entry into one job, but branching Kademlia dial graphs can still deliver one event exponentially and monopolize the Node main thread. The workaround extends the upstream fix from [libp2p/js-libp2p#3485](https://github.com/libp2p/js-libp2p/pull/3485) until the full graph case is fixed upstream. |
 
 The scripts intentionally fail when an upstream dependency changes its source
 shape without already containing the expected correction. Treat that failure as

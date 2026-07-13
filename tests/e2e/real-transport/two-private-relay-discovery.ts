@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
+import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
+import { libp2pKeyAdapter } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
+import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { generateKeyPairSync, randomUUID } from 'crypto';
 import fs from 'fs-extra';
@@ -40,6 +43,8 @@ type RelayReadyEvent = InstanceEvent & {
   cid: string;
   peerId: string;
   pid: number;
+  publicProviderAddress: string;
+  publicProviderPeerId: string;
   sha256: string;
 };
 
@@ -71,6 +76,9 @@ class E2EInstanceProcess {
     readline.createInterface({ input: child.stderr }).on('line', (line) => {
       this.stderrLines.push(line);
       this.stderrLines.splice(0, Math.max(0, this.stderrLines.length - 80));
+    });
+    child.stdin.on('error', (error) => {
+      this.stderrLines.push(`stdin error: ${String(error)}`);
     });
     child.once('exit', (code, signal) => {
       this.exited = { code, signal };
@@ -171,6 +179,10 @@ class E2EInstanceProcess {
   }
 
   public send(command: Record<string, unknown>): void {
+    if (this.child.stdin.destroyed || this.child.stdin.writableEnded) {
+      return;
+    }
+
     this.child.stdin.write(`${JSON.stringify(command)}\n`);
   }
 
@@ -190,22 +202,47 @@ class E2EInstanceProcess {
       this.child.kill('SIGTERM');
     }
   }
+
+  public diagnostics(): string {
+    return this.stderrTail();
+  }
 }
 
 async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
   const networkKey = generateNetworkKey();
+  let bootstraps: IPFSConnection[] = [];
+  let completed = false;
   let relay: E2EInstanceProcess | undefined;
   let leaf: E2EInstanceProcess | undefined;
 
   try {
-    relay = spawnInstance('relay', networkKey);
+    bootstraps = await Promise.all(
+      Array.from({ length: 4 }, () => createPublicBootstrap()),
+    );
+    const bootstrapAddress = (
+      await Promise.all(bootstraps.map(waitForPublicMultiaddr))
+    ).join(',');
+    relay = spawnInstance('relay', networkKey, { bootstrapAddress });
     const relayReady = (await relay.waitFor(
       'relay-ready',
       (event) => event.type === 'relay-ready',
     )) as RelayReadyEvent;
 
+    if (relayReady.advertisedRelayAddress === relayReady.publicProviderAddress) {
+      throw new Error(
+        'False-positive guard failed: public provider and private relay addresses are equal.',
+      );
+    }
+
+    if (relayReady.peerId === relayReady.publicProviderPeerId) {
+      throw new Error(
+        'False-positive guard failed: public provider and private relay peer IDs are equal.',
+      );
+    }
+
     leaf = spawnInstance('leaf', networkKey, {
+      bootstrapAddress,
       PRIVATE_RELAY_DISCOVERY_E2E_EXPECTED_RELAY_PEER_ID: relayReady.peerId,
     });
     await leaf.waitFor('leaf-ready', (event) => event.type === 'leaf-ready');
@@ -224,9 +261,16 @@ async function main(): Promise<void> {
     await assertNoPreDiscoveryPubSub(relay, leaf);
 
     leaf.send({
+      publicProviderPeerId: relayReady.publicProviderPeerId,
       relayPeerId: relayReady.peerId,
       type: 'start-discovery',
     });
+    await leaf.waitFor(
+      'public provider false-positive guard',
+      (event) =>
+        event.type === 'public-provider-pre-discovery-ok' &&
+        event.publicProviderPeerId === relayReady.publicProviderPeerId,
+    );
     await leaf.waitFor(
       'private relay discovery',
       (event) =>
@@ -251,6 +295,7 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           advertisedRelayAddress: relayReady.advertisedRelayAddress,
+          advertisedProviderAddress: relayReady.publicProviderAddress,
           leafPid: await pidOf(leaf),
           networkId: NETWORK_ID,
           relayPeerId: relayReady.peerId,
@@ -263,9 +308,35 @@ async function main(): Promise<void> {
         2,
       ),
     );
+    completed = true;
   } finally {
+    if (!completed) {
+      process.stderr.write(`relay diagnostics:\n${relay?.diagnostics() || ''}\n`);
+    }
     await Promise.allSettled([leaf?.stop(), relay?.stop()]);
-    await fs.remove(TMP_ROOT);
+    await Promise.race([
+      Promise.allSettled(bootstraps.map((bootstrap) => bootstrap.stop())),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+    await removeTemporaryRoot();
+  }
+}
+
+async function removeTemporaryRoot(): Promise<void> {
+  const attempts = 10;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await fs.remove(TMP_ROOT);
+
+      return;
+    } catch (error) {
+      if (attempt === attempts) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 }
 
@@ -444,8 +515,9 @@ async function assertOrbitDBReplication(
 function spawnInstance(
   role: InstanceRole,
   networkKey: string,
-  extraEnv: NodeJS.ProcessEnv = {},
+  options: NodeJS.ProcessEnv & { bootstrapAddress: string },
 ): E2EInstanceProcess {
+  const { bootstrapAddress, ...extraEnv } = options;
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...extraEnv,
@@ -457,14 +529,13 @@ function spawnInstance(
     PRIVATE_RELAY_DISCOVERY_E2E_RUN_ID: RUN_ID,
     PRIVATE_RELAY_DISCOVERY_E2E_STORAGE_ROOT: path.join(TMP_ROOT, role),
     PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS: '15000',
+    PIGEON_PUBLIC_BOOTSTRAP_ENABLED: 'true',
+    PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS: bootstrapAddress,
     PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS: '2000',
     PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS: '10000',
     PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS: '2000',
     PIGEON_RELAY_RECORD_TTL_MS: '600000',
   };
-
-  delete env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED;
-  delete env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS;
 
   const child = spawn(
     TSX_BIN,
@@ -477,6 +548,42 @@ function spawnInstance(
   );
 
   return new E2EInstanceProcess(role, child);
+}
+
+async function createPublicBootstrap(): Promise<IPFSConnection> {
+  return PublicIPFS.create({
+    distributedHashTableServerEnabled: true,
+    listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
+    localAddressRoutingEnabled: true,
+    localPeerDiscoveryEnabled: false,
+    privateKey: await libp2pKeyAdapter.generateEd25519KeyPair(),
+    storageLocation: path.join(TMP_ROOT, `bootstrap-${randomUUID()}`),
+  });
+}
+
+async function waitForPublicMultiaddr(
+  connection: IPFSConnection,
+): Promise<string> {
+  const deadline = Date.now() + WAIT_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const address = connection
+      .getMultiaddrs()
+      .find(
+        (candidate) =>
+          candidate.includes('/ip4/127.0.0.1/') &&
+          candidate.includes('/tcp/') &&
+          !candidate.includes('/p2p-circuit'),
+      );
+
+    if (address) {
+      return address;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error('Timed out waiting for the public DHT bootstrap multiaddr.');
 }
 
 async function pidOf(
