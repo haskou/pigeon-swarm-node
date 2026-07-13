@@ -813,7 +813,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const publicConnection = mock<IPFSConnection>();
     const sharedPrivateKey = {} as Libp2pPrivateKeyLike;
     const createPublicConnection = jest
-      .spyOn(PublicIPFS, 'create')
+      .spyOn(PublicIPFS, 'createRoutingConnection')
       .mockResolvedValue(publicConnection);
     const options = {
       enableRelayServer: true,

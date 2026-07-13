@@ -11,21 +11,36 @@ export class PublicIPFS extends HeliaIPFS {
     const optionKey = JSON.stringify(options);
 
     if (this.connectionPool[optionKey]) {
-      return new PublicIPFS(this.connectionPool[optionKey], options);
+      return new PublicIPFS(this.connectionPool[optionKey], options, optionKey);
     }
     const heliaCore = await HeliaIPFS.createPublicHeliaCore(options);
 
     this.connectionPool[optionKey] = heliaCore;
 
+    return new PublicIPFS(heliaCore, options, optionKey);
+  }
+
+  public static async createRoutingConnection(
+    options: IPFSOptions,
+  ): Promise<IPFSConnection> {
+    const heliaCore = await HeliaIPFS.createPublicRoutingHeliaCore(options);
+
     return new PublicIPFS(heliaCore, options);
   }
 
-  constructor(core: HeliaInstance, options: IPFSOptions) {
+  constructor(
+    core: HeliaInstance,
+    options: IPFSOptions,
+    private readonly connectionPoolKey?: string,
+  ) {
     super(core, options);
   }
 
   public async stop(): Promise<void> {
     await super.stop();
-    delete PublicIPFS.connectionPool[JSON.stringify(this.options)];
+
+    if (this.connectionPoolKey) {
+      delete PublicIPFS.connectionPool[this.connectionPoolKey];
+    }
   }
 }

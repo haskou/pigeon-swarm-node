@@ -4,6 +4,7 @@ const mockHeliaNode = {
   addRouter: jest.fn(),
   addMixin: jest.fn(),
   start: jest.fn().mockResolvedValue(undefined),
+  stop: jest.fn().mockResolvedValue(undefined),
   blockstore: {
     delete: jest.fn(),
     get: jest.fn(),
@@ -69,6 +70,11 @@ const mockUnixfsRm = jest
   .mockResolvedValue({ toString: () => 'bafymockcid' });
 const mockDagPbDecode = jest.fn();
 const mockWithHTTP = jest.fn().mockImplementation((helia: unknown) => helia);
+const mockWithBitswap = jest.fn().mockImplementation((helia: unknown) => helia);
+const mockMemoryBlockstore = jest.fn();
+const mockFsBlockstore = jest.fn();
+const mockMemoryDatastore = jest.fn();
+const mockFsDatastore = jest.fn();
 
 jest.mock(
   'helia',
@@ -95,7 +101,7 @@ jest.mock(
 jest.mock(
   '@helia/bitswap',
   () => ({
-    withBitswap: jest.fn().mockReturnValue(mockHeliaNode),
+    withBitswap: mockWithBitswap,
   }),
   { virtual: true },
 );
@@ -189,7 +195,7 @@ jest.mock(
 jest.mock(
   'blockstore-core',
   () => ({
-    MemoryBlockstore: jest.fn(),
+    MemoryBlockstore: mockMemoryBlockstore,
   }),
   { virtual: true },
 );
@@ -197,7 +203,7 @@ jest.mock(
 jest.mock(
   'blockstore-fs',
   () => ({
-    FsBlockstore: jest.fn(),
+    FsBlockstore: mockFsBlockstore,
   }),
   { virtual: true },
 );
@@ -205,7 +211,7 @@ jest.mock(
 jest.mock(
   'datastore-core',
   () => ({
-    MemoryDatastore: jest.fn(),
+    MemoryDatastore: mockMemoryDatastore,
   }),
   { virtual: true },
 );
@@ -213,7 +219,7 @@ jest.mock(
 jest.mock(
   'datastore-fs',
   () => ({
-    FsDatastore: jest.fn(),
+    FsDatastore: mockFsDatastore,
   }),
   { virtual: true },
 );
@@ -292,6 +298,33 @@ describe('PublicIPFS', () => {
       await PublicIPFS.create({ storageLocation: 'memory' });
 
       expect(mockWithHTTP).toHaveBeenCalledWith(mockHeliaNode);
+    });
+
+    it('should create an ephemeral routing connection without block brokers', async () => {
+      const result = await PublicIPFS.createRoutingConnection({
+        storageLocation: '/tmp/public-relay-record-directory',
+      });
+
+      expect(result).toBeInstanceOf(PublicIPFS);
+      expect(mockMemoryBlockstore).toHaveBeenCalledTimes(1);
+      expect(mockMemoryDatastore).toHaveBeenCalledTimes(1);
+      expect(mockFsBlockstore).not.toHaveBeenCalled();
+      expect(mockFsDatastore).not.toHaveBeenCalled();
+      expect(mockWithHTTP).not.toHaveBeenCalled();
+      expect(mockWithBitswap).not.toHaveBeenCalled();
+      expect(mockHeliaNode.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not evict a content connection when a routing connection stops', async () => {
+      const options = { storageLocation: 'memory' as const };
+
+      await PublicIPFS.create(options);
+      const routingConnection =
+        await PublicIPFS.createRoutingConnection(options);
+      await routingConnection.stop();
+      await PublicIPFS.create(options);
+
+      expect(mockCreateHelia).toHaveBeenCalledTimes(2);
     });
 
     it('should reuse connection from pool on second call with same options', async () => {

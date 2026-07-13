@@ -207,6 +207,26 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return heliaCore;
   }
 
+  public static async createPublicRoutingHeliaCore(
+    options: IPFSOptions,
+  ): Promise<HeliaInstance> {
+    const parsedOptions = await HeliaIPFSParser.parseOptions(options, {
+      persistentBlockstore: false,
+      persistentDatastore: false,
+    });
+    const heliaCore = await heliaRuntimeAdapter.createRoutingHelia({
+      blockstore: parsedOptions.blockstore,
+      datastore: parsedOptions.datastore,
+      libp2p: parsedOptions.libp2p,
+    });
+
+    Kernel.logger.info(
+      `Started public routing network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
+    );
+
+    return heliaCore;
+  }
+
   public static async createPrivateHeliaCore(
     options: IPFSOptions,
     networkKey: NetworkPrivateKey,

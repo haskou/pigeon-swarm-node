@@ -19,6 +19,7 @@ export class HeliaIPFSParser {
   private static async parseStorageLocationOptions(
     options: IPFSOptions,
     parserOptions?: {
+      persistentBlockstore?: boolean;
       persistentDatastore?: boolean;
     },
   ): Promise<{
@@ -33,9 +34,12 @@ export class HeliaIPFSParser {
     }
 
     return {
-      blockstore: await heliaRuntimeAdapter.createFsBlockstore(
-        `${options.storageLocation}/blockstore`,
-      ),
+      blockstore:
+        parserOptions?.persistentBlockstore === false
+          ? await heliaRuntimeAdapter.createMemoryBlockstore()
+          : await heliaRuntimeAdapter.createFsBlockstore(
+              `${options.storageLocation}/blockstore`,
+            ),
       datastore:
         parserOptions?.persistentDatastore === false
           ? await heliaRuntimeAdapter.createMemoryDatastore()
@@ -180,6 +184,7 @@ export class HeliaIPFSParser {
   public static async parseOptions(
     options: IPFSOptions,
     parserOptions?: {
+      persistentBlockstore?: boolean;
       privateNetwork?: boolean;
       persistentDatastore?: boolean;
       publicBootstrap?: boolean;

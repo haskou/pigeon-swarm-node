@@ -167,7 +167,8 @@ Operational rules:
   publish an encrypted private relay record through a private-network-scoped
   gossipsub topic;
 - a node requesting that topic receives the current encrypted relay record from
-  an active relay without querying the public DHT;
+  an active relay over gossipsub; a synthetic CID may be announced and queried
+  in the public DHT only to locate the provider peer and has no block payload;
 - the relay topic suffix and encrypted payload are derived from the private
   network key, so nodes outside the private network cannot read the relay
   multiaddrs;
@@ -175,6 +176,9 @@ Operational rules:
   discover private relay records when `privateRelay.discoveryEnabled` is true,
   and can always use `manualRelayMultiaddrs` as an explicit fallback;
 - CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
+- the public relay-record connection runs DHT, gossipsub and circuit-relay
+  transport without HTTP/Bitswap block brokers or persistent block stores, so
+  public wantlists cannot turn it into a content cache;
 - Helia/Bitswap is patched during install so private relay limited connections
   can transfer blocks through `/p2p-circuit`.
 

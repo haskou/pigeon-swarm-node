@@ -1,7 +1,13 @@
 name: Real Transport E2E
 
 on:
+  pull_request:
+    branches: ['main']
   workflow_dispatch:
+
+concurrency:
+  group: real-transport-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -35,7 +41,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run real transport E2E
+      - name: Run deterministic real transport E2E
+        if: github.event_name == 'pull_request'
+        run: yarn test:e2e:real-transport:ci
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Run all real transport E2E
+        if: github.event_name == 'workflow_dispatch'
         run: yarn test:e2e:real-transport
         env:
           NODE_OPTIONS: --max-old-space-size=4096
