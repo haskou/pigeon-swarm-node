@@ -1,9 +1,7 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
-import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
-import { libp2pKeyAdapter } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
-import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
+import { heliaRuntimeAdapter } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { generateKeyPairSync, randomUUID } from 'crypto';
 import fs from 'fs-extra';
@@ -32,6 +30,10 @@ const FALSE_POSITIVE_GUARD_MS = Number(
 );
 
 type InstanceRole = 'leaf' | 'relay';
+
+type PublicBootstrap = Awaited<
+  ReturnType<typeof heliaRuntimeAdapter.createLibp2p>
+>;
 
 type InstanceEvent = {
   type: string;
@@ -211,7 +213,7 @@ class E2EInstanceProcess {
 async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
   const networkKey = generateNetworkKey();
-  let bootstraps: IPFSConnection[] = [];
+  let bootstraps: PublicBootstrap[] = [];
   let completed = false;
   let relay: E2EInstanceProcess | undefined;
   let leaf: E2EInstanceProcess | undefined;
@@ -311,14 +313,22 @@ async function main(): Promise<void> {
     completed = true;
   } finally {
     if (!completed) {
-      process.stderr.write(`relay diagnostics:\n${relay?.diagnostics() || ''}\n`);
+      process.stderr.write(
+        `relay diagnostics:\n${relay?.diagnostics() || ''}\nleaf diagnostics:\n${leaf?.diagnostics() || ''}\n`,
+      );
     }
     await Promise.allSettled([leaf?.stop(), relay?.stop()]);
     await Promise.race([
       Promise.allSettled(bootstraps.map((bootstrap) => bootstrap.stop())),
       new Promise((resolve) => setTimeout(resolve, 5000)),
     ]);
-    await removeTemporaryRoot();
+    await removeTemporaryRoot().catch((error: unknown): void => {
+      if (completed) {
+        throw error;
+      }
+
+      process.stderr.write(`cleanup diagnostics: ${String(error)}\n`);
+    });
   }
 }
 
@@ -550,25 +560,32 @@ function spawnInstance(
   return new E2EInstanceProcess(role, child);
 }
 
-async function createPublicBootstrap(): Promise<IPFSConnection> {
-  return PublicIPFS.create({
+async function createPublicBootstrap(): Promise<PublicBootstrap> {
+  const config = await heliaRuntimeAdapter.getLibp2pDefaults({
     distributedHashTableServerEnabled: true,
-    listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
     localAddressRoutingEnabled: true,
     localPeerDiscoveryEnabled: false,
-    privateKey: await libp2pKeyAdapter.generateEd25519KeyPair(),
-    storageLocation: path.join(TMP_ROOT, `bootstrap-${randomUUID()}`),
+    publicBootstrap: false,
   });
+
+  config.addresses = {
+    ...(config.addresses || {}),
+    listen: ['/ip4/127.0.0.1/tcp/0'],
+  };
+  config.peerDiscovery = [];
+
+  return heliaRuntimeAdapter.createLibp2p(config);
 }
 
 async function waitForPublicMultiaddr(
-  connection: IPFSConnection,
+  connection: PublicBootstrap,
 ): Promise<string> {
   const deadline = Date.now() + WAIT_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
     const address = connection
       .getMultiaddrs()
+      .map((candidate) => candidate.toString())
       .find(
         (candidate) =>
           candidate.includes('/ip4/127.0.0.1/') &&

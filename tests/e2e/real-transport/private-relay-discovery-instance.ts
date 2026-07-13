@@ -153,7 +153,7 @@ async function startRelay(): Promise<void> {
     relayDataLimitBytes: 16 * 1024 * 1024,
     sharedPrivateKey: getPublicDirectoryPrivateKey(),
   });
-  await connectPublicDirectoryToBootstrap();
+  await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
   const publicProviderAddress = await waitFor(
     () =>
       getPublicDirectoryConnection()
@@ -325,7 +325,6 @@ async function startDiscovery(command: Command): Promise<void> {
     relayDataLimitBytes: 16 * 1024 * 1024,
     sharedPrivateKey: getPublicDirectoryPrivateKey(),
   });
-  await connectPublicDirectoryToBootstrap();
   await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
 
   if (getPublicDirectoryConnection().getPeers().includes(publicProviderPeerId)) {
@@ -528,20 +527,6 @@ function getPublicDirectoryConnection(): IPFSConnection {
   }
 
   return publicDirectoryConnection;
-}
-
-async function connectPublicDirectoryToBootstrap(): Promise<void> {
-  const bootstrapMultiaddrs = requiredEnv(
-    'PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS',
-  )
-    .split(',')
-    .filter(Boolean);
-
-  await Promise.all(
-    bootstrapMultiaddrs.map((multiaddr) =>
-      getPublicDirectoryConnection().dial(multiaddr),
-    ),
-  );
 }
 
 function requiredEnv(name: string): string {
