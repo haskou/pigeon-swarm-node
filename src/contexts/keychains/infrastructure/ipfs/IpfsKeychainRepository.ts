@@ -77,18 +77,22 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   private async findCandidateReferenceFromMetadata(
     metadata: KeychainMetadataRecord,
   ): Promise<KeychainCandidate | undefined> {
-    const candidate = await this.findCandidateFromCid(
+    const externalIdentifier = new KeychainExternalIdentifier(metadata.cid);
+
+    if (metadata.keychain) {
+      return KeychainCandidate.localCandidate(
+        externalIdentifier,
+        metadata.keychain,
+      );
+    }
+
+    const keychain = await this.findCandidateFromCid(
       new IPFSId(metadata.cid),
       false,
     ).catch((): undefined => undefined);
 
-    const keychain = candidate || metadata.keychain;
-
     return keychain
-      ? KeychainCandidate.localCandidate(
-          new KeychainExternalIdentifier(metadata.cid),
-          keychain,
-        )
+      ? KeychainCandidate.localCandidate(externalIdentifier, keychain)
       : undefined;
   }
 

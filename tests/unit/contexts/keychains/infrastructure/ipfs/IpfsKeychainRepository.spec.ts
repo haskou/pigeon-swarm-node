@@ -29,7 +29,7 @@ describe('IpfsKeychainRepository', () => {
     );
   });
 
-  it('should use replicated keychain metadata when the IPFS block is not available', async () => {
+  it('should use complete replicated keychain metadata without reading IPFS', async () => {
     const mother = await KeychainMother.create();
     const keychain = mother.withVersion(4).build();
     const metadata: KeychainMetadataRecord = {
@@ -42,9 +42,6 @@ describe('IpfsKeychainRepository', () => {
     };
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([metadata]);
-    ipfs.getJSON.mockRejectedValue(new Error('not available'));
-    ipfs.getBytes.mockRejectedValue(new Error('not available'));
-
     const candidates = await repository.findCandidateReferencesByOwnerId(
       mother.ownerIdentityId,
     );
@@ -56,6 +53,8 @@ describe('IpfsKeychainRepository', () => {
     expect(candidates[0].getKeychain().toPrimitives()).toEqual(
       keychain.toPrimitives(),
     );
+    expect(ipfs.getJSON).not.toHaveBeenCalled();
+    expect(ipfs.getBytes).not.toHaveBeenCalled();
     expect(ipfs.hasConnectedPeers).toHaveBeenCalled();
   });
 
@@ -96,6 +95,8 @@ describe('IpfsKeychainRepository', () => {
     expect(candidates[0].getKeychain().toPrimitives()).toEqual(
       available.toPrimitives(),
     );
+    expect(ipfs.getJSON).toHaveBeenCalledTimes(1);
+    expect(ipfs.getBytes).toHaveBeenCalledTimes(1);
     expect(ipfs.hasConnectedPeers).toHaveBeenCalled();
   });
 
