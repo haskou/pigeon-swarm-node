@@ -595,6 +595,34 @@ describe('WebSocketEventHub', () => {
     );
   });
 
+  it('sends call participant roster changes to call participants', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const event = new TestDomainEvent('call-lease-id', {
+      connectionChanged: false,
+      mediaConnectionsChanged: false,
+      participantIds: [participantIdentityId.valueOf()],
+      participantsChanged: true,
+      status: 'connected',
+    });
+
+    jest
+      .spyOn(event, 'eventName')
+      .mockReturnValue('calls.v1.participant_lease.was_updated');
+    hub.register(participantIdentityId, participantClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+
+    expect(participantClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+  });
+
   it('does not forward internal signal acknowledgements to clients', async () => {
     const hub = new WebSocketEventHub();
     const senderIdentityId = await generateIdentityId();

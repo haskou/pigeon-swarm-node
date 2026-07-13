@@ -15,5 +15,6 @@ export class CallParticipantLeaseWasUpdatedAttributes {
   public readonly ownerNodeId!: string;
   public readonly participantIds!: string[];
   public readonly participantIdentityId!: string;
+  public readonly participantsChanged!: boolean;
   public readonly status!: string;
 }

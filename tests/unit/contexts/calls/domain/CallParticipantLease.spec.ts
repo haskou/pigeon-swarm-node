@@ -34,7 +34,7 @@ describe('CallParticipantLease', () => {
     );
 
     lease.pullDomainEvents();
-    lease.renew([], new Timestamp(200));
+    lease.renew([identityId], [], new Timestamp(200));
 
     expect(lease.isConnected()).toBe(true);
     expect(lease.getLastHeartbeatAt().isEqual(new Timestamp(200))).toBe(true);
@@ -78,13 +78,86 @@ describe('CallParticipantLease', () => {
     );
 
     lease.pullDomainEvents();
-    lease.renew([mediaConnection], new Timestamp(200));
+    lease.renew(
+      [identityId, remoteIdentityId],
+      [mediaConnection],
+      new Timestamp(200),
+    );
 
     expect(lease.pullDomainEvents()[0].attributes).toMatchObject({
       connectionChanged: false,
       mediaConnectionsChanged: false,
     });
     expect(lease.getMediaConnections()[0].usesRelay()).toBe(true);
+  });
+
+  it('accepts media reports for participants added after the lease was created', () => {
+    const mediaConnection =
+      CallParticipantMediaConnection.fromPrimitives({
+        remoteIdentityId: remoteIdentityId.valueOf(),
+        state: 'connected',
+      });
+    const lease = CallParticipantLease.connect(
+      callId,
+      identityId,
+      nodeId,
+      networkId,
+      [identityId],
+      [],
+      new Timestamp(100),
+    );
+
+    lease.pullDomainEvents();
+    lease.renew(
+      [identityId, remoteIdentityId],
+      [mediaConnection],
+      new Timestamp(200),
+    );
+
+    expect(lease.toPrimitives().participantIds).toEqual([
+      identityId.valueOf(),
+      remoteIdentityId.valueOf(),
+    ]);
+    expect(lease.pullDomainEvents()[0].attributes).toMatchObject({
+      mediaConnectionsChanged: true,
+      participantsChanged: true,
+    });
+  });
+
+  it('preserves participants when renewed from an older call snapshot', () => {
+    const mediaConnection =
+      CallParticipantMediaConnection.fromPrimitives({
+        remoteIdentityId: remoteIdentityId.valueOf(),
+        state: 'connected',
+      });
+    const lease = CallParticipantLease.connect(
+      callId,
+      identityId,
+      nodeId,
+      networkId,
+      [identityId, remoteIdentityId],
+      [],
+      new Timestamp(100),
+    );
+
+    lease.pullDomainEvents();
+    lease.renew([identityId], [], new Timestamp(200));
+
+    expect(lease.toPrimitives().participantIds).toEqual([
+      identityId.valueOf(),
+      remoteIdentityId.valueOf(),
+    ]);
+    expect(lease.pullDomainEvents()[0].attributes).toMatchObject({
+      participantsChanged: false,
+    });
+
+    expect(() =>
+      lease.renew(
+        [identityId],
+        [mediaConnection],
+        new Timestamp(300),
+      ),
+    ).not.toThrow();
   });
 
   it('rejects media reports targeting self or duplicate participants', () => {

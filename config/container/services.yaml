@@ -19,6 +19,12 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19Db21tdW5pdHlDaGFubmVsQ2FsbFN0YXJ0Q29vcmRpbmF0b3JfX0NvbW11bml0eUNoYW5uZWxDYWxsU3RhcnRDb29yZGluYXRvcg==:
+    class: >-
+      /contexts/calls/application/start-call/CommunityChannelCallStartCoordinator
+    arguments: []
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUGFydGljaXBhbnRMZWFzZVJlcG9zaXRvcnlfX0NhbGxQYXJ0aWNpcGFudExlYXNlUmVwb3NpdG9yeQ==: >-
     @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2luZnJhc3RydWN0dXJlX19tZW1vcnlfX0luTWVtb3J5Q2FsbFBhcnRpY2lwYW50TGVhc2VSZXBvc2l0b3J5X19Jbk1lbW9yeUNhbGxQYXJ0aWNpcGFudExlYXNlUmVwb3NpdG9yeQ==
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=: >-
@@ -2188,19 +2194,6 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Ob2RlUmVwb3NpdG9yeV9fTm9kZVJlcG9zaXRvcnk=
     abstract: false
     parent: null
-  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19DYWxsU3RhcnRlcl9fQ2FsbFN0YXJ0ZXI=:
-    class: /contexts/calls/application/start-call/CallStarter
-    arguments:
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19DYWxsU2NvcGVSZXNvbHZlcl9fQ2FsbFNjb3BlUmVzb2x2ZXI=
-      - >-
-        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19yZW5ldy1wYXJ0aWNpcGFudC1sZWFzZV9fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZW5ld2VyX19DYWxsUGFydGljaXBhbnRMZWFzZVJlbmV3ZXI=
-    abstract: false
-    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ2FsbFJlcG9zaXRvcnlfX09yYml0REJDYWxsUmVwb3NpdG9yeQ==:
     class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
     arguments:
@@ -2784,6 +2777,21 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeQ==
       - >-
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlNZXNzYWdlUmVhY3Rpb25SZXBvc2l0b3J5X19Db21tdW5pdHlNZXNzYWdlUmVhY3Rpb25SZXBvc2l0b3J5
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19DYWxsU3RhcnRlcl9fQ2FsbFN0YXJ0ZXI=:
+    class: /contexts/calls/application/start-call/CallStarter
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19DYWxsU2NvcGVSZXNvbHZlcl9fQ2FsbFNjb3BlUmVzb2x2ZXI=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19yZW5ldy1wYXJ0aWNpcGFudC1sZWFzZV9fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZW5ld2VyX19DYWxsUGFydGljaXBhbnRMZWFzZVJlbmV3ZXI=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19Db21tdW5pdHlDaGFubmVsQ2FsbFN0YXJ0Q29vcmRpbmF0b3JfX0NvbW11bml0eUNoYW5uZWxDYWxsU3RhcnRDb29yZGluYXRvcg==
     abstract: false
     parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19kZWxldGUtY2hhbm5lbC1tZXNzYWdlX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZURlbGV0ZXJfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlRGVsZXRlcg==:

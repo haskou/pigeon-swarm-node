@@ -34,7 +34,7 @@ export default class CallParticipantLeaseRenewer {
       );
 
     if (existing) {
-      lease.renew(mediaConnections);
+      lease.renew(call.getParticipantIds(), mediaConnections);
     }
 
     await this.repository.save(lease);

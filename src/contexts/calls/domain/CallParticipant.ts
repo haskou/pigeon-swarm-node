@@ -73,6 +73,9 @@ export class CallParticipant {
   public join(now: Timestamp = Timestamp.now()): void {
     this.status = CallParticipantStatus.JOINED;
     this.joinedAt = now;
+    this.leftAt = undefined;
+    this.declinedAt = undefined;
+    this.missedAt = undefined;
   }
 
   public leave(now: Timestamp = Timestamp.now()): void {

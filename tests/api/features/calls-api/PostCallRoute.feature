@@ -100,3 +100,30 @@ Feature: Start calls
     When I POST to "/calls/"
     Then response code is equal to 200
     And response body should contain the current call
+    And response body should contain the other identity id
+
+  Scenario: Reuse one community channel call when members join concurrently
+    Given I register a test IPFS network "api-calls-community-concurrent-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community member body for another identity
+    And I sign the current community member request
+    When I POST to the current community members
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And the community member signs the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
+    And I set a community voice channel body
+    And I sign the current community voice channel request
+    When I POST a voice channel to the current community
+    Then response code is equal to 200
+    And I remember the current community voice channel
+    And I set a community channel call body
+    When both community members start the current call concurrently
+    Then both concurrent call responses contain the same participants
+    And both community members can list the concurrent call

@@ -26,12 +26,37 @@ export class CallParticipantLeaseRoute {
     );
   }
 
+  public includesAllParticipants(participantIds: IdentityId[]): boolean {
+    return participantIds.every((participantId) =>
+      this.hasParticipant(participantId),
+    );
+  }
+
   public leaseIdFor(participantIdentityId: IdentityId): string {
     return [
       this.callId.valueOf(),
       participantIdentityId.valueOf(),
       this.ownerNodeId.valueOf(),
     ].join(':');
+  }
+
+  public includingParticipants(
+    participantIds: IdentityId[],
+  ): CallParticipantLeaseRoute {
+    const additionalParticipantIds = participantIds.filter(
+      (participantId, index) =>
+        !this.hasParticipant(participantId) &&
+        participantIds.findIndex((candidate) =>
+          candidate.isEqual(participantId),
+        ) === index,
+    );
+
+    return new CallParticipantLeaseRoute(
+      this.callId,
+      this.ownerNodeId,
+      this.networkId,
+      [...this.participantIds, ...additionalParticipantIds],
+    );
   }
 
   public toPrimitives() {

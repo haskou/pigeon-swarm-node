@@ -303,7 +303,7 @@ Event contracts used by frontend:
 | `calls.v1.call.missed`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status`                                      |
 | `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `networkId`, `ownerNodeId`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
 | `calls.v1.signal.acknowledged`                        | call id           | `signalId`, `callId`, `networkId`, `ownerNodeId`, `senderIdentityId`, `recipientIdentityId`, `acknowledgedAt` |
-| `calls.v1.participant_lease.was_updated`              | call lease id     | `callId`, `networkId`, `participantIds`, `participantIdentityId`, `ownerNodeId`, `connectionChanged`, `mediaConnectionsChanged`, `mediaConnections`, `status` |
+| `calls.v1.participant_lease.was_updated`              | call lease id     | `callId`, `networkId`, `participantIds`, `participantIdentityId`, `ownerNodeId`, `connectionChanged`, `mediaConnectionsChanged`, `participantsChanged`, `mediaConnections`, `status` |
 | `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
 | `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
 | `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
@@ -508,9 +508,9 @@ Implemented:
   available and the derived `usesRelay` flag
 - remote nodes expire stale lease copies locally, while only the owner node may
   announce its lease as disconnected
-- WebSocket clients receive lease events when `connectionChanged` or
-  `mediaConnectionsChanged` is true; unchanged heartbeat renewals are not
-  forwarded to frontend clients
+- WebSocket clients receive lease events when `connectionChanged`,
+  `mediaConnectionsChanged` or `participantsChanged` is true; unchanged
+  heartbeat renewals are not forwarded to frontend clients
 - after a lease connection event, refetch `GET /calls/{callId}` to obtain the
   aggregated `connected` and `lastHeartbeatAt` participant projection
 - leaving removes the authenticated identity from the active call

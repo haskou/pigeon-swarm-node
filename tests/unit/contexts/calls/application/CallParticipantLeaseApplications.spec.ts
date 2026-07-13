@@ -4,6 +4,7 @@ import { CallParticipantHeartbeatRecordMessage } from '@app/contexts/calls/appli
 import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import { CallParticipantMediaConnection } from '@app/contexts/calls/domain/CallParticipantMediaConnection';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import InMemoryCallParticipantLeaseRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
@@ -18,6 +19,9 @@ import { mock } from 'jest-mock-extended';
 describe('call participant lease application services', () => {
   const creator = new IdentityId(
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
+  );
+  const participant = new IdentityId(
+    'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
   );
   const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440011');
   const nodeId = new NodeId('550e8400-e29b-41d4-a716-446655440012');
@@ -73,6 +77,36 @@ describe('call participant lease application services', () => {
     expect(
       (await repository.findByCallIds([call.getId()]))[0].isConnected(),
     ).toBe(false);
+  });
+
+  it('renews an existing lease with participants added to the call', async () => {
+    const call = activeCall();
+    const repository = new InMemoryCallParticipantLeaseRepository();
+    const nodeRepository = mock<NodeRepository>();
+    const renewer = new CallParticipantLeaseRenewer(
+      repository,
+      nodeRepository,
+    );
+    const mediaConnection =
+      CallParticipantMediaConnection.fromPrimitives({
+        remoteIdentityId: participant.valueOf(),
+        state: 'connected',
+      });
+
+    nodeRepository.loadLocalNodeId.mockResolvedValue(nodeId);
+    await renewer.renew(call, creator);
+    call.joinOrAdd(participant);
+
+    await expect(
+      renewer.renew(call, creator, [mediaConnection]),
+    ).resolves.toBeDefined();
+
+    const [lease] = await repository.findByCallIds([call.getId()]);
+
+    expect(lease.toPrimitives().participantIds).toEqual([
+      creator.valueOf(),
+      participant.valueOf(),
+    ]);
   });
 
   function activeCall(): Call {

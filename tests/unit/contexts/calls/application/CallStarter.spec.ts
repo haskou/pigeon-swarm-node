@@ -1,5 +1,6 @@
 import CallScopeResolver from '@app/contexts/calls/application/start-call/CallScopeResolver';
 import CallStarter from '@app/contexts/calls/application/start-call/CallStarter';
+import CommunityChannelCallStartCoordinator from '@app/contexts/calls/application/start-call/CommunityChannelCallStartCoordinator';
 import { CallStartMessage } from '@app/contexts/calls/application/start-call/messages/CallStartMessage';
 import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
@@ -61,6 +62,7 @@ describe('CallStarter', () => {
       new CallScopeResolver(conversationRepository, communityRepository),
       eventPublisher,
       leaseRenewer,
+      new CommunityChannelCallStartCoordinator(),
     );
 
     const call = await starter.start(
@@ -109,6 +111,7 @@ describe('CallStarter', () => {
       new CallScopeResolver(conversationRepository, communityRepository),
       eventPublisher,
       leaseRenewer,
+      new CommunityChannelCallStartCoordinator(),
     );
 
     const call = await starter.start(
@@ -128,5 +131,65 @@ describe('CallStarter', () => {
     expect(call.hasParticipant(recipient)).toBe(false);
     expect(call.toPrimitives().participantIds).toEqual([caller.valueOf()]);
     expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
+  });
+
+  it('reuses one community channel call when participants join concurrently', async () => {
+    const otherCaller = new IdentityId(
+      'MCowBQYDK2VwAyEAwg5LY0eW1pL8E8D2slZJKjQYS6btRH5DMSdrN0lpLkg=',
+    );
+    const repository: MockProxy<CallRepository> = mock<CallRepository>();
+    const conversationRepository: MockProxy<ConversationRepository> =
+      mock<ConversationRepository>();
+    const communityRepository: MockProxy<CommunityRepository> =
+      mock<CommunityRepository>();
+    const eventPublisher: MockProxy<DomainEventPublisher> =
+      mock<DomainEventPublisher>();
+    const leaseRenewer = mock<CallParticipantLeaseRenewer>();
+    const lease = mock<CallParticipantLease>();
+    let activeCall: Awaited<
+      ReturnType<CallRepository['findActiveByCommunityChannel']>
+    >;
+
+    repository.findActiveByCommunityChannel.mockImplementation(() =>
+      Promise.resolve(activeCall),
+    );
+    repository.save.mockImplementation((call) => {
+      activeCall = call;
+
+      return Promise.resolve();
+    });
+    communityRepository.findById.mockResolvedValue({
+      authorizeVoiceChannelCall: jest.fn(),
+      getNetworkId: () => networkId,
+    } as never);
+    lease.pullDomainEvents.mockReturnValue([]);
+    leaseRenewer.renew.mockResolvedValue(lease);
+
+    const starter = new CallStarter(
+      repository,
+      new CallScopeResolver(conversationRepository, communityRepository),
+      eventPublisher,
+      leaseRenewer,
+      new CommunityChannelCallStartCoordinator(),
+    );
+    const startCall = (identityId: IdentityId) =>
+      starter.start(
+        new CallStartMessage(
+          identityId.valueOf(),
+          'community_channel',
+          undefined,
+          'community-1',
+          'voice-1',
+        ),
+      );
+
+    const [firstCall, secondCall] = await Promise.all([
+      startCall(caller),
+      startCall(otherCaller),
+    ]);
+
+    expect(secondCall.getId().isEqual(firstCall.getId())).toBe(true);
+    expect(firstCall.hasParticipant(caller)).toBe(true);
+    expect(firstCall.hasParticipant(otherCaller)).toBe(true);
   });
 });
