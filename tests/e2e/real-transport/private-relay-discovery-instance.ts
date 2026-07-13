@@ -3,6 +3,7 @@ import 'module-alias/register';
 
 import Kernel from '@haskou/ddd-kernel';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { libp2pKeyAdapter } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
@@ -49,7 +50,8 @@ type Command = {
 
 let network: IPFSNetwork | undefined;
 let directory: PrivateNetworkRelayRecordDirectory | undefined;
-let publicPrivateKey: Libp2pPrivateKeyLike | undefined;
+let publicDirectoryConnection: IPFSConnection | undefined;
+let publicDirectoryPrivateKey: Libp2pPrivateKeyLike | undefined;
 let orbitdb: OrbitDBInstance | undefined;
 let documents: OrbitDBDatabase | undefined;
 
@@ -73,8 +75,6 @@ async function main(): Promise<void> {
 }
 
 function configureEnvironment(): void {
-  delete process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED;
-  delete process.env.PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS;
   process.env.IPFS_STORAGE_PATH = path.join(STORAGE_ROOT, 'public-ipfs');
   process.env.PIGEON_LOCAL_DB_PATH = path.join(STORAGE_ROOT, 'local-db');
   process.env.PIGEON_PUBLIC_RELAY_RECORDS_PATH = path.join(
@@ -100,7 +100,10 @@ function configureTestLogger(): void {
 
 async function createPrivateNetwork(): Promise<void> {
   const networkKey = new PrivateKey(NETWORK_KEY);
-  publicPrivateKey = await libp2pKeyAdapter.generateEd25519KeyPair();
+  const privateNetworkPrivateKey =
+    await libp2pKeyAdapter.generateEd25519KeyPair();
+  publicDirectoryPrivateKey =
+    await libp2pKeyAdapter.generateEd25519KeyPair();
   const config = IPFSNetworkConfig.fromPrimitives({
     id: NETWORK_ID,
     key: networkKey.valueOf(),
@@ -109,7 +112,7 @@ async function createPrivateNetwork(): Promise<void> {
   const connection = await PrivateIPFS.create({
     key: networkKey,
     name: NETWORK_NAME,
-    privateKey: publicPrivateKey,
+    privateKey: privateNetworkPrivateKey,
     ...(ROLE === 'relay'
       ? {
           enableRelayServer: true,
@@ -143,22 +146,44 @@ async function startRelay(): Promise<void> {
     listenAddresses: [relayAddress],
     relayDataLimitBytes: 16 * 1024 * 1024,
   };
+  publicDirectoryConnection = await getDirectory().configurePublicConnection({
+    enableRelayServer: false,
+    listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
+    localAddressRoutingEnabled: true,
+    relayDataLimitBytes: 16 * 1024 * 1024,
+    sharedPrivateKey: getPublicDirectoryPrivateKey(),
+  });
+  await connectPublicDirectoryToBootstrap();
+  const publicProviderAddress = await waitFor(
+    () =>
+      getPublicDirectoryConnection()
+        .getMultiaddrs()
+        .find(isDirectTcpMultiaddr),
+    'public provider direct TCP multiaddr',
+  );
 
   await getDirectory().publish(
     getNetwork(),
     relayOptions,
-    getPublicPrivateKey(),
+    getPublicDirectoryPrivateKey(),
   );
-  getDirectory().start(getNetwork(), relayOptions, getPublicPrivateKey(), {
-    discoveryEnabled: true,
-    publicationEnabled: true,
-  });
+  getDirectory().start(
+    getNetwork(),
+    relayOptions,
+    getPublicDirectoryPrivateKey(),
+    {
+      discoveryEnabled: true,
+      publicationEnabled: true,
+    },
+  );
 
   emit('relay-ready', {
     advertisedRelayAddress: relayAddress,
     cid: cid.valueOf(),
     peerId: getNetwork().getPeerId(),
     pid: process.pid,
+    publicProviderAddress,
+    publicProviderPeerId: getPublicDirectoryConnection().getPeerId(),
     sha256: sha256(bytes),
     storageRoot: STORAGE_ROOT,
   });
@@ -284,15 +309,36 @@ async function startDiscovery(command: Command): Promise<void> {
   const relayPeerId =
     requiredCommandString(command, 'relayPeerId') ||
     requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_EXPECTED_RELAY_PEER_ID');
+  const publicProviderPeerId = requiredCommandString(
+    command,
+    'publicProviderPeerId',
+  );
 
   if (EXPECTED_RELAY_PEER_ID && relayPeerId !== EXPECTED_RELAY_PEER_ID) {
     throw new Error('Unexpected relay peer id for discovery command.');
   }
 
+  publicDirectoryConnection = await getDirectory().configurePublicConnection({
+    enableRelayServer: false,
+    listenAddresses: [],
+    localAddressRoutingEnabled: true,
+    relayDataLimitBytes: 16 * 1024 * 1024,
+    sharedPrivateKey: getPublicDirectoryPrivateKey(),
+  });
+  await connectPublicDirectoryToBootstrap();
+  await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
+
+  if (getPublicDirectoryConnection().getPeers().includes(publicProviderPeerId)) {
+    throw new Error(
+      `False-positive guard failed: leaf public connection already has relay provider ${publicProviderPeerId}.`,
+    );
+  }
+
+  emit('public-provider-pre-discovery-ok', { publicProviderPeerId });
   getDirectory().start(
     getNetwork(),
     undefined,
-    getPublicPrivateKey(),
+    getPublicDirectoryPrivateKey(),
     {
       discoveryEnabled: true,
       publicationEnabled: false,
@@ -305,9 +351,17 @@ async function startDiscovery(command: Command): Promise<void> {
         : undefined,
     `leaf to discover relay peer ${relayPeerId}`,
   );
+  await waitFor(
+    () =>
+      getPublicDirectoryConnection().getPeers().includes(publicProviderPeerId)
+        ? getPublicDirectoryConnection().getPeers()
+        : undefined,
+    `leaf to dial public relay provider ${publicProviderPeerId}`,
+  );
   emit('connected', {
     peerId: relayPeerId,
     peers: getNetwork().getPeers(),
+    publicProviderPeerId,
   });
 }
 
@@ -460,12 +514,34 @@ function getDirectory(): PrivateNetworkRelayRecordDirectory {
   return directory;
 }
 
-function getPublicPrivateKey(): Libp2pPrivateKeyLike {
-  if (!publicPrivateKey) {
+function getPublicDirectoryPrivateKey(): Libp2pPrivateKeyLike {
+  if (!publicDirectoryPrivateKey) {
     throw new Error('Public private key has not been created.');
   }
 
-  return publicPrivateKey;
+  return publicDirectoryPrivateKey;
+}
+
+function getPublicDirectoryConnection(): IPFSConnection {
+  if (!publicDirectoryConnection) {
+    throw new Error('Public directory connection has not been created.');
+  }
+
+  return publicDirectoryConnection;
+}
+
+async function connectPublicDirectoryToBootstrap(): Promise<void> {
+  const bootstrapMultiaddrs = requiredEnv(
+    'PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS',
+  )
+    .split(',')
+    .filter(Boolean);
+
+  await Promise.all(
+    bootstrapMultiaddrs.map((multiaddr) =>
+      getPublicDirectoryConnection().dial(multiaddr),
+    ),
+  );
 }
 
 function requiredEnv(name: string): string {
