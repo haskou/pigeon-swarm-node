@@ -4,7 +4,9 @@ import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import CallScopeResolver from './CallScopeResolver';
+import CommunityChannelCallStartCoordinator from './CommunityChannelCallStartCoordinator';
 import { CallStartMessage } from './messages/CallStartMessage';
+import { ResolvedCallScope } from './ResolvedCallScope';
 
 export default class CallStarter {
   constructor(
@@ -12,6 +14,7 @@ export default class CallStarter {
     private readonly scopeResolver: CallScopeResolver,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly leaseRenewer: CallParticipantLeaseRenewer,
+    private readonly communityChannelStartCoordinator: CommunityChannelCallStartCoordinator,
   ) {}
 
   private async findActiveCommunityChannelCall(
@@ -27,8 +30,10 @@ export default class CallStarter {
     );
   }
 
-  public async start(message: CallStartMessage): Promise<Call> {
-    const resolvedScope = await this.scopeResolver.resolve(message);
+  private async startResolved(
+    message: CallStartMessage,
+    resolvedScope: ResolvedCallScope,
+  ): Promise<Call> {
     const activeCall = await this.findActiveCommunityChannelCall(message);
 
     if (activeCall) {
@@ -67,5 +72,19 @@ export default class CallStarter {
     ]);
 
     return call;
+  }
+
+  public async start(message: CallStartMessage): Promise<Call> {
+    const resolvedScope = await this.scopeResolver.resolve(message);
+
+    if (!message.scopeType.isCommunityChannel()) {
+      return this.startResolved(message, resolvedScope);
+    }
+
+    return this.communityChannelStartCoordinator.coordinate(
+      message.getCommunityId(),
+      message.getCommunityChannelId(),
+      () => this.startResolved(message, resolvedScope),
+    );
   }
 }

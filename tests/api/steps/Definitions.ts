@@ -40,6 +40,7 @@ export default class Definitions {
   private communityInviteToken: string | undefined;
   private communityMembershipRequestId: string | undefined;
   private communityRoleId: string | undefined;
+  private concurrentCallResponses: RestResponse[] = [];
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -297,6 +298,7 @@ export default class Definitions {
     this.communityInviteToken = undefined;
     this.communityMembershipRequestId = undefined;
     this.communityRoleId = undefined;
+    this.concurrentCallResponses = [];
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -1705,6 +1707,31 @@ export default class Definitions {
       keyPair,
       this.otherIdentityId,
     );
+  }
+
+  @when('both community members start the current call concurrently')
+  public async bothCommunityMembersStartTheCurrentCallConcurrently(): Promise<void> {
+    const body = JSON.parse(this.body || '{}');
+
+    await this.signCurrentRequest('POST', '/calls/');
+    const ownerHeaders = { ...this.headers };
+    const otherIdentityKeyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/calls/',
+      String(Date.now()),
+      otherIdentityKeyPair,
+      this.otherIdentityId,
+    );
+    const otherHeaders = { ...this.headers };
+
+    this.concurrentCallResponses = await Promise.all([
+      this.restClient.post('/calls/', body, { headers: ownerHeaders }),
+      this.restClient.post('/calls/', body, { headers: otherHeaders }),
+    ]);
+    this.response = this.concurrentCallResponses[0];
+    this.callId = String(this.concurrentCallResponses[0].data.id);
   }
 
   @given('I sign the current calls request')
@@ -3685,6 +3712,94 @@ export default class Definitions {
       this.callId,
       JSON.stringify(this.response.data),
     );
+  }
+
+  @then('both concurrent call responses contain the same participants')
+  public bothConcurrentCallResponsesContainTheSameParticipants(): void {
+    if (!this.ownerIdentityId || !this.otherIdentityId) {
+      throw new Error('Both community identities must exist first.');
+    }
+
+    const [firstResponse, secondResponse] = this.concurrentCallResponses;
+    const expectedParticipantIds = [
+      this.ownerIdentityId.valueOf(),
+      this.otherIdentityId.valueOf(),
+    ];
+
+    expect(firstResponse.status).to.equal(200);
+    expect(secondResponse.status).to.equal(200);
+    expect(secondResponse.data.id).to.equal(firstResponse.data.id);
+    expect(firstResponse.data.participantIds).to.contain(
+      this.ownerIdentityId.valueOf(),
+    );
+    expect(secondResponse.data.participantIds).to.contain(
+      this.otherIdentityId.valueOf(),
+    );
+    expect(
+      this.concurrentCallResponses.some((response) => {
+        const participantIds = response.data.participantIds;
+
+        return (
+          Array.isArray(participantIds) &&
+          expectedParticipantIds.every((participantId) =>
+            participantIds.includes(participantId),
+          )
+        );
+      }),
+    ).to.equal(true);
+  }
+
+  @then('both community members can list the concurrent call')
+  public async bothCommunityMembersCanListTheConcurrentCall(): Promise<void> {
+    if (!this.callId || !this.ownerIdentityId || !this.otherIdentityId) {
+      throw new Error('The concurrent call and both identities must exist.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/calls/');
+    const ownerHeaders = { ...this.headers };
+    const otherIdentityKeyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'GET',
+      '/calls/',
+      String(Date.now()),
+      otherIdentityKeyPair,
+      this.otherIdentityId,
+    );
+    const otherHeaders = { ...this.headers };
+    const responses = await Promise.all([
+      this.restClient.get('/calls/', { headers: ownerHeaders }),
+      this.restClient.get('/calls/', { headers: otherHeaders }),
+    ]);
+
+    for (const response of responses) {
+      const calls = response.data.calls;
+
+      expect(response.status).to.equal(200);
+      expect(calls).to.be.an('array');
+
+      const currentCall = Array.isArray(calls)
+        ? calls.find(
+            (call) =>
+              typeof call === 'object' &&
+              call !== null &&
+              'id' in call &&
+              call.id === this.callId,
+          )
+        : undefined;
+      const participantIds =
+        typeof currentCall === 'object' &&
+        currentCall !== null &&
+        'participantIds' in currentCall
+          ? currentCall.participantIds
+          : undefined;
+
+      expect(participantIds).to.have.members([
+        this.ownerIdentityId.valueOf(),
+        this.otherIdentityId.valueOf(),
+      ]);
+    }
   }
 
   @then('response body should contain')
