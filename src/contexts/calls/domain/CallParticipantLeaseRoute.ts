@@ -26,12 +26,9 @@ export class CallParticipantLeaseRoute {
     );
   }
 
-  public hasSameParticipants(participantIds: IdentityId[]): boolean {
-    return (
-      this.participantIds.length === participantIds.length &&
-      participantIds.every((participantId) =>
-        this.hasParticipant(participantId),
-      )
+  public includesAllParticipants(participantIds: IdentityId[]): boolean {
+    return participantIds.every((participantId) =>
+      this.hasParticipant(participantId),
     );
   }
 
@@ -43,14 +40,22 @@ export class CallParticipantLeaseRoute {
     ].join(':');
   }
 
-  public withParticipants(
+  public includingParticipants(
     participantIds: IdentityId[],
   ): CallParticipantLeaseRoute {
+    const additionalParticipantIds = participantIds.filter(
+      (participantId, index) =>
+        !this.hasParticipant(participantId) &&
+        participantIds.findIndex((candidate) =>
+          candidate.isEqual(participantId),
+        ) === index,
+    );
+
     return new CallParticipantLeaseRoute(
       this.callId,
       this.ownerNodeId,
       this.networkId,
-      participantIds,
+      [...this.participantIds, ...additionalParticipantIds],
     );
   }
 

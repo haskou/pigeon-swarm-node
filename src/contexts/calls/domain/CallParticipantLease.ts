@@ -129,11 +129,11 @@ export class CallParticipantLease extends AggregateRoot {
   }
 
   private synchronizeParticipants(participantIds: IdentityId[]): boolean {
-    if (this.route.hasSameParticipants(participantIds)) {
+    if (this.route.includesAllParticipants(participantIds)) {
       return false;
     }
 
-    this.route = this.route.withParticipants(participantIds);
+    this.route = this.route.includingParticipants(participantIds);
 
     return true;
   }

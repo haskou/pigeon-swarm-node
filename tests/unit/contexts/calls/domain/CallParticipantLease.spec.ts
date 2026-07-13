@@ -124,6 +124,42 @@ describe('CallParticipantLease', () => {
     });
   });
 
+  it('preserves participants when renewed from an older call snapshot', () => {
+    const mediaConnection =
+      CallParticipantMediaConnection.fromPrimitives({
+        remoteIdentityId: remoteIdentityId.valueOf(),
+        state: 'connected',
+      });
+    const lease = CallParticipantLease.connect(
+      callId,
+      identityId,
+      nodeId,
+      networkId,
+      [identityId, remoteIdentityId],
+      [],
+      new Timestamp(100),
+    );
+
+    lease.pullDomainEvents();
+    lease.renew([identityId], [], new Timestamp(200));
+
+    expect(lease.toPrimitives().participantIds).toEqual([
+      identityId.valueOf(),
+      remoteIdentityId.valueOf(),
+    ]);
+    expect(lease.pullDomainEvents()[0].attributes).toMatchObject({
+      participantsChanged: false,
+    });
+
+    expect(() =>
+      lease.renew(
+        [identityId],
+        [mediaConnection],
+        new Timestamp(300),
+      ),
+    ).not.toThrow();
+  });
+
   it('rejects media reports targeting self or duplicate participants', () => {
     const selfConnection = new CallParticipantMediaConnection(
       identityId,
