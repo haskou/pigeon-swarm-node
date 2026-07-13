@@ -15,7 +15,6 @@ import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly keychainByCid = new Map<string, Keychain>();
-  private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
   constructor(
     private readonly ipfsManager: IPFS,
@@ -77,18 +76,22 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   private async findCandidateReferenceFromMetadata(
     metadata: KeychainMetadataRecord,
   ): Promise<KeychainCandidate | undefined> {
-    const candidate = await this.findCandidateFromCid(
+    const externalIdentifier = new KeychainExternalIdentifier(metadata.cid);
+
+    if (metadata.keychain) {
+      return KeychainCandidate.localCandidate(
+        externalIdentifier,
+        metadata.keychain,
+      );
+    }
+
+    const keychain = await this.findCandidateFromCid(
       new IPFSId(metadata.cid),
       false,
     ).catch((): undefined => undefined);
 
-    const keychain = candidate || metadata.keychain;
-
     return keychain
-      ? KeychainCandidate.localCandidate(
-          new KeychainExternalIdentifier(metadata.cid),
-          keychain,
-        )
+      ? KeychainCandidate.localCandidate(externalIdentifier, keychain)
       : undefined;
   }
 
@@ -170,40 +173,6 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  private refreshRemoteCandidateReferencesInBackground(
-    ownerIdentityId: IdentityId,
-    knownCids: Set<string>,
-  ): void {
-    const refreshKey = ownerIdentityId.valueOf();
-
-    if (this.activeRemoteCandidateRefreshes.has(refreshKey)) {
-      return;
-    }
-
-    this.activeRemoteCandidateRefreshes.add(refreshKey);
-    void this.refreshRemoteCandidateReferences(
-      ownerIdentityId,
-      knownCids,
-    ).finally(() => {
-      this.activeRemoteCandidateRefreshes.delete(refreshKey);
-    });
-  }
-
-  private async refreshRemoteCandidateReferences(
-    ownerIdentityId: IdentityId,
-    knownCids: Set<string>,
-  ): Promise<void> {
-    try {
-      if (!(await this.ipfsManager.hasConnectedPeers())) {
-        return;
-      }
-
-      await this.findRemoteCandidateReferences(ownerIdentityId, knownCids);
-    } catch {
-      return;
-    }
-  }
-
   public async findByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
@@ -235,33 +204,15 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
     if (localCandidates.length > 0) {
-      this.refreshRemoteCandidateReferencesInBackground(
-        ownerIdentityId,
-        new Set(metadata.map((document) => document.cid)),
-      );
-
       return this.sortCandidateReferencesByFreshness(localCandidates);
     }
 
-    let remoteCandidates: KeychainCandidate[];
+    const remoteCandidates = await this.findRemoteCandidateReferences(
+      ownerIdentityId,
+      new Set(metadata.map((document) => document.cid)),
+    );
 
-    try {
-      remoteCandidates = await this.findRemoteCandidateReferences(
-        ownerIdentityId,
-        new Set(metadata.map((document) => document.cid)),
-      );
-    } catch (error) {
-      if (localCandidates.length > 0) {
-        return this.sortCandidateReferencesByFreshness(localCandidates);
-      }
-
-      throw error;
-    }
-
-    return this.sortCandidateReferencesByFreshness([
-      ...localCandidates,
-      ...remoteCandidates,
-    ]);
+    return this.sortCandidateReferencesByFreshness(remoteCandidates);
   }
 
   public async save(
