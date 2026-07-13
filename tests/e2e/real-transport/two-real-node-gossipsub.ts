@@ -90,6 +90,10 @@ type ConversationResponse = {
 
 type CallResponse = {
   id: string;
+  participants: Array<{
+    connected: boolean;
+    identityId: string;
+  }>;
 };
 
 type ConversationListResponse = {
@@ -183,6 +187,12 @@ async function main(): Promise<void> {
       },
       nodeAIdentity,
     );
+    await waitForCallParticipantConnection(
+      nodeB,
+      nodeBIdentity,
+      call.id,
+      nodeAIdentity.id,
+    );
     const callSignal = await receiveAndAcknowledgeCallSignal(
       nodeB,
       nodeBIdentity,
@@ -209,6 +219,20 @@ async function main(): Promise<void> {
         `Call signal retried after acknowledgement: attempts=${callSignal.attempts.join(',')}`,
       );
     }
+
+    await request<CallResponse>(
+      nodeB,
+      'POST',
+      `/calls/${call.id}/participants`,
+      undefined,
+      nodeBIdentity,
+    );
+    await waitForCallParticipantConnection(
+      nodeA,
+      nodeAIdentity,
+      call.id,
+      nodeBIdentity.id,
+    );
 
     const nodeBMessages = listenForDomainEvents(
       nodeB,
@@ -677,6 +701,28 @@ async function waitForConversation(
   }, `${node.name} to sync conversation`);
 }
 
+async function waitForCallParticipantConnection(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  callId: string,
+  participantIdentityId: string,
+): Promise<void> {
+  await waitFor(async () => {
+    const call = await requestMaybe<CallResponse>(
+      node,
+      'GET',
+      `/calls/${encodeURIComponent(callId)}`,
+      undefined,
+      identity,
+    );
+    const participant = call?.participants.find(
+      (candidate) => candidate.identityId === participantIdentityId,
+    );
+
+    return participant?.connected === true;
+  }, `${node.name} to receive the participant lease for ${participantIdentityId}`);
+}
+
 async function waitForMessage(
   node: NodeRuntime,
   identity: IdentityFixture,
@@ -796,10 +842,10 @@ async function receiveAndAcknowledgeCallSignal(
   );
 
   return new Promise<CallSignalDeliveryResult>((resolve, reject) => {
-    const attempts: number[] = [];
-    let delivery: { expiresAt: number; signalId: string } | undefined;
-    let settleTimeout: ReturnType<typeof setTimeout> | undefined;
-    let sent = false;
+    const receiver: CallSignalReceiver = {
+      attempts: [],
+      sent: false,
+    };
     const timeout = setTimeout(() => {
       ws.close();
       reject(new Error(`${node.name} did not receive a signal for ${callId}`));
@@ -807,8 +853,8 @@ async function receiveAndAcknowledgeCallSignal(
     const fail = (error: unknown): void => {
       clearTimeout(timeout);
 
-      if (settleTimeout) {
-        clearTimeout(settleTimeout);
+      if (receiver.settleTimeout) {
+        clearTimeout(receiver.settleTimeout);
       }
 
       ws.close();
@@ -816,12 +862,6 @@ async function receiveAndAcknowledgeCallSignal(
     };
 
     ws.on('message', (data) => {
-      const receiver: CallSignalReceiver = {
-        attempts,
-        delivery,
-        sent,
-        settleTimeout,
-      };
       handleCallSignalMessage(
         JSON.parse(data.toString()) as CallSignalMessage,
         receiver,
@@ -836,9 +876,6 @@ async function receiveAndAcknowledgeCallSignal(
         resolve,
         reject,
       );
-      delivery = receiver.delivery;
-      sent = receiver.sent;
-      settleTimeout = receiver.settleTimeout;
     });
     ws.on('error', fail);
   });
