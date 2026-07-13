@@ -4,6 +4,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -57,22 +58,22 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     );
   });
 
-  it('should persist identity heads before their metadata document', async () => {
+  it('should project identity metadata only after persisting its canonical document', async () => {
     const mother = new IdentityMother();
     const identity = mother.build();
     const networkId = mother.networks[0].valueOf();
-    const delayedHead = deferred<string>();
+    const delayedDocument = deferred<string>();
     const stores = identityStores(documents, heads) as unknown as {
-      heads: { put: jest.Mock };
+      identities: { put: jest.Mock };
     };
 
     registry.clear();
     await registry.register(networkId, stores as never);
     repository = new OrbitDBIdentityMetadataIndex(registry);
-    stores.heads.put.mockImplementation(
-      async (key: string, value: Record<string, unknown>) => {
-        await delayedHead.promise;
-        heads.set(key, value);
+    stores.identities.put.mockImplementation(
+      async (document: Record<string, unknown>) => {
+        await delayedDocument.promise;
+        upsertDocument(documents, document);
 
         return 'ok';
       },
@@ -88,24 +89,26 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     ]);
 
     expect(result).toBe('blocked');
-    expect(heads.get(`identity:${mother.id.valueOf()}`)).toBeUndefined();
+    expect(heads.size).toBe(0);
     expect(documents).toEqual([]);
+    await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([]);
+
+    delayedDocument.resolve('ok');
+    await save;
+
+    expect(documents).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-fast-head',
+        identityId: mother.id.valueOf(),
+      }),
+    ]);
+    expect(heads.size).toBe(0);
     await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([
       expect.objectContaining({
         cid: 'bafyidentity-fast-head',
         identityId: mother.id.valueOf(),
       }),
     ]);
-
-    delayedHead.resolve('ok');
-    await save;
-
-    expect(heads.get(`identity:${mother.id.valueOf()}`)).toEqual(
-      expect.objectContaining({
-        cid: 'bafyidentity-fast-head',
-        identityId: mother.id.valueOf(),
-      }),
-    );
   });
 
   it('should tombstone identity metadata by external identifier', async () => {
@@ -126,7 +129,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(records).toEqual([]);
   });
 
-  it('should tombstone persisted handle aliases when deleting identity metadata', async () => {
+  it('should project identity tombstones without replicating handle heads', async () => {
     const identityMother = new IdentityMother();
     const handle = new ProfileHandle('hasko');
     const identity = await identityMother
@@ -152,19 +155,17 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       identity,
       new IdentityExternalIdentifier('bafyidentity-handle-delete'),
     );
-    await registry.putHead(
-      `identity-handle:${handle.valueOf()}`,
-      heads.get(`identity:${identityMother.id.valueOf()}`) || {},
-      [networkId.valueOf()],
-    );
-
     await repository.deleteByExternalIdentifier(
       new IdentityExternalIdentifier('bafyidentity-handle-delete'),
     );
 
-    expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
-      expect.objectContaining({ deleted: true }),
-    );
+    expect(documents).toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-handle-delete',
+        deleted: true,
+      }),
+    ]);
+    expect(heads.size).toBe(0);
     await expect(repository.findByHandle(handle)).resolves.toEqual([]);
   });
 
@@ -526,6 +527,63 @@ describe('OrbitDBIdentityMetadataIndex', () => {
         identityId,
       }),
     ]);
+  });
+
+  it('should project the freshest replicated identity into id and handle heads', async () => {
+    const identityId = new IdentityMother().id.valueOf();
+
+    repository.projectDocument({
+      cid: 'bafyidentity-v1',
+      handle: 'hasko',
+      id: identityId,
+      identityId,
+      networkIds: ['network-1'],
+      receivedAt: 1,
+      version: 1,
+    });
+    repository.projectDocument({
+      cid: 'bafyidentity-v2',
+      handle: 'hasko',
+      id: identityId,
+      identityId,
+      networkIds: ['network-1'],
+      receivedAt: 2,
+      version: 2,
+    });
+
+    await expect(
+      repository.findByIdentityId(new IdentityId(identityId)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        identityId,
+        version: 2,
+      }),
+    ]);
+    await expect(
+      repository.findByHandle(new ProfileHandle('hasko')),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        identityId,
+        version: 2,
+      }),
+    ]);
+  });
+
+  it('should not project identity metadata with conflicting identity ids', async () => {
+    const identityId = new IdentityMother().id.valueOf();
+
+    repository.projectDocument({
+      cid: 'bafyidentity-tampered',
+      identity: {
+        id: 'MCowBQYDK2VwAyEA+n7g5mYrSv5WVp+HrWddapvm+7mWpZmglXEcAcXAfTs=',
+      },
+      identityId,
+      version: 2,
+    });
+
+    await expect(repository.findAll()).resolves.toEqual([]);
   });
 
   it('should read persisted identity id heads on cache misses', async () => {

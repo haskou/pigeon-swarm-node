@@ -21,6 +21,10 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     );
   }
 
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
   private stringValue(
     document: Record<string, unknown>,
     attribute: string,
@@ -41,10 +45,11 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
   private identityIdFrom(
     document: Record<string, unknown>,
-    identity: Identity | undefined,
   ): string | undefined {
     const identityId = this.stringValue(document, 'identityId');
-    const embeddedIdentityId = identity?.toPrimitives().id;
+    const embeddedIdentityId = this.isRecord(document.identity)
+      ? this.stringValue(document.identity, 'id')
+      : undefined;
     const projectedIdentityId = this.isProjectedIdentityRecord(document)
       ? this.stringValue(document, 'id')
       : undefined;
@@ -99,7 +104,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): IdentityMetadataRecord | undefined {
     const cid = this.stringValue(document, 'cid');
     const identity = this.identityFrom(document);
-    const identityId = this.identityIdFrom(document, identity);
+    const identityId = this.identityIdFrom(document);
 
     if (!cid || !identityId || document.deleted === true) {
       return undefined;
@@ -192,47 +197,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       );
   }
 
-  private networkIdsFor(document: IdentityMetadataRecord): string[] {
-    return [
-      ...new Set([
-        ...(document.networkIds || []),
-        ...(document.networkId ? [document.networkId] : []),
-      ]),
-    ];
-  }
-
-  private async putHeads(document: IdentityMetadataRecord): Promise<void> {
-    const networkIds = this.networkIdsFor(document);
-    const storageDocument = this.toStorageDocument(document);
-
-    await this.registry.putHead(
-      this.identityHeadKey(document.identityId),
-      storageDocument,
-      networkIds,
-    );
-  }
-
-  private async putTombstoneHeads(
-    document: IdentityMetadataRecord,
-  ): Promise<void> {
-    const tombstone = this.toStorageDocument(document, true);
-    const networkIds = this.networkIdsFor(document);
-
-    await this.registry.putHead(
-      this.identityHeadKey(document.identityId),
-      tombstone,
-      networkIds,
-    );
-
-    if (document.handle) {
-      await this.registry.putHead(
-        this.handleHeadKey(document.handle),
-        tombstone,
-        networkIds,
-      );
-    }
-  }
-
   public findAll(): Promise<IdentityMetadataRecord[]> {
     return Promise.resolve(
       this.sortByFreshness(
@@ -323,10 +287,24 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       version: primitives.version,
     };
 
-    await this.putHeads(record);
-    await this.registry.putDocument(
-      'identities',
-      this.toStorageDocument(record),
+    const document = this.toStorageDocument(record);
+
+    await this.registry.putDocument('identities', document);
+    this.projectDocument(document);
+  }
+
+  public projectDocument(document: Record<string, unknown>): void {
+    const cid = this.stringValue(document, 'cid');
+    const identityId = this.identityIdFrom(document);
+
+    if (!cid || !identityId) {
+      return;
+    }
+
+    this.registry.cacheHeadLocally(
+      this.identityHeadKey(identityId),
+      document,
+      this.networkIdsFrom(document) ?? [],
     );
   }
 
@@ -338,15 +316,12 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     );
 
     await Promise.all(
-      documents.map((document) =>
-        this.registry.putDocument(
-          'identities',
-          this.toStorageDocument(document, true),
-        ),
-      ),
-    );
-    await Promise.all(
-      documents.map((document) => this.putTombstoneHeads(document)),
+      documents.map(async (document) => {
+        const tombstone = this.toStorageDocument(document, true);
+
+        await this.registry.putDocument('identities', tombstone);
+        this.projectDocument(tombstone);
+      }),
     );
   }
 }

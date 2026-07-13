@@ -1,5 +1,6 @@
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -58,21 +59,21 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     );
   });
 
-  it('should persist keychain heads before their metadata document', async () => {
+  it('should project keychain metadata only after persisting its canonical document', async () => {
     const mother = await KeychainMother.create();
     const keychain = mother.withVersion(2).build();
-    const delayedHead = deferred<string>();
+    const delayedDocument = deferred<string>();
     const stores = keychainStores(documents, heads) as unknown as {
-      heads: { put: jest.Mock };
+      keychains: { put: jest.Mock };
     };
 
     registry.clear();
     await registry.register(networkId, stores as never);
     repository = new OrbitDBKeychainMetadataIndex(registry);
-    stores.heads.put.mockImplementation(
-      async (key: string, value: Record<string, unknown>) => {
-        await delayedHead.promise;
-        heads.set(key, value);
+    stores.keychains.put.mockImplementation(
+      async (document: Record<string, unknown>) => {
+        await delayedDocument.promise;
+        upsertDocument(documents, document);
 
         return 'ok';
       },
@@ -89,10 +90,22 @@ describe('OrbitDBKeychainMetadataIndex', () => {
     ]);
 
     expect(result).toBe('blocked');
-    expect(
-      heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`),
-    ).toBeUndefined();
+    expect(heads.size).toBe(0);
     expect(documents).toEqual([]);
+    await expect(
+      repository.findByOwnerIdentityId(mother.ownerIdentityId),
+    ).resolves.toEqual([]);
+
+    delayedDocument.resolve('ok');
+    await save;
+
+    expect(documents).toEqual([
+      expect.objectContaining({
+        cid: 'bafykeychain-fast-head',
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+      }),
+    ]);
+    expect(heads.size).toBe(0);
     await expect(
       repository.findByOwnerIdentityId(mother.ownerIdentityId),
     ).resolves.toEqual([
@@ -101,16 +114,6 @@ describe('OrbitDBKeychainMetadataIndex', () => {
         ownerIdentityId: mother.ownerIdentityId.valueOf(),
       }),
     ]);
-
-    delayedHead.resolve('ok');
-    await save;
-
-    expect(heads.get(`keychain:${mother.ownerIdentityId.valueOf()}`)).toEqual(
-      expect.objectContaining({
-        cid: 'bafykeychain-fast-head',
-        ownerIdentityId: mother.ownerIdentityId.valueOf(),
-      }),
-    );
   });
 
   it('should return all non-deleted keychain metadata ordered by freshness', async () => {
@@ -253,6 +256,56 @@ describe('OrbitDBKeychainMetadataIndex', () => {
       }),
     );
     expect(records[0].keychain?.toPrimitives()).toEqual(latest.toPrimitives());
+  });
+
+  it('should project every replicated keychain version into local heads', async () => {
+    const ownerIdentityId = (
+      await KeychainMother.create()
+    ).ownerIdentityId.valueOf();
+
+    repository.projectDocument({
+      cid: 'bafykeychain-v1',
+      id: 'bafykeychain-v1',
+      networkIds: [networkId],
+      ownerIdentityId,
+      receivedAt: 1,
+      version: 1,
+    });
+    repository.projectDocument({
+      cid: 'bafykeychain-v2',
+      id: 'bafykeychain-v2',
+      networkIds: [networkId],
+      ownerIdentityId,
+      receivedAt: 2,
+      version: 2,
+    });
+
+    await expect(
+      repository.findByOwnerIdentityId(new IdentityId(ownerIdentityId)),
+    ).resolves.toEqual([
+      expect.objectContaining({ cid: 'bafykeychain-v2', version: 2 }),
+      expect.objectContaining({ cid: 'bafykeychain-v1', version: 1 }),
+    ]);
+    await expect(
+      repository.findByExternalIdentifier(
+        new KeychainExternalIdentifier('bafykeychain-v1'),
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({ cid: 'bafykeychain-v1', version: 1 }),
+    );
+  });
+
+  it('should not project keychain metadata without a cid', async () => {
+    const ownerIdentityId = (
+      await KeychainMother.create()
+    ).ownerIdentityId.valueOf();
+
+    repository.projectDocument({
+      ownerIdentityId,
+      version: 2,
+    });
+
+    await expect(repository.findAll()).resolves.toEqual([]);
   });
 
   it('should not scan stored keychains to repair stale owner heads', async () => {
