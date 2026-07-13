@@ -197,47 +197,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       );
   }
 
-  private networkIdsFor(document: IdentityMetadataRecord): string[] {
-    return [
-      ...new Set([
-        ...(document.networkIds || []),
-        ...(document.networkId ? [document.networkId] : []),
-      ]),
-    ];
-  }
-
-  private async putHeads(document: IdentityMetadataRecord): Promise<void> {
-    const networkIds = this.networkIdsFor(document);
-    const storageDocument = this.toStorageDocument(document);
-
-    await this.registry.putHead(
-      this.identityHeadKey(document.identityId),
-      storageDocument,
-      networkIds,
-    );
-  }
-
-  private async putTombstoneHeads(
-    document: IdentityMetadataRecord,
-  ): Promise<void> {
-    const tombstone = this.toStorageDocument(document, true);
-    const networkIds = this.networkIdsFor(document);
-
-    await this.registry.putHead(
-      this.identityHeadKey(document.identityId),
-      tombstone,
-      networkIds,
-    );
-
-    if (document.handle) {
-      await this.registry.putHead(
-        this.handleHeadKey(document.handle),
-        tombstone,
-        networkIds,
-      );
-    }
-  }
-
   public findAll(): Promise<IdentityMetadataRecord[]> {
     return Promise.resolve(
       this.sortByFreshness(
@@ -328,14 +287,13 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       version: primitives.version,
     };
 
-    await this.putHeads(record);
-    await this.registry.putDocument(
-      'identities',
-      this.toStorageDocument(record),
-    );
+    const document = this.toStorageDocument(record);
+
+    await this.registry.putDocument('identities', document);
+    this.projectDocument(document);
   }
 
-  public projectReplicatedDocument(document: Record<string, unknown>): void {
+  public projectDocument(document: Record<string, unknown>): void {
     const cid = this.stringValue(document, 'cid');
     const identityId = this.identityIdFrom(document);
 
@@ -358,15 +316,12 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     );
 
     await Promise.all(
-      documents.map((document) =>
-        this.registry.putDocument(
-          'identities',
-          this.toStorageDocument(document, true),
-        ),
-      ),
-    );
-    await Promise.all(
-      documents.map((document) => this.putTombstoneHeads(document)),
+      documents.map(async (document) => {
+        const tombstone = this.toStorageDocument(document, true);
+
+        await this.registry.putDocument('identities', tombstone);
+        this.projectDocument(tombstone);
+      }),
     );
   }
 }

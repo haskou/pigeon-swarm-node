@@ -168,17 +168,6 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       );
   }
 
-  private async putHeads(
-    document: OrbitDBKeychainMetadataDocument,
-  ): Promise<void> {
-    await this.registry.putHead(this.ownerHeadKey(document.ownerIdentityId), {
-      ...document,
-    });
-    await this.registry.putHead(this.cidHeadKey(document.cid), {
-      ...document,
-    });
-  }
-
   public findAll(): Promise<KeychainMetadataRecord[]> {
     const records = [
       ...this.registry.findCachedHeadsByPrefix('keychain:'),
@@ -242,11 +231,11 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
       version: primitives.version,
     };
 
-    await this.putHeads(document);
     await this.registry.putDocument('keychains', document);
+    this.projectDocument(document);
   }
 
-  public projectReplicatedDocument(document: Record<string, unknown>): void {
+  public projectDocument(document: Record<string, unknown>): void {
     const cid = this.stringValue(document, 'cid');
     const ownerIdentityId = this.ownerIdentityIdFrom(document);
 

@@ -13,7 +13,7 @@ export default class OrbitDBIdentityMetadataProjection {
   public async start(): Promise<void> {
     this.startPromise ??= this.registry.onDocumentUpdated(
       'identities',
-      (document) => this.metadataIndex.projectReplicatedDocument(document),
+      (document) => this.metadataIndex.projectDocument(document),
     );
 
     await this.startPromise;

@@ -4,6 +4,7 @@ import 'module-alias/register';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import OrbitDBIdentityMetadataProjection from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataProjection';
+import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
 import OrbitDBKeychainMetadataProjection from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataProjection';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -723,10 +724,19 @@ async function assertProjectedMetadataIndexes(
   const identities = await identityIndex.findByHandle(
     new ProfileHandle('hasko'),
   );
+  const identitiesById = await identityIndex.findByIdentityId(identityId);
   const keychains = await keychainIndex.findByOwnerIdentityId(identityId);
+  const previousKeychain = await keychainIndex.findByExternalIdentifier(
+    new KeychainExternalIdentifier('cid-keychain-hasko-v4'),
+  );
 
-  if (identities[0]?.cid !== 'cid-identity-hasko-v2') {
-    throw new Error('Replicated identity metadata was not projected by handle');
+  if (
+    identities[0]?.cid !== 'cid-identity-hasko-v2' ||
+    identitiesById[0]?.cid !== 'cid-identity-hasko-v2'
+  ) {
+    throw new Error(
+      'Replicated identity metadata was not projected by handle and id',
+    );
   }
 
   if (
@@ -734,6 +744,12 @@ async function assertProjectedMetadataIndexes(
     keychains[1]?.cid !== 'cid-keychain-hasko-v4'
   ) {
     throw new Error('Replicated keychain versions were not projected by owner');
+  }
+
+  if (previousKeychain?.cid !== 'cid-keychain-hasko-v4') {
+    throw new Error(
+      'Historical replicated keychain was not projected by external identifier',
+    );
   }
 
   registry.clear();

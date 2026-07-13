@@ -13,7 +13,7 @@ export default class OrbitDBKeychainMetadataProjection {
   public async start(): Promise<void> {
     this.startPromise ??= this.registry.onDocumentUpdated(
       'keychains',
-      (document) => this.metadataIndex.projectReplicatedDocument(document),
+      (document) => this.metadataIndex.projectDocument(document),
     );
 
     await this.startPromise;

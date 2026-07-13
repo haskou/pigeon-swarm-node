@@ -32,9 +32,7 @@ describe('OrbitDBIdentityMetadataProjection', () => {
     await projection.start();
     listener(document);
 
-    expect(metadataIndex.projectReplicatedDocument).toHaveBeenCalledWith(
-      document,
-    );
+    expect(metadataIndex.projectDocument).toHaveBeenCalledWith(document);
   });
 
   it('subscribes to identity documents only once', async () => {
