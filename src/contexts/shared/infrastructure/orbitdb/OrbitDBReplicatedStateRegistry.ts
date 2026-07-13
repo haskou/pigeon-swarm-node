@@ -192,6 +192,29 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  private async yieldAfterHydrationBatch(index: number): Promise<void> {
+    if (
+      (index + 1) % OrbitDBReplicatedStateRegistry.HYDRATION_BATCH_SIZE !==
+      0
+    ) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+
+  private async bootstrapDocumentUpdateListener(
+    store: OrbitDBDatabase,
+    listeners: Set<(document: Record<string, unknown>) => void | Promise<void>>,
+  ): Promise<void> {
+    const records = await this.allRecords(store);
+
+    for (let index = 0; index < records.length; index++) {
+      await this.notifyBootstrappedDocument(listeners, records[index].value);
+      await this.yieldAfterHydrationBatch(index);
+    }
+  }
+
   private async bootstrapDocumentUpdateListeners(
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
@@ -202,20 +225,7 @@ export default class OrbitDBReplicatedStateRegistry {
         continue;
       }
 
-      const records = await this.allRecords(store);
-
-      for (let index = 0; index < records.length; index++) {
-        const record = records[index];
-
-        await this.notifyBootstrappedDocument(listeners, record.value);
-
-        if (
-          (index + 1) % OrbitDBReplicatedStateRegistry.HYDRATION_BATCH_SIZE ===
-          0
-        ) {
-          await new Promise<void>((resolve) => setImmediate(resolve));
-        }
-      }
+      await this.bootstrapDocumentUpdateListener(store, listeners);
     }
   }
 
@@ -425,12 +435,7 @@ export default class OrbitDBReplicatedStateRegistry {
         (await this.hydrateHeadRecord(networkId, records[index])) &&
         persistedAllHeads;
 
-      if (
-        (index + 1) % OrbitDBReplicatedStateRegistry.HYDRATION_BATCH_SIZE ===
-        0
-      ) {
-        await new Promise<void>((resolve) => setImmediate(resolve));
-      }
+      await this.yieldAfterHydrationBatch(index);
     }
 
     if (persistedAllHeads) {
@@ -992,9 +997,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
       this.registerDocumentUpdateListener(storeName, store);
 
-      for (const record of await this.allRecords(store)) {
-        await listener(record.value);
-      }
+      await this.bootstrapDocumentUpdateListener(store, new Set([listener]));
     }
   }
 

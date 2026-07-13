@@ -1321,6 +1321,27 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
+  it('yields while bootstrapping a projection from an existing store', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+    const setImmediateSpy = jest.spyOn(global, 'setImmediate');
+
+    for (let index = 0; index < 17; index++) {
+      await firstNetwork.calls.put({
+        id: `call-${index}`,
+        networkId: 'network-1',
+      });
+    }
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('calls', listener);
+
+    expect(listener).toHaveBeenCalledTimes(17);
+    expect(setImmediateSpy).toHaveBeenCalled();
+    setImmediateSpy.mockRestore();
+  });
+
 });
 
 function deferred<T>(): {

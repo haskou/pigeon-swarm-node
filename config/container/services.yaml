@@ -368,6 +368,22 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ2FsbFByb2plY3Rpb25fX09yYml0REJDYWxsUHJvamVjdGlvbg==
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19hcHBzX19ydW50aW1lc19fb3JiaXRkYi1pZGVudGl0eS1tZXRhZGF0YS1wcm9qZWN0aW9uLXJ1bnRpbWVfX09yYml0REJJZGVudGl0eU1ldGFkYXRhUHJvamVjdGlvblJ1bnRpbWVfX09yYml0REJJZGVudGl0eU1ldGFkYXRhUHJvamVjdGlvblJ1bnRpbWU=:
+    class: >-
+      /apps/runtimes/orbitdb-identity-metadata-projection-runtime/OrbitDBIdentityMetadataProjectionRuntime
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJJZGVudGl0eU1ldGFkYXRhUHJvamVjdGlvbl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFQcm9qZWN0aW9u
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19hcHBzX19ydW50aW1lc19fb3JiaXRkYi1rZXljaGFpbi1tZXRhZGF0YS1wcm9qZWN0aW9uLXJ1bnRpbWVfX09yYml0REJLZXljaGFpbk1ldGFkYXRhUHJvamVjdGlvblJ1bnRpbWVfX09yYml0REJLZXljaGFpbk1ldGFkYXRhUHJvamVjdGlvblJ1bnRpbWU=:
+    class: >-
+      /apps/runtimes/orbitdb-keychain-metadata-projection-runtime/OrbitDBKeychainMetadataProjectionRuntime
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQktleWNoYWluTWV0YWRhdGFQcm9qZWN0aW9uX19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YVByb2plY3Rpb24=
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19leHBpcmUtc2lnbmFsLWRlbGl2ZXJpZXNfX0NhbGxTaWduYWxEZWxpdmVyeUV4cGlyYXRpb25SZWdpc3RyYXJfX0NhbGxTaWduYWxEZWxpdmVyeUV4cGlyYXRpb25SZWdpc3RyYXI=:
     class: >-
       /contexts/calls/application/expire-signal-deliveries/CallSignalDeliveryExpirationRegistrar
@@ -1230,6 +1246,16 @@ services:
     abstract: false
     parent: >-
       X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX21ldGFkYXRhX19JZGVudGl0eU1ldGFkYXRhSW5kZXhfX0lkZW50aXR5TWV0YWRhdGFJbmRleA==
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJJZGVudGl0eU1ldGFkYXRhUHJvamVjdGlvbl9fT3JiaXREQklkZW50aXR5TWV0YWRhdGFQcm9qZWN0aW9u:
+    class: >-
+      /contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataProjection
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRTdGF0ZVJlZ2lzdHJ5X19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19faWRlbnRpdGllc19faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJJZGVudGl0eU1ldGFkYXRhSW5kZXhfX09yYml0REJJZGVudGl0eU1ldGFkYXRhSW5kZXg=
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19hcHBsaWNhdGlvbl9fcmVnaXN0ZXItY2FuZGlkYXRlX19LZXljaGFpbkNhbmRpZGF0ZVJlZ2lzdHJhcl9fS2V5Y2hhaW5DYW5kaWRhdGVSZWdpc3RyYXI=:
     class: >-
       /contexts/keychains/application/register-candidate/KeychainCandidateRegistrar
@@ -1248,6 +1274,16 @@ services:
     abstract: false
     parent: >-
       X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19pbmZyYXN0cnVjdHVyZV9fbWV0YWRhdGFfX0tleWNoYWluTWV0YWRhdGFJbmRleF9fS2V5Y2hhaW5NZXRhZGF0YUluZGV4
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQktleWNoYWluTWV0YWRhdGFQcm9qZWN0aW9uX19PcmJpdERCS2V5Y2hhaW5NZXRhZGF0YVByb2plY3Rpb24=:
+    class: >-
+      /contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataProjection
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRTdGF0ZVJlZ2lzdHJ5X19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fa2V5Y2hhaW5zX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQktleWNoYWluTWV0YWRhdGFJbmRleF9fT3JiaXREQktleWNoYWluTWV0YWRhdGFJbmRleA==
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fbm9kZXNfX2FwcGxpY2F0aW9uX19hc3NpZ24tb3duZXJfX05vZGVPd25lckFzc2lnbmVyX19Ob2RlT3duZXJBc3NpZ25lcg==:
     class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
     arguments:

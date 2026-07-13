@@ -1,5 +1,6 @@
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -253,6 +254,56 @@ describe('OrbitDBKeychainMetadataIndex', () => {
       }),
     );
     expect(records[0].keychain?.toPrimitives()).toEqual(latest.toPrimitives());
+  });
+
+  it('should project every replicated keychain version into local heads', async () => {
+    const ownerIdentityId = (
+      await KeychainMother.create()
+    ).ownerIdentityId.valueOf();
+
+    repository.projectReplicatedDocument({
+      cid: 'bafykeychain-v1',
+      id: 'bafykeychain-v1',
+      networkIds: [networkId],
+      ownerIdentityId,
+      receivedAt: 1,
+      version: 1,
+    });
+    repository.projectReplicatedDocument({
+      cid: 'bafykeychain-v2',
+      id: 'bafykeychain-v2',
+      networkIds: [networkId],
+      ownerIdentityId,
+      receivedAt: 2,
+      version: 2,
+    });
+
+    await expect(
+      repository.findByOwnerIdentityId(new IdentityId(ownerIdentityId)),
+    ).resolves.toEqual([
+      expect.objectContaining({ cid: 'bafykeychain-v2', version: 2 }),
+      expect.objectContaining({ cid: 'bafykeychain-v1', version: 1 }),
+    ]);
+    await expect(
+      repository.findByExternalIdentifier(
+        new KeychainExternalIdentifier('bafykeychain-v1'),
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({ cid: 'bafykeychain-v1', version: 1 }),
+    );
+  });
+
+  it('should not project keychain metadata without a cid', async () => {
+    const ownerIdentityId = (
+      await KeychainMother.create()
+    ).ownerIdentityId.valueOf();
+
+    repository.projectReplicatedDocument({
+      ownerIdentityId,
+      version: 2,
+    });
+
+    await expect(repository.findAll()).resolves.toEqual([]);
   });
 
   it('should not scan stored keychains to repair stale owner heads', async () => {

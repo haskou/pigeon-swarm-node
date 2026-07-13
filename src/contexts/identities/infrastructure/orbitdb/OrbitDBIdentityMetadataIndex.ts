@@ -21,6 +21,10 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     );
   }
 
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
   private stringValue(
     document: Record<string, unknown>,
     attribute: string,
@@ -41,10 +45,11 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
   private identityIdFrom(
     document: Record<string, unknown>,
-    identity: Identity | undefined,
   ): string | undefined {
     const identityId = this.stringValue(document, 'identityId');
-    const embeddedIdentityId = identity?.toPrimitives().id;
+    const embeddedIdentityId = this.isRecord(document.identity)
+      ? this.stringValue(document.identity, 'id')
+      : undefined;
     const projectedIdentityId = this.isProjectedIdentityRecord(document)
       ? this.stringValue(document, 'id')
       : undefined;
@@ -99,7 +104,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): IdentityMetadataRecord | undefined {
     const cid = this.stringValue(document, 'cid');
     const identity = this.identityFrom(document);
-    const identityId = this.identityIdFrom(document, identity);
+    const identityId = this.identityIdFrom(document);
 
     if (!cid || !identityId || document.deleted === true) {
       return undefined;
@@ -327,6 +332,21 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     await this.registry.putDocument(
       'identities',
       this.toStorageDocument(record),
+    );
+  }
+
+  public projectReplicatedDocument(document: Record<string, unknown>): void {
+    const cid = this.stringValue(document, 'cid');
+    const identityId = this.identityIdFrom(document);
+
+    if (!cid || !identityId) {
+      return;
+    }
+
+    this.registry.cacheHeadLocally(
+      this.identityHeadKey(identityId),
+      document,
+      this.networkIdsFrom(document) ?? [],
     );
   }
 

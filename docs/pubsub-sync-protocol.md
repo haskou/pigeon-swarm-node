@@ -12,6 +12,15 @@ routing record: OrbitDB metadata is the canonical discovery index.
 The remaining attributes describe the published identity metadata:
 `handle`, `networkIds`, `previousExternalIdentifier`, and `version`.
 
+OrbitDB replicates identity and keychain metadata documents independently from
+the optimized `heads` store. Each node projects those canonical documents into
+its local head cache as they arrive and when a store is hydrated. This keeps
+lookups by identity id, handle, keychain owner, and historical keychain CID
+available even when a peer did not replicate the corresponding head entry.
+Projection hydration yields to the Node.js event loop after each bounded batch;
+it does not rescan documents on HTTP reads or write repaired heads back into
+OrbitDB.
+
 ## Private relay records
 
 Private relay records use two gossipsub topics derived from the private network

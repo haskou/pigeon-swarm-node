@@ -4,6 +4,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -526,6 +527,63 @@ describe('OrbitDBIdentityMetadataIndex', () => {
         identityId,
       }),
     ]);
+  });
+
+  it('should project the freshest replicated identity into id and handle heads', async () => {
+    const identityId = new IdentityMother().id.valueOf();
+
+    repository.projectReplicatedDocument({
+      cid: 'bafyidentity-v1',
+      handle: 'hasko',
+      id: identityId,
+      identityId,
+      networkIds: ['network-1'],
+      receivedAt: 1,
+      version: 1,
+    });
+    repository.projectReplicatedDocument({
+      cid: 'bafyidentity-v2',
+      handle: 'hasko',
+      id: identityId,
+      identityId,
+      networkIds: ['network-1'],
+      receivedAt: 2,
+      version: 2,
+    });
+
+    await expect(
+      repository.findByIdentityId(new IdentityId(identityId)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        identityId,
+        version: 2,
+      }),
+    ]);
+    await expect(
+      repository.findByHandle(new ProfileHandle('hasko')),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid: 'bafyidentity-v2',
+        identityId,
+        version: 2,
+      }),
+    ]);
+  });
+
+  it('should not project identity metadata with conflicting identity ids', async () => {
+    const identityId = new IdentityMother().id.valueOf();
+
+    repository.projectReplicatedDocument({
+      cid: 'bafyidentity-tampered',
+      identity: {
+        id: 'MCowBQYDK2VwAyEA+n7g5mYrSv5WVp+HrWddapvm+7mWpZmglXEcAcXAfTs=',
+      },
+      identityId,
+      version: 2,
+    });
+
+    await expect(repository.findAll()).resolves.toEqual([]);
   });
 
   it('should read persisted identity id heads on cache misses', async () => {

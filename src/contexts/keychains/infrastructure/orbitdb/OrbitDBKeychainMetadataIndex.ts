@@ -245,4 +245,19 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     await this.putHeads(document);
     await this.registry.putDocument('keychains', document);
   }
+
+  public projectReplicatedDocument(document: Record<string, unknown>): void {
+    const cid = this.stringValue(document, 'cid');
+    const ownerIdentityId = this.ownerIdentityIdFrom(document);
+
+    if (!cid || !ownerIdentityId) {
+      return;
+    }
+
+    this.registry.cacheHeadLocally(
+      this.ownerHeadKey(ownerIdentityId),
+      document,
+      this.stringArrayValue(document, 'networkIds') ?? [],
+    );
+  }
 }

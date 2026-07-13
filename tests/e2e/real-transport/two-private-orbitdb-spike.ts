@@ -1,6 +1,12 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 
+import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
+import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
+import OrbitDBIdentityMetadataProjection from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataProjection';
+import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
+import OrbitDBKeychainMetadataProjection from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataProjection';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import {
   heliaRuntimeAdapter,
@@ -8,6 +14,8 @@ import {
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
 import { IPFSOptions } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSOptions';
+import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { PrivateKey } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
@@ -18,6 +26,8 @@ const TMP_ROOT = path.join(ROOT, '.tmp', 'two-private-orbitdb-spike-e2e');
 const WAIT_TIMEOUT_MS = 15000;
 const NETWORK_ID = 'orbitdb-private-network';
 const NETWORK_NAME = 'orbitdb-private-sync-e2e';
+const IDENTITY_ID =
+  'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=';
 
 type OrbitDatabase = {
   access?: {
@@ -114,6 +124,7 @@ type PrivateOrbitDbStores = {
 
 async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
+  process.env.NODE_ENV = 'test';
   configureTestLogger();
 
   const orbitdbCore = (await import('@orbitdb/core')) as OrbitDbCore;
@@ -175,6 +186,7 @@ async function main(): Promise<void> {
     await writeReplicatedDocuments(providerStores);
 
     await assertQueryViability(requesterStores);
+    await assertProjectedMetadataIndexes(requesterStores);
     await assertUnauthorizedWriteIsRejected(
       orbitdbCore,
       intruder,
@@ -187,6 +199,7 @@ async function main(): Promise<void> {
       writers,
     );
     await assertQueryViability(restartedRequester.stores);
+    await assertProjectedMetadataIndexes(restartedRequester.stores);
     await restartedRequester.orbitdb.stop();
 
     console.info(
@@ -195,6 +208,7 @@ async function main(): Promise<void> {
           replicatedStoreCount: Object.keys(getAddresses(providerStores)).length,
           providerPeerId: getPeerId(provider.helia),
           requesterPeerId: getPeerId(requester.helia),
+          projectedMetadataIndexes: ['identities', 'keychains'],
           result: 'PASS',
           stores: Object.keys(getAddresses(providerStores)),
           transportDsn: 'private-ipfs-circuit-relay://orbitdb',
@@ -510,11 +524,29 @@ function generateNetworkKey(): string {
 async function writeReplicatedDocuments(stores: PrivateOrbitDbStores): Promise<void> {
   await stores.identities.put?.({
     cid: 'cid-identity-hasko-v2',
-    id: 'identity-hasko',
+    handle: 'hasko',
+    id: IDENTITY_ID,
+    identityId: IDENTITY_ID,
+    lastEventId: 'identity-event-hasko-v2',
+    networkIds: [NETWORK_ID],
+    receivedAt: 2,
+    version: 2,
+  });
+  await stores.keychains.put?.({
+    cid: 'cid-keychain-hasko-v4',
+    id: 'cid-keychain-hasko-v4',
+    networkIds: [NETWORK_ID],
+    ownerIdentityId: IDENTITY_ID,
+    receivedAt: 4,
+    version: 4,
   });
   await stores.keychains.put?.({
     cid: 'cid-keychain-hasko-v5',
-    id: 'identity-hasko',
+    id: 'cid-keychain-hasko-v5',
+    networkIds: [NETWORK_ID],
+    ownerIdentityId: IDENTITY_ID,
+    receivedAt: 5,
+    version: 5,
   });
   await stores.communities.put?.({
     channelIds: ['channel-general'],
@@ -598,13 +630,16 @@ async function assertUnauthorizedWriteIsRejected(
 
 async function assertQueryViability(stores: PrivateOrbitDbStores): Promise<void> {
   await waitFor(async () => {
-    const identity = await getDocumentValue(stores.identities, 'identity-hasko');
+    const identity = await getDocumentValue(stores.identities, IDENTITY_ID);
 
     return identity?.cid === 'cid-identity-hasko-v2' ? true : undefined;
   }, 'latest identity replication');
 
   await waitFor(async () => {
-    const keychain = await getDocumentValue(stores.keychains, 'identity-hasko');
+    const keychain = await getDocumentValue(
+      stores.keychains,
+      'cid-keychain-hasko-v5',
+    );
 
     return keychain?.cid === 'cid-keychain-hasko-v5' ? true : undefined;
   }, 'latest keychain replication');
@@ -665,6 +700,56 @@ async function assertQueryViability(stores: PrivateOrbitDbStores): Promise<void>
 
     return latestMessage === 'message-1' ? true : undefined;
   }, 'latest message keyvalue replication');
+}
+
+async function assertProjectedMetadataIndexes(
+  stores: PrivateOrbitDbStores,
+): Promise<void> {
+  const identityId = new IdentityId(IDENTITY_ID);
+  const registry = new OrbitDBReplicatedStateRegistry();
+  const identityIndex = new OrbitDBIdentityMetadataIndex(registry);
+  const keychainIndex = new OrbitDBKeychainMetadataIndex(registry);
+
+  await assertMetadataHeadsAreAbsent(stores);
+  await registry.register(
+    NETWORK_ID,
+    stores as unknown as OrbitDBPrivateNetworkStores,
+  );
+  await Promise.all([
+    new OrbitDBIdentityMetadataProjection(registry, identityIndex).start(),
+    new OrbitDBKeychainMetadataProjection(registry, keychainIndex).start(),
+  ]);
+
+  const identities = await identityIndex.findByHandle(
+    new ProfileHandle('hasko'),
+  );
+  const keychains = await keychainIndex.findByOwnerIdentityId(identityId);
+
+  if (identities[0]?.cid !== 'cid-identity-hasko-v2') {
+    throw new Error('Replicated identity metadata was not projected by handle');
+  }
+
+  if (
+    keychains[0]?.cid !== 'cid-keychain-hasko-v5' ||
+    keychains[1]?.cid !== 'cid-keychain-hasko-v4'
+  ) {
+    throw new Error('Replicated keychain versions were not projected by owner');
+  }
+
+  registry.clear();
+}
+
+async function assertMetadataHeadsAreAbsent(
+  stores: PrivateOrbitDbStores,
+): Promise<void> {
+  const identityHead = await stores.heads.get?.(`identity:${IDENTITY_ID}`);
+  const keychainHead = await stores.heads.get?.(`keychain:${IDENTITY_ID}`);
+
+  if (identityHead !== undefined || keychainHead !== undefined) {
+    throw new Error(
+      'Metadata projection E2E requires replicated documents without heads',
+    );
+  }
 }
 
 async function getDocumentValue(
