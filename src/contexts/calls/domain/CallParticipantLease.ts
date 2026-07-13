@@ -63,7 +63,7 @@ export class CallParticipantLease extends AggregateRoot {
 
   constructor(
     private readonly participantIdentityId: IdentityId,
-    private readonly route: CallParticipantLeaseRoute,
+    private route: CallParticipantLeaseRoute,
     private status: CallParticipantConnectionStatus,
     private lastHeartbeatAt: Timestamp,
     private mediaConnections: CallParticipantMediaConnection[],
@@ -114,6 +114,7 @@ export class CallParticipantLease extends AggregateRoot {
   private recordUpdated(
     connectionChanged: boolean,
     mediaConnectionsChanged: boolean,
+    participantsChanged = false,
   ): void {
     const primitives = this.toPrimitives();
 
@@ -122,8 +123,19 @@ export class CallParticipantLease extends AggregateRoot {
         ...primitives,
         connectionChanged,
         mediaConnectionsChanged,
+        participantsChanged,
       }),
     );
+  }
+
+  private synchronizeParticipants(participantIds: IdentityId[]): boolean {
+    if (this.route.hasSameParticipants(participantIds)) {
+      return false;
+    }
+
+    this.route = this.route.withParticipants(participantIds);
+
+    return true;
   }
 
   private replaceMediaConnections(
@@ -193,16 +205,22 @@ export class CallParticipantLease extends AggregateRoot {
   }
 
   public renew(
+    participantIds: IdentityId[],
     mediaConnections: CallParticipantMediaConnection[] = [],
     now: Timestamp = Timestamp.now(),
   ): void {
     const connectionChanged = !this.status.isConnected();
+    const participantsChanged = this.synchronizeParticipants(participantIds);
     const mediaConnectionsChanged =
       this.replaceMediaConnections(mediaConnections);
 
     this.status = CallParticipantConnectionStatus.CONNECTED;
     this.lastHeartbeatAt = now;
-    this.recordUpdated(connectionChanged, mediaConnectionsChanged);
+    this.recordUpdated(
+      connectionChanged,
+      mediaConnectionsChanged,
+      participantsChanged,
+    );
   }
 
   public toPrimitives() {

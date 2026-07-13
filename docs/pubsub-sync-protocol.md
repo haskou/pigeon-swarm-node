@@ -103,6 +103,7 @@ they contain no heartbeat timestamp.
   "callId": "550e8400-e29b-41d4-a716-446655440010",
   "connectionChanged": true,
   "mediaConnectionsChanged": true,
+  "participantsChanged": true,
   "mediaConnections": [
     {
       "localCandidateType": "relay",

@@ -219,6 +219,41 @@ describe('Call', () => {
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallParticipantLeftEvent);
   });
 
+  it('clears a previous departure when a community participant rejoins', () => {
+    const call = Call.fromPrimitives({
+      createdAt: 100,
+      creatorIdentityId: creator.valueOf(),
+      endedAt: undefined,
+      endedByIdentityId: undefined,
+      id: '550e8400-e29b-41d4-a716-446655440099',
+      networkId: networkId.valueOf(),
+      participantIds: [creator.valueOf()],
+      participants: [
+        {
+          identityId: creator.valueOf(),
+          joinedAt: 100,
+          leftAt: 200,
+          status: 'left',
+        },
+      ],
+      scope: {
+        channelId: 'voice-channel',
+        communityId: 'community',
+        conversationId: undefined,
+        type: 'community_channel',
+      },
+      status: 'active',
+    });
+
+    call.joinOrAdd(creator);
+
+    expect(call.toPrimitives().participants[0]).toMatchObject({
+      identityId: creator.valueOf(),
+      status: 'joined',
+    });
+    expect(call.toPrimitives().participants[0]).not.toHaveProperty('leftAt');
+  });
+
   it('should mark ringing participants as missed', () => {
     const call = Call.start(creator, networkId, scope, [recipient]);
 

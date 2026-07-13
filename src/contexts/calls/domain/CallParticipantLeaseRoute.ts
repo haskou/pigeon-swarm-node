@@ -26,12 +26,32 @@ export class CallParticipantLeaseRoute {
     );
   }
 
+  public hasSameParticipants(participantIds: IdentityId[]): boolean {
+    return (
+      this.participantIds.length === participantIds.length &&
+      participantIds.every((participantId) =>
+        this.hasParticipant(participantId),
+      )
+    );
+  }
+
   public leaseIdFor(participantIdentityId: IdentityId): string {
     return [
       this.callId.valueOf(),
       participantIdentityId.valueOf(),
       this.ownerNodeId.valueOf(),
     ].join(':');
+  }
+
+  public withParticipants(
+    participantIds: IdentityId[],
+  ): CallParticipantLeaseRoute {
+    return new CallParticipantLeaseRoute(
+      this.callId,
+      this.ownerNodeId,
+      this.networkId,
+      participantIds,
+    );
   }
 
   public toPrimitives() {

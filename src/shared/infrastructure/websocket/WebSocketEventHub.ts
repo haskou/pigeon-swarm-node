@@ -80,11 +80,7 @@ export class WebSocketEventHub {
   private getEventRecipients(event: DomainEvent): Set<string> {
     const recipients = new Set<string>();
 
-    if (
-      this.isCallParticipantLeaseEvent(event) &&
-      event.attributes.connectionChanged !== true &&
-      event.attributes.mediaConnectionsChanged !== true
-    ) {
+    if (this.shouldSuppressCallParticipantLeaseEvent(event)) {
       return recipients;
     }
 
@@ -134,6 +130,18 @@ export class WebSocketEventHub {
 
   private isCallParticipantLeaseEvent(event: DomainEvent): boolean {
     return event.eventName() === 'calls.v1.participant_lease.was_updated';
+  }
+
+  private shouldSuppressCallParticipantLeaseEvent(event: DomainEvent): boolean {
+    if (!this.isCallParticipantLeaseEvent(event)) {
+      return false;
+    }
+
+    return ![
+      event.attributes.connectionChanged,
+      event.attributes.mediaConnectionsChanged,
+      event.attributes.participantsChanged,
+    ].includes(true);
   }
 
   private isCallSignalAcknowledgementEvent(event: DomainEvent): boolean {
