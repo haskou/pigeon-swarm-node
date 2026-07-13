@@ -515,6 +515,53 @@ export class HeliaRuntimeAdapter {
     return this.withPublicBootstrap(defaults);
   }
 
+  private async createHeliaWithLibp2p(
+    options: Parameters<typeof HeliaCore.createHelia>[0] & {
+      libp2p?: HeliaLibp2pConfig | Awaited<ReturnType<typeof createLibp2p>>;
+      http?: boolean;
+    },
+  ): Promise<HeliaInstance> {
+    const [
+      heliaModule,
+      heliaLibp2pModule,
+      heliaHttpModule,
+      dagCborModule,
+      dagJsonModule,
+      jsonCodecModule,
+      sha2Module,
+    ] = await Promise.all([
+      this.loadHeliaModule(),
+      this.loadHeliaLibp2pModule(),
+      this.loadHeliaHttpModule(),
+      this.loadDagCborModule(),
+      this.loadDagJsonModule(),
+      this.loadJsonCodecModule(),
+      this.loadSha2Module(),
+    ]);
+    const { http = true, libp2p, ...heliaOptions } = options;
+    const heliaLight = await heliaModule.createHeliaLight({
+      ...heliaOptions,
+      codecs: [
+        dagCborModule,
+        dagJsonModule,
+        jsonCodecModule,
+        ...(heliaOptions.codecs ?? []),
+      ],
+      hashers: [sha2Module.sha512, ...(heliaOptions.hashers ?? [])],
+    } as Parameters<typeof HeliaCore.createHelia>[0]);
+
+    const helia = http ? heliaHttpModule.withHTTP(heliaLight) : heliaLight;
+
+    if (!libp2p) {
+      throw new Error('Helia requires a libp2p configuration.');
+    }
+
+    return (await heliaLibp2pModule.withLibp2p(
+      helia,
+      libp2p as unknown as Parameters<typeof heliaLibp2pModule.withLibp2p>[1],
+    )) as HeliaInstance;
+  }
+
   public async withBootstrapRelays(
     defaults: Libp2pDefaults,
     relayMultiaddrs: string[] = [],
@@ -596,47 +643,10 @@ export class HeliaRuntimeAdapter {
       http?: boolean;
     },
   ): Promise<HeliaInstance> {
-    const [
-      heliaModule,
-      heliaLibp2pModule,
-      heliaBitswapModule,
-      heliaHttpModule,
-      dagCborModule,
-      dagJsonModule,
-      jsonCodecModule,
-      sha2Module,
-    ] = await Promise.all([
-      this.loadHeliaModule(),
-      this.loadHeliaLibp2pModule(),
-      this.loadHeliaBitswapModule(),
-      this.loadHeliaHttpModule(),
-      this.loadDagCborModule(),
-      this.loadDagJsonModule(),
-      this.loadJsonCodecModule(),
-      this.loadSha2Module(),
-    ]);
-    const { bitswap, http = true, libp2p, ...heliaOptions } = options;
-    const heliaLight = await heliaModule.createHeliaLight({
-      ...heliaOptions,
-      codecs: [
-        dagCborModule,
-        dagJsonModule,
-        jsonCodecModule,
-        ...(heliaOptions.codecs ?? []),
-      ],
-      hashers: [sha2Module.sha512, ...(heliaOptions.hashers ?? [])],
-    } as Parameters<typeof HeliaCore.createHelia>[0]);
+    const { bitswap, ...heliaOptions } = options;
+    const heliaWithLibp2p = await this.createHeliaWithLibp2p(heliaOptions);
+    const heliaBitswapModule = await this.loadHeliaBitswapModule();
 
-    const helia = http ? heliaHttpModule.withHTTP(heliaLight) : heliaLight;
-
-    if (!libp2p) {
-      throw new Error('Helia requires a libp2p configuration.');
-    }
-
-    const heliaWithLibp2p = await heliaLibp2pModule.withLibp2p(
-      helia,
-      libp2p as unknown as Parameters<typeof heliaLibp2pModule.withLibp2p>[1],
-    );
     const heliaWithBitswap = heliaBitswapModule.withBitswap(
       heliaWithLibp2p as Parameters<typeof heliaBitswapModule.withBitswap>[0],
       bitswap,
@@ -653,6 +663,21 @@ export class HeliaRuntimeAdapter {
     bitswap?: BitswapBlockBrokerInit;
   }): Promise<HeliaInstance> {
     return this.createHelia({ ...options, http: false });
+  }
+
+  public async createRoutingHelia(options: {
+    blockstore?: Parameters<typeof HeliaCore.createHelia>[0]['blockstore'];
+    datastore?: Parameters<typeof HeliaCore.createHelia>[0]['datastore'];
+    libp2p: HeliaLibp2pConfig | Awaited<ReturnType<typeof createLibp2p>>;
+  }): Promise<HeliaInstance> {
+    const helia = await this.createHeliaWithLibp2p({
+      ...options,
+      http: false,
+    });
+
+    await helia.start();
+
+    return helia;
   }
 
   public async createLibp2p(

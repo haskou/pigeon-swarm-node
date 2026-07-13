@@ -197,7 +197,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     options: PublicRelayConnectionOptions,
   ): Promise<IPFSConnection> {
     await this.preparePublicConnectionStorage();
-    const connection = await PublicIPFS.create({
+    const connection = await PublicIPFS.createRoutingConnection({
       announceAddresses: options.announceAddresses,
       contentRoutingEnabled: false,
       distributedHashTableEnabled: false,

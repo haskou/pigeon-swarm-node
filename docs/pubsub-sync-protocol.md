@@ -21,7 +21,17 @@ to the record topic, publishes an empty request payload, and an active relay
 replies on the record topic with its current encrypted record.
 
 The request and reply are node-to-node transport messages. They have no
-frontend consumer and never use IPNS or the public Kademlia DHT.
+frontend consumer and never use IPNS or public IPFS content blocks. Relay
+providers may announce a synthetic CID in the public Kademlia DHT so another
+node can locate and connect to them; the CID is a discovery key without a block
+payload. The encrypted relay record itself remains on the scoped gossipsub
+topic.
+
+The public relay-record connection has no HTTP or Bitswap block brokers and
+uses ephemeral blockstore/datastore instances. It still provides Kademlia,
+gossipsub and circuit-relay transport. IPFS blocks transferred through a
+private `/p2p-circuit` stream are exchanged by its endpoint nodes and are not
+retained by the public relay.
 
 ## Identity presence leases
 

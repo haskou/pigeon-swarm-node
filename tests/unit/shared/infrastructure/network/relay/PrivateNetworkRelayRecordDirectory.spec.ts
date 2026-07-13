@@ -772,7 +772,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const publicConnection = mock<IPFSConnection>();
     const sharedPrivateKey = {} as Libp2pPrivateKeyLike;
     const createPublicConnection = jest
-      .spyOn(PublicIPFS, 'create')
+      .spyOn(PublicIPFS, 'createRoutingConnection')
       .mockResolvedValue(publicConnection);
     const options = {
       enableRelayServer: true,
@@ -803,9 +803,14 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
     const blockedPeersPath = path.join(storageLocation, 'blockedPeers.json');
 
-    await fs.mkdir(path.join(storageLocation, 'datastore'), { recursive: true });
+    await fs.mkdir(path.join(storageLocation, 'datastore'), {
+      recursive: true,
+    });
     await fs.writeFile(blockedPeersPath, '["blocked-peer"]');
-    await fs.writeFile(path.join(storageLocation, 'datastore', 'stale'), 'cache');
+    await fs.writeFile(
+      path.join(storageLocation, 'datastore', 'stale'),
+      'cache',
+    );
 
     await (
       directory as unknown as {
@@ -816,7 +821,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     await expect(fs.readFile(blockedPeersPath, 'utf8')).resolves.toBe(
       '["blocked-peer"]',
     );
-    await expect(fs.access(path.join(storageLocation, 'datastore'))).rejects.toThrow();
+    await expect(
+      fs.access(path.join(storageLocation, 'datastore')),
+    ).rejects.toThrow();
   });
 });
 

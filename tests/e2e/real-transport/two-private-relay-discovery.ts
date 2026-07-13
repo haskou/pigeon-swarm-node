@@ -143,7 +143,9 @@ class E2EInstanceProcess {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        const waiter = this.waiters.find((candidate) => candidate.label === label);
+        const waiter = this.waiters.find(
+          (candidate) => candidate.label === label,
+        );
 
         if (waiter) {
           this.waiters.splice(this.waiters.indexOf(waiter), 1);
@@ -227,7 +229,8 @@ async function main(): Promise<void> {
     });
     await leaf.waitFor(
       'private relay discovery',
-      (event) => event.type === 'connected' && event.peerId === relayReady.peerId,
+      (event) =>
+        event.type === 'connected' && event.peerId === relayReady.peerId,
     );
 
     leaf.send({
@@ -242,6 +245,7 @@ async function main(): Promise<void> {
 
     await assertPostDiscoveryPubSub(relay, leaf);
     await assertOrbitDBReplication(relay, leaf);
+    const blockstores = await assertRelayBlockstoreIsolation();
 
     console.info(
       JSON.stringify(
@@ -252,6 +256,7 @@ async function main(): Promise<void> {
           relayPeerId: relayReady.peerId,
           relayPid: relayReady.pid,
           result: 'PASS',
+          blockstores,
           transportDsn: 'private-relay-public-ipfs-discovery://',
         },
         null,
@@ -262,6 +267,77 @@ async function main(): Promise<void> {
     await Promise.allSettled([leaf?.stop(), relay?.stop()]);
     await fs.remove(TMP_ROOT);
   }
+}
+
+async function assertRelayBlockstoreIsolation(): Promise<{
+  leafPrivateBlocks: number;
+  leafPublicRelayBlocks: number;
+  relayPrivateBlocks: number;
+  relayPublicRelayBlocks: number;
+}> {
+  const blockstores = {
+    leafPrivateBlocks: await countFiles(
+      path.join(TMP_ROOT, 'leaf', 'private-ipfs', 'blockstore'),
+    ),
+    leafPublicRelayBlocks: await countFiles(
+      path.join(
+        TMP_ROOT,
+        'leaf',
+        'public-ipfs',
+        'public-relay-record-directory',
+        'blockstore',
+      ),
+    ),
+    relayPrivateBlocks: await countFiles(
+      path.join(TMP_ROOT, 'relay', 'private-ipfs', 'blockstore'),
+    ),
+    relayPublicRelayBlocks: await countFiles(
+      path.join(
+        TMP_ROOT,
+        'relay',
+        'public-ipfs',
+        'public-relay-record-directory',
+        'blockstore',
+      ),
+    ),
+  };
+
+  if (
+    blockstores.leafPrivateBlocks === 0 ||
+    blockstores.relayPrivateBlocks === 0
+  ) {
+    throw new Error(
+      `Private IPFS blockstores did not retain transferred content: ${JSON.stringify(blockstores)}`,
+    );
+  }
+
+  if (
+    blockstores.leafPublicRelayBlocks !== 0 ||
+    blockstores.relayPublicRelayBlocks !== 0
+  ) {
+    throw new Error(
+      `Public relay routing nodes retained IPFS blocks: ${JSON.stringify(blockstores)}`,
+    );
+  }
+
+  return blockstores;
+}
+
+async function countFiles(directory: string): Promise<number> {
+  if (!(await fs.pathExists(directory))) {
+    return 0;
+  }
+
+  let count = 0;
+
+  for (const entry of await fs.readdir(directory)) {
+    const entryPath = path.join(directory, entry);
+    const stats = await fs.stat(entryPath);
+
+    count += stats.isDirectory() ? await countFiles(entryPath) : 1;
+  }
+
+  return count;
 }
 
 async function assertNoPreDiscoveryPubSub(
@@ -403,7 +479,9 @@ function spawnInstance(
   return new E2EInstanceProcess(role, child);
 }
 
-async function pidOf(instance: E2EInstanceProcess): Promise<number | undefined> {
+async function pidOf(
+  instance: E2EInstanceProcess,
+): Promise<number | undefined> {
   const readyEvent = await instance.waitFor(
     'pid',
     (event) => event.type === 'leaf-ready' || event.type === 'relay-ready',
