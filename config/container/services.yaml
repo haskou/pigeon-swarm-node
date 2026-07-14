@@ -971,6 +971,16 @@ services:
         @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19maW5kLWNvbW11bml0eS1jaGFubmVsLW9jY3VwYW5jaWVzX19Db21tdW5pdHlDaGFubmVsQ2FsbE9jY3VwYW5jeUZpbmRlcl9fQ29tbXVuaXR5Q2hhbm5lbENhbGxPY2N1cGFuY3lGaW5kZXI=:
+    class: >-
+      /contexts/calls/application/find-community-channel-occupancies/CommunityChannelCallOccupancyFinder
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUGFydGljaXBhbnRMZWFzZVJlcG9zaXRvcnlfX0NhbGxQYXJ0aWNpcGFudExlYXNlUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19yZWxlYXNlLXBhcnRpY2lwYW50LWxlYXNlX19DYWxsUGFydGljaXBhbnRMZWFzZVJlbGVhc2VyX19DYWxsUGFydGljaXBhbnRMZWFzZVJlbGVhc2Vy:
     class: >-
       /contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser
@@ -1823,7 +1833,7 @@ services:
     class: /contexts/communities/application/find-channels/CommunityChannelsFinder
     arguments:
       - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19maW5kLWNvbW11bml0eS1jaGFubmVsLW9jY3VwYW5jaWVzX19Db21tdW5pdHlDaGFubmVsQ2FsbE9jY3VwYW5jeUZpbmRlcl9fQ29tbXVuaXR5Q2hhbm5lbENhbGxPY2N1cGFuY3lGaW5kZXI=
       - >-
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19maW5kLWNvbW11bml0eV9fQ29tbXVuaXR5RmluZGVyX19Db21tdW5pdHlGaW5kZXI=
       - >-

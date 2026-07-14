@@ -1,4 +1,4 @@
-import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import CommunityChannelCallOccupancyFinder from '@app/contexts/calls/application/find-community-channel-occupancies/CommunityChannelCallOccupancyFinder';
 
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
@@ -10,7 +10,7 @@ export default class CommunityChannelsFinder {
   private static readonly THREAD_SUMMARY_LIMIT_PER_CHANNEL = 2;
 
   constructor(
-    private readonly callRepository: CallRepository,
+    private readonly callOccupancyFinder: CommunityChannelCallOccupancyFinder,
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
   ) {}
@@ -18,22 +18,16 @@ export default class CommunityChannelsFinder {
   private async findConnectedIdentityIdsByChannelId(
     message: CommunityChannelsFindMessage,
   ): Promise<Map<string, string[]>> {
-    const calls = await this.callRepository.findActiveByCommunity(
+    const occupancies = await this.callOccupancyFinder.find(
       message.communityId,
     );
     const connectedIdentityIdsByChannelId = new Map<string, string[]>();
 
-    for (const call of calls) {
-      const channelId = call.getCommunityChannelId();
-
-      if (!channelId) {
-        continue;
-      }
-
+    for (const occupancy of occupancies) {
       connectedIdentityIdsByChannelId.set(
-        channelId.valueOf(),
-        call
-          .getJoinedParticipantIds()
+        occupancy.getChannelId().valueOf(),
+        occupancy
+          .getConnectedIdentityIds()
           .map((participantId) => participantId.valueOf()),
       );
     }

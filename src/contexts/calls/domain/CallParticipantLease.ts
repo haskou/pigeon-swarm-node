@@ -193,6 +193,10 @@ export class CallParticipantLease extends AggregateRoot {
     return [...this.mediaConnections];
   }
 
+  public getParticipantIdentityId(): IdentityId {
+    return this.participantIdentityId;
+  }
+
   public hasTimedOut(threshold: Timestamp): boolean {
     return (
       this.status.isConnected() &&
