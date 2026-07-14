@@ -1227,7 +1227,7 @@ components:
           $ref: '#/components/schemas/CommunityChannelPermissionsResource'
         connectedIdentityIds:
           type: array
-          description: Identities currently joined to the active call for this voice channel.
+          description: Identities with a live participant lease in the active call for this voice channel.
           items:
             type: string
     CommunityResource:

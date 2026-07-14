@@ -16,6 +16,8 @@ package "calls" {
     class CallParticipantLeaseRenewer
     class CallParticipantLeaseReleaser
     class CallParticipantLeaseFinder
+    class CommunityChannelCallOccupancyFinder
+    class CommunityChannelCallOccupancy
     class CallParticipantLeaseExpirationRegistrar
     class CallSignalSender
     class CallSignalAcknowledger
@@ -181,6 +183,9 @@ CallParticipantHeartbeatRecorder --> CallParticipantLeaseRenewer
 CallParticipantLeaseRenewer ..> CallParticipantLeaseRepository
 CallParticipantLeaseReleaser ..> CallParticipantLeaseRepository
 CallParticipantLeaseFinder ..> CallParticipantLeaseRepository
+CommunityChannelCallOccupancyFinder ..> CallRepository
+CommunityChannelCallOccupancyFinder ..> CallParticipantLeaseRepository
+CommunityChannelCallOccupancyFinder --> CommunityChannelCallOccupancy
 CallParticipantLeaseExpirationRegistrar ..> CallParticipantLeaseRepository
 CallSignalSender ..> CallRepository
 CallSignalSender ..> CallSignalDeliveryRepository

@@ -2676,6 +2676,7 @@ Implemented:
 - only allow community members to list channel metadata
 - omit channels that are not visible to the authenticated member roles
 - return both text and voice channels
+- derive `connectedIdentityIds` from live call participant leases; durable call history alone does not mark an identity as connected
 - include up to 2 recent active thread summaries per text channel, ordered by
   newest reply activity and calculated from OrbitDB metadata without hydrating
   message payloads

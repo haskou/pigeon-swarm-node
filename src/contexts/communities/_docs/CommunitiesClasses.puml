@@ -194,7 +194,9 @@ package "communities/application" {
   CommunitiesFinder ..> CommunityRepository
   CommunitiesDiscoverer ..> CommunityRepository
   CommunitiesDiscoverer ..> CommunityMembershipRequestRepository
-  CommunityChannelsFinder ..> CommunityRepository
+  CommunityChannelsFinder ..> CommunityFinder
+  CommunityChannelsFinder ..> CommunityChannelMessageRepository
+  CommunityChannelsFinder ..> CommunityChannelCallOccupancyFinder
 }
 
 package "communities/domain" {
