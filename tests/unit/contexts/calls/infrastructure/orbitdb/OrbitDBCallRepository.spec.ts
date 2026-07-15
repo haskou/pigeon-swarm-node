@@ -164,7 +164,12 @@ describe('OrbitDBCallRepository', () => {
   it('starts the local projection only once', async () => {
     await projection.start();
 
-    expect(calls.events.on).toHaveBeenCalledTimes(1);
+    expect(calls.events.on).toHaveBeenCalledTimes(2);
+    expect(calls.events.on).toHaveBeenCalledWith(
+      'update',
+      expect.any(Function),
+    );
+    expect(calls.events.on).toHaveBeenCalledWith('join', expect.any(Function));
   });
 
   it('keeps all call queries current from the local projection', async () => {

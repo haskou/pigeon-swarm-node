@@ -290,7 +290,7 @@ async function main(): Promise<void> {
     );
 
     await assertPostDiscoveryPubSub(relay, leaf);
-    await assertOrbitDBReplication(relay, leaf);
+    await assertOrbitDBLateJoinReplication(relay, leaf);
     const blockstores = await assertRelayBlockstoreIsolation();
 
     console.info(
@@ -479,7 +479,7 @@ async function assertPostDiscoveryPubSub(
   );
 }
 
-async function assertOrbitDBReplication(
+async function assertOrbitDBLateJoinReplication(
   relay: E2EInstanceProcess,
   leaf: E2EInstanceProcess,
 ): Promise<void> {
@@ -494,27 +494,30 @@ async function assertOrbitDBReplication(
     address,
     type: 'open-orbit',
   });
+  await relay.waitFor(
+    'relay OrbitDB open',
+    (event) => event.type === 'orbit-open' && event.address === address,
+  );
+  relay.send({
+    document,
+    type: 'write-orbit',
+  });
+  await relay.waitFor(
+    'relay OrbitDB write',
+    (event) => event.type === 'orbit-written',
+  );
+
   leaf.send({
     address,
     expectedDocumentId: document.id,
     type: 'open-orbit',
   });
-  await Promise.all([
-    relay.waitFor(
-      'relay OrbitDB open',
-      (event) => event.type === 'orbit-open' && event.address === address,
-    ),
-    leaf.waitFor(
-      'leaf OrbitDB open',
-      (event) => event.type === 'orbit-open' && event.address === address,
-    ),
-  ]);
-  relay.send({
-    document,
-    type: 'write-orbit',
-  });
   await leaf.waitFor(
-    'OrbitDB replication',
+    'leaf OrbitDB late open',
+    (event) => event.type === 'orbit-open' && event.address === address,
+  );
+  await leaf.waitFor(
+    'OrbitDB late-join replication',
     (event) =>
       event.type === 'orbit-replicated' &&
       event.documentId === document.id &&

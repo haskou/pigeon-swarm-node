@@ -4,6 +4,7 @@ import Kernel from '@haskou/ddd-kernel';
 
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
+import { OrbitDBEntry } from './OrbitDBEntry';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
@@ -68,6 +69,21 @@ export default class OrbitDBReplicatedStateRegistry {
   private readonly documentUpdateListenerStores = new Map<
     OrbitDBReplicatedDocumentStoreName,
     WeakSet<OrbitDBDatabase>
+  >();
+
+  private readonly documentProjectionHeadSignatures = new WeakMap<
+    OrbitDBDatabase,
+    string
+  >();
+
+  private readonly documentProjectionReconciliations = new WeakMap<
+    OrbitDBDatabase,
+    Promise<void>
+  >();
+
+  private readonly pendingDocumentProjectionHeadSignatures = new WeakMap<
+    OrbitDBDatabase,
+    string | undefined
   >();
 
   private headCache?: OrbitDBReplicatedHeadCache;
@@ -153,6 +169,121 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  private documentProjectionHeadSignature(
+    heads: OrbitDBEntry[] | undefined,
+  ): string | undefined {
+    if (!heads) {
+      return undefined;
+    }
+
+    const hashes = heads
+      .map((head) => head.hash)
+      .filter((hash): hash is string => typeof hash === 'string')
+      .sort();
+
+    return hashes.length === heads.length ? JSON.stringify(hashes) : undefined;
+  }
+
+  private reconcileDocumentProjection(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+    heads: OrbitDBEntry[] | undefined,
+  ): void {
+    const headSignature = this.documentProjectionHeadSignature(heads);
+
+    if (
+      headSignature &&
+      this.documentProjectionHeadSignatures.get(store) === headSignature
+    ) {
+      return;
+    }
+
+    this.pendingDocumentProjectionHeadSignatures.set(store, headSignature);
+    this.startDocumentProjectionReconciliation(storeName, store);
+  }
+
+  private startDocumentProjectionReconciliation(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): void {
+    if (this.documentProjectionReconciliations.has(store)) {
+      return;
+    }
+
+    const reconciliation = this.drainDocumentProjectionReconciliations(
+      storeName,
+      store,
+    )
+      .catch((error: unknown) => {
+        Kernel.logger.warn?.(
+          `OrbitDB document projection reconciliation failed: store=${storeName}` +
+            ` error=${String(error)}`,
+        );
+      })
+      .finally(() => {
+        if (
+          this.documentProjectionReconciliations.get(store) === reconciliation
+        ) {
+          this.documentProjectionReconciliations.delete(store);
+        }
+
+        if (this.pendingDocumentProjectionHeadSignatures.has(store)) {
+          this.startDocumentProjectionReconciliation(storeName, store);
+        }
+      });
+
+    this.documentProjectionReconciliations.set(store, reconciliation);
+  }
+
+  private async drainDocumentProjectionReconciliations(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): Promise<void> {
+    while (this.pendingDocumentProjectionHeadSignatures.has(store)) {
+      const headSignature =
+        this.pendingDocumentProjectionHeadSignatures.get(store);
+      this.pendingDocumentProjectionHeadSignatures.delete(store);
+
+      if (
+        headSignature &&
+        this.documentProjectionHeadSignatures.get(store) === headSignature
+      ) {
+        continue;
+      }
+
+      await this.projectCanonicalDocuments(storeName, store);
+
+      if (headSignature) {
+        this.documentProjectionHeadSignatures.set(store, headSignature);
+      }
+    }
+  }
+
+  private async projectCanonicalDocuments(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): Promise<void> {
+    const listeners = this.documentUpdateListeners.get(storeName);
+
+    if (!listeners || listeners.size === 0) {
+      return;
+    }
+
+    const startedAt = process.hrtime.bigint();
+    const projectedDocuments = await this.bootstrapDocumentUpdateListener(
+      store,
+      listeners,
+    );
+    const elapsedMilliseconds =
+      Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+    Kernel.logger.debug?.(
+      `OrbitDB document projection reconciled: store=${storeName}` +
+        ` documents=${projectedDocuments}` +
+        ` durationMs=${elapsedMilliseconds.toFixed(3)}`,
+    );
+  }
+
   private registerDocumentUpdateListener(
     storeName: OrbitDBReplicatedDocumentStoreName,
     store: OrbitDBDatabase,
@@ -166,6 +297,9 @@ export default class OrbitDBReplicatedStateRegistry {
 
     store.events?.on?.('update', (entry) =>
       this.notifyDocumentUpdated(storeName, entry.payload?.value),
+    );
+    store.events?.on?.('join', (_peerId, heads) =>
+      this.reconcileDocumentProjection(storeName, store, heads),
     );
     registeredStores.add(store);
     this.documentUpdateListenerStores.set(storeName, registeredStores);
@@ -206,13 +340,15 @@ export default class OrbitDBReplicatedStateRegistry {
   private async bootstrapDocumentUpdateListener(
     store: OrbitDBDatabase,
     listeners: Set<(document: Record<string, unknown>) => void | Promise<void>>,
-  ): Promise<void> {
+  ): Promise<number> {
     const records = await this.allRecords(store);
 
     for (let index = 0; index < records.length; index++) {
       await this.notifyBootstrappedDocument(listeners, records[index].value);
       await this.yieldAfterHydrationBatch(index);
     }
+
+    return records.length;
   }
 
   private async bootstrapDocumentUpdateListeners(
