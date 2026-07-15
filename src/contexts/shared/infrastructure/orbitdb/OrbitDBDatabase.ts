@@ -18,6 +18,9 @@ export type OrbitDBDatabase = {
     on(event: 'update', handler: (entry: OrbitDBEntry) => void): void;
   };
   get?(key: string): Promise<{ key?: string; value: unknown } | unknown>;
+  log?: {
+    heads(): Promise<OrbitDBEntry[]>;
+  };
   put?(
     keyOrDocument: string | Record<string, unknown>,
     value?: unknown,

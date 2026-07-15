@@ -5,6 +5,7 @@ import Kernel from '@haskou/ddd-kernel';
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBEntry } from './OrbitDBEntry';
+import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
@@ -13,6 +14,7 @@ import ReplicatedStateNotReadyError from './ReplicatedStateNotReadyError';
 
 type PersistedHeadCacheHydration = {
   heads: number;
+  reconciledHeadSignature?: string;
   warm: boolean;
 };
 
@@ -71,19 +73,19 @@ export default class OrbitDBReplicatedStateRegistry {
     WeakSet<OrbitDBDatabase>
   >();
 
-  private readonly documentProjectionHeadSignatures = new WeakMap<
+  private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
     string
   >();
 
-  private readonly documentProjectionReconciliations = new WeakMap<
+  private readonly storeHeadReconciliations = new WeakMap<
     OrbitDBDatabase,
     Promise<void>
   >();
 
-  private readonly pendingDocumentProjectionHeadSignatures = new WeakMap<
+  private readonly pendingStoreHeadReconciliations = new WeakMap<
     OrbitDBDatabase,
-    string | undefined
+    OrbitDBPendingHeadReconciliation
   >();
 
   private headCache?: OrbitDBReplicatedHeadCache;
@@ -169,9 +171,7 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
-  private documentProjectionHeadSignature(
-    heads: OrbitDBEntry[] | undefined,
-  ): string | undefined {
+  private headSignature(heads: OrbitDBEntry[] | undefined): string | undefined {
     if (!heads) {
       return undefined;
     }
@@ -189,72 +189,89 @@ export default class OrbitDBReplicatedStateRegistry {
     store: OrbitDBDatabase,
     heads: OrbitDBEntry[] | undefined,
   ): void {
-    const headSignature = this.documentProjectionHeadSignature(heads);
+    this.reconcileStoreAfterHeadExchange(
+      store,
+      heads,
+      `document projection store=${storeName}`,
+      async (): Promise<void> =>
+        this.projectCanonicalDocuments(storeName, store),
+    );
+  }
+
+  private reconcileStoreAfterHeadExchange(
+    store: OrbitDBDatabase,
+    heads: OrbitDBEntry[] | undefined,
+    scope: string,
+    reconcile: (headSignature: string | undefined) => Promise<void>,
+  ): void {
+    const headSignature = this.headSignature(heads);
 
     if (
       headSignature &&
-      this.documentProjectionHeadSignatures.get(store) === headSignature
+      this.reconciledStoreHeadSignatures.get(store) === headSignature
     ) {
       return;
     }
 
-    this.pendingDocumentProjectionHeadSignatures.set(store, headSignature);
-    this.startDocumentProjectionReconciliation(storeName, store);
+    this.pendingStoreHeadReconciliations.set(store, {
+      headSignature,
+      reconcile,
+      scope,
+    });
+    this.startStoreHeadReconciliation(store);
   }
 
-  private startDocumentProjectionReconciliation(
-    storeName: OrbitDBReplicatedDocumentStoreName,
-    store: OrbitDBDatabase,
-  ): void {
-    if (this.documentProjectionReconciliations.has(store)) {
+  private startStoreHeadReconciliation(store: OrbitDBDatabase): void {
+    if (this.storeHeadReconciliations.has(store)) {
       return;
     }
 
-    const reconciliation = this.drainDocumentProjectionReconciliations(
-      storeName,
-      store,
-    )
-      .catch((error: unknown) => {
-        Kernel.logger.warn?.(
-          `OrbitDB document projection reconciliation failed: store=${storeName}` +
-            ` error=${String(error)}`,
-        );
-      })
-      .finally(() => {
-        if (
-          this.documentProjectionReconciliations.get(store) === reconciliation
-        ) {
-          this.documentProjectionReconciliations.delete(store);
+    const reconciliation = this.drainStoreHeadReconciliations(store).finally(
+      () => {
+        if (this.storeHeadReconciliations.get(store) === reconciliation) {
+          this.storeHeadReconciliations.delete(store);
         }
 
-        if (this.pendingDocumentProjectionHeadSignatures.has(store)) {
-          this.startDocumentProjectionReconciliation(storeName, store);
+        if (this.pendingStoreHeadReconciliations.has(store)) {
+          this.startStoreHeadReconciliation(store);
         }
-      });
+      },
+    );
 
-    this.documentProjectionReconciliations.set(store, reconciliation);
+    this.storeHeadReconciliations.set(store, reconciliation);
   }
 
-  private async drainDocumentProjectionReconciliations(
-    storeName: OrbitDBReplicatedDocumentStoreName,
+  private async drainStoreHeadReconciliations(
     store: OrbitDBDatabase,
   ): Promise<void> {
-    while (this.pendingDocumentProjectionHeadSignatures.has(store)) {
-      const headSignature =
-        this.pendingDocumentProjectionHeadSignatures.get(store);
-      this.pendingDocumentProjectionHeadSignatures.delete(store);
+    while (this.pendingStoreHeadReconciliations.has(store)) {
+      const pending = this.pendingStoreHeadReconciliations.get(store);
+      this.pendingStoreHeadReconciliations.delete(store);
+
+      if (!pending) {
+        continue;
+      }
 
       if (
-        headSignature &&
-        this.documentProjectionHeadSignatures.get(store) === headSignature
+        pending.headSignature &&
+        this.reconciledStoreHeadSignatures.get(store) === pending.headSignature
       ) {
         continue;
       }
 
-      await this.projectCanonicalDocuments(storeName, store);
+      try {
+        await pending.reconcile(pending.headSignature);
+      } catch (error) {
+        Kernel.logger.warn?.(
+          `OrbitDB head reconciliation failed: scope=${pending.scope}` +
+            ` error=${String(error)}`,
+        );
 
-      if (headSignature) {
-        this.documentProjectionHeadSignatures.set(store, headSignature);
+        continue;
+      }
+
+      if (pending.headSignature) {
+        this.reconciledStoreHeadSignatures.set(store, pending.headSignature);
       }
     }
   }
@@ -562,6 +579,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private async hydrateHeadCache(
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
+    reconciledHeadSignature?: string,
   ): Promise<number> {
     const records = await this.allRecords(stores.heads);
     let persistedAllHeads = true;
@@ -575,10 +593,64 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     if (persistedAllHeads) {
-      await this.markHeadCacheWarm(networkId);
+      await this.markHeadCacheWarm(networkId, reconciledHeadSignature);
     }
 
     return records.length;
+  }
+
+  private async currentHeadSignature(
+    store: OrbitDBDatabase,
+  ): Promise<string | undefined> {
+    try {
+      return this.headSignature(await store.log?.heads());
+    } catch (error) {
+      Kernel.logger.warn?.(
+        `OrbitDB current head signature unavailable: error=${String(error)}`,
+      );
+
+      return undefined;
+    }
+  }
+
+  private isPersistedHeadCacheCurrent(
+    persistedHeadCache: PersistedHeadCacheHydration,
+    currentHeadSignature: string | undefined,
+    canCompareHeadSignatures: boolean,
+  ): boolean {
+    if (!persistedHeadCache.warm || persistedHeadCache.heads === 0) {
+      return false;
+    }
+
+    if (!canCompareHeadSignatures) {
+      return true;
+    }
+
+    return (
+      currentHeadSignature !== undefined &&
+      persistedHeadCache.reconciledHeadSignature === currentHeadSignature
+    );
+  }
+
+  private async reconcileHeadCache(
+    networkId: string,
+    stores: OrbitDBPrivateNetworkStores,
+    reconciledHeadSignature: string | undefined,
+  ): Promise<void> {
+    const startedAt = process.hrtime.bigint();
+    const reconciledHeads = await this.hydrateHeadCache(
+      networkId,
+      stores,
+      reconciledHeadSignature,
+    );
+    const elapsedMilliseconds =
+      Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+    Kernel.logger.debug?.(
+      `OrbitDB replicated head cache reconciled: networkId=${networkId}` +
+        ` heads=${reconciledHeads}` +
+        ` durationMs=${elapsedMilliseconds.toFixed(3)}`,
+    );
   }
 
   private async hydratePersistedHeadCache(
@@ -589,8 +661,11 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     try {
-      const heads = await this.headCache.findByNetworkId(networkId);
-      const warm = await this.headCache.isWarm(networkId);
+      const [heads, reconciledHeadSignature, warm] = await Promise.all([
+        this.headCache.findByNetworkId(networkId),
+        this.headCache.findReconciledHeadSignature(networkId),
+        this.headCache.isWarm(networkId),
+      ]);
 
       heads.forEach((head) => {
         this.markPersistedHeadKey(networkId, head.key);
@@ -609,7 +684,7 @@ export default class OrbitDBReplicatedStateRegistry {
         );
       }
 
-      return { heads: heads.length, warm };
+      return { heads: heads.length, reconciledHeadSignature, warm };
     } catch (error) {
       Kernel.logger.warn?.(
         `OrbitDB replicated head cache restore failed: networkId=${networkId} error=${String(error)}`,
@@ -652,13 +727,16 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
-  private async markHeadCacheWarm(networkId: string): Promise<void> {
+  private async markHeadCacheWarm(
+    networkId: string,
+    reconciledHeadSignature?: string,
+  ): Promise<void> {
     if (!this.headCache) {
       return;
     }
 
     try {
-      await this.headCache.markWarm(networkId);
+      await this.headCache.markWarm(networkId, reconciledHeadSignature);
     } catch (error) {
       Kernel.logger.warn?.(
         `OrbitDB replicated head cache warm marker failed: networkId=${networkId} error=${String(error)}`,
@@ -1075,27 +1153,68 @@ export default class OrbitDBReplicatedStateRegistry {
     return undefined;
   }
 
+  private registerHeadCacheListeners(
+    networkId: string,
+    stores: OrbitDBPrivateNetworkStores,
+  ): void {
+    stores.heads.events?.on?.('update', (entry) =>
+      this.cacheHeadUpdate(networkId, entry),
+    );
+    stores.heads.events?.on?.('join', (_peerId, heads) =>
+      this.reconcileStoreAfterHeadExchange(
+        stores.heads,
+        heads,
+        `replicated head cache networkId=${networkId}`,
+        async (headSignature): Promise<void> =>
+          this.reconcileHeadCache(networkId, stores, headSignature),
+      ),
+    );
+  }
+
   public async register(
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
     this.storesByNetworkId.set(networkId, stores);
     this.registerDocumentUpdateListeners(stores);
-    stores.heads.events?.on?.('update', (entry) =>
-      this.cacheHeadUpdate(networkId, entry),
-    );
+    this.registerHeadCacheListeners(networkId, stores);
+
+    const currentHeadSignature = stores.heads.log
+      ? await this.currentHeadSignature(stores.heads)
+      : undefined;
 
     const persistedHeadCache = this.headCache
       ? await this.hydratePersistedHeadCache(networkId)
       : { heads: 0, warm: false };
 
-    if (persistedHeadCache.warm && persistedHeadCache.heads > 0) {
+    if (
+      this.isPersistedHeadCacheCurrent(
+        persistedHeadCache,
+        currentHeadSignature,
+        Boolean(stores.heads.log),
+      )
+    ) {
+      if (currentHeadSignature) {
+        this.reconciledStoreHeadSignatures.set(
+          stores.heads,
+          currentHeadSignature,
+        );
+      }
+
       await this.bootstrapDocumentUpdateListeners(stores);
 
       return;
     }
 
-    await this.hydrateHeadCache(networkId, stores);
+    await this.hydrateHeadCache(networkId, stores, currentHeadSignature);
+
+    if (currentHeadSignature) {
+      this.reconciledStoreHeadSignatures.set(
+        stores.heads,
+        currentHeadSignature,
+      );
+    }
+
     await this.bootstrapDocumentUpdateListeners(stores);
   }
 

@@ -14,6 +14,7 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
   private readonly entries: Array<
     OrbitDBReplicatedHeadCacheEntry & { networkId: string }
   > = [];
+  private readonly reconciledHeadSignatures = new Map<string, string>();
   private readonly warmNetworkIds = new Set<string>();
 
   public async findByNetworkId(
@@ -31,8 +32,24 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
     return this.warmNetworkIds.has(networkId);
   }
 
-  public async markWarm(networkId: string): Promise<void> {
+  public async findReconciledHeadSignature(
+    networkId: string,
+  ): Promise<string | undefined> {
+    return this.reconciledHeadSignatures.get(networkId);
+  }
+
+  public async markWarm(
+    networkId: string,
+    reconciledHeadSignature?: string,
+  ): Promise<void> {
     this.warmNetworkIds.add(networkId);
+
+    if (reconciledHeadSignature) {
+      this.reconciledHeadSignatures.set(
+        networkId,
+        reconciledHeadSignature,
+      );
+    }
   }
 
   public async save(
@@ -74,6 +91,9 @@ type Store = {
     >;
   };
   get: jest.Mock<Promise<Record<string, unknown> | undefined>, [string]>;
+  log?: {
+    heads: jest.Mock<Promise<OrbitDBEntry[]>>;
+  };
   put: jest.Mock<Promise<string>, [string | Record<string, unknown>, unknown?]>;
   query: jest.Mock<
     Promise<Record<string, unknown>[]>,
@@ -1165,6 +1185,156 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       },
     ]);
     expect(firstNetwork.heads.all).not.toHaveBeenCalled();
+  });
+
+  it('does not rebuild a warm local head cache when the OrbitDB log heads are unchanged', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+    const headSignature = JSON.stringify(['head-1']);
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1', headSignature);
+    firstNetwork.heads.log = {
+      heads: jest.fn(async () => [{ hash: 'head-1' }]),
+    };
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(registry.findCachedHead('community:community-1')).toEqual({
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    expect(firstNetwork.heads.all).not.toHaveBeenCalled();
+    expect(firstNetwork.heads.put).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds a warm local head cache when the OrbitDB log heads changed', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+    firstNetwork.heads.log = {
+      heads: jest.fn(async () => [{ hash: 'head-2' }]),
+    };
+    firstNetwork.heads.all.mockResolvedValue([
+      {
+        key: 'community:community-1',
+        value: {
+          id: 'community-1',
+          networkId: 'network-1',
+          updatedAt: 2,
+        },
+      },
+    ]);
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(registry.findCachedHead('community:community-1')).toEqual({
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 2,
+    });
+    expect(firstNetwork.heads.all).toHaveBeenCalledTimes(1);
+    expect(firstNetwork.heads.put).not.toHaveBeenCalled();
+    await expect(
+      headCache.findReconciledHeadSignature('network-1'),
+    ).resolves.toBe(JSON.stringify(['head-2']));
+  });
+
+  it('rebuilds a warm local head cache when the OrbitDB head signature cannot be read', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+    firstNetwork.heads.log = {
+      heads: jest.fn(async () => {
+        throw new Error('head storage unavailable');
+      }),
+    };
+    firstNetwork.heads.all.mockResolvedValue([
+      {
+        key: 'community:community-1',
+        value: {
+          id: 'community-1',
+          networkId: 'network-1',
+          updatedAt: 2,
+        },
+      },
+    ]);
+
+    await registry.register('network-1', firstNetwork.stores);
+
+    expect(registry.findCachedHead('community:community-1')).toEqual({
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 2,
+    });
+    expect(firstNetwork.heads.all).toHaveBeenCalledTimes(1);
+    expect(firstNetwork.heads.put).not.toHaveBeenCalled();
+  });
+
+  it('reconciles missed replicated heads once after peer synchronization', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+
+    await headCache.save('network-1', 'notification:notification-1', {
+      createdAt: 1,
+      id: 'notification-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+    firstNetwork.heads.log = {
+      heads: jest.fn(async () => [{ hash: 'head-1' }]),
+    };
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.all.mockResolvedValue([
+      {
+        key: 'notification:notification-1',
+        value: {
+          createdAt: 1,
+          id: 'notification-1',
+          updatedAt: 2,
+        },
+      },
+    ]);
+    firstNetwork.heads.all.mockClear();
+    firstNetwork.heads.put.mockClear();
+
+    firstNetwork.heads.emitJoin('peer-1', [{ hash: 'head-2' }]);
+    await flushPromises();
+
+    expect(registry.findCachedHead('notification:notification-1')).toEqual({
+      createdAt: 1,
+      id: 'notification-1',
+      updatedAt: 2,
+    });
+    expect(firstNetwork.heads.all).toHaveBeenCalledTimes(1);
+    expect(firstNetwork.heads.put).not.toHaveBeenCalled();
+
+    firstNetwork.heads.emitJoin('peer-2', [{ hash: 'head-2' }]);
+    await flushPromises();
+
+    expect(firstNetwork.heads.all).toHaveBeenCalledTimes(1);
   });
 
   it('restores derived identity handle heads from the local cache', async () => {
