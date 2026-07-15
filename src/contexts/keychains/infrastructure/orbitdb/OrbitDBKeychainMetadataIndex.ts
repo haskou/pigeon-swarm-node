@@ -246,7 +246,6 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     this.registry.cacheHeadLocally(
       this.ownerHeadKey(ownerIdentityId),
       document,
-      this.stringArrayValue(document, 'networkIds') ?? [],
     );
   }
 }

@@ -301,11 +301,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return;
     }
 
-    this.registry.cacheHeadLocally(
-      this.identityHeadKey(identityId),
-      document,
-      this.networkIdsFrom(document) ?? [],
-    );
+    this.registry.cacheHeadLocally(this.identityHeadKey(identityId), document);
   }
 
   public async deleteByExternalIdentifier(

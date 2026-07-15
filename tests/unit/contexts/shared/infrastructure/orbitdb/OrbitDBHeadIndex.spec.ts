@@ -187,7 +187,6 @@ describe('OrbitDBHeadIndex', () => {
         ownerId: 'owner',
         updatedAt: 1,
       },
-      [networkId],
     );
 
     index.replicateRecordInBackground(

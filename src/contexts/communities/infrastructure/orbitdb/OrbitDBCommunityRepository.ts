@@ -156,7 +156,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     document: OrbitDBCommunityDocument,
   ): void {
     const key = this.communityHeadKey(document.id);
-    this.registry.cacheHeadLocally(key, { ...document }, [document.networkId]);
+    this.registry.cacheHeadLocally(key, { ...document });
     this.registry.replicateHeadInBackground(
       key,
       {

@@ -4,13 +4,22 @@ export type OrbitDBReplicatedHeadCacheEntry = {
 };
 
 export default abstract class OrbitDBReplicatedHeadCache {
+  public abstract deleteByNetworkId(networkId: string): Promise<void>;
+
   public abstract findByNetworkId(
     networkId: string,
   ): Promise<OrbitDBReplicatedHeadCacheEntry[]>;
 
+  public abstract findReconciledHeadSignature(
+    networkId: string,
+  ): Promise<string | undefined>;
+
   public abstract isWarm(networkId: string): Promise<boolean>;
 
-  public abstract markWarm(networkId: string): Promise<void>;
+  public abstract markWarm(
+    networkId: string,
+    reconciledHeadSignature?: string,
+  ): Promise<void>;
 
   public abstract save(
     networkId: string,

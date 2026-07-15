@@ -38,6 +38,13 @@ export default class LocalOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHe
     );
   }
 
+  public async deleteByNetworkId(networkId: string): Promise<void> {
+    await this.database.deleteMany(
+      LocalOrbitDBReplicatedHeadCache.NAMESPACE,
+      (document) => document.networkId === networkId,
+    );
+  }
+
   public async findByNetworkId(
     networkId: string,
   ): Promise<OrbitDBReplicatedHeadCacheEntry[]> {
@@ -66,12 +73,29 @@ export default class LocalOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHe
     );
   }
 
-  public async markWarm(networkId: string): Promise<void> {
+  public async findReconciledHeadSignature(
+    networkId: string,
+  ): Promise<string | undefined> {
+    const document = await this.database.findOne(
+      LocalOrbitDBReplicatedHeadCache.WARM_NETWORK_NAMESPACE,
+      networkId,
+    );
+
+    const signature = document?.reconciledHeadSignature;
+
+    return typeof signature === 'string' ? signature : undefined;
+  }
+
+  public async markWarm(
+    networkId: string,
+    reconciledHeadSignature?: string,
+  ): Promise<void> {
     await this.database.save(
       LocalOrbitDBReplicatedHeadCache.WARM_NETWORK_NAMESPACE,
       networkId,
       {
         networkId,
+        reconciledHeadSignature,
         warmedAt: Date.now(),
       },
     );

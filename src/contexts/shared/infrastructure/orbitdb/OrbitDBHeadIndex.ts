@@ -164,14 +164,12 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     metadata: Record<string, unknown>,
     head: Record<string, unknown>,
     record: Record<string, unknown>,
-    networkIds: string[],
   ): void {
     const records = this.mergeRecords(this.recordsFromHead(head), record);
 
     this.registry.cacheHeadLocally(
       key,
       this.recordsHead(metadata, records, this.nextHeadUpdatedAt(head)),
-      networkIds,
     );
   }
 
@@ -408,13 +406,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
 
     if (queue) {
       if (cachedHead) {
-        this.cacheRecordHeadLocally(
-          key,
-          metadata,
-          cachedHead,
-          record,
-          networkIds,
-        );
+        this.cacheRecordHeadLocally(key, metadata, cachedHead, record);
       } else {
         this.addPendingRecord(key, record);
       }
