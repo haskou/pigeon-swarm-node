@@ -11,6 +11,19 @@ describe('LocalOrbitDBReplicatedHeadCache', () => {
     cache = new LocalOrbitDBReplicatedHeadCache(database);
   });
 
+  it('deletes only cached heads from the selected network', async () => {
+    await cache.deleteByNetworkId('network-1');
+
+    expect(database.deleteMany).toHaveBeenCalledWith(
+      'orbitdb_replicated_heads',
+      expect.any(Function),
+    );
+    const matcher = database.deleteMany.mock.calls[0][1];
+
+    expect(matcher({ networkId: 'network-1' })).toBe(true);
+    expect(matcher({ networkId: 'network-2' })).toBe(false);
+  });
+
   it('returns the signature of the OrbitDB heads used to reconcile the cache', async () => {
     database.findOne.mockResolvedValue({
       networkId: 'network-1',

@@ -4,6 +4,8 @@ export type OrbitDBReplicatedHeadCacheEntry = {
 };
 
 export default abstract class OrbitDBReplicatedHeadCache {
+  public abstract deleteByNetworkId(networkId: string): Promise<void>;
+
   public abstract findByNetworkId(
     networkId: string,
   ): Promise<OrbitDBReplicatedHeadCacheEntry[]>;
