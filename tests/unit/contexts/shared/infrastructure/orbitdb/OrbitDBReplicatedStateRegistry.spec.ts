@@ -1489,6 +1489,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       version: 1,
     });
     firstNetwork.identities.put.mockClear();
+    firstNetwork.heads.put.mockClear();
 
     firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
     await flushPromises();
@@ -1497,6 +1498,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     expect(firstNetwork.identities.all).toHaveBeenCalledTimes(2);
     expect(firstNetwork.identities.put).not.toHaveBeenCalled();
+    expect(firstNetwork.heads.put).not.toHaveBeenCalled();
   });
 
   it('bootstraps projections when a network is registered later', async () => {
