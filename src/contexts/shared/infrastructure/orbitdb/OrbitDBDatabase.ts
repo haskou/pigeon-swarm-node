@@ -10,7 +10,10 @@ export type OrbitDBDatabase = {
   close(): Promise<void>;
   events: {
     on(event: 'error', handler: (error: unknown) => void): void;
-    on(event: 'join', handler: (peerId: string) => void): void;
+    on(
+      event: 'join',
+      handler: (peerId: string, heads?: OrbitDBEntry[]) => void,
+    ): void;
     on(event: 'leave', handler: (peerId: string) => void): void;
     on(event: 'update', handler: (entry: OrbitDBEntry) => void): void;
   };

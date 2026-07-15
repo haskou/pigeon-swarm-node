@@ -1,6 +1,7 @@
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
+import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 
@@ -56,13 +57,19 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
 
 type Store = {
   all: jest.Mock<Promise<Entry[]>>;
+  emitJoin(peerId: string, heads: OrbitDBEntry[]): void;
   emitUpdate(entry: { payload?: { key?: string; value?: unknown } }): void;
   events: {
     on: jest.Mock<
       void,
       [
-        'update',
-        (entry: { payload?: { key?: string; value?: unknown } }) => void,
+        'join' | 'update',
+        (
+          entryOrPeerId:
+            | string
+            | { payload?: { key?: string; value?: unknown } },
+          heads?: OrbitDBEntry[],
+        ) => void,
       ]
     >;
   };
@@ -76,17 +83,29 @@ type Store = {
 
 function createStore(): Store {
   const entries: Entry[] = [];
+  const joinHandlers: Array<
+    (peerId: string, heads?: OrbitDBEntry[]) => void
+  > = [];
   const updateHandlers: Array<
     (entry: { payload?: { key?: string; value?: unknown } }) => void
   > = [];
 
   return {
     all: jest.fn(async () => entries),
+    emitJoin(peerId, heads): void {
+      joinHandlers.forEach((handler) => handler(peerId, heads));
+    },
     emitUpdate(entry): void {
       updateHandlers.forEach((handler) => handler(entry));
     },
     events: {
-      on: jest.fn((_event, handler) => {
+      on: jest.fn((event, handler) => {
+        if (event === 'join') {
+          joinHandlers.push(handler);
+
+          return;
+        }
+
         updateHandlers.push(handler);
       }),
     },
@@ -1276,7 +1295,15 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     await registry.onDocumentUpdated('calls', jest.fn());
 
-    expect(firstNetwork.calls.events.on).toHaveBeenCalledTimes(1);
+    expect(firstNetwork.calls.events.on).toHaveBeenCalledTimes(2);
+    expect(firstNetwork.calls.events.on).toHaveBeenCalledWith(
+      'update',
+      expect.any(Function),
+    );
+    expect(firstNetwork.calls.events.on).toHaveBeenCalledWith(
+      'join',
+      expect.any(Function),
+    );
     expect(firstNetwork.communities.events.on).not.toHaveBeenCalled();
   });
 
@@ -1301,6 +1328,175 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       id: 'call-1',
       networkId: 'network-1',
     });
+  });
+
+  it('reconciles persisted documents after OrbitDB completes head synchronization', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('identities', listener);
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+    await firstNetwork.identities.put({
+      cid: 'identity-v2',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      version: 2,
+    });
+
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
+    await flushPromises();
+
+    expect(listener).toHaveBeenCalledWith({
+      cid: 'identity-v2',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      version: 2,
+    });
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reconcile the same OrbitDB heads more than once', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('identities', listener);
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+    await firstNetwork.identities.put({
+      cid: 'identity-v2',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      version: 2,
+    });
+
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
+    await flushPromises();
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
+    await flushPromises();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(firstNetwork.identities.all).not.toHaveBeenCalled();
+  });
+
+  it('does not repeatedly reconcile an empty OrbitDB document store', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('identities', listener);
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+
+    firstNetwork.identities.emitJoin('peer-1', []);
+    await flushPromises();
+    firstNetwork.identities.emitJoin('peer-2', []);
+    await flushPromises();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces concurrent reconciliation for the same OrbitDB heads', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+    const delayedRecords = deferred<Entry[]>();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('identities', listener);
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+    firstNetwork.identities.all.mockImplementationOnce(
+      async () => delayedRecords.promise,
+    );
+
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
+    firstNetwork.identities.emitJoin('peer-2', [{ hash: 'head-1' }]);
+    await flushPromises();
+
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(1);
+    delayedRecords.resolve([
+      {
+        key: 'identity-1',
+        value: {
+          cid: 'identity-v2',
+          id: 'identity-1',
+          identityId: 'identity-1',
+          networkIds: ['network-1'],
+          version: 2,
+        },
+      },
+    ]);
+    await flushPromises();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces a burst of changed OrbitDB heads to the latest state', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+    const delayedRecords = deferred<Entry[]>();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('identities', listener);
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+    firstNetwork.identities.all.mockImplementationOnce(
+      async () => delayedRecords.promise,
+    );
+
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
+    firstNetwork.identities.emitJoin('peer-2', [{ hash: 'head-2' }]);
+    firstNetwork.identities.emitJoin('peer-3', [{ hash: 'head-3' }]);
+    await flushPromises();
+
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(1);
+    delayedRecords.resolve([]);
+    await flushPromises();
+
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(2);
+    firstNetwork.identities.emitJoin('peer-3', [{ hash: 'head-3' }]);
+    await flushPromises();
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(2);
+  });
+
+  it('reconciles again when the OrbitDB heads change', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const listener = jest.fn();
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.onDocumentUpdated('identities', listener);
+    listener.mockClear();
+    firstNetwork.identities.all.mockClear();
+    await firstNetwork.identities.put({
+      cid: 'identity-v1',
+      id: 'identity-1',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      version: 1,
+    });
+    firstNetwork.identities.put.mockClear();
+
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-1' }]);
+    await flushPromises();
+    firstNetwork.identities.emitJoin('peer-1', [{ hash: 'head-2' }]);
+    await flushPromises();
+
+    expect(firstNetwork.identities.all).toHaveBeenCalledTimes(2);
+    expect(firstNetwork.identities.put).not.toHaveBeenCalled();
   });
 
   it('bootstraps projections when a network is registered later', async () => {
