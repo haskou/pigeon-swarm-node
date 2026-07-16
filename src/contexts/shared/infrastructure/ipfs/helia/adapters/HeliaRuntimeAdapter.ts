@@ -445,7 +445,6 @@ export class HeliaRuntimeAdapter {
       dht: kadDHTModule.kadDHT({
         clientMode: true,
         initialQuerySelfInterval: 1_000,
-        kBucketSize: 4,
         ...(localAddressRoutingEnabled
           ? { peerInfoMapper: kadDHTModule.passthroughMapper }
           : {}),
@@ -471,7 +470,6 @@ export class HeliaRuntimeAdapter {
       ...(config.services || {}),
       dht: kadDHTModule.kadDHT({
         clientMode: false,
-        kBucketSize: 4,
         ...(localAddressRoutingEnabled
           ? { peerInfoMapper: kadDHTModule.passthroughMapper }
           : {}),
