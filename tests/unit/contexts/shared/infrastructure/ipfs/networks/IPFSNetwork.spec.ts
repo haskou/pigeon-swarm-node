@@ -249,6 +249,34 @@ describe('IPFSNetwork', () => {
     });
   });
 
+  describe('getConnectedRelayPeerIds', () => {
+    it('should return connected peers used by circuit relay addresses', () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+      const relayPeerId = '12D3KooWConnectedRelay';
+
+      connection.getPeers.mockReturnValue([relayPeerId, '12D3KooWDirectPeer']);
+      connection.getMultiaddrs.mockReturnValue([
+        `/dns4/relay.example.test/tcp/4181/p2p/${relayPeerId}/p2p-circuit/p2p/12D3KooWLocalPeer`,
+        '/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWDirectPeer',
+      ]);
+
+      expect(network.getConnectedRelayPeerIds()).toEqual([relayPeerId]);
+    });
+
+    it('should ignore stale circuit relay addresses without a live peer', () => {
+      const config = new IPFSNetworkConfig(networkId, 'net');
+      const network = new IPFSNetwork(config, connection);
+
+      connection.getPeers.mockReturnValue([]);
+      connection.getMultiaddrs.mockReturnValue([
+        '/dns4/relay.example.test/tcp/4181/p2p/12D3KooWStaleRelay/p2p-circuit',
+      ]);
+
+      expect(network.getConnectedRelayPeerIds()).toEqual([]);
+    });
+  });
+
   describe('dial', () => {
     it('should delegate to connection.dial', async () => {
       const config = new IPFSNetworkConfig(networkId, 'net');

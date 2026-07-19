@@ -432,6 +432,37 @@ describe('IPFSNetworkRegistry', () => {
 
   });
 
+  describe('getConnectedRelayPeerIds', () => {
+    it('should return unique connected relay peers from every network', () => {
+      const registry = createRegistry();
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+      const publicNetwork = mock<IPFSNetwork>();
+
+      firstNetwork.isPrivate.mockReturnValue(true);
+      firstNetwork.getConnectedRelayPeerIds.mockReturnValue([
+        '12D3KooWSharedRelay',
+      ]);
+      secondNetwork.isPrivate.mockReturnValue(true);
+      secondNetwork.getConnectedRelayPeerIds.mockReturnValue([
+        '12D3KooWSharedRelay',
+        '12D3KooWOtherRelay',
+      ]);
+      publicNetwork.isPrivate.mockReturnValue(false);
+      publicNetwork.getConnectedRelayPeerIds.mockReturnValue([
+        '12D3KooWPublicRelay',
+      ]);
+      jest
+        .spyOn(registry, 'getAll')
+        .mockReturnValue([firstNetwork, secondNetwork, publicNetwork]);
+
+      expect(registry.getConnectedRelayPeerIds()).toEqual([
+        '12D3KooWSharedRelay',
+        '12D3KooWOtherRelay',
+      ]);
+    });
+  });
+
   describe('deleteNetwork', () => {
     it('should delete IPFS and OrbitDB storage for the network', async () => {
       process.env.IPFS_STORAGE_PATH = '/tmp/pigeon-swarm-ipfs';

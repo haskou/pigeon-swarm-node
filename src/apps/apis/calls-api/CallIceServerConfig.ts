@@ -166,18 +166,24 @@ export class CallIceServerConfig {
     };
   }
 
+  private getTurnUrls(connectedRelayTurnUrls: string[]): string[] {
+    if (this.values.turnUrls.length > 0) {
+      return this.values.turnUrls;
+    }
+
+    if (!this.values.turnDiscoveryEnabled || !this.values.turnSharedSecret) {
+      return [];
+    }
+
+    return CallIceServerConfig.unique(connectedRelayTurnUrls);
+  }
+
   public toResource(
     identityId: IdentityId,
-    discoveredTurnUrls: string[] = [],
+    connectedRelayTurnUrls: string[] = [],
   ): CallIceServersResource {
     const iceServers: CallIceServerResource[] = [];
-    const turnUrls =
-      this.values.turnDiscoveryEnabled && this.values.turnSharedSecret
-        ? CallIceServerConfig.unique([
-            ...this.values.turnUrls,
-            ...discoveredTurnUrls,
-          ])
-        : this.values.turnUrls;
+    const turnUrls = this.getTurnUrls(connectedRelayTurnUrls);
 
     const hasUsableTurnServer =
       turnUrls.length > 0 && this.hasTurnCredentials();
