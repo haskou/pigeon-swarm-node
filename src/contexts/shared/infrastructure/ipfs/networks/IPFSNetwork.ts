@@ -8,6 +8,9 @@ import { IPFSNetworkConfig } from './IPFSNetworkConfig';
 import { IPFSNetworkType } from './IPFSNetworkType';
 
 export class IPFSNetwork {
+  private static readonly CIRCUIT_RELAY_PEER_PATTERN =
+    /\/p2p\/([^/]+)\/p2p-circuit(?:\/|$)/;
+
   constructor(
     private readonly config: IPFSNetworkConfig,
     private readonly connection: IPFSConnection,
@@ -147,6 +150,25 @@ export class IPFSNetwork {
 
   public getMultiaddrs(): string[] {
     return this.connection.getMultiaddrs();
+  }
+
+  public getConnectedRelayPeerIds(): string[] {
+    const connectedPeerIds = new Set(this.connection.getPeers());
+
+    return [
+      ...new Set(
+        this.connection
+          .getMultiaddrs()
+          .map(
+            (multiaddr) =>
+              multiaddr.match(IPFSNetwork.CIRCUIT_RELAY_PEER_PATTERN)?.[1],
+          )
+          .filter(
+            (peerId): peerId is string =>
+              Boolean(peerId) && connectedPeerIds.has(peerId),
+          ),
+      ),
+    ];
   }
 
   public getHeliaCore(): HeliaInstance {

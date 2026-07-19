@@ -467,4 +467,14 @@ export default class IPFSNetworkRegistry {
   public getAll(): IPFSNetwork[] {
     return [...this.getNetworks()];
   }
+
+  public getConnectedRelayPeerIds(): string[] {
+    return [
+      ...new Set(
+        this.getAll()
+          .filter((network) => network.isPrivate())
+          .flatMap((network) => network.getConnectedRelayPeerIds()),
+      ),
+    ];
+  }
 }

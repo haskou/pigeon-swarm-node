@@ -12,7 +12,9 @@ import { PrivateIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/P
 import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
-import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
+import PrivateNetworkRelayRecordDirectory, {
+  PrivateRelayListenOptions,
+} from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { PrivateKey } from '@haskou/value-objects';
@@ -42,6 +44,8 @@ const FALSE_POSITIVE_GUARD_MS = Number(
 const TCP_REACHABILITY_TIMEOUT_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_TCP_REACHABILITY_TIMEOUT_MS || 5000,
 );
+const AUTO_START_RELAY_DISCOVERY =
+  process.env.PRIVATE_RELAY_DISCOVERY_E2E_AUTO_START_RELAY_DISCOVERY !== 'false';
 
 type Command = {
   type: string;
@@ -54,6 +58,7 @@ let publicDirectoryConnection: IPFSConnection | undefined;
 let publicDirectoryPrivateKey: Libp2pPrivateKeyLike | undefined;
 let orbitdb: OrbitDBInstance | undefined;
 let documents: OrbitDBDatabase | undefined;
+let relayOptions: PrivateRelayListenOptions | undefined;
 
 async function main(): Promise<void> {
   configureEnvironment();
@@ -141,7 +146,7 @@ async function startRelay(): Promise<void> {
 
   const bytes = randomBytes(128 * 1024);
   const cid = await getNetwork().addBytes(bytes);
-  const relayOptions = {
+  relayOptions = {
     announceAddresses: [relayAddress],
     listenAddresses: [relayAddress],
     relayDataLimitBytes: 16 * 1024 * 1024,
@@ -162,20 +167,29 @@ async function startRelay(): Promise<void> {
     'public provider direct TCP multiaddr',
   );
 
-  await getDirectory().publish(
-    getNetwork(),
-    relayOptions,
-    getPublicDirectoryPrivateKey(),
-  );
-  getDirectory().start(
-    getNetwork(),
-    relayOptions,
-    getPublicDirectoryPrivateKey(),
-    {
-      discoveryEnabled: true,
-      publicationEnabled: true,
-    },
-  );
+  if (AUTO_START_RELAY_DISCOVERY) {
+    await getDirectory().publish(
+      getNetwork(),
+      relayOptions,
+      getPublicDirectoryPrivateKey(),
+    );
+    startRelayDirectory();
+  } else {
+    getDirectory().start(
+      getNetwork(),
+      relayOptions,
+      getPublicDirectoryPrivateKey(),
+      {
+        discoveryEnabled: false,
+        publicationEnabled: true,
+      },
+    );
+    await getDirectory().publish(
+      getNetwork(),
+      relayOptions,
+      getPublicDirectoryPrivateKey(),
+    );
+  }
 
   emit('relay-ready', {
     advertisedRelayAddress: relayAddress,
@@ -222,6 +236,9 @@ async function handleCommand(command: Command): Promise<void> {
     case 'start-discovery':
       await startDiscovery(command);
       return;
+    case 'start-relay-mesh':
+      await startRelayMesh(command);
+      return;
     case 'stop':
       await stopAndExit();
       return;
@@ -237,6 +254,50 @@ async function handleCommand(command: Command): Promise<void> {
     default:
       throw new Error(`Unknown command: ${command.type}`);
   }
+}
+
+function startRelayDirectory(): void {
+  if (!relayOptions) {
+    throw new Error('Relay listen options are not available.');
+  }
+
+  getDirectory().start(
+    getNetwork(),
+    relayOptions,
+    getPublicDirectoryPrivateKey(),
+    {
+      discoveryEnabled: true,
+      publicationEnabled: true,
+    },
+  );
+}
+
+async function startRelayMesh(command: Command): Promise<void> {
+  if (ROLE !== 'relay') {
+    throw new Error('Only relay instances can start relay mesh discovery.');
+  }
+
+  const remotePeerId = requiredCommandString(command, 'remotePeerId');
+
+  if (getNetwork().getPeers().includes(remotePeerId)) {
+    throw new Error(
+      `False-positive guard failed: relay is connected to ${remotePeerId} before mesh discovery.`,
+    );
+  }
+
+  startRelayDirectory();
+  emit('relay-mesh-started', { peerId: remotePeerId });
+  await waitFor(
+    () =>
+      getNetwork().getPeers().includes(remotePeerId)
+        ? getNetwork().getPeers()
+        : undefined,
+    `relay mesh peer ${remotePeerId}`,
+  );
+  emit('relay-mesh-connected', {
+    peerId: remotePeerId,
+    peers: getNetwork().getPeers(),
+  });
 }
 
 async function assertPreDiscoveryFetchMiss(command: Command): Promise<void> {

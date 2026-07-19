@@ -82,7 +82,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should include discovered TURN urls only when shared secret exists', () => {
+  it('should prefer local TURN urls over connected relay urls', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const discoveredUrl = 'turn:remote-relay.example.test:4199?transport=udp';
     const resource = CallIceServerConfig.fromEnvironment({
@@ -92,7 +92,6 @@ describe('CallIceServerConfig', () => {
 
     expect(resource.iceServers[0].urls).toEqual([
       'turn:local-relay.example.test:4199?transport=udp',
-      discoveredUrl,
     ]);
 
     const staticCredentialResource = CallIceServerConfig.fromEnvironment({
@@ -104,6 +103,39 @@ describe('CallIceServerConfig', () => {
     expect(staticCredentialResource.iceServers[0].urls).toEqual([
       'turn:local-relay.example.test:4199?transport=udp',
     ]);
+  });
+
+  it('should use the connected relay TURN urls when no local relay is configured', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    const connectedRelayTurnUrls = [
+      'turn:connected-relay.example.test:4199?transport=udp',
+      'turn:connected-relay.example.test:4199?transport=tcp',
+    ];
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+    }).toResource(identityId, connectedRelayTurnUrls);
+
+    expect(resource.iceServers[0]).toEqual({
+      credential: createHmac('sha1', 'turn-shared-secret')
+        .update(`1770003600:${identityId.valueOf()}`)
+        .digest('base64'),
+      urls: connectedRelayTurnUrls,
+      username: `1770003600:${identityId.valueOf()}`,
+    });
+  });
+
+  it('should not use connected relay TURN urls without a shared secret', () => {
+    const connectedRelayUrl =
+      'turn:connected-relay.example.test:4199?transport=udp';
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_CREDENTIAL: 'turn-password',
+      CALLS_TURN_USERNAME: 'turn-user',
+    }).toResource(identityId, [connectedRelayUrl]);
+
+    expect(resource).toEqual({
+      iceServers: [],
+      iceTransportPolicy: 'all',
+    });
   });
 
   it('should include STUN only when explicitly configured', () => {

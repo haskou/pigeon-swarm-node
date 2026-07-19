@@ -234,6 +234,11 @@ The node-to-node discovery protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md). Set
 `CALLS_TURN_DISCOVERY_ENABLED=false` to disable it.
 
+The ICE endpoint prefers the node's own configured calls relay. A leaf node
+without one uses TURN URLs only from the signed record belonging to a circuit
+relay to which it is currently connected. Configure `CALLS_TURN_SHARED_SECRET`
+with the same secret used by every coturn service in that relay pool.
+
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
 

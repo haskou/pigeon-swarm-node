@@ -30,7 +30,9 @@ export class GetCallIceServersRoute extends CallRouteSupport {
           this.networkRegistry.getRelaySettings(),
         ).toResource(
           identityId,
-          this.callRelayRecordRegistry.urlsExceptPeer(undefined),
+          this.callRelayRecordRegistry.urlsForPeers(
+            this.networkRegistry.getConnectedRelayPeerIds(),
+          ),
         ),
       );
   }

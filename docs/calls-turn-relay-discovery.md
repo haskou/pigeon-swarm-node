@@ -10,8 +10,14 @@ contract.
 Calls use WebRTC ICE. The backend does not embed a TURN server and does not
 relay media itself. A node that can expose coturn advertises the reachable TURN
 URLs to other backend nodes through the public IPFS pubsub network. Other nodes
-validate and cache those records, then include active TURN URLs in
-`GET /calls/ice-servers`.
+validate and cache those records. `GET /calls/ice-servers` uses a discovered
+record only while its publishing peer is also the currently connected circuit
+relay.
+
+Leaf nodes keep one active circuit relay per private network. Relay publishers
+connect directly to the other relay publishers they discover for that network.
+This keeps the private gossip and replication backbone connected without
+creating nested relay reservations.
 
 Frontend does not negotiate relay servers with other clients. It requests ICE
 servers from its selected backend node and passes the response to
@@ -25,7 +31,9 @@ flowchart LR
     BrowserB["Client B"] --> BackendB["Backend node B"]
 
     BackendA --> CoturnA["coturn A"]
-    BackendB -. optional .-> CoturnB["coturn B"]
+    BackendB --> CoturnB["coturn B"]
+
+    BackendA <-->|"direct private-network connection"| BackendB
 
     BackendA <--> PublicIPFS["Public IPFS network"]
     BackendB <--> PublicIPFS
@@ -36,11 +44,34 @@ flowchart LR
     Topic -. signed relay records .-> BackendB
 
     BrowserA -. WebRTC ICE .-> CoturnA
-    BrowserB -. WebRTC ICE .-> CoturnA
+    BrowserB -. WebRTC ICE .-> CoturnB
+    CoturnA <-. relayed media .-> CoturnB
 ```
 
 The public IPFS network is only used for relay discovery. WebRTC media flows
 through the TURN service selected by ICE, not through IPFS pubsub.
+
+## Multiple Relay Nodes
+
+Private relay discovery distinguishes two roles:
+
+- a leaf node selects one active relay, listens through its circuit and ignores
+  alternative records until that relay disconnects or its record expires;
+- a relay publisher keeps itself as the local active relay and dials other
+  relay publishers directly through their advertised private-network
+  multiaddrs.
+
+For each pair of relay publishers, only the lexicographically lower peer ID
+starts the direct dial. The resulting libp2p connection is bidirectional, so
+this avoids duplicate simultaneous dials while keeping every discovered relay
+pair connected. Relay publishers never listen through another relay and never
+republish records received from peers.
+
+TURN servers do not establish a control connection with each other. Each
+browser obtains credentials for the TURN server exposed by its backend side,
+and the resulting public ICE candidates are exchanged through the normal call
+signalling path. The private relay mesh is what carries that signalling and the
+associated gossip and replication between backend nodes.
 
 ## Components
 
@@ -51,7 +82,7 @@ through the TURN service selected by ICE, not through IPFS pubsub.
 | `CallRelayRecordSigner` | Signs and verifies call relay records with the shared libp2p peer key. |
 | `CallRelayRecordDiscovery` | Subscribes to the call relay pubsub topic and publishes records. |
 | `CallRelayRecordRegistry` | Keeps active discovered relay records in local memory. |
-| `CallIceServerConfig` | Builds the HTTP ICE server response from local and discovered TURN URLs. |
+| `CallIceServerConfig` | Builds the HTTP ICE server response from the local relay or the connected relay's TURN URLs. |
 | `GET /calls/ice-servers` | Authenticated frontend contract for WebRTC ICE configuration. |
 
 ## Discovery Flow
@@ -71,7 +102,7 @@ sequenceDiagram
     NodeB->>NodeB: Cache active relay record
     Client->>NodeB: GET /calls/ice-servers
     NodeB->>NodeB: Generate temporary TURN credentials
-    NodeB-->>Client: Local plus discovered ICE servers
+    NodeB-->>Client: Local or active-relay ICE server
     Client->>Client: Create RTCPeerConnection
 ```
 
@@ -164,9 +195,12 @@ Frontend calls:
 GET /calls/ice-servers
 ```
 
-The request must be signed like the rest of authenticated API calls. The backend
-returns local TURN URLs plus active discovered TURN URLs when
-`CALLS_TURN_SHARED_SECRET` is configured.
+The request must be signed like the rest of authenticated API calls. A relay
+node returns its locally configured TURN URLs. A leaf node without local TURN
+configuration returns URLs from signed records whose `peerId` matches a live
+circuit relay connection. Records from disconnected or unrelated relay peers
+are not exposed. If neither source is available, the endpoint returns no TURN
+server and preserves the existing direct-ICE fallback behavior.
 
 Example response:
 
@@ -174,10 +208,7 @@ Example response:
 {
   "iceServers": [
     {
-      "urls": [
-        "turn:local-relay.example.com:3478?transport=udp",
-        "turn:remote-relay.example.com:3478?transport=udp"
-      ],
+      "urls": ["turn:active-relay.example.com:3478?transport=udp"],
       "username": "1770003600:MCowBQYDK2VwAyEA...",
       "credential": "<temporaryHmacCredential>"
     }

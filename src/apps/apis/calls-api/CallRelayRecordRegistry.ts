@@ -34,20 +34,14 @@ export default class CallRelayRecordRegistry {
     );
   }
 
-  public allExceptPeer(
-    peerId: string | undefined,
-    now: number = Date.now(),
-  ): CallRelayRecordPrimitives[] {
-    return this.all(now).filter((record) => record.peerId !== peerId);
-  }
-
-  public urlsExceptPeer(
-    peerId: string | undefined,
-    now: number = Date.now(),
-  ): string[] {
+  public urlsForPeers(peerIds: string[], now: number = Date.now()): string[] {
     return [
       ...new Set(
-        this.allExceptPeer(peerId, now).flatMap((record) => record.urls),
+        peerIds.flatMap((peerId) => {
+          const record = this.records.get(peerId);
+
+          return record && record.expiresAt > now ? record.urls : [];
+        }),
       ),
     ];
   }

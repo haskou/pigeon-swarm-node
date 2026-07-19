@@ -411,8 +411,11 @@ Implemented:
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
 - publish signed call relay records through the public IPFS pubsub network when
   `CALLS_TURN_SHARED_SECRET` and at least one local TURN URL are configured
-- include active TURN URLs discovered from other nodes that publish signed call
-  relay records; all nodes that share those relays must use the same
+- use the node's locally configured TURN URLs when it exposes a calls relay
+- otherwise include TURN URLs only from signed call relay records whose
+  `peerId` matches a currently connected circuit relay; records from unrelated
+  or disconnected relays are ignored
+- require all nodes sharing a calls relay to use the same
   `CALLS_TURN_SHARED_SECRET`
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
   lifetime; it defaults to `3600`
@@ -2500,7 +2503,7 @@ Implemented:
 Recommended frontend invite link shape:
 
 ```text
-https://pigeon.futoineko.com/invite/community/<inviteToken>#k=<inviteSecret>
+https://node.example.com/invite/community/<inviteToken>#k=<inviteSecret>
 ```
 
 The `inviteSecret` after `#` must not be sent to the backend. Frontend encrypts
