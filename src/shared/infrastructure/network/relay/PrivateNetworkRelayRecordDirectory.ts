@@ -94,6 +94,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly activePrivateRelayDialKeys: Set<string> = new Set();
 
+  private readonly relayPublisherNetworkIds: Set<string> = new Set();
+
   private readonly activeDiscoveries = new Map<string, Promise<void>>();
 
   private readonly publicRelayRecordRegistry = new PublicRelayRecordRegistry();
@@ -478,7 +480,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.activeRelayRecords.set(network.getId(), relayRecord);
     this.activeRelayRecordObservedAt[network.getId()] = Date.now();
 
-    if (!this.activeRelayDiscoveryAttempts[network.getId()]) {
+    if (
+      !this.relayPublisherNetworkIds.has(network.getId()) &&
+      !this.activeRelayDiscoveryAttempts[network.getId()]
+    ) {
       this.markActiveRelayDiscoveryAttempt(network);
     }
   }
@@ -524,19 +529,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     return undefined;
   }
 
-  private hasActiveRelayRecord(
-    network: IPFSNetwork,
-    relayRecord: PrivateNetworkRelayRecord,
-  ): boolean {
-    const activeRelayRecord = this.findActiveRelayRecord(network);
-
-    if (!activeRelayRecord) {
-      return false;
-    }
-
-    return activeRelayRecord.peerId === relayRecord.peerId;
-  }
-
   private forgetActiveRelayRecord(networkId: string): void {
     this.activeRelayRecords.delete(networkId);
     delete this.activeRelayRecordObservedAt[networkId];
@@ -560,6 +552,22 @@ export default class PrivateNetworkRelayRecordDirectory {
     shouldDiscover: boolean;
   } {
     const activeRelayRecord = this.findActiveRelayRecord(network);
+
+    if (this.relayPublisherNetworkIds.has(network.getId())) {
+      if (!this.shouldRefreshActiveRelayDiscovery(network)) {
+        return {
+          shouldConnectRelayRecords: false,
+          shouldDiscover: false,
+        };
+      }
+
+      this.markActiveRelayDiscoveryAttempt(network);
+
+      return {
+        shouldConnectRelayRecords: false,
+        shouldDiscover: true,
+      };
+    }
 
     if (!activeRelayRecord) {
       return {
@@ -820,7 +828,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         relayRecord,
       );
       await this.saveRelayRecordEnvelope(network, envelope);
-      await this.dialPrivateRelayRecord(network, relayRecord);
+      await this.connectRelayRecord(network, relayRecord);
     });
     this.subscribedRelayRecordTopics.add(topic);
   }
@@ -943,22 +951,12 @@ export default class PrivateNetworkRelayRecordDirectory {
     publicConnection: IPFSConnection,
     network: IPFSNetwork,
   ): Promise<boolean> {
-    const routingKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
-
-    Kernel.logger.debug(
-      `Private IPFS relay record provider lookup started: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-    );
-    const providerMultiaddrs =
-      await publicConnection.findRecordProviderMultiaddrs(routingKey);
-
-    Kernel.logger.debug(
-      `Private IPFS relay record provider lookup completed: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-        ` providers=${providerMultiaddrs.length}`,
+    const providerMultiaddrs = await this.findRelayRecordProviderMultiaddrs(
+      publicConnection,
+      network,
     );
 
-    for (const multiaddr of providerMultiaddrs.slice(0, 2)) {
+    for (const multiaddr of providerMultiaddrs) {
       const relayRecord = this.providerRelayRecord(network, multiaddr);
 
       if (
@@ -981,6 +979,49 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     return false;
+  }
+
+  private async findRelayRecordProviderMultiaddrs(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<string[]> {
+    const routingKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
+
+    Kernel.logger.debug(
+      `Private IPFS relay record provider lookup started: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
+    );
+    const providerMultiaddrs = (
+      await publicConnection.findRecordProviderMultiaddrs(routingKey)
+    ).slice(0, 2);
+
+    Kernel.logger.debug(
+      `Private IPFS relay record provider lookup completed: networkId=${network.getId()}` +
+        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+        ` providers=${providerMultiaddrs.length}`,
+    );
+
+    return providerMultiaddrs;
+  }
+
+  private async connectRelayPublisherRecordProviders(
+    publicConnection: IPFSConnection,
+    network: IPFSNetwork,
+  ): Promise<void> {
+    const providerMultiaddrs = await this.findRelayRecordProviderMultiaddrs(
+      publicConnection,
+      network,
+    );
+
+    await Promise.all(
+      providerMultiaddrs.map((multiaddr) =>
+        this.connectToPublicRelayRecordProvider(
+          publicConnection,
+          network,
+          multiaddr,
+        ),
+      ),
+    );
   }
 
   private providerRelayRecord(
@@ -1078,7 +1119,13 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
     relayRecord: PrivateNetworkRelayRecord,
   ): Promise<boolean> {
-    if (this.hasActiveRelayRecord(network, relayRecord)) {
+    const activeRelayRecord = this.findActiveRelayRecord(network);
+
+    if (activeRelayRecord && activeRelayRecord.peerId !== relayRecord.peerId) {
+      return false;
+    }
+
+    if (activeRelayRecord) {
       this.rememberActiveRelayRecord(network, relayRecord);
 
       return true;
@@ -1088,6 +1135,87 @@ export default class PrivateNetworkRelayRecordDirectory {
       this.rememberActiveRelayRecord(network, relayRecord);
 
       return true;
+    }
+
+    for (const multiaddr of relayRecord.multiaddrs) {
+      if (
+        await this.connectThroughRelayMultiaddr(network, relayRecord, multiaddr)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private async connectThroughRelayMultiaddr(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+    multiaddr: string,
+  ): Promise<boolean> {
+    try {
+      if (
+        !(await this.dialDiscoveredPrivateRelay(
+          network,
+          relayRecord,
+          multiaddr,
+        ))
+      ) {
+        return false;
+      }
+
+      const circuitRelayMultiaddr =
+        this.getCircuitRelayListenMultiaddr(multiaddr);
+
+      if (!this.isListeningThroughRelay(network, multiaddr)) {
+        await network.listen(circuitRelayMultiaddr);
+        Kernel.logger.info(
+          `Private IPFS relay record listening through relay: networkId=${network.getId()}` +
+            ` peerId=${relayRecord.peerId}` +
+            ` multiaddr="${circuitRelayMultiaddr}"` +
+            ` localMultiaddrs="${network.getMultiaddrs().join(',')}"`,
+        );
+      }
+
+      this.infoWhenPrivateRelayRecordIsConnected(
+        network,
+        relayRecord,
+        multiaddr,
+      );
+      this.rememberActiveRelayRecord(network, relayRecord);
+
+      return true;
+    } catch (error) {
+      this.warnWhenPrivateRelayDialFails(
+        network,
+        relayRecord,
+        multiaddr,
+        error,
+      );
+
+      return false;
+    }
+  }
+
+  private shouldDialRelayPublisherPeer(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): boolean {
+    const localPeerId = network.getPeerId();
+
+    return (
+      localPeerId !== relayRecord.peerId &&
+      !network.getPeers().includes(relayRecord.peerId) &&
+      localPeerId < relayRecord.peerId
+    );
+  }
+
+  private async connectRelayPublisherPeer(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): Promise<boolean> {
+    if (!this.shouldDialRelayPublisherPeer(network, relayRecord)) {
+      return false;
     }
 
     for (const multiaddr of relayRecord.multiaddrs) {
@@ -1102,25 +1230,11 @@ export default class PrivateNetworkRelayRecordDirectory {
           continue;
         }
 
-        const circuitRelayMultiaddr =
-          this.getCircuitRelayListenMultiaddr(multiaddr);
-
-        if (!this.isListeningThroughRelay(network, multiaddr)) {
-          await network.listen(circuitRelayMultiaddr);
-          Kernel.logger.info(
-            `Private IPFS relay record listening through relay: networkId=${network.getId()}` +
-              ` peerId=${relayRecord.peerId}` +
-              ` multiaddr="${circuitRelayMultiaddr}"` +
-              ` localMultiaddrs="${network.getMultiaddrs().join(',')}"`,
-          );
-        }
-
-        this.infoWhenPrivateRelayRecordIsConnected(
-          network,
-          relayRecord,
-          multiaddr,
+        Kernel.logger.info(
+          `Private IPFS relay mesh peer connected: networkId=${network.getId()}` +
+            ` peerId=${relayRecord.peerId}` +
+            ` multiaddr="${multiaddr}"`,
         );
-        this.rememberActiveRelayRecord(network, relayRecord);
 
         return true;
       } catch (error) {
@@ -1134,6 +1248,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     return false;
+  }
+
+  private connectRelayRecord(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): Promise<boolean> {
+    if (this.relayPublisherNetworkIds.has(network.getId())) {
+      return this.connectRelayPublisherPeer(network, relayRecord);
+    }
+
+    return this.dialPrivateRelayRecord(network, relayRecord);
   }
 
   private schedulePublicationRetry(
@@ -1521,8 +1646,15 @@ export default class PrivateNetworkRelayRecordDirectory {
       return;
     }
 
-    if (await this.connectToRelayRecordProviders(publicConnection, network)) {
-      return;
+    if (discoveryState.shouldConnectRelayRecords) {
+      if (await this.connectToRelayRecordProviders(publicConnection, network)) {
+        return;
+      }
+    } else {
+      await this.connectRelayPublisherRecordProviders(
+        publicConnection,
+        network,
+      );
     }
 
     await this.requestRelayRecord(publicConnection, network);
@@ -1601,6 +1733,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     const networkId = network.getId();
 
     if (relayOptions && options.publicationEnabled) {
+      this.relayPublisherNetworkIds.add(networkId);
       this.startPublication(network, relayOptions, sharedPrivateKey);
     }
 
@@ -1619,6 +1752,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   public stop(networkId: string): void {
     this.forgetActiveRelayRecord(networkId);
+    this.relayPublisherNetworkIds.delete(networkId);
     this.deactivatePublicationGeneration(networkId);
     this.relayRecordEnvelopeCache.delete(networkId);
     delete this.activeRelayDiscoveryAttempts[networkId];

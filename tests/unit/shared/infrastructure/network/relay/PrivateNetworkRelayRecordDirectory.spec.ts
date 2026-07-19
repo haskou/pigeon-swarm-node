@@ -492,6 +492,152 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
   });
 
+  it('should keep one active circuit relay while it remains connected', async () => {
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const firstRelay: PrivateNetworkRelayRecord = {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: [
+        '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+      ],
+      peerId: '12D3KooWRelayA',
+      role: 'relay',
+      version: 1,
+    };
+    const secondRelay: PrivateNetworkRelayRecord = {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: [
+        '/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB',
+      ],
+      peerId: '12D3KooWRelayB',
+      role: 'relay',
+      version: 1,
+    };
+    let peers: string[] = [];
+    let multiaddrs: string[] = [];
+
+    privateConnection.getPeers.mockImplementation(() => peers);
+    privateConnection.getMultiaddrs.mockImplementation(() => multiaddrs);
+    privateConnection.dial.mockImplementation(async () => {
+      peers = [firstRelay.peerId];
+    });
+    privateConnection.listen.mockImplementation(async (multiaddr) => {
+      multiaddrs = [multiaddr];
+    });
+    const dialRelayRecord = (
+      directory as unknown as {
+        dialPrivateRelayRecord(
+          currentNetwork: IPFSNetwork,
+          relayRecord: PrivateNetworkRelayRecord,
+        ): Promise<boolean>;
+      }
+    ).dialPrivateRelayRecord.bind(directory);
+
+    await expect(dialRelayRecord(network, firstRelay)).resolves.toBe(true);
+    await expect(dialRelayRecord(network, secondRelay)).resolves.toBe(false);
+
+    expect(privateConnection.dial).toHaveBeenCalledTimes(1);
+    expect(privateConnection.dial).toHaveBeenCalledWith(
+      firstRelay.multiaddrs[0],
+      expect.any(AbortSignal),
+    );
+    expect(privateConnection.listen).toHaveBeenCalledWith(
+      `${firstRelay.multiaddrs[0]}/p2p-circuit`,
+    );
+  });
+
+  it('should connect relay publishers directly without nested circuit reservations', async () => {
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const publicConnection = mock<IPFSConnection>();
+    const networkKey = privateKey();
+    const network = privateNetwork(
+      networkKey,
+      privateConnection,
+      '12D3KooWRelayA',
+    );
+    const remoteRelay: PrivateNetworkRelayRecord = {
+      expiresAt: Date.now() + 60_000,
+      issuedAt: Date.now(),
+      multiaddrs: [
+        '/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB',
+      ],
+      peerId: '12D3KooWRelayB',
+      role: 'relay',
+      version: 1,
+    };
+    const subscriptions = new Map<
+      string,
+      (payload: string) => Promise<void>
+    >();
+
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.dial.mockResolvedValue(undefined);
+    publicConnection.dial.mockResolvedValue(undefined);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
+      '/dns4/public-provider.example.com/tcp/4001/p2p/12D3KooWPublicProvider',
+    ]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.provideRecord.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
+      subscriptions.set(topic, handler);
+
+      return Promise.resolve();
+    });
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    (
+      directory as unknown as {
+        getPublicConnection(): Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    directory.start(
+      network,
+      {
+        announceAddresses: [
+          '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+        ],
+        listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+        relayDataLimitBytes: 67_108_864,
+      },
+      mock(),
+      {
+        discoveryEnabled: true,
+        publicationEnabled: true,
+      },
+    );
+    await flushPromises();
+    await flushPromises();
+
+    const relayRecordHandler = [...subscriptions.entries()].find(
+      ([topic]) => !topic.endsWith('.request'),
+    )?.[1];
+
+    expect(relayRecordHandler).toBeDefined();
+    await relayRecordHandler?.(
+      JSON.stringify(PrivateNetworkRelayRecordCodec.seal(network, remoteRelay)),
+    );
+
+    expect(privateConnection.dial).toHaveBeenCalledWith(
+      remoteRelay.multiaddrs[0],
+      expect.any(AbortSignal),
+    );
+    expect(privateConnection.listen).not.toHaveBeenCalled();
+    expect(publicConnection.dial).toHaveBeenCalledWith(
+      expect.stringContaining('12D3KooWPublicProvider'),
+      expect.any(AbortSignal),
+    );
+    directory.stop(network.getId());
+  });
+
   it('should request a relay record when routed private relay dials fail', async () => {
     const directory = createDirectory(localDatabase);
     const privateConnection = mock<IPFSConnection>();
