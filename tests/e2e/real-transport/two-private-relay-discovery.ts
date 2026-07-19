@@ -2,11 +2,15 @@ import 'reflect-metadata';
 import 'module-alias/register';
 
 import { heliaRuntimeAdapter } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { generateKeyPairSync, randomUUID } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
-import readline from 'readline';
+
+import {
+  RealTransportInstanceEvent,
+  RealTransportInstanceProcess,
+} from './RealTransportInstanceProcess';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const RUN_ID = randomUUID();
@@ -35,12 +39,7 @@ type PublicBootstrap = Awaited<
   ReturnType<typeof heliaRuntimeAdapter.createLibp2p>
 >;
 
-type InstanceEvent = {
-  type: string;
-  [key: string]: unknown;
-};
-
-type RelayReadyEvent = InstanceEvent & {
+type RelayReadyEvent = RealTransportInstanceEvent & {
   advertisedRelayAddress: string;
   cid: string;
   peerId: string;
@@ -50,173 +49,13 @@ type RelayReadyEvent = InstanceEvent & {
   sha256: string;
 };
 
-class E2EInstanceProcess {
-  private readonly events: InstanceEvent[] = [];
-  private readonly stderrLines: string[] = [];
-  private readonly waiters: Array<{
-    label: string;
-    predicate: (event: InstanceEvent) => boolean;
-    reject(error: Error): void;
-    resolve(event: InstanceEvent): void;
-    timeout: ReturnType<typeof setTimeout>;
-  }> = [];
-
-  private exited:
-    | {
-        code: number | null;
-        signal: NodeJS.Signals | null;
-      }
-    | undefined;
-
-  public constructor(
-    private readonly role: InstanceRole,
-    private readonly child: ChildProcessWithoutNullStreams,
-  ) {
-    readline.createInterface({ input: child.stdout }).on('line', (line) => {
-      this.handleStdoutLine(line);
-    });
-    readline.createInterface({ input: child.stderr }).on('line', (line) => {
-      this.stderrLines.push(line);
-      this.stderrLines.splice(0, Math.max(0, this.stderrLines.length - 80));
-    });
-    child.stdin.on('error', (error) => {
-      this.stderrLines.push(`stdin error: ${String(error)}`);
-    });
-    child.once('exit', (code, signal) => {
-      this.exited = { code, signal };
-      this.rejectWaiters(
-        new Error(
-          `${this.role} exited before expected event: code=${code} signal=${signal} stderr="${this.stderrTail()}"`,
-        ),
-      );
-    });
-  }
-
-  private handleStdoutLine(line: string): void {
-    let event: InstanceEvent;
-
-    try {
-      event = JSON.parse(line) as InstanceEvent;
-    } catch {
-      this.stderrLines.push(`non-json stdout: ${line}`);
-
-      return;
-    }
-
-    this.events.push(event);
-    this.resolveMatchingWaiters(event);
-  }
-
-  private resolveMatchingWaiters(event: InstanceEvent): void {
-    for (const waiter of [...this.waiters]) {
-      if (!waiter.predicate(event)) {
-        continue;
-      }
-
-      clearTimeout(waiter.timeout);
-      this.waiters.splice(this.waiters.indexOf(waiter), 1);
-      waiter.resolve(event);
-    }
-  }
-
-  private rejectWaiters(error: Error): void {
-    for (const waiter of [...this.waiters]) {
-      clearTimeout(waiter.timeout);
-      waiter.reject(error);
-    }
-
-    this.waiters.splice(0);
-  }
-
-  private stderrTail(): string {
-    return this.stderrLines.slice(-20).join('\n');
-  }
-
-  public waitFor(
-    label: string,
-    predicate: (event: InstanceEvent) => boolean,
-    timeoutMs: number = WAIT_TIMEOUT_MS,
-  ): Promise<InstanceEvent> {
-    const existing = this.events.find(predicate);
-
-    if (existing) {
-      return Promise.resolve(existing);
-    }
-
-    if (this.exited) {
-      return Promise.reject(
-        new Error(
-          `${this.role} already exited while waiting for ${label}: code=${this.exited.code} signal=${this.exited.signal} stderr="${this.stderrTail()}"`,
-        ),
-      );
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        const waiter = this.waiters.find(
-          (candidate) => candidate.label === label,
-        );
-
-        if (waiter) {
-          this.waiters.splice(this.waiters.indexOf(waiter), 1);
-        }
-
-        reject(
-          new Error(
-            `Timed out waiting for ${this.role} ${label}. stderr="${this.stderrTail()}" events=${JSON.stringify(
-              this.events,
-            )}`,
-          ),
-        );
-      }, timeoutMs);
-
-      this.waiters.push({
-        label,
-        predicate,
-        reject,
-        resolve,
-        timeout,
-      });
-    });
-  }
-
-  public send(command: Record<string, unknown>): void {
-    if (this.child.stdin.destroyed || this.child.stdin.writableEnded) {
-      return;
-    }
-
-    this.child.stdin.write(`${JSON.stringify(command)}\n`);
-  }
-
-  public async stop(): Promise<void> {
-    if (!this.exited) {
-      this.send({ type: 'stop' });
-    }
-
-    await Promise.race([
-      this.waitFor('stop', (event) => event.type === 'stopped', 15000).catch(
-        (): void => {},
-      ),
-      new Promise((resolve) => setTimeout(resolve, 15000)),
-    ]);
-
-    if (!this.exited) {
-      this.child.kill('SIGTERM');
-    }
-  }
-
-  public diagnostics(): string {
-    return this.stderrTail();
-  }
-}
-
 async function main(): Promise<void> {
   await fs.remove(TMP_ROOT);
   const networkKey = generateNetworkKey();
   let bootstraps: PublicBootstrap[] = [];
   let completed = false;
-  let relay: E2EInstanceProcess | undefined;
-  let leaf: E2EInstanceProcess | undefined;
+  let relay: RealTransportInstanceProcess | undefined;
+  let leaf: RealTransportInstanceProcess | undefined;
 
   try {
     bootstraps = await Promise.all(
@@ -422,8 +261,8 @@ async function countFiles(directory: string): Promise<number> {
 }
 
 async function assertNoPreDiscoveryPubSub(
-  relay: E2EInstanceProcess,
-  leaf: E2EInstanceProcess,
+  relay: RealTransportInstanceProcess,
+  leaf: RealTransportInstanceProcess,
 ): Promise<void> {
   const topic = `pigeon-swarm.e2e.${NETWORK_ID}.pre-discovery.${randomUUID()}`;
   const payload = `payload-${randomUUID()}`;
@@ -450,8 +289,8 @@ async function assertNoPreDiscoveryPubSub(
 }
 
 async function assertPostDiscoveryPubSub(
-  relay: E2EInstanceProcess,
-  leaf: E2EInstanceProcess,
+  relay: RealTransportInstanceProcess,
+  leaf: RealTransportInstanceProcess,
 ): Promise<void> {
   const topic = `pigeon-swarm.e2e.${NETWORK_ID}.post-discovery.${randomUUID()}`;
   const payload = `payload-${randomUUID()}`;
@@ -480,8 +319,8 @@ async function assertPostDiscoveryPubSub(
 }
 
 async function assertOrbitDBLateJoinReplication(
-  relay: E2EInstanceProcess,
-  leaf: E2EInstanceProcess,
+  relay: RealTransportInstanceProcess,
+  leaf: RealTransportInstanceProcess,
 ): Promise<void> {
   const address = `${NETWORK_ID}/documents/e2e-separated-relay-${RUN_ID}`;
   const document = {
@@ -529,7 +368,7 @@ function spawnInstance(
   role: InstanceRole,
   networkKey: string,
   options: NodeJS.ProcessEnv & { bootstrapAddress: string },
-): E2EInstanceProcess {
+): RealTransportInstanceProcess {
   const { bootstrapAddress, ...extraEnv } = options;
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -560,7 +399,7 @@ function spawnInstance(
     },
   );
 
-  return new E2EInstanceProcess(role, child);
+  return new RealTransportInstanceProcess(role, child, WAIT_TIMEOUT_MS);
 }
 
 async function createPublicBootstrap(): Promise<PublicBootstrap> {
@@ -607,7 +446,7 @@ async function waitForPublicMultiaddr(
 }
 
 async function pidOf(
-  instance: E2EInstanceProcess,
+  instance: RealTransportInstanceProcess,
 ): Promise<number | undefined> {
   const readyEvent = await instance.waitFor(
     'pid',
