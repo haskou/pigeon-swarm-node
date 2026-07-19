@@ -96,6 +96,9 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly relayPublisherNetworkIds: Set<string> = new Set();
 
+  private readonly knownRelayPublisherPeerIds: Map<string, Set<string>> =
+    new Map();
+
   private readonly activeDiscoveries = new Map<string, Promise<void>>();
 
   private readonly publicRelayRecordRegistry = new PublicRelayRecordRegistry();
@@ -547,6 +550,33 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.activeRelayDiscoveryAttempts[network.getId()] = Date.now();
   }
 
+  private rememberRelayPublisherPeer(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): void {
+    if (
+      !this.relayPublisherNetworkIds.has(network.getId()) ||
+      relayRecord.peerId === network.getPeerId()
+    ) {
+      return;
+    }
+
+    const peerIds =
+      this.knownRelayPublisherPeerIds.get(network.getId()) ?? new Set<string>();
+
+    peerIds.add(relayRecord.peerId);
+    this.knownRelayPublisherPeerIds.set(network.getId(), peerIds);
+  }
+
+  private hasConnectedRelayPublisherPeer(network: IPFSNetwork): boolean {
+    const knownPeerIds = this.knownRelayPublisherPeerIds.get(network.getId());
+
+    return Boolean(
+      knownPeerIds &&
+      network.getPeers().some((peerId) => knownPeerIds.has(peerId)),
+    );
+  }
+
   private getDiscoveryState(network: IPFSNetwork): {
     shouldConnectRelayRecords: boolean;
     shouldDiscover: boolean;
@@ -554,6 +584,13 @@ export default class PrivateNetworkRelayRecordDirectory {
     const activeRelayRecord = this.findActiveRelayRecord(network);
 
     if (this.relayPublisherNetworkIds.has(network.getId())) {
+      if (!this.hasConnectedRelayPublisherPeer(network)) {
+        return {
+          shouldConnectRelayRecords: false,
+          shouldDiscover: true,
+        };
+      }
+
       if (!this.shouldRefreshActiveRelayDiscovery(network)) {
         return {
           shouldConnectRelayRecords: false,
@@ -827,6 +864,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         network,
         relayRecord,
       );
+      this.rememberRelayPublisherPeer(network, relayRecord);
       await this.saveRelayRecordEnvelope(network, envelope);
       await this.connectRelayRecord(network, relayRecord);
     });
@@ -1588,7 +1626,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     const timeout = setTimeout(() => {
       delete this.discoveryRetryTimeouts[networkId];
 
-      if (this.findActiveRelayRecord(network)) {
+      if (
+        this.relayPublisherNetworkIds.has(networkId)
+          ? this.hasConnectedRelayPublisherPeer(network)
+          : this.findActiveRelayRecord(network)
+      ) {
         return;
       }
 
@@ -1753,6 +1795,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   public stop(networkId: string): void {
     this.forgetActiveRelayRecord(networkId);
     this.relayPublisherNetworkIds.delete(networkId);
+    this.knownRelayPublisherPeerIds.delete(networkId);
     this.deactivatePublicationGeneration(networkId);
     this.relayRecordEnvelopeCache.delete(networkId);
     delete this.activeRelayDiscoveryAttempts[networkId];
