@@ -42,7 +42,7 @@
   "author": "",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "@haskou/ddd-kernel": "2.0.6",
+    "@haskou/ddd-kernel": "2.0.7",
     "@haskou/value-objects": "3.0.1",
     "@helia/bitswap": "^4.0.6",
     "@helia/http": "^4.0.5",
