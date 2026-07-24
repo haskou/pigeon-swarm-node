@@ -762,14 +762,14 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/ddd-kernel@2.0.6":
-  version "2.0.6"
-  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-2.0.6.tgz#80c7dd878b254b4e0481d52b626a7b39be63a400"
-  integrity sha512-KZSCByG6k7ZeUYXs/1II0DwSbu8teBC2x0mekj+PqmT73rfu3LSe/mKaRhMTLXoyKDOGErOr4aIAZ5G67NDZlg==
+"@haskou/ddd-kernel@2.0.7":
+  version "2.0.7"
+  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-2.0.7.tgz#f0732887d31374a65be59a75b331e3d136009856"
+  integrity sha512-DAAmbb2hcW+rABtxbHnsRFJLWMSf57E4Ct6bXdghBasWwEGWAJaz/di8iuzBnzcNpPxeQ4aOULlLt2EsrBSwqg==
   dependencies:
     "@haskou/flow" "2.0.1"
     dotenv "^17.4.2"
-    fs-extra "^11.3.6"
+    fs-extra "^11.4.0"
     node-dependency-injection "3.8.0"
 
 "@haskou/eslint-config@^0.2.1":
@@ -5065,15 +5065,6 @@ fs-constants@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/fs-constants/-/fs-constants-1.0.0.tgz#6be0de9be998ce16af8afc24497b9ee9b7ccd9ad"
   integrity sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==
-
-fs-extra@^11.3.6:
-  version "11.3.6"
-  resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-11.3.6.tgz#f7cb80e9df550cd1db6f537fa5cdd568d3e70d10"
-  integrity sha512-w8ZNZr2mKIc7qeNaQ9AVPT1+iFaI+Avd4xudVOvdDJ8VytREi1Ft5Ih7hd9jjehod8vAM5GMsfQ/TpPf4EyoEA==
-  dependencies:
-    graceful-fs "^4.2.0"
-    jsonfile "^6.0.1"
-    universalify "^2.0.0"
 
 fs-extra@^11.4.0:
   version "11.4.0"
