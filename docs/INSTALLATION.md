@@ -248,6 +248,14 @@ no explicit value interoperate by default. Configure `CALLS_TURN_SHARED_SECRET`
 with the same custom secret on every backend and coturn service in a production
 relay pool.
 
+`relayConfiguration.callsRelay.port` is advertisement data; it does not start
+or reconfigure coturn. Coturn must listen on that exact UDP/TCP port, the router
+and firewall must expose it, and the configured UDP media relay range must be
+forwarded without translation. Clients inside the relay's LAN also need NAT
+loopback or split DNS. Keep the default `CALLS_ICE_TRANSPORT_POLICY=all` until
+TURN reachability has been verified from both an external network and the relay
+LAN; set `relay` explicitly only when failed TURN access must fail the call.
+
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
 

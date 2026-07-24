@@ -13,7 +13,7 @@ describe('CallIceServerConfig', () => {
     jest.restoreAllMocks();
   });
 
-  it('should expose TURN servers with relay-only transport by default', () => {
+  it('should preserve direct ICE fallback when TURN is advertised by default', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_TURN_CREDENTIAL: 'turn-password',
       CALLS_TURN_URLS:
@@ -32,7 +32,7 @@ describe('CallIceServerConfig', () => {
           username: 'turn-user',
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
     });
   });
 
@@ -145,7 +145,7 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
     });
   });
 
@@ -175,7 +175,7 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
     });
   });
 
@@ -195,7 +195,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should not return default relay-only transport policy without TURN servers', () => {
+  it('should use the default all transport policy without TURN servers', () => {
     const emptyResource = CallIceServerConfig.fromEnvironment({}).toResource(
       identityId,
     );
