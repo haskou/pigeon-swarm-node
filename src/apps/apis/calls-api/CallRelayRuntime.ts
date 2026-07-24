@@ -8,6 +8,7 @@ import CallRelayRecordDiscovery from './CallRelayRecordDiscovery';
 import CallRelayRecordSigner from './CallRelayRecordSigner';
 
 type CallRelayRuntimeState = {
+  defaultTurnSharedSecretWarningLogged: boolean;
   publicationIntervals: Record<string, NodeJS.Timeout>;
   relaySettingsListenerRegistered: boolean;
   startedNetworkIds: string[];
@@ -28,6 +29,7 @@ export default class CallRelayRuntime implements Runtime {
     };
 
     globalState[CallRelayRuntime.globalStateKey] ??= {
+      defaultTurnSharedSecretWarningLogged: false,
       publicationIntervals: {},
       relaySettingsListenerRegistered: false,
       startedNetworkIds: [],
@@ -48,10 +50,6 @@ export default class CallRelayRuntime implements Runtime {
     }
 
     const sharedSecret = this.configuration.getTurnSharedSecret();
-
-    if (!sharedSecret) {
-      return;
-    }
 
     const issuedAt = Date.now();
     const record = await this.signer.sign(
@@ -78,6 +76,22 @@ export default class CallRelayRuntime implements Runtime {
           ` error=${String(error)}`,
       );
     }
+  }
+
+  private warnWhenUsingDefaultTurnSharedSecret(): void {
+    if (
+      !this.configuration.usesDefaultTurnSharedSecret() ||
+      this.state.defaultTurnSharedSecretWarningLogged
+    ) {
+      return;
+    }
+
+    this.state.defaultTurnSharedSecretWarningLogged = true;
+    Kernel.logger.warn(
+      'Calls TURN is using the built-in shared secret. ' +
+        'Set CALLS_TURN_SHARED_SECRET to the same custom value on every ' +
+        'backend and coturn service in the relay pool.',
+    );
   }
 
   private startPublicationInterval(network: IPFSNetwork): void {
@@ -165,6 +179,8 @@ export default class CallRelayRuntime implements Runtime {
   }
 
   public async run(): Promise<void> {
+    this.warnWhenUsingDefaultTurnSharedSecret();
+
     if (!this.configuration.isDiscoveryEnabled()) {
       return;
     }

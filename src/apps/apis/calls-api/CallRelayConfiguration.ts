@@ -4,6 +4,7 @@ import {
   RelayRuntimeSettings,
 } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 
+import { CallTurnSharedSecret } from './CallTurnSharedSecret';
 import { CallIceServerEnvironment } from './types/CallIceServerEnvironment';
 
 export class CallRelayConfiguration {
@@ -79,16 +80,20 @@ export class CallRelayConfiguration {
     ];
   }
 
-  public getTurnSharedSecret(): string | undefined {
-    return this.environment.CALLS_TURN_SHARED_SECRET;
+  public getTurnSharedSecret(): string {
+    return CallTurnSharedSecret.fromEnvironment(
+      this.environment.CALLS_TURN_SHARED_SECRET,
+    ).getValue();
+  }
+
+  public usesDefaultTurnSharedSecret(): boolean {
+    return CallTurnSharedSecret.fromEnvironment(
+      this.environment.CALLS_TURN_SHARED_SECRET,
+    ).usesDefaultValue();
   }
 
   public canPublishLocalRelay(): boolean {
-    return (
-      this.isDiscoveryEnabled() &&
-      Boolean(this.environment.CALLS_TURN_SHARED_SECRET) &&
-      this.getAdvertisedTurnUrls().length > 0
-    );
+    return this.isDiscoveryEnabled() && this.getAdvertisedTurnUrls().length > 0;
   }
 
   public getRecordTtlMs(): number {

@@ -405,22 +405,22 @@ Implemented:
 - read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
 - derive local TURN server URLs from node `relayConfiguration.publicHost` plus
   `relayConfiguration.callsRelay.port` when `CALLS_TURN_URLS` is not enough
-- when `CALLS_TURN_SHARED_SECRET` is configured, generate temporary coturn REST
-  credentials per authenticated identity:
+- generate temporary coturn REST credentials per authenticated identity using
+  `CALLS_TURN_SHARED_SECRET`, or the built-in shared fallback when it is empty:
   `username=<expiresAtUnix>:<identityId>` and
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
 - publish signed call relay records through the public IPFS pubsub network when
-  `CALLS_TURN_SHARED_SECRET` and at least one local TURN URL are configured
+  at least one local TURN URL is configured
 - use the node's locally configured TURN URLs when it exposes a calls relay
 - otherwise include TURN URLs only from signed call relay records whose
   `peerId` matches a currently connected circuit relay; records from unrelated
   or disconnected relays are ignored
-- require all nodes sharing a calls relay to use the same
-  `CALLS_TURN_SHARED_SECRET`
+- require all nodes sharing a calls relay to use the same effective TURN secret;
+  nodes without an explicit value use the same built-in fallback
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
   lifetime; it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
-  fallback when no shared secret is configured
+  override for locally configured TURN URLs when no custom shared secret exists
 - default `iceTransportPolicy` to `relay` only when a usable TURN server is
   available; without TURN URLs plus valid credentials, return `all` so clients
   can still use direct ICE candidates unless the operator explicitly configured

@@ -2,6 +2,7 @@ import { CallRelayRecord } from '@app/apps/apis/calls-api/CallRelayRecord';
 import CallRelayRecordDiscovery from '@app/apps/apis/calls-api/CallRelayRecordDiscovery';
 import CallRelayRecordSigner from '@app/apps/apis/calls-api/CallRelayRecordSigner';
 import CallRelayRuntime from '@app/apps/apis/calls-api/CallRelayRuntime';
+import { CallTurnSharedSecret } from '@app/apps/apis/calls-api/CallTurnSharedSecret';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
@@ -135,6 +136,27 @@ describe('CallRelayRuntime', () => {
         ],
         version: 1,
       }),
+    );
+  });
+
+  it('should warn once and publish with the built-in shared secret', async () => {
+    delete process.env.CALLS_TURN_SHARED_SECRET;
+    networkRegistry.getAll.mockReturnValue([publicNetwork]);
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    await runtime.run();
+    await runtime.run();
+
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Calls TURN is using the built-in shared secret. ' +
+        'Set CALLS_TURN_SHARED_SECRET to the same custom value on every ' +
+        'backend and coturn service in the relay pool.',
+    );
+    expect(signer.sign).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      CallTurnSharedSecret.DEFAULT,
     );
   });
 
