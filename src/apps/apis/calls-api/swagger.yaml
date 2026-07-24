@@ -76,7 +76,7 @@ paths:
       tags:
         - calls
       summary: Get ICE servers for WebRTC calls
-      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Production nodes should use CALLS_TURN_SHARED_SECRET so credentials are generated temporarily per authenticated identity. The default response uses iceTransportPolicy relay only when a usable TURN server can be returned; without TURN URLs plus valid credentials it returns all so clients can still use direct ICE candidates unless the operator explicitly configures relay. Nodes with CALLS_TURN_SHARED_SECRET and local TURN URLs publish signed call relay records through the IPFS pubsub network.
+      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Credentials are generated temporarily per authenticated identity using CALLS_TURN_SHARED_SECRET, or a public built-in fallback that emits an operational warning when the variable is empty. Production relay pools should configure one custom secret on every backend and coturn service. The default response uses iceTransportPolicy relay only when a usable TURN server can be returned; without TURN URLs it returns all so clients can still use direct ICE candidates unless the operator explicitly configures relay. Nodes with local TURN URLs publish signed call relay records through the IPFS pubsub network.
       responses:
         '200':
           description: ICE server configuration for the authenticated client.
@@ -345,10 +345,10 @@ components:
             type: string
         username:
           type: string
-          description: Temporary coturn REST username when CALLS_TURN_SHARED_SECRET is configured.
+          description: Temporary coturn REST username generated with the configured or built-in shared secret.
         credential:
           type: string
-          description: Temporary coturn REST HMAC credential when CALLS_TURN_SHARED_SECRET is configured.
+          description: Temporary coturn REST HMAC credential generated with the configured or built-in shared secret.
     CallScope:
       type: object
       required:

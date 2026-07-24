@@ -1765,6 +1765,15 @@ export default class Definitions {
     process.env.CALLS_TURN_URLS = 'turn:test-turn.local:3478?transport=udp';
   }
 
+  @given('calls use a test TURN server without a custom shared secret')
+  public callsUseATestTurnServerWithoutACustomSharedSecret(): void {
+    delete process.env.CALLS_TURN_CREDENTIAL;
+    delete process.env.CALLS_TURN_SHARED_SECRET;
+    delete process.env.CALLS_TURN_USERNAME;
+    process.env.CALLS_TURN_CREDENTIAL_TTL_SECONDS = '600';
+    process.env.CALLS_TURN_URLS = 'turn:test-turn.local:3478?transport=udp';
+  }
+
   @given('a remote TURN relay has been discovered for calls')
   public aRemoteTurnRelayHasBeenDiscoveredForCalls(): void {
     const callRelayRecordRegistry =

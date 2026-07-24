@@ -201,6 +201,13 @@ CALLS_TURN_SHARED_SECRET=shared-coturn-rest-secret
 CALLS_TURN_TRANSPORTS=udp,tcp
 ```
 
+When `CALLS_TURN_SHARED_SECRET` is empty, the backend uses the built-in
+`Kestrel7-Quartz9-Pigeon4-Nebula8-Harbor2-Cipher6-Orbit5-Velvet3` fallback and
+logs a warning. The official deployment stack gives coturn the same fallback.
+This makes an unconfigured relay usable, but the value is public and must be
+replaced with one custom secret shared by every backend and coturn service in a
+production relay pool.
+
 ```http
 PUT /node/relay-configuration
 ```
@@ -236,8 +243,10 @@ The node-to-node discovery protocol is documented in
 
 The ICE endpoint prefers the node's own configured calls relay. A leaf node
 without one uses TURN URLs only from the signed record belonging to a circuit
-relay to which it is currently connected. Configure `CALLS_TURN_SHARED_SECRET`
-with the same secret used by every coturn service in that relay pool.
+relay to which it is currently connected. The built-in secret lets nodes with
+no explicit value interoperate by default. Configure `CALLS_TURN_SHARED_SECRET`
+with the same custom secret on every backend and coturn service in a production
+relay pool.
 
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.
