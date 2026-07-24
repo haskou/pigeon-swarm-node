@@ -5339,10 +5339,10 @@ hasown@^2.0.2:
   dependencies:
     function-bind "^1.1.2"
 
-helia@^7.1.0:
-  version "7.1.0"
-  resolved "https://registry.yarnpkg.com/helia/-/helia-7.1.0.tgz#144e760d9d89ae8b0afff34e996cec95b62612bd"
-  integrity sha512-URKOGPhsLgRgjngCpa5OSk3RkImZBfv96oTWdWMyKCZoQRdln1XF4PX4PccSSTIp181ygGv1NNRHPQzuTFa8xw==
+helia@^7.1.1:
+  version "7.1.1"
+  resolved "https://registry.yarnpkg.com/helia/-/helia-7.1.1.tgz#5d138f2671a50c98f1ebcd0792b9e4563ec759c5"
+  integrity sha512-Gjme9l+oarxjILhFalMIByuhwHC8NM5jE287mmlqeGG0bYkF69NaIu5wy6+qPAKtR25660MuVnPikaq1kzW4yQ==
   dependencies:
     "@helia/bitswap" "^4.0.6"
     "@helia/http" "^4.0.5"
