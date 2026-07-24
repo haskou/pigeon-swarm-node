@@ -10,7 +10,13 @@ describe('CallTurnSharedSecret', () => {
     expect(secret.usesDefaultValue()).toBe(false);
   });
 
-  it.each([undefined, '', '   '])(
+  it.each([
+    undefined,
+    '',
+    '   ',
+    CallTurnSharedSecret.DEFAULT,
+    ` ${CallTurnSharedSecret.DEFAULT} `,
+  ])(
     'should use the built-in shared secret when configuration is %p',
     (configuredSecret) => {
       const secret =

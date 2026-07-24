@@ -7,9 +7,14 @@ export class CallTurnSharedSecret {
   ): CallTurnSharedSecret {
     const normalizedSecret = configuredSecret?.trim();
 
-    return normalizedSecret
-      ? new CallTurnSharedSecret(normalizedSecret, false)
-      : new CallTurnSharedSecret(CallTurnSharedSecret.DEFAULT, true);
+    if (
+      !normalizedSecret ||
+      normalizedSecret === CallTurnSharedSecret.DEFAULT
+    ) {
+      return new CallTurnSharedSecret(CallTurnSharedSecret.DEFAULT, true);
+    }
+
+    return new CallTurnSharedSecret(normalizedSecret, false);
   }
 
   private constructor(
