@@ -5,7 +5,8 @@ export type CallIceServerConfigValues = {
   turnCredential: string | undefined;
   turnCredentialTtlSeconds: number;
   turnDiscoveryEnabled: boolean;
-  turnSharedSecret: string | undefined;
+  turnSharedSecret: string;
+  turnSharedSecretConfigured: boolean;
   turnUrls: string[];
   turnUsername: string | undefined;
 };

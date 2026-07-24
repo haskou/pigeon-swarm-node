@@ -6,6 +6,7 @@ import {
 } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { createHmac } from 'crypto';
 
+import { CallTurnSharedSecret } from './CallTurnSharedSecret';
 import {
   CallIceServerResource,
   CallIceServersResource,
@@ -95,6 +96,10 @@ export class CallIceServerConfig {
     environment: CallIceServerEnvironment = pigeonEnvironment(),
     relaySettings: RelayRuntimeSettings = defaultRelayRuntimeSettings(),
   ): CallIceServerConfig {
+    const turnSharedSecret = CallTurnSharedSecret.fromEnvironment(
+      environment.CALLS_TURN_SHARED_SECRET,
+    );
+
     return new CallIceServerConfig({
       iceTransportPolicy: this.normalizeIceTransportPolicy(
         environment.CALLS_ICE_TRANSPORT_POLICY,
@@ -110,7 +115,8 @@ export class CallIceServerConfig {
       turnDiscoveryEnabled:
         environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
         environment.CALLS_TURN_DISCOVERY_ENABLED !== 'false',
-      turnSharedSecret: environment.CALLS_TURN_SHARED_SECRET,
+      turnSharedSecret: turnSharedSecret.getValue(),
+      turnSharedSecretConfigured: !turnSharedSecret.usesDefaultValue(),
       turnUrls: this.getAdvertisedTurnUrls(environment, relaySettings),
       turnUsername: environment.CALLS_TURN_USERNAME,
     });
@@ -137,16 +143,16 @@ export class CallIceServerConfig {
     return this.values.iceTransportPolicy;
   }
 
-  private hasTurnCredentials(): boolean {
-    if (this.values.turnSharedSecret) {
-      return true;
-    }
-
-    return Boolean(this.values.turnUsername && this.values.turnCredential);
-  }
-
-  private createTurnCredentials(identityId: IdentityId): TurnCredentials {
-    if (!this.values.turnSharedSecret) {
+  private createTurnCredentials(
+    identityId: IdentityId,
+    localTurnServer: boolean,
+  ): TurnCredentials {
+    if (
+      localTurnServer &&
+      !this.values.turnSharedSecretConfigured &&
+      this.values.turnUsername &&
+      this.values.turnCredential
+    ) {
       return {
         credential: this.values.turnCredential,
         username: this.values.turnUsername,
@@ -171,7 +177,7 @@ export class CallIceServerConfig {
       return this.values.turnUrls;
     }
 
-    if (!this.values.turnDiscoveryEnabled || !this.values.turnSharedSecret) {
+    if (!this.values.turnDiscoveryEnabled) {
       return [];
     }
 
@@ -185,11 +191,13 @@ export class CallIceServerConfig {
     const iceServers: CallIceServerResource[] = [];
     const turnUrls = this.getTurnUrls(connectedRelayTurnUrls);
 
-    const hasUsableTurnServer =
-      turnUrls.length > 0 && this.hasTurnCredentials();
+    const hasUsableTurnServer = turnUrls.length > 0;
 
     if (hasUsableTurnServer) {
-      const credentials = this.createTurnCredentials(identityId);
+      const credentials = this.createTurnCredentials(
+        identityId,
+        this.values.turnUrls.length > 0,
+      );
 
       iceServers.push({
         credential: credentials.credential,

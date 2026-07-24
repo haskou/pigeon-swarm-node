@@ -1,4 +1,5 @@
 import { CallIceServerConfig } from '@app/apps/apis/calls-api/CallIceServerConfig';
+import { CallTurnSharedSecret } from '@app/apps/apis/calls-api/CallTurnSharedSecret';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { createHmac } from 'crypto';
@@ -124,17 +125,57 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should not use connected relay TURN urls without a shared secret', () => {
+  it('should use connected relay TURN urls with the built-in shared secret', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const connectedRelayUrl =
       'turn:connected-relay.example.test:4199?transport=udp';
     const resource = CallIceServerConfig.fromEnvironment({
-      CALLS_TURN_CREDENTIAL: 'turn-password',
-      CALLS_TURN_USERNAME: 'turn-user',
+      CALLS_TURN_CREDENTIAL: 'local-turn-password',
+      CALLS_TURN_USERNAME: 'local-turn-user',
     }).toResource(identityId, [connectedRelayUrl]);
+    const username = `1770003600:${identityId.valueOf()}`;
 
     expect(resource).toEqual({
-      iceServers: [],
-      iceTransportPolicy: 'all',
+      iceServers: [
+        {
+          credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
+            .update(username)
+            .digest('base64'),
+          urls: [connectedRelayUrl],
+          username,
+        },
+      ],
+      iceTransportPolicy: 'relay',
+    });
+  });
+
+  it('should derive local TURN credentials from the built-in shared secret', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    const resource = CallIceServerConfig.fromEnvironment(
+      {},
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    ).toResource(identityId);
+    const username = `1770003600:${identityId.valueOf()}`;
+
+    expect(resource).toEqual({
+      iceServers: [
+        {
+          credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
+            .update(username)
+            .digest('base64'),
+          urls: [
+            'turn:relay.example.test:4199?transport=udp',
+            'turn:relay.example.test:4199?transport=tcp',
+          ],
+          username,
+        },
+      ],
+      iceTransportPolicy: 'relay',
     });
   });
 
@@ -192,15 +233,24 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should respect explicit relay-only transport policy without TURN credentials', () => {
+  it('should use built-in TURN credentials with explicit relay-only transport', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_ICE_TRANSPORT_POLICY: 'relay',
       CALLS_STUN_URLS: 'stun:stun.example.test:3478',
       CALLS_TURN_URLS: 'turn:turn.example.test:3478?transport=udp',
     }).toResource(identityId);
+    const username = `1770003600:${identityId.valueOf()}`;
 
     expect(resource).toEqual({
       iceServers: [
+        {
+          credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
+            .update(username)
+            .digest('base64'),
+          urls: ['turn:turn.example.test:3478?transport=udp'],
+          username,
+        },
         {
           urls: ['stun:stun.example.test:3478'],
         },
