@@ -1,5 +1,6 @@
 import CallRelayRuntime from '@app/apps/apis/calls-api/CallRelayRuntime';
 import CallSignalDeliveryMaintenanceRuntime from '@app/apps/runtimes/call-signal-delivery-maintenance-runtime/CallSignalDeliveryMaintenanceRuntime';
+import CallTurnConfigurationRuntime from '@app/apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime';
 import IPFSRuntime from '@app/apps/runtimes/ipfs-runtime/IPFSRuntime';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBIdentityMetadataProjectionRuntime from '@app/apps/runtimes/orbitdb-identity-metadata-projection-runtime/OrbitDBIdentityMetadataProjectionRuntime';
@@ -12,6 +13,7 @@ import { ApplicationServiceClass } from './ApplicationServiceClass';
 
 export const applicationRuntimes: ApplicationServiceClass<Runtime>[] = [
   PublicRelayRuntime,
+  CallTurnConfigurationRuntime,
   CallRelayRuntime,
   IPFSRuntime,
   OrbitDBReplicatedStateRuntime,

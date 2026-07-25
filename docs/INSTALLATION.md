@@ -185,8 +185,8 @@ Operational rules:
 ### Calls TURN/coturn setup
 
 Calls use WebRTC ICE, not the libp2p/IPFS circuit relay. The backend does not
-embed a TURN server; run coturn or an equivalent TURN service separately and let
-the backend advertise its reachable URLs.
+embed a TURN server. The official deployment runs coturn as a sidecar sharing
+the backend network namespace.
 
 The same host-level port range can be reused operationally when the protocols do
 not collide. The existing private IPFS relay range is TCP. TURN media relay
@@ -198,7 +198,6 @@ Example:
 
 ```dotenv
 CALLS_TURN_SHARED_SECRET=shared-coturn-rest-secret
-CALLS_TURN_TRANSPORTS=udp,tcp
 ```
 
 When `CALLS_TURN_SHARED_SECRET` is empty, the backend uses the built-in
@@ -216,26 +215,21 @@ PUT /node/relay-configuration
 {
   "publicHost": "relay.example.com",
   "callsRelay": {
-    "port": 3478
+    "port": 4101
+  },
+  "privateRelay": {
+    "enabled": true,
+    "portStart": 4102,
+    "portEnd": 4199
   }
 }
 ```
 
-Coturn must be configured with the same REST secret and a relay media range that
-matches the opened UDP range, for example:
-
-```text
-use-auth-secret
-static-auth-secret=shared-coturn-rest-secret
-realm=relay.example.com
-listening-port=3478
-min-port=4100
-max-port=4199
-```
-
-Expose the TURN listening port over UDP/TCP and the relay media range over UDP
-on the coturn service. Do not map those UDP ports to the backend container unless
-coturn is actually running there.
+The backend publishes this persisted configuration to the local TURN sidecar.
+Coturn listens on `callsRelay.port` and reuses the private relay range over UDP.
+It reloads automatically when the persisted configuration changes. Publish the
+configured host range over TCP for IPFS and UDP for TURN; no TURN port, media
+range, URL, or ICE policy environment variables are required.
 
 The node-to-node discovery protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md). Set
@@ -247,6 +241,12 @@ relay to which it is currently connected. The built-in secret lets nodes with
 no explicit value interoperate by default. Configure `CALLS_TURN_SHARED_SECRET`
 with the same custom secret on every backend and coturn service in a production
 relay pool.
+
+The official coturn sidecar consumes `relayConfiguration.callsRelay.port` and
+the persisted private relay range directly. The router and firewall must still
+expose the listener over UDP/TCP and the media range over UDP without
+translation. Clients inside the relay's LAN also need NAT loopback or split DNS.
+The endpoint uses `iceTransportPolicy=all` by default.
 
 - UnixFS child blocks are read sequentially on limited relay connections to avoid
   parallel stream-open failures over `/p2p-circuit`.

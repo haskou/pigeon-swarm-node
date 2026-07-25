@@ -395,7 +395,7 @@ Response:
       "credential": "<temporaryHmacCredential>"
     }
   ],
-  "iceTransportPolicy": "relay"
+  "iceTransportPolicy": "all"
 }
 ```
 
@@ -421,12 +421,12 @@ Implemented:
   lifetime; it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
   override for locally configured TURN URLs when no custom shared secret exists
-- default `iceTransportPolicy` to `relay` only when a usable TURN server is
-  available; without TURN URLs plus valid credentials, return `all` so clients
-  can still use direct ICE candidates unless the operator explicitly configured
-  `CALLS_ICE_TRANSPORT_POLICY=relay`
+- default `iceTransportPolicy` to `all` so clients can fall back to direct ICE
+  candidates when an advertised TURN service is unreachable
+- allow operators to set `CALLS_ICE_TRANSPORT_POLICY=relay` explicitly only
+  after verifying that coturn is reachable from every supported client network
 - include STUN servers only when `CALLS_STUN_URLS` is explicitly configured
-- allow `CALLS_ICE_TRANSPORT_POLICY=all` for development or trusted networks
+- allow `CALLS_ICE_TRANSPORT_POLICY=all` explicitly as well as by default
 
 TURN improves NAT traversal and hides peer IPs from the other participant, but
 it does not make large group calls cheap. A mesh group call still creates one
@@ -434,10 +434,11 @@ peer connection per participant pair. For large groups, add an SFU/media relay
 later so every client uploads one media stream and receives only the streams it
 needs.
 
-The backend does not embed a TURN server. Node relay configuration and
-discovered records only describe reachable coturn instances; the coturn
-process/service must be running and must expose its listening port and relay
-media port range. The node-to-node relay discovery protocol is documented in
+The backend does not embed a TURN server. The official coturn sidecar consumes
+the persisted listener and private relay range through a local runtime contract,
+then shares the backend network namespace. The configured host range must be
+published over TCP for IPFS and UDP for TURN. The node-to-node relay discovery
+protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md).
 
 ### Start call

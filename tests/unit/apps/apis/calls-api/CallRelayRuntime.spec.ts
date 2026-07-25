@@ -34,6 +34,20 @@ function clearCallRelayRuntimeState(): void {
   ).__pigeonSwarmCallRelayRuntime;
 }
 
+function completeRelaySettings(port = 4199): RelayRuntimeSettings {
+  return normalizeRelayRuntimeSettings({
+    callsRelay: {
+      port,
+    },
+    privateRelay: {
+      enabled: true,
+      portEnd: 4299,
+      portStart: 4201,
+    },
+    publicHost: 'relay.example.test',
+  });
+}
+
 describe('CallRelayRuntime', () => {
   let previousEnvironment: NodeJS.ProcessEnv;
   let relaySettingsChangedListener:
@@ -64,14 +78,7 @@ describe('CallRelayRuntime', () => {
     publicNetwork.getId.mockReturnValue('public-network');
     publicNetwork.isPrivate.mockReturnValue(false);
     networkRegistry.getAll.mockReturnValue([]);
-    networkRegistry.getRelaySettings.mockReturnValue(
-      normalizeRelayRuntimeSettings({
-        callsRelay: {
-          port: 4199,
-        },
-        publicHost: 'relay.example.test',
-      }),
-    );
+    networkRegistry.getRelaySettings.mockReturnValue(completeRelaySettings());
     networkRegistry.getSharedPeerPrivateKey.mockResolvedValue(
       {} as Libp2pPrivateKeyLike,
     );
@@ -200,14 +207,7 @@ describe('CallRelayRuntime', () => {
     expect(discovery.startConnection).toHaveBeenCalledWith(publicNetwork);
     expect(signer.sign).not.toHaveBeenCalled();
 
-    networkRegistry.getRelaySettings.mockReturnValue(
-      normalizeRelayRuntimeSettings({
-        callsRelay: {
-          port: 4199,
-        },
-        publicHost: 'relay.example.test',
-      }),
-    );
+    networkRegistry.getRelaySettings.mockReturnValue(completeRelaySettings());
 
     await relaySettingsChangedListener?.(networkRegistry.getRelaySettings());
 
@@ -235,6 +235,26 @@ describe('CallRelayRuntime', () => {
     );
   });
 
+  it('should publish an explicit external TURN url without a local sidecar', async () => {
+    process.env.CALLS_TURN_URLS =
+      'turn:external-relay.example.test:3478?transport=udp';
+    networkRegistry.getAll.mockReturnValue([publicNetwork]);
+    networkRegistry.getRelaySettings.mockReturnValue(
+      normalizeRelayRuntimeSettings({}),
+    );
+    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+
+    await runtime.run();
+
+    expect(signer.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urls: ['turn:external-relay.example.test:3478?transport=udp'],
+      }),
+      expect.anything(),
+      'turn-shared-secret',
+    );
+  });
+
   it('should keep publishing private network call relay records after relay settings change', async () => {
     const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
 
@@ -255,12 +275,7 @@ describe('CallRelayRuntime', () => {
     discovery.publishConnection.mockClear();
     signer.sign.mockClear();
     networkRegistry.getRelaySettings.mockReturnValue(
-      normalizeRelayRuntimeSettings({
-        callsRelay: {
-          port: 4200,
-        },
-        publicHost: 'relay.example.test',
-      }),
+      completeRelaySettings(4200),
     );
 
     await relaySettingsChangedListener?.(networkRegistry.getRelaySettings());

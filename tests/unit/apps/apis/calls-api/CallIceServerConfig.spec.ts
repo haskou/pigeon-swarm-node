@@ -13,7 +13,7 @@ describe('CallIceServerConfig', () => {
     jest.restoreAllMocks();
   });
 
-  it('should expose TURN servers with relay-only transport by default', () => {
+  it('should preserve direct ICE fallback when TURN is advertised by default', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_TURN_CREDENTIAL: 'turn-password',
       CALLS_TURN_URLS:
@@ -32,7 +32,7 @@ describe('CallIceServerConfig', () => {
           username: 'turn-user',
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
     });
   });
 
@@ -64,6 +64,11 @@ describe('CallIceServerConfig', () => {
       normalizeRelayRuntimeSettings({
         callsRelay: {
           port: 4199,
+        },
+        privateRelay: {
+          enabled: true,
+          portEnd: 4205,
+          portStart: 4201,
         },
         publicHost: 'relay.example.test',
       }),
@@ -145,7 +150,7 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
     });
   });
 
@@ -156,6 +161,11 @@ describe('CallIceServerConfig', () => {
       normalizeRelayRuntimeSettings({
         callsRelay: {
           port: 4199,
+        },
+        privateRelay: {
+          enabled: true,
+          portEnd: 4205,
+          portStart: 4201,
         },
         publicHost: 'relay.example.test',
       }),
@@ -175,8 +185,44 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'all',
     });
+  });
+
+  it('should not advertise a persisted TURN listener when its sidecar configuration is incomplete', () => {
+    const connectedRelayUrl =
+      'turn:connected-relay.example.test:4199?transport=udp';
+    const resource = CallIceServerConfig.fromEnvironment(
+      {
+        CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      },
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    ).toResource(identityId, [connectedRelayUrl]);
+
+    expect(resource.iceServers[0]?.urls).toEqual([connectedRelayUrl]);
+  });
+
+  it('should preserve explicit external TURN urls when the local sidecar is disabled', () => {
+    const explicitUrl = 'turn:external-relay.example.test:3478?transport=udp';
+    const resource = CallIceServerConfig.fromEnvironment(
+      {
+        CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+        CALLS_TURN_URLS: explicitUrl,
+      },
+      normalizeRelayRuntimeSettings({
+        callsRelay: {
+          port: 4199,
+        },
+        publicHost: 'relay.example.test',
+      }),
+    ).toResource(identityId);
+
+    expect(resource.iceServers[0]?.urls).toEqual([explicitUrl]);
   });
 
   it('should include STUN only when explicitly configured', () => {
@@ -195,7 +241,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should not return default relay-only transport policy without TURN servers', () => {
+  it('should use the default all transport policy without TURN servers', () => {
     const emptyResource = CallIceServerConfig.fromEnvironment({}).toResource(
       identityId,
     );

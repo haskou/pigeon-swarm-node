@@ -1,6 +1,5 @@
 export type CallIceServerConfigValues = {
   iceTransportPolicy: 'all' | 'relay';
-  iceTransportPolicyConfigured: boolean;
   stunUrls: string[];
   turnCredential: string | undefined;
   turnCredentialTtlSeconds: number;

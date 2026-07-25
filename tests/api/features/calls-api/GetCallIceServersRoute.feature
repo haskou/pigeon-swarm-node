@@ -9,7 +9,7 @@ Feature: Get call ICE servers
     When I GET call ICE servers
     Then response code is equal to 200
     And response body should contain "turn:test-turn.local:3478?transport=udp"
-    And response body should contain "relay"
+    And response body should contain "\"iceTransportPolicy\":\"all\""
 
   Scenario: Read TURN configuration with the built-in shared secret
     Given calls use a test TURN server without a custom shared secret
@@ -17,7 +17,7 @@ Feature: Get call ICE servers
     When I GET call ICE servers
     Then response code is equal to 200
     And response body should contain "turn:test-turn.local:3478?transport=udp"
-    And response body should contain "relay"
+    And response body should contain "\"iceTransportPolicy\":\"all\""
 
   Scenario: Prefer the node-configured TURN relay over unrelated records
     Given calls use a test TURN server
