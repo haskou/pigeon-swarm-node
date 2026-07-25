@@ -67,6 +67,10 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 7 * 24 * 60 * 60 * 1000,
     type: 'number',
   },
+  PIGEON_TURN_RUNTIME_CONFIG_PATH: {
+    defaultValue: './var/cache/calls-turn-runtime.conf',
+    type: 'string',
+  },
   PUBSUB_TOPIC_PREFIX: { defaultValue: 'pigeon-swarm', type: 'string' },
   PUSH_VAPID_PRIVATE_KEY: { type: 'string' },
   PUSH_VAPID_PUBLIC_KEY: { type: 'string' },

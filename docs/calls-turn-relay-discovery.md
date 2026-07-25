@@ -262,22 +262,25 @@ process bindings do not collide. In practice:
 flowchart LR
     subgraph Backend["Backend process"]
         IPFSRelay["Private IPFS relay<br/>TCP 4100-4199"]
+        RuntimeConfig["Persisted TURN runtime contract"]
         Discovery["TURN discovery publisher<br/>public IPFS pubsub"]
     end
 
     subgraph Coturn["coturn process"]
-        TurnListen["TURN listen<br/>UDP/TCP 3478"]
-        TurnMedia["TURN media relay<br/>UDP 4100-4199"]
+        TurnListen["TURN listen<br/>UDP/TCP 4101"]
+        TurnMedia["TURN media relay<br/>UDP 4102-4199"]
     end
 
-    Discovery --> TurnRecord["Advertised URL<br/>turn:host:3478"]
+    RuntimeConfig --> TurnListen
+    Discovery --> TurnRecord["Advertised URL<br/>turn:host:4101"]
     TurnRecord --> Clients["WebRTC clients"]
     Clients --> TurnListen
     TurnListen --> TurnMedia
 ```
 
-Do not map TURN UDP ports to the backend container unless coturn is actually
-running there.
+The official Compose stack shares the backend network namespace with coturn, so
+the same published host range carries private IPFS over TCP and TURN media over
+UDP.
 
 ## Configuration
 
@@ -295,6 +298,22 @@ running there.
 When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
 `relayConfiguration.publicHost` and `relayConfiguration.callsRelay.port` in
 `PUT /node/relay-configuration`.
+
+The official deployment does not duplicate TURN ports in environment
+variables. The backend atomically publishes
+`/run/pigeon/calls-turn-runtime.conf` from the persisted node configuration:
+
+```text
+version=1
+enabled=true
+listening_port=4101
+relay_port_start=4102
+relay_port_end=4199
+```
+
+Coturn observes this local-only contract and reloads when it changes. The
+listener must be outside the media relay range. Incomplete or conflicting
+persisted configuration publishes `enabled=false` and stops the sidecar.
 
 ## Operational States
 

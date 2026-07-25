@@ -434,12 +434,11 @@ peer connection per participant pair. For large groups, add an SFU/media relay
 later so every client uploads one media stream and receives only the streams it
 needs.
 
-The backend does not embed a TURN server. Node relay configuration and
-discovered records only describe reachable coturn instances; the coturn
-process/service must be running and must expose its listening port and relay
-media port range. Configuring `relayConfiguration.callsRelay.port` only
-advertises that port; it does not configure or start coturn. The node-to-node
-relay discovery protocol is documented in
+The backend does not embed a TURN server. The official coturn sidecar consumes
+the persisted listener and private relay range through a local runtime contract,
+then shares the backend network namespace. The configured host range must be
+published over TCP for IPFS and UDP for TURN. The node-to-node relay discovery
+protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md).
 
 ### Start call

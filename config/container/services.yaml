@@ -19,6 +19,12 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19hcHBzX19ydW50aW1lc19fY2FsbC10dXJuLWNvbmZpZ3VyYXRpb24tcnVudGltZV9fQ2FsbFR1cm5SdW50aW1lQ29uZmlndXJhdGlvblB1Ymxpc2hlcl9fQ2FsbFR1cm5SdW50aW1lQ29uZmlndXJhdGlvblB1Ymxpc2hlcg==:
+    class: >-
+      /apps/runtimes/call-turn-configuration-runtime/CallTurnRuntimeConfigurationPublisher
+    arguments: []
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19zdGFydC1jYWxsX19Db21tdW5pdHlDaGFubmVsQ2FsbFN0YXJ0Q29vcmRpbmF0b3JfX0NvbW11bml0eUNoYW5uZWxDYWxsU3RhcnRDb29yZGluYXRvcg==:
     class: >-
       /contexts/calls/application/start-call/CommunityChannelCallStartCoordinator
@@ -951,6 +957,16 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeQ==
       - >-
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fc2VydmljZXNfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlU2lnbmF0dXJlRG9tYWluU2VydmljZV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VTaWduYXR1cmVEb21haW5TZXJ2aWNl
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19hcHBzX19ydW50aW1lc19fY2FsbC10dXJuLWNvbmZpZ3VyYXRpb24tcnVudGltZV9fQ2FsbFR1cm5Db25maWd1cmF0aW9uUnVudGltZV9fQ2FsbFR1cm5Db25maWd1cmF0aW9uUnVudGltZQ==:
+    class: >-
+      /apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9faXBmc19fbmV0d29ya3NfX0lQRlNOZXR3b3JrUmVnaXN0cnlfX0lQRlNOZXR3b3JrUmVnaXN0cnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19hcHBzX19ydW50aW1lc19fY2FsbC10dXJuLWNvbmZpZ3VyYXRpb24tcnVudGltZV9fQ2FsbFR1cm5SdW50aW1lQ29uZmlndXJhdGlvblB1Ymxpc2hlcl9fQ2FsbFR1cm5SdW50aW1lQ29uZmlndXJhdGlvblB1Ymxpc2hlcg==
     abstract: false
     parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2FwcGxpY2F0aW9uX19hY2tub3dsZWRnZS1zaWduYWxfX0NhbGxTaWduYWxBY2tub3dsZWRnZXJfX0NhbGxTaWduYWxBY2tub3dsZWRnZXI=:
