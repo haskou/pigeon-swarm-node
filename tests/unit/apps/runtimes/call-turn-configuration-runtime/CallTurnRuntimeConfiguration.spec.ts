@@ -1,4 +1,4 @@
-import { CallTurnRuntimeConfiguration } from '@app/apps/runtimes/call-turn-configuration-runtime/CallTurnRuntimeConfiguration';
+import { CallTurnRuntimeConfiguration } from '@app/shared/infrastructure/network/relay/CallTurnRuntimeConfiguration';
 import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 
 describe('CallTurnRuntimeConfiguration', () => {
@@ -28,6 +28,10 @@ describe('CallTurnRuntimeConfiguration', () => {
         '',
       ].join('\n'),
     );
+    expect(configuration.getTurnUrls(['udp', 'tcp'])).toEqual([
+      'turn:relay.example.test:4101?transport=udp',
+      'turn:relay.example.test:4101?transport=tcp',
+    ]);
   });
 
   it.each([
@@ -77,6 +81,7 @@ describe('CallTurnRuntimeConfiguration', () => {
       expect(configuration.serialize()).toBe(
         ['version=1', 'enabled=false', ''].join('\n'),
       );
+      expect(configuration.getTurnUrls(['udp', 'tcp'])).toEqual([]);
     },
   );
 });

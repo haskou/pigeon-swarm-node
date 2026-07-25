@@ -1,4 +1,5 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { CallTurnRuntimeConfiguration } from '@app/shared/infrastructure/network/relay/CallTurnRuntimeConfiguration';
 import {
   defaultRelayRuntimeSettings,
   RelayRuntimeSettings,
@@ -37,10 +38,6 @@ export class CallRelayConfiguration {
       .filter((item) => item.length > 0);
   }
 
-  private getPublicHost(): string | undefined {
-    return this.relaySettings.publicHost;
-  }
-
   private getTurnTransports(): string[] {
     const configuredTransports = this.splitEnvironmentList(
       this.environment.CALLS_TURN_TRANSPORTS,
@@ -52,16 +49,9 @@ export class CallRelayConfiguration {
   }
 
   private getGeneratedTurnUrls(): string[] {
-    const publicHost = this.getPublicHost();
-    const port = this.relaySettings.callsRelay.port;
-
-    if (!publicHost || port === undefined) {
-      return [];
-    }
-
-    return this.getTurnTransports().map(
-      (transport) => `turn:${publicHost}:${port}?transport=${transport}`,
-    );
+    return CallTurnRuntimeConfiguration.fromRelaySettings(
+      this.relaySettings,
+    ).getTurnUrls(this.getTurnTransports());
   }
 
   public isDiscoveryEnabled(): boolean {

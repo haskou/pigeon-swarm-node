@@ -1,5 +1,5 @@
-import { CallTurnRuntimeConfiguration } from '@app/apps/runtimes/call-turn-configuration-runtime/CallTurnRuntimeConfiguration';
 import CallTurnRuntimeConfigurationPublisher from '@app/apps/runtimes/call-turn-configuration-runtime/CallTurnRuntimeConfigurationPublisher';
+import { CallTurnRuntimeConfiguration } from '@app/shared/infrastructure/network/relay/CallTurnRuntimeConfiguration';
 import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { mkdtemp, readFile, rm } from 'fs/promises';
 import { tmpdir } from 'os';

@@ -1,8 +1,7 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { CallTurnRuntimeConfiguration } from '@app/shared/infrastructure/network/relay/CallTurnRuntimeConfiguration';
 import { mkdir, rename, rm, writeFile } from 'fs/promises';
 import path from 'path';
-
-import { CallTurnRuntimeConfiguration } from './CallTurnRuntimeConfiguration';
 
 export default class CallTurnRuntimeConfigurationPublisher {
   private get configurationPath(): string {

@@ -1,9 +1,9 @@
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Runtime } from '@app/shared/infrastructure/lifecycle/Runtime';
+import { CallTurnRuntimeConfiguration } from '@app/shared/infrastructure/network/relay/CallTurnRuntimeConfiguration';
 import { RelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import Kernel from '@haskou/ddd-kernel';
 
-import { CallTurnRuntimeConfiguration } from './CallTurnRuntimeConfiguration';
 import CallTurnRuntimeConfigurationPublisher from './CallTurnRuntimeConfigurationPublisher';
 
 export default class CallTurnConfigurationRuntime implements Runtime {

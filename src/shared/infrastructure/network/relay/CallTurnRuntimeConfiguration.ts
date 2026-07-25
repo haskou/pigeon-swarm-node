@@ -4,7 +4,12 @@ export class CallTurnRuntimeConfiguration {
   private static readonly VERSION = 1;
 
   private static isPort(value: number | undefined): value is number {
-    return Number.isInteger(value);
+    return (
+      Number.isInteger(value) &&
+      value !== undefined &&
+      value >= 1 &&
+      value <= 65535
+    );
   }
 
   private static isValidRelayPortRange(
@@ -44,6 +49,7 @@ export class CallTurnRuntimeConfiguration {
 
     return new CallTurnRuntimeConfiguration(
       hasCompleteConfiguration,
+      settings.publicHost,
       listeningPort,
       relayPortRange[0],
       relayPortRange[1],
@@ -52,6 +58,7 @@ export class CallTurnRuntimeConfiguration {
 
   public constructor(
     private readonly enabled: boolean,
+    private readonly publicHost: string | undefined,
     private readonly listeningPort: number | undefined,
     private readonly relayPortStart: number | undefined,
     private readonly relayPortEnd: number | undefined,
@@ -59,6 +66,21 @@ export class CallTurnRuntimeConfiguration {
 
   public isEnabled(): boolean {
     return this.enabled;
+  }
+
+  public getTurnUrls(transports: string[]): string[] {
+    if (
+      !this.enabled ||
+      this.publicHost === undefined ||
+      this.listeningPort === undefined
+    ) {
+      return [];
+    }
+
+    return transports.map(
+      (transport) =>
+        `turn:${this.publicHost}:${this.listeningPort}?transport=${transport}`,
+    );
   }
 
   public serialize(): string {

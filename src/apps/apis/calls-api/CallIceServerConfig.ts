@@ -1,5 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { CallTurnRuntimeConfiguration } from '@app/shared/infrastructure/network/relay/CallTurnRuntimeConfiguration';
 import {
   defaultRelayRuntimeSettings,
   RelayRuntimeSettings,
@@ -49,12 +50,6 @@ export class CallIceServerConfig {
     return [...new Set(values)];
   }
 
-  private static getTurnPublicHost(
-    relaySettings: RelayRuntimeSettings,
-  ): string | undefined {
-    return relaySettings.publicHost;
-  }
-
   private static getTurnTransports(
     environment: CallIceServerEnvironment,
   ): string[] {
@@ -72,16 +67,9 @@ export class CallIceServerConfig {
     relaySettings: RelayRuntimeSettings,
   ): string[] {
     const explicitUrls = this.splitEnvironmentList(environment.CALLS_TURN_URLS);
-    const publicHost = this.getTurnPublicHost(relaySettings);
-    const port = relaySettings.callsRelay.port;
-
-    if (!publicHost || port === undefined) {
-      return explicitUrls;
-    }
-
-    const generatedUrls = this.getTurnTransports(environment).map(
-      (transport) => `turn:${publicHost}:${port}?transport=${transport}`,
-    );
+    const generatedUrls = CallTurnRuntimeConfiguration.fromRelaySettings(
+      relaySettings,
+    ).getTurnUrls(this.getTurnTransports(environment));
 
     return this.unique([...explicitUrls, ...generatedUrls]);
   }
