@@ -80,7 +80,7 @@
   "resolutions": {
     "@libp2p/interface": "3.2.5",
     "interface-datastore": "10.0.1",
-    "wrap-ansi": "7.0.0",
+    "wrap-ansi": "10.0.0",
     "string-width": "4.2.3"
   },
   "devDependencies": {
