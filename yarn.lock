@@ -816,13 +816,13 @@
     buffer "^6.0.3"
     tslib "^2.8.1"
 
-"@helia/bitswap@^4.0.7":
-  version "4.0.7"
-  resolved "https://registry.yarnpkg.com/@helia/bitswap/-/bitswap-4.0.7.tgz#ecac9c055b0a5d5735a40e1e094582b9a95563d3"
-  integrity sha512-tyeYj+5uG3M/EFpWf8MRs2q2Ey3pPMogI9b4z2VXwCqghAmNJMIiQL0TPhGbFtLApTO75FEXiegRBKphNDxo/g==
+"@helia/bitswap@^4.0.8":
+  version "4.0.8"
+  resolved "https://registry.yarnpkg.com/@helia/bitswap/-/bitswap-4.0.8.tgz#bfc782672825f8c6ff43fc469e81995eb1afa726"
+  integrity sha512-YMzhRe7xxnCs2sEzb71/yUyzpeUT0SM22m2kW74XCisBuz5OMbEnShjBbFVHo1roXhNYEKkDWQirypLlroHuow==
   dependencies:
     "@helia/interface" "^7.1.1"
-    "@helia/libp2p" "^1.0.7"
+    "@helia/libp2p" "^1.0.8"
     "@helia/utils" "^3.0.5"
     "@libp2p/interface" "^3.2.3"
     "@libp2p/logger" "^6.2.8"
@@ -927,10 +927,10 @@
     multiformats "^14.0.0"
     progress-events "^1.1.0"
 
-"@helia/libp2p@^1.0.7":
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/@helia/libp2p/-/libp2p-1.0.7.tgz#c9ee1baf97c693df6569cd9a67e8111d1acf436d"
-  integrity sha512-RoN3IU/JsdId9Hlq6HJpyanSzaQYjFj53GoeSiBoivBUCRwiYgwRdzGIW+tzJCrQ2PpVl/cCAMj0TcKISYktnw==
+"@helia/libp2p@^1.0.8":
+  version "1.0.8"
+  resolved "https://registry.yarnpkg.com/@helia/libp2p/-/libp2p-1.0.8.tgz#aa4014254d7dddf5d3d366b6815c52b461473d02"
+  integrity sha512-FxL5CPMTnHOt2C01m4TLElTirToSCpzibbHIQK4gotAwwuh1nMMDpBwQHmakmEnnRy+r0dKxTfp0A3+vn5BG1Q==
   dependencies:
     "@chainsafe/libp2p-noise" "^17.0.0"
     "@chainsafe/libp2p-yamux" "^8.0.1"
@@ -3867,12 +3867,7 @@ cborg@^5.1.0:
   resolved "https://registry.yarnpkg.com/cborg/-/cborg-5.1.1.tgz#d6d6959112209003616261368269b6bc86f1b6c6"
   integrity sha512-BDbSRIp6XrQXkTc7g+DN0RB9RrDPTUfals2ecWUlt3juPLjbAvy/V72mJcXY0Ehu0Dq/3WpNCOCT68HUTbW+lw==
 
-cborg@^5.1.4:
-  version "5.1.7"
-  resolved "https://registry.yarnpkg.com/cborg/-/cborg-5.1.7.tgz#2ed664bf6f3d673e91806efafc86718957efc5af"
-  integrity sha512-rGg2MG9zZEUKtKqjkBppIWUecTXf9N1vs1Qru43vJWoDaODhCrtmzdehCaA/aq/c1cPI5A0kPrJ5Tf+jIfhV4w==
-
-cborg@^6.0.0:
+cborg@^6.0.0, cborg@^6.1.1:
   version "6.1.1"
   resolved "https://registry.yarnpkg.com/cborg/-/cborg-6.1.1.tgz#8e623d597954ca6489d1a43d245e519c09f68bcf"
   integrity sha512-Ci8+V1OMFtqea8EXicsATqV+3kEqCGXCicM+5MEzpKTxqy58WMzhJUjtUqAjfWpKPZ0wpG8F+u5mC8Xy/0Zevg==
@@ -5393,15 +5388,15 @@ hasown@^2.0.2:
   dependencies:
     function-bind "^1.1.2"
 
-helia@^7.1.2:
-  version "7.1.2"
-  resolved "https://registry.yarnpkg.com/helia/-/helia-7.1.2.tgz#e9c3cad0cabd74c1384773e28e955672498fc50c"
-  integrity sha512-HZJuKzlwxbgV25HWSOkCizSWM/hH+M1f8IXcAByILL5ESAY3RF4Ap2Nv8KF+svPJAvzg1X0vQjWWKTsHmxKJrA==
+helia@^7.1.3:
+  version "7.1.3"
+  resolved "https://registry.yarnpkg.com/helia/-/helia-7.1.3.tgz#5493c1bab4a8fc6eb2dc3d244c8f73085ca66464"
+  integrity sha512-Y8tRvOGDu2Z9n0GaCAwjNuYYxQ4esB1VqN99vFKeiZ2NuQnzIsfSJPaHpEd2gfxyIueaV9ifLxI0UCbtIUh0tg==
   dependencies:
-    "@helia/bitswap" "^4.0.7"
+    "@helia/bitswap" "^4.0.8"
     "@helia/http" "^4.0.6"
     "@helia/interface" "^7.1.1"
-    "@helia/libp2p" "^1.0.7"
+    "@helia/libp2p" "^1.0.8"
     "@helia/utils" "^3.0.5"
     "@ipld/dag-cbor" "^10.0.1"
     "@ipld/dag-json" "^11.0.0"
@@ -5416,7 +5411,7 @@ helia@^7.1.2:
     any-signal "^4.2.0"
     birnam "^1.0.0"
     blockstore-core "^7.0.1"
-    cborg "^5.1.4"
+    cborg "^6.1.1"
     datastore-core "^12.0.1"
     interface-blockstore "^7.0.1"
     interface-datastore "^10.0.1"
@@ -5670,15 +5665,15 @@ ipfs-unixfs@^13.0.0:
     protons-runtime "^7.0.0"
     uint8arraylist "^3.0.2"
 
-ipns@11.0.0:
-  version "11.0.0"
-  resolved "https://registry.yarnpkg.com/ipns/-/ipns-11.0.0.tgz#9dd2f7b797a3f4d05540a7de0528e342c66d04dc"
-  integrity sha512-ZcvvgPE8DcaEcSK3vYBUIdo5HPytVKkpV3qVyXTDfBJ4Hg/NTCDyJIpiN2Ak1uCsfFnWbne0MeqtlkmbA5b5kQ==
+ipns@11.0.1:
+  version "11.0.1"
+  resolved "https://registry.yarnpkg.com/ipns/-/ipns-11.0.1.tgz#f42dd684fc852f29329acc5bdaf1faeecdd7def9"
+  integrity sha512-e6moct6UhKSFIIPbBZnCQDZFDajRbL2yzV4V+hJaLZsb8q+QAkM5NveXN8qyZsRspFWg2vTPfkRe+N+nns8B/g==
   dependencies:
     "@libp2p/crypto" "^5.0.0"
     "@libp2p/interface" "^3.0.2"
     "@libp2p/logger" "^6.0.4"
-    cborg "^5.1.0"
+    cborg "^6.1.1"
     interface-datastore "^10.0.0"
     multiformats "^14.0.0"
     protons-runtime "^7.0.0"
