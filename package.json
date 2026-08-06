@@ -54,7 +54,7 @@
     "@libp2p/gossipsub": "^16.1.1",
     "@libp2p/pnet": "^3.0.27",
     "@multiformats/multiaddr": "^13.0.3",
-    "@noble/curves": "2.2.0",
+    "@noble/curves": "2.3.0",
     "@orbitdb/core": "4.0.0",
     "amqplib": "2.0.1",
     "blockstore-core": "^7.0.1",
