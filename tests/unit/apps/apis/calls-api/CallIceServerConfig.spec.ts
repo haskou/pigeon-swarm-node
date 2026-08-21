@@ -22,6 +22,11 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'local-configuration',
+        unreachableTurnUrls: [],
+      },
       iceServers: [
         {
           credential: 'turn-password',
@@ -32,11 +37,6 @@ describe('CallIceServerConfig', () => {
           username: 'turn-user',
         },
       ],
-      diagnostics: {
-        sharedSecretIsBuiltInFallback: true,
-        turnSource: 'local-configuration',
-        unreachableTurnUrls: [],
-      },
       iceTransportPolicy: 'all',
     });
   });
@@ -63,6 +63,24 @@ describe('CallIceServerConfig', () => {
         'turn:coturn.local:3478?transport=udp',
       ],
     });
+  });
+
+  it('should flag bracketed IPv6 TURN hosts as unreachable across relays', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: [
+        'turn:[2001:db8::1]:3478?transport=udp',
+        'turn:[::1]:3478?transport=udp',
+        'turn:[fc00::1]:3478?transport=udp',
+        'turn:[fe80::1]:3478?transport=udp',
+      ].join(','),
+    }).toResource(identityId);
+
+    expect(resource.diagnostics.unreachableTurnUrls).toEqual([
+      'turn:[::1]:3478?transport=udp',
+      'turn:[fc00::1]:3478?transport=udp',
+      'turn:[fe80::1]:3478?transport=udp',
+    ]);
   });
 
   it('should generate temporary coturn REST credentials when shared secret exists', () => {
@@ -170,6 +188,11 @@ describe('CallIceServerConfig', () => {
     const username = `1770003600:${identityId.valueOf()}`;
 
     expect(resource).toEqual({
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'connected-relay-record',
+        unreachableTurnUrls: [],
+      },
       iceServers: [
         {
           credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
@@ -179,11 +202,6 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
-      diagnostics: {
-        sharedSecretIsBuiltInFallback: true,
-        turnSource: 'connected-relay-record',
-        unreachableTurnUrls: [],
-      },
       iceTransportPolicy: 'all',
     });
   });
@@ -207,6 +225,11 @@ describe('CallIceServerConfig', () => {
     const username = `1770003600:${identityId.valueOf()}`;
 
     expect(resource).toEqual({
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'local-configuration',
+        unreachableTurnUrls: [],
+      },
       iceServers: [
         {
           credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
@@ -219,11 +242,6 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
-      diagnostics: {
-        sharedSecretIsBuiltInFallback: true,
-        turnSource: 'local-configuration',
-        unreachableTurnUrls: [],
-      },
       iceTransportPolicy: 'all',
     });
   });
@@ -271,16 +289,16 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
-      iceServers: [
-        {
-          urls: ['stun:stun.example.test:3478'],
-        },
-      ],
       diagnostics: {
         sharedSecretIsBuiltInFallback: true,
         turnSource: 'none',
         unreachableTurnUrls: [],
       },
+      iceServers: [
+        {
+          urls: ['stun:stun.example.test:3478'],
+        },
+      ],
       iceTransportPolicy: 'all',
     });
   });
@@ -294,25 +312,25 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(emptyResource).toEqual({
-      iceServers: [],
       diagnostics: {
         sharedSecretIsBuiltInFallback: true,
         turnSource: 'none',
         unreachableTurnUrls: [],
       },
+      iceServers: [],
       iceTransportPolicy: 'all',
     });
     expect(stunResource).toEqual({
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'none',
+        unreachableTurnUrls: [],
+      },
       iceServers: [
         {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
-      diagnostics: {
-        sharedSecretIsBuiltInFallback: true,
-        turnSource: 'none',
-        unreachableTurnUrls: [],
-      },
       iceTransportPolicy: 'all',
     });
   });
@@ -324,16 +342,16 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
-      iceServers: [
-        {
-          urls: ['stun:stun.example.test:3478'],
-        },
-      ],
       diagnostics: {
         sharedSecretIsBuiltInFallback: true,
         turnSource: 'none',
         unreachableTurnUrls: [],
       },
+      iceServers: [
+        {
+          urls: ['stun:stun.example.test:3478'],
+        },
+      ],
       iceTransportPolicy: 'relay',
     });
   });
@@ -348,6 +366,11 @@ describe('CallIceServerConfig', () => {
     const username = `1770003600:${identityId.valueOf()}`;
 
     expect(resource).toEqual({
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'local-configuration',
+        unreachableTurnUrls: [],
+      },
       iceServers: [
         {
           credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
@@ -360,11 +383,6 @@ describe('CallIceServerConfig', () => {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
-      diagnostics: {
-        sharedSecretIsBuiltInFallback: true,
-        turnSource: 'local-configuration',
-        unreachableTurnUrls: [],
-      },
       iceTransportPolicy: 'relay',
     });
   });
