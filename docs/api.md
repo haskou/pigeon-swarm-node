@@ -395,9 +395,29 @@ Response:
       "credential": "<temporaryHmacCredential>"
     }
   ],
-  "iceTransportPolicy": "all"
+  "iceTransportPolicy": "all",
+  "diagnostics": {
+    "sharedSecretIsBuiltInFallback": false,
+    "turnSource": "local-configuration",
+    "unreachableTurnUrls": []
+  }
 }
 ```
+
+The `diagnostics` block exposes why a cross-relay TURN media path may fail:
+
+- `sharedSecretIsBuiltInFallback` is `true` when `CALLS_TURN_SHARED_SECRET` is
+  missing or still equals the built-in fallback. Credentials minted with the
+  public fallback only work against coturn instances using the same fallback,
+  so a relay pool where one member overrides the secret cannot complete
+  cross-relay allocations.
+- `turnSource` reports whether the TURN URLs come from this node's local
+  configuration, from a signed record of a connected relay, or from neither.
+- `unreachableTurnUrls` lists TURN URLs whose host is loopback, link-local, a
+  private LAN address or a zero-conf hostname. Clients connected through a
+  different relay node cannot reach those hosts, so WebRTC stays in ICE
+  `checking` and no relay candidate pair is selected until every relay of the
+  pool advertises an externally reachable URL with its UDP media range open.
 
 Implemented:
 

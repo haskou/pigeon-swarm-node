@@ -324,6 +324,7 @@ components:
       required:
         - iceServers
         - iceTransportPolicy
+        - diagnostics
       properties:
         iceServers:
           type: array
@@ -334,6 +335,28 @@ components:
           enum:
             - all
             - relay
+        diagnostics:
+          $ref: '#/components/schemas/CallIceServersDiagnostics'
+    CallIceServersDiagnostics:
+      type: object
+      required:
+        - sharedSecretIsBuiltInFallback
+        - turnSource
+        - unreachableTurnUrls
+      description: Operational diagnostics for the cross-relay TURN media path. sharedSecretIsBuiltInFallback warns that credentials only match coturn instances using the same built-in fallback. unreachableTurnUrls lists TURN URLs whose host is loopback, link-local, a private LAN address or a zero-conf hostname, which clients connected through another relay node cannot reach.
+      properties:
+        sharedSecretIsBuiltInFallback:
+          type: boolean
+        turnSource:
+          type: string
+          enum:
+            - local-configuration
+            - connected-relay-record
+            - none
+        unreachableTurnUrls:
+          type: array
+          items:
+            type: string
     CallIceServer:
       type: object
       required:

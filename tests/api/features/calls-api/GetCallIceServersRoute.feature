@@ -18,6 +18,7 @@ Feature: Get call ICE servers
     Then response code is equal to 200
     And response body should contain "turn:test-turn.local:3478?transport=udp"
     And response body should contain "\"iceTransportPolicy\":\"all\""
+    And response body should contain "\"sharedSecretIsBuiltInFallback\":true"
 
   Scenario: Prefer the node-configured TURN relay over unrelated records
     Given calls use a test TURN server

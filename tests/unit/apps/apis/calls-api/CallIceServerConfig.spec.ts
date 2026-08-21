@@ -32,7 +32,36 @@ describe('CallIceServerConfig', () => {
           username: 'turn-user',
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'local-configuration',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'all',
+    });
+  });
+
+  it('should flag loopback and private TURN hosts as unreachable across relays', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: [
+        'turn:turn.example.test:3478?transport=udp',
+        'turn:127.0.0.1:3478?transport=udp',
+        'turn:10.0.0.5:3478?transport=udp',
+        'turn:192.168.1.10:3478?transport=udp',
+        'turn:coturn.local:3478?transport=udp',
+      ].join(','),
+    }).toResource(identityId);
+
+    expect(resource.diagnostics).toEqual({
+      sharedSecretIsBuiltInFallback: false,
+      turnSource: 'local-configuration',
+      unreachableTurnUrls: [
+        'turn:127.0.0.1:3478?transport=udp',
+        'turn:10.0.0.5:3478?transport=udp',
+        'turn:192.168.1.10:3478?transport=udp',
+        'turn:coturn.local:3478?transport=udp',
+      ],
     });
   });
 
@@ -150,6 +179,11 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'connected-relay-record',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'all',
     });
   });
@@ -185,6 +219,11 @@ describe('CallIceServerConfig', () => {
           username,
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'local-configuration',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'all',
     });
   });
@@ -237,6 +276,11 @@ describe('CallIceServerConfig', () => {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'none',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'all',
     });
   });
@@ -251,6 +295,11 @@ describe('CallIceServerConfig', () => {
 
     expect(emptyResource).toEqual({
       iceServers: [],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'none',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'all',
     });
     expect(stunResource).toEqual({
@@ -259,6 +308,11 @@ describe('CallIceServerConfig', () => {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'none',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'all',
     });
   });
@@ -275,6 +329,11 @@ describe('CallIceServerConfig', () => {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'none',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'relay',
     });
   });
@@ -301,6 +360,11 @@ describe('CallIceServerConfig', () => {
           urls: ['stun:stun.example.test:3478'],
         },
       ],
+      diagnostics: {
+        sharedSecretIsBuiltInFallback: true,
+        turnSource: 'local-configuration',
+        unreachableTurnUrls: [],
+      },
       iceTransportPolicy: 'relay',
     });
   });
