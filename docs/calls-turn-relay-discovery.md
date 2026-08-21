@@ -67,6 +67,36 @@ this avoids duplicate simultaneous dials while keeping every discovered relay
 pair connected. Relay publishers never listen through another relay and never
 republish records received from peers.
 
+The resulting private topology is a star per leaf node plus a full mesh between
+relay publishers: every leaf listens through exactly one publisher, and every
+pair of publishers holds one direct connection. Operators can therefore expect
+`peers` on a relay publisher to include every other relay publisher of the
+private network; gossip or replication status that shows fewer direct
+publisher peers indicates a discovery problem.
+
+### Discovery Recovery
+
+Relay discovery is designed to converge without operator intervention:
+
+- after startup, discovery retries with bounded exponential backoff starting
+  at 1 second and capped at the regular discovery interval
+  (`PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS`, default 60 seconds), so cold
+  starts and late public IPFS connectivity recover within that interval;
+- when a direct relay-to-relay connection drops, the next discovery pass dials
+  the cached record again;
+- when the peer that wins the deterministic dial order cannot establish the
+  connection, the losing peer falls back to dialing itself once
+  `meshFallbackDialDelayMs` (45 seconds) have passed since the last time the
+  pair was observed disconnected;
+- dials are deduplicated per multiaddr and retries stop once the connection is
+  confirmed, so recovery never creates publication loops or dial storms.
+
+Each discovery attempt logs one summary line with the phase
+(`cached-record-connected`, `provider-record-connected`,
+`waiting-for-public-peers`, `record-requested`), the number of DHT providers
+found, public peer count, and whether the private relay connection is up.
+Deferred mesh dials log the chosen dialer peer ID and the fallback window.
+
 TURN servers do not establish a control connection with each other. Each
 browser obtains credentials for the TURN server exposed by its backend side,
 and the resulting public ICE candidates are exchanged through the normal call
