@@ -7,16 +7,27 @@ import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityMapper from './mappers/OrbitDBCommunityMapper';
+import OrbitDBCommunitySectionMerger from './OrbitDBCommunitySectionMerger';
 
 export default class OrbitDBCommunityRepository extends CommunityRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
   private readonly communityIndex: OrbitDBHeadIndex<OrbitDBCommunityDocument>;
+
+  private readonly sectionMerger = new OrbitDBCommunitySectionMerger();
+
+  private readonly aggregateBaselines = new Map<
+    string,
+    OrbitDBCommunityDocument
+  >();
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityMapper,
   ) {
     super();
+    registry.registerHeadRecordMerger('community:', (current, candidate) =>
+      this.mergeReplicaDocuments(current, candidate),
+    );
     this.communityIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'communities',
       documentFromRecord: (record) =>
@@ -110,6 +121,30 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
+  private freshestStoredHead(
+    communityId: string,
+  ): OrbitDBCommunityDocument | undefined {
+    const head = this.registry.findCachedHead(
+      this.communityHeadKey(communityId),
+    );
+
+    return head && this.isStoredDocument(head) ? head : undefined;
+  }
+
+  private mergeReplicaDocuments(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!this.isStoredDocument(current) || !this.isStoredDocument(candidate)) {
+      return candidate;
+    }
+
+    return this.sectionMerger.merge(current, candidate) as unknown as Record<
+      string,
+      unknown
+    >;
+  }
+
   private async findHead(
     id: CommunityId,
   ): Promise<Record<string, unknown> | undefined> {
@@ -176,27 +211,36 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   private toFreshDocument(community: Community): OrbitDBCommunityDocument {
-    const currentHead = this.registry.findCachedHead(
-      this.communityHeadKey(community.getId().valueOf()),
-    );
-    const nextUpdatedAt =
-      typeof currentHead?.updatedAt === 'number'
-        ? currentHead.updatedAt + 1
-        : 0;
+    const communityId = community.getId().valueOf();
 
-    return {
-      ...this.mapper.toDocument(community),
-      updatedAt: Math.max(Date.now(), nextUpdatedAt),
-    };
+    return this.sectionMerger.nextDocument(
+      this.mapper.toDocument(community),
+      this.aggregateBaselines.get(communityId),
+      this.freshestStoredHead(communityId),
+      Date.now(),
+    );
+  }
+
+  private toDomain(document: OrbitDBCommunityDocument): Community {
+    // Remembers the replicated state the aggregate was hydrated from so the
+    // next write can tell untouched sections apart from edited ones.
+    this.aggregateBaselines.set(document.id, { ...document });
+
+    return this.mapper.toDomain(document);
   }
 
   public async delete(community: Community): Promise<void> {
-    const document = this.toFreshDocument(community);
+    const communityId = community.getId().valueOf();
+    const document = this.sectionMerger.tombstone(
+      this.mapper.toDocument(community),
+      this.freshestStoredHead(communityId),
+      Date.now(),
+    );
 
-    const deletedDocument = {
+    this.aggregateBaselines.delete(communityId);
+
+    const deletedDocument: OrbitDBCommunityDocument = {
       ...document,
-      deleted: true,
-      deletedAt: Date.now(),
     };
 
     await this.registry.replicateDocumentInBackground(
@@ -212,7 +256,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const head = await this.findHead(id);
 
     if (head) {
-      return this.isDocument(head) ? this.mapper.toDomain(head) : undefined;
+      return this.isDocument(head) ? this.toDomain(head) : undefined;
     }
 
     return undefined;
@@ -237,7 +281,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     });
 
     return Promise.resolve(
-      documents.slice(0, 50).map((document) => this.mapper.toDomain(document)),
+      documents.slice(0, 50).map((document) => this.toDomain(document)),
     );
   }
 
@@ -257,19 +301,21 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
           this.isDocument(document) &&
           document.memberIds.includes(identityId.valueOf()),
       )
-      .map((document) => this.mapper.toDomain(document));
+      .map((document) => this.toDomain(document));
   }
 
   public async findSyncable(): Promise<Community[]> {
     return Promise.resolve(
       this.cachedCommunityDocuments().map((document) =>
-        this.mapper.toDomain(document),
+        this.toDomain(document),
       ),
     );
   }
 
   public async save(community: Community): Promise<void> {
     const document = this.toFreshDocument(community);
+
+    this.aggregateBaselines.set(document.id, { ...document });
 
     await this.registry.replicateDocumentInBackground('communities', document, [
       document.networkId,

@@ -5,6 +5,7 @@ import Kernel from '@haskou/ddd-kernel';
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBEntry } from './OrbitDBEntry';
+import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
@@ -91,6 +92,11 @@ export default class OrbitDBReplicatedStateRegistry {
   private readonly pendingStoreHeadReconciliations = new WeakMap<
     OrbitDBDatabase,
     OrbitDBPendingHeadReconciliation
+  >();
+
+  private readonly headRecordMergers = new Map<
+    string,
+    OrbitDBHeadRecordMerger
   >();
 
   private readonly headWriteQueues = new Map<string, Promise<void>>();
@@ -520,6 +526,20 @@ export default class OrbitDBReplicatedStateRegistry {
     };
   }
 
+  private mergeHeadRecord(
+    key: string,
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const prefix = [...this.headRecordMergers.keys()].find((candidatePrefix) =>
+      key.startsWith(candidatePrefix),
+    );
+
+    return prefix
+      ? this.headRecordMergers.get(prefix)!(current, candidate)
+      : this.mergeHeadRecordCollection(current, candidate);
+  }
+
   private cacheHeadIn(
     cache: Map<string, Record<string, unknown>>,
     key: string,
@@ -527,7 +547,7 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Record<string, unknown> | undefined {
     const current = cache.get(key);
     const candidate = current
-      ? this.mergeHeadRecordCollection(current, value)
+      ? this.mergeHeadRecord(key, current, value)
       : value;
     const accepted =
       !current || this.isNewerOrEqualDocument(current, candidate);
@@ -594,7 +614,7 @@ export default class OrbitDBReplicatedStateRegistry {
           return candidate;
         }
 
-        const merged = this.mergeHeadRecordCollection(current, candidate);
+        const merged = this.mergeHeadRecord(key, current, candidate);
 
         return this.isNewerOrEqualDocument(current, merged) ? merged : current;
       },
@@ -1006,11 +1026,12 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private acceptedHeadWriteValue(
+    key: string,
     value: Record<string, unknown>,
     current: Record<string, unknown> | undefined,
   ): Record<string, unknown> | undefined {
     const candidate = current
-      ? this.mergeHeadRecordCollection(current, value)
+      ? this.mergeHeadRecord(key, current, value)
       : value;
 
     return !current || this.isNewerOrEqualDocument(current, candidate)
@@ -1019,12 +1040,13 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private nextHeadWriteValue(
+    key: string,
     value: Record<string, unknown>,
     current: Record<string, unknown> | undefined,
     hasSameCachedContent: boolean,
     force: boolean = false,
   ): Record<string, unknown> | undefined {
-    const acceptedValue = this.acceptedHeadWriteValue(value, current);
+    const acceptedValue = this.acceptedHeadWriteValue(key, value, current);
 
     if (force) {
       return acceptedValue ?? current;
@@ -1301,6 +1323,19 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  /**
+   * Registers a store-agnostic merge strategy for cached heads whose key
+   * starts with the given prefix. Contexts own their record semantics; the
+   * registry only invokes the strategy instead of rejecting a concurrent
+   * replica outright.
+   */
+  public registerHeadRecordMerger(
+    keyPrefix: string,
+    merger: OrbitDBHeadRecordMerger,
+  ): void {
+    this.headRecordMergers.set(keyPrefix, merger);
+  }
+
   public async register(
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
@@ -1547,6 +1582,7 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     const cachedValue = this.nextHeadWriteValue(
+      key,
       cleanValue,
       currentValue,
       hasSameCachedContent,

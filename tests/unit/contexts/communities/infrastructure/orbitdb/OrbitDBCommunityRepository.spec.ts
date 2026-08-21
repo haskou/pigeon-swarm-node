@@ -1,6 +1,9 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
+import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
+import { OrbitDBCommunityDocument } from '@app/contexts/communities/infrastructure/orbitdb/documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -320,6 +323,98 @@ describe('OrbitDBCommunityRepository', () => {
     const byMember = await repository.findByMember(identityMother.id);
 
     expect(byMember).toEqual([]);
+  });
+
+  it('should keep a replicated membership change when the local node saves an unrelated profile edit', async () => {
+    // Dedicated stores whose heads support simulated inbound replicas.
+    const headEntries = new Map<string, Record<string, unknown>>();
+    let emitHeadUpdate: (entry: {
+      payload?: { key?: string; value?: unknown };
+    }) => void = () => undefined;
+
+    const replicatedRegistry = new OrbitDBReplicatedStateRegistry();
+    replicatedRegistry.clear();
+    await replicatedRegistry.register(networkId, {
+      communities: {
+        put: jest.fn(() => 'ok'),
+        query: jest.fn((): Record<string, unknown>[] => []),
+      },
+      heads: {
+        all: jest.fn(() =>
+          Promise.all(
+            [...headEntries.entries()].map(([key, value]) => ({ key, value })),
+          ),
+        ),
+        events: {
+          on: jest.fn((event, handler) => {
+            if (event !== 'join') {
+              emitHeadUpdate = handler;
+            }
+          }),
+        },
+        get: jest.fn((key: string) => {
+          const value = headEntries.get(key);
+
+          return Promise.resolve(value ? { key, value } : undefined);
+        }),
+        put: jest.fn((key: string, value: Record<string, unknown>) => {
+          headEntries.set(key, value);
+
+          return Promise.resolve('ok');
+        }),
+      },
+    } as never);
+
+    const replicatedRepository = new OrbitDBCommunityRepository(
+      replicatedRegistry,
+      new OrbitDBCommunityMapper(),
+    );
+
+    const community = Community.fromPrimitives(communityPrimitives());
+    await replicatedRepository.save(community);
+    await flushBackgroundTasks();
+
+    // The local node loaded the community before the remote change arrived.
+    const staleLocalAggregate = await replicatedRepository.findById(
+      new CommunityId('community-1'),
+    );
+
+    // Another node accepts a member and the replica arrives.
+    const remoteMemberId =
+      'MCowBQYDK2VwAyEAe0LjQOVZBAN7CbruJPg6LKFMzEJR4FEbB3ySIDpSVV4=';
+    const previousHead = headEntries.get(
+      'community:community-1',
+    ) as OrbitDBCommunityDocument;
+    const remoteHead: OrbitDBCommunityDocument = {
+      ...previousHead,
+      memberIds: [...previousHead.memberIds, remoteMemberId],
+      sectionRevisions: {
+        ...previousHead.sectionRevisions,
+        members: (previousHead.sectionRevisions?.members ?? 0) + 1,
+      },
+      updatedAt: (previousHead.updatedAt ?? 0) + 1,
+    };
+
+    emitHeadUpdate({
+      payload: { key: 'community:community-1', value: remoteHead },
+    });
+
+    // The local node renames the community from its stale aggregate.
+    staleLocalAggregate!.updateProfile(
+      identityMother.id,
+      new CommunityName('Renamed community'),
+      new CommunityDescription('OrbitDB replicated community'),
+    );
+    await replicatedRepository.save(staleLocalAggregate!);
+    await flushBackgroundTasks();
+
+    const saved = await replicatedRepository.findById(
+      new CommunityId('community-1'),
+    );
+
+    expect(saved?.toPrimitives().name).toBe('Renamed community');
+    expect(saved?.toPrimitives().memberIds).toContain(remoteMemberId);
+    replicatedRegistry.clear();
   });
 
   function communityPrimitives(): PrimitiveOf<Community> {

@@ -1,5 +1,6 @@
 import { OrbitDBCommunityMemberRoleDocument } from './OrbitDBCommunityMemberRoleDocument';
 import { OrbitDBCommunityRoleDocument } from './OrbitDBCommunityRoleDocument';
+import { OrbitDBCommunitySectionRevisions } from './OrbitDBCommunitySectionRevisions';
 import { OrbitDBCommunityTextChannelDocument } from './OrbitDBCommunityTextChannelDocument';
 import { OrbitDBCommunityVoiceChannelDocument } from './OrbitDBCommunityVoiceChannelDocument';
 
@@ -20,6 +21,7 @@ export interface OrbitDBCommunityDocument extends Record<string, unknown> {
   networkId: string;
   ownerIdentityId: string;
   roles?: OrbitDBCommunityRoleDocument[];
+  sectionRevisions?: OrbitDBCommunitySectionRevisions;
   textChannels: OrbitDBCommunityTextChannelDocument[];
   updatedAt?: number;
   visibility: string;

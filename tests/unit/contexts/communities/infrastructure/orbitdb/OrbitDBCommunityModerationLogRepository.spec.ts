@@ -80,8 +80,9 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     ]);
 
     expect(result).toBe('saved');
-    expect(heads.get(`community-moderation-log:${entry.getId().valueOf()}`))
-      .toEqual(expect.objectContaining({ id: entry.getId().valueOf() }));
+    expect(
+      heads.get(`community-moderation-log:${entry.getId().valueOf()}`),
+    ).toEqual(expect.objectContaining({ id: entry.getId().valueOf() }));
   });
 
   it('should find moderation logs from fresh heads when indexes lag', async () => {
@@ -114,8 +115,9 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     const logs = await repository.findByCommunity(communityId, 10);
 
     expect(logs).toEqual([]);
-    expect(heads.get(`community-moderation-log:${entry.getId().valueOf()}`))
-      .toEqual(expect.objectContaining({ deleted: true }));
+    expect(
+      heads.get(`community-moderation-log:${entry.getId().valueOf()}`),
+    ).toEqual(expect.objectContaining({ deleted: true }));
   });
 
   function moderationLogEntry(): CommunityModerationLogEntry {
