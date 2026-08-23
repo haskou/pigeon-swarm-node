@@ -78,7 +78,7 @@
     "ws": "^8.21.3"
   },
   "resolutions": {
-    "@libp2p/interface": "3.2.5",
+    "@libp2p/interface": "3.3.0",
     "interface-datastore": "10.0.1",
     "wrap-ansi": "7.0.0",
     "string-width": "4.2.3"
