@@ -57,6 +57,7 @@ type Command = {
 
 let network: IPFSNetwork | undefined;
 let directory: PrivateNetworkRelayRecordDirectory | undefined;
+let localDatabase: EmbeddedLocalDatabase | undefined;
 let publicDirectoryConnection: IPFSConnection | undefined;
 let publicDirectoryPrivateKey: Libp2pPrivateKeyLike | undefined;
 let orbitdb: OrbitDBInstance | undefined;
@@ -153,8 +154,9 @@ async function createPrivateNetwork(): Promise<void> {
       activePrivateDials.delete(peerId);
     }
   };
+  localDatabase = new EmbeddedLocalDatabase();
   directory = new PrivateNetworkRelayRecordDirectory(
-    new EmbeddedLocalDatabase(),
+    localDatabase,
     new PrivateNetworkRelayDirectorySettings(),
   );
   const discover = directory.discover.bind(directory);
@@ -716,13 +718,24 @@ async function stopAndExit(): Promise<void> {
 }
 
 async function stopResources(): Promise<void> {
-  await Promise.allSettled([
-    documents?.close(),
-    orbitdb?.stop(),
-    directory?.stopPublicConnection(),
-  ]);
   directory?.stop(NETWORK_ID);
-  await network?.stop();
+  const errors: unknown[] = [];
+  for (const close of [
+    () => documents?.close(),
+    () => orbitdb?.stop(),
+    () => directory?.stopPublicConnection(),
+    () => network?.stop(),
+    () => localDatabase?.close(),
+  ]) {
+    try {
+      await close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) {
+    throw new AggregateError(errors, 'Relay instance resource shutdown failed.');
+  }
 }
 
 function getNetwork(): IPFSNetwork {
