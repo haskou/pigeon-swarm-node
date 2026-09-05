@@ -1454,13 +1454,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     providers?: number,
     publicPeers?: number,
   ): void {
+    const privateConnected = this.relayPublisherNetworkIds.has(network.getId())
+      ? this.hasConnectedRelayPublisherPeer(network)
+      : Boolean(this.findActiveRelayRecord(network));
+
     Kernel.logger.info(
       `Private IPFS relay record discovery pass:` +
         ` networkId=${network.getId()}` +
         ` phase=${phase}` +
         ` providers=${providers ?? this.lastProviderCounts[network.getId()] ?? 0}` +
         ` publicPeers=${publicPeers ?? 0}` +
-        ` privateConnected=${Boolean(this.findActiveRelayRecord(network))}`,
+        ` privateConnected=${privateConnected}`,
     );
   }
 

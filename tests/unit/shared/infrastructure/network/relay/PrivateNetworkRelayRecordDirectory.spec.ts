@@ -771,6 +771,11 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       await flushPromises();
       await flushPromises();
       await directory.discover(network, mock());
+      logger.info.mockClear();
+      await directory.discover(network, mock());
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('privateConnected=false'),
+      );
       const handler = [...subscriptions.entries()].find(
         ([topic]) => !topic.endsWith('.request'),
       )?.[1];
@@ -784,6 +789,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       publicConnection.findRecordProviderMultiaddrs.mockClear();
 
       await directory.discover(network, mock());
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('privateConnected=true'),
+      );
       expect(
         publicConnection.findRecordProviderMultiaddrs,
       ).toHaveBeenCalledTimes(1);
