@@ -659,6 +659,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private refreshRelayPublisherObservations(network: IPFSNetwork): void {
+    // Expired records must not bypass the connected refresh indefinitely.
+    this.cachedRelayRecords(network);
+
+    // Observe inbound connections even when discovery skips cached dials.
+    // A subsequent drop must receive a fresh fallback window.
+    for (const peerId of network.getPeers()) {
+      delete this.relayPublisherPeerObservedAt[`${network.getId()}:${peerId}`];
+    }
+  }
+
   private getDiscoveryState(network: IPFSNetwork): {
     shouldConnectRelayRecords: boolean;
     shouldDiscover: boolean;
@@ -666,9 +677,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     const activeRelayRecord = this.findActiveRelayRecord(network);
 
     if (this.relayPublisherNetworkIds.has(network.getId())) {
-      // Expired publisher records must not bypass the connected refresh
-      // interval indefinitely. Prune before evaluating mesh membership.
-      this.cachedRelayRecords(network);
+      this.refreshRelayPublisherObservations(network);
 
       if (!this.hasConnectedRelayPublisherPeer(network)) {
         return {
@@ -1341,6 +1350,10 @@ export default class PrivateNetworkRelayRecordDirectory {
       localPeerId === relayRecord.peerId ||
       network.getPeers().includes(relayRecord.peerId)
     ) {
+      delete this.relayPublisherPeerObservedAt[
+        `${network.getId()}:${relayRecord.peerId}`
+      ];
+
       return false;
     }
 
