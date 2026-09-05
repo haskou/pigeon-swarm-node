@@ -1,20 +1,18 @@
 export type CallIceServersDiagnosticsResource = {
   /**
-   * True when CALLS_TURN_SHARED_SECRET is missing or equals the built-in
-   * fallback. Credentials minted with the public fallback only work against
-   * coturn instances using the same fallback, so cross-relay calls fail when
-   * one pool member overrides it.
+   * Whether a private TURN shared secret is configured. Missing secrets and the
+   * former public fallback disable shared-secret credential issuance.
+   * Explicit local static credentials may still be used when this is false.
    */
-  sharedSecretIsBuiltInFallback: boolean;
+  turnSharedSecretConfigured: boolean;
   /**
-   * Where the advertised TURN URLs come from.
+   * Source of candidate TURN URLs, even when credentials are unavailable.
    */
   turnSource: 'connected-relay-record' | 'local-configuration' | 'none';
   /**
-   * TURN URLs whose host is loopback, link-local, a private LAN address or a
-   * zero-conf hostname. Clients connected through another relay node cannot
-   * reach those hosts, so cross-relay media cannot select them as a relay
-   * candidate pair.
+   * Static hints for loopback, link-local, private IP and zero-conf hosts.
+   * These are not reachability checks: private hosts may work over LAN or VPN,
+   * and public hosts may still be unreachable or reject credentials.
    */
-  unreachableTurnUrls: string[];
+  nonPublicTurnUrls: string[];
 };

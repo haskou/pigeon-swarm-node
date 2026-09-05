@@ -51,8 +51,7 @@ function completeRelaySettings(port = 4199): RelayRuntimeSettings {
 describe('CallRelayRuntime', () => {
   let previousEnvironment: NodeJS.ProcessEnv;
   let relaySettingsChangedListener:
-    | ((settings: RelayRuntimeSettings) => Promise<void> | void)
-    | undefined;
+    ((settings: RelayRuntimeSettings) => Promise<void> | void) | undefined;
   let networkRegistry: MockProxy<IPFSNetworkRegistry>;
   let discovery: MockProxy<CallRelayRecordDiscovery>;
   let logger: MockProxy<WinstonLogger>;
@@ -107,8 +106,7 @@ describe('CallRelayRuntime', () => {
 
   it('should publish a signed call relay record when a public network is registered', async () => {
     let registeredListener:
-      | ((network: IPFSNetwork) => Promise<void> | void)
-      | undefined;
+      ((network: IPFSNetwork) => Promise<void> | void) | undefined;
     const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
 
     networkRegistry.onNetworkRegistered.mockImplementation((listener) => {
@@ -146,31 +144,31 @@ describe('CallRelayRuntime', () => {
     );
   });
 
-  it('should warn once and publish with the built-in shared secret', async () => {
-    delete process.env.CALLS_TURN_SHARED_SECRET;
-    networkRegistry.getAll.mockReturnValue([publicNetwork]);
-    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+  it.each([undefined, CallTurnSharedSecret.REJECTED_PUBLIC_SECRET])(
+    'should warn once and not publish with rejected secret %s',
+    async (secret) => {
+      if (secret === undefined) delete process.env.CALLS_TURN_SHARED_SECRET;
+      else process.env.CALLS_TURN_SHARED_SECRET = secret;
+      networkRegistry.getAll.mockReturnValue([publicNetwork]);
+      const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
 
-    await runtime.run();
-    await runtime.run();
+      await runtime.run();
+      await runtime.run();
 
-    expect(logger.warn).toHaveBeenCalledTimes(1);
-    expect(logger.warn).toHaveBeenCalledWith(
-      'Calls TURN is using the built-in shared secret. ' +
-        'Set CALLS_TURN_SHARED_SECRET to the same custom value on every ' +
-        'backend and coturn service in the relay pool.',
-    );
-    expect(signer.sign).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      CallTurnSharedSecret.DEFAULT,
-    );
-  });
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Shared-secret TURN credentials and relay publication are disabled: ' +
+          'CALLS_TURN_SHARED_SECRET is missing or uses the rejected public fallback. ' +
+          'Configure the same private secret on each issuer and its TURN server.',
+      );
+      expect(signer.sign).not.toHaveBeenCalled();
+      expect(discovery.publishConnection).not.toHaveBeenCalled();
+    },
+  );
 
   it('should publish a signed call relay record when a private network is registered', async () => {
     let registeredListener:
-      | ((network: IPFSNetwork) => Promise<void> | void)
-      | undefined;
+      ((network: IPFSNetwork) => Promise<void> | void) | undefined;
     const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
 
     networkRegistry.onNetworkRegistered.mockImplementation((listener) => {

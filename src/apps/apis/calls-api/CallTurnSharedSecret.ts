@@ -1,5 +1,5 @@
 export class CallTurnSharedSecret {
-  public static readonly DEFAULT =
+  public static readonly REJECTED_PUBLIC_SECRET =
     'Kestrel7-Quartz9-Pigeon4-Nebula8-Harbor2-Cipher6-Orbit5-Velvet3';
 
   public static fromEnvironment(
@@ -9,24 +9,21 @@ export class CallTurnSharedSecret {
 
     if (
       !normalizedSecret ||
-      normalizedSecret === CallTurnSharedSecret.DEFAULT
+      normalizedSecret === CallTurnSharedSecret.REJECTED_PUBLIC_SECRET
     ) {
-      return new CallTurnSharedSecret(CallTurnSharedSecret.DEFAULT, true);
+      return new CallTurnSharedSecret('');
     }
 
-    return new CallTurnSharedSecret(normalizedSecret, false);
+    return new CallTurnSharedSecret(normalizedSecret);
   }
 
-  private constructor(
-    private readonly secret: string,
-    private readonly defaultValue: boolean,
-  ) {}
+  private constructor(private readonly secret: string) {}
 
   public getValue(): string {
     return this.secret;
   }
 
-  public usesDefaultValue(): boolean {
-    return this.defaultValue;
+  public isConfigured(): boolean {
+    return this.secret.length > 0;
   }
 }

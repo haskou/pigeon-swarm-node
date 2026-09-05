@@ -76,14 +76,18 @@ export class CallRelayConfiguration {
     ).getValue();
   }
 
-  public usesDefaultTurnSharedSecret(): boolean {
+  public hasTurnSharedSecret(): boolean {
     return CallTurnSharedSecret.fromEnvironment(
       this.environment.CALLS_TURN_SHARED_SECRET,
-    ).usesDefaultValue();
+    ).isConfigured();
   }
 
   public canPublishLocalRelay(): boolean {
-    return this.isDiscoveryEnabled() && this.getAdvertisedTurnUrls().length > 0;
+    return (
+      this.isDiscoveryEnabled() &&
+      !!this.getTurnSharedSecret() &&
+      this.getAdvertisedTurnUrls().length > 0
+    );
   }
 
   public getRecordTtlMs(): number {

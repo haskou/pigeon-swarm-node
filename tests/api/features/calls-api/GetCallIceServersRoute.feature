@@ -11,14 +11,14 @@ Feature: Get call ICE servers
     And response body should contain "turn:test-turn.local:3478?transport=udp"
     And response body should contain "\"iceTransportPolicy\":\"all\""
 
-  Scenario: Read TURN configuration with the built-in shared secret
+  Scenario: Omit TURN credentials when no private shared secret is configured
     Given calls use a test TURN server without a custom shared secret
     And I sign the current call ICE servers request
     When I GET call ICE servers
     Then response code is equal to 200
-    And response body should contain "turn:test-turn.local:3478?transport=udp"
+    And response body should contain "\"iceServers\":[]"
     And response body should contain "\"iceTransportPolicy\":\"all\""
-    And response body should contain "\"sharedSecretIsBuiltInFallback\":true"
+    And response body should contain "\"turnSharedSecretConfigured\":false"
 
   Scenario: Prefer the node-configured TURN relay over unrelated records
     Given calls use a test TURN server

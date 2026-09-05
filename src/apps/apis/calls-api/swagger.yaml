@@ -76,7 +76,7 @@ paths:
       tags:
         - calls
       summary: Get ICE servers for WebRTC calls
-      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Credentials are generated temporarily per authenticated identity using CALLS_TURN_SHARED_SECRET, or a public built-in fallback that emits an operational warning when the variable is empty. Production relay pools should configure one custom secret on every backend and coturn service. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs publish signed call relay records through the IPFS pubsub network.
+      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the target coturn server. Missing or former public secrets disable temporary credential issuance and relay publication. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network.
       responses:
         '200':
           description: ICE server configuration for the authenticated client.
@@ -340,12 +340,12 @@ components:
     CallIceServersDiagnostics:
       type: object
       required:
-        - sharedSecretIsBuiltInFallback
+        - turnSharedSecretConfigured
         - turnSource
-        - unreachableTurnUrls
-      description: Operational diagnostics for the cross-relay TURN media path. sharedSecretIsBuiltInFallback warns that credentials only match coturn instances using the same built-in fallback. unreachableTurnUrls lists TURN URLs whose host is loopback, link-local, a private LAN address or a zero-conf hostname, which clients connected through another relay node cannot reach.
+        - nonPublicTurnUrls
+      description: Configuration diagnostics only; no active reachability or credential check is performed. turnSharedSecretConfigured indicates whether a private shared secret is set. turnSource describes candidate URLs even when credentials are unavailable. nonPublicTurnUrls flags common private IP and local hostname forms; these may be reachable over LAN or VPN.
       properties:
-        sharedSecretIsBuiltInFallback:
+        turnSharedSecretConfigured:
           type: boolean
         turnSource:
           type: string
@@ -353,7 +353,7 @@ components:
             - local-configuration
             - connected-relay-record
             - none
-        unreachableTurnUrls:
+        nonPublicTurnUrls:
           type: array
           items:
             type: string
@@ -368,10 +368,10 @@ components:
             type: string
         username:
           type: string
-          description: Temporary coturn REST username generated with the configured or built-in shared secret.
+          description: Temporary coturn REST username generated with the private shared secret, or an explicitly configured local static value.
         credential:
           type: string
-          description: Temporary coturn REST HMAC credential generated with the configured or built-in shared secret.
+          description: Temporary coturn REST HMAC credential generated with the private shared secret, or an explicitly configured local static value.
     CallScope:
       type: object
       required:

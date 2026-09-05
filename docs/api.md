@@ -397,27 +397,24 @@ Response:
   ],
   "iceTransportPolicy": "all",
   "diagnostics": {
-    "sharedSecretIsBuiltInFallback": false,
+    "turnSharedSecretConfigured": true,
     "turnSource": "local-configuration",
-    "unreachableTurnUrls": []
+    "nonPublicTurnUrls": []
   }
 }
 ```
 
-The `diagnostics` block exposes why a cross-relay TURN media path may fail:
+The `diagnostics` block describes configuration, not live connectivity:
 
-- `sharedSecretIsBuiltInFallback` is `true` when `CALLS_TURN_SHARED_SECRET` is
-  missing or still equals the built-in fallback. Credentials minted with the
-  public fallback only work against coturn instances using the same fallback,
-  so a relay pool where one member overrides the secret cannot complete
-  cross-relay allocations.
+- `turnSharedSecretConfigured` is false when the secret is missing or equals
+  the rejected public fallback. Shared-secret credentials are then omitted.
+  Explicit local static credentials can still be returned.
 - `turnSource` reports whether the TURN URLs come from this node's local
-  configuration, from a signed record of a connected relay, or from neither.
-- `unreachableTurnUrls` lists TURN URLs whose host is loopback, link-local, a
-  private LAN address or a zero-conf hostname. Clients connected through a
-  different relay node cannot reach those hosts, so WebRTC stays in ICE
-  `checking` and no relay candidate pair is selected until every relay of the
-  pool advertises an externally reachable URL with its UDP media range open.
+  configuration, from a signed record of a connected relay, or from neither,
+  even when no credentials are available.
+- `nonPublicTurnUrls` flags common private IP and local hostname forms.
+  Such hosts may work over LAN or VPN. Public hosts are not guaranteed reachable.
+  This field does not test DNS, credential acceptance, NAT traversal or media.
 
 Implemented:
 
@@ -426,17 +423,17 @@ Implemented:
 - derive local TURN server URLs from node `relayConfiguration.publicHost` plus
   `relayConfiguration.callsRelay.port` when `CALLS_TURN_URLS` is not enough
 - generate temporary coturn REST credentials per authenticated identity using
-  `CALLS_TURN_SHARED_SECRET`, or the built-in shared fallback when it is empty:
+  a configured private `CALLS_TURN_SHARED_SECRET`:
   `username=<expiresAtUnix>:<identityId>` and
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
 - publish signed call relay records through the public IPFS pubsub network when
-  at least one local TURN URL is configured
+  at least one local TURN URL and a private shared secret are configured
 - use the node's locally configured TURN URLs when it exposes a calls relay
 - otherwise include TURN URLs only from signed call relay records whose
   `peerId` matches a currently connected circuit relay; records from unrelated
   or disconnected relays are ignored
 - require all nodes sharing a calls relay to use the same effective TURN secret;
-  nodes without an explicit value use the same built-in fallback
+  nodes without a private value cannot issue temporary credentials or publish records
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
   lifetime; it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev

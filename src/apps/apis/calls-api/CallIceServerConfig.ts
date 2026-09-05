@@ -107,7 +107,7 @@ export class CallIceServerConfig {
         environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
         environment.CALLS_TURN_DISCOVERY_ENABLED !== 'false',
       turnSharedSecret: turnSharedSecret.getValue(),
-      turnSharedSecretConfigured: !turnSharedSecret.usesDefaultValue(),
+      turnSharedSecretConfigured: turnSharedSecret.isConfigured(),
       turnUrls: this.getAdvertisedTurnUrls(environment, relaySettings),
       turnUsername: environment.CALLS_TURN_USERNAME,
     });
@@ -125,7 +125,7 @@ export class CallIceServerConfig {
   private createTurnCredentials(
     identityId: IdentityId,
     localTurnServer: boolean,
-  ): TurnCredentials {
+  ): TurnCredentials | undefined {
     if (
       localTurnServer &&
       !this.values.turnSharedSecretConfigured &&
@@ -136,6 +136,13 @@ export class CallIceServerConfig {
         credential: this.values.turnCredential,
         username: this.values.turnUsername,
       };
+    }
+
+    if (
+      !this.values.turnSharedSecretConfigured ||
+      !this.values.turnSharedSecret
+    ) {
+      return undefined;
     }
 
     const expiresAt =
@@ -175,7 +182,7 @@ export class CallIceServerConfig {
     return withoutScheme.split(/[:/?]/)[0] || '';
   }
 
-  private isUnreachableAcrossRelays(url: string): boolean {
+  private hasNonPublicHost(url: string): boolean {
     const host = this.turnUrlHost(url).toLowerCase();
 
     if (host === 'localhost' || host.endsWith('.local')) {
@@ -199,11 +206,11 @@ export class CallIceServerConfig {
           : 'none';
 
     return {
-      sharedSecretIsBuiltInFallback: !this.values.turnSharedSecretConfigured,
-      turnSource,
-      unreachableTurnUrls: advertisedTurnUrls.filter((url) =>
-        this.isUnreachableAcrossRelays(url),
+      nonPublicTurnUrls: advertisedTurnUrls.filter((url) =>
+        this.hasNonPublicHost(url),
       ),
+      turnSharedSecretConfigured: this.values.turnSharedSecretConfigured,
+      turnSource,
     };
   }
 
@@ -221,11 +228,13 @@ export class CallIceServerConfig {
         this.values.turnUrls.length > 0,
       );
 
-      iceServers.push({
-        credential: credentials.credential,
-        urls: turnUrls,
-        username: credentials.username,
-      });
+      if (credentials) {
+        iceServers.push({
+          credential: credentials.credential,
+          urls: turnUrls,
+          username: credentials.username,
+        });
+      }
     }
 
     if (this.values.stunUrls.length > 0) {
