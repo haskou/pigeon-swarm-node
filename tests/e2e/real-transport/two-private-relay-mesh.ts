@@ -137,14 +137,14 @@ async function main(): Promise<void> {
     );
     const partitionStartedAt = Date.now();
     await assertFullMesh(relays, peerIds);
-    if (Date.now() - partitionStartedAt > 90_000) {
-      throw new Error(
-        'Cached mesh recovery exceeded the 90 second local fault budget.',
-      );
-    }
     await Promise.all(relays.map((relay) => setPublicNetwork(relay, false)));
     await assertPostDiscoveryPubSub(relayA, relayC);
     await assertOrbitDBLateJoinReplication(relayB, relayC);
+    if (Date.now() - partitionStartedAt > 90_000) {
+      throw new Error(
+        'Cached mesh and traffic recovery exceeded the 90 second local fault budget.',
+      );
+    }
     console.info(
       JSON.stringify({
         phase: 'public-network-outage',

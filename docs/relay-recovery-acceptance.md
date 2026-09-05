@@ -33,7 +33,7 @@ replica cannot accidentally pass.
 
 The local matrix uses a 2-second discovery interval, 4-second connected refresh,
 2-second publication interval, 1-second public-peer wait and 10-minute record
-TTL. Each wait is bounded by 120 seconds by default. Cached mesh reconnection in
+TTL. Each wait is bounded by 120 seconds by default. Cached mesh reconnection, signalling and replication in
 the combined public-outage/failed-initiator phase must finish within 90 seconds.
 The production fallback dial window remains 45 seconds. That window is time
 until another peer becomes eligible to dial, not a promise that a connection or
