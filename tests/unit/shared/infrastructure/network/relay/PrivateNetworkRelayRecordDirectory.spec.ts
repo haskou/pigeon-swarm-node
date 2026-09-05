@@ -90,6 +90,32 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     jest.restoreAllMocks();
   });
 
+  it('should coalesce simultaneous discovery requests and allow the next pass after settlement', async () => {
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    let complete!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    const discoverNow = jest
+      .spyOn(
+        directory as unknown as { discoverNow: () => Promise<void> },
+        'discoverNow',
+      )
+      .mockReturnValueOnce(pending)
+      .mockResolvedValue(undefined);
+    const requests = Array.from({ length: 20 }, () =>
+      directory.discover(network, mock()),
+    );
+
+    expect(new Set(requests).size).toBe(1);
+    expect(discoverNow).toHaveBeenCalledTimes(1);
+    complete();
+    await Promise.all(requests);
+    await directory.discover(network, mock());
+    expect(discoverNow).toHaveBeenCalledTimes(2);
+  });
+
   it('should publish relay records through gossipsub and announce their providers', async () => {
     const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
@@ -826,7 +852,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       privateKey(),
       privateConnection,
-      '12D3KooWRelayA',
+      '12D3KooWRelayZ',
     );
     const knownRelay: PrivateNetworkRelayRecord = {
       expiresAt: now + 600_000,
@@ -859,7 +885,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayZ',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -885,16 +911,40 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         multiaddrs: ['/dns4/relay-c.example.com/tcp/4181/p2p/12D3KooWRelayC'],
         peerId: '12D3KooWRelayC',
       };
-      await handler?.(
-        JSON.stringify(
-          PrivateNetworkRelayRecordCodec.seal(network, departedRelay),
-        ),
+      const cacheState = directory as unknown as {
+        relayRecordEnvelopeCache: Map<string, string>;
+        knownRelayPublisherPeerIds: Map<string, Set<string>>;
+        relayPublisherPeerObservedAt: Record<string, number>;
+      };
+      const cacheSizeBefore = cacheState.relayRecordEnvelopeCache.size;
+      for (let publication = 0; publication < 100; publication += 1) {
+        await handler?.(
+          JSON.stringify(
+            PrivateNetworkRelayRecordCodec.seal(network, departedRelay),
+          ),
+        );
+      }
+      expect(cacheState.relayRecordEnvelopeCache.size).toBe(
+        cacheSizeBefore + 1,
       );
+      const departedCacheKey = `${network.getId()}:${departedRelay.peerId}`;
+      expect(cacheState.relayPublisherPeerObservedAt[departedCacheKey]).toBe(now);
       now += 1001;
       publicConnection.publishPubSub.mockClear();
       publicConnection.findRecordProviderMultiaddrs.mockClear();
 
       await directory.discover(network, mock());
+      expect(cacheState.relayRecordEnvelopeCache.has(departedCacheKey)).toBe(
+        false,
+      );
+      expect(
+        cacheState.knownRelayPublisherPeerIds
+          .get(network.getId())
+          ?.has(departedRelay.peerId),
+      ).toBe(false);
+      expect(
+        cacheState.relayPublisherPeerObservedAt[departedCacheKey],
+      ).toBeUndefined();
       expect(
         publicConnection.findRecordProviderMultiaddrs,
       ).toHaveBeenCalledTimes(1);
