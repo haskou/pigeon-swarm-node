@@ -7,8 +7,8 @@ import {
 } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { createHmac } from 'crypto';
 
+import { CallIceServerDiagnostics } from './CallIceServerDiagnostics';
 import { CallTurnSharedSecret } from './CallTurnSharedSecret';
-import { CallIceServersDiagnosticsResource } from './resources/CallIceServersDiagnosticsResource';
 import {
   CallIceServerResource,
   CallIceServersResource,
@@ -21,17 +21,6 @@ export class CallIceServerConfig {
   private static readonly DEFAULT_CREDENTIAL_TTL_SECONDS = 3600;
   private static readonly DEFAULT_ICE_TRANSPORT_POLICY = 'all';
   private static readonly DEFAULT_TURN_TRANSPORTS = ['udp', 'tcp'];
-
-  private static readonly nonPublicHostPatterns = [
-    /^127\./,
-    /^10\./,
-    /^169\.254\./,
-    /^192\.168\./,
-    /^172\.(1[6-9]|2\d|3[01])\./,
-    /^::1$/,
-    /^f[cd][0-9a-f]{2}:/i,
-    /^fe80:/i,
-  ];
 
   private static normalizeCredentialTtl(
     value: number | string | undefined,
@@ -170,57 +159,17 @@ export class CallIceServerConfig {
     return CallIceServerConfig.unique(connectedRelayTurnUrls);
   }
 
-  private turnUrlHost(url: string): string {
-    const withoutScheme = url.replace(/^turn(s)?:(\/\/)?/, '');
-
-    // Bracketed IPv6 literals such as turn:[fc00::1]:3478 must keep the full
-    // address; splitting on ':' would only leave '['.
-    if (withoutScheme.startsWith('[')) {
-      return withoutScheme.slice(1, withoutScheme.indexOf(']'));
-    }
-
-    return withoutScheme.split(/[:/?]/)[0] || '';
-  }
-
-  private hasNonPublicHost(url: string): boolean {
-    const host = this.turnUrlHost(url).toLowerCase();
-
-    if (host === 'localhost' || host.endsWith('.local')) {
-      return true;
-    }
-
-    return CallIceServerConfig.nonPublicHostPatterns.some((pattern) =>
-      pattern.test(host),
-    );
-  }
-
-  private buildDiagnostics(
-    advertisedTurnUrls: string[],
-    connectedRelayTurnUrls: string[],
-  ): CallIceServersDiagnosticsResource {
-    const turnSource: CallIceServersDiagnosticsResource['turnSource'] =
-      this.values.turnUrls.length > 0
-        ? 'local-configuration'
-        : advertisedTurnUrls.length > 0 && connectedRelayTurnUrls.length > 0
-          ? 'connected-relay-record'
-          : 'none';
-
-    return {
-      nonPublicTurnUrls: advertisedTurnUrls.filter((url) =>
-        this.hasNonPublicHost(url),
-      ),
-      turnSharedSecretConfigured: this.values.turnSharedSecretConfigured,
-      turnSource,
-    };
-  }
-
   public toResource(
     identityId: IdentityId,
     connectedRelayTurnUrls: string[] = [],
   ): CallIceServersResource {
     const iceServers: CallIceServerResource[] = [];
     const turnUrls = this.getTurnUrls(connectedRelayTurnUrls);
-    const diagnostics = this.buildDiagnostics(turnUrls, connectedRelayTurnUrls);
+    const diagnostics = new CallIceServerDiagnostics(
+      turnUrls,
+      this.values.turnUrls.length > 0,
+      this.values.turnSharedSecretConfigured,
+    ).toResource();
 
     if (turnUrls.length > 0) {
       const credentials = this.createTurnCredentials(

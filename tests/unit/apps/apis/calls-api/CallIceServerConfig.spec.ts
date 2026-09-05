@@ -79,7 +79,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should flag bracketed IPv6 TURN hosts as unreachable across relays', () => {
+  it('should flag non-public IPv6 TURN hosts across the complete link-local prefix', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
       CALLS_TURN_URLS: [
@@ -87,6 +87,10 @@ describe('CallIceServerConfig', () => {
         'turn:[::1]:3478?transport=udp',
         'turn:[fc00::1]:3478?transport=udp',
         'turn:[fe80::1]:3478?transport=udp',
+        'turn:[fe90::1]:3478?transport=udp',
+        'turns:[febf::1]:5349?transport=tcp',
+        'turn:[fe7f::1]:3478?transport=udp',
+        'turn:[fec0::1]:3478?transport=udp',
       ].join(','),
     }).toResource(identityId);
 
@@ -94,6 +98,8 @@ describe('CallIceServerConfig', () => {
       'turn:[::1]:3478?transport=udp',
       'turn:[fc00::1]:3478?transport=udp',
       'turn:[fe80::1]:3478?transport=udp',
+      'turn:[fe90::1]:3478?transport=udp',
+      'turns:[febf::1]:5349?transport=tcp',
     ]);
   });
 
