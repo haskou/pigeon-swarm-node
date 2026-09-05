@@ -7,23 +7,22 @@ describe('CallTurnSharedSecret', () => {
     );
 
     expect(secret.getValue()).toBe('configured-turn-secret');
-    expect(secret.usesDefaultValue()).toBe(false);
+    expect(secret.isConfigured()).toBe(true);
   });
 
   it.each([
     undefined,
     '',
     '   ',
-    CallTurnSharedSecret.DEFAULT,
-    ` ${CallTurnSharedSecret.DEFAULT} `,
+    CallTurnSharedSecret.REJECTED_PUBLIC_SECRET,
+    ` ${CallTurnSharedSecret.REJECTED_PUBLIC_SECRET} `,
   ])(
-    'should use the built-in shared secret when configuration is %p',
+    'should disable shared-secret credentials when configuration is %p',
     (configuredSecret) => {
-      const secret =
-        CallTurnSharedSecret.fromEnvironment(configuredSecret);
+      const secret = CallTurnSharedSecret.fromEnvironment(configuredSecret);
 
-      expect(secret.getValue()).toBe(CallTurnSharedSecret.DEFAULT);
-      expect(secret.usesDefaultValue()).toBe(true);
+      expect(secret.getValue()).toBe('');
+      expect(secret.isConfigured()).toBe(false);
     },
   );
 });

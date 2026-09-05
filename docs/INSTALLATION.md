@@ -197,15 +197,22 @@ listening port is configured with `callsRelay.port` in
 Example:
 
 ```dotenv
-CALLS_TURN_SHARED_SECRET=shared-coturn-rest-secret
+CALLS_TURN_SHARED_SECRET=<private-random-secret-from-your-secret-manager>
 ```
 
-When `CALLS_TURN_SHARED_SECRET` is empty, the backend uses the built-in
-`Kestrel7-Quartz9-Pigeon4-Nebula8-Harbor2-Cipher6-Orbit5-Velvet3` fallback and
-logs a warning. The official deployment stack gives coturn the same fallback.
-This makes an unconfigured relay usable, but the value is public and must be
-replaced with one custom secret shared by every backend and coturn service in a
-production relay pool.
+Replace the placeholder with a private random secret. The official deployment
+requires 32–256 characters using letters, digits, `+`, `/` or `=`. Provision it
+through your secret manager or a protected environment file; do not commit it,
+print it in logs or pass it in command-line arguments.
+
+Missing, blank and former public shared secrets disable temporary TURN
+credential issuance and local relay-record publication. The deployment also
+rejects the former public secret. Before upgrading an existing installation,
+configure each backend issuer and its advertised coturn server with the same
+private value and restart both. Rotate the secret on coturn itself: a backend
+upgrade alone cannot revoke credentials accepted by a server using the old key.
+Explicit static credentials remain available for locally configured TURN URLs
+only; they are not reused for discovered relays.
 
 ```http
 PUT /node/relay-configuration
@@ -237,10 +244,10 @@ The node-to-node discovery protocol is documented in
 
 The ICE endpoint prefers the node's own configured calls relay. A leaf node
 without one uses TURN URLs only from the signed record belonging to a circuit
-relay to which it is currently connected. The built-in secret lets nodes with
-no explicit value interoperate by default. Configure `CALLS_TURN_SHARED_SECRET`
-with the same custom secret on every backend and coturn service in a production
-relay pool.
+relay to which it is currently connected. Every issuer needs a private
+`CALLS_TURN_SHARED_SECRET` matching the TURN servers whose URLs it returns.
+The current distributed issuance pool uses one shared private value. Independent
+TURN servers do not need matching secrets merely to relay media to each other.
 
 The official coturn sidecar consumes `relayConfiguration.callsRelay.port` and
 the persisted private relay range directly. The router and firewall must still

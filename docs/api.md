@@ -395,9 +395,26 @@ Response:
       "credential": "<temporaryHmacCredential>"
     }
   ],
-  "iceTransportPolicy": "all"
+  "iceTransportPolicy": "all",
+  "diagnostics": {
+    "turnSharedSecretConfigured": true,
+    "turnSource": "local-configuration",
+    "nonPublicTurnUrls": []
+  }
 }
 ```
+
+The `diagnostics` block describes configuration, not live connectivity:
+
+- `turnSharedSecretConfigured` is false when the secret is missing or equals
+  the rejected public fallback. Shared-secret credentials are then omitted.
+  Explicit local static credentials can still be returned.
+- `turnSource` reports whether the TURN URLs come from this node's local
+  configuration, from a signed record of a connected relay, or from neither,
+  even when no credentials are available.
+- `nonPublicTurnUrls` flags common private IP and local hostname forms.
+  Such hosts may work over LAN or VPN. Public hosts are not guaranteed reachable.
+  This field does not test DNS, credential acceptance, NAT traversal or media.
 
 Implemented:
 
@@ -406,17 +423,17 @@ Implemented:
 - derive local TURN server URLs from node `relayConfiguration.publicHost` plus
   `relayConfiguration.callsRelay.port` when `CALLS_TURN_URLS` is not enough
 - generate temporary coturn REST credentials per authenticated identity using
-  `CALLS_TURN_SHARED_SECRET`, or the built-in shared fallback when it is empty:
+  a configured private `CALLS_TURN_SHARED_SECRET`:
   `username=<expiresAtUnix>:<identityId>` and
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
 - publish signed call relay records through the public IPFS pubsub network when
-  at least one local TURN URL is configured
+  at least one local TURN URL and a private shared secret are configured
 - use the node's locally configured TURN URLs when it exposes a calls relay
 - otherwise include TURN URLs only from signed call relay records whose
   `peerId` matches a currently connected circuit relay; records from unrelated
   or disconnected relays are ignored
 - require all nodes sharing a calls relay to use the same effective TURN secret;
-  nodes without an explicit value use the same built-in fallback
+  nodes without a private value cannot issue temporary credentials or publish records
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
   lifetime; it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev

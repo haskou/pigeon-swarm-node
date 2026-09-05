@@ -80,7 +80,7 @@ export default class CallRelayRuntime implements Runtime {
 
   private warnWhenUsingDefaultTurnSharedSecret(): void {
     if (
-      !this.configuration.usesDefaultTurnSharedSecret() ||
+      this.configuration.hasTurnSharedSecret() ||
       this.state.defaultTurnSharedSecretWarningLogged
     ) {
       return;
@@ -88,9 +88,9 @@ export default class CallRelayRuntime implements Runtime {
 
     this.state.defaultTurnSharedSecretWarningLogged = true;
     Kernel.logger.warn(
-      'Calls TURN is using the built-in shared secret. ' +
-        'Set CALLS_TURN_SHARED_SECRET to the same custom value on every ' +
-        'backend and coturn service in the relay pool.',
+      'Shared-secret TURN credentials and relay publication are disabled: ' +
+        'CALLS_TURN_SHARED_SECRET is missing or uses the rejected public fallback. ' +
+        'Configure the same private secret on each issuer and its TURN server.',
     );
   }
 

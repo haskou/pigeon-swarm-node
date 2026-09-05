@@ -5,6 +5,20 @@ import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/networ
 import { createHmac } from 'crypto';
 
 describe('CallIceServerConfig', () => {
+  it.each([undefined, '', CallTurnSharedSecret.REJECTED_PUBLIC_SECRET])(
+    'should not issue local or discovered TURN credentials with a missing or public secret',
+    (secret) => {
+      const local = CallIceServerConfig.fromEnvironment({
+        CALLS_TURN_SHARED_SECRET: secret,
+        CALLS_TURN_URLS: 'turn:relay.example.test:3478',
+      }).toResource(identityId);
+      const discovered = CallIceServerConfig.fromEnvironment({
+        CALLS_TURN_SHARED_SECRET: secret,
+      }).toResource(identityId, ['turn:remote.example.test:3478']);
+      expect(local.iceServers).toEqual([]);
+      expect(discovered.iceServers).toEqual([]);
+    },
+  );
   const identityId = new IdentityId(
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
   );
@@ -22,6 +36,11 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'local-configuration',
+        nonPublicTurnUrls: [],
+      },
       iceServers: [
         {
           credential: 'turn-password',
@@ -34,6 +53,70 @@ describe('CallIceServerConfig', () => {
       ],
       iceTransportPolicy: 'all',
     });
+  });
+
+  it('should flag loopback and private TURN hosts as unreachable across relays', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: [
+        'turn:turn.example.test:3478?transport=udp',
+        'turn:127.0.0.1:3478?transport=udp',
+        'turn:10.0.0.5:3478?transport=udp',
+        'turn:192.168.1.10:3478?transport=udp',
+        'turn:coturn.local:3478?transport=udp',
+      ].join(','),
+    }).toResource(identityId);
+
+    expect(resource.diagnostics).toEqual({
+      turnSharedSecretConfigured: true,
+      turnSource: 'local-configuration',
+      nonPublicTurnUrls: [
+        'turn:127.0.0.1:3478?transport=udp',
+        'turn:10.0.0.5:3478?transport=udp',
+        'turn:192.168.1.10:3478?transport=udp',
+        'turn:coturn.local:3478?transport=udp',
+      ],
+    });
+  });
+
+  it('should flag non-public IPv6 TURN hosts across the complete link-local prefix', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: [
+        'turn:[2001:db8::1]:3478?transport=udp',
+        'turn:[::1]:3478?transport=udp',
+        'turn:[fc00::1]:3478?transport=udp',
+        'turn:[fe80::1]:3478?transport=udp',
+        'turn:[fe90::1]:3478?transport=udp',
+        'turns:[febf::1]:5349?transport=tcp',
+        'turn:[fe7f::1]:3478?transport=udp',
+        'turn:[fec0::1]:3478?transport=udp',
+      ].join(','),
+    }).toResource(identityId);
+
+    expect(resource.diagnostics.nonPublicTurnUrls).toEqual([
+      'turn:[::1]:3478?transport=udp',
+      'turn:[fc00::1]:3478?transport=udp',
+      'turn:[fe80::1]:3478?transport=udp',
+      'turn:[fe90::1]:3478?transport=udp',
+      'turns:[febf::1]:5349?transport=tcp',
+    ]);
+  });
+
+  it('should not classify numeric DNS labels as private IP addresses', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: [
+        'turn:10.example.com:3478',
+        'turn:192.168.example.com:3478',
+        'turn:127.example.com:3478',
+        'turn:10.0.0.1:3478',
+      ].join(','),
+    }).toResource(identityId);
+
+    expect(resource.diagnostics.nonPublicTurnUrls).toEqual([
+      'turn:10.0.0.1:3478',
+    ]);
   });
 
   it('should generate temporary coturn REST credentials when shared secret exists', () => {
@@ -130,7 +213,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should use connected relay TURN urls with the built-in shared secret', () => {
+  it('should not reuse local static credentials for a connected relay', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const connectedRelayUrl =
       'turn:connected-relay.example.test:4199?transport=udp';
@@ -138,23 +221,18 @@ describe('CallIceServerConfig', () => {
       CALLS_TURN_CREDENTIAL: 'local-turn-password',
       CALLS_TURN_USERNAME: 'local-turn-user',
     }).toResource(identityId, [connectedRelayUrl]);
-    const username = `1770003600:${identityId.valueOf()}`;
-
     expect(resource).toEqual({
-      iceServers: [
-        {
-          credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
-            .update(username)
-            .digest('base64'),
-          urls: [connectedRelayUrl],
-          username,
-        },
-      ],
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'connected-relay-record',
+        nonPublicTurnUrls: [],
+      },
+      iceServers: [],
       iceTransportPolicy: 'all',
     });
   });
 
-  it('should derive local TURN credentials from the built-in shared secret', () => {
+  it('should omit local TURN without private or static credentials', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const resource = CallIceServerConfig.fromEnvironment(
       {},
@@ -170,21 +248,13 @@ describe('CallIceServerConfig', () => {
         publicHost: 'relay.example.test',
       }),
     ).toResource(identityId);
-    const username = `1770003600:${identityId.valueOf()}`;
-
     expect(resource).toEqual({
-      iceServers: [
-        {
-          credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
-            .update(username)
-            .digest('base64'),
-          urls: [
-            'turn:relay.example.test:4199?transport=udp',
-            'turn:relay.example.test:4199?transport=tcp',
-          ],
-          username,
-        },
-      ],
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'local-configuration',
+        nonPublicTurnUrls: [],
+      },
+      iceServers: [],
       iceTransportPolicy: 'all',
     });
   });
@@ -232,6 +302,11 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'none',
+        nonPublicTurnUrls: [],
+      },
       iceServers: [
         {
           urls: ['stun:stun.example.test:3478'],
@@ -250,10 +325,20 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(emptyResource).toEqual({
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'none',
+        nonPublicTurnUrls: [],
+      },
       iceServers: [],
       iceTransportPolicy: 'all',
     });
     expect(stunResource).toEqual({
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'none',
+        nonPublicTurnUrls: [],
+      },
       iceServers: [
         {
           urls: ['stun:stun.example.test:3478'],
@@ -270,6 +355,11 @@ describe('CallIceServerConfig', () => {
     }).toResource(identityId);
 
     expect(resource).toEqual({
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'none',
+        nonPublicTurnUrls: [],
+      },
       iceServers: [
         {
           urls: ['stun:stun.example.test:3478'],
@@ -279,24 +369,20 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should use built-in TURN credentials with explicit relay-only transport', () => {
+  it('should preserve relay-only policy when TURN credentials are unavailable', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_ICE_TRANSPORT_POLICY: 'relay',
       CALLS_STUN_URLS: 'stun:stun.example.test:3478',
       CALLS_TURN_URLS: 'turn:turn.example.test:3478?transport=udp',
     }).toResource(identityId);
-    const username = `1770003600:${identityId.valueOf()}`;
-
     expect(resource).toEqual({
+      diagnostics: {
+        turnSharedSecretConfigured: false,
+        turnSource: 'local-configuration',
+        nonPublicTurnUrls: [],
+      },
       iceServers: [
-        {
-          credential: createHmac('sha1', CallTurnSharedSecret.DEFAULT)
-            .update(username)
-            .digest('base64'),
-          urls: ['turn:turn.example.test:3478?transport=udp'],
-          username,
-        },
         {
           urls: ['stun:stun.example.test:3478'],
         },

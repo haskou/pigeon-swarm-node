@@ -7,6 +7,7 @@ import {
 } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import { createHmac } from 'crypto';
 
+import { CallIceServerDiagnostics } from './CallIceServerDiagnostics';
 import { CallTurnSharedSecret } from './CallTurnSharedSecret';
 import {
   CallIceServerResource,
@@ -95,7 +96,7 @@ export class CallIceServerConfig {
         environment.CALLS_TURN_DISCOVERY_ENABLED !== false &&
         environment.CALLS_TURN_DISCOVERY_ENABLED !== 'false',
       turnSharedSecret: turnSharedSecret.getValue(),
-      turnSharedSecretConfigured: !turnSharedSecret.usesDefaultValue(),
+      turnSharedSecretConfigured: turnSharedSecret.isConfigured(),
       turnUrls: this.getAdvertisedTurnUrls(environment, relaySettings),
       turnUsername: environment.CALLS_TURN_USERNAME,
     });
@@ -113,7 +114,7 @@ export class CallIceServerConfig {
   private createTurnCredentials(
     identityId: IdentityId,
     localTurnServer: boolean,
-  ): TurnCredentials {
+  ): TurnCredentials | undefined {
     if (
       localTurnServer &&
       !this.values.turnSharedSecretConfigured &&
@@ -124,6 +125,13 @@ export class CallIceServerConfig {
         credential: this.values.turnCredential,
         username: this.values.turnUsername,
       };
+    }
+
+    if (
+      !this.values.turnSharedSecretConfigured ||
+      !this.values.turnSharedSecret
+    ) {
+      return undefined;
     }
 
     const expiresAt =
@@ -157,6 +165,11 @@ export class CallIceServerConfig {
   ): CallIceServersResource {
     const iceServers: CallIceServerResource[] = [];
     const turnUrls = this.getTurnUrls(connectedRelayTurnUrls);
+    const diagnostics = new CallIceServerDiagnostics(
+      turnUrls,
+      this.values.turnUrls.length > 0,
+      this.values.turnSharedSecretConfigured,
+    ).toResource();
 
     if (turnUrls.length > 0) {
       const credentials = this.createTurnCredentials(
@@ -164,11 +177,13 @@ export class CallIceServerConfig {
         this.values.turnUrls.length > 0,
       );
 
-      iceServers.push({
-        credential: credentials.credential,
-        urls: turnUrls,
-        username: credentials.username,
-      });
+      if (credentials) {
+        iceServers.push({
+          credential: credentials.credential,
+          urls: turnUrls,
+          username: credentials.username,
+        });
+      }
     }
 
     if (this.values.stunUrls.length > 0) {
@@ -178,6 +193,7 @@ export class CallIceServerConfig {
     }
 
     return {
+      diagnostics,
       iceServers,
       iceTransportPolicy: this.values.iceTransportPolicy,
     };
