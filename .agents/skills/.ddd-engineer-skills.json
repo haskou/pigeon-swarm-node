@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "package": "@haskou/ddd-engineer-skills",
+  "skills": {
+    "ddd-engineer": {
+      "hash": "sha256:1fd824c295a33da0c2f334aec7c05975acdf118cc5a9df628cfaa75f80d8a7c9",
+      "version": "0.1.0"
+    },
+    "ddd-migration": {
+      "hash": "sha256:bb2a01e8c1adc43bd40b64b9910886d85c26f306f915db7b59f85073a849ccd2",
+      "version": "0.1.0"
+    },
+    "haskou-ddd-kernel": {
+      "hash": "sha256:4e4afba9c91001b82ed0d946086ce9682eb5bd4e06bb813536f742fae6cd758c",
+      "version": "0.1.0"
+    },
+    "haskou-flow": {
+      "hash": "sha256:80fae65b2f537e5113247be4ed05286151f0d3d21870ae4754af905a8f79a347",
+      "version": "0.1.0"
+    },
+    "haskou-value-objects": {
+      "hash": "sha256:ea66d57df789d3235079be3c450f93b479ec9a2a4ed7e2999f77c5530ad3c672",
+      "version": "0.1.0"
+    }
+  }
+}

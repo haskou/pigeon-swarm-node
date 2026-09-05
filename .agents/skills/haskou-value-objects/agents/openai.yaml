@@ -1,0 +1,4 @@
+interface:
+  display_name: "@haskou/value-objects"
+  short_description: "Use @haskou/value-objects correctly in DDD code"
+  default_prompt: "Use $haskou-value-objects to implement this Value Object change without leaking primitives into domain decisions."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DDD Engineer"
+  short_description: "Implement and review practical DDD code"
+  default_prompt: "Use $ddd-engineer to implement or review this change with explicit domain boundaries and targeted verification."

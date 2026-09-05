@@ -1,0 +1,4 @@
+interface:
+  display_name: "DDD Migration"
+  short_description: "Plan and execute incremental DDD migrations"
+  default_prompt: "Use $ddd-migration to plan or execute this migration toward DDD in coherent, verifiable slices."
