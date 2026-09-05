@@ -10,7 +10,7 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';

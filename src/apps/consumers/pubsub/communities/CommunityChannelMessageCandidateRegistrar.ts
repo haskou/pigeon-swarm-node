@@ -14,7 +14,8 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
 import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { assert, Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { assert, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandidate';
 

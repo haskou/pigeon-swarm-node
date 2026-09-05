@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { WebSocketConnectionAuthenticator } from '@app/shared/infrastructure/websocket/WebSocketConnectionAuthenticator';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { IncomingMessage } from 'http';
 
 describe('WebSocketConnectionAuthenticator', () => {

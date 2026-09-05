@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';

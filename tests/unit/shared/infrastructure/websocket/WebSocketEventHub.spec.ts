@@ -2,7 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { WebSocket } from 'ws';
 
 class TestDomainEvent extends DomainEvent {

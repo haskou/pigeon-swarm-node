@@ -15,7 +15,7 @@ import { MessageSendOptions } from '@app/contexts/conversations/domain/value-obj
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { ConversationMother } from '../../../mothers/ConversationMother';
 

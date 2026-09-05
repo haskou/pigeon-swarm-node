@@ -9,7 +9,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
-import { KeyPair, UUID } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { UUID } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 

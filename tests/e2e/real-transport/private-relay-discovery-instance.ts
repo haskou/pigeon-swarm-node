@@ -17,7 +17,7 @@ import PrivateNetworkRelayRecordDirectory, {
 } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import type { GossipSub } from '@libp2p/gossipsub';
 import { createHash, randomBytes } from 'crypto';
 import { createConnection } from 'net';

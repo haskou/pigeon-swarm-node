@@ -1,12 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import {
-  assert,
-  PrimitiveOf,
-  Signature,
-  Timestamp,
-} from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityAccessValidator } from './asserts/CommunityAccessValidator';
 import { CommunityOwnerValidator } from './asserts/CommunityOwnerValidator';

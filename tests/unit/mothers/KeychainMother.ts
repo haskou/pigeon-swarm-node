@@ -1,6 +1,7 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair, PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
+import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 export class KeychainMother {
   public ownerIdentityId: IdentityId;

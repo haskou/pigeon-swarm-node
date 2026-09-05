@@ -12,7 +12,7 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { Kernel } from '@haskou/ddd-kernel';
 import { setDefaultTimeout } from '@cucumber/cucumber';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import * as fsSync from 'fs';

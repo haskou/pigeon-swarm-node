@@ -1,4 +1,5 @@
-import { PrivateKey, StringValueObject } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject } from '@haskou/value-objects';
 
 export class NetworkKey extends PrivateKey {
   private static normalize(value: string | StringValueObject): string {

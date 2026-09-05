@@ -1,4 +1,4 @@
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 

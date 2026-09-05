@@ -4,7 +4,7 @@ import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/re
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import Kernel from '@haskou/ddd-kernel';
-import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
+import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';

@@ -1,4 +1,5 @@
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageId } from '../../value-objects/CommunityChannelMessageId';
 

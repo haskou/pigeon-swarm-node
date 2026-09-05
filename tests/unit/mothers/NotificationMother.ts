@@ -7,7 +7,8 @@ import { NotificationState } from '@app/contexts/notifications/domain/value-obje
 import { NotificationStatus } from '@app/contexts/notifications/domain/value-objects/NotificationStatus';
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityMother } from './IdentityMother';
 

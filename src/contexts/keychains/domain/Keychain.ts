@@ -1,11 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import {
-  PrimitiveOf,
-  PublicKey,
-  Signature,
-  Timestamp,
-} from '@haskou/value-objects';
+import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { KeychainWasPublishedEvent } from './events/KeychainWasPublishedEvent';
 import { KeychainSignaturePayload } from './KeychainSignaturePayload';

@@ -10,14 +10,8 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import {
-  EncryptedKeyPair,
-  EncryptedPrivateKey,
-  PublicKey,
-  Signature,
-  Timestamp,
-  UniqueObjectArray,
-} from '@haskou/value-objects';
+import { EncryptedKeyPair, EncryptedPrivateKey, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp, UniqueObjectArray } from '@haskou/value-objects';
 
 export class IdentityMother {
   public encryptedKeyPair: EncryptedKeyPair = new EncryptedKeyPair(

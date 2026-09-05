@@ -2,10 +2,10 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
 import {
   assert,
   PrimitiveOf,
-  Signature,
   Timestamp,
   UniqueObjectArray,
 } from '@haskou/value-objects';
@@ -26,7 +26,11 @@ import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class Identity extends AggregateRoot {
-  public static fromPrimitives(primitives: PrimitiveOf<Identity>): Identity {
+  public static fromPrimitives(
+    primitives: Omit<PrimitiveOf<Identity>, 'masterKeyDerivation'> & {
+      masterKeyDerivation: Record<string, unknown>;
+    },
+  ): Identity {
     return new Identity(
       new IdentityId(primitives.id),
       IdentitySigningKey.fromPrimitives(primitives.encryptedKeyPair),
@@ -40,7 +44,9 @@ export class Identity extends AggregateRoot {
   }
 
   public static fromSignedPublication(
-    primitives: PrimitiveOf<Identity>,
+    primitives: Omit<PrimitiveOf<Identity>, 'masterKeyDerivation'> & {
+      masterKeyDerivation: Record<string, unknown>;
+    },
   ): Identity {
     const identity = Identity.fromPrimitives(primitives);
 

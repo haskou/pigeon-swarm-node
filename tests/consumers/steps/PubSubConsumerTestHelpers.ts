@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventConsumer } from '@haskou/ddd-kernel/domain';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 export type UseCaseCall = {
   message: unknown;

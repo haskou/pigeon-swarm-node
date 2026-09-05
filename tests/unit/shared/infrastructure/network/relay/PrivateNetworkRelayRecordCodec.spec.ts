@@ -3,7 +3,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { PrivateNetworkRelayRecord } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec';
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
 import { mock } from 'jest-mock-extended';
 

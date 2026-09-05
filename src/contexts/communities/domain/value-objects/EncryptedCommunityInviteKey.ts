@@ -3,17 +3,11 @@ import {
   Integer,
   PrimitiveOf,
   StringValueObject,
-  ValueObject,
 } from '@haskou/value-objects';
 
 import { InvalidEncryptedCommunityInviteKeyError } from '../errors/InvalidEncryptedCommunityInviteKeyError';
 
-export class EncryptedCommunityInviteKey extends ValueObject<{
-  algorithm: string;
-  ciphertext: string;
-  nonce: string;
-  version: number;
-}> {
+export class EncryptedCommunityInviteKey {
   private static readonly CURRENT_VERSION = 1;
   private static readonly SUPPORTED_ALGORITHM = 'AES-GCM';
   private static readonly BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -32,17 +26,11 @@ export class EncryptedCommunityInviteKey extends ValueObject<{
   }
 
   constructor(
-    version: Integer,
-    algorithm: StringValueObject,
-    nonce: StringValueObject,
-    ciphertext: StringValueObject,
+    private readonly version: Integer,
+    private readonly algorithm: StringValueObject,
+    private readonly nonce: StringValueObject,
+    private readonly ciphertext: StringValueObject,
   ) {
-    super({
-      algorithm: algorithm.valueOf(),
-      ciphertext: ciphertext.valueOf(),
-      nonce: nonce.valueOf(),
-      version: version.valueOf(),
-    });
     assert(
       version.isEqual(new Integer(EncryptedCommunityInviteKey.CURRENT_VERSION)),
       new InvalidEncryptedCommunityInviteKeyError(
@@ -85,6 +73,11 @@ export class EncryptedCommunityInviteKey extends ValueObject<{
   }
 
   public toPrimitives() {
-    return this.valueOf();
+    return {
+      algorithm: this.algorithm.valueOf(),
+      ciphertext: this.ciphertext.valueOf(),
+      nonce: this.nonce.valueOf(),
+      version: this.version.valueOf(),
+    };
   }
 }

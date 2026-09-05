@@ -1,6 +1,7 @@
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair, Timestamp } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 describe('IdentityPresence', () => {
   it('keeps presence online when one heartbeat is skipped', async () => {

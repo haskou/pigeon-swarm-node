@@ -1,6 +1,6 @@
 import { GetPresenceListRequest } from '@app/apps/apis/presence-api/requests/GetPresenceListRequest';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 describe('GetPresenceListRequest', () => {
   it('accepts repeated identityIds query params', async () => {
