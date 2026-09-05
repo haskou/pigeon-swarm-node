@@ -146,20 +146,31 @@ export class RealTransportInstanceProcess {
   }
 
   public async stop(): Promise<void> {
-    if (!this.exited) {
+    if (this.exited) {
+      if (this.exited.code !== 0 || this.exited.signal) {
+        throw new Error(
+          `${this.label} already exited uncleanly: code=${this.exited.code} signal=${this.exited.signal}`,
+        );
+      }
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => this.child.kill('SIGKILL'), 15_000);
+      this.child.once('exit', (code, signal) => {
+        clearTimeout(timeout);
+        if (code !== 0 || signal) {
+          reject(
+            new Error(
+              `${this.label} did not stop cleanly: code=${code} signal=${signal}`,
+            ),
+          );
+          return;
+        }
+        resolve();
+      });
       this.send({ type: 'stop' });
-    }
-
-    await Promise.race([
-      this.waitFor('stop', (event) => event.type === 'stopped', 15_000).catch(
-        (): void => {},
-      ),
-      new Promise((resolve) => setTimeout(resolve, 15_000)),
-    ]);
-
-    if (!this.exited) {
-      this.child.kill('SIGTERM');
-    }
+    });
   }
 
   public diagnostics(): string {

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import 'module-alias/register';
 
 import Kernel from '@haskou/ddd-kernel';
+import PubSubNetworkMessageCodec from '@app/shared/infrastructure/messageBus/libp2p/PubSubNetworkMessageCodec';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
@@ -22,6 +23,7 @@ import type { GossipSub } from '@libp2p/gossipsub';
 import { createHash, randomBytes } from 'crypto';
 import { createConnection } from 'net';
 import path from 'path';
+import fs from 'fs-extra';
 import readline from 'readline';
 
 const ROLE = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_INSTANCE_ROLE') as
@@ -60,6 +62,10 @@ let publicDirectoryPrivateKey: Libp2pPrivateKeyLike | undefined;
 let orbitdb: OrbitDBInstance | undefined;
 let documents: OrbitDBDatabase | undefined;
 let relayOptions: PrivateRelayListenOptions | undefined;
+let blockPrivateDials = false;
+let rejectedPrivateDials = 0;
+const activePrivateDials = new Set<string>();
+let concurrentDuplicateDials = 0;
 
 async function main(): Promise<void> {
   configureEnvironment();
@@ -106,9 +112,8 @@ function configureTestLogger(): void {
 
 async function createPrivateNetwork(): Promise<void> {
   const networkKey = new PrivateKey(NETWORK_KEY);
-  const privateNetworkPrivateKey =
-    await libp2pKeyAdapter.generateEd25519KeyPair();
-  publicDirectoryPrivateKey = await libp2pKeyAdapter.generateEd25519KeyPair();
+  const privateNetworkPrivateKey = await loadTestIdentity('private');
+  publicDirectoryPrivateKey = await loadTestIdentity('public');
   const config = IPFSNetworkConfig.fromPrimitives({
     id: NETWORK_ID,
     key: networkKey.valueOf(),
@@ -131,10 +136,57 @@ async function createPrivateNetwork(): Promise<void> {
   });
 
   network = new IPFSNetwork(config, connection);
+  const dial = network.dial.bind(network);
+  network.dial = async (address, signal): Promise<void> => {
+    const peerId = address.split('/p2p/').at(-1) || address;
+    if (activePrivateDials.has(peerId)) {
+      concurrentDuplicateDials += 1;
+    }
+    activePrivateDials.add(peerId);
+    try {
+      if (blockPrivateDials) {
+        rejectedPrivateDials += 1;
+        throw new Error('Injected private outbound dial failure');
+      }
+      await dial(address, signal);
+    } finally {
+      activePrivateDials.delete(peerId);
+    }
+  };
   directory = new PrivateNetworkRelayRecordDirectory(
     new EmbeddedLocalDatabase(),
     new PrivateNetworkRelayDirectorySettings(),
   );
+  const discover = directory.discover.bind(directory);
+  directory.discover = async (...args): Promise<void> => {
+    try {
+      await discover(...args);
+    } finally {
+      emit('discovery-pass-completed', {
+        publicPeerCount: publicDirectoryConnection?.getPeers().length ?? 0,
+        privatePeerCount: getNetwork().getPeers().length,
+      });
+    }
+  };
+}
+
+async function loadTestIdentity(
+  name: string,
+): Promise<
+  Awaited<ReturnType<typeof libp2pKeyAdapter.generateEd25519KeyPair>>
+> {
+  const filename = path.join(STORAGE_ROOT, `${name}-identity.bin`);
+  if (await fs.pathExists(filename)) {
+    return libp2pKeyAdapter.privateKeyFromProtobuf(await fs.readFile(filename));
+  }
+  const key = await libp2pKeyAdapter.generateEd25519KeyPair();
+  await fs.ensureDir(STORAGE_ROOT);
+  await fs.writeFile(
+    filename,
+    await libp2pKeyAdapter.privateKeyToProtobuf(key),
+    { mode: 0o600 },
+  );
+  return key;
 }
 
 async function startRelay(): Promise<void> {
@@ -158,14 +210,25 @@ async function startRelay(): Promise<void> {
     relayDataLimitBytes: 16 * 1024 * 1024,
     sharedPrivateKey: getPublicDirectoryPrivateKey(),
   });
-  await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
   const publicProviderAddress = await waitFor(
     () =>
       getPublicDirectoryConnection().getMultiaddrs().find(isDirectTcpMultiaddr),
     'public provider direct TCP multiaddr',
   );
 
-  if (AUTO_START_RELAY_DISCOVERY) {
+  if (process.env.PRIVATE_RELAY_DISCOVERY_E2E_DELAY_PUBLIC_NETWORK === 'true') {
+    await getPublicDirectoryConnection().getHeliaCore().libp2p.stop();
+    getDirectory().start(
+      getNetwork(),
+      relayOptions,
+      getPublicDirectoryPrivateKey(),
+      {
+        discoveryEnabled: false,
+        publicationEnabled: true,
+      },
+    );
+  } else if (AUTO_START_RELAY_DISCOVERY) {
+    await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
     await getDirectory().publish(
       getNetwork(),
       relayOptions,
@@ -173,6 +236,7 @@ async function startRelay(): Promise<void> {
     );
     startRelayDirectory();
   } else {
+    await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
     getDirectory().start(
       getNetwork(),
       relayOptions,
@@ -242,6 +306,17 @@ async function handleCommand(command: Command): Promise<void> {
       return;
     case 'drop-private-connections':
       await dropPrivateConnections(command);
+      return;
+    case 'set-private-dials':
+      blockPrivateDials = command.enabled === false;
+      emit('private-dial-state', {
+        requestId: command.requestId,
+        rejectedPrivateDials,
+        concurrentDuplicateDials,
+      });
+      return;
+    case 'set-public-network':
+      await setPublicNetwork(command);
       return;
     case 'stop':
       await stopAndExit();
@@ -337,6 +412,27 @@ async function dropPrivateConnections(command: Command): Promise<void> {
     throw new Error('A private connection did not close.');
   }
   emit('private-connections-dropped', { requestId, count: connections.length });
+}
+
+async function setPublicNetwork(command: Command): Promise<void> {
+  const requestId = requiredCommandString(command, 'requestId');
+  const enabled = command.enabled === true;
+  const connection = getPublicDirectoryConnection();
+  if (enabled) {
+    await connection.getHeliaCore().libp2p.start();
+    if (!(await connection.waitForPeers(WAIT_TIMEOUT_MS))) {
+      throw new Error(
+        'Public transport restarted without recovering public peers.',
+      );
+    }
+  } else {
+    await connection.getHeliaCore().libp2p.stop();
+  }
+  emit('public-network-state', {
+    requestId,
+    enabled,
+    peerCount: connection.getPeers().length,
+  });
 }
 
 async function assertPreDiscoveryFetchMiss(command: Command): Promise<void> {
@@ -491,14 +587,18 @@ async function subscribePubSub(command: Command): Promise<void> {
   const payload = requiredCommandString(command, 'payload');
 
   await getNetwork().subscribePubSub(topic, async (message) => {
-    if (message === payload) {
+    const decoded =
+      command.encrypted === true
+        ? new PubSubNetworkMessageCodec().decode(message, getNetwork())
+        : message;
+    if (decoded === payload) {
       emit('pubsub-received', {
         payload,
         topic,
       });
     }
   });
-  emit('pubsub-subscribed', { topic });
+  emit('pubsub-subscribed', { topic, payload });
 }
 
 async function publishPubSub(command: Command): Promise<void> {
@@ -518,7 +618,17 @@ async function publishPubSub(command: Command): Promise<void> {
     );
   }
 
-  await getNetwork().publishPubSub(topic, payload);
+  const encoded =
+    command.encrypted === true
+      ? new PubSubNetworkMessageCodec().encode(payload, getNetwork())
+      : payload;
+  if (
+    command.encrypted === true &&
+    (encoded === payload || JSON.parse(encoded).encrypted !== true)
+  ) {
+    throw new Error('Call signalling must use an encrypted network envelope.');
+  }
+  await getNetwork().publishPubSub(topic, encoded);
   emit('pubsub-published', {
     payload,
     topic,
@@ -583,14 +693,15 @@ async function waitForOrbitDocument(
     throw new Error('OrbitDB documents database is not open.');
   }
 
-  await waitFor(async () => {
+  const document = await waitFor(async () => {
     const results = await documents?.query?.((candidate) => {
       return candidate.id === documentId;
     });
 
-    return results && results.length > 0 ? true : undefined;
+    return results?.[0];
   }, `OrbitDB document ${documentId}`);
   emit('orbit-replicated', {
+    document,
     address,
     documentId,
   });

@@ -90,6 +90,7 @@ secrets, sign domain payloads, and publish encrypted keychain updates.
 Primary API documentation:
 
 * [HTTP API](./docs/api.md)
+* [Relay recovery acceptance](./docs/relay-recovery-acceptance.md)
 * [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
 
 When the server is running, Swagger UI is available at:

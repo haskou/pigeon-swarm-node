@@ -3,6 +3,9 @@ import 'module-alias/register';
 
 import { heliaRuntimeAdapter } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { spawn } from 'child_process';
+import { isDeepStrictEqual } from 'util';
+import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
+import PubSubTopicResolver from '@app/shared/infrastructure/messageBus/libp2p/PubSubTopicResolver';
 import { generateKeyPairSync, randomUUID } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
@@ -23,7 +26,6 @@ const INSTANCE_SCRIPT = path.join(
   __dirname,
   'private-relay-discovery-instance.ts',
 );
-const TSX_BIN = path.join(ROOT, 'node_modules', '.bin', 'tsx');
 const NETWORK_ID = randomUUID();
 const NETWORK_NAME = `private-relay-mesh-e2e-${RUN_ID}`;
 const WAIT_TIMEOUT_MS = Number(
@@ -47,6 +49,7 @@ async function main(): Promise<void> {
   const networkKey = generateNetworkKey();
   let bootstraps: PublicBootstrap[] = [];
   let completed = false;
+  let report: Record<string, unknown> | undefined;
   let relayA: RealTransportInstanceProcess | undefined;
   let relayB: RealTransportInstanceProcess | undefined;
   let relayC: RealTransportInstanceProcess | undefined;
@@ -60,7 +63,11 @@ async function main(): Promise<void> {
     ).join(',');
 
     relayA = spawnRelay('relay-a', networkKey, bootstrapAddress);
-    relayB = spawnRelay('relay-b', networkKey, bootstrapAddress);
+    await relayA.waitFor(
+      'first relay ready',
+      (event) => event.type === 'relay-ready',
+    );
+    relayB = spawnRelay('relay-b', networkKey, bootstrapAddress, true);
     const [relayAReady, relayBReady] = (await Promise.all([
       relayA.waitFor('relay-ready', (event) => event.type === 'relay-ready'),
       relayB.waitFor('relay-ready', (event) => event.type === 'relay-ready'),
@@ -68,12 +75,12 @@ async function main(): Promise<void> {
 
     assertDistinctRelays(relayAReady, relayBReady);
     await assertNoPreDiscoveryPubSub(relayA, relayB);
-    await connectRelayMesh(relayA, relayAReady, relayB, relayBReady);
+    await connectRelayMesh(relayA, relayAReady, relayB, relayBReady, () =>
+      setPublicNetwork(relayB!, true),
+    );
     await assertPostDiscoveryPubSub(relayA, relayB);
     await assertOrbitDBLateJoinReplication(relayA, relayB);
 
-    // Add a publisher only after the original pair is healthy. Do not restart
-    // their discovery loops or inject the new publisher's private address.
     relayC = spawnRelay('relay-c', networkKey, bootstrapAddress);
     const relayCReady = (await relayC.waitFor(
       'third relay ready',
@@ -113,22 +120,87 @@ async function main(): Promise<void> {
       );
     }
 
-    console.info(
-      JSON.stringify(
-        {
-          networkId: NETWORK_ID,
-          relayAPeerId: relayAReady.peerId,
-          relayBPeerId: relayBReady.peerId,
-          relayCPeerId: relayCReady.peerId,
-          scope:
-            'local TCP relay discovery, pubsub and OrbitDB; no NAT or WebRTC media proof',
-          result: 'PASS',
-          transportDsn: 'private-relay-mesh-public-ipfs-discovery://',
-        },
-        null,
-        2,
-      ),
+    await Promise.all(relays.map((relay) => setPublicNetwork(relay, false)));
+    const isolatedIndex = peerIds.indexOf([...peerIds].sort()[0]);
+    const isolatedRelay = relays[isolatedIndex];
+    await setPrivateDials(isolatedRelay, false);
+    const partitionId = randomUUID();
+    isolatedRelay.send({
+      type: 'drop-private-connections',
+      requestId: partitionId,
+    });
+    await isolatedRelay.waitFor(
+      'partition applied',
+      (event) =>
+        event.type === 'private-connections-dropped' &&
+        event.requestId === partitionId,
     );
+    const partitionStartedAt = Date.now();
+    await assertFullMesh(relays, peerIds);
+    if (Date.now() - partitionStartedAt > 90_000) {
+      throw new Error(
+        'Cached mesh recovery exceeded the 90 second local fault budget.',
+      );
+    }
+    await Promise.all(relays.map((relay) => setPublicNetwork(relay, false)));
+    await assertPostDiscoveryPubSub(relayA, relayC);
+    await assertOrbitDBLateJoinReplication(relayB, relayC);
+    console.info(
+      JSON.stringify({
+        phase: 'public-network-outage',
+        recoveryMs: Date.now() - partitionStartedAt,
+      }),
+    );
+    const dialState = await setPrivateDials(isolatedRelay, true);
+    if (Number(dialState.rejectedPrivateDials) === 0) {
+      throw new Error(
+        'The selected initiator did not attempt an outbound dial during the fault.',
+      );
+    }
+    await Promise.all(relays.map((relay) => setPublicNetwork(relay, true)));
+
+    console.info(JSON.stringify({ phase: 'public-network-restored' }));
+    await Promise.all(relays.map((relay) => setPrivateDials(relay, true)));
+    await relayC.stop();
+    console.info(JSON.stringify({ phase: 'relay-process-stopped' }));
+    relayC = spawnRelay('relay-c', networkKey, bootstrapAddress);
+    const restartedReady = await relayC.waitFor(
+      'restarted relay ready',
+      (event) => event.type === 'relay-ready',
+    );
+    if (
+      restartedReady.peerId !== relayCReady.peerId ||
+      restartedReady.pid === relayCReady.pid
+    ) {
+      throw new Error(
+        'Restart must retain the peer identity in a new process.',
+      );
+    }
+    console.info(JSON.stringify({ phase: 'relay-process-ready' }));
+    const restartStartedAt = Date.now();
+    await assertFullMesh([relayA, relayB, relayC], peerIds, 2);
+    await assertPostDiscoveryPubSub(relayC, relayA);
+    await assertOrbitDBLateJoinReplication(relayB, relayC);
+    await Promise.all(
+      [relayA, relayB, relayC].map((relay) => setPrivateDials(relay, true)),
+    );
+    console.info(
+      JSON.stringify({
+        phase: 'process-restart',
+        recoveryMs: Date.now() - restartStartedAt,
+      }),
+    );
+
+    report = {
+      networkId: NETWORK_ID,
+      relayAPeerId: relayAReady.peerId,
+      relayBPeerId: relayBReady.peerId,
+      relayCPeerId: relayCReady.peerId,
+      scope:
+        'local TCP relay discovery, encrypted call signalling and OrbitDB; no NAT or WebRTC media proof',
+      result: 'PASS',
+      transportDsn: 'private-relay-mesh-public-ipfs-discovery://',
+    };
     completed = true;
   } finally {
     if (!completed) {
@@ -137,13 +209,70 @@ async function main(): Promise<void> {
       );
     }
 
-    await Promise.allSettled([relayA?.stop(), relayB?.stop(), relayC?.stop()]);
-    await Promise.race([
-      Promise.allSettled(bootstraps.map((bootstrap) => bootstrap.stop())),
-      new Promise((resolve) => setTimeout(resolve, 5000)),
+    const relayShutdowns = await Promise.allSettled([
+      relayA?.stop(),
+      relayB?.stop(),
+      relayC?.stop(),
     ]);
-    await fs.remove(TMP_ROOT);
+    let stopTimeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        Promise.all(bootstraps.map((bootstrap) => bootstrap.stop())),
+        new Promise<never>((_, reject) => {
+          stopTimeout = setTimeout(
+            () =>
+              reject(
+                new Error('Public bootstrap shutdown exceeded 15 seconds.'),
+              ),
+            15_000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(stopTimeout);
+      await fs.remove(TMP_ROOT);
+    }
+    const failedShutdown = relayShutdowns.find(
+      (result) => result.status === 'rejected',
+    );
+    if (failedShutdown?.status === 'rejected') {
+      throw failedShutdown.reason;
+    }
   }
+  console.info(JSON.stringify(report, null, 2));
+}
+
+async function setPrivateDials(
+  relay: RealTransportInstanceProcess,
+  enabled: boolean,
+): Promise<RealTransportInstanceEvent> {
+  const requestId = randomUUID();
+  relay.send({ type: 'set-private-dials', enabled, requestId });
+  const state = await relay.waitFor(
+    'private dial state',
+    (event) =>
+      event.type === 'private-dial-state' && event.requestId === requestId,
+  );
+  if (state.concurrentDuplicateDials !== 0) {
+    throw new Error('Overlapping private relay dials detected.');
+  }
+  return state;
+}
+
+async function setPublicNetwork(
+  relay: RealTransportInstanceProcess,
+  enabled: boolean,
+): Promise<void> {
+  const requestId = randomUUID();
+  relay.send({ type: 'set-public-network', enabled, requestId });
+  await relay.waitFor(
+    'public network state',
+    (event) =>
+      event.type === 'public-network-state' &&
+      event.requestId === requestId &&
+      event.enabled === enabled &&
+      (enabled ? Number(event.peerCount) > 0 : event.peerCount === 0),
+  );
 }
 
 async function assertFullMesh(
@@ -190,6 +319,7 @@ async function connectRelayMesh(
   relayAReady: RelayReadyEvent,
   relayB: RealTransportInstanceProcess,
   relayBReady: RelayReadyEvent,
+  restorePublicNetwork: () => Promise<void>,
 ): Promise<void> {
   const [dialer, dialerReady, receiver, receiverReady] =
     relayAReady.peerId < relayBReady.peerId
@@ -210,6 +340,19 @@ async function connectRelayMesh(
     remotePeerId: receiverReady.peerId,
     type: 'start-relay-mesh',
   });
+
+  await dialer.waitFor(
+    'dialer discovery started',
+    (event) => event.type === 'relay-mesh-started',
+  );
+  await relayB.waitFor(
+    'initial discovery completed without public connectivity',
+    (event) =>
+      event.type === 'discovery-pass-completed' &&
+      event.publicPeerCount === 0 &&
+      event.privatePeerCount === 0,
+  );
+  await restorePublicNetwork();
 
   await Promise.all([
     dialer.waitFor(
@@ -255,22 +398,49 @@ async function assertPostDiscoveryPubSub(
   publisher: RealTransportInstanceProcess,
   subscriber: RealTransportInstanceProcess,
 ): Promise<void> {
-  const topic = `pigeon-swarm.e2e.${NETWORK_ID}.relay-mesh.post.${randomUUID()}`;
-  const payload = `payload-${randomUUID()}`;
+  const topic = new PubSubTopicResolver().fromRoutingKeyForNetwork(
+    CallSignalSentEvent.EVENT_NAME,
+    NETWORK_ID,
+  );
+  const now = Date.now();
+  const callId = randomUUID();
+  const payload = new CallSignalSentEvent(callId, {
+    attempt: 1,
+    callId,
+    expiresAt: now + WAIT_TIMEOUT_MS,
+    networkId: NETWORK_ID,
+    ownerNodeId: randomUUID(),
+    participantIds: ['sender', 'recipient'],
+    payload: { candidate: `candidate:${randomUUID()}` },
+    recipientIdentityId: 'recipient',
+    senderIdentityId: 'sender',
+    sentAt: now,
+    signalId: randomUUID(),
+    signalType: 'ice-candidate',
+  }).decode();
   const subscriberReady = (await subscriber.waitFor(
     'subscriber relay identity',
     (event) => event.type === 'relay-ready',
   )) as RelayReadyEvent;
 
-  subscriber.send({ payload, topic, type: 'subscribe-pubsub' });
+  subscriber.send({
+    payload,
+    topic,
+    encrypted: true,
+    type: 'subscribe-pubsub',
+  });
   await subscriber.waitFor(
     'post-discovery pubsub subscription',
-    (event) => event.type === 'pubsub-subscribed' && event.topic === topic,
+    (event) =>
+      event.type === 'pubsub-subscribed' &&
+      event.topic === topic &&
+      event.payload === payload,
   );
   publisher.send({
     payload,
     topic,
     subscriberPeerId: subscriberReady.peerId,
+    encrypted: true,
     type: 'publish-pubsub',
   });
   await subscriber.waitFor(
@@ -320,7 +490,8 @@ async function assertOrbitDBLateJoinReplication(
     (event) =>
       event.type === 'orbit-replicated' &&
       event.documentId === document.id &&
-      event.address === address,
+      event.address === address &&
+      isDeepStrictEqual(event.document, document),
   );
 }
 
@@ -328,16 +499,19 @@ function spawnRelay(
   name: string,
   networkKey: string,
   bootstrapAddress: string,
+  delayPublicNetwork = false,
 ): RealTransportInstanceProcess {
   const child = spawn(
-    TSX_BIN,
-    ['-r', 'tsconfig-paths/register', INSTANCE_SCRIPT],
+    process.execPath,
+    ['--import', 'tsx', '-r', 'tsconfig-paths/register', INSTANCE_SCRIPT],
     {
       cwd: ROOT,
       env: {
         ...process.env,
         NODE_ENV: 'test',
         PRIVATE_RELAY_DISCOVERY_E2E_AUTO_START_RELAY_DISCOVERY: 'false',
+        PRIVATE_RELAY_DISCOVERY_E2E_DELAY_PUBLIC_NETWORK:
+          String(delayPublicNetwork),
         PRIVATE_RELAY_DISCOVERY_E2E_INSTANCE_ROLE: 'relay',
         PRIVATE_RELAY_DISCOVERY_E2E_NETWORK_ID: NETWORK_ID,
         PRIVATE_RELAY_DISCOVERY_E2E_NETWORK_KEY: networkKey,
@@ -349,7 +523,7 @@ function spawnRelay(
         PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS: bootstrapAddress,
         PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS: '2000',
         PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS: '4000',
-        PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS: '10000',
+        PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS: '1000',
         PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS: '2000',
         PIGEON_RELAY_RECORD_TTL_MS: '600000',
       },
@@ -409,7 +583,10 @@ function generateNetworkKey(): string {
   return privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main().then(
+  () => process.exit(0),
+  (error) => {
+    console.error(error);
+    process.exit(1);
+  },
+);
