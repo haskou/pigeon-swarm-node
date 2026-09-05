@@ -48,6 +48,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
   private readonly discoveryRetryAttempts: Record<string, number> = {};
 
+  private readonly activeDiscoveryGenerations = new Map<string, symbol>();
+
   private readonly discoveryRetryTimeouts: Record<
     string,
     ReturnType<typeof setTimeout>
@@ -1723,6 +1725,9 @@ export default class PrivateNetworkRelayRecordDirectory {
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): void {
     const networkId = network.getId();
+    const generation =
+      this.activeDiscoveryGenerations.get(networkId) ?? Symbol();
+    this.activeDiscoveryGenerations.set(networkId, generation);
 
     Kernel.logger.info(
       `Private IPFS relay record discovery started: networkId=${networkId}` +
@@ -1735,13 +1740,16 @@ export default class PrivateNetworkRelayRecordDirectory {
           ` error=${String(error)}`,
       );
     });
-    this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey);
+    this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey, generation);
 
     if (this.discoveryIntervals[networkId]) {
       return;
     }
 
     const interval = setInterval(() => {
+      if (this.activeDiscoveryGenerations.get(networkId) !== generation) {
+        return;
+      }
       this.discover(network, sharedPrivateKey).catch((error: unknown) => {
         Kernel.logger.debug(
           `Private IPFS relay record discovery refresh crashed: networkId=${networkId}` +
@@ -1757,10 +1765,14 @@ export default class PrivateNetworkRelayRecordDirectory {
   private scheduleInitialDiscoveryRetry(
     network: IPFSNetwork,
     sharedPrivateKey: Libp2pPrivateKeyLike,
+    generation: symbol,
   ): void {
     const networkId = network.getId();
 
-    if (this.discoveryRetryTimeouts[networkId]) {
+    if (
+      this.activeDiscoveryGenerations.get(networkId) !== generation ||
+      this.discoveryRetryTimeouts[networkId]
+    ) {
       return;
     }
 
@@ -1787,6 +1799,9 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     this.discoveryRetryAttempts[networkId] = attempt + 1;
     const timeout = setTimeout(() => {
+      if (this.activeDiscoveryGenerations.get(networkId) !== generation) {
+        return;
+      }
       delete this.discoveryRetryTimeouts[networkId];
 
       if (
@@ -1805,7 +1820,11 @@ export default class PrivateNetworkRelayRecordDirectory {
           );
         })
         .finally(() => {
-          this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey);
+          this.scheduleInitialDiscoveryRetry(
+            network,
+            sharedPrivateKey,
+            generation,
+          );
         });
     }, unboundedDelay);
 
@@ -2002,6 +2021,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   public stop(networkId: string): void {
+    this.activeDiscoveryGenerations.delete(networkId);
     this.forgetActiveRelayRecord(networkId);
     this.relayPublisherNetworkIds.delete(networkId);
     this.knownRelayPublisherPeerIds.delete(networkId);

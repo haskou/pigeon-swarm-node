@@ -257,13 +257,22 @@ async function assertPostDiscoveryPubSub(
 ): Promise<void> {
   const topic = `pigeon-swarm.e2e.${NETWORK_ID}.relay-mesh.post.${randomUUID()}`;
   const payload = `payload-${randomUUID()}`;
+  const subscriberReady = (await subscriber.waitFor(
+    'subscriber relay identity',
+    (event) => event.type === 'relay-ready',
+  )) as RelayReadyEvent;
 
   subscriber.send({ payload, topic, type: 'subscribe-pubsub' });
   await subscriber.waitFor(
     'post-discovery pubsub subscription',
     (event) => event.type === 'pubsub-subscribed' && event.topic === topic,
   );
-  publisher.send({ payload, topic, type: 'publish-pubsub' });
+  publisher.send({
+    payload,
+    topic,
+    subscriberPeerId: subscriberReady.peerId,
+    type: 'publish-pubsub',
+  });
   await subscriber.waitFor(
     'post-discovery pubsub delivery',
     (event) =>

@@ -18,6 +18,7 @@ import PrivateNetworkRelayRecordDirectory, {
 import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { PrivateKey } from '@haskou/value-objects';
+import type { GossipSub } from '@libp2p/gossipsub';
 import { createHash, randomBytes } from 'crypto';
 import { createConnection } from 'net';
 import path from 'path';
@@ -503,6 +504,19 @@ async function subscribePubSub(command: Command): Promise<void> {
 async function publishPubSub(command: Command): Promise<void> {
   const topic = requiredCommandString(command, 'topic');
   const payload = requiredCommandString(command, 'payload');
+
+  if (typeof command.subscriberPeerId === 'string') {
+    const pubsub = getNetwork().getHeliaCore().libp2p.services
+      .pubsub as GossipSub;
+    await waitFor(
+      () =>
+        pubsub
+          .getSubscribers(topic)
+          .some((peer) => peer.toString() === command.subscriberPeerId) ||
+        undefined,
+      'publisher observing the remote topic subscription',
+    );
+  }
 
   await getNetwork().publishPubSub(topic, payload);
   emit('pubsub-published', {

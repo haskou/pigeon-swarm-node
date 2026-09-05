@@ -286,6 +286,94 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     }
   });
 
+  it('should not reschedule a discovery retry that settles after stop', async () => {
+    jest.useFakeTimers();
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    let finishRetry!: () => void;
+    const retry = new Promise<void>((resolve) => {
+      finishRetry = resolve;
+    });
+    const discover = jest
+      .spyOn(directory, 'discover')
+      .mockResolvedValue()
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(retry);
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+      jest.advanceTimersByTime(1_000);
+      expect(discover).toHaveBeenCalledTimes(2);
+      directory.stop(network.getId());
+      finishRetry();
+      await flushPromises();
+      jest.advanceTimersByTime(5_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(2);
+    } finally {
+      directory.stop(network.getId());
+      finishRetry();
+      jest.useRealTimers();
+    }
+  });
+
+  it('should not let a previous lifecycle restart retries while a new retry is pending', async () => {
+    jest.useFakeTimers();
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    let finishOldRetry!: () => void;
+    let finishNewRetry!: () => void;
+    const oldRetry = new Promise<void>((resolve) => {
+      finishOldRetry = resolve;
+    });
+    const newRetry = new Promise<void>((resolve) => {
+      finishNewRetry = resolve;
+    });
+    const discover = jest
+      .spyOn(directory, 'discover')
+      .mockResolvedValue()
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(oldRetry)
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(newRetry);
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+      jest.advanceTimersByTime(1_000);
+      directory.stop(network.getId());
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+      jest.advanceTimersByTime(1_000);
+      expect(discover).toHaveBeenCalledTimes(4);
+      finishOldRetry();
+      await flushPromises();
+      jest.advanceTimersByTime(2_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(4);
+      finishNewRetry();
+      await flushPromises();
+      jest.advanceTimersByTime(2_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(5);
+    } finally {
+      directory.stop(network.getId());
+      finishOldRetry();
+      finishNewRetry();
+      jest.useRealTimers();
+    }
+  });
+
   it('should retry failed startup relay record publications before the hourly refresh', async () => {
     jest.useFakeTimers();
     const directory = createDirectory(localDatabase);
