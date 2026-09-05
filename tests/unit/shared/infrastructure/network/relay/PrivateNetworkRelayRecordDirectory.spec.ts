@@ -286,6 +286,94 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     }
   });
 
+  it('should not reschedule a discovery retry that settles after stop', async () => {
+    jest.useFakeTimers();
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    let finishRetry!: () => void;
+    const retry = new Promise<void>((resolve) => {
+      finishRetry = resolve;
+    });
+    const discover = jest
+      .spyOn(directory, 'discover')
+      .mockResolvedValue()
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(retry);
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+      jest.advanceTimersByTime(1_000);
+      expect(discover).toHaveBeenCalledTimes(2);
+      directory.stop(network.getId());
+      finishRetry();
+      await flushPromises();
+      jest.advanceTimersByTime(5_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(2);
+    } finally {
+      directory.stop(network.getId());
+      finishRetry();
+      jest.useRealTimers();
+    }
+  });
+
+  it('should not let a previous lifecycle restart retries while a new retry is pending', async () => {
+    jest.useFakeTimers();
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    let finishOldRetry!: () => void;
+    let finishNewRetry!: () => void;
+    const oldRetry = new Promise<void>((resolve) => {
+      finishOldRetry = resolve;
+    });
+    const newRetry = new Promise<void>((resolve) => {
+      finishNewRetry = resolve;
+    });
+    const discover = jest
+      .spyOn(directory, 'discover')
+      .mockResolvedValue()
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(oldRetry)
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(newRetry);
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+      jest.advanceTimersByTime(1_000);
+      directory.stop(network.getId());
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+      jest.advanceTimersByTime(1_000);
+      expect(discover).toHaveBeenCalledTimes(4);
+      finishOldRetry();
+      await flushPromises();
+      jest.advanceTimersByTime(2_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(4);
+      finishNewRetry();
+      await flushPromises();
+      jest.advanceTimersByTime(2_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(5);
+    } finally {
+      directory.stop(network.getId());
+      finishOldRetry();
+      finishNewRetry();
+      jest.useRealTimers();
+    }
+  });
+
   it('should retry failed startup relay record publications before the hourly refresh', async () => {
     jest.useFakeTimers();
     const directory = createDirectory(localDatabase);
@@ -503,9 +591,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const firstRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: [
-        '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
-      ],
+      multiaddrs: ['/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA'],
       peerId: '12D3KooWRelayA',
       role: 'relay',
       version: 1,
@@ -513,9 +599,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const secondRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: [
-        '/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB',
-      ],
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
       peerId: '12D3KooWRelayB',
       role: 'relay',
       version: 1,
@@ -566,17 +650,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const remoteRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: [
-        '/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB',
-      ],
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
       peerId: '12D3KooWRelayB',
       role: 'relay',
       version: 1,
     };
-    const subscriptions = new Map<
-      string,
-      (payload: string) => Promise<void>
-    >();
+    const subscriptions = new Map<string, (payload: string) => Promise<void>>();
 
     privateConnection.getPeers.mockReturnValue([]);
     privateConnection.dial.mockResolvedValue(undefined);
@@ -636,6 +715,222 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       expect.any(AbortSignal),
     );
     directory.stop(network.getId());
+  });
+
+  it('should keep requesting unknown publishers while all known relays are connected', async () => {
+    let now = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS = '10000';
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWRelayA',
+    );
+    const knownRelay: PrivateNetworkRelayRecord = {
+      expiresAt: now + 600_000,
+      issuedAt: now,
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
+      peerId: '12D3KooWRelayB',
+      role: 'relay',
+      version: 1,
+    };
+    const subscriptions = new Map<string, (payload: string) => Promise<void>>();
+    privateConnection.getPeers.mockReturnValue([knownRelay.peerId]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
+    publicConnection.provideRecord.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockImplementation(
+      async (topic, handler) => {
+        subscriptions.set(topic, handler);
+      },
+    );
+    (
+      directory as unknown as {
+        getPublicConnection(): Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    try {
+      directory.start(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+        { discoveryEnabled: true, publicationEnabled: true },
+      );
+      await flushPromises();
+      await flushPromises();
+      await directory.discover(network, mock());
+      logger.info.mockClear();
+      await directory.discover(network, mock());
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('privateConnected=false'),
+      );
+      const handler = [...subscriptions.entries()].find(
+        ([topic]) => !topic.endsWith('.request'),
+      )?.[1];
+      expect(handler).toBeDefined();
+      await handler?.(
+        JSON.stringify(
+          PrivateNetworkRelayRecordCodec.seal(network, knownRelay),
+        ),
+      );
+      publicConnection.publishPubSub.mockClear();
+      publicConnection.findRecordProviderMultiaddrs.mockClear();
+
+      await directory.discover(network, mock());
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('privateConnected=true'),
+      );
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(1);
+      expect(publicConnection.publishPubSub).toHaveBeenCalledWith(
+        expect.stringMatching(/\.request$/),
+        '',
+      );
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(1);
+
+      now += 10_000;
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(2);
+      expect(privateConnection.dial).not.toHaveBeenCalled();
+    } finally {
+      directory.stop(network.getId());
+      delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
+    }
+  });
+
+  it('should resume connected discovery throttling after a departed publisher expires', async () => {
+    let now = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS = '10000';
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWRelayA',
+    );
+    const knownRelay: PrivateNetworkRelayRecord = {
+      expiresAt: now + 600_000,
+      issuedAt: now,
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
+      peerId: '12D3KooWRelayB',
+      role: 'relay',
+      version: 1,
+    };
+    const subscriptions = new Map<string, (payload: string) => Promise<void>>();
+    privateConnection.getPeers.mockReturnValue([knownRelay.peerId]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
+    publicConnection.provideRecord.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockImplementation(
+      async (topic, handler) => {
+        subscriptions.set(topic, handler);
+      },
+    );
+    (
+      directory as unknown as {
+        getPublicConnection(): Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    try {
+      directory.start(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+        { discoveryEnabled: true, publicationEnabled: true },
+      );
+      await flushPromises();
+      await flushPromises();
+      await directory.discover(network, mock());
+      const handler = [...subscriptions.entries()].find(
+        ([topic]) => !topic.endsWith('.request'),
+      )?.[1];
+      expect(handler).toBeDefined();
+      await handler?.(
+        JSON.stringify(
+          PrivateNetworkRelayRecordCodec.seal(network, knownRelay),
+        ),
+      );
+      const departedRelay: PrivateNetworkRelayRecord = {
+        ...knownRelay,
+        expiresAt: now + 1000,
+        multiaddrs: ['/dns4/relay-c.example.com/tcp/4181/p2p/12D3KooWRelayC'],
+        peerId: '12D3KooWRelayC',
+      };
+      await handler?.(
+        JSON.stringify(
+          PrivateNetworkRelayRecordCodec.seal(network, departedRelay),
+        ),
+      );
+      now += 1001;
+      publicConnection.publishPubSub.mockClear();
+      publicConnection.findRecordProviderMultiaddrs.mockClear();
+
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(1);
+      expect(publicConnection.publishPubSub).toHaveBeenCalledWith(
+        expect.stringMatching(/\.request$/),
+        '',
+      );
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(1);
+
+      now += 10_000;
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(2);
+      // A new valid record must make the publisher eligible for recovery again.
+      await handler?.(
+        JSON.stringify(
+          PrivateNetworkRelayRecordCodec.seal(network, {
+            ...departedRelay,
+            expiresAt: now + 600_000,
+            issuedAt: now,
+          }),
+        ),
+      );
+      await directory.discover(network, mock());
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(4);
+    } finally {
+      directory.stop(network.getId());
+      delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
+    }
   });
 
   it('should retry relay publisher discovery until a mesh peer connects', async () => {
@@ -1108,6 +1403,278 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     await expect(
       fs.access(path.join(storageLocation, 'datastore')),
     ).rejects.toThrow();
+  });
+
+  it('should keep retrying initial discovery with bounded backoff while the relay stays disconnected', async () => {
+    jest.useFakeTimers();
+    process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS = '16000';
+    const directory = createDirectory(localDatabase);
+    const network = privateNetwork(privateKey());
+    const discover = jest.spyOn(directory, 'discover').mockResolvedValue();
+
+    try {
+      directory.start(network, undefined, mock(), {
+        discoveryEnabled: true,
+        publicationEnabled: false,
+      });
+      await flushPromises();
+
+      expect(discover).toHaveBeenCalledTimes(1);
+
+      // Delays double: 1s, 2s, 4s, 8s, then cap at the 16s interval.
+      jest.advanceTimersByTime(1_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(2);
+
+      jest.advanceTimersByTime(2_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(3);
+
+      jest.advanceTimersByTime(4_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(4);
+
+      jest.advanceTimersByTime(8_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(5);
+
+      jest.advanceTimersByTime(16_000);
+      await flushPromises();
+      expect(discover).toHaveBeenCalledTimes(7);
+    } finally {
+      directory.stop(network.getId());
+      delete process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS;
+      jest.useRealTimers();
+    }
+  });
+
+  it.each([false, true])(
+    'should give the dial loser a full fallback window after an inbound connection: %s',
+    async (reconnectInbound) => {
+      jest.useFakeTimers();
+      process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS = '5000';
+      const directory = createDirectory(localDatabase);
+      const privateConnection = mock<IPFSConnection>();
+      const publicConnection = mock<IPFSConnection>();
+      const networkKey = privateKey();
+      // Local peer ID sorts after the remote one, so it loses the dial order.
+      const network = privateNetwork(
+        networkKey,
+        privateConnection,
+        '12D3KooWRelayZ',
+      );
+      const remoteRelay: PrivateNetworkRelayRecord = {
+        expiresAt: Date.now() + 600_000,
+        issuedAt: Date.now(),
+        multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
+        peerId: '12D3KooWRelayB',
+        role: 'relay',
+        version: 1,
+      };
+      const subscriptions = new Map<
+        string,
+        (payload: string) => Promise<void>
+      >();
+      let privatePeers: string[] = [];
+
+      privateConnection.getPeers.mockImplementation(() => privatePeers);
+      privateConnection.dial.mockImplementation(async () => {
+        privatePeers = [remoteRelay.peerId];
+      });
+      publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
+      publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+      publicConnection.provideRecord.mockResolvedValue(true);
+      publicConnection.publishPubSub.mockResolvedValue(undefined);
+      publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
+        subscriptions.set(topic, handler);
+
+        return Promise.resolve();
+      });
+      publicConnection.waitForPeers.mockResolvedValue(true);
+      (
+        directory as unknown as {
+          getPublicConnection(): Promise<IPFSConnection>;
+        }
+      ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+      try {
+        directory.start(
+          network,
+          {
+            announceAddresses: [
+              '/dns4/relay-z.example.com/tcp/4181/p2p/12D3KooWRelayZ',
+            ],
+            listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+            relayDataLimitBytes: 67_108_864,
+          },
+          mock(),
+          {
+            discoveryEnabled: true,
+            publicationEnabled: true,
+          },
+        );
+        await flushPromises();
+        await flushPromises();
+
+        const relayRecordHandler = [...subscriptions.entries()].find(
+          ([topic]) => !topic.endsWith('.request'),
+        )?.[1];
+
+        expect(relayRecordHandler).toBeDefined();
+        await relayRecordHandler?.(
+          JSON.stringify(
+            PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
+          ),
+        );
+        await flushPromises();
+
+        // The winning peer is expected to dial first.
+        expect(privateConnection.dial).not.toHaveBeenCalled();
+
+        if (reconnectInbound) {
+          // Start a fallback window, then observe an inbound connection without
+          // receiving another publisher record. A later drop needs a fresh window.
+          for (let step = 0; step < 6; step += 1) {
+            jest.advanceTimersByTime(5_000);
+            await flushPromises();
+            await flushPromises();
+          }
+          privatePeers = [remoteRelay.peerId];
+          await directory.discover(network, mock());
+          privatePeers = [];
+          for (let step = 0; step < 5; step += 1) {
+            jest.advanceTimersByTime(5_000);
+            await flushPromises();
+            await flushPromises();
+          }
+          expect(privateConnection.dial).not.toHaveBeenCalled();
+        }
+
+        // After the fallback window, this peer dials anyway instead of staying
+        // partitioned behind a failed winning dial. Advance in interval-sized
+        // steps so each discovery pass settles before the next tick.
+        for (let step = 0; step < 10; step += 1) {
+          jest.advanceTimersByTime(5_000);
+          await flushPromises();
+          await flushPromises();
+        }
+
+        expect(privateConnection.dial).toHaveBeenCalledWith(
+          remoteRelay.multiaddrs[0],
+          expect.anything(),
+        );
+      } finally {
+        directory.stop(network.getId());
+        delete process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS;
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  it('should fall back to every disconnected publisher even while another is connected and public IPFS is down', async () => {
+    jest.useFakeTimers();
+    process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS = '5000';
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const publicConnection = mock<IPFSConnection>();
+    const networkKey = privateKey();
+    const network = privateNetwork(
+      networkKey,
+      privateConnection,
+      '12D3KooWRelayZ',
+    );
+    const remoteRelays: PrivateNetworkRelayRecord[] = [
+      '12D3KooWRelayB',
+      '12D3KooWRelayC',
+    ].map((peerId) => ({
+      expiresAt: Date.now() + 600_000,
+      issuedAt: Date.now(),
+      multiaddrs: [
+        `/dns4/${peerId.toLowerCase()}.example.com/tcp/4181/p2p/${peerId}`,
+      ],
+      peerId,
+      role: 'relay' as const,
+      version: 1,
+    }));
+    const subscriptions = new Map<string, (payload: string) => Promise<void>>();
+    // Already connected to one publisher; B and C remain missing.
+    const privatePeers: string[] = ['12D3KooWRelayA'];
+    const dialedMultiaddrs: string[] = [];
+
+    privateConnection.getPeers.mockImplementation(() => privatePeers);
+    privateConnection.dial.mockImplementation(async (multiaddr: string) => {
+      dialedMultiaddrs.push(multiaddr);
+    });
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
+    publicConnection.getPeers.mockReturnValue([]);
+    publicConnection.provideRecord.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
+      subscriptions.set(topic, handler);
+
+      return Promise.resolve();
+    });
+    // Public IPFS outage: no pubsub peers ever arrive.
+    publicConnection.waitForPeers.mockResolvedValue(false);
+    (
+      directory as unknown as {
+        getPublicConnection(): Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    try {
+      directory.start(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay-z.example.com/tcp/4181/p2p/12D3KooWRelayZ',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+        {
+          discoveryEnabled: true,
+          publicationEnabled: true,
+        },
+      );
+      await flushPromises();
+      await flushPromises();
+
+      const relayRecordHandler = [...subscriptions.entries()].find(
+        ([topic]) => !topic.endsWith('.request'),
+      )?.[1];
+
+      expect(relayRecordHandler).toBeDefined();
+
+      for (const remoteRelay of remoteRelays) {
+        await relayRecordHandler?.(
+          JSON.stringify(
+            PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
+          ),
+        );
+      }
+      await flushPromises();
+
+      expect(dialedMultiaddrs).toEqual([]);
+
+      for (let step = 0; step < 10; step += 1) {
+        jest.advanceTimersByTime(5_000);
+        await flushPromises();
+        await flushPromises();
+      }
+
+      expect(dialedMultiaddrs).toEqual(
+        expect.arrayContaining([
+          remoteRelays[0].multiaddrs[0],
+          remoteRelays[1].multiaddrs[0],
+        ]),
+      );
+    } finally {
+      directory.stop(network.getId());
+      delete process.env.PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS;
+      jest.useRealTimers();
+    }
   });
 });
 

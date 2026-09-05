@@ -4,7 +4,6 @@ import {
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import Kernel from '@haskou/ddd-kernel';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { PublicRelayRecordDiscovery } from '@app/shared/infrastructure/network/relay/PublicRelayRecordDiscovery';
@@ -12,6 +11,7 @@ import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/
 import PublicRelayRuntime from '@app/shared/infrastructure/network/relay/PublicRelayRuntime';
 import { PublicRelayRuntimeNode } from '@app/shared/infrastructure/network/relay/PublicRelayRuntimeNode';
 import { defaultRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
+import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 function clearPublicRelayRuntimeState(): void {
@@ -144,9 +144,7 @@ describe('PublicRelayRuntime', () => {
 
     await runtime.start();
 
-    expect(
-      relayRecordDirectory.configurePublicConnection,
-    ).toHaveBeenCalledWith(
+    expect(relayRecordDirectory.configurePublicConnection).toHaveBeenCalledWith(
       expect.objectContaining({
         enableRelayServer: true,
         sharedPrivateKey,

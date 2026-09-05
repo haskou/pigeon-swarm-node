@@ -27,11 +27,13 @@ export type PrivateRelayListenOptions = {
 };
 
 export default class PrivateNetworkRelayRecordDirectory {
-  private static readonly initialDiscoveryRetryDelaysMs = [
-    1_000, 5_000, 15_000,
-  ];
+  private static readonly initialDiscoveryRetryDelayMs = 1_000;
 
   private static readonly maxCachedRelayRecordDialFailures = 3;
+
+  // Once the deterministic dial order picks a winner, the losing peer waits
+  // this long for the winning dial before dialing itself as a fallback.
+  private static readonly meshFallbackDialDelayMs = 45_000;
 
   private static readonly relayRecordPubSubTopicPrefix =
     'pigeon-swarm.private-relay-records.v1';
@@ -45,6 +47,8 @@ export default class PrivateNetworkRelayRecordDirectory {
   > = {};
 
   private readonly discoveryRetryAttempts: Record<string, number> = {};
+
+  private readonly activeDiscoveryGenerations = new Map<string, symbol>();
 
   private readonly discoveryRetryTimeouts: Record<
     string,
@@ -93,6 +97,10 @@ export default class PrivateNetworkRelayRecordDirectory {
   private readonly cachedRelayDialFailures: Record<string, number> = {};
 
   private readonly activePrivateRelayDialKeys: Set<string> = new Set();
+
+  private readonly relayPublisherPeerObservedAt: Record<string, number> = {};
+
+  private readonly lastProviderCounts: Record<string, number> = {};
 
   private readonly relayPublisherNetworkIds: Set<string> = new Set();
 
@@ -261,6 +269,69 @@ export default class PrivateNetworkRelayRecordDirectory {
     return this.publicConnection;
   }
 
+  private relayRecordCacheKey(networkId: string, peerId: string): string {
+    return `${networkId}:${peerId}`;
+  }
+
+  private cachedRelayRecords(network: IPFSNetwork): {
+    peerId: string;
+    record: PrivateNetworkRelayRecord;
+  }[] {
+    const prefix = `${network.getId()}:`;
+    const entries: { peerId: string; record: PrivateNetworkRelayRecord }[] = [];
+
+    for (const [key, payload] of this.relayRecordEnvelopeCache) {
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+
+      const envelope = this.decodeEnvelope(payload);
+      const record = envelope
+        ? this.getRelayRecordFromEnvelope(network, envelope)
+        : undefined;
+
+      if (record) {
+        entries.push({
+          peerId: key.slice(prefix.length),
+          record,
+        });
+      } else {
+        this.relayRecordEnvelopeCache.delete(key);
+        this.forgetRelayPublisherPeer(
+          network.getId(),
+          key.slice(prefix.length),
+        );
+      }
+    }
+
+    return entries;
+  }
+
+  private forgetRelayRecordCacheEntries(networkId: string): void {
+    for (const key of [...this.relayRecordEnvelopeCache.keys()]) {
+      if (key.startsWith(`${networkId}:`)) {
+        this.relayRecordEnvelopeCache.delete(key);
+      }
+    }
+  }
+
+  private hasDisconnectedKnownRelayPublisher(network: IPFSNetwork): boolean {
+    const knownPeerIds = this.knownRelayPublisherPeerIds.get(network.getId());
+
+    if (!knownPeerIds) {
+      return false;
+    }
+
+    const connectedPeers = new Set(network.getPeers());
+
+    return [...knownPeerIds].some((peerId) => !connectedPeers.has(peerId));
+  }
+
+  private forgetRelayPublisherPeer(networkId: string, peerId: string): void {
+    this.knownRelayPublisherPeerIds.get(networkId)?.delete(peerId);
+    delete this.relayPublisherPeerObservedAt[`${networkId}:${peerId}`];
+  }
+
   private warnWhenPublicConnectionHasNoPeers(
     operation: 'discover' | 'publish',
     network: IPFSNetwork,
@@ -373,7 +444,10 @@ export default class PrivateNetworkRelayRecordDirectory {
       network.getId(),
     );
     this.forgetCachedRelayDialFailures(network, relayRecord);
-    this.relayRecordEnvelopeCache.delete(network.getId());
+    this.relayRecordEnvelopeCache.delete(
+      this.relayRecordCacheKey(network.getId(), relayRecord.peerId),
+    );
+    this.forgetRelayPublisherPeer(network.getId(), relayRecord.peerId);
     this.forgetActiveRelayRecord(network.getId());
     Kernel.logger.warn(
       `Private IPFS relay cached record invalidated: networkId=${network.getId()}` +
@@ -566,6 +640,14 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     peerIds.add(relayRecord.peerId);
     this.knownRelayPublisherPeerIds.set(network.getId(), peerIds);
+
+    // A live direct connection resets the fallback dial window so a later
+    // drop starts counting from zero again.
+    if (network.getPeers().includes(relayRecord.peerId)) {
+      delete this.relayPublisherPeerObservedAt[
+        `${network.getId()}:${relayRecord.peerId}`
+      ];
+    }
   }
 
   private hasConnectedRelayPublisherPeer(network: IPFSNetwork): boolean {
@@ -577,6 +659,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private refreshRelayPublisherObservations(network: IPFSNetwork): void {
+    // Expired records must not bypass the connected refresh indefinitely.
+    this.cachedRelayRecords(network);
+
+    // Observe inbound connections even when discovery skips cached dials.
+    // A subsequent drop must receive a fresh fallback window.
+    for (const peerId of network.getPeers()) {
+      delete this.relayPublisherPeerObservedAt[`${network.getId()}:${peerId}`];
+    }
+  }
+
   private getDiscoveryState(network: IPFSNetwork): {
     shouldConnectRelayRecords: boolean;
     shouldDiscover: boolean;
@@ -584,7 +677,19 @@ export default class PrivateNetworkRelayRecordDirectory {
     const activeRelayRecord = this.findActiveRelayRecord(network);
 
     if (this.relayPublisherNetworkIds.has(network.getId())) {
+      this.refreshRelayPublisherObservations(network);
+
       if (!this.hasConnectedRelayPublisherPeer(network)) {
+        return {
+          shouldConnectRelayRecords: false,
+          shouldDiscover: true,
+        };
+      }
+
+      // A missing mesh edge must not wait for the slower connected refresh:
+      // evaluate it on every discovery interval so the fallback dial window
+      // stays meaningful.
+      if (this.hasDisconnectedKnownRelayPublisher(network)) {
         return {
           shouldConnectRelayRecords: false,
           shouldDiscover: true,
@@ -858,7 +963,10 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      this.relayRecordEnvelopeCache.set(network.getId(), payload);
+      this.relayRecordEnvelopeCache.set(
+        this.relayRecordCacheKey(network.getId(), relayRecord.peerId),
+        payload,
+      );
       this.infoWhenRelayPubSubRecordIsDiscovered(
         publicConnection,
         network,
@@ -886,7 +994,9 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      const envelope = this.relayRecordEnvelopeCache.get(network.getId());
+      const envelope = this.relayRecordEnvelopeCache.get(
+        this.relayRecordCacheKey(network.getId(), network.getPeerId()),
+      );
 
       if (!envelope) {
         return;
@@ -939,35 +1049,23 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   private async dialCachedRelayRecord(network: IPFSNetwork): Promise<boolean> {
-    const cachedEnvelope = this.relayRecordEnvelopeCache.get(network.getId());
+    let connected = false;
 
-    if (!cachedEnvelope) {
-      return false;
+    for (const { record: relayRecord } of this.cachedRelayRecords(network)) {
+      connected =
+        (await this.dialRelayRecordWhenAvailable(network, relayRecord)) ||
+        connected;
+
+      if (connected) {
+        this.forgetCachedRelayDialFailures(network, relayRecord);
+
+        return true;
+      }
+
+      await this.recordCachedRelayDialFailure(network, relayRecord);
     }
 
-    const envelope = this.decodeEnvelope(cachedEnvelope);
-    const relayRecord = envelope
-      ? this.getRelayRecordFromEnvelope(network, envelope)
-      : undefined;
-
-    const connected = await this.dialRelayRecordWhenAvailable(
-      network,
-      relayRecord,
-    );
-
-    if (!relayRecord) {
-      return connected;
-    }
-
-    if (connected) {
-      this.forgetCachedRelayDialFailures(network, relayRecord);
-
-      return true;
-    }
-
-    await this.recordCachedRelayDialFailure(network, relayRecord);
-
-    return false;
+    return connected;
   }
 
   private async requestRelayRecord(
@@ -1001,6 +1099,11 @@ export default class PrivateNetworkRelayRecordDirectory {
         relayRecord &&
         (await this.dialPrivateRelayRecord(network, relayRecord))
       ) {
+        this.logDiscoveryPass(
+          network,
+          'provider-record-connected',
+          providerMultiaddrs.length,
+        );
         await this.saveRelayRecordEnvelope(
           network,
           PrivateNetworkRelayRecordCodec.seal(network, relayRecord),
@@ -1032,6 +1135,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     const providerMultiaddrs = (
       await publicConnection.findRecordProviderMultiaddrs(routingKey)
     ).slice(0, 2);
+
+    this.lastProviderCounts[network.getId()] = providerMultiaddrs.length;
 
     Kernel.logger.debug(
       `Private IPFS relay record provider lookup completed: networkId=${network.getId()}` +
@@ -1241,10 +1346,33 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): boolean {
     const localPeerId = network.getPeerId();
 
+    if (
+      localPeerId === relayRecord.peerId ||
+      network.getPeers().includes(relayRecord.peerId)
+    ) {
+      delete this.relayPublisherPeerObservedAt[
+        `${network.getId()}:${relayRecord.peerId}`
+      ];
+
+      return false;
+    }
+
+    // The lexicographically lower peer ID dials first to avoid duplicate
+    // simultaneous dials. The other peer falls back to dialing itself when
+    // the direct connection stays missing for too long, so a failed or
+    // unreachable winning dial cannot partition the mesh indefinitely.
+    if (localPeerId < relayRecord.peerId) {
+      return true;
+    }
+
+    const observedKey = `${network.getId()}:${relayRecord.peerId}`;
+    const observedAt =
+      this.relayPublisherPeerObservedAt[observedKey] ??
+      (this.relayPublisherPeerObservedAt[observedKey] = Date.now());
+
     return (
-      localPeerId !== relayRecord.peerId &&
-      !network.getPeers().includes(relayRecord.peerId) &&
-      localPeerId < relayRecord.peerId
+      Date.now() - observedAt >=
+      PrivateNetworkRelayRecordDirectory.meshFallbackDialDelayMs
     );
   }
 
@@ -1253,6 +1381,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     relayRecord: PrivateNetworkRelayRecord,
   ): Promise<boolean> {
     if (!this.shouldDialRelayPublisherPeer(network, relayRecord)) {
+      this.logWaitingForChosenDialer(network, relayRecord);
+
       return false;
     }
 
@@ -1273,6 +1403,9 @@ export default class PrivateNetworkRelayRecordDirectory {
             ` peerId=${relayRecord.peerId}` +
             ` multiaddr="${multiaddr}"`,
         );
+        delete this.relayPublisherPeerObservedAt[
+          `${network.getId()}:${relayRecord.peerId}`
+        ];
 
         return true;
       } catch (error) {
@@ -1286,6 +1419,53 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     return false;
+  }
+
+  private async reconnectCachedRelayPublishers(
+    network: IPFSNetwork,
+  ): Promise<void> {
+    for (const { record } of this.cachedRelayRecords(network)) {
+      await this.connectRelayPublisherPeer(network, record);
+    }
+  }
+
+  private logWaitingForChosenDialer(
+    network: IPFSNetwork,
+    relayRecord: PrivateNetworkRelayRecord,
+  ): void {
+    const infoKey = `${network.getId()}:chosen-dialer:${relayRecord.peerId}`;
+
+    if (this.discoveredRelayInfoKeys.has(infoKey)) {
+      return;
+    }
+
+    this.discoveredRelayInfoKeys.add(infoKey);
+    Kernel.logger.info(
+      `Private IPFS relay mesh dial deferred to chosen peer:` +
+        ` networkId=${network.getId()}` +
+        ` chosenDialer=${relayRecord.peerId}` +
+        ` fallbackDialAfterMs=${PrivateNetworkRelayRecordDirectory.meshFallbackDialDelayMs}`,
+    );
+  }
+
+  private logDiscoveryPass(
+    network: IPFSNetwork,
+    phase: string,
+    providers?: number,
+    publicPeers?: number,
+  ): void {
+    const privateConnected = this.relayPublisherNetworkIds.has(network.getId())
+      ? this.hasConnectedRelayPublisherPeer(network)
+      : Boolean(this.findActiveRelayRecord(network));
+
+    Kernel.logger.info(
+      `Private IPFS relay record discovery pass:` +
+        ` networkId=${network.getId()}` +
+        ` phase=${phase}` +
+        ` providers=${providers ?? this.lastProviderCounts[network.getId()] ?? 0}` +
+        ` publicPeers=${publicPeers ?? 0}` +
+        ` privateConnected=${privateConnected}`,
+    );
   }
 
   private connectRelayRecord(
@@ -1464,7 +1644,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
     const serializedEnvelope = JSON.stringify(envelope);
 
-    this.relayRecordEnvelopeCache.set(network.getId(), serializedEnvelope);
+    this.relayRecordEnvelopeCache.set(
+      this.relayRecordCacheKey(network.getId(), relayRecord.peerId),
+      serializedEnvelope,
+    );
 
     try {
       await this.subscribeRelayRecordRequestTopic(publicConnection, network);
@@ -1573,6 +1756,9 @@ export default class PrivateNetworkRelayRecordDirectory {
     sharedPrivateKey: Libp2pPrivateKeyLike,
   ): void {
     const networkId = network.getId();
+    const generation =
+      this.activeDiscoveryGenerations.get(networkId) ?? Symbol();
+    this.activeDiscoveryGenerations.set(networkId, generation);
 
     Kernel.logger.info(
       `Private IPFS relay record discovery started: networkId=${networkId}` +
@@ -1585,13 +1771,16 @@ export default class PrivateNetworkRelayRecordDirectory {
           ` error=${String(error)}`,
       );
     });
-    this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey);
+    this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey, generation);
 
     if (this.discoveryIntervals[networkId]) {
       return;
     }
 
     const interval = setInterval(() => {
+      if (this.activeDiscoveryGenerations.get(networkId) !== generation) {
+        return;
+      }
       this.discover(network, sharedPrivateKey).catch((error: unknown) => {
         Kernel.logger.debug(
           `Private IPFS relay record discovery refresh crashed: networkId=${networkId}` +
@@ -1607,23 +1796,43 @@ export default class PrivateNetworkRelayRecordDirectory {
   private scheduleInitialDiscoveryRetry(
     network: IPFSNetwork,
     sharedPrivateKey: Libp2pPrivateKeyLike,
+    generation: symbol,
   ): void {
     const networkId = network.getId();
 
-    if (this.discoveryRetryTimeouts[networkId]) {
+    if (
+      this.activeDiscoveryGenerations.get(networkId) !== generation ||
+      this.discoveryRetryTimeouts[networkId]
+    ) {
       return;
     }
 
+    // Bounded exponential backoff: retries keep running while the private
+    // relay connection is missing but never poll faster than the first delay
+    // nor more often than the regular discovery interval, which takes over.
     const attempt = this.discoveryRetryAttempts[networkId] || 0;
-    const delay =
-      PrivateNetworkRelayRecordDirectory.initialDiscoveryRetryDelaysMs[attempt];
+    const unboundedDelay =
+      PrivateNetworkRelayRecordDirectory.initialDiscoveryRetryDelayMs *
+      2 ** attempt;
+    const maximumDelayMs = Math.max(
+      this.settings.getDiscoveryIntervalMs(),
+      PrivateNetworkRelayRecordDirectory.initialDiscoveryRetryDelayMs,
+    );
 
-    if (delay === undefined) {
+    if (unboundedDelay > maximumDelayMs) {
+      Kernel.logger.debug(
+        `Private IPFS relay initial discovery retries handed over to the interval:` +
+          ` networkId=${networkId} attempts=${attempt}`,
+      );
+
       return;
     }
 
     this.discoveryRetryAttempts[networkId] = attempt + 1;
     const timeout = setTimeout(() => {
+      if (this.activeDiscoveryGenerations.get(networkId) !== generation) {
+        return;
+      }
       delete this.discoveryRetryTimeouts[networkId];
 
       if (
@@ -1637,17 +1846,26 @@ export default class PrivateNetworkRelayRecordDirectory {
       this.discover(network, sharedPrivateKey)
         .catch((error: unknown) => {
           Kernel.logger.debug(
-            `Private IPFS relay record initial discovery retry crashed: networkId=${networkId}` +
-              ` error=${String(error)}`,
+            `Private IPFS relay record initial discovery retry crashed:` +
+              ` networkId=${networkId} error=${String(error)}`,
           );
         })
         .finally(() => {
-          this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey);
+          this.scheduleInitialDiscoveryRetry(
+            network,
+            sharedPrivateKey,
+            generation,
+          );
         });
-    }, delay);
+    }, unboundedDelay);
 
     timeout.unref?.();
     this.discoveryRetryTimeouts[networkId] = timeout;
+    Kernel.logger.debug(
+      `Private IPFS relay discovery retry scheduled:` +
+        ` networkId=${networkId} attempt=${attempt + 1}` +
+        ` nextRetryMs=${unboundedDelay}`,
+    );
   }
 
   private logDiscoveryDisabled(networkId: string): void {
@@ -1671,8 +1889,21 @@ export default class PrivateNetworkRelayRecordDirectory {
       discoveryState.shouldConnectRelayRecords &&
       (await this.dialCachedLocalRelayRecord(network))
     ) {
+      this.logDiscoveryPass(network, 'cached-record-connected');
+
       return;
     }
+
+    // Dialing cached publisher multiaddrs is purely private-network work and
+    // must not wait for public IPFS peers, so a public outage cannot stall
+    // the mesh fallback.
+    if (!discoveryState.shouldConnectRelayRecords) {
+      await this.reconnectCachedRelayPublishers(network);
+    }
+
+    // A healthy known mesh must still refresh public discovery: a missed
+    // announcement may be the only reason a new publisher is not known yet.
+    // getDiscoveryState throttles this work while all known links are healthy.
 
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
 
@@ -1685,14 +1916,36 @@ export default class PrivateNetworkRelayRecordDirectory {
         publicConnection,
       ))
     ) {
+      this.logDiscoveryPass(
+        network,
+        'waiting-for-public-peers',
+        undefined,
+        publicConnection.getPeers().length,
+      );
+
       return;
     }
 
-    if (discoveryState.shouldConnectRelayRecords) {
-      if (await this.connectToRelayRecordProviders(publicConnection, network)) {
-        return;
-      }
-    } else {
+    await this.discoverThroughPublicPeers(
+      network,
+      publicConnection,
+      discoveryState,
+    );
+  }
+
+  private async discoverThroughPublicPeers(
+    network: IPFSNetwork,
+    publicConnection: IPFSConnection,
+    discoveryState: { shouldConnectRelayRecords: boolean },
+  ): Promise<void> {
+    if (
+      discoveryState.shouldConnectRelayRecords &&
+      (await this.connectToRelayRecordProviders(publicConnection, network))
+    ) {
+      return;
+    }
+
+    if (!discoveryState.shouldConnectRelayRecords) {
       await this.connectRelayPublisherRecordProviders(
         publicConnection,
         network,
@@ -1700,6 +1953,12 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     await this.requestRelayRecord(publicConnection, network);
+    this.logDiscoveryPass(
+      network,
+      'record-requested',
+      undefined,
+      publicConnection.getPeers().length,
+    );
   }
 
   public async configurePublicConnection(
@@ -1793,11 +2052,18 @@ export default class PrivateNetworkRelayRecordDirectory {
   }
 
   public stop(networkId: string): void {
+    this.activeDiscoveryGenerations.delete(networkId);
     this.forgetActiveRelayRecord(networkId);
     this.relayPublisherNetworkIds.delete(networkId);
     this.knownRelayPublisherPeerIds.delete(networkId);
+    for (const key of Object.keys(this.relayPublisherPeerObservedAt)) {
+      if (key.startsWith(`${networkId}:`)) {
+        delete this.relayPublisherPeerObservedAt[key];
+      }
+    }
+    delete this.lastProviderCounts[networkId];
     this.deactivatePublicationGeneration(networkId);
-    this.relayRecordEnvelopeCache.delete(networkId);
+    this.forgetRelayRecordCacheEntries(networkId);
     delete this.activeRelayDiscoveryAttempts[networkId];
     delete this.discoveryRetryAttempts[networkId];
 

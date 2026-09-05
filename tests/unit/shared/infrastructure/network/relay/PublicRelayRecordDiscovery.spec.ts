@@ -5,9 +5,7 @@ import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/re
 import { PublicRelayRecordSigner } from '@app/shared/infrastructure/network/relay/PublicRelayRecordSigner';
 import { mock } from 'jest-mock-extended';
 
-function publicRelayRecord(
-  multiaddrs: string[],
-): PublicRelayRecordPrimitives {
+function publicRelayRecord(multiaddrs: string[]): PublicRelayRecordPrimitives {
   return {
     expiresAt: Date.now() + 60_000,
     issuedAt: Date.now(),
