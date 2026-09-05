@@ -794,10 +794,10 @@
   dependencies:
     "@haskou/value-objects" "^2.13.1"
 
-"@haskou/value-objects@3.0.1":
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-3.0.1.tgz#d62e30c91425f873874f14c0b9c47df643f3a666"
-  integrity sha512-ofPcdZeOsj1lOP+eftkrYJ7jIGGlOYzBNbGuezv6RM0D15G+GFWM4gqxB0iMS1MFR9SYCo6rkQi2hI4779Q+/w==
+"@haskou/value-objects@4.0.1":
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-4.0.1.tgz#bfe6b6ba9d646a84c6a8a5d444e51fa6f591a3d2"
+  integrity sha512-k+S2itD8Bm8wW7wkNVh9e2voVUqUxXjjTgsnvpcvLAGKp3sZ1g10Nomh218G2BdLxDKjWmvQ/FVxQON91wfSRA==
   dependencies:
     "@noble/ciphers" "^2.2.0"
     "@noble/curves" "^2.2.0"
