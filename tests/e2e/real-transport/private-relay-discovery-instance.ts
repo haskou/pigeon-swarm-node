@@ -24,8 +24,7 @@ import path from 'path';
 import readline from 'readline';
 
 const ROLE = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_INSTANCE_ROLE') as
-  | 'leaf'
-  | 'relay';
+  'leaf' | 'relay';
 const NETWORK_ID = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_NETWORK_ID');
 const NETWORK_NAME = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_NETWORK_NAME');
 const NETWORK_KEY = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_NETWORK_KEY');
@@ -45,7 +44,8 @@ const TCP_REACHABILITY_TIMEOUT_MS = Number(
   process.env.PRIVATE_RELAY_DISCOVERY_E2E_TCP_REACHABILITY_TIMEOUT_MS || 5000,
 );
 const AUTO_START_RELAY_DISCOVERY =
-  process.env.PRIVATE_RELAY_DISCOVERY_E2E_AUTO_START_RELAY_DISCOVERY !== 'false';
+  process.env.PRIVATE_RELAY_DISCOVERY_E2E_AUTO_START_RELAY_DISCOVERY !==
+  'false';
 
 type Command = {
   type: string;
@@ -107,8 +107,7 @@ async function createPrivateNetwork(): Promise<void> {
   const networkKey = new PrivateKey(NETWORK_KEY);
   const privateNetworkPrivateKey =
     await libp2pKeyAdapter.generateEd25519KeyPair();
-  publicDirectoryPrivateKey =
-    await libp2pKeyAdapter.generateEd25519KeyPair();
+  publicDirectoryPrivateKey = await libp2pKeyAdapter.generateEd25519KeyPair();
   const config = IPFSNetworkConfig.fromPrimitives({
     id: NETWORK_ID,
     key: networkKey.valueOf(),
@@ -161,9 +160,7 @@ async function startRelay(): Promise<void> {
   await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
   const publicProviderAddress = await waitFor(
     () =>
-      getPublicDirectoryConnection()
-        .getMultiaddrs()
-        .find(isDirectTcpMultiaddr),
+      getPublicDirectoryConnection().getMultiaddrs().find(isDirectTcpMultiaddr),
     'public provider direct TCP multiaddr',
   );
 
@@ -239,6 +236,12 @@ async function handleCommand(command: Command): Promise<void> {
     case 'start-relay-mesh':
       await startRelayMesh(command);
       return;
+    case 'wait-relay-peers':
+      await waitForRelayPeers(command);
+      return;
+    case 'drop-private-connections':
+      await dropPrivateConnections(command);
+      return;
     case 'stop':
       await stopAndExit();
       return;
@@ -298,6 +301,41 @@ async function startRelayMesh(command: Command): Promise<void> {
     peerId: remotePeerId,
     peers: getNetwork().getPeers(),
   });
+}
+
+async function waitForRelayPeers(command: Command): Promise<void> {
+  const requestId = requiredCommandString(command, 'requestId');
+  const peerIds = command.peerIds;
+  if (
+    !Array.isArray(peerIds) ||
+    !peerIds.every((id) => typeof id === 'string')
+  ) {
+    throw new Error('Expected a list of relay peer IDs.');
+  }
+  if (command.startDiscovery === true) {
+    startRelayDirectory();
+  }
+  await waitFor(
+    () =>
+      peerIds.every((id) => getNetwork().getPeers().includes(id)) || undefined,
+    'all expected private relay peers',
+  );
+  emit('relay-peers-connected', { requestId, peers: getNetwork().getPeers() });
+}
+
+async function dropPrivateConnections(command: Command): Promise<void> {
+  const requestId = requiredCommandString(command, 'requestId');
+  const connections = getNetwork().getHeliaCore().libp2p.getConnections();
+  if (connections.length === 0) {
+    throw new Error(
+      'False-positive guard failed: no private connections to drop.',
+    );
+  }
+  await Promise.all(connections.map((connection) => connection.close()));
+  if (connections.some((connection) => connection.status !== 'closed')) {
+    throw new Error('A private connection did not close.');
+  }
+  emit('private-connections-dropped', { requestId, count: connections.length });
 }
 
 async function assertPreDiscoveryFetchMiss(command: Command): Promise<void> {
@@ -388,7 +426,9 @@ async function startDiscovery(command: Command): Promise<void> {
   });
   await getPublicDirectoryConnection().waitForPeers(WAIT_TIMEOUT_MS);
 
-  if (getPublicDirectoryConnection().getPeers().includes(publicProviderPeerId)) {
+  if (
+    getPublicDirectoryConnection().getPeers().includes(publicProviderPeerId)
+  ) {
     throw new Error(
       `False-positive guard failed: leaf public connection already has relay provider ${publicProviderPeerId}.`,
     );
@@ -478,6 +518,8 @@ async function openOrbit(command: Command): Promise<void> {
       ? command.expectedDocumentId
       : undefined;
 
+  await documents?.close();
+  await orbitdb?.stop();
   orbitdb = await orbitDBRuntimeAdapter.createOrbitDB({
     directory: path.join(STORAGE_ROOT, 'orbitdb'),
     id: `${ROLE}-${getNetwork().getPeerId()}`,

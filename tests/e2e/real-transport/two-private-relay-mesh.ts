@@ -49,6 +49,7 @@ async function main(): Promise<void> {
   let completed = false;
   let relayA: RealTransportInstanceProcess | undefined;
   let relayB: RealTransportInstanceProcess | undefined;
+  let relayC: RealTransportInstanceProcess | undefined;
 
   try {
     bootstraps = await Promise.all(
@@ -71,12 +72,56 @@ async function main(): Promise<void> {
     await assertPostDiscoveryPubSub(relayA, relayB);
     await assertOrbitDBLateJoinReplication(relayA, relayB);
 
+    // Add a publisher only after the original pair is healthy. Do not restart
+    // their discovery loops or inject the new publisher's private address.
+    relayC = spawnRelay('relay-c', networkKey, bootstrapAddress);
+    const relayCReady = (await relayC.waitFor(
+      'third relay ready',
+      (event) => event.type === 'relay-ready',
+    )) as RelayReadyEvent;
+    assertDistinctRelays(relayAReady, relayCReady);
+    assertDistinctRelays(relayBReady, relayCReady);
+    const relays = [relayA, relayB, relayC];
+    const peerIds = [
+      relayAReady.peerId,
+      relayBReady.peerId,
+      relayCReady.peerId,
+    ];
+    await assertFullMesh(relays, peerIds, 2);
+    await assertPostDiscoveryPubSub(relayA, relayC);
+    await assertPostDiscoveryPubSub(relayC, relayB);
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      const requestId = randomUUID();
+      const startedAt = Date.now();
+      relayC.send({ type: 'drop-private-connections', requestId });
+      await relayC.waitFor(
+        'private connections dropped',
+        (event) =>
+          event.type === 'private-connections-dropped' &&
+          event.requestId === requestId,
+      );
+      await assertFullMesh(relays, peerIds);
+      await assertPostDiscoveryPubSub(relayC, relayA);
+      await assertOrbitDBLateJoinReplication(relayA, relayC);
+      console.info(
+        JSON.stringify({
+          cycle,
+          recoveryMs: Date.now() - startedAt,
+          phase: 'three-relay-recovery',
+        }),
+      );
+    }
+
     console.info(
       JSON.stringify(
         {
           networkId: NETWORK_ID,
           relayAPeerId: relayAReady.peerId,
           relayBPeerId: relayBReady.peerId,
+          relayCPeerId: relayCReady.peerId,
+          scope:
+            'local TCP relay discovery, pubsub and OrbitDB; no NAT or WebRTC media proof',
           result: 'PASS',
           transportDsn: 'private-relay-mesh-public-ipfs-discovery://',
         },
@@ -88,17 +133,41 @@ async function main(): Promise<void> {
   } finally {
     if (!completed) {
       process.stderr.write(
-        `relay-a diagnostics:\n${relayA?.diagnostics() || ''}\nrelay-b diagnostics:\n${relayB?.diagnostics() || ''}\n`,
+        `relay-a diagnostics:\n${relayA?.diagnostics() || ''}\nrelay-b diagnostics:\n${relayB?.diagnostics() || ''}\nrelay-c diagnostics:\n${relayC?.diagnostics() || ''}\n`,
       );
     }
 
-    await Promise.allSettled([relayA?.stop(), relayB?.stop()]);
+    await Promise.allSettled([relayA?.stop(), relayB?.stop(), relayC?.stop()]);
     await Promise.race([
       Promise.allSettled(bootstraps.map((bootstrap) => bootstrap.stop())),
       new Promise((resolve) => setTimeout(resolve, 5000)),
     ]);
     await fs.remove(TMP_ROOT);
   }
+}
+
+async function assertFullMesh(
+  relays: RealTransportInstanceProcess[],
+  peerIds: string[],
+  startDiscoveryIndex?: number,
+): Promise<void> {
+  await Promise.all(
+    relays.map(async (relay, index) => {
+      const requestId = randomUUID();
+      relay.send({
+        type: 'wait-relay-peers',
+        requestId,
+        peerIds: peerIds.filter((_, peerIndex) => peerIndex !== index),
+        startDiscovery: index === startDiscoveryIndex,
+      });
+      await relay.waitFor(
+        'complete three-relay mesh',
+        (event) =>
+          event.type === 'relay-peers-connected' &&
+          event.requestId === requestId,
+      );
+    }),
+  );
 }
 
 function assertDistinctRelays(
@@ -208,7 +277,7 @@ async function assertOrbitDBLateJoinReplication(
   publisher: RealTransportInstanceProcess,
   subscriber: RealTransportInstanceProcess,
 ): Promise<void> {
-  const address = `${NETWORK_ID}/documents/e2e-relay-mesh-${RUN_ID}`;
+  const address = `${NETWORK_ID}/documents/e2e-relay-mesh-${randomUUID()}`;
   const document = {
     id: `relay-mesh-proof-${randomUUID()}`,
     replicated: true,
@@ -223,7 +292,9 @@ async function assertOrbitDBLateJoinReplication(
   publisher.send({ document, type: 'write-orbit' });
   await publisher.waitFor(
     'publisher OrbitDB write',
-    (event) => event.type === 'orbit-written',
+    (event) =>
+      event.type === 'orbit-written' &&
+      (event.document as { id?: string } | undefined)?.id === document.id,
   );
 
   subscriber.send({
@@ -268,6 +339,7 @@ function spawnRelay(
         PIGEON_PUBLIC_BOOTSTRAP_ENABLED: 'true',
         PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS: bootstrapAddress,
         PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS: '2000',
+        PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS: '4000',
         PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS: '10000',
         PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS: '2000',
         PIGEON_RELAY_RECORD_TTL_MS: '600000',

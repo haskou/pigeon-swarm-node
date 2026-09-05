@@ -1392,29 +1392,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     return false;
   }
 
-  /**
-   * Re-evaluates every cached relay publisher record on each discovery pass.
-   * Keeps the deterministic dial order while giving every losing peer a
-   * bounded fallback path instead of waiting indefinitely for another pubsub
-   * delivery.
-   */
-  /**
-   * Dials every cached publisher record without touching public IPFS and
-   * reports whether all known publishers are connected afterwards, so the
-   * caller can skip the public discovery work entirely.
-   */
-  private async reconnectConnectedCachedRelayPublishers(
-    network: IPFSNetwork,
-  ): Promise<boolean> {
-    if (!this.knownRelayPublisherPeerIds.get(network.getId())?.size) {
-      return false;
-    }
-
-    await this.reconnectCachedRelayPublishers(network);
-
-    return !this.hasDisconnectedKnownRelayPublisher(network);
-  }
-
   private async reconnectCachedRelayPublishers(
     network: IPFSNetwork,
   ): Promise<void> {
@@ -1870,12 +1847,13 @@ export default class PrivateNetworkRelayRecordDirectory {
     // Dialing cached publisher multiaddrs is purely private-network work and
     // must not wait for public IPFS peers, so a public outage cannot stall
     // the mesh fallback.
-    if (
-      !discoveryState.shouldConnectRelayRecords &&
-      (await this.reconnectConnectedCachedRelayPublishers(network))
-    ) {
-      return;
+    if (!discoveryState.shouldConnectRelayRecords) {
+      await this.reconnectCachedRelayPublishers(network);
     }
+
+    // A healthy known mesh must still refresh public discovery: a missed
+    // announcement may be the only reason a new publisher is not known yet.
+    // getDiscoveryState throttles this work while all known links are healthy.
 
     const publicConnection = await this.getPublicConnection(sharedPrivateKey);
 

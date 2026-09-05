@@ -629,6 +629,97 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     directory.stop(network.getId());
   });
 
+  it('should keep requesting unknown publishers while all known relays are connected', async () => {
+    let now = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS = '10000';
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWRelayA',
+    );
+    const knownRelay: PrivateNetworkRelayRecord = {
+      expiresAt: now + 600_000,
+      issuedAt: now,
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
+      peerId: '12D3KooWRelayB',
+      role: 'relay',
+      version: 1,
+    };
+    const subscriptions = new Map<string, (payload: string) => Promise<void>>();
+    privateConnection.getPeers.mockReturnValue([knownRelay.peerId]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
+    publicConnection.provideRecord.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockImplementation(
+      async (topic, handler) => {
+        subscriptions.set(topic, handler);
+      },
+    );
+    (
+      directory as unknown as {
+        getPublicConnection(): Promise<IPFSConnection>;
+      }
+    ).getPublicConnection = jest.fn().mockResolvedValue(publicConnection);
+
+    try {
+      directory.start(
+        network,
+        {
+          announceAddresses: [
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+          ],
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+        { discoveryEnabled: true, publicationEnabled: true },
+      );
+      await flushPromises();
+      await flushPromises();
+      await directory.discover(network, mock());
+      const handler = [...subscriptions.entries()].find(
+        ([topic]) => !topic.endsWith('.request'),
+      )?.[1];
+      expect(handler).toBeDefined();
+      await handler?.(
+        JSON.stringify(
+          PrivateNetworkRelayRecordCodec.seal(network, knownRelay),
+        ),
+      );
+      publicConnection.publishPubSub.mockClear();
+      publicConnection.findRecordProviderMultiaddrs.mockClear();
+
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(1);
+      expect(publicConnection.publishPubSub).toHaveBeenCalledWith(
+        expect.stringMatching(/\.request$/),
+        '',
+      );
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(1);
+
+      now += 10_000;
+      await directory.discover(network, mock());
+      expect(
+        publicConnection.findRecordProviderMultiaddrs,
+      ).toHaveBeenCalledTimes(2);
+      expect(privateConnection.dial).not.toHaveBeenCalled();
+    } finally {
+      directory.stop(network.getId());
+      delete process.env.PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS;
+    }
+  });
+
   it('should retry relay publisher discovery until a mesh peer connects', async () => {
     jest.useFakeTimers();
     const directory = createDirectory(localDatabase);
