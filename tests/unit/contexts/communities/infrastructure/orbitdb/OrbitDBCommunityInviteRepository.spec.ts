@@ -1,6 +1,6 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
-import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
 import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
