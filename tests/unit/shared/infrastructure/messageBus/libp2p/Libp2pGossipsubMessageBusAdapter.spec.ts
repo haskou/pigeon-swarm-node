@@ -7,7 +7,7 @@ import PubSubNetworkMessageCodec from '@app/shared/infrastructure/messageBus/lib
 import PubSubTopicResolver from '@app/shared/infrastructure/messageBus/libp2p/PubSubTopicResolver';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
-import { KeyPair, PrivateKey } from '@haskou/value-objects';
+import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { WebSocket } from 'ws';
 

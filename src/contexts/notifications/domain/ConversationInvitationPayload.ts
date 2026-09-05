@@ -1,6 +1,7 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf, Signature } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { EncryptedConversationKey } from './value-objects/EncryptedConversationKey';
 

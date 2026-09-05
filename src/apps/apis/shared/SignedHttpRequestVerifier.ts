@@ -1,5 +1,5 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PublicKey, Signature } from '@haskou/value-objects';
+import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { createHash } from 'crypto';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';

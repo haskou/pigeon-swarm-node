@@ -2,7 +2,8 @@ import * as fsSync from 'fs';
 import path from 'path';
 import { generateKeyPairSync } from 'crypto';
 
-import { PrivateKey, UUID } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import { UUID } from '@haskou/value-objects';
 
 import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipfs/helia/HeliaIPFSParser';
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';

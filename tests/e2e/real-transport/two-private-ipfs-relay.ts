@@ -4,7 +4,7 @@ import 'module-alias/register';
 import Kernel from '@haskou/ddd-kernel';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { PrivateIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PrivateIPFS';
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync, randomBytes } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';

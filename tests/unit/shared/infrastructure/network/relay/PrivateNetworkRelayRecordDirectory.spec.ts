@@ -14,7 +14,7 @@ import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/r
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { PrivateRelayRecordCacheDocument } from '@app/shared/infrastructure/network/relay/PrivateRelayRecordCacheDocument';
 import Kernel from '@haskou/ddd-kernel';
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
 import { mock, MockProxy } from 'jest-mock-extended';

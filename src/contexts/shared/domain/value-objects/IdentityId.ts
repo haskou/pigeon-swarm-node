@@ -1,4 +1,5 @@
-import { PublicKey, StringValueObject } from '@haskou/value-objects';
+import { PublicKey } from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject } from '@haskou/value-objects';
 
 export class IdentityId extends PublicKey {
   private static addPEMHeaders(publicKey: string): string {

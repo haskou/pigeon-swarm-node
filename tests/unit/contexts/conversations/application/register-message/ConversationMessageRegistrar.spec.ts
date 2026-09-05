@@ -10,7 +10,8 @@ import MessageSignatureDomainService from '@app/contexts/conversations/domain/se
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { ConversationMother } from '../../../../mothers/ConversationMother';

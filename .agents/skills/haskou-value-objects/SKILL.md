@@ -15,7 +15,8 @@ Do not unwrap a Value Object to make a domain decision.
 
 Use the methods exposed by the object:
 
-- `isEqual(other)` and `isNotEqual(other)` for equality.
+- `isEqual(other)` and `isNotEqual(other)` for domain equality: the same concrete Value Object type and the same value.
+- `hasValue(other)` for deliberate value-only comparison when the concrete domain type is intentionally irrelevant or when comparing against a primitive.
 - Domain-specific predicates like `isPaid()`, `isDraft()`, `canBeCancelled()`, `belongsToCustomer(customerId)`, etc. when the comparison has business meaning.
 - `isGreaterThan`, `isGreaterOrEqualThan`, `isLessThan`, `isLessOrEqualThan`, `isZero` for numeric Value Objects.
 - `add`, `subtract`, `multiply`, `divide` for numeric operations.
@@ -40,6 +41,9 @@ const isSameEmail = user.email.isEqual(email);
 const includesTimestamp = interval.includes(timestamp);
 const isPaid = order.status.isPaid();
 ```
+
+
+For the full `isEqual()` / `hasValue()` contract and examples, see [Equality semantics](references/equality.md).
 
 ## Boundary rule
 
@@ -108,7 +112,7 @@ Common primitives:
 - `Integer`: whole numbers.
 - `PositiveNumber`: numbers greater than zero.
 - `Email`: validated email values.
-- `Color`: validated hex colors, predefined colors, and case-insensitive `isEqual`.
+- `Color`: validated hex colors and predefined colors. `hasValue()` compares color values case-insensitively; `isEqual()` still requires another `Color`.
 
 Finite domain values:
 
@@ -141,19 +145,20 @@ Collections:
 - Use it for uniqueness by Value Object behavior instead of deduping with primitives.
 - Prefer `includes`, `push`, `remove`, `length`, and `toArray()` over hand-rolled array rituals.
 
-Hashes, media, and crypto:
+Hashes and media:
 
-- Use `MD5Hash`, `SHA256Hash`, `SHA512Hash`, `Media`, `KeyPair`, `EncryptedKeyPair`, `PrivateKey`, `EncryptedPrivateKey`, `PublicKey`, `Signature`, etc. when the domain actually needs those concepts.
-- Use `Hash.from(...)`, `toBase64()`, `Media.getBuffer()`, `Media.getSize()`, and `Media.getBase64()` at boundaries or crypto/media behavior points.
-- Do not leak crypto payload internals across the domain. Keep encryption/signing behavior on the relevant objects.
+- Use `MD5Hash`, `SHA256Hash`, and `SHA512Hash` to represent and validate already-computed digest values. These Value Objects do not compute digests; do not expect `Hash.from(...)` or algorithm-specific `.from(...)` factories.
+- Use `toBase64()`, `Media.getBuffer()`, `Media.getSize()`, and `Media.getBase64()` at serialization/media boundaries.
+
 
 Nullish behavior:
 
-- `ValueObject` supports the library's Null Object behavior for `null` or `undefined` inputs.
-- Do not return `Foo | undefined`, `Foo | null`, or broad optional unions from domain/application code as defensive programming.
-- If a required value/object is missing, return `NullObject.new(Foo)` instead of widening the return type, and let the appropriate error handler handle that failure path.
+- Automatic Null Object creation for `null` or `undefined` remains the library default for compatibility.
+- Projects that reject implicit Null Objects should call `ValueObject.disableNullObjectCreation()` during bootstrap. In that mode, nullish construction throws `NullObjectCreationDisabledError`; `ValueObject.enableNullObjectCreation()` restores the default behavior.
+- Follow the project's configured mode. Do not manufacture `NullObject.new(Foo)` as a generic fallback unless that codebase explicitly models and expects Null Objects.
+- Do not return `Foo | undefined`, `Foo | null`, or broad optional unions from domain/application code as defensive programming when absence is not part of the domain language.
 - Do not pass `null` or `undefined` intentionally to mean a business state unless the existing design explicitly models that pattern.
-- Prefer explicit domain concepts such as `OptionalDeliveryDate`, `UnassignedOwner`, or nullable fields at the boundary when absence is part of the language.
+- Prefer explicit domain concepts such as `OptionalDeliveryDate`, `UnassignedOwner`, or nullable fields at the boundary when absence is genuinely part of the language.
 
 ## Enum / EnumValueObject-style Value Objects
 
@@ -425,6 +430,7 @@ Good:
 
 ```ts
 expect(email.isEqual(new Email('user@example.com'))).toBe(true);
+expect(email.hasValue('user@example.com')).toBe(true); // only when value-only comparison is deliberate
 expect(interval.getStart().isEqual(start)).toBe(true);
 expect(interval.includes(start)).toBe(true);
 expect(status.isPaid()).toBe(true);

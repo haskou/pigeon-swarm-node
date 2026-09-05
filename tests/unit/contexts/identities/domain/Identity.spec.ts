@@ -13,7 +13,8 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
-import { KeyPair, PrimitiveOf } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 

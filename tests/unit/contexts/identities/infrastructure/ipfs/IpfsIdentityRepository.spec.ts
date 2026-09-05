@@ -1,4 +1,4 @@
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';

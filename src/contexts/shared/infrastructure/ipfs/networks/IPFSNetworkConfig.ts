@@ -1,4 +1,4 @@
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 
 export class IPFSNetworkConfig {
   public static fromPrimitives(primitives: {

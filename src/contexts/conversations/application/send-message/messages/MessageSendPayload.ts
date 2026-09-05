@@ -1,4 +1,5 @@
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../../domain/value-objects/MessageId';

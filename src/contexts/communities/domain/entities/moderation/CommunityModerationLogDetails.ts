@@ -1,7 +1,13 @@
-export class CommunityModerationLogDetails {
-  constructor(private readonly values: Record<string, unknown>) {}
+import { JsonObject } from '@app/shared/domain/serialization/JsonObject';
 
-  public toPrimitives(): Record<string, unknown> {
-    return this.values;
+export class CommunityModerationLogDetails {
+  private readonly values: JsonObject;
+
+  constructor(values: Record<string, unknown>) {
+    this.values = JsonObject.fromPrimitives(values);
+  }
+
+  public toPrimitives() {
+    return this.values.toPrimitives();
   }
 }

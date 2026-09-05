@@ -1,6 +1,6 @@
 import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
-import { PublicKey, Signature } from '@haskou/value-objects';
+import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 describe('CommunityChannelMessageSignatureDomainService', () => {

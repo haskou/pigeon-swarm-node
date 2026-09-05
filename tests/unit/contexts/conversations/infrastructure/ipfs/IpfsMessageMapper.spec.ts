@@ -5,7 +5,8 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 describe('IpfsMessageMapper', () => {
   let mapper: IpfsMessageMapper;

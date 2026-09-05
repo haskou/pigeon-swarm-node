@@ -1,20 +1,12 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf, ValueObject } from '@haskou/value-objects';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { CallIceCandidateType } from './value-objects/CallIceCandidateType';
 import { CallMediaConnectionProtocol } from './value-objects/CallMediaConnectionProtocol';
 import { CallMediaConnectionState } from './value-objects/CallMediaConnectionState';
 import { CallRelayUrl } from './value-objects/CallRelayUrl';
 
-export class CallParticipantMediaConnection extends ValueObject<{
-  localCandidateType?: string;
-  protocol?: string;
-  relayProtocol?: string;
-  relayUrl?: string;
-  remoteCandidateType?: string;
-  remoteIdentityId: string;
-  state: string;
-}> {
+export class CallParticipantMediaConnection {
   public static fromPrimitives(
     primitives: PrimitiveOf<CallParticipantMediaConnection>,
   ): CallParticipantMediaConnection {
@@ -38,49 +30,54 @@ export class CallParticipantMediaConnection extends ValueObject<{
   }
 
   constructor(
-    remoteIdentityId: IdentityId,
-    state: CallMediaConnectionState,
-    localCandidateType?: CallIceCandidateType,
-    remoteCandidateType?: CallIceCandidateType,
-    relayUrl?: CallRelayUrl,
-    protocol?: CallMediaConnectionProtocol,
-    relayProtocol?: CallMediaConnectionProtocol,
-  ) {
-    super({
-      localCandidateType: localCandidateType?.valueOf(),
-      protocol: protocol?.valueOf(),
-      relayProtocol: relayProtocol?.valueOf(),
-      relayUrl: relayUrl?.valueOf(),
-      remoteCandidateType: remoteCandidateType?.valueOf(),
-      remoteIdentityId: remoteIdentityId.valueOf(),
-      state: state.valueOf(),
-    });
-  }
+    private readonly remoteIdentityId: IdentityId,
+    private readonly state: CallMediaConnectionState,
+    private readonly localCandidateType?: CallIceCandidateType,
+    private readonly remoteCandidateType?: CallIceCandidateType,
+    private readonly relayUrl?: CallRelayUrl,
+    private readonly protocol?: CallMediaConnectionProtocol,
+    private readonly relayProtocol?: CallMediaConnectionProtocol,
+  ) {}
 
   public isFor(identityId: IdentityId): boolean {
-    return new IdentityId(this.value.remoteIdentityId).isEqual(identityId);
+    return this.remoteIdentityId.isEqual(identityId);
   }
 
   public getRemoteIdentityId(): IdentityId {
-    return new IdentityId(this.value.remoteIdentityId);
+    return this.remoteIdentityId;
   }
 
   public usesRelay(): boolean {
     return (
-      (this.value.localCandidateType
-        ? CallIceCandidateType.fromPrimitives(
-            this.value.localCandidateType,
-          ).isRelay()
-        : false) ||
-      (this.value.remoteCandidateType
-        ? CallIceCandidateType.fromPrimitives(
-            this.value.remoteCandidateType,
-          ).isRelay()
-        : false)
+      (this.localCandidateType?.isRelay() ?? false) ||
+      (this.remoteCandidateType?.isRelay() ?? false)
     );
   }
 
-  public toPrimitives() {
-    return this.valueOf();
+  public isEqual(other: CallParticipantMediaConnection): boolean {
+    return (
+      JSON.stringify(this.toPrimitives()) ===
+      JSON.stringify(other.toPrimitives())
+    );
+  }
+
+  public toPrimitives(): {
+    localCandidateType?: string;
+    protocol?: string;
+    relayProtocol?: string;
+    relayUrl?: string;
+    remoteCandidateType?: string;
+    remoteIdentityId: string;
+    state: string;
+  } {
+    return {
+      localCandidateType: this.localCandidateType?.valueOf(),
+      protocol: this.protocol?.valueOf(),
+      relayProtocol: this.relayProtocol?.valueOf(),
+      relayUrl: this.relayUrl?.valueOf(),
+      remoteCandidateType: this.remoteCandidateType?.valueOf(),
+      remoteIdentityId: this.remoteIdentityId.valueOf(),
+      state: this.state.valueOf(),
+    };
   }
 }

@@ -1,7 +1,8 @@
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { KeyPair, UUID } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { UUID } from '@haskou/value-objects';
 
 export class ConversationMother {
   public author: IdentityId;

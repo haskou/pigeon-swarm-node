@@ -1,6 +1,7 @@
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
 import { CommunityChannelId } from '../../value-objects/CommunityChannelId';

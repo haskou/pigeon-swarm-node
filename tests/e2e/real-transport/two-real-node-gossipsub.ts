@@ -4,7 +4,7 @@ import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpReque
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/value-objects';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';

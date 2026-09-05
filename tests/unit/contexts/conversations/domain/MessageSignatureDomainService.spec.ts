@@ -6,7 +6,8 @@ import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/valu
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PublicKey, Signature, Timestamp } from '@haskou/value-objects';
+import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
 const identityId =

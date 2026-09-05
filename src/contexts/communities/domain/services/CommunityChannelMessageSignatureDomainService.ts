@@ -1,4 +1,5 @@
-import { assert, PublicKey, Signature } from '@haskou/value-objects';
+import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+import { assert } from '@haskou/value-objects';
 
 import { CommunityChannelMessageSignaturePayload } from '../entities/messages/CommunityChannelMessageSignaturePayload';
 import { InvalidCommunityChannelMessageSignatureError } from '../errors/InvalidCommunityChannelMessageSignatureError';

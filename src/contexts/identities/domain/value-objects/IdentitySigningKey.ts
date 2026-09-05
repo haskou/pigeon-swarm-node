@@ -1,10 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import {
-  EncryptedKeyPair,
-  PrimitiveOf,
-  Signature,
-} from '@haskou/value-objects';
+import { EncryptedKeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 export class IdentitySigningKey {
   public static fromPrimitives(

@@ -1,4 +1,5 @@
-import { PrimitiveOf, Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { Profile } from './Profile';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';

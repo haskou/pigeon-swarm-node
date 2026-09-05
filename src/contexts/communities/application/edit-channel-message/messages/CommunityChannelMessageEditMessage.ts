@@ -1,5 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMentions } from '../../../domain/CommunityChannelMessageMentions';
 import { CommunityChannelMessageEdition } from '../../../domain/entities/messages/CommunityChannelMessageEdition';

@@ -1,6 +1,7 @@
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf, Signature } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { EncryptedCommunityKey } from './value-objects/EncryptedCommunityKey';
 

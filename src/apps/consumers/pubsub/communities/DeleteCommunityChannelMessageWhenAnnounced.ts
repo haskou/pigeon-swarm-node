@@ -14,7 +14,8 @@ import { pigeonEnvironment } from '@app/shared/infrastructure/environment/Pigeon
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { assert, Signature, Timestamp } from '@haskou/value-objects';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { assert, Timestamp } from '@haskou/value-objects';
 
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 

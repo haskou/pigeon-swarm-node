@@ -1,4 +1,4 @@
-import { PrivateKey as NetworkPrivateKey } from '@haskou/value-objects';
+import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
 import * as fsSync from 'fs';
 import { createHash, createPrivateKey } from 'node:crypto';
 

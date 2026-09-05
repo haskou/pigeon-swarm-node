@@ -1,10 +1,10 @@
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import {
-  assert,
   EncryptedKeyPair,
   PublicKey,
   Signature,
-} from '@haskou/value-objects';
+} from '@haskou/pigeon-swarm-crypto';
+import { assert } from '@haskou/value-objects';
 
 import { Message } from '../entities/messages/Message';
 import { MessageSignaturePayload } from '../entities/messages/MessageSignaturePayload';

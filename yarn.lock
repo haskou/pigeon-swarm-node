@@ -794,16 +794,24 @@
   dependencies:
     "@haskou/value-objects" "^2.13.1"
 
-"@haskou/value-objects@3.0.1":
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-3.0.1.tgz#d62e30c91425f873874f14c0b9c47df643f3a666"
-  integrity sha512-ofPcdZeOsj1lOP+eftkrYJ7jIGGlOYzBNbGuezv6RM0D15G+GFWM4gqxB0iMS1MFR9SYCo6rkQi2hI4779Q+/w==
+"@haskou/pigeon-swarm-crypto@1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-1.0.1.tgz#823466c68eeb95f493de3f859a84ff286cb0a488"
+  integrity sha512-JT7ieWADXu+imiVo/gLecZCbDWwNbC2Lou+lYA+ARLWjY8S/AADZ4B0yw0H86buLLJc8Zbew9g03yy5C60PDBg==
   dependencies:
     "@noble/ciphers" "^2.2.0"
     "@noble/curves" "^2.2.0"
     "@noble/hashes" "^2.2.0"
     buffer "^6.0.3"
     tslib "^2.8.1"
+
+"@haskou/value-objects@7.0.0":
+  version "7.0.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-7.0.0.tgz#b7028a082b4f71bd8c3708c0450d0a54b8edbbbb"
+  integrity sha512-wcZlTGZvNmsVUpZciPJ05ugoEpfn6/uwVEduRtanxVGpvT+Su8kYWFfemOYjosqyLsuB9/AR+auss3l/NEyU/w==
+  dependencies:
+    buffer "^6.0.3"
+    uuid "^11.1.1"
 
 "@haskou/value-objects@^2.13.1":
   version "2.13.1"
@@ -2504,7 +2512,7 @@
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.0.1.tgz#fc1a928061d1232b0a52bb754393c37a5216c89e"
   integrity sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==
 
-"@noble/hashes@2.2.0", "@noble/hashes@^2.2.0":
+"@noble/hashes@2.2.0":
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.2.0.tgz#22da1d16a469954fce877055d559900a6c73b63b"
   integrity sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==
@@ -2513,6 +2521,11 @@
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.3.0.tgz#505fd39c3134a37e67c8c4e6c6049a496154879c"
   integrity sha512-oN+QwyX7VSHotibwubG3kpzbwKrfnyR6OOO+3Nk/53ADL7FmgHHz4TgrbaYKvvOw09u6QTx0oiH1cNCIOuN0CQ==
+
+"@noble/hashes@^2.2.0":
+  version "2.4.0"
+  resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.4.0.tgz#e6a3e98edbed3c8659b28bb8f9b18ca02ec8ea4b"
+  integrity sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==
 
 "@nodable/entities@^2.2.0":
   version "2.2.0"
@@ -9222,6 +9235,11 @@ utils-merge@1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
   integrity sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==
+
+uuid@^11.1.1:
+  version "11.1.1"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.1.1.tgz#f6d81d2e1c65d00762e5e29b16c5d2d995e208ad"
+  integrity sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==
 
 uuid@^8.3.2:
   version "8.3.2"

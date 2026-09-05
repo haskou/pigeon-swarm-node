@@ -17,7 +17,7 @@ import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaI
 import { IPFSOptions } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSOptions';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { PrivateKey } from '@haskou/value-objects';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
