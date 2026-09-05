@@ -11,6 +11,8 @@ Run the smallest relevant checks first, then broader checks when the change warr
 - Typecheck/build if the language or framework benefits from it.
 - Lint/format when configured.
 
+A touched context or slice is not complete unless every non-trivial domain, application, or infrastructure class in that slice has direct unit coverage where its behavior can be isolated. When the repository has architecture verification scripts, run the relevant checks to catch structural regressions.
+
 If checks fail, report exactly what failed and why it remains unresolved. Do not claim the slice is complete while relevant checks are failing unless clearly blocked.
 
 ## PR description template

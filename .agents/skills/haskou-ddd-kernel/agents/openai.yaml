@@ -1,0 +1,4 @@
+interface:
+  display_name: "@haskou/ddd-kernel"
+  short_description: "Use ddd-kernel DI conventions in TypeScript."
+  default_prompt: "Use $haskou-ddd-kernel to apply the project's @haskou/ddd-kernel or node-dependency-injection conventions correctly."

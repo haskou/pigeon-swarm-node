@@ -10,6 +10,8 @@ Prefer methods such as `save`, `findById`, `findPendingForIdentity`, or existing
 
 Repositories normally load and save aggregate roots. Do not add repositories for child entities unless the existing codebase has a deliberate exception.
 
+Use `Repository` for domain-owned persistence contracts. Do not introduce `Store` contracts or `stores/` folders in domain or application code. `Store` is only appropriate inside infrastructure when adapting a third-party storage primitive whose own API uses that term.
+
 Do not expose ORM query builders, persistence rows, transaction clients, or DTOs through domain/application repository interfaces unless the local architecture explicitly does so.
 
 Repository implementations may call `fromPrimitives()` and `toPrimitives()` or equivalent serialization/hydration behavior. Domain and application decision code should not use serialization as a getter shortcut.

@@ -24,6 +24,8 @@ Do not put external routing, broker topics, websocket recipients, retry metadata
 
 ## Event lifecycle
 
+Aggregate roots must record domain events when they are created and on every state-changing mutation. If a mutation intentionally does not emit an event, the reason must be local-only or non-replicated behavior and should be obvious from the code.
+
 When an aggregate raises events, follow the project pattern for recording, pulling, clearing, persisting, publishing, or dispatching them.
 
 Use application or unit-of-work code to coordinate persistence and publication. Do not publish directly from domain objects.

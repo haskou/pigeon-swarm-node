@@ -1,0 +1,4 @@
+interface:
+  display_name: "@haskou/flow"
+  short_description: "Coordinate TypeScript async work with @haskou/flow"
+  default_prompt: "Use $haskou-flow to implement this async coordination with the appropriate @haskou/flow primitive."
