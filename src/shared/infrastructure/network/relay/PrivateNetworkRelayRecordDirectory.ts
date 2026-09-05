@@ -297,6 +297,10 @@ export default class PrivateNetworkRelayRecordDirectory {
         });
       } else {
         this.relayRecordEnvelopeCache.delete(key);
+        this.forgetRelayPublisherPeer(
+          network.getId(),
+          key.slice(prefix.length),
+        );
       }
     }
 
@@ -321,6 +325,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     const connectedPeers = new Set(network.getPeers());
 
     return [...knownPeerIds].some((peerId) => !connectedPeers.has(peerId));
+  }
+
+  private forgetRelayPublisherPeer(networkId: string, peerId: string): void {
+    this.knownRelayPublisherPeerIds.get(networkId)?.delete(peerId);
+    delete this.relayPublisherPeerObservedAt[`${networkId}:${peerId}`];
   }
 
   private warnWhenPublicConnectionHasNoPeers(
@@ -438,6 +447,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.relayRecordEnvelopeCache.delete(
       this.relayRecordCacheKey(network.getId(), relayRecord.peerId),
     );
+    this.forgetRelayPublisherPeer(network.getId(), relayRecord.peerId);
     this.forgetActiveRelayRecord(network.getId());
     Kernel.logger.warn(
       `Private IPFS relay cached record invalidated: networkId=${network.getId()}` +
@@ -649,6 +659,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
   }
 
+  private refreshRelayPublisherObservations(network: IPFSNetwork): void {
+    // Expired records must not bypass the connected refresh indefinitely.
+    this.cachedRelayRecords(network);
+
+    // Observe inbound connections even when discovery skips cached dials.
+    // A subsequent drop must receive a fresh fallback window.
+    for (const peerId of network.getPeers()) {
+      delete this.relayPublisherPeerObservedAt[`${network.getId()}:${peerId}`];
+    }
+  }
+
   private getDiscoveryState(network: IPFSNetwork): {
     shouldConnectRelayRecords: boolean;
     shouldDiscover: boolean;
@@ -656,6 +677,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     const activeRelayRecord = this.findActiveRelayRecord(network);
 
     if (this.relayPublisherNetworkIds.has(network.getId())) {
+      this.refreshRelayPublisherObservations(network);
+
       if (!this.hasConnectedRelayPublisherPeer(network)) {
         return {
           shouldConnectRelayRecords: false,
@@ -1327,6 +1350,10 @@ export default class PrivateNetworkRelayRecordDirectory {
       localPeerId === relayRecord.peerId ||
       network.getPeers().includes(relayRecord.peerId)
     ) {
+      delete this.relayPublisherPeerObservedAt[
+        `${network.getId()}:${relayRecord.peerId}`
+      ];
+
       return false;
     }
 
@@ -1427,13 +1454,17 @@ export default class PrivateNetworkRelayRecordDirectory {
     providers?: number,
     publicPeers?: number,
   ): void {
+    const privateConnected = this.relayPublisherNetworkIds.has(network.getId())
+      ? this.hasConnectedRelayPublisherPeer(network)
+      : Boolean(this.findActiveRelayRecord(network));
+
     Kernel.logger.info(
       `Private IPFS relay record discovery pass:` +
         ` networkId=${network.getId()}` +
         ` phase=${phase}` +
         ` providers=${providers ?? this.lastProviderCounts[network.getId()] ?? 0}` +
         ` publicPeers=${publicPeers ?? 0}` +
-        ` privateConnected=${Boolean(this.findActiveRelayRecord(network))}`,
+        ` privateConnected=${privateConnected}`,
     );
   }
 
