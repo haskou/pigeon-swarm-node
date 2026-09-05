@@ -297,6 +297,10 @@ export default class PrivateNetworkRelayRecordDirectory {
         });
       } else {
         this.relayRecordEnvelopeCache.delete(key);
+        this.forgetRelayPublisherPeer(
+          network.getId(),
+          key.slice(prefix.length),
+        );
       }
     }
 
@@ -321,6 +325,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     const connectedPeers = new Set(network.getPeers());
 
     return [...knownPeerIds].some((peerId) => !connectedPeers.has(peerId));
+  }
+
+  private forgetRelayPublisherPeer(networkId: string, peerId: string): void {
+    this.knownRelayPublisherPeerIds.get(networkId)?.delete(peerId);
+    delete this.relayPublisherPeerObservedAt[`${networkId}:${peerId}`];
   }
 
   private warnWhenPublicConnectionHasNoPeers(
@@ -438,6 +447,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.relayRecordEnvelopeCache.delete(
       this.relayRecordCacheKey(network.getId(), relayRecord.peerId),
     );
+    this.forgetRelayPublisherPeer(network.getId(), relayRecord.peerId);
     this.forgetActiveRelayRecord(network.getId());
     Kernel.logger.warn(
       `Private IPFS relay cached record invalidated: networkId=${network.getId()}` +
@@ -656,6 +666,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     const activeRelayRecord = this.findActiveRelayRecord(network);
 
     if (this.relayPublisherNetworkIds.has(network.getId())) {
+      // Expired publisher records must not bypass the connected refresh
+      // interval indefinitely. Prune before evaluating mesh membership.
+      this.cachedRelayRecords(network);
+
       if (!this.hasConnectedRelayPublisherPeer(network)) {
         return {
           shouldConnectRelayRecords: false,
