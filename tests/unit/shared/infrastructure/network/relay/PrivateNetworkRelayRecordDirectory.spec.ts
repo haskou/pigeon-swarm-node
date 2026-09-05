@@ -852,7 +852,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       privateKey(),
       privateConnection,
-      '12D3KooWRelayA',
+      '12D3KooWRelayZ',
     );
     const knownRelay: PrivateNetworkRelayRecord = {
       expiresAt: now + 600_000,
@@ -885,7 +885,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayZ',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -928,6 +928,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         cacheSizeBefore + 1,
       );
       const departedCacheKey = `${network.getId()}:${departedRelay.peerId}`;
+      expect(cacheState.relayPublisherPeerObservedAt[departedCacheKey]).toBe(now);
       now += 1001;
       publicConnection.publishPubSub.mockClear();
       publicConnection.findRecordProviderMultiaddrs.mockClear();
