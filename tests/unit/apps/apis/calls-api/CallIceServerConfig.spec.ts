@@ -103,6 +103,22 @@ describe('CallIceServerConfig', () => {
     ]);
   });
 
+  it('should not classify numeric DNS labels as private IP addresses', () => {
+    const resource = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: [
+        'turn:10.example.com:3478',
+        'turn:192.168.example.com:3478',
+        'turn:127.example.com:3478',
+        'turn:10.0.0.1:3478',
+      ].join(','),
+    }).toResource(identityId);
+
+    expect(resource.diagnostics.nonPublicTurnUrls).toEqual([
+      'turn:10.0.0.1:3478',
+    ]);
+  });
+
   it('should generate temporary coturn REST credentials when shared secret exists', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
     const resource = CallIceServerConfig.fromEnvironment({

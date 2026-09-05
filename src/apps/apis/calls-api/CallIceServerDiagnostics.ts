@@ -1,3 +1,5 @@
+import { isIP } from 'net';
+
 import { CallIceServersDiagnosticsResource } from './resources/CallIceServersDiagnosticsResource';
 
 export class CallIceServerDiagnostics {
@@ -36,6 +38,8 @@ export class CallIceServerDiagnostics {
     if (host === 'localhost' || host.endsWith('.local')) {
       return true;
     }
+
+    if (isIP(host) === 0) return false;
 
     return CallIceServerDiagnostics.nonPublicHostPatterns.some((pattern) =>
       pattern.test(host),
