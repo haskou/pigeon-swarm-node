@@ -2777,7 +2777,11 @@ Implemented:
   newest reply activity and calculated from OrbitDB metadata without hydrating
   message payloads
 - include `connectedIdentityIds` for voice channels, derived from identities
-  currently `joined` to the active call scoped to that voice channel
+  currently `joined` to an active call scoped to that voice channel with at least
+  one connected participant lease for the same call and identity. Historical
+  joined state without a connected lease does not imply presence. Lease expiry
+  removes the identity from subsequent channel reads; identities are deduplicated
+  across devices and active calls for the channel
 
 ### Community roles
 

@@ -62,3 +62,37 @@ Feature: Get community channels API
     When I GET channels from the current community
     Then response code is equal to 200
     And response body should not contain "threads"
+
+  Scenario: Remove voice presence after a participant stops sending heartbeats
+    Given I register a test IPFS network "communities-api-voice-presence-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community voice channel body
+    And I sign the current community voice channel request
+    When I POST a voice channel to the current community
+    Then response code is equal to 200
+    And I remember the current community voice channel
+    And I set a community channel call body
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 200
+    And I remember the current call
+    And I sign the current community channels request
+    When I GET channels from the current community
+    Then response code is equal to 200
+    And the current voice channel has 1 connected identities
+    When the current call heartbeat expires
+    And I sign the current call request
+    And I GET the current call
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      {"participants": [{"status": "joined", "connected": false}]}
+      """
+    And I sign the current community channels request
+    When I GET channels from the current community
+    Then response code is equal to 200
+    And the current voice channel has 0 connected identities

@@ -1,3 +1,4 @@
+import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
@@ -1732,6 +1733,26 @@ export default class Definitions {
     ]);
     this.response = this.concurrentCallResponses[0];
     this.callId = String(this.concurrentCallResponses[0].data.id);
+  }
+
+  @when('the current call heartbeat expires')
+  public async theCurrentCallHeartbeatExpires(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 5500));
+    await Kernel.di.getService<CallParticipantLeaseExpirationRegistrar>(
+      CallParticipantLeaseExpirationRegistrar,
+    ).expire();
+  }
+
+  @then('the current voice channel has {int} connected identities')
+  public theCurrentVoiceChannelHasConnectedIdentities(count: number): void {
+    const channels = this.response.data.channels;
+    if (!Array.isArray(channels)) {
+      throw new Error('Response must contain a channels array.');
+    }
+    const channel = channels.find(
+      (candidate: { id: string }) => candidate.id === this.communityChannelId,
+    );
+    expect(channel).to.have.property('connectedIdentityIds').with.lengthOf(count);
   }
 
   @given('I sign the current calls request')

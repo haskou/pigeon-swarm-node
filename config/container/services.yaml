@@ -1835,17 +1835,6 @@ services:
         @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19tZXNzYWdlQnVzX19Eb21haW5FdmVudFB1Ymxpc2hlcl9fRG9tYWluRXZlbnRQdWJsaXNoZXI=
     abstract: false
     parent: null
-  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19maW5kLWNoYW5uZWxzX19Db21tdW5pdHlDaGFubmVsc0ZpbmRlcl9fQ29tbXVuaXR5Q2hhbm5lbHNGaW5kZXI=:
-    class: /contexts/communities/application/find-channels/CommunityChannelsFinder
-    arguments:
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19maW5kLWNvbW11bml0eV9fQ29tbXVuaXR5RmluZGVyX19Db21tdW5pdHlGaW5kZXI=
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeQ==
-    abstract: false
-    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19raWNrLW1lbWJlcl9fQ29tbXVuaXR5TWVtYmVyS2lja2VyX19Db21tdW5pdHlNZW1iZXJLaWNrZXI=:
     class: /contexts/communities/application/kick-member/CommunityMemberKicker
     arguments:
@@ -2368,6 +2357,19 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlNZXNzYWdlUmVhY3Rpb25SZXBvc2l0b3J5X19Db21tdW5pdHlNZXNzYWdlUmVhY3Rpb25SZXBvc2l0b3J5
       - >-
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fcG9sbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Qb2xsUmVwb3NpdG9yeV9fUG9sbFJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19maW5kLWNoYW5uZWxzX19Db21tdW5pdHlDaGFubmVsc0ZpbmRlcl9fQ29tbXVuaXR5Q2hhbm5lbHNGaW5kZXI=:
+    class: /contexts/communities/application/find-channels/CommunityChannelsFinder
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUmVwb3NpdG9yeV9fQ2FsbFJlcG9zaXRvcnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19maW5kLWNvbW11bml0eV9fQ29tbXVuaXR5RmluZGVyX19Db21tdW5pdHlGaW5kZXI=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnlfX0NvbW11bml0eUNoYW5uZWxNZXNzYWdlUmVwb3NpdG9yeQ==
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY2FsbHNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19DYWxsUGFydGljaXBhbnRMZWFzZVJlcG9zaXRvcnlfX0NhbGxQYXJ0aWNpcGFudExlYXNlUmVwb3NpdG9yeQ==
     abstract: false
     parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19pbnZpdGUtbWVtYmVyX19Db21tdW5pdHlNZW1iZXJJbnZpdGVyX19Db21tdW5pdHlNZW1iZXJJbnZpdGVy:
