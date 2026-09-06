@@ -1,3 +1,4 @@
+import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
@@ -13,6 +14,7 @@ export default class CommunityChannelsFinder {
     private readonly callRepository: CallRepository,
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
+    private readonly participantLeaseRepository: CallParticipantLeaseRepository,
   ) {}
 
   private async findConnectedIdentityIdsByChannelId(
@@ -20,6 +22,9 @@ export default class CommunityChannelsFinder {
   ): Promise<Map<string, string[]>> {
     const calls = await this.callRepository.findActiveByCommunity(
       message.communityId,
+    );
+    const leases = await this.participantLeaseRepository.findByCallIds(
+      calls.map((call) => call.getId()),
     );
     const connectedIdentityIdsByChannelId = new Map<string, string[]>();
 
@@ -32,9 +37,22 @@ export default class CommunityChannelsFinder {
 
       connectedIdentityIdsByChannelId.set(
         channelId.valueOf(),
-        call
-          .getJoinedParticipantIds()
-          .map((participantId) => participantId.valueOf()),
+        Array.from(
+          new Set([
+            ...(connectedIdentityIdsByChannelId.get(channelId.valueOf()) ?? []),
+            ...call
+              .getJoinedParticipantIds()
+              .filter((participantId) =>
+                leases.some(
+                  (lease) =>
+                    lease.belongsToCall(call.getId()) &&
+                    lease.belongsTo(participantId) &&
+                    lease.isConnected(),
+                ),
+              )
+              .map((participantId) => participantId.valueOf()),
+          ]),
+        ),
       );
     }
 
