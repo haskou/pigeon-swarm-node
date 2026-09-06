@@ -55,7 +55,7 @@ describe('CallIceServerConfig', () => {
     });
   });
 
-  it('should flag loopback and private TURN hosts as unreachable across relays', () => {
+  it('should flag loopback and private TURN hosts as configuration hints', () => {
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
       CALLS_TURN_URLS: [
@@ -136,6 +136,52 @@ describe('CallIceServerConfig', () => {
       urls: ['turn:turn.example.test:3478?transport=udp'],
       username,
     });
+  });
+
+  it.each(['0.5', '-1', 'Infinity', 'invalid', '9007199254740991'])(
+    'should use the default lifetime for an invalid credential TTL of %s',
+    (ttl) => {
+      jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+      const resource = CallIceServerConfig.fromEnvironment({
+        CALLS_TURN_CREDENTIAL_TTL_SECONDS: ttl,
+        CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+        CALLS_TURN_URLS: 'turn:turn.example.test:3478',
+      }).toResource(identityId);
+
+      expect(resource.iceServers[0].username).toBe(
+        `1770003600:${identityId.valueOf()}`,
+      );
+    },
+  );
+
+  it('should issue a fresh lifetime and credential on the next request', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    const config = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_CREDENTIAL_TTL_SECONDS: 60,
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: 'turn:turn.example.test:3478',
+    });
+    const first = config.toResource(identityId).iceServers[0];
+    clock.mockReturnValue(1770000061000);
+    const renewed = config.toResource(identityId).iceServers[0];
+
+    expect(first.username).toBe(`1770000060:${identityId.valueOf()}`);
+    expect(renewed.username).toBe(`1770000121:${identityId.valueOf()}`);
+    expect(renewed.credential).not.toBe(first.credential);
+  });
+
+  it('should revalidate an expiry near the integer limit when issuing again', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    const config = CallIceServerConfig.fromEnvironment({
+      CALLS_TURN_CREDENTIAL_TTL_SECONDS: Number.MAX_SAFE_INTEGER - 1770000000,
+      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_URLS: 'turn:turn.example.test:3478',
+    });
+    clock.mockReturnValue(1770000002000);
+
+    expect(config.toResource(identityId).iceServers[0].username).toBe(
+      `1770003602:${identityId.valueOf()}`,
+    );
   });
 
   it('should derive local TURN urls from the public host and configured TURN port', () => {

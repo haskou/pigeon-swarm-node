@@ -42,6 +42,28 @@ gossipsub and circuit-relay transport. IPFS blocks transferred through a
 private `/p2p-circuit` stream are exchanged by its endpoint nodes and are not
 retained by the public relay.
 
+## Call relay records
+
+`pigeon-swarm.call-relays.v1` carries signed TURN advertisements. These are public
+metadata: peer identity, public key, TURN URLs, issuance and expiry times are
+visible. They contain neither the TURN shared secret nor client credentials.
+The peer signature authenticates the payload and a separate HMAC proves membership
+in the configured TURN pool. This does not hide network topology from observers.
+
+Receivers reject invalid signatures, mismatched pool proofs, empty/non-TURN URL
+lists and expired records. `issuedAt` and `expiresAt` are safe integer Unix
+milliseconds, with `0 <= issuedAt < expiresAt`. For one peer, only a strictly
+newer issuance replaces the stored record; shortening the lifetime must not
+prevent a URL update. Equal or older records are ignored. The in-memory registry
+filters expired records and the ICE endpoint selects only currently connected
+relay peers. The pool remains a trust boundary: a member holding the shared
+secret can advertise its own URLs, and timestamps are not a consensus protocol.
+
+Publishers normalize `CALLS_TURN_RECORD_TTL_MS` before signing: it must be a
+positive whole number of milliseconds producing a safe integer expiry at the
+record's issuance time. Invalid values use the ten-minute default, with a
+five-minute publication interval unless explicitly configured otherwise.
+
 ## Identity presence leases
 
 `presence.v1.identity_presence.was_updated` replicates ephemeral presence over

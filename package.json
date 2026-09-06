@@ -25,6 +25,7 @@
     "test:e2e:real-transport:private-relay-discovery": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-private-relay-discovery.ts",
     "test:e2e:real-transport:private-relay-mesh": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-private-relay-mesh.ts",
     "test:e2e:real-transport:orbitdb-spike": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-private-orbitdb-spike.ts",
+    "test:e2e:turn-credentials": "tsx -r tsconfig-paths/register tests/e2e/turn/credential-acceptance.ts",
     "test:scheduler": "NODE_ENV=test cucumber-js -p scheduler",
     "test:scheduler:only": "NODE_ENV=test cucumber-js -p scheduler --tags @Only",
     "test:ci": "npm-run-all test:unit test:api test:api:real-ipfs test:consumer test:scheduler",

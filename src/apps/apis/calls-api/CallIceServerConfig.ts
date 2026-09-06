@@ -24,10 +24,13 @@ export class CallIceServerConfig {
 
   private static normalizeCredentialTtl(
     value: number | string | undefined,
+    now: number = Math.floor(Date.now() / 1000),
   ): number {
     const parsedValue = Number(value);
 
-    return Number.isFinite(parsedValue) && parsedValue > 0
+    return Number.isSafeInteger(parsedValue) &&
+      parsedValue > 0 &&
+      Number.isSafeInteger(now + parsedValue)
       ? parsedValue
       : CallIceServerConfig.DEFAULT_CREDENTIAL_TTL_SECONDS;
   }
@@ -134,8 +137,13 @@ export class CallIceServerConfig {
       return undefined;
     }
 
+    const now = Math.floor(Date.now() / 1000);
     const expiresAt =
-      Math.floor(Date.now() / 1000) + this.values.turnCredentialTtlSeconds;
+      now +
+      CallIceServerConfig.normalizeCredentialTtl(
+        this.values.turnCredentialTtlSeconds,
+        now,
+      );
     const username = `${expiresAt}:${identityId.valueOf()}`;
     const credential = createHmac('sha1', this.values.turnSharedSecret)
       .update(username)

@@ -61,6 +61,19 @@ export default class CallRelayRecordSigner {
     };
   }
 
+  private isLifetimeValid(
+    payload: CallRelayRecordPayload,
+    now: number,
+  ): boolean {
+    return (
+      Number.isSafeInteger(payload.issuedAt) &&
+      Number.isSafeInteger(payload.expiresAt) &&
+      payload.issuedAt >= 0 &&
+      payload.issuedAt < payload.expiresAt &&
+      payload.expiresAt > now
+    );
+  }
+
   public async sign(
     payload: Omit<CallRelayRecordPayload, 'peerId' | 'publicKey'>,
     privateKey: Libp2pPrivateKeyLike,
@@ -89,7 +102,7 @@ export default class CallRelayRecordSigner {
     sharedSecret: string,
     now: number = Date.now(),
   ): Promise<boolean> {
-    if (payload.expiresAt <= now) {
+    if (!this.isLifetimeValid(payload, now)) {
       return false;
     }
 

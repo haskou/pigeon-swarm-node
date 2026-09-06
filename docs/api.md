@@ -435,7 +435,8 @@ Implemented:
 - require all nodes sharing a calls relay to use the same effective TURN secret;
   nodes without a private value cannot issue temporary credentials or publish records
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
-  lifetime; it defaults to `3600`
+  lifetime; it must be a positive whole number of seconds whose resulting Unix
+  expiry is a safe integer, otherwise it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
   override for locally configured TURN URLs when no custom shared secret exists
 - default `iceTransportPolicy` to `all` so clients can fall back to direct ICE
@@ -444,6 +445,55 @@ Implemented:
   after verifying that coturn is reachable from every supported client network
 - include STUN servers only when `CALLS_STUN_URLS` is explicitly configured
 - allow `CALLS_ICE_TRANSPORT_POLICY=all` explicitly as well as by default
+
+#### Credential renewal and configuration changes
+
+Each authenticated request reads the current relay settings and issues a new
+expiry measured from that request. The Unix timestamp before the first `:` in a
+temporary username is its expiry in seconds. Requests made within the same
+second may return identical credentials. Static credentials have no expiry
+encoded by this endpoint.
+
+Clients must request configuration again before an ICE restart and apply the
+returned servers before creating the restart offer. Do not cache temporary
+credentials beyond their expiry. Expiry prevents new TURN authentication; it
+does not promise to terminate an existing allocation at that instant. Replacing
+the server list does not migrate an established media path by itself.
+
+Independent TURN deployments use their own secrets and locally configured URLs.
+Every URL in one returned server entry must accept the same credentials. Nodes
+issuing credentials for a shared pool must use the secret configured on every
+server in that pool; discovery accepts only records proving that pool membership.
+Static credentials are never applied to a discovered remote server.
+
+Rotate a pool secret by updating all issuers and coturn servers and restarting
+them together. Environment-based secret rotation is not a hot-reload contract;
+restart also discards the in-memory discovery cache. Existing clients fetch new
+credentials during recovery. This procedure can interrupt calls: the endpoint
+does not provide overlapping old/new secrets or seamless migration.
+
+Relay URL changes propagate in signed publications. For each peer, a record
+with a strictly newer `issuedAt` replaces its predecessor even when its expiry
+is earlier. Equal or older publications cannot restore previous URLs. Expired
+records are excluded from selection. Issuers should keep their clocks synchronized;
+record timestamps are not a consensus sequence or a defense against a compromised
+member of the trusted pool.
+
+#### Acceptance evidence
+
+`yarn test:e2e:turn-credentials` requires Docker and the
+`coturn/coturn:4.11.0-r0-alpine` image. It exercises production credential issuance
+and signed discovery with real keys against isolated coturn servers: independent
+secrets, a shared pool, wrong-secret rejection, expiry, renewal and coordinated
+restart. The harness removes its containers and network and reports cleanup
+failures as failures. It does not simulate a public NAT.
+
+The wrapper's `tests/turn-media.integration.mjs` covers signed HTTP credential
+requests from the real backend and Chromium audio over UDP, TCP and TLS before
+and after coturn restart. `tests/two-node-call.integration.mjs` covers application
+signalling and browser audio between two nodes with independent TURN secrets.
+External NAT/CGNAT and user-observed audio acceptance remain tracked separately
+in [deployment #29](https://github.com/haskou/pigeon-swarm/issues/29).
 
 TURN improves NAT traversal and hides peer IPs from the other participant, but
 it does not make large group calls cheap. A mesh group call still creates one
