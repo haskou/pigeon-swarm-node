@@ -22,6 +22,32 @@ contract.
 - Node-to-node missed-message recovery is handled by the backend sync
   consumers and is not part of the browser/mobile HTTP contract.
 
+## Client compatibility discovery
+
+`GET /client-contract` is public and requires no identity or signed request.
+Apply the configured `ROUTE_PREFIX`, for example `/api/client-contract`.
+It returns HTTP 200 with `Content-Type: application/json`,
+`Cache-Control: no-store`, and exactly:
+
+```json
+{"protocol":"pigeon-swarm","apiVersion":1}
+```
+
+`apiVersion` identifies the breaking-major client API contract implemented by
+this node. It is independent of the node software release and cannot be set by
+an operator. Breaking changes to client-visible HTTP or WebSocket behavior
+require a new major contract version and coordinated client support; compatible
+additions retain the version. Independent clients check the protocol and their
+supported version before enabling node features, and reject an unknown or
+unsupported contract. A failed or missing discovery response does not establish
+compatibility. Discovery responses contain declarative data only, never scripts,
+module locations, or executable code URLs.
+
+This endpoint uses the existing API CORS policy, including cross-origin GET and
+OPTIONS preflight. It does not grant browser permissions or bypass browser
+mixed-content or local-network restrictions. Clients must use a node URL that
+their browser can reach.
+
 ## Authentication
 
 Authenticated endpoints use a canonical request signature:

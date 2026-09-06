@@ -3688,6 +3688,11 @@ export default class Definitions {
     );
   }
 
+  @when('I OPTIONS {string}')
+  public async iOPTIONS(path: string): Promise<void> {
+    this.response = await this.restClient.options(path, this.headers);
+  }
+
   @then('response code is equal to {int}')
   public responseCodeIsEqualTo(statusCode: number): void {
     expect(this.response.status).to.equal(

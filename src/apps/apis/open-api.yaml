@@ -19,6 +19,8 @@ tags:
   - name: push
   - name: realtime
 paths:
+  /client-contract:
+    $ref: './nodes-api/swagger.yaml#/paths/~1client-contract'
   /ws:
     get:
       tags:

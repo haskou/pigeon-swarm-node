@@ -6,6 +6,25 @@ info:
 tags:
   - name: nodes
 paths:
+  /client-contract:
+    get:
+      tags:
+        - nodes
+      summary: Discover the client compatibility contract
+      description: Public declarative metadata. apiVersion is the implemented breaking-major client API contract, not the node software version or an operator setting. Clients must reject unsupported versions. No executable code or code URLs are returned.
+      security: []
+      responses:
+        '200':
+          description: Implemented client API contract. Responses must not be cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientContractResource'
   /node/:
     get:
       tags:
@@ -229,6 +248,17 @@ components:
       schema:
         type: string
   schemas:
+    ClientContractResource:
+      type: object
+      additionalProperties: false
+      required: [protocol, apiVersion]
+      properties:
+        protocol:
+          type: string
+          enum: [pigeon-swarm]
+        apiVersion:
+          type: integer
+          enum: [1]
     NodeResource:
       type: object
       required:

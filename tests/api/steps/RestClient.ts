@@ -86,6 +86,13 @@ export default class RestClient {
     return JSON.parse(text) as RestResponseData;
   }
 
+  public async options(
+    path: string,
+    headers: RestHeaders = {},
+  ): Promise<RestResponse> {
+    return this.request('OPTIONS', path, undefined, headers);
+  }
+
   public async get(
     path: string,
     headers: RestHeaders = {},
