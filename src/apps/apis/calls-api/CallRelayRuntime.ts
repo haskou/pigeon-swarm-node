@@ -54,7 +54,7 @@ export default class CallRelayRuntime implements Runtime {
     const issuedAt = Date.now();
     const record = await this.signer.sign(
       {
-        expiresAt: issuedAt + this.configuration.getRecordTtlMs(),
+        expiresAt: issuedAt + this.configuration.getRecordTtlMs(issuedAt),
         issuedAt,
         role: 'call-relay',
         urls: this.configuration.getAdvertisedTurnUrls(),

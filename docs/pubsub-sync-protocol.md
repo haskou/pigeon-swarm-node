@@ -59,6 +59,11 @@ filters expired records and the ICE endpoint selects only currently connected
 relay peers. The pool remains a trust boundary: a member holding the shared
 secret can advertise its own URLs, and timestamps are not a consensus protocol.
 
+Publishers normalize `CALLS_TURN_RECORD_TTL_MS` before signing: it must be a
+positive whole number of milliseconds producing a safe integer expiry at the
+record's issuance time. Invalid values use the ten-minute default, with a
+five-minute publication interval unless explicitly configured otherwise.
+
 ## Identity presence leases
 
 `presence.v1.identity_presence.was_updated` replicates ephemeral presence over

@@ -90,10 +90,12 @@ export class CallRelayConfiguration {
     );
   }
 
-  public getRecordTtlMs(): number {
+  public getRecordTtlMs(issuedAt: number = Date.now()): number {
     const ttl = Number(this.environment.CALLS_TURN_RECORD_TTL_MS);
 
-    return Number.isFinite(ttl) && ttl > 0
+    return Number.isSafeInteger(ttl) &&
+      ttl > 0 &&
+      Number.isSafeInteger(issuedAt + ttl)
       ? ttl
       : CallRelayConfiguration.DEFAULT_RECORD_TTL_MS;
   }
