@@ -369,6 +369,12 @@ export class OrbitDBPrivateNetworkStores {
   }
 
   public async stop(): Promise<void> {
+    const stores = this.getSynchronizationStores();
+
+    await Promise.all(stores.map(({ database }) => database.sync?.stop()));
+    await Promise.all(
+      stores.map(({ database }) => database.log?.storage?.close()),
+    );
     await this.orbitdb.stop();
   }
 }

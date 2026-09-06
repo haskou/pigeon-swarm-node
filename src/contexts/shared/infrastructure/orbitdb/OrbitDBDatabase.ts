@@ -20,6 +20,7 @@ export type OrbitDBDatabase = {
   get?(key: string): Promise<{ key?: string; value: unknown } | unknown>;
   log?: {
     heads(): Promise<OrbitDBEntry[]>;
+    storage?: { close(): Promise<void> };
   };
   put?(
     keyOrDocument: string | Record<string, unknown>,
