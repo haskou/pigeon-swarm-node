@@ -77,6 +77,7 @@ import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychai
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { PostLinkPreviewRoute } from '@app/apps/apis/link-previews-api/routes/PostLinkPreviewRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
+import { GetClientContractRoute } from '@app/apps/apis/nodes-api/routes/GetClientContractRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRelayConfigurationRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
@@ -158,6 +159,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetIPFSContentRoute,
   PostPublicIPFSContentRoute,
   PostNetworkIPFSContentRoute,
+  GetClientContractRoute,
   GetNodeRoute,
   GetNodeNetworksRoute,
   DeleteNodeNetworkRoute,
