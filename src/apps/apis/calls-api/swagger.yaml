@@ -76,7 +76,7 @@ paths:
       tags:
         - calls
       summary: Get ICE servers for WebRTC calls
-      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the target coturn server. Missing or former public secrets disable temporary credential issuance and relay publication. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network.
+      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the target coturn server. Missing or former public secrets disable temporary credential issuance and relay publication. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Each request issues a fresh lifetime; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. Shared pools require the same secret on every selected server. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
       responses:
         '200':
           description: ICE server configuration for the authenticated client.
@@ -368,7 +368,7 @@ components:
             type: string
         username:
           type: string
-          description: Temporary coturn REST username generated with the private shared secret, or an explicitly configured local static value.
+          description: Temporary coturn REST username in Unix-expiry-seconds:identityId form, or an explicitly configured local static value. Temporary lifetime defaults to 3600 seconds; invalid or fractional TTL values fall back to that default. Expiry governs new authentication, not immediate termination of existing allocations.
         credential:
           type: string
           description: Temporary coturn REST HMAC credential generated with the private shared secret, or an explicitly configured local static value.

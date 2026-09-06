@@ -21,7 +21,7 @@ export default class CallRelayRecordRegistry {
 
     const existing = this.records.get(record.peerId);
 
-    if (existing && existing.expiresAt > record.expiresAt) {
+    if (existing && existing.issuedAt >= record.issuedAt) {
       return;
     }
 

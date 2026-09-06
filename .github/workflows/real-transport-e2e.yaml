@@ -47,6 +47,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      - name: Validate backend credentials against coturn
+        run: |
+          docker pull coturn/coturn:4.11.0-r0-alpine
+          yarn test:e2e:turn-credentials
+
       - name: Run all real transport E2E
         if: github.event_name == 'workflow_dispatch'
         run: yarn test:e2e:real-transport
