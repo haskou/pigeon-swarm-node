@@ -144,6 +144,14 @@ export default class WinstonLogger implements Log {
 
   public run(prefix?: string): void {
     this.prefix = prefix || '';
-    this.server?.app.use(expressWinston.logger(this.createLoggerOptions()));
+    this.server?.app.use(
+      expressWinston.logger({
+        ...this.createLoggerOptions(),
+        meta: false,
+        msg: 'HTTP {{req.method}} {{res.statusCode}}',
+        requestWhitelist: [],
+        responseWhitelist: [],
+      }),
+    );
   }
 }

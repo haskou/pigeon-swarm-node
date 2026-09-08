@@ -47,10 +47,8 @@ export default class Libp2pGossipsubTransport extends PubSubTransport {
         topic,
         new TextEncoder().encode(payload),
       );
-    } catch (error: unknown) {
-      Kernel.logger.warn(
-        `PubSub publish failed for topic "${topic}": ${String(error)}`,
-      );
+    } catch {
+      Kernel.logger.warn('PubSub publish failed');
     }
   }
 
@@ -60,10 +58,8 @@ export default class Libp2pGossipsubTransport extends PubSubTransport {
   ): Promise<void> {
     const node = await this.getNode();
     const listener = (event: PubSubEvent): void => {
-      this.handleEvent(topic, handler, event).catch((error: unknown) => {
-        Kernel.logger.error(
-          `PubSub handler failed for topic "${topic}": ${String(error)}`,
-        );
+      this.handleEvent(topic, handler, event).catch(() => {
+        Kernel.logger.error('PubSub handler failed');
       });
     };
 
