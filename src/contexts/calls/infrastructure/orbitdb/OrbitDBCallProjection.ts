@@ -25,6 +25,8 @@ export default class OrbitDBCallProjection {
 
   private readonly participantCallIds = new Map<string, Set<string>>();
 
+  private readonly bootstrapRepairs = new Map<string, OrbitDBCallDocument>();
+
   private ready = false;
 
   private startPromise?: Promise<void>;
@@ -181,7 +183,15 @@ export default class OrbitDBCallProjection {
       this.index(merged);
     }
 
-    if (!isDeepStrictEqual(merged, incoming)) this.replicator.replicate(merged);
+    if (!this.ready) {
+      if (isDeepStrictEqual(merged, incoming)) {
+        this.bootstrapRepairs.delete(document.id);
+      } else {
+        this.bootstrapRepairs.set(document.id, merged);
+      }
+    } else if (!isDeepStrictEqual(merged, incoming)) {
+      this.replicator.replicate(merged);
+    }
   }
 
   private assertReady(): void {
@@ -197,6 +207,12 @@ export default class OrbitDBCallProjection {
       })
       .then(() => {
         this.ready = true;
+
+        for (const document of this.bootstrapRepairs.values()) {
+          this.replicator.replicate(document);
+        }
+
+        this.bootstrapRepairs.clear();
       });
 
     await this.startPromise;

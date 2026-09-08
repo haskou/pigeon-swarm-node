@@ -49,17 +49,17 @@ describe('OrbitDBCallDocumentMerger', () => {
     },
   );
 
-  it('does not revive an ended call with a later-saved active snapshot', () => {
+  it.each(['ended', 'missed'])('does not revive a %s call with a later-saved active snapshot', (status) => {
     const ended = {
       ...document([]),
-      status: 'ended',
+      status,
       endedAt: 20,
       endedByIdentityId: 'a',
     };
     const active = document([], 30);
 
     expect(merger.merge(ended, active)).toEqual(merger.merge(active, ended));
-    expect(merger.merge(ended, active).status).toBe('ended');
+    expect(merger.merge(ended, active).status).toBe(status);
   });
 
   it('converges across three versions, duplicates and every delivery order', () => {

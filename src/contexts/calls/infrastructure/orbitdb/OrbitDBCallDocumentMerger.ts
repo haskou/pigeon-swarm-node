@@ -81,7 +81,11 @@ export default class OrbitDBCallDocumentMerger {
     left: OrbitDBCallDocument,
     right: OrbitDBCallDocument,
   ): number {
-    if (left.status !== right.status) return left.status === 'ended' ? 1 : -1;
+    if (left.status !== right.status) {
+      const statuses = ['active', 'missed', 'ended'];
+
+      return statuses.indexOf(left.status) - statuses.indexOf(right.status);
+    }
 
     return (
       this.compareEndings(left, right) ||

@@ -170,8 +170,11 @@ async function main(): Promise<void> {
 
     await stores.stop();
     stores = await OrbitDBPrivateNetworkStores.open(network);
+    const headsBeforeReplay = await stores.calls.log!.heads();
     const reopened = await project(stores);
     assertBothJoined(await reopened.findById(new CallId(callId)));
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(await stores.calls.log!.heads(), headsBeforeReplay, 'Reopening repaired history must not append another repair');
     console.log(
       'PASS: ancestor rejoin recovered, repaired document persisted, and fresh reopen retained both joined participants',
     );
