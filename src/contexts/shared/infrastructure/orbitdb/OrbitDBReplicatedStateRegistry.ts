@@ -4,6 +4,7 @@ import Kernel from '@haskou/ddd-kernel';
 
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
+import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
 import { OrbitDBEntry } from './OrbitDBEntry';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
@@ -73,6 +74,14 @@ export default class OrbitDBReplicatedStateRegistry {
     Set<(document: Record<string, unknown>) => void | Promise<void>>
   >();
 
+  private readonly historyStoreNames =
+    new Set<OrbitDBReplicatedDocumentStoreName>();
+
+  private readonly documentHistories = new WeakMap<
+    OrbitDBDatabase,
+    OrbitDBDocumentHistory
+  >();
+
   private readonly documentUpdateListenerStores = new Map<
     OrbitDBReplicatedDocumentStoreName,
     WeakSet<OrbitDBDatabase>
@@ -118,6 +127,38 @@ export default class OrbitDBReplicatedStateRegistry {
 
   constructor() {
     this.headCache = OrbitDBReplicatedStateRegistry.defaultHeadCache();
+  }
+
+  private documentHistory(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): OrbitDBDocumentHistory | undefined {
+    if (!this.historyStoreNames.has(storeName) || !store.log?.get)
+      return undefined;
+
+    let history = this.documentHistories.get(store);
+
+    if (!history) {
+      history = new OrbitDBDocumentHistory(store.log, async (value) => {
+        const document = this.recordValue(value);
+
+        if (document) {
+          await this.notifyBootstrappedDocument(
+            this.documentUpdateListeners.get(storeName) ?? new Set(),
+            document,
+          );
+        }
+      });
+      this.documentHistories.set(store, history);
+    }
+
+    return history;
+  }
+
+  private refreshDocumentHistory(history: OrbitDBDocumentHistory): void {
+    void history.refresh().catch(() => {
+      Kernel.logger.warn?.('OrbitDB document history projection failed');
+    });
   }
 
   private assertReady(): void {
@@ -319,12 +360,18 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
 
-    store.events?.on?.('update', (entry) =>
-      this.notifyDocumentUpdated(storeName, entry.payload?.value),
-    );
-    store.events?.on?.('join', (_peerId, heads) =>
-      this.reconcileDocumentProjection(storeName, store, heads),
-    );
+    store.events?.on?.('update', (entry) => {
+      const history = this.documentHistory(storeName, store);
+
+      if (history) this.refreshDocumentHistory(history);
+      else this.notifyDocumentUpdated(storeName, entry.payload?.value);
+    });
+    store.events?.on?.('join', (_peerId, heads) => {
+      const history = this.documentHistory(storeName, store);
+
+      if (history) this.refreshDocumentHistory(history);
+      else this.reconcileDocumentProjection(storeName, store, heads);
+    });
     registeredStores.add(store);
     this.documentUpdateListenerStores.set(storeName, registeredStores);
   }
@@ -375,6 +422,27 @@ export default class OrbitDBReplicatedStateRegistry {
     return records.length;
   }
 
+  private async bootstrapSubscribedDocumentListener(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+    listener: (document: Record<string, unknown>) => void | Promise<void>,
+  ): Promise<void> {
+    const existingHistory = this.documentHistories.has(store);
+    const history = this.documentHistory(storeName, store);
+
+    if (history && existingHistory && store.log) {
+      await new OrbitDBDocumentHistory(store.log, async (value) => {
+        const document = this.recordValue(value);
+
+        if (document) await listener(document);
+      }).refresh();
+    } else if (history) {
+      await history.refresh();
+    } else {
+      await this.bootstrapDocumentUpdateListener(store, new Set([listener]));
+    }
+  }
+
   private async bootstrapDocumentUpdateListeners(
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
@@ -385,7 +453,10 @@ export default class OrbitDBReplicatedStateRegistry {
         continue;
       }
 
-      await this.bootstrapDocumentUpdateListener(store, listeners);
+      const history = this.documentHistory(storeName, store);
+
+      if (history) await history.refresh();
+      else await this.bootstrapDocumentUpdateListener(store, listeners);
     }
   }
 
@@ -1369,7 +1440,9 @@ export default class OrbitDBReplicatedStateRegistry {
   public async onDocumentUpdated(
     storeName: OrbitDBReplicatedDocumentStoreName,
     listener: (document: Record<string, unknown>) => void | Promise<void>,
+    options: { includeHistory?: boolean } = {},
   ): Promise<void> {
+    if (options.includeHistory) this.historyStoreNames.add(storeName);
     const listeners = this.documentUpdateListeners.get(storeName) ?? new Set();
 
     listeners.add(listener);
@@ -1384,7 +1457,11 @@ export default class OrbitDBReplicatedStateRegistry {
 
       this.registerDocumentUpdateListener(storeName, store);
 
-      await this.bootstrapDocumentUpdateListener(store, new Set([listener]));
+      await this.bootstrapSubscribedDocumentListener(
+        storeName,
+        store,
+        listener,
+      );
     }
   }
 

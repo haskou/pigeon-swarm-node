@@ -107,6 +107,27 @@ The event attributes are:
 absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
 `status`, and `updatedAt` are required.
 
+## Durable call state convergence
+
+Call snapshots in the private network's OrbitDB `calls` store merge each
+participant independently. A later snapshot for one participant cannot overwrite
+another participant's newer join or departure. Participant revisions use the
+latest join, leave, decline or missed timestamp. Equal timestamps use a stable
+status order: left, missed, declined, joined, then ringing. An ended call remains
+ended when an active snapshot arrives later.
+
+A fresh call projection replays the store's causal log history, including earlier
+snapshots hidden by the document index. Incremental replay stops at previously
+processed heads. Each new subscriber receives its own initial history, and
+initialization waits for that subscriber to finish processing it. Missing log
+ancestors fail initialization instead of presenting partial call state as ready.
+
+When merging recovers state missing from an incoming snapshot, the existing
+coalescing call writer persists the combined document to the same network store.
+Identical merged snapshots do not schedule another repair. Reopening the store
+therefore retains the recovered participant state. No additional pubsub event or
+heartbeat field is introduced by this repair.
+
 ## Call participant leases
 
 `calls.v1.participant_lease.was_updated` replicates ephemeral call membership

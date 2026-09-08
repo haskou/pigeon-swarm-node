@@ -6,8 +6,11 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Timestamp } from '@haskou/value-objects';
+import { isDeepStrictEqual } from 'node:util';
 
 import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
+import OrbitDBCallDocumentMerger from './OrbitDBCallDocumentMerger';
+import OrbitDBCallDocumentReplicator from './OrbitDBCallDocumentReplicator';
 
 export default class OrbitDBCallProjection {
   private readonly activeCallIds = new Set<string>();
@@ -26,7 +29,11 @@ export default class OrbitDBCallProjection {
 
   private startPromise?: Promise<void>;
 
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {}
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly merger: OrbitDBCallDocumentMerger,
+    private readonly replicator: OrbitDBCallDocumentReplicator,
+  ) {}
 
   private hasCallIdentityFields(document: Record<string, unknown>): boolean {
     return (
@@ -52,14 +59,6 @@ export default class OrbitDBCallProjection {
   ): document is OrbitDBCallDocument {
     return (
       this.hasCallIdentityFields(document) && this.hasCallStateFields(document)
-    );
-  }
-
-  private freshness(document: OrbitDBCallDocument): number {
-    return Math.max(
-      document.updatedAt ?? 0,
-      document.endedAt ?? 0,
-      document.createdAt,
     );
   }
 
@@ -170,15 +169,19 @@ export default class OrbitDBCallProjection {
     }
 
     const current = this.documents.get(document.id);
+    const incoming = this.merger.merge(undefined, document);
+    const merged = this.merger.merge(current, incoming);
 
-    if (!current || this.freshness(current) <= this.freshness(document)) {
+    if (!isDeepStrictEqual(current, merged)) {
       if (current) {
         this.unindex(current);
       }
 
-      this.documents.set(document.id, document);
-      this.index(document);
+      this.documents.set(document.id, merged);
+      this.index(merged);
     }
+
+    if (!isDeepStrictEqual(merged, incoming)) this.replicator.replicate(merged);
   }
 
   private assertReady(): void {
@@ -189,7 +192,9 @@ export default class OrbitDBCallProjection {
 
   public async start(): Promise<void> {
     this.startPromise ??= this.registry
-      .onDocumentUpdated('calls', (document) => this.projectRecord(document))
+      .onDocumentUpdated('calls', (document) => this.projectRecord(document), {
+        includeHistory: true,
+      })
       .then(() => {
         this.ready = true;
       });

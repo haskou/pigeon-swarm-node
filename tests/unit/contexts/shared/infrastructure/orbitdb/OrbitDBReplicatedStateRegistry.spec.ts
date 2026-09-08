@@ -100,6 +100,7 @@ type Store = {
   };
   get: jest.Mock<Promise<Record<string, unknown> | undefined>, [string]>;
   log?: {
+    get?: (hash: string) => Promise<OrbitDBEntry | undefined>;
     heads: jest.Mock<Promise<OrbitDBEntry[]>>;
   };
   put: jest.Mock<Promise<string>, [string | Record<string, unknown>, unknown?]>;
@@ -217,6 +218,84 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
+  it('replays call history for each new subscriber without resetting existing subscribers', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const ancestor: OrbitDBEntry = {
+      hash: 'first',
+      next: [],
+      payload: { value: { id: 'call', updatedAt: 1 } },
+    };
+    const head: OrbitDBEntry = {
+      hash: 'second',
+      next: ['first'],
+      payload: { value: { id: 'call', updatedAt: 2 } },
+    };
+    calls.log = {
+      get: async () => ancestor,
+      heads: jest.fn(async () => [head]),
+    };
+    await registry.register('network-1', stores);
+    const first: unknown[] = [];
+    const second: unknown[] = [];
+
+    await registry.onDocumentUpdated(
+      'calls',
+      (document) => {
+        first.push(document.updatedAt);
+      },
+      { includeHistory: true },
+    );
+    await registry.onDocumentUpdated(
+      'calls',
+      (document) => {
+        second.push(document.updatedAt);
+      },
+      { includeHistory: true },
+    );
+
+    expect(first).toEqual([1, 2]);
+    expect(second).toEqual([1, 2]);
+    registry.clear();
+  });
+
+  it('waits for asynchronous call history projection before completing subscription', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    calls.log = {
+      get: async () => undefined,
+      heads: jest.fn(async (): Promise<OrbitDBEntry[]> => [
+        { hash: 'first', next: [], payload: { value: { id: 'call' } } },
+      ]),
+    };
+    await registry.register('network-1', stores);
+    const entered = deferred<void>();
+    const release = deferred<void>();
+    let ready = false;
+    const subscription = registry
+      .onDocumentUpdated(
+        'calls',
+        async () => {
+          entered.resolve();
+          await release.promise;
+        },
+        { includeHistory: true },
+      )
+      .then(() => {
+        ready = true;
+      });
+
+    await entered.promise;
+    await flushPromises();
+    const completedBeforeProjection = ready;
+    release.resolve();
+    await subscription;
+
+    expect(completedBeforeProjection).toBe(false);
+    expect(ready).toBe(true);
+    registry.clear();
+  });
+
   it('throws when replicated state is not ready yet', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
 
