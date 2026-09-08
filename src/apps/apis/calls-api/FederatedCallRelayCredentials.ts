@@ -52,7 +52,9 @@ export default class FederatedCallRelayCredentials {
 
       if (bytes.length > 8192)
         throw new Error('TURN credential request rejected');
-      stream.send(bytes);
+      const header = Buffer.alloc(4);
+      header.writeUInt32BE(bytes.length);
+      stream.send(Buffer.concat([header, bytes]));
       await stream.close({ signal: AbortSignal.timeout(5000) });
     } catch {
       stream.abort(new Error('TURN credential request rejected'));
@@ -99,6 +101,31 @@ export default class FederatedCallRelayCredentials {
     return credential;
   }
 
+  private async readResponse(
+    stream: Stream,
+    urls: string[],
+  ): Promise<FederatedTurnCredential> {
+    let bytes = Buffer.alloc(0);
+    for await (const chunk of stream) {
+      if (bytes.length + chunk.byteLength > 8196)
+        throw new Error('Invalid TURN credential response');
+      bytes = Buffer.concat([bytes, Buffer.from(chunk.subarray())]);
+
+      if (bytes.length < 4) continue;
+      const size = bytes.readUInt32BE();
+
+      if (size === 0 || size > 8192 || bytes.length > size + 4)
+        throw new Error('Invalid TURN credential response');
+
+      if (bytes.length === size + 4)
+        return this.validate(
+          JSON.parse(bytes.subarray(4).toString('utf8')),
+          urls,
+        );
+    }
+    throw new Error('Incomplete TURN credential response');
+  }
+
   private async request(
     connection: Connection,
     urls: string[],
@@ -108,26 +135,15 @@ export default class FederatedCallRelayCredentials {
       FederatedCallRelayCredentials.protocol,
       { runOnLimitedConnection: true, signal },
     );
-    stream.maxReadBufferLength = 8192;
+    stream.maxReadBufferLength = 8196;
     stream.inactivityTimeout = 5000;
     const abort = (): void =>
       stream.abort(new Error('TURN credential request timed out'));
     signal.addEventListener('abort', abort, { once: true });
     try {
       if (signal.aborted) throw new Error('TURN credential request timed out');
-      const chunks: Buffer[] = [];
-      let size = 0;
-      for await (const chunk of stream) {
-        size += chunk.byteLength;
 
-        if (size > 8192) throw new Error('Invalid TURN credential response');
-        chunks.push(Buffer.from(chunk.subarray()));
-      }
-
-      return this.validate(
-        JSON.parse(Buffer.concat(chunks).toString('utf8')),
-        urls,
-      );
+      return await this.readResponse(stream, urls);
     } finally {
       signal.removeEventListener('abort', abort);
       stream.abort(new Error('TURN credential exchange finished'));

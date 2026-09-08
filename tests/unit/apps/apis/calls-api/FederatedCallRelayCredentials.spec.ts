@@ -7,6 +7,13 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import FederatedCallRelayCredentials from '@app/apps/apis/calls-api/FederatedCallRelayCredentials';
 
+function frame(value: string): Buffer {
+  const body = Buffer.from(value);
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(body.length);
+  return Buffer.concat([header, body]);
+}
+
 describe('FederatedCallRelayCredentials', () => {
   it('never registers a credential issuer on a public network', async () => {
     const network = mock<IPFSNetwork>();
@@ -62,7 +69,7 @@ function connectedFixture() {
     const credential = issuer.issue('requester', urls, 'private-owner-secret');
     return Object.assign(mock<Stream>(), {
       async *[Symbol.asyncIterator]() {
-        yield Buffer.from(JSON.stringify(credential));
+        yield frame(JSON.stringify(credential));
       },
     });
   });
@@ -140,7 +147,7 @@ describe('federated response validation', () => {
     connection.newStream.mockImplementation(async () =>
       Object.assign(mock<Stream>(), {
         async *[Symbol.asyncIterator]() {
-          yield Buffer.from(
+          yield frame(
             kind === 'oversized'
               ? 'a'.repeat(8193)
               : kind === 'malformed'
@@ -183,4 +190,58 @@ describe('owner secret rotation', () => {
     expect(await service.get()).toHaveLength(1);
     expect(connection.newStream).toHaveBeenCalledTimes(2);
   });
+});
+
+describe('federated response framing', () => {
+  it.each([1, 3, 4, 17, 8196])(
+    'reads a complete response in %i-byte chunks without waiting for EOF',
+    async (chunkSize) => {
+      const { service, connection } = connectedFixture();
+      const credential = new CallRelayCredentialIssuer().issue(
+        'peer',
+        ['turn:relay.test:3478'],
+        'owner-secret',
+      );
+      const bytes = frame(JSON.stringify(credential));
+      connection.newStream.mockImplementation(async () =>
+        Object.assign(mock<Stream>(), {
+          async *[Symbol.asyncIterator]() {
+            for (let offset = 0; offset < bytes.length; offset += chunkSize)
+              yield bytes.subarray(offset, offset + chunkSize);
+            throw new Error(
+              'EOF was already delivered before the reader subscribed',
+            );
+          },
+        }),
+      );
+      expect(await service.get()).toEqual([credential]);
+    },
+  );
+  it.each(['zero', 'oversized', 'truncated', 'trailing'])(
+    'rejects a %s response frame',
+    async (kind) => {
+      const { service, connection } = connectedFixture();
+      let bytes = frame(
+        JSON.stringify(
+          new CallRelayCredentialIssuer().issue(
+            'peer',
+            ['turn:relay.test:3478'],
+            'owner-secret',
+          ),
+        ),
+      );
+      if (kind === 'zero') bytes.writeUInt32BE(0);
+      if (kind === 'oversized') bytes.writeUInt32BE(8193);
+      if (kind === 'truncated') bytes = bytes.subarray(0, bytes.length - 1);
+      if (kind === 'trailing') bytes = Buffer.concat([bytes, Buffer.from('x')]);
+      connection.newStream.mockImplementation(async () =>
+        Object.assign(mock<Stream>(), {
+          async *[Symbol.asyncIterator]() {
+            yield bytes;
+          },
+        }),
+      );
+      expect(await service.get()).toEqual([]);
+    },
+  );
 });

@@ -368,10 +368,10 @@ components:
             type: string
         username:
           type: string
-          description: Temporary coturn REST username in Unix-expiry-seconds:identityId form, or an explicitly configured local static value. Temporary lifetime defaults to 3600 seconds; invalid or fractional TTL values fall back to that default. Expiry governs new authentication, not immediate termination of existing allocations.
+          description: Locally issued v1 usernames use Unix-expiry-seconds:identityId; their lifetime defaults to 3600 seconds and invalid or fractional TTL values fall back to that default. Private-network v2 relay owners issue Unix-expiry-seconds:opaque-peer-subject usernames with a fixed ten-minute lifetime. Eligible v2 credentials are cached until thirty seconds before expiry or a newer signed advertisement; each request does not renew them. Static local values are also supported. Expiry governs new authentication, not immediate termination of existing allocations.
         credential:
           type: string
-          description: Temporary coturn REST HMAC credential generated with the private shared secret, or an explicitly configured local static value.
+          description: Temporary coturn REST HMAC credential generated locally for v1 or by the connected private-network relay owner for v2, or an explicitly configured local static value. Independent v2 owners keep separate master secrets and deliver temporary credentials over encrypted authenticated streams.
     CallScope:
       type: object
       required:

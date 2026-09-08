@@ -462,7 +462,7 @@ Implemented:
 - for v2 private-network relays, request credentials from the connected relay owner over an encrypted authenticated libp2p stream; independent deployments keep different master secrets
 - reuse v2 credentials for up to ten minutes, refreshing thirty seconds before expiry and checking relay eligibility on every lookup; usernames contain a stable per-peer opaque subject rather than an application identity
 - limit v2 issuance to ten requests per peer and one hundred globally per minute; credentials never enter pubsub or replicated storage
-- use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
+- use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control locally issued v1 credential
   lifetime; it must be a positive whole number of seconds whose resulting Unix
   expiry is a safe integer, otherwise it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
@@ -476,11 +476,16 @@ Implemented:
 
 #### Credential renewal and configuration changes
 
-Each authenticated request reads the current relay settings and issues a new
-expiry measured from that request. The Unix timestamp before the first `:` in a
-temporary username is its expiry in seconds. Requests made within the same
-second may return identical credentials. Static credentials have no expiry
-encoded by this endpoint.
+Each authenticated request reads the current relay settings. Locally issued v1
+credentials get a new expiry measured from that request; requests within the
+same second may return identical credentials. For v2, a connected private-network
+relay owner issues ten-minute credentials with an opaque peer subject. Eligible
+cached credentials are reused until thirty seconds before expiry or a newer
+signed advertisement invalidates them; each lookup does not extend their lifetime.
+The Unix timestamp before the first `:` is the expiry in seconds. Static
+credentials have no expiry encoded by this endpoint. Independent v2 relay owners
+keep their own master secrets; clients obtain temporary credentials over encrypted
+authenticated streams rather than sharing those secrets.
 
 Clients must request configuration again before an ICE restart and apply the
 returned servers before creating the restart offer. Do not cache temporary

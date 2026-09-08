@@ -126,7 +126,7 @@ corresponding issues can be closed.
 | Component | Responsibility |
 | --- | --- |
 | coturn | Terminates TURN/STUN and relays WebRTC media. Runs outside the backend. |
-| `CallRelayRuntime` | Starts call relay discovery on public IPFS networks and republishes local records. |
+| `CallRelayRuntime` | Starts v1 discovery on public networks and v2 discovery and credential serving on private networks; republishes local records. |
 | `CallRelayRecordSigner` | Signs and verifies call relay records with the shared libp2p peer key. |
 | `CallRelayRecordDiscovery` | Subscribes to the call relay pubsub topic and publishes records. |
 | `CallRelayRecordRegistry` | Keeps active discovered relay records in local memory. |
@@ -138,7 +138,7 @@ corresponding issues can be closed.
 ```mermaid
 sequenceDiagram
     participant NodeA as Node A with coturn
-    participant IPFS as Public IPFS pubsub
+    participant IPFS as IPFS pubsub (v2 private only)
     participant NodeB as Node B
     participant Client as Frontend client
 
@@ -149,13 +149,28 @@ sequenceDiagram
     NodeB->>NodeB: Validate shape, expiry, URLs and signature
     NodeB->>NodeB: Cache active relay record
     Client->>NodeB: GET /calls/ice-servers
-    NodeB->>NodeB: Generate temporary TURN credentials
-    NodeB-->>Client: Local or active-relay ICE server
+    alt Local configuration or v1 shared-secret pool
+        NodeB->>NodeB: Generate temporary credentials with matching local secret
+    else v2 connected private-network relay
+        alt Eligible cached credentials for current advertisement
+            NodeB->>NodeB: Reuse owner-issued credentials before renewal margin
+        else Credential renewal needed
+            NodeB->>NodeA: Request via encrypted authenticated libp2p stream
+            NodeA-->>NodeB: Ten-minute credentials with opaque peer subject
+        end
+    end
+    NodeB-->>Client: Local or eligible connected-relay ICE server
     Client->>Client: Create RTCPeerConnection
 ```
 
 Discovery happens before and independently from a specific call. Nodes keep
 republishing records while they remain configured as call relay advertisers.
+For v2, both admission and credential requests are private-network-only. Each
+relay owner retains its own master secret; Node B never mints credentials for
+that owner. Cached credentials are rechecked against current relay eligibility,
+renewed thirty seconds before expiry, and invalidated by a newer signed
+advertisement. The configurable local v1 lifetime defaults to one hour; it does
+not change the fixed ten-minute v2 lifetime.
 
 ## Record Contract
 
