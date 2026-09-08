@@ -167,7 +167,10 @@ export default class OrbitDBCallProjection {
       );
   }
 
-  private projectRecord(document: Record<string, unknown>): void {
+  private projectRecord(
+    document: Record<string, unknown>,
+    persistRepair: boolean,
+  ): void {
     if (!this.isDocument(document)) {
       return;
     }
@@ -184,6 +187,8 @@ export default class OrbitDBCallProjection {
       this.documents.set(document.id, merged);
       this.index(merged);
     }
+
+    if (!persistRepair) return;
 
     if (!this.ready || this.historyReplayDepth > 0) {
       if (isDeepStrictEqual(merged, incoming)) {
@@ -214,19 +219,23 @@ export default class OrbitDBCallProjection {
 
   public async start(): Promise<void> {
     this.startPromise ??= this.registry
-      .onDocumentUpdated('calls', (document) => this.projectRecord(document), {
-        historyObserver: {
-          finished: (success) => {
-            this.historyReplayDepth--;
+      .onDocumentUpdated(
+        'calls',
+        (document) => this.projectRecord(document, true),
+        {
+          historyObserver: {
+            finished: (success) => {
+              this.historyReplayDepth--;
 
-            if (success) this.flushRepairs();
+              if (success) this.flushRepairs();
+            },
+            started: () => {
+              this.historyReplayDepth++;
+            },
           },
-          started: () => {
-            this.historyReplayDepth++;
-          },
+          includeHistory: true,
         },
-        includeHistory: true,
-      })
+      )
       .then(() => {
         this.ready = true;
 
@@ -238,7 +247,7 @@ export default class OrbitDBCallProjection {
 
   public project(document: OrbitDBCallDocument): void {
     this.assertReady();
-    this.projectRecord(document);
+    this.projectRecord(document, false);
   }
 
   public findById(id: CallId): Promise<OrbitDBCallDocument | undefined> {

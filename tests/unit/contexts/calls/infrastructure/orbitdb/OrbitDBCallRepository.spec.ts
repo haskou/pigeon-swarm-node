@@ -311,6 +311,19 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toBeDefined();
   });
 
+  it('does not persist stale gossip projections as durable repairs', async () => {
+    calls.emitUpdate(document('ended', 1_780_000_005_000));
+    await flushBackgroundTasks();
+    calls.put.mockClear();
+
+    await repository.registerReplica(communityCall());
+    await repository.registerReplica(communityCall());
+    await flushBackgroundTasks();
+
+    expect(calls.put).not.toHaveBeenCalled();
+    await expect(repository.findActiveByCommunity(communityId)).resolves.toEqual([]);
+  });
+
   it('does not wait for canonical document replication', async () => {
     calls.put.mockImplementationOnce(() => new Promise(() => undefined));
 
