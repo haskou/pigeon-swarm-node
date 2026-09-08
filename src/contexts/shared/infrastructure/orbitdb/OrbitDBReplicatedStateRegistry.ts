@@ -72,7 +72,12 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly documentUpdateListeners = new Map<
     OrbitDBReplicatedDocumentStoreName,
-    Set<(document: Record<string, unknown>) => void | Promise<void>>
+    Set<
+      (
+        document: Record<string, unknown>,
+        scope?: object,
+      ) => void | Promise<void>
+    >
   >();
 
   private readonly historyObservers = new Map<
@@ -147,13 +152,14 @@ export default class OrbitDBReplicatedStateRegistry {
     if (!history) {
       history = new OrbitDBDocumentHistory(
         store.log,
-        async (value) => {
+        async (value, scope) => {
           const document = this.recordValue(value);
 
           if (document) {
             await this.notifyBootstrappedDocument(
               this.documentUpdateListeners.get(storeName) ?? new Set(),
               document,
+              scope,
             );
           }
         },
@@ -399,11 +405,18 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private async notifyBootstrappedDocument(
-    listeners: Set<(document: Record<string, unknown>) => void | Promise<void>>,
+    listeners: Set<
+      (
+        document: Record<string, unknown>,
+        scope?: object,
+      ) => void | Promise<void>
+    >,
     document: Record<string, unknown>,
+    scope?: object,
   ): Promise<void> {
     for (const listener of listeners) {
-      await listener(document);
+      if (scope) await listener(document, scope);
+      else await listener(document);
     }
   }
 
@@ -420,7 +433,12 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private async bootstrapDocumentUpdateListener(
     store: OrbitDBDatabase,
-    listeners: Set<(document: Record<string, unknown>) => void | Promise<void>>,
+    listeners: Set<
+      (
+        document: Record<string, unknown>,
+        scope?: object,
+      ) => void | Promise<void>
+    >,
   ): Promise<number> {
     const records = await this.allRecords(store);
 
@@ -435,7 +453,10 @@ export default class OrbitDBReplicatedStateRegistry {
   private async bootstrapSubscribedDocumentListener(
     storeName: OrbitDBReplicatedDocumentStoreName,
     store: OrbitDBDatabase,
-    listener: (document: Record<string, unknown>) => void | Promise<void>,
+    listener: (
+      document: Record<string, unknown>,
+      scope?: object,
+    ) => void | Promise<void>,
     observer?: OrbitDBHistoryReplayObserver,
   ): Promise<void> {
     const existingHistory = this.documentHistories.has(store);
@@ -444,10 +465,10 @@ export default class OrbitDBReplicatedStateRegistry {
     if (history && existingHistory && store.log) {
       await new OrbitDBDocumentHistory(
         store.log,
-        async (value) => {
+        async (value, scope) => {
           const document = this.recordValue(value);
 
-          if (document) await listener(document);
+          if (document) await listener(document, scope);
         },
         () => (observer ? [observer] : []),
       ).refresh();
@@ -1454,7 +1475,10 @@ export default class OrbitDBReplicatedStateRegistry {
 
   public async onDocumentUpdated(
     storeName: OrbitDBReplicatedDocumentStoreName,
-    listener: (document: Record<string, unknown>) => void | Promise<void>,
+    listener: (
+      document: Record<string, unknown>,
+      scope?: object,
+    ) => void | Promise<void>,
     options: {
       includeHistory?: boolean;
       historyObserver?: OrbitDBHistoryReplayObserver;

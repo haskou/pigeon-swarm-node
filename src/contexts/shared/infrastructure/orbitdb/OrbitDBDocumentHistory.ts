@@ -9,7 +9,10 @@ export class OrbitDBDocumentHistory {
 
   constructor(
     private readonly log: NonNullable<OrbitDBDatabase['log']>,
-    private readonly notify: (value: unknown) => void | Promise<void>,
+    private readonly notify: (
+      value: unknown,
+      scope: object,
+    ) => void | Promise<void>,
     private readonly observers: () => OrbitDBHistoryReplayObserver[] = () => [],
   ) {}
 
@@ -48,7 +51,7 @@ export class OrbitDBDocumentHistory {
       const { entry, expanded } = stack.pop()!;
 
       if (expanded) {
-        await this.notify(entry.payload?.value);
+        await this.notify(entry.payload?.value, this);
         continue;
       }
 
@@ -78,14 +81,16 @@ export class OrbitDBDocumentHistory {
   private async replay(): Promise<void> {
     const observers = this.observers();
     let success = false;
+    const frontier = this.frontier;
 
-    for (const observer of observers) observer.started();
+    for (const observer of observers) observer.started(this);
 
     try {
       await this.drain();
       success = true;
     } finally {
-      for (const observer of observers) observer.finished(success);
+      if (!success) this.frontier = frontier;
+      for (const observer of observers) observer.finished(this, success);
     }
   }
 

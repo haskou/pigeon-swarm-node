@@ -11,6 +11,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
 import OrbitDBCallDocumentMerger from './OrbitDBCallDocumentMerger';
 import OrbitDBCallDocumentReplicator from './OrbitDBCallDocumentReplicator';
+import OrbitDBCallHistoryReplay from './OrbitDBCallHistoryReplay';
 
 export default class OrbitDBCallProjection {
   private readonly activeCallIds = new Set<string>();
@@ -29,7 +30,7 @@ export default class OrbitDBCallProjection {
 
   private ready = false;
 
-  private historyReplayDepth = 0;
+  private readonly historyReplays = new Map<object, OrbitDBCallHistoryReplay>();
 
   private startPromise?: Promise<void>;
 
@@ -170,8 +171,17 @@ export default class OrbitDBCallProjection {
   private projectRecord(
     document: Record<string, unknown>,
     persistRepair: boolean,
+    scope?: object,
   ): void {
     if (!this.isDocument(document)) {
+      return;
+    }
+
+    const replay = scope ? this.historyReplays.get(scope) : undefined;
+
+    if (persistRepair && replay) {
+      this.stageRecord(document, replay);
+
       return;
     }
 
@@ -191,11 +201,41 @@ export default class OrbitDBCallProjection {
     if (persistRepair) this.scheduleRepair(merged, incoming);
   }
 
+  private stageRecord(
+    document: OrbitDBCallDocument,
+    replay: OrbitDBCallHistoryReplay,
+  ): void {
+    const incoming = this.merger.merge(undefined, document);
+    const current =
+      replay.documents.get(document.id) ?? this.documents.get(document.id);
+
+    replay.documents.set(document.id, this.merger.merge(current, incoming));
+    replay.incoming.set(document.id, incoming);
+  }
+
+  private finishHistoryReplay(scope: object, success: boolean): void {
+    const replay = this.historyReplays.get(scope);
+
+    this.historyReplays.delete(scope);
+
+    if (success && replay) {
+      for (const document of replay.documents.values()) {
+        this.projectRecord(document, false);
+        this.scheduleRepair(
+          this.documents.get(document.id)!,
+          replay.incoming.get(document.id)!,
+        );
+      }
+    }
+
+    this.flushRepairs();
+  }
+
   private scheduleRepair(
     merged: OrbitDBCallDocument,
     incoming: OrbitDBCallDocument,
   ): void {
-    if (!this.ready || this.historyReplayDepth > 0) {
+    if (!this.ready || this.historyReplays.size > 0) {
       if (isDeepStrictEqual(merged, incoming)) {
         this.bootstrapRepairs.delete(incoming.id);
       } else {
@@ -213,7 +253,7 @@ export default class OrbitDBCallProjection {
   }
 
   private flushRepairs(): void {
-    if (!this.ready || this.historyReplayDepth > 0) return;
+    if (!this.ready || this.historyReplays.size > 0) return;
 
     for (const document of this.bootstrapRepairs.values()) {
       this.replicator.replicate(document);
@@ -226,16 +266,13 @@ export default class OrbitDBCallProjection {
     this.startPromise ??= this.registry
       .onDocumentUpdated(
         'calls',
-        (document) => this.projectRecord(document, true),
+        (document, scope) => this.projectRecord(document, true, scope),
         {
           historyObserver: {
-            finished: (success) => {
-              this.historyReplayDepth--;
-
-              if (success) this.flushRepairs();
-            },
-            started: () => {
-              this.historyReplayDepth++;
+            finished: (scope, success) =>
+              this.finishHistoryReplay(scope, success),
+            started: (scope) => {
+              this.historyReplays.set(scope, new OrbitDBCallHistoryReplay());
             },
           },
           includeHistory: true,

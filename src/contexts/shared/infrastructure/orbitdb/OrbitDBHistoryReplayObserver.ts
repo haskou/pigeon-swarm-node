@@ -1,4 +1,4 @@
 export interface OrbitDBHistoryReplayObserver {
-  started(): void;
-  finished(success: boolean): void;
+  started(scope: object): void;
+  finished(scope: object, success: boolean): void;
 }

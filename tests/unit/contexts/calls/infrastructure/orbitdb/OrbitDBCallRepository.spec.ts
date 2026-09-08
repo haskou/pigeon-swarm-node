@@ -142,6 +142,50 @@ describe('OrbitDBCallRepository', () => {
     registry.clear();
   });
 
+  it.each([true, false])('does not expose historical active calls while a running projection replays (success=%s)', async (success) => {
+    const subscribe = jest.spyOn(registry, 'onDocumentUpdated');
+    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry));
+
+    await laterProjection.start();
+    const observer = subscribe.mock.calls[0][2]!.historyObserver!;
+    const scope = {};
+    observer.started(scope);
+    await subscribe.mock.calls[0][1](document(), scope);
+    await flushBackgroundTasks();
+
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toEqual([]);
+    await expect(laterProjection.findTimedOutRingingCalls(new Timestamp(1_780_000_010_000))).resolves.toEqual([]);
+    await subscribe.mock.calls[0][1](document('ended', 1_780_000_005_000), scope);
+    await flushBackgroundTasks();
+    observer.finished(scope, success);
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toEqual([]);
+    if (!success) await expect(laterProjection.findById(new CallId(callId))).resolves.toBeUndefined();
+  });
+
+  it('keeps a successful replay when an overlapping replay fails', async () => {
+    const subscribe = jest.spyOn(registry, 'onDocumentUpdated');
+    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry));
+
+    await laterProjection.start();
+    const observer = subscribe.mock.calls[0][2]!.historyObserver!;
+    const listener = subscribe.mock.calls[0][1];
+    const first = {};
+    const second = {};
+    const secondDocument = { ...document(), id: '550e8400-e29b-41d4-a716-446655440099' };
+    observer.started(first);
+    observer.started(second);
+    await listener(document(), first);
+    await listener(secondDocument, second);
+    observer.finished(first, true);
+    observer.finished(second, false);
+
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toHaveLength(1);
+    observer.started(second);
+    await listener(secondDocument, second);
+    observer.finished(second, true);
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toHaveLength(2);
+  });
+
   it('writes one canonical OrbitDB document without replicated call heads', async () => {
     await repository.save(communityCall());
     await flushBackgroundTasks();
