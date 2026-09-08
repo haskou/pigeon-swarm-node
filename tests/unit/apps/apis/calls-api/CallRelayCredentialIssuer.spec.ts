@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto';
-import { CallRelayCredentialIssuer } from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
+import CallRelayCredentialIssuer from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
 
 describe('CallRelayCredentialIssuer', () => {
   it('issues temporary credentials with the owner secret and an opaque stable subject', () => {

@@ -4,14 +4,13 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 
 import { CallRelayConfiguration } from './CallRelayConfiguration';
-import { CallRelayCredentialIssuer } from './CallRelayCredentialIssuer';
+import CallRelayCredentialIssuer from './CallRelayCredentialIssuer';
 import CallRelayRecordRegistry from './CallRelayRecordRegistry';
 import { FederatedTurnCredential } from './types/FederatedTurnCredential';
 
 export default class FederatedCallRelayCredentials {
   private static readonly protocol = '/pigeon-swarm/turn-credentials/2.0.0';
   private readonly started = new WeakSet<IPFSNetwork>();
-  private readonly issuer = new CallRelayCredentialIssuer();
   private readonly cached = new Map<
     string,
     { credential: FederatedTurnCredential; issuedAt: number }
@@ -22,6 +21,7 @@ export default class FederatedCallRelayCredentials {
   public constructor(
     private readonly networks: IPFSNetworkRegistry,
     private readonly records: CallRelayRecordRegistry,
+    private readonly issuer: CallRelayCredentialIssuer,
   ) {}
 
   private async serve(

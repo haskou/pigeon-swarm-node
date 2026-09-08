@@ -2,7 +2,7 @@ import { createHmac } from 'crypto';
 
 import { FederatedTurnCredential } from './types/FederatedTurnCredential';
 
-export class CallRelayCredentialIssuer {
+export default class CallRelayCredentialIssuer {
   private windowStart = 0;
   private total = 0;
   private readonly requests = new Map<string, number>();

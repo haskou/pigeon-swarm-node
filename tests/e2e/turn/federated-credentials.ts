@@ -12,7 +12,7 @@ import FederatedCallRelayCredentials from '@app/apps/apis/calls-api/FederatedCal
 import CallRelayRecordDiscovery from '@app/apps/apis/calls-api/CallRelayRecordDiscovery';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import CallRelayRecordSigner from '@app/apps/apis/calls-api/CallRelayRecordSigner';
-import { CallRelayCredentialIssuer } from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
+import CallRelayCredentialIssuer from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
 import assert from 'node:assert/strict';
 import { fork, spawnSync, ChildProcess } from 'node:child_process';
 import { generateKeyPairSync, randomBytes, createHmac } from 'node:crypto';
@@ -64,7 +64,11 @@ async function createNetwork(key: string, root: string, relay: boolean) {
       getRelaySettings: defaultRelayRuntimeSettings,
     },
   );
-  const service = new FederatedCallRelayCredentials(registry, records);
+  const service = new FederatedCallRelayCredentials(
+    registry,
+    records,
+    new CallRelayCredentialIssuer(),
+  );
   await service.start(network);
   await discovery.startConnection(network, true);
   return { network, service, privateKey };

@@ -67,7 +67,7 @@ export class CallRelayConfiguration {
         ...this.splitEnvironmentList(this.environment.CALLS_TURN_URLS),
         ...this.getGeneratedTurnUrls(),
       ]),
-    ];
+    ].slice(0, 8);
   }
 
   public getTurnSharedSecret(): string {

@@ -1,5 +1,5 @@
 import type { Connection, Stream } from '@libp2p/interface';
-import { CallRelayCredentialIssuer } from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
+import CallRelayCredentialIssuer from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
 import { CallRelayRecordPrimitives } from '@app/apps/apis/calls-api/CallRelayRecordPrimitives';
 import { mock } from 'jest-mock-extended';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -14,6 +14,7 @@ describe('FederatedCallRelayCredentials', () => {
     const service = new FederatedCallRelayCredentials(
       mock<IPFSNetworkRegistry>(),
       mock<CallRelayRecordRegistry>(),
+      new CallRelayCredentialIssuer(),
     );
     await service.start(network);
     expect(network.getHeliaCore).not.toHaveBeenCalled();
@@ -26,7 +27,11 @@ describe('FederatedCallRelayCredentials', () => {
     const records = mock<CallRelayRecordRegistry>();
     records.all.mockReturnValue([]);
     await expect(
-      new FederatedCallRelayCredentials(registry, records).get(),
+      new FederatedCallRelayCredentials(
+        registry,
+        records,
+        new CallRelayCredentialIssuer(),
+      ).get(),
     ).resolves.toEqual([]);
     expect(network.getHeliaCore).not.toHaveBeenCalled();
   });
@@ -66,7 +71,11 @@ function connectedFixture() {
     network,
     records,
     registry,
-    service: new FederatedCallRelayCredentials(registry, records),
+    service: new FederatedCallRelayCredentials(
+      registry,
+      records,
+      new CallRelayCredentialIssuer(),
+    ),
   };
 }
 
@@ -159,12 +168,18 @@ describe('federated response validation', () => {
   });
 });
 
-
 describe('owner secret rotation', () => {
   it('refreshes cached credentials after a newer advertisement with unchanged URLs', async () => {
     const { service, records, connection } = connectedFixture();
     expect(await service.get()).toHaveLength(1);
-    records.all.mockReturnValue([{ version: 2, peerId: 'relay', issuedAt: Date.now(), urls: ['turn:relay.test:3478'] } as CallRelayRecordPrimitives]);
+    records.all.mockReturnValue([
+      {
+        version: 2,
+        peerId: 'relay',
+        issuedAt: Date.now(),
+        urls: ['turn:relay.test:3478'],
+      } as CallRelayRecordPrimitives,
+    ]);
     expect(await service.get()).toHaveLength(1);
     expect(connection.newStream).toHaveBeenCalledTimes(2);
   });
