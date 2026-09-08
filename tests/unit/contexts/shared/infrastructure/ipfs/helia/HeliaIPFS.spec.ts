@@ -1,3 +1,5 @@
+import Kernel from '@haskou/ddd-kernel';
+import { mock } from 'jest-mock-extended';
 import {
   heliaRuntimeAdapter,
   HeliaInstance,
@@ -28,14 +30,53 @@ describe('HeliaIPFS', () => {
 
     await ipfs.subscribePubSub('calls.v1.signal.sent', jest.fn());
 
-    expect(pubsub.subscribe).toHaveBeenCalledWith(
-      'calls.v1.signal.sent',
-    );
+    expect(pubsub.subscribe).toHaveBeenCalledWith('calls.v1.signal.sent');
     expect(pubsub.addEventListener).toHaveBeenCalledTimes(1);
     expect(pubsub.addEventListener).toHaveBeenCalledWith(
       'message',
       expect.any(Function),
     );
+  });
+
+  it('does not log a private topic or decrypted payload when a subscriber fails', async () => {
+    const pubsub = mock<Libp2pPubSubService>();
+    const heliaCore = {
+      libp2p: { addEventListener: jest.fn(), services: { pubsub } },
+    } as unknown as HeliaInstance;
+    const ipfs = new (class extends HeliaIPFS {})(heliaCore, {
+      storageLocation: 'memory',
+    });
+    const log = jest.fn();
+    jest
+      .spyOn(Kernel, 'logger', 'get')
+      .mockReturnValue({ error: log } as unknown as typeof Kernel.logger);
+    const handler = jest.fn(async (payload: string): Promise<void> => {
+      JSON.parse(payload);
+    });
+    await ipfs.subscribePubSub('PRIVATE-TOPIC', handler);
+    const listener = pubsub.addEventListener.mock.calls[0][1];
+    listener(
+      new CustomEvent('message', {
+        detail: {
+          topic: 'PRIVATE-TOPIC',
+          data: new TextEncoder().encode('PRIVATE-DECRYPTED-TEXT'),
+        },
+      }),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(log).toHaveBeenCalledWith('IPFS pubsub handler failed');
+    expect(JSON.stringify(log.mock.calls)).not.toContain('PRIVATE-');
+    listener(
+      new CustomEvent('message', {
+        detail: {
+          topic: 'PRIVATE-TOPIC',
+          data: new TextEncoder().encode('{}'),
+        },
+      }),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledTimes(1);
   });
 
   it('publishes relay providers through libp2p content routing only', async () => {
@@ -111,9 +152,7 @@ describe('HeliaIPFS', () => {
 
     await expect(
       ipfs.findRecordProviderMultiaddrs('private-relay-key'),
-    ).resolves.toEqual([
-      '/dns4/relay.example.com/tcp/4103/p2p/12D3KooWRelay',
-    ]);
+    ).resolves.toEqual(['/dns4/relay.example.com/tcp/4103/p2p/12D3KooWRelay']);
 
     expect(contentRouting.findProviders).toHaveBeenCalledWith(
       parsedCid,

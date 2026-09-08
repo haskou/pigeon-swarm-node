@@ -313,3 +313,11 @@ PUSH_VAPID_SUBJECT=mailto:admin@example.com
 Use `TRANSPORT_DSN=libp2p-gossipsub://` to publish and subscribe through the
 standalone libp2p/gossipsub runtime. This runtime is separate from IPFS content
 storage.
+
+## Application log privacy
+
+HTTP access logs record the request method and response status alongside the logger timestamp and severity. They exclude URLs, query parameters, headers, cookies, request bodies and response bodies. Private identifiers and bearer capabilities must not be added to access-log messages.
+
+A failed pubsub subscriber emits only `IPFS pubsub handler failed` or `PubSub handler failed`, depending on the transport. Publish failures in the shared pubsub transport emit only `PubSub publish failed`. The topic and exception text are omitted because parser errors can contain decrypted message fragments. Subsequent messages continue to be processed.
+
+These safeguards apply to newly generated application access logs and this subscriber error path. They do not remove existing logs, configure reverse-proxy logs, or conceal IPFS traffic and relationship metadata.

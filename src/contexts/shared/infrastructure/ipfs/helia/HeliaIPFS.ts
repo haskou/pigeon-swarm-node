@@ -1327,13 +1327,9 @@ export abstract class HeliaIPFS implements IPFSConnection {
         return;
       }
 
-      handler(new TextDecoder().decode(message.data)).catch(
-        (error: unknown) => {
-          Kernel.logger.error(
-            `IPFS pubsub handler failed for topic "${topic}": ${String(error)}`,
-          );
-        },
-      );
+      handler(new TextDecoder().decode(message.data)).catch(() => {
+        Kernel.logger.error('IPFS pubsub handler failed');
+      });
     };
 
     await pubsub.subscribe(topic);
