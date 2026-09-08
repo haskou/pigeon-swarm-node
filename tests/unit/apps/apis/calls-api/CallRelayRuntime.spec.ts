@@ -1,3 +1,4 @@
+import FederatedCallRelayCredentials from '@app/apps/apis/calls-api/FederatedCallRelayCredentials';
 import { CallRelayRecord } from '@app/apps/apis/calls-api/CallRelayRecord';
 import CallRelayRecordDiscovery from '@app/apps/apis/calls-api/CallRelayRecordDiscovery';
 import CallRelayRecordSigner from '@app/apps/apis/calls-api/CallRelayRecordSigner';
@@ -107,7 +108,12 @@ describe('CallRelayRuntime', () => {
   it('should publish a signed call relay record when a public network is registered', async () => {
     let registeredListener:
       ((network: IPFSNetwork) => Promise<void> | void) | undefined;
-    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+    const runtime = new CallRelayRuntime(
+      networkRegistry,
+      discovery,
+      signer,
+      mock<FederatedCallRelayCredentials>(),
+    );
 
     networkRegistry.onNetworkRegistered.mockImplementation((listener) => {
       registeredListener = listener;
@@ -116,7 +122,10 @@ describe('CallRelayRuntime', () => {
     await runtime.run();
     await registeredListener?.(publicNetwork);
 
-    expect(discovery.startConnection).toHaveBeenCalledWith(publicNetwork);
+    expect(discovery.startConnection).toHaveBeenCalledWith(
+      publicNetwork,
+      false,
+    );
     expect(signer.sign).toHaveBeenCalledWith(
       expect.objectContaining({
         role: 'call-relay',
@@ -150,7 +159,12 @@ describe('CallRelayRuntime', () => {
       if (secret === undefined) delete process.env.CALLS_TURN_SHARED_SECRET;
       else process.env.CALLS_TURN_SHARED_SECRET = secret;
       networkRegistry.getAll.mockReturnValue([publicNetwork]);
-      const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+      const runtime = new CallRelayRuntime(
+        networkRegistry,
+        discovery,
+        signer,
+        mock<FederatedCallRelayCredentials>(),
+      );
 
       await runtime.run();
       await runtime.run();
@@ -169,7 +183,12 @@ describe('CallRelayRuntime', () => {
   it('should publish a signed call relay record when a private network is registered', async () => {
     let registeredListener:
       ((network: IPFSNetwork) => Promise<void> | void) | undefined;
-    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+    const runtime = new CallRelayRuntime(
+      networkRegistry,
+      discovery,
+      signer,
+      mock<FederatedCallRelayCredentials>(),
+    );
 
     networkRegistry.onNetworkRegistered.mockImplementation((listener) => {
       registeredListener = listener;
@@ -178,7 +197,10 @@ describe('CallRelayRuntime', () => {
     await runtime.run();
     await registeredListener?.(privateNetwork);
 
-    expect(discovery.startConnection).toHaveBeenCalledWith(privateNetwork);
+    expect(discovery.startConnection).toHaveBeenCalledWith(
+      privateNetwork,
+      true,
+    );
     expect(discovery.publishConnection).toHaveBeenCalledWith(
       privateNetwork,
       expect.objectContaining({
@@ -187,13 +209,18 @@ describe('CallRelayRuntime', () => {
           'turn:relay.example.test:4199?transport=udp',
           'turn:relay.example.test:4199?transport=tcp',
         ],
-        version: 1,
+        version: 2,
       }),
     );
   });
 
   it('should publish a local call relay record when relay settings become publishable', async () => {
-    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+    const runtime = new CallRelayRuntime(
+      networkRegistry,
+      discovery,
+      signer,
+      mock<FederatedCallRelayCredentials>(),
+    );
 
     networkRegistry.getAll.mockReturnValue([publicNetwork]);
     networkRegistry.getRelaySettings.mockReturnValue(
@@ -202,7 +229,10 @@ describe('CallRelayRuntime', () => {
 
     await runtime.run();
 
-    expect(discovery.startConnection).toHaveBeenCalledWith(publicNetwork);
+    expect(discovery.startConnection).toHaveBeenCalledWith(
+      publicNetwork,
+      false,
+    );
     expect(signer.sign).not.toHaveBeenCalled();
 
     networkRegistry.getRelaySettings.mockReturnValue(completeRelaySettings());
@@ -240,7 +270,12 @@ describe('CallRelayRuntime', () => {
     networkRegistry.getRelaySettings.mockReturnValue(
       normalizeRelayRuntimeSettings({}),
     );
-    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+    const runtime = new CallRelayRuntime(
+      networkRegistry,
+      discovery,
+      signer,
+      mock<FederatedCallRelayCredentials>(),
+    );
 
     await runtime.run();
 
@@ -254,7 +289,12 @@ describe('CallRelayRuntime', () => {
   });
 
   it('should keep publishing private network call relay records after relay settings change', async () => {
-    const runtime = new CallRelayRuntime(networkRegistry, discovery, signer);
+    const runtime = new CallRelayRuntime(
+      networkRegistry,
+      discovery,
+      signer,
+      mock<FederatedCallRelayCredentials>(),
+    );
 
     networkRegistry.getAll.mockReturnValue([privateNetwork]);
 
@@ -285,7 +325,7 @@ describe('CallRelayRuntime', () => {
           'turn:relay.example.test:4200?transport=udp',
           'turn:relay.example.test:4200?transport=tcp',
         ],
-        version: 1,
+        version: 2,
       }),
       expect.anything(),
       'turn-shared-secret',

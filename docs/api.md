@@ -433,8 +433,8 @@ Response:
 The `diagnostics` block describes configuration, not live connectivity:
 
 - `turnSharedSecretConfigured` is false when the secret is missing or equals
-  the rejected public fallback. Shared-secret credentials are then omitted.
-  Explicit local static credentials can still be returned.
+  the rejected public fallback. Locally issued shared-secret credentials are then omitted.
+  Explicit local static credentials and credentials obtained from a private-network relay can still be returned.
 - `turnSource` reports whether the TURN URLs come from this node's local
   configuration, from a signed record of a connected relay, or from neither,
   even when no credentials are available.
@@ -448,19 +448,21 @@ Implemented:
 - read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
 - derive local TURN server URLs from node `relayConfiguration.publicHost` plus
   `relayConfiguration.callsRelay.port` when `CALLS_TURN_URLS` is not enough
-- generate temporary coturn REST credentials per authenticated identity using
+- generate local/v1 temporary coturn REST credentials per authenticated identity using
   a configured private `CALLS_TURN_SHARED_SECRET`:
   `username=<expiresAtUnix>:<identityId>` and
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
-- publish signed call relay records through the public IPFS pubsub network when
-  at least one local TURN URL and a private shared secret are configured
+- publish signed v1 records on public IPFS networks and v2 records on shared
+  private networks when at least one local TURN URL and a private local secret are configured
 - use the node's locally configured TURN URLs when it exposes a calls relay
 - otherwise include TURN URLs only from signed call relay records whose
   `peerId` matches a currently connected circuit relay; records from unrelated
   or disconnected relays are ignored
-- require all nodes sharing a calls relay to use the same effective TURN secret;
-  nodes without a private value cannot issue temporary credentials or publish records
-- use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
+- for v1 shared pools, require issuers and selected coturn servers to use the same private secret
+- for v2 private-network relays, request credentials from the connected relay owner over an encrypted authenticated libp2p stream; independent deployments keep different master secrets
+- reuse v2 credentials for up to ten minutes, refreshing thirty seconds before expiry and checking relay eligibility on every lookup; usernames contain a stable per-peer opaque subject rather than an application identity
+- limit v2 issuance to ten requests per peer and one hundred globally per minute; credentials never enter pubsub or replicated storage
+- use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control locally issued v1 credential
   lifetime; it must be a positive whole number of seconds whose resulting Unix
   expiry is a safe integer, otherwise it defaults to `3600`
 - keep `CALLS_TURN_USERNAME` and `CALLS_TURN_CREDENTIAL` only as a local/dev
@@ -474,11 +476,16 @@ Implemented:
 
 #### Credential renewal and configuration changes
 
-Each authenticated request reads the current relay settings and issues a new
-expiry measured from that request. The Unix timestamp before the first `:` in a
-temporary username is its expiry in seconds. Requests made within the same
-second may return identical credentials. Static credentials have no expiry
-encoded by this endpoint.
+Each authenticated request reads the current relay settings. Locally issued v1
+credentials get a new expiry measured from that request; requests within the
+same second may return identical credentials. For v2, a connected private-network
+relay owner issues ten-minute credentials with an opaque peer subject. Eligible
+cached credentials are reused until thirty seconds before expiry or a newer
+signed advertisement invalidates them; each lookup does not extend their lifetime.
+The Unix timestamp before the first `:` is the expiry in seconds. Static
+credentials have no expiry encoded by this endpoint. Independent v2 relay owners
+keep their own master secrets; clients obtain temporary credentials over encrypted
+authenticated streams rather than sharing those secrets.
 
 Clients must request configuration again before an ICE restart and apply the
 returned servers before creating the restart offer. Do not cache temporary
@@ -488,12 +495,15 @@ the server list does not migrate an established media path by itself.
 
 Independent TURN deployments use their own secrets and locally configured URLs.
 Every URL in one returned server entry must accept the same credentials. Nodes
-issuing credentials for a shared pool must use the secret configured on every
-server in that pool; discovery accepts only records proving that pool membership.
+issuing local credentials for a legacy v1 pool must use the secret configured on
+every server in that pool; v1 records must prove that pool membership. V2 owners
+issue their own credentials over a private encrypted stream and do not share
+master secrets between deployments.
 Static credentials are never applied to a discovered remote server.
 
-Rotate a pool secret by updating all issuers and coturn servers and restarting
-them together. Environment-based secret rotation is not a hot-reload contract;
+Rotate a legacy v1 pool secret by updating its issuers and coturn servers and
+restarting them together. For v2, coordinate only the owner backend and its own
+coturn; newer owner advertisements invalidate requesting nodes' cached credentials. Environment-based secret rotation is not a hot-reload contract;
 restart also discards the in-memory discovery cache. Existing clients fetch new
 credentials during recovery. This procedure can interrupt calls: the endpoint
 does not provide overlapping old/new secrets or seamless migration.

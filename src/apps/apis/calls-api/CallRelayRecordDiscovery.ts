@@ -41,6 +41,7 @@ export default class CallRelayRecordDiscovery {
     return (
       Array.isArray(record.urls) &&
       record.urls.length > 0 &&
+      record.urls.length <= 8 &&
       record.urls.every(
         (url) =>
           typeof url === 'string' &&
@@ -55,7 +56,7 @@ export default class CallRelayRecordDiscovery {
     }
 
     return (
-      value.version === 1 &&
+      (value.version === 1 || value.version === 2) &&
       value.role === 'call-relay' &&
       this.hasRecordStrings(value) &&
       this.hasRecordTimestamps(value) &&
@@ -68,7 +69,7 @@ export default class CallRelayRecordDiscovery {
   ): Promise<void> {
     const sharedSecret = this.configuration.getTurnSharedSecret();
 
-    if (!sharedSecret) {
+    if (record.version === 1 && !sharedSecret) {
       return;
     }
 
@@ -79,10 +80,17 @@ export default class CallRelayRecordDiscovery {
     this.registry.save(record);
   }
 
-  private async handlePayload(payload: string): Promise<void> {
+  private async handlePayload(
+    payload: string,
+    privateNetwork: boolean,
+  ): Promise<void> {
+    if (Buffer.byteLength(payload) > 8192) return;
     const parsedPayload = JSON.parse(payload);
 
-    if (!this.isRecord(parsedPayload)) {
+    if (
+      !this.isRecord(parsedPayload) ||
+      (parsedPayload.version === 2 && !privateNetwork)
+    ) {
       return;
     }
 
@@ -91,6 +99,7 @@ export default class CallRelayRecordDiscovery {
 
   public async startConnection(
     connection: PublicRelayPubSubConnection,
+    privateNetwork = false,
   ): Promise<void> {
     const connectionKey = connection as unknown as object;
 
@@ -102,10 +111,8 @@ export default class CallRelayRecordDiscovery {
     await connection.subscribePubSub(
       CallRelayRecordDiscovery.topic,
       async (payload) => {
-        await this.handlePayload(payload).catch((error: unknown) => {
-          Kernel.logger.debug(
-            `Call relay record discovery failed: ${String(error)}`,
-          );
+        await this.handlePayload(payload, privateNetwork).catch(() => {
+          Kernel.logger.debug('Call relay record discovery failed');
         });
       },
     );

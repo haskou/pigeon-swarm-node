@@ -25,3 +25,16 @@ describe('CallRelayConfiguration record lifetime', () => {
     expect(configuration.getPublicationIntervalMs()).toBe(30_000);
   });
 });
+
+describe('advertised TURN URL limits', () => {
+  it('limits the publication and owner credential list to eight distinct URLs', () => {
+    const urls = Array.from(
+      { length: 10 },
+      (_, i) => `turn:relay-${i}.example.test:3478`,
+    );
+    const config = CallRelayConfiguration.fromEnvironment({
+      CALLS_TURN_URLS: [urls[0], ...urls].join(','),
+    });
+    expect(config.getAdvertisedTurnUrls()).toEqual(urls.slice(0, 8));
+  });
+});

@@ -76,7 +76,7 @@ paths:
       tags:
         - calls
       summary: Get ICE servers for WebRTC calls
-      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the target coturn server. Missing or former public secrets disable temporary credential issuance and relay publication. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Each request issues a fresh lifetime; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. Shared pools require the same secret on every selected server. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
+      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Local temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the local coturn server. Private-network v2 relays issue their own credentials over an authenticated encrypted stream, so different deployments keep independent secrets. Missing or former public local secrets disable local credential issuance and relay publication, but do not prevent fetching credentials from eligible v2 owners. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Local requests issue a fresh lifetime; remote v2 credentials are reused until thirty seconds before their ten-minute expiry while connection eligibility is rechecked; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. Legacy v1 shared pools require the same secret on every selected server. V2 issuance is limited per peer and globally and credentials are never published through gossip. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
       responses:
         '200':
           description: ICE server configuration for the authenticated client.
@@ -343,7 +343,7 @@ components:
         - turnSharedSecretConfigured
         - turnSource
         - nonPublicTurnUrls
-      description: Configuration diagnostics only; no active reachability or credential check is performed. turnSharedSecretConfigured indicates whether a private shared secret is set. turnSource describes candidate URLs even when credentials are unavailable. nonPublicTurnUrls flags common private IP and local hostname forms; these may be reachable over LAN or VPN.
+      description: Configuration diagnostics only; no active reachability or credential check is performed. turnSharedSecretConfigured indicates whether a local private shared secret is set; remote v2 credentials may be available even when false. turnSource describes candidate URLs even when credentials are unavailable. nonPublicTurnUrls flags common private IP and local hostname forms; these may be reachable over LAN or VPN.
       properties:
         turnSharedSecretConfigured:
           type: boolean
@@ -368,10 +368,10 @@ components:
             type: string
         username:
           type: string
-          description: Temporary coturn REST username in Unix-expiry-seconds:identityId form, or an explicitly configured local static value. Temporary lifetime defaults to 3600 seconds; invalid or fractional TTL values fall back to that default. Expiry governs new authentication, not immediate termination of existing allocations.
+          description: Locally issued v1 usernames use Unix-expiry-seconds:identityId; their lifetime defaults to 3600 seconds and invalid or fractional TTL values fall back to that default. Private-network v2 relay owners issue Unix-expiry-seconds:opaque-peer-subject usernames with a fixed ten-minute lifetime. Eligible v2 credentials are cached until thirty seconds before expiry or a newer signed advertisement; each request does not renew them. Static local values are also supported. Expiry governs new authentication, not immediate termination of existing allocations.
         credential:
           type: string
-          description: Temporary coturn REST HMAC credential generated with the private shared secret, or an explicitly configured local static value.
+          description: Temporary coturn REST HMAC credential generated locally for v1 or by the connected private-network relay owner for v2, or an explicitly configured local static value. Independent v2 owners keep separate master secrets and deliver temporary credentials over encrypted authenticated streams.
     CallScope:
       type: object
       required:

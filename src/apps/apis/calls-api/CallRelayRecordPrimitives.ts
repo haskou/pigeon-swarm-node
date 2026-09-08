@@ -7,5 +7,5 @@ export type CallRelayRecordPrimitives = {
   role: 'call-relay';
   signature: string;
   urls: string[];
-  version: 1;
+  version: 1 | 2;
 };

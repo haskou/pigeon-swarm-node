@@ -44,25 +44,18 @@ retained by the public relay.
 
 ## Call relay records
 
-`pigeon-swarm.call-relays.v1` carries signed TURN advertisements. These are public
-metadata: peer identity, public key, TURN URLs, issuance and expiry times are
-visible. They contain neither the TURN shared secret nor client credentials.
-The peer signature authenticates the payload and a separate HMAC proves membership
-in the configured TURN pool. This does not hide network topology from observers.
+`pigeon-swarm.call-relays.v1` carries versioned signed TURN advertisements:
 
-Receivers reject invalid signatures, mismatched pool proofs, empty/non-TURN URL
-lists and expired records. `issuedAt` and `expiresAt` are safe integer Unix
-milliseconds, with `0 <= issuedAt < expiresAt`. For one peer, only a strictly
-newer issuance replaces the stored record; shortening the lifetime must not
-prevent a URL update. Equal or older records are ignored. The in-memory registry
-filters expired records and the ICE endpoint selects only currently connected
-relay peers. The pool remains a trust boundary: a member holding the shared
-secret can advertise its own URLs, and timestamps are not a consensus protocol.
+- Version 1 retains the peer signature and pool HMAC. It can be published on the public network; peer identity, public key, TURN URLs and issuance/expiry timestamps are public metadata. Issuers in a v1 pool require the same private TURN secret.
+- Version 2 is published and accepted only within private networks. It uses the peer signature with `poolSignature: ""` and no shared pool HMAC. The private network still reveals relay topology to its members. Public-network v2 records are ignored. Older backends reject v2 records and cannot use this path until upgraded.
 
-Publishers normalize `CALLS_TURN_RECORD_TTL_MS` before signing: it must be a
-positive whole number of milliseconds producing a safe integer expiry at the
-record's issuance time. Invalid values use the ten-minute default, with a
-five-minute publication interval unless explicitly configured otherwise.
+Publishers advertise at most the first eight distinct configured TURN URLs; the same bounded list is used by the v2 issuer. Neither version includes master secrets or client credentials. Receivers reject invalid signatures, empty/non-TURN URL lists, more than eight URLs, records larger than 8192 bytes and expired records. `issuedAt` and `expiresAt` are safe integer Unix milliseconds with `0 <= issuedAt < expiresAt`. Only a strictly newer issuance replaces the stored record for a peer, including when its expiry is earlier. The ICE endpoint selects currently connected circuit relays; v2 URLs are never passed to the legacy local-secret issuer.
+
+Publishers normalize `CALLS_TURN_RECORD_TTL_MS` before signing: it must be a positive whole number producing a safe integer expiry. Invalid values use ten minutes, with a five-minute publication interval unless configured otherwise.
+
+V2 credential exchange uses `/pigeon-swarm/turn-credentials/2.0.0` on an existing encrypted libp2p connection in a shared private network. Opening the stream requests credentials without a body. The owner verifies that the connection is encrypted and open, the private network is still registered and local TURN issuance is configured. Private-network access authorizes issuance; no per-conversation membership proof is claimed.
+
+The response starts with a four-byte unsigned big-endian body length, followed by a UTF-8 JSON body. The reader completes as soon as the declared body arrives, without relying on stream closure; zero, oversized and incomplete frames are rejected. The JSON body contains exactly `urls`, `username` and `credential`. The username is `<expiryUnix>:<opaquePeerSubject>`, with a ten-minute lifetime; the password uses the owner's coturn secret. JSON bodies are bounded to 8192 bytes (8196 including the length prefix), eight previously advertised URLs and a five-second exchange. No exchange payload is published through gossip, replicated or logged. Clients choose at most three relays and cache until thirty seconds before expiry while checking current eligibility and advertisement issuance; newer owner records invalidate cached credentials. Owners enforce ten requests per peer and one hundred globally per minute. See [independent TURN deployments](federated-turn.md) for privacy limits, rotation and executable validation.
 
 ## Identity presence leases
 
