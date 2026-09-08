@@ -188,13 +188,18 @@ export default class OrbitDBCallProjection {
       this.index(merged);
     }
 
-    if (!persistRepair) return;
+    if (persistRepair) this.scheduleRepair(merged, incoming);
+  }
 
+  private scheduleRepair(
+    merged: OrbitDBCallDocument,
+    incoming: OrbitDBCallDocument,
+  ): void {
     if (!this.ready || this.historyReplayDepth > 0) {
       if (isDeepStrictEqual(merged, incoming)) {
-        this.bootstrapRepairs.delete(document.id);
+        this.bootstrapRepairs.delete(incoming.id);
       } else {
-        this.bootstrapRepairs.set(document.id, merged);
+        this.bootstrapRepairs.set(incoming.id, merged);
       }
     } else if (!isDeepStrictEqual(merged, incoming)) {
       this.replicator.replicate(merged);
