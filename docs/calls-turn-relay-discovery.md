@@ -9,7 +9,8 @@ contract.
 
 Calls use WebRTC ICE. The backend does not embed a TURN server and does not
 relay media itself. A node that can expose coturn advertises the reachable TURN
-URLs to other backend nodes through the public IPFS pubsub network. Other nodes
+URLs through IPFS pubsub: legacy v1 records on public networks and v2 records
+on shared private networks. Other nodes
 validate and cache those records. `GET /calls/ice-servers` uses a discovered
 record only while its publishing peer is also the currently connected circuit
 relay.
@@ -35,7 +36,7 @@ flowchart LR
 
     BackendA <-->|"direct private-network connection"| BackendB
 
-    BackendA <--> PublicIPFS["Public IPFS network"]
+    BackendA <--> PublicIPFS["IPFS network<br/>v1 public / v2 private"]
     BackendB <--> PublicIPFS
 
     PublicIPFS --> Topic["Pubsub topic<br/>pigeon-swarm.call-relays.v1"]
@@ -48,7 +49,7 @@ flowchart LR
     CoturnA <-. relayed media .-> CoturnB
 ```
 
-The public IPFS network is only used for relay discovery. WebRTC media flows
+This pubsub topic carries relay discovery records only. WebRTC media flows
 through the TURN service selected by ICE, not through IPFS pubsub.
 
 ## Multiple Relay Nodes
@@ -130,7 +131,9 @@ corresponding issues can be closed.
 | `CallRelayRecordSigner` | Signs and verifies call relay records with the shared libp2p peer key. |
 | `CallRelayRecordDiscovery` | Subscribes to the call relay pubsub topic and publishes records. |
 | `CallRelayRecordRegistry` | Keeps active discovered relay records in local memory. |
-| `CallIceServerConfig` | Builds the HTTP ICE server response from the local relay or the connected relay's TURN URLs. |
+| `CallIceServerConfig` | Builds the local or legacy v1 HTTP ICE configuration. |
+| `FederatedCallRelayCredentials` | Selects connected private v2 relays and fetches, validates and caches owner-issued credentials. |
+| `CallRelayCredentialIssuer` | Issues ten-minute v2 credentials using the owner secret and enforces request quotas. |
 | `GET /calls/ice-servers` | Authenticated frontend contract for WebRTC ICE configuration. |
 
 ## Discovery Flow
@@ -180,7 +183,8 @@ Records are JSON payloads published on:
 pigeon-swarm.call-relays.v1
 ```
 
-Shape:
+The topic name is retained for compatibility; `version` selects the record contract.
+Legacy v1 shape:
 
 ```json
 {
@@ -199,6 +203,9 @@ Shape:
 }
 ```
 
+V2 uses the same fields with `"version": 2` and `"poolSignature": ""`. It is
+published and accepted only on private networks. No pool-wide secret is needed.
+
 The canonical signed payload contains:
 
 - `version`
@@ -209,7 +216,7 @@ The canonical signed payload contains:
 - `issuedAt`
 - `expiresAt`
 
-`poolSignature` is `base64url(hmac-sha256(canonicalPayload,
+For v1, `poolSignature` is `base64url(hmac-sha256(canonicalPayload,
 CALLS_TURN_SHARED_SECRET))`. It proves that the publishing node knows the TURN
 pool secret before its URLs are returned with local coturn credentials.
 
@@ -221,19 +228,22 @@ final connectivity check.
 
 A node accepts a discovered record only when all these checks pass:
 
-- `version` is `1`.
+- `version` is `1` or `2`; v2 is accepted only from a private-network subscription.
 - `role` is `call-relay`.
 - `peerId`, `publicKey`, `poolSignature` and `signature` are strings.
-- `issuedAt` and `expiresAt` are numbers.
-- `urls` is non-empty.
+- `issuedAt` and `expiresAt` are safe integer Unix milliseconds, with `0 <= issuedAt < expiresAt`.
+- The encoded record is at most 8192 bytes, and `urls` contains one to eight entries.
 - every URL starts with `turn:` or `turns:`.
 - `expiresAt` is in the future.
-- `poolSignature` matches the local `CALLS_TURN_SHARED_SECRET`.
+- For v1, `poolSignature` matches the local private `CALLS_TURN_SHARED_SECRET`.
+- For v2, `poolSignature` is empty; peer-signature verification remains mandatory.
 - `publicKey` maps back to `peerId`.
 - `signature` verifies against the canonical payload.
 
 Invalid records are ignored. Expired records remain harmless because reads from
-the registry filter them out.
+the registry filter them out. Only a strictly newer `issuedAt` replaces the
+stored record for a peer. The publisher caps its advertised URLs at the first
+eight distinct configured values.
 
 ```mermaid
 flowchart TD
@@ -243,9 +253,13 @@ flowchart TD
     Urls -- no --> Ignore2["Ignore"]
     Urls -- yes --> Expiry{"Not expired?"}
     Expiry -- no --> Ignore3["Ignore"]
-    Expiry -- yes --> Pool{"Pool signature valid?"}
+    Expiry -- yes --> Version{"Record version?"}
+    Version -- v1 --> Pool{"Private pool HMAC valid?"}
+    Version -- v2 --> Private{"Private network and empty poolSignature?"}
     Pool -- no --> Ignore4["Ignore"]
+    Private -- no --> Ignore4
     Pool -- yes --> Signature{"Signature valid for peerId?"}
+    Private -- yes --> Signature
     Signature -- no --> Ignore5["Ignore"]
     Signature -- yes --> Cache["Save active record"]
 ```
@@ -260,12 +274,14 @@ GET /calls/ice-servers
 
 The request must be signed like the rest of authenticated API calls. A relay
 node returns its locally configured TURN URLs. A leaf node without local TURN
-configuration returns URLs from signed records whose `peerId` matches a live
-circuit relay connection. Records from disconnected or unrelated relay peers
+configuration selects signed records whose `peerId` matches a live circuit
+relay connection. V1 uses matching local pool credentials. V2 requests credentials
+from that owner over an existing encrypted connection in a shared private
+network and never mints them with the requesting node's own secret. Records from disconnected or unrelated relay peers
 are not exposed. If neither source is available, the endpoint returns no TURN
 server and preserves the existing direct-ICE fallback behavior.
 
-Example response:
+Example local/v1 response:
 
 ```json
 {
@@ -280,18 +296,36 @@ Example response:
 }
 ```
 
-Credential generation uses the coturn REST API pattern:
+Local/v1 credential generation uses the coturn REST API pattern:
 
 ```text
 username=<expiresAtUnix>:<identityId>
 credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))
 ```
 
-When `CALLS_TURN_SHARED_SECRET` is missing, blank or equals the former public
-fallback, the backend omits shared-secret TURN credentials and does not publish
-local relay records. A warning explains the configuration error. Explicit static
-credentials remain supported for local TURN URLs only. Configure the same private
-secret on every issuer and the coturn servers whose URLs it returns.
+For v2, the username is `<expiresAtUnix>:<opaquePeerSubject>`. The subject is
+32 hexadecimal characters derived with the owner's secret and requesting peer;
+it contains no application identity or call ID. The owner signs the username
+with its own coturn secret and fixes the lifetime at ten minutes. A requester
+without local TURN credentials can use this path. It caches eligible credentials
+until thirty seconds before expiry and invalidates them on a newer advertisement.
+The local `CALLS_TURN_CREDENTIAL_TTL_SECONDS` setting does not affect v2.
+
+V2 requests use `/pigeon-swarm/turn-credentials/2.0.0` on an existing encrypted
+private-network connection. Opening the stream is the request. The response is
+a four-byte unsigned big-endian length followed by a UTF-8 JSON body containing
+exactly `urls`, `username` and `credential`. The body is limited to 8192 bytes and
+eight advertised URLs, with a five-second deadline. The reader completes at the
+declared length without waiting for EOF. Owners allow ten requests per peer and
+one hundred globally per minute. See [the v2 protocol guide](federated-turn.md)
+for admission, renewal and rotation details.
+
+When the local `CALLS_TURN_SHARED_SECRET` is missing, blank or equals the former
+public fallback, local issuance and relay publication are disabled with a warning.
+Explicit static credentials remain supported for local URLs only. This does not
+disable fetching credentials from eligible private v2 owners. Only local/v1
+issuers and the coturn servers they advertise must share a secret. Independent v2
+deployments keep separate secrets; each owner's backend and coturn agree on theirs.
 
 Frontend should treat this response as opaque WebRTC configuration:
 
@@ -303,7 +337,8 @@ new RTCPeerConnection({
 ```
 
 Do not cache this response for long periods. Temporary TURN credentials expire.
-The expected client behavior is to request ICE servers when starting a new call.
+Clients request ICE servers when starting a new call and again before ICE
+restart, then apply the refreshed configuration before creating the restart offer.
 
 ## Port Model
 
@@ -326,7 +361,7 @@ flowchart LR
     subgraph Backend["Backend process"]
         IPFSRelay["Private IPFS relay<br/>TCP 4100-4199"]
         RuntimeConfig["Persisted TURN runtime contract"]
-        Discovery["TURN discovery publisher<br/>public IPFS pubsub"]
+        Discovery["TURN discovery publisher<br/>v1 public / v2 private pubsub"]
     end
 
     subgraph Coturn["coturn process"]
@@ -349,13 +384,13 @@ UDP.
 
 | Variable | Purpose |
 | --- | --- |
-| `CALLS_TURN_SHARED_SECRET` | Shared coturn REST secret. Required for temporary credential issuance and relay publication. Missing or former public values disable both and log a warning. |
+| `CALLS_TURN_SHARED_SECRET` | Local coturn REST secret. Required for local issuance and publication; missing or former public values disable those operations with a warning. Not required to fetch credentials from another v2 owner. |
 | `CALLS_TURN_URLS` | Explicit local TURN URLs to advertise and return. Comma-separated. |
 | `CALLS_TURN_TRANSPORTS` | Transports used when deriving URLs. Defaults to `udp,tcp`. |
 | `CALLS_TURN_RECORD_TTL_MS` | Signed record lifetime. Defaults to 10 minutes. |
 | `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL. |
 | `CALLS_TURN_DISCOVERY_ENABLED` | Set to `false` to disable pubsub discovery. |
-| `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | Temporary credential lifetime for `/calls/ice-servers`. Defaults to 3600 seconds. |
+| `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | Local/v1 credential lifetime, default 3600 seconds. V2 owner credentials always last ten minutes. |
 | `CALLS_ICE_TRANSPORT_POLICY` | Defaults to `all`, allowing direct ICE candidates when an advertised TURN service is unreachable. Configure `relay` explicitly only after verifying coturn reachability from every supported client network. |
 
 When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
@@ -387,7 +422,7 @@ stateDiagram-v2
     [*] --> Publisher: local TURN URL
 
     ListenerOnly --> CacheRecords: valid remote record received
-    Publisher --> PublishRecord: public IPFS network registered
+    Publisher --> PublishRecord: eligible IPFS network registered
     PublishRecord --> Republish: interval tick
     Republish --> PublishRecord
     CacheRecords --> ServeIceServers: frontend requests ICE servers
@@ -402,20 +437,22 @@ records.
 
 | Failure | Result |
 | --- | --- |
-| Public IPFS pubsub unavailable | Nodes can still return their local configured TURN URLs. Remote relay discovery is delayed. |
-| Record pool signature or peer signature invalid | Record is ignored. |
+| Discovery pubsub unavailable | Local configured TURN remains available. Remote discovery is delayed on the affected public v1 or private v2 network. |
+| Required version proof or peer signature invalid | Record is ignored: v1 needs a matching pool HMAC; v2 needs private-network reception and an empty pool signature. |
 | Record expired | Record is filtered out and not returned to frontend. |
 | coturn process down but record still active | Frontend receives the URL. With the default `all` policy, WebRTC rejects the failed TURN candidate and can still select a direct candidate; an explicit `relay` policy makes the call fail. |
-| Different `CALLS_TURN_SHARED_SECRET` values across nodes | Credentials generated by one backend may not work against another node's coturn service. Use one shared secret for the relay pool. |
-| Shared secret is missing or public fallback is configured | Shared-secret TURN credentials and local record publication are disabled. Configure a private pool secret. |
+| Different secrets in a legacy v1 pool | Records fail pool verification or credentials fail coturn authentication. V1 issuers and selected servers must agree. Independent v2 owners intentionally use different secrets. |
+| V2 credential stream fails or owner is no longer eligible | That owner is omitted from the response; stale cached credentials are not returned for an ineligible peer. |
+| Local secret is missing or uses the public fallback | Local issuance and publication are disabled. Fetching from eligible v2 owners remains possible. Configure a private local secret to advertise a local coturn. |
 | Frontend caches ICE servers too long | TURN credentials can expire before or during call setup. Request fresh ICE servers for each new call. |
 
 ## Security Notes
 
-- Relay records are signed, but they are public on the public IPFS pubsub
-  network. Do not put secrets in records.
-- TURN credentials are not published through pubsub. They are generated only for
-  authenticated HTTP clients.
+- V1 records on public pubsub are public. V2 records are visible to members of
+  the shared private network. Neither includes secrets or temporary credentials.
+- TURN credentials never enter pubsub or replicated storage. Local/v1 issuance
+  serves authenticated HTTP clients. V2 owners authorize issuance by private
+  network membership and an encrypted peer connection, not per-conversation ACLs.
 - Explicit `iceTransportPolicy=relay` avoids direct peer IP candidates, but
   should only be enabled after coturn reachability has been verified.
 - The shared coturn REST secret must be treated as infrastructure secret
@@ -424,5 +461,7 @@ records.
   using it; changing only the backend cannot revoke credentials on that server.
 - ICE diagnostics describe configuration only. Non-public addresses can work on
   LAN or VPN; public URLs do not prove reachability or credential acceptance.
-- This change does not hide identity-bearing TURN usernames, public relay records,
-  IPFS history or communication metadata. Those need separate privacy work.
+- V2 usernames replace application identities with an opaque peer subject. V1
+  local usernames still contain identity IDs. Owners observe requesting peers
+  and connection IPs; this does not hide IPFS history or traffic relationships
+  and does not claim anonymity.

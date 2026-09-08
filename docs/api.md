@@ -448,12 +448,12 @@ Implemented:
 - read TURN servers from `CALLS_TURN_URLS`, as a comma-separated list
 - derive local TURN server URLs from node `relayConfiguration.publicHost` plus
   `relayConfiguration.callsRelay.port` when `CALLS_TURN_URLS` is not enough
-- generate temporary coturn REST credentials per authenticated identity using
+- generate local/v1 temporary coturn REST credentials per authenticated identity using
   a configured private `CALLS_TURN_SHARED_SECRET`:
   `username=<expiresAtUnix>:<identityId>` and
   `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
-- publish signed call relay records through the public IPFS pubsub network when
-  at least one local TURN URL and a private shared secret are configured
+- publish signed v1 records on public IPFS networks and v2 records on shared
+  private networks when at least one local TURN URL and a private local secret are configured
 - use the node's locally configured TURN URLs when it exposes a calls relay
 - otherwise include TURN URLs only from signed call relay records whose
   `peerId` matches a currently connected circuit relay; records from unrelated
@@ -495,12 +495,15 @@ the server list does not migrate an established media path by itself.
 
 Independent TURN deployments use their own secrets and locally configured URLs.
 Every URL in one returned server entry must accept the same credentials. Nodes
-issuing credentials for a shared pool must use the secret configured on every
-server in that pool; discovery accepts only records proving that pool membership.
+issuing local credentials for a legacy v1 pool must use the secret configured on
+every server in that pool; v1 records must prove that pool membership. V2 owners
+issue their own credentials over a private encrypted stream and do not share
+master secrets between deployments.
 Static credentials are never applied to a discovered remote server.
 
-Rotate a pool secret by updating all issuers and coturn servers and restarting
-them together. Environment-based secret rotation is not a hot-reload contract;
+Rotate a legacy v1 pool secret by updating its issuers and coturn servers and
+restarting them together. For v2, coordinate only the owner backend and its own
+coturn; newer owner advertisements invalidate requesting nodes' cached credentials. Environment-based secret rotation is not a hot-reload contract;
 restart also discards the in-memory discovery cache. Existing clients fetch new
 credentials during recovery. This procedure can interrupt calls: the endpoint
 does not provide overlapping old/new secrets or seamless migration.
