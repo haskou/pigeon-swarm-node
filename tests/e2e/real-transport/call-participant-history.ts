@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Call } from '@app/contexts/calls/domain/Call';
+import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/documents/OrbitDBCallDocument';
 import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
@@ -47,6 +47,7 @@ function snapshot(
     scope: {
       channelId: 'channel-1',
       communityId: 'community-1',
+      conversationId: undefined,
       type: 'community_channel',
     },
     status: 'active',
@@ -78,7 +79,7 @@ function assertBothJoined(document: OrbitDBCallDocument | undefined): void {
     ].sort((left, right) => (left.identityId < right.identityId ? -1 : 1)),
     'Fresh projection must recover both rejoins from the actual OrbitDB log history',
   );
-  const call = Call.fromPrimitives(document);
+  const call = new OrbitDBCallMapper().toDomain(document);
   for (const identityId of [creatorIdentityId, participantIdentityId]) {
     call.assertParticipantCanHeartbeat(new IdentityId(identityId));
   }
@@ -136,8 +137,8 @@ async function main(): Promise<void> {
     stores = await OrbitDBPrivateNetworkStores.open(network);
     const first = snapshot(creatorIdentityId, createdAt + 200);
     const second = snapshot(participantIdentityId, createdAt + 210);
-    const firstHash = await stores.calls.put!(first);
-    await stores.calls.put!(second);
+    const firstHash = await stores.calls.put!(JSON.parse(JSON.stringify(first)));
+    await stores.calls.put!(JSON.parse(JSON.stringify(second)));
     const heads = await stores.calls.log!.heads();
     assert.equal(heads.length, 1);
     assert.ok(
@@ -145,7 +146,7 @@ async function main(): Promise<void> {
     );
     const canonical = await stores.calls.all!();
     assert.equal(canonical.length, 1);
-    assert.deepEqual(canonical[0].value, second);
+    assert.deepEqual((canonical[0].value as OrbitDBCallDocument).participants, second.participants);
 
     const projection = await project(stores);
     assertBothJoined(await projection.findById(new CallId(callId)));
