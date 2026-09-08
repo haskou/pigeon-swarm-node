@@ -3,6 +3,7 @@ import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/documents/OrbitDBCallDocument';
 import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
 import OrbitDBCallDocumentReplicator from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator';
+import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
 import OrbitDBCallProjection from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection';
 import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
@@ -11,9 +12,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
-type UpdateHandler = (entry: {
-  payload?: { value?: unknown };
-}) => void;
+type UpdateHandler = (entry: { payload?: { value?: unknown } }) => void;
 
 function createStore(initialDocuments: Record<string, unknown>[] = []) {
   const entries = new Map(
@@ -122,7 +121,11 @@ describe('OrbitDBCallRepository', () => {
     heads = createStore();
     registry = new OrbitDBReplicatedStateRegistry();
     await registry.register(networkId, { calls, heads } as never);
-    projection = new OrbitDBCallProjection(registry);
+    projection = new OrbitDBCallProjection(
+      registry,
+      new OrbitDBCallDocumentMerger(),
+      new OrbitDBCallDocumentReplicator(registry),
+    );
     repository = new OrbitDBCallRepository(
       new OrbitDBCallMapper(),
       new OrbitDBCallDocumentReplicator(registry),
@@ -139,17 +142,67 @@ describe('OrbitDBCallRepository', () => {
     registry.clear();
   });
 
+  it.each([true, false])('does not expose historical active calls while a running projection replays (success=%s)', async (success) => {
+    const subscribe = jest.spyOn(registry, 'onDocumentUpdated');
+    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry));
+
+    await laterProjection.start();
+    const observer = subscribe.mock.calls[0][2]!.historyObserver!;
+    const scope = {};
+    observer.started(scope);
+    await subscribe.mock.calls[0][1](document(), scope);
+    await flushBackgroundTasks();
+
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toEqual([]);
+    await expect(laterProjection.findTimedOutRingingCalls(new Timestamp(1_780_000_010_000))).resolves.toEqual([]);
+    await subscribe.mock.calls[0][1](document('ended', 1_780_000_005_000), scope);
+    await flushBackgroundTasks();
+    observer.finished(scope, success);
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toEqual([]);
+    if (!success) await expect(laterProjection.findById(new CallId(callId))).resolves.toBeUndefined();
+  });
+
+  it('keeps a successful replay when an overlapping replay fails', async () => {
+    const subscribe = jest.spyOn(registry, 'onDocumentUpdated');
+    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry));
+
+    await laterProjection.start();
+    const observer = subscribe.mock.calls[0][2]!.historyObserver!;
+    const listener = subscribe.mock.calls[0][1];
+    const first = {};
+    const second = {};
+    const secondDocument = { ...document(), id: '550e8400-e29b-41d4-a716-446655440099' };
+    observer.started(first);
+    observer.started(second);
+    await listener(document(), first);
+    await listener(secondDocument, second);
+    observer.finished(first, true);
+    observer.finished(second, false);
+
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toHaveLength(1);
+    observer.started(second);
+    await listener(secondDocument, second);
+    observer.finished(second, true);
+    await expect(laterProjection.findActiveByCommunity(communityId)).resolves.toHaveLength(2);
+  });
+
   it('writes one canonical OrbitDB document without replicated call heads', async () => {
     await repository.save(communityCall());
     await flushBackgroundTasks();
 
     expect(calls.put).toHaveBeenCalledTimes(1);
     expect(heads.put).not.toHaveBeenCalled();
-    await expect(repository.findById(new CallId(callId))).resolves.toBeDefined();
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeDefined();
   });
 
   it('rejects reads until canonical documents have been projected', async () => {
-    const unstartedProjection = new OrbitDBCallProjection(registry);
+    const unstartedProjection = new OrbitDBCallProjection(
+      registry,
+      new OrbitDBCallDocumentMerger(),
+      new OrbitDBCallDocumentReplicator(registry),
+    );
     const unstartedRepository = new OrbitDBCallRepository(
       new OrbitDBCallMapper(),
       new OrbitDBCallDocumentReplicator(registry),
@@ -185,9 +238,7 @@ describe('OrbitDBCallRepository', () => {
       repository.findByParticipant(new IdentityId(participantIdentityId)),
     ).resolves.toHaveLength(1);
     await expect(
-      repository.findTimedOutRingingCalls(
-        new Timestamp(1_780_000_000_000),
-      ),
+      repository.findTimedOutRingingCalls(new Timestamp(1_780_000_000_000)),
     ).resolves.toHaveLength(1);
 
     await repository.save(communityCall('ended'));
@@ -201,7 +252,9 @@ describe('OrbitDBCallRepository', () => {
     registry.clear();
     await createRepository([document()]);
 
-    await expect(repository.findById(new CallId(callId))).resolves.toBeDefined();
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeDefined();
     await expect(
       repository.findActiveByCommunityChannel(communityId, channelId),
     ).resolves.toBeDefined();
@@ -230,12 +283,89 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toEqual([]);
   });
 
+  it.each(['forward', 'reverse'] as const)(
+    'preserves both participants latest rejoins from competing snapshots in %s order',
+    async (order) => {
+      const creatorRejoined = {
+        identityId: creatorIdentityId,
+        joinedAt: 1_780_000_000_200,
+        status: 'joined',
+      };
+      const participantRejoined = {
+        identityId: participantIdentityId,
+        joinedAt: 1_780_000_000_210,
+        status: 'joined',
+      };
+      const creatorSnapshot: OrbitDBCallDocument = {
+        ...document('active', 1_780_000_000_200),
+        participants: [
+          creatorRejoined,
+          {
+            identityId: participantIdentityId,
+            joinedAt: 1_780_000_000_000,
+            leftAt: 1_780_000_000_100,
+            status: 'left',
+          },
+        ],
+      };
+      const participantSnapshot: OrbitDBCallDocument = {
+        ...document('active', 1_780_000_000_210),
+        participants: [
+          {
+            identityId: creatorIdentityId,
+            joinedAt: 1_780_000_000_000,
+            leftAt: 1_780_000_000_100,
+            status: 'left',
+          },
+          participantRejoined,
+        ],
+      };
+      const snapshots = [creatorSnapshot, participantSnapshot];
+
+      const orderedSnapshots =
+        order === 'forward' ? snapshots : snapshots.reverse();
+
+      for (const snapshot of orderedSnapshots) {
+        calls.emitUpdate(snapshot);
+      }
+      await flushBackgroundTasks();
+
+      const call = await repository.findById(new CallId(callId));
+
+      expect(call).toBeDefined();
+      for (const identityId of [creatorIdentityId, participantIdentityId]) {
+        expect(() =>
+          call!.assertParticipantCanHeartbeat(new IdentityId(identityId)),
+        ).not.toThrow();
+      }
+      expect(call!.toPrimitives().participants).toEqual([
+        creatorRejoined,
+        participantRejoined,
+      ]);
+    },
+  );
+
   it('registers gossip replicas for immediate reads without persistence', async () => {
     await repository.registerReplica(communityCall());
 
     expect(calls.put).not.toHaveBeenCalled();
     expect(heads.put).not.toHaveBeenCalled();
-    await expect(repository.findById(new CallId(callId))).resolves.toBeDefined();
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not persist stale gossip projections as durable repairs', async () => {
+    calls.emitUpdate(document('ended', 1_780_000_005_000));
+    await flushBackgroundTasks();
+    calls.put.mockClear();
+
+    await repository.registerReplica(communityCall());
+    await repository.registerReplica(communityCall());
+    await flushBackgroundTasks();
+
+    expect(calls.put).not.toHaveBeenCalled();
+    await expect(repository.findActiveByCommunity(communityId)).resolves.toEqual([]);
   });
 
   it('does not wait for canonical document replication', async () => {
@@ -247,7 +377,9 @@ describe('OrbitDBCallRepository', () => {
     ]);
 
     expect(result).toBe('saved');
-    await expect(repository.findById(new CallId(callId))).resolves.toBeDefined();
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeDefined();
   });
 });
 

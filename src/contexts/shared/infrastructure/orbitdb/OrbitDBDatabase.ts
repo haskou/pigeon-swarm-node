@@ -19,6 +19,7 @@ export type OrbitDBDatabase = {
   };
   get?(key: string): Promise<{ key?: string; value: unknown } | unknown>;
   log?: {
+    get?(hash: string): Promise<OrbitDBEntry | undefined>;
     heads(): Promise<OrbitDBEntry[]>;
     storage?: { close(): Promise<void> };
   };
