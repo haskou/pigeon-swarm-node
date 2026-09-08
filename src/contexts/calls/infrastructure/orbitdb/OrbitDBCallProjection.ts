@@ -29,6 +29,8 @@ export default class OrbitDBCallProjection {
 
   private ready = false;
 
+  private historyReplayDepth = 0;
+
   private startPromise?: Promise<void>;
 
   constructor(
@@ -183,7 +185,7 @@ export default class OrbitDBCallProjection {
       this.index(merged);
     }
 
-    if (!this.ready) {
+    if (!this.ready || this.historyReplayDepth > 0) {
       if (isDeepStrictEqual(merged, incoming)) {
         this.bootstrapRepairs.delete(document.id);
       } else {
@@ -200,19 +202,35 @@ export default class OrbitDBCallProjection {
     }
   }
 
+  private flushRepairs(): void {
+    if (!this.ready || this.historyReplayDepth > 0) return;
+
+    for (const document of this.bootstrapRepairs.values()) {
+      this.replicator.replicate(document);
+    }
+
+    this.bootstrapRepairs.clear();
+  }
+
   public async start(): Promise<void> {
     this.startPromise ??= this.registry
       .onDocumentUpdated('calls', (document) => this.projectRecord(document), {
+        historyObserver: {
+          finished: (success) => {
+            this.historyReplayDepth--;
+
+            if (success) this.flushRepairs();
+          },
+          started: () => {
+            this.historyReplayDepth++;
+          },
+        },
         includeHistory: true,
       })
       .then(() => {
         this.ready = true;
 
-        for (const document of this.bootstrapRepairs.values()) {
-          this.replicator.replicate(document);
-        }
-
-        this.bootstrapRepairs.clear();
+        this.flushRepairs();
       });
 
     await this.startPromise;

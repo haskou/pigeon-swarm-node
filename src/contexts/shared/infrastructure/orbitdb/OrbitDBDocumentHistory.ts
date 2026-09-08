@@ -1,5 +1,6 @@
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBEntry } from './OrbitDBEntry';
+import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
 
 export class OrbitDBDocumentHistory {
   private frontier = new Set<string>();
@@ -9,6 +10,7 @@ export class OrbitDBDocumentHistory {
   constructor(
     private readonly log: NonNullable<OrbitDBDatabase['log']>,
     private readonly notify: (value: unknown) => void | Promise<void>,
+    private readonly observers: () => OrbitDBHistoryReplayObserver[] = () => [],
   ) {}
 
   private hasVisited(entry: OrbitDBEntry, visited: Set<string>): boolean {
@@ -61,7 +63,7 @@ export class OrbitDBDocumentHistory {
     }
   }
 
-  private async replay(): Promise<void> {
+  private async drain(): Promise<void> {
     while (this.dirty) {
       this.dirty = false;
       const heads = await this.log.heads();
@@ -70,6 +72,20 @@ export class OrbitDBDocumentHistory {
       this.frontier = new Set(
         heads.flatMap((entry) => (entry.hash ? [entry.hash] : [])),
       );
+    }
+  }
+
+  private async replay(): Promise<void> {
+    const observers = this.observers();
+    let success = false;
+
+    for (const observer of observers) observer.started();
+
+    try {
+      await this.drain();
+      success = true;
+    } finally {
+      for (const observer of observers) observer.finished(success);
     }
   }
 

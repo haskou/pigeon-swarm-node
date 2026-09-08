@@ -87,8 +87,8 @@ function assertBothJoined(document: OrbitDBCallDocument | undefined): void {
 
 async function project(
   stores: OrbitDBPrivateNetworkStores,
+  registry = new OrbitDBReplicatedStateRegistry(),
 ): Promise<OrbitDBCallProjection> {
-  const registry = new OrbitDBReplicatedStateRegistry();
   await registry.register(networkId, stores);
   const projection = new OrbitDBCallProjection(
     registry,
@@ -148,7 +148,8 @@ async function main(): Promise<void> {
     assert.equal(canonical.length, 1);
     assert.deepEqual((canonical[0].value as OrbitDBCallDocument).participants, second.participants);
 
-    const projection = await project(stores);
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const projection = await project(stores, registry);
     assertBothJoined(await projection.findById(new CallId(callId)));
 
     const deadline = Date.now() + 2000;
@@ -171,6 +172,9 @@ async function main(): Promise<void> {
     await stores.stop();
     stores = await OrbitDBPrivateNetworkStores.open(network);
     const headsBeforeReplay = await stores.calls.log!.heads();
+    await registry.register(networkId, stores);
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(await stores.calls.log!.heads(), headsBeforeReplay, 'Re-registering repaired history must not append another repair');
     const reopened = await project(stores);
     assertBothJoined(await reopened.findById(new CallId(callId)));
     await new Promise<void>((resolve) => setTimeout(resolve, 100));

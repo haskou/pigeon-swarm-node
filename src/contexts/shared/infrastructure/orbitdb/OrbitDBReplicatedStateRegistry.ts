@@ -6,6 +6,7 @@ import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
 import { OrbitDBEntry } from './OrbitDBEntry';
+import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
@@ -74,6 +75,11 @@ export default class OrbitDBReplicatedStateRegistry {
     Set<(document: Record<string, unknown>) => void | Promise<void>>
   >();
 
+  private readonly historyObservers = new Map<
+    OrbitDBReplicatedDocumentStoreName,
+    Set<OrbitDBHistoryReplayObserver>
+  >();
+
   private readonly historyStoreNames =
     new Set<OrbitDBReplicatedDocumentStoreName>();
 
@@ -139,16 +145,20 @@ export default class OrbitDBReplicatedStateRegistry {
     let history = this.documentHistories.get(store);
 
     if (!history) {
-      history = new OrbitDBDocumentHistory(store.log, async (value) => {
-        const document = this.recordValue(value);
+      history = new OrbitDBDocumentHistory(
+        store.log,
+        async (value) => {
+          const document = this.recordValue(value);
 
-        if (document) {
-          await this.notifyBootstrappedDocument(
-            this.documentUpdateListeners.get(storeName) ?? new Set(),
-            document,
-          );
-        }
-      });
+          if (document) {
+            await this.notifyBootstrappedDocument(
+              this.documentUpdateListeners.get(storeName) ?? new Set(),
+              document,
+            );
+          }
+        },
+        () => [...(this.historyObservers.get(storeName) ?? [])],
+      );
       this.documentHistories.set(store, history);
     }
 
@@ -426,16 +436,21 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
     store: OrbitDBDatabase,
     listener: (document: Record<string, unknown>) => void | Promise<void>,
+    observer?: OrbitDBHistoryReplayObserver,
   ): Promise<void> {
     const existingHistory = this.documentHistories.has(store);
     const history = this.documentHistory(storeName, store);
 
     if (history && existingHistory && store.log) {
-      await new OrbitDBDocumentHistory(store.log, async (value) => {
-        const document = this.recordValue(value);
+      await new OrbitDBDocumentHistory(
+        store.log,
+        async (value) => {
+          const document = this.recordValue(value);
 
-        if (document) await listener(document);
-      }).refresh();
+          if (document) await listener(document);
+        },
+        () => (observer ? [observer] : []),
+      ).refresh();
     } else if (history) {
       await history.refresh();
     } else {
@@ -1440,9 +1455,19 @@ export default class OrbitDBReplicatedStateRegistry {
   public async onDocumentUpdated(
     storeName: OrbitDBReplicatedDocumentStoreName,
     listener: (document: Record<string, unknown>) => void | Promise<void>,
-    options: { includeHistory?: boolean } = {},
+    options: {
+      includeHistory?: boolean;
+      historyObserver?: OrbitDBHistoryReplayObserver;
+    } = {},
   ): Promise<void> {
     if (options.includeHistory) this.historyStoreNames.add(storeName);
+
+    if (options.historyObserver) {
+      const observers = this.historyObservers.get(storeName) ?? new Set();
+
+      observers.add(options.historyObserver);
+      this.historyObservers.set(storeName, observers);
+    }
     const listeners = this.documentUpdateListeners.get(storeName) ?? new Set();
 
     listeners.add(listener);
@@ -1461,6 +1486,7 @@ export default class OrbitDBReplicatedStateRegistry {
         storeName,
         store,
         listener,
+        options.historyObserver,
       );
     }
   }
