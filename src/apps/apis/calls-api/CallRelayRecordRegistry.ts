@@ -40,7 +40,9 @@ export default class CallRelayRecordRegistry {
         peerIds.flatMap((peerId) => {
           const record = this.records.get(peerId);
 
-          return record && record.expiresAt > now ? record.urls : [];
+          return record && record.version === 1 && record.expiresAt > now
+            ? record.urls
+            : [];
         }),
       ),
     ];

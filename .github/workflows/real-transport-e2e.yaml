@@ -51,6 +51,7 @@ jobs:
         run: |
           docker pull coturn/coturn:4.11.0-r0-alpine
           yarn test:e2e:turn-credentials
+          yarn test:e2e:turn-federation
 
       - name: Run all real transport E2E
         if: github.event_name == 'workflow_dispatch'

@@ -22,6 +22,40 @@ jest.mock(
 import CallRelayRecordSigner from '@app/apps/apis/calls-api/CallRelayRecordSigner';
 
 describe('CallRelayRecordSigner', () => {
+  it('verifies a v2 peer announcement without a shared pool secret', async () => {
+    const signer = new CallRelayRecordSigner();
+    const privateKey = {
+      publicKey: mockPublicKey,
+      sign: jest.fn(async () => Buffer.from('peer-signature')),
+    } as unknown as Libp2pPrivateKeyLike;
+    const record = (
+      await signer.sign(
+        {
+          issuedAt: Date.now(),
+          expiresAt: Date.now() + 60_000,
+          role: 'call-relay',
+          urls: ['turn:relay.example.test:4101'],
+          version: 2,
+        },
+        privateKey,
+        'owner-secret',
+      )
+    ).toPrimitives();
+    expect(record.poolSignature).toBe('');
+    await expect(
+      signer.verify(record, record.signature, 'different-secret'),
+    ).resolves.toBe(true);
+    mockPublicKey.verify = jest.fn(async () => false);
+    await expect(
+      signer.verify(
+        { ...record, urls: ['turn:attacker.example'] },
+        record.signature,
+        '',
+      ),
+    ).resolves.toBe(false);
+    mockPublicKey.verify = jest.fn(async () => true);
+  });
+
   it.each([
     [NaN, 2000],
     [1000, Infinity],

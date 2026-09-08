@@ -6,6 +6,7 @@ import Kernel from '@haskou/ddd-kernel';
 import { CallRelayConfiguration } from './CallRelayConfiguration';
 import CallRelayRecordDiscovery from './CallRelayRecordDiscovery';
 import CallRelayRecordSigner from './CallRelayRecordSigner';
+import FederatedCallRelayCredentials from './FederatedCallRelayCredentials';
 
 type CallRelayRuntimeState = {
   defaultTurnSharedSecretWarningLogged: boolean;
@@ -21,6 +22,7 @@ export default class CallRelayRuntime implements Runtime {
     private readonly networkRegistry: IPFSNetworkRegistry,
     private readonly discovery: CallRelayRecordDiscovery,
     private readonly signer: CallRelayRecordSigner,
+    private readonly credentials: FederatedCallRelayCredentials,
   ) {}
 
   private get state(): CallRelayRuntimeState {
@@ -58,7 +60,7 @@ export default class CallRelayRuntime implements Runtime {
         issuedAt,
         role: 'call-relay',
         urls: this.configuration.getAdvertisedTurnUrls(),
-        version: 1,
+        version: network.isPrivate() ? 2 : 1,
       },
       await this.networkRegistry.getSharedPeerPrivateKey(),
       sharedSecret,
@@ -159,8 +161,9 @@ export default class CallRelayRuntime implements Runtime {
       return;
     }
 
+    await this.credentials.start(network);
     this.state.startedNetworkIds.push(network.getId());
-    await this.discovery.startConnection(network);
+    await this.discovery.startConnection(network, network.isPrivate());
     await this.publishCurrentRecord(network);
     this.startPublicationInterval(network);
   }

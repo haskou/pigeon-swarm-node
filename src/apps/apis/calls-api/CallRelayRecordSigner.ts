@@ -74,6 +74,18 @@ export default class CallRelayRecordSigner {
     );
   }
 
+  private isVersionProofValid(
+    payload: CallRelayRecordPayload &
+      Pick<CallRelayRecordPrimitives, 'poolSignature'>,
+    sharedSecret: string,
+  ): boolean {
+    if (payload.version === 2) return payload.poolSignature === '';
+
+    return (
+      payload.version === 1 && this.isPoolSignatureValid(payload, sharedSecret)
+    );
+  }
+
   public async sign(
     payload: Omit<CallRelayRecordPayload, 'peerId' | 'publicKey'>,
     privateKey: Libp2pPrivateKeyLike,
@@ -89,7 +101,10 @@ export default class CallRelayRecordSigner {
     return new CallRelayRecord(
       {
         ...completePayload,
-        poolSignature: this.createPoolSignature(completePayload, sharedSecret),
+        poolSignature:
+          completePayload.version === 2
+            ? ''
+            : this.createPoolSignature(completePayload, sharedSecret),
       },
       Buffer.from(signature).toString('base64url'),
     );
@@ -106,9 +121,7 @@ export default class CallRelayRecordSigner {
       return false;
     }
 
-    if (!this.isPoolSignatureValid(payload, sharedSecret)) {
-      return false;
-    }
+    if (!this.isVersionProofValid(payload, sharedSecret)) return false;
 
     const publicKey = await libp2pKeyAdapter.publicKeyFromProtobuf(
       Buffer.from(payload.publicKey, 'base64url'),

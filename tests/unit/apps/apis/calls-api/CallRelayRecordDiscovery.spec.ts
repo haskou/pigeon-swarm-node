@@ -103,3 +103,54 @@ describe('CallRelayRecordDiscovery', () => {
     expect(registry.all()).toEqual([]);
   });
 });
+
+describe('private federated relay advertisements', () => {
+  it.each([true, false])(
+    'accepts v2 only on private networks (private=%s)',
+    async (privateNetwork) => {
+      const registry = new CallRelayRecordRegistry();
+      registry.clear();
+      const signer = mock<CallRelayRecordSigner>();
+      signer.verify.mockResolvedValue(true);
+      const discovery = new CallRelayRecordDiscovery(registry, signer);
+      let receive: (payload: string) => Promise<void> = async () => {};
+      const connection: PublicRelayPubSubConnection = {
+        publishPubSub: jest.fn(),
+        subscribePubSub: async (_topic, handler) => {
+          receive = handler;
+        },
+      };
+      await discovery.startConnection(connection, privateNetwork);
+      const record = {
+        ...callRelayRecord(['turn:relay.test:3478']),
+        version: 2,
+        poolSignature: '',
+      };
+      await receive(JSON.stringify(record));
+      expect(registry.all()).toHaveLength(privateNetwork ? 1 : 0);
+      expect(signer.verify).toHaveBeenCalledTimes(privateNetwork ? 1 : 0);
+      registry.clear();
+    },
+  );
+  it('rejects oversized advertisements before signature verification', async () => {
+    const registry = new CallRelayRecordRegistry();
+    const signer = mock<CallRelayRecordSigner>();
+    let receive: (payload: string) => Promise<void> = async () => {};
+    await new CallRelayRecordDiscovery(registry, signer).startConnection(
+      {
+        publishPubSub: jest.fn(),
+        subscribePubSub: async (_topic, handler) => {
+          receive = handler;
+        },
+      },
+      true,
+    );
+    await receive(
+      JSON.stringify({
+        ...callRelayRecord(['turn:' + 'a'.repeat(8192)]),
+        version: 2,
+      }),
+    );
+    expect(signer.verify).not.toHaveBeenCalled();
+  });
+});

@@ -39,7 +39,8 @@
     "test:coverage:report": "nyc report -t coverage --reporter=json-summary --reporter=text --report-dir=coverage > coverage/coverage-summary.txt",
     "test:coverage:report:html": "nyc report -t coverage --reporter=html --report-dir=coverage/html",
     "test:coverage:all:html": "yarn test:coverage:clean && yarn test:coverage:unit && yarn test:coverage:api && yarn test:coverage:command && yarn test:coverage:report:html",
-    "test:api:feature": "NODE_ENV=test cucumber-js -p api_support"
+    "test:api:feature": "NODE_ENV=test cucumber-js -p api_support",
+    "test:e2e:turn-federation": "tsx -r tsconfig-paths/register tests/e2e/turn/federated-credentials.ts"
   },
   "keywords": [],
   "author": "",

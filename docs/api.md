@@ -433,8 +433,8 @@ Response:
 The `diagnostics` block describes configuration, not live connectivity:
 
 - `turnSharedSecretConfigured` is false when the secret is missing or equals
-  the rejected public fallback. Shared-secret credentials are then omitted.
-  Explicit local static credentials can still be returned.
+  the rejected public fallback. Locally issued shared-secret credentials are then omitted.
+  Explicit local static credentials and credentials obtained from a private-network relay can still be returned.
 - `turnSource` reports whether the TURN URLs come from this node's local
   configuration, from a signed record of a connected relay, or from neither,
   even when no credentials are available.
@@ -458,8 +458,10 @@ Implemented:
 - otherwise include TURN URLs only from signed call relay records whose
   `peerId` matches a currently connected circuit relay; records from unrelated
   or disconnected relays are ignored
-- require all nodes sharing a calls relay to use the same effective TURN secret;
-  nodes without a private value cannot issue temporary credentials or publish records
+- for v1 shared pools, require issuers and selected coturn servers to use the same private secret
+- for v2 private-network relays, request credentials from the connected relay owner over an encrypted authenticated libp2p stream; independent deployments keep different master secrets
+- reuse v2 credentials for up to ten minutes, refreshing thirty seconds before expiry and checking relay eligibility on every lookup; usernames contain a stable per-peer opaque subject rather than an application identity
+- limit v2 issuance to ten requests per peer and one hundred globally per minute; credentials never enter pubsub or replicated storage
 - use `CALLS_TURN_CREDENTIAL_TTL_SECONDS` to control the temporary credential
   lifetime; it must be a positive whole number of seconds whose resulting Unix
   expiry is a safe integer, otherwise it defaults to `3600`
