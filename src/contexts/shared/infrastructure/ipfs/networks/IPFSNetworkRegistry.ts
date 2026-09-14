@@ -271,11 +271,28 @@ export default class IPFSNetworkRegistry {
         await libp2pKeyAdapter.generateEd25519KeyPair();
 
       await fs.mkdir(this.storagePath, { recursive: true });
-      await fs.writeFile(
-        this.getSharedPeerKeyFilePath(),
-        await libp2pKeyAdapter.privateKeyToProtobuf(generatedPrivateKey),
-        { flag: 'wx', mode: 0o600 },
+      const temporaryDirectory = await fs.mkdtemp(
+        `${this.storagePath}/.peer-key-`,
       );
+
+      try {
+        const temporaryKeyPath = `${temporaryDirectory}/shared-peer-private-key.pb`;
+        await fs.writeFile(
+          temporaryKeyPath,
+          await libp2pKeyAdapter.privateKeyToProtobuf(generatedPrivateKey),
+          { flag: 'wx', flush: true, mode: 0o600 },
+        );
+        await fs.link(temporaryKeyPath, this.getSharedPeerKeyFilePath());
+        const directory = await fs.open(this.storagePath, 'r');
+
+        try {
+          await directory.sync();
+        } finally {
+          await directory.close();
+        }
+      } finally {
+        await fs.rm(temporaryDirectory, { force: true, recursive: true });
+      }
 
       return generatedPrivateKey;
     }

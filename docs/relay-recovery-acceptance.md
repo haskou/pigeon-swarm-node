@@ -78,3 +78,5 @@ encrypted call-event delivery and OrbitDB replication. It does not establish
 connectivity across external NAT/CGNAT, firewall behavior, browser media quality,
 or privacy against a member holding the shared network key. Those require the
 separate deployment, call and privacy acceptance work.
+
+New peer keys are written and flushed in a private temporary directory, then published with an exclusive hard link. A partial write cannot leave a malformed final key, and a competing existing key is never overwritten. The storage filesystem must support hard links and directory synchronization.

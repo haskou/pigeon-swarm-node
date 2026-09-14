@@ -5,6 +5,9 @@ import { mock } from 'jest-mock-extended';
 
 jest.mock('fs/promises', () => ({
   mkdir: jest.fn(),
+  mkdtemp: jest.fn(),
+  link: jest.fn(),
+  open: jest.fn(),
   readFile: jest.fn(),
   rm: jest.fn(),
   writeFile: jest.fn(),
@@ -175,9 +178,23 @@ describe('IPFSNetworkRegistry', () => {
     restoreEnvVariable('IPFS_STORAGE_PATH', previousStoragePath);
 
     jest.restoreAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('shared peer identity', () => {
+    const sync = jest.fn();
+    const close = jest.fn();
+
+    beforeEach(() => {
+      jest.mocked(fs.mkdtemp).mockResolvedValue('/storage/.peer-key-test');
+      jest.mocked(fs.link).mockResolvedValue(undefined);
+      jest.mocked(fs.rm).mockResolvedValue(undefined);
+      jest
+        .mocked(fs.open)
+        .mockResolvedValue({ sync, close } as unknown as fs.FileHandle);
+      sync.mockResolvedValue(undefined);
+      close.mockResolvedValue(undefined);
+    });
     it('keeps concurrent consumers pending until persistence succeeds and shares a write failure', async () => {
       const missing = Object.assign(new Error('Not found'), { code: 'ENOENT' });
       const failedWrite = new Error('Write failed');
@@ -213,6 +230,11 @@ describe('IPFSNetworkRegistry', () => {
         { status: 'rejected', reason: failedWrite },
         { status: 'rejected', reason: failedWrite },
       ]);
+      expect(fs.link).not.toHaveBeenCalled();
+      expect(fs.rm).toHaveBeenCalledWith('/storage/.peer-key-test', {
+        recursive: true,
+        force: true,
+      });
       jest.mocked(fs.readFile).mockResolvedValue(Buffer.from('persisted'));
       jest
         .spyOn(libp2pKeyAdapter, 'privateKeyFromProtobuf')
@@ -248,10 +270,16 @@ describe('IPFSNetworkRegistry', () => {
       expect(keys.every((key) => key === firstKey)).toBe(true);
       expect(generate).toHaveBeenCalledTimes(1);
       expect(fs.writeFile).toHaveBeenCalledWith(
-        expect.stringContaining('shared-peer-private-key.pb'),
+        '/storage/.peer-key-test/shared-peer-private-key.pb',
         Buffer.from('first'),
-        { flag: 'wx', mode: 0o600 },
+        { flag: 'wx', mode: 0o600, flush: true },
       );
+      expect(fs.link).toHaveBeenCalledWith(
+        '/storage/.peer-key-test/shared-peer-private-key.pb',
+        expect.stringMatching(/shared-peer-private-key\.pb$/),
+      );
+      expect(sync).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledTimes(1);
       delete (globalThis as IPFSNetworkRegistryTestGlobal)
         .__pigeonSwarmIPFSNetworkRegistryState;
       jest.mocked(fs.readFile).mockResolvedValue(Buffer.from('first'));
@@ -312,7 +340,8 @@ describe('IPFSNetworkRegistry', () => {
         .mockRejectedValueOnce(missing)
         .mockResolvedValue(Buffer.from('existing'));
       jest.mocked(fs.mkdir).mockResolvedValue(undefined);
-      jest.mocked(fs.writeFile).mockRejectedValueOnce(exists);
+      jest.mocked(fs.writeFile).mockResolvedValue(undefined);
+      jest.mocked(fs.link).mockRejectedValueOnce(exists);
       const generate = jest
         .spyOn(libp2pKeyAdapter, 'generateEd25519KeyPair')
         .mockResolvedValue(generatedKey);
