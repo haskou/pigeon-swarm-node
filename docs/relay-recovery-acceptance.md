@@ -4,6 +4,20 @@ The private relay mesh must recover useful traffic, not merely report connected
 peers. Run `yarn test:e2e:real-transport:private-relay-mesh` from the backend
 repository. This scenario is included in `test:e2e:real-transport:ci`.
 
+The deployment repository additionally exercises the complete application image
+with automatic discovery, signed HTTP operations and authenticated WebSocket
+delivery: [application relay acceptance](https://github.com/haskou/pigeon-swarm/blob/main/docs/RELAY_DISCOVERY_VALIDATION.md).
+
+## Persisted peer identity
+
+All startup consumers share one pending key load or creation operation. The key
+is returned only after it has been persisted, so public routing and private
+networks use the identity that will be loaded after restart. New key files use
+exclusive creation and owner-only permissions. An unreadable or malformed
+existing key fails initialization instead of silently replacing the identity.
+A failed operation can be retried after the underlying storage problem is fixed.
+Running multiple application processes against the same storage is not supported.
+
 ## Topology and fault matrix
 
 Four independent public DHT bootstrap nodes and three private relay processes

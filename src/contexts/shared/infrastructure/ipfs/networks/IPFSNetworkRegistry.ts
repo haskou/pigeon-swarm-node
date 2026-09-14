@@ -36,6 +36,7 @@ type IPFSNetworkRegistryState = {
     (settings: RelayRuntimeSettings) => Promise<void> | void
   >;
   sharedPeerPrivateKey?: Libp2pPrivateKeyLike;
+  sharedPeerPrivateKeyLoading?: Promise<Libp2pPrivateKeyLike>;
   sharedPeerPrivateKeyPem?: string;
 };
 
@@ -236,15 +237,36 @@ export default class IPFSNetworkRegistry {
       return state.sharedPeerPrivateKey;
     }
 
+    state.sharedPeerPrivateKeyLoading ??=
+      this.readOrCreateSharedPeerPrivateKey()
+        .then((privateKey) => {
+          state.sharedPeerPrivateKey = privateKey;
+
+          return privateKey;
+        })
+        .finally(() => {
+          state.sharedPeerPrivateKeyLoading = undefined;
+        });
+
+    return state.sharedPeerPrivateKeyLoading;
+  }
+
+  private async readOrCreateSharedPeerPrivateKey(): Promise<Libp2pPrivateKeyLike> {
     try {
       const persistedPrivateKey = await fs.readFile(
         this.getSharedPeerKeyFilePath(),
       );
-      state.sharedPeerPrivateKey =
-        await libp2pKeyAdapter.privateKeyFromProtobuf(persistedPrivateKey);
 
-      return state.sharedPeerPrivateKey;
-    } catch {
+      return await libp2pKeyAdapter.privateKeyFromProtobuf(persistedPrivateKey);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !('code' in error) ||
+        error.code !== 'ENOENT'
+      ) {
+        throw error;
+      }
+
       const generatedPrivateKey =
         await libp2pKeyAdapter.generateEd25519KeyPair();
 
@@ -252,9 +274,8 @@ export default class IPFSNetworkRegistry {
       await fs.writeFile(
         this.getSharedPeerKeyFilePath(),
         await libp2pKeyAdapter.privateKeyToProtobuf(generatedPrivateKey),
+        { flag: 'wx', mode: 0o600 },
       );
-
-      state.sharedPeerPrivateKey = generatedPrivateKey;
 
       return generatedPrivateKey;
     }
