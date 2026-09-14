@@ -47,10 +47,6 @@ export class WebSocketEventHub {
 
   private networkSynchronizationStatusProvider?: () => unknown;
 
-  private debug(message: string): void {
-    Kernel.logger?.debug(message);
-  }
-
   private broadcast(
     event: DomainEvent,
     message: WebSocketRealtimeMessage,
@@ -60,11 +56,6 @@ export class WebSocketEventHub {
       recipients.size > 0
         ? [...recipients].map((recipient) => this.clients.get(recipient))
         : this.getNodeWideClients(event);
-    const connectedRecipients = targetClients.filter(Boolean).length;
-
-    this.debug(
-      `WebSocket domain event "${event.eventName()}" aggregate="${event.aggregateId}" recipients="${[...recipients].join(',')}" connectedRecipients=${connectedRecipients}`,
-    );
 
     for (const identityClients of targetClients) {
       if (!identityClients) {
@@ -186,23 +177,17 @@ export class WebSocketEventHub {
     }
 
     if (message.type === 'typing') {
-      this.relayTypingIndicator(identityId, message).catch((error: unknown) => {
-        Kernel.logger?.error(
-          `WebSocket typing indicator failed for "${identityId}": ${String(error)}`,
-        );
+      this.relayTypingIndicator(identityId, message).catch(() => {
+        Kernel.logger?.error('WebSocket typing indicator failed');
       });
 
       return;
     }
 
     if (message.type === 'call_signal_ack') {
-      this.acknowledgeCallSignal(identityId, message).catch(
-        (error: unknown) => {
-          Kernel.logger?.error(
-            `WebSocket call signal acknowledgement failed for "${identityId}": ${String(error)}`,
-          );
-        },
-      );
+      this.acknowledgeCallSignal(identityId, message).catch(() => {
+        Kernel.logger?.error('WebSocket call signal acknowledgement failed');
+      });
 
       return;
     }
@@ -212,10 +197,8 @@ export class WebSocketEventHub {
     }
 
     this.recordIdentityHeartbeat(identityId, Boolean(message.active)).catch(
-      (error: unknown) => {
-        Kernel.logger?.error(
-          `WebSocket identity heartbeat failed for "${identityId}": ${String(error)}`,
-        );
+      () => {
+        Kernel.logger?.error('WebSocket identity heartbeat failed');
       },
     );
     this.send(client, {
@@ -371,9 +354,6 @@ export class WebSocketEventHub {
       )) || []
     ).filter((recipient) => !baseRecipients.has(recipient));
 
-    this.debug(
-      `WebSocket community poll fanout "${event.aggregateId}" communityId="${scope.communityId}" channelId="${scope.channelId}" recipients="${recipients.join(',')}"`,
-    );
     this.sendToRecipients(recipients, message);
   }
 
@@ -393,9 +373,6 @@ export class WebSocketEventHub {
       (recipient) => !baseRecipients.has(recipient),
     );
 
-    this.debug(
-      `WebSocket identity update fanout "${event.aggregateId}" relatedRecipients="${recipients.join(',')}"`,
-    );
     this.sendToRecipients(recipients, message);
   }
 
@@ -560,16 +537,12 @@ export class WebSocketEventHub {
       this.relayIdentityUpdateToRelatedRecipients(
         event,
         domainEventMessage,
-      ).catch((error: unknown) => {
-        Kernel.logger?.error(
-          `WebSocket identity update fanout failed for "${event.aggregateId}": ${String(error)}`,
-        );
+      ).catch(() => {
+        Kernel.logger?.error('WebSocket identity update fanout failed');
       });
       this.relayCommunityPollEventToRecipients(event, domainEventMessage).catch(
-        (error: unknown) => {
-          Kernel.logger?.error(
-            `WebSocket community poll fanout failed for "${event.aggregateId}": ${String(error)}`,
-          );
+        () => {
+          Kernel.logger?.error('WebSocket community poll fanout failed');
         },
       );
       const conversationCallEvents =
@@ -590,9 +563,6 @@ export class WebSocketEventHub {
 
     identityClients.add(client);
     this.clients.set(identityIdValue, identityClients);
-    this.debug(
-      `WebSocket client registered for identity "${identityIdValue}" connections=${identityClients.size}`,
-    );
 
     client.on('close', () => this.unregister(identityIdValue, client));
     client.on('error', () => this.unregister(identityIdValue, client));

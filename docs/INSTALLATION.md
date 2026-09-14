@@ -320,4 +320,6 @@ HTTP access logs record the request method and response status alongside the log
 
 A failed pubsub subscriber emits only `IPFS pubsub handler failed` or `PubSub handler failed`, depending on the transport. Publish failures in the shared pubsub transport emit only `PubSub publish failed`. The topic and exception text are omitted because parser errors can contain decrypted message fragments. Subsequent messages continue to be processed.
 
-These safeguards apply to newly generated application access logs and this subscriber error path. They do not remove existing logs, configure reverse-proxy logs, or conceal IPFS traffic and relationship metadata.
+The WebSocket event hub does not log successful registrations, domain-event delivery or recipient fanout, even at debug level. Handler failures retain a fixed operation label and severity, without identity, conversation, channel, event payload, exception text or stack trace. Normal delivery, heartbeats and signal acknowledgements continue after a handler rejection.
+
+These safeguards apply to newly generated HTTP access logs, the pubsub failure paths described above and the WebSocket event hub. They do not remove existing logs or cover every application component. Error categories and timestamps remain observable; the hub still receives routing identities and event content in memory. Reverse-proxy logs, signed WebSocket URL parameters, ambient browser cookies and IPFS traffic correlation require separate controls. Log minimization does not conceal the social graph from the selected node operator.
