@@ -79,6 +79,11 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwbGljYU1lcmdlcl9fT3JiaXREQkNvbW11bml0eVJlcGxpY2FNZXJnZXI=:
+    class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger
+    arguments: []
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19tYXBwZXJzX19PcmJpdERCQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VNYXBwZXJfX09yYml0REJDb21tdW5pdHlDaGFubmVsTWVzc2FnZU1hcHBlcg==:
     class: >-
       /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper
@@ -331,6 +336,11 @@ services:
     arguments: []
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkhlYWRIaXN0b3J5UmVhZGVyX19PcmJpdERCSGVhZEhpc3RvcnlSZWFkZXI=:
+    class: /contexts/shared/infrastructure/orbitdb/OrbitDBHeadHistoryReader
+    arguments: []
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19lcnJvcnNfX0hhbmRsZXJOb3RGb3VuZEVycm9yX19IYW5kbGVyTm90Rm91bmRFcnJvcg==:
     class: /shared/infrastructure/errors/HandlerNotFoundError
     arguments: []
@@ -378,6 +388,13 @@ services:
     arguments:
       - >-
         @X192YXJfX3d3d19fc3JjX19zaGFyZWRfX2luZnJhc3RydWN0dXJlX19sb2NhbC1kYl9fRW1iZWRkZWRMb2NhbERhdGFiYXNlX19FbWJlZGRlZExvY2FsRGF0YWJhc2U=
+    abstract: false
+    parent: null
+  X192YXJfX3d3d19fc3JjX19hcHBzX19pbml0aWFsaXplcnNfX2NvbW11bml0eS1yZXBsaWNhdGlvbl9fQ29tbXVuaXR5UmVwbGljYXRpb25Jbml0aWFsaXplcl9fQ29tbXVuaXR5UmVwbGljYXRpb25Jbml0aWFsaXplcg==:
+    class: /apps/initializers/community-replication/CommunityReplicationInitializer
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwbGljYVByb2plY3Rpb25fX09yYml0REJDb21tdW5pdHlSZXBsaWNhUHJvamVjdGlvbg==
     abstract: false
     parent: null
   X192YXJfX3d3d19fc3JjX19hcHBzX19ydW50aW1lc19faXBmcy1ydW50aW1lX19JUEZTUnVudGltZV9fSVBGU1J1bnRpbWU=:
@@ -1119,6 +1136,16 @@ services:
     abstract: false
     parent: >-
       X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlNb2RlcmF0aW9uTG9nUmVwb3NpdG9yeV9fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlcG9zaXRvcnk=
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwbGljYVByb2plY3Rpb25fX09yYml0REJDb21tdW5pdHlSZXBsaWNhUHJvamVjdGlvbg==:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRTdGF0ZVJlZ2lzdHJ5X19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwbGljYU1lcmdlcl9fT3JiaXREQkNvbW11bml0eVJlcGxpY2FNZXJnZXI=
+    abstract: false
+    parent: null
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29udGVudC1yZXBsaWNhdGlvbl9fYXBwbGljYXRpb25fX2ZpbmQtc3VtbWFyeV9fQ29udGVudFJlcGxpY2F0aW9uU3RhdHVzU3VtbWFyeUZpbmRlcl9fQ29udGVudFJlcGxpY2F0aW9uU3RhdHVzU3VtbWFyeUZpbmRlcg==:
     class: >-
       /contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder
@@ -1957,16 +1984,6 @@ services:
     abstract: false
     parent: >-
       X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlNZXNzYWdlUmVhY3Rpb25SZXBvc2l0b3J5X19Db21tdW5pdHlNZXNzYWdlUmVhY3Rpb25SZXBvc2l0b3J5
-  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwb3NpdG9yeV9fT3JiaXREQkNvbW11bml0eVJlcG9zaXRvcnk=:
-    class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository
-    arguments:
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRTdGF0ZVJlZ2lzdHJ5X19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnk=
-      - >-
-        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19tYXBwZXJzX19PcmJpdERCQ29tbXVuaXR5TWFwcGVyX19PcmJpdERCQ29tbXVuaXR5TWFwcGVy
-    abstract: false
-    parent: >-
-      X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlSZXBvc2l0b3J5X19Db21tdW5pdHlSZXBvc2l0b3J5
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29udGVudC1yZXBsaWNhdGlvbl9faW5mcmFzdHJ1Y3R1cmVfX29yYml0ZGJfX09yYml0REJDb250ZW50UmVwbGljYUNsYWltUmVwb3NpdG9yeV9fT3JiaXREQkNvbnRlbnRSZXBsaWNhQ2xhaW1SZXBvc2l0b3J5:
     class: >-
       /contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository
@@ -2876,6 +2893,20 @@ services:
         @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2FwcGxpY2F0aW9uX19yZWNvcmQtbW9kZXJhdGlvbi1sb2dfX0NvbW11bml0eU1vZGVyYXRpb25Mb2dSZWNvcmRlcl9fQ29tbXVuaXR5TW9kZXJhdGlvbkxvZ1JlY29yZGVy
     abstract: false
     parent: null
+  X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwb3NpdG9yeV9fT3JiaXREQkNvbW11bml0eVJlcG9zaXRvcnk=:
+    class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository
+    arguments:
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQlJlcGxpY2F0ZWRTdGF0ZVJlZ2lzdHJ5X19PcmJpdERCUmVwbGljYXRlZFN0YXRlUmVnaXN0cnk=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19tYXBwZXJzX19PcmJpdERCQ29tbXVuaXR5TWFwcGVyX19PcmJpdERCQ29tbXVuaXR5TWFwcGVy
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwbGljYU1lcmdlcl9fT3JiaXREQkNvbW11bml0eVJlcGxpY2FNZXJnZXI=
+      - >-
+        @X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2luZnJhc3RydWN0dXJlX19vcmJpdGRiX19PcmJpdERCQ29tbXVuaXR5UmVwbGljYVByb2plY3Rpb25fX09yYml0REJDb21tdW5pdHlSZXBsaWNhUHJvamVjdGlvbg==
+    abstract: false
+    parent: >-
+      X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29tbXVuaXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db21tdW5pdHlSZXBvc2l0b3J5X19Db21tdW5pdHlSZXBvc2l0b3J5
   X192YXJfX3d3d19fc3JjX19jb250ZXh0c19fY29udGVudC1yZXBsaWNhdGlvbl9fYXBwbGljYXRpb25fX2ZpbmQtc3RhdHVzX19Db250ZW50UmVwbGljYXRpb25TdGF0dXNGaW5kZXJfX0NvbnRlbnRSZXBsaWNhdGlvblN0YXR1c0ZpbmRlcg==:
     class: >-
       /contexts/content-replication/application/find-status/ContentReplicationStatusFinder

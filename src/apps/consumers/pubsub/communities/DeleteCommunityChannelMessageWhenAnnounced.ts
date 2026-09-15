@@ -49,6 +49,15 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
+  private async resolveCommunity(
+    snapshot: ReturnType<Community['toPrimitives']>,
+  ): Promise<Community> {
+    return (
+      (await this.communityRepository.findById(new CommunityId(snapshot.id))) ??
+      Community.fromPrimitives(snapshot)
+    );
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     if (!isCommunityPrimitive(event.attributes.community)) {
       return;
@@ -62,6 +71,7 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       return;
     }
 
+    const canonical = await this.resolveCommunity(event.attributes.community);
     const community = Community.fromPrimitives(event.attributes.community);
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
@@ -113,6 +123,6 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       channelId,
       targetMessageId,
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(canonical);
   }
 }

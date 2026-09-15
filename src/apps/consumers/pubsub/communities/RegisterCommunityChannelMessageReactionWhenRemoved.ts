@@ -57,6 +57,9 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
       return;
     }
 
+    const canonical = await this.communityRepository.findById(
+      new CommunityId(communityAttributes.id),
+    );
     const community = Community.fromPrimitives(communityAttributes);
     const communityId = new CommunityId(event.attributes.communityId);
     const channelId = new CommunityChannelId(event.attributes.channelId);
@@ -80,6 +83,6 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
     );
 
     await this.reactionRepository.delete(reaction);
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(canonical ?? community);
   }
 }

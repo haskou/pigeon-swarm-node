@@ -1,6 +1,7 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -47,6 +48,9 @@ export default class RegisterCommunityMessageEdition extends Consumer {
       return;
     }
 
+    const canonical = await this.communityRepository.findById(
+      new CommunityId(event.attributes.community.id),
+    );
     const community = Community.fromPrimitives(event.attributes.community);
     const message = await this.messageRegistrar.registerEdition(
       community,
@@ -54,7 +58,7 @@ export default class RegisterCommunityMessageEdition extends Consumer {
     );
 
     if (message) {
-      await this.communityRepository.save(community);
+      await this.communityRepository.save(canonical ?? community);
     }
   }
 }

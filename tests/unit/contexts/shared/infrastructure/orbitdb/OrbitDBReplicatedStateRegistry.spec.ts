@@ -1,3 +1,5 @@
+import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
+import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
@@ -218,6 +220,90 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
+  it('never persists another private network community through a shared member index', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    new OrbitDBCommunityReplicaProjection(registry, new OrbitDBCommunityReplicaMerger()).register();
+    const first = createStores();
+    const second = createStores();
+    const key = 'community-member-index:member';
+    const community = (networkId: string) => ({ id: `community-${networkId}`, networkId, ownerIdentityId: 'owner', createdAt: 1, name: networkId, description: 'private', visibility: 'private', memberIds: ['member'], textChannels: [] as unknown[] });
+    const head = (networkId: string) => ({ id: key, identityId: 'member', memberId: 'member', networkId, communities: [community(networkId)], updatedAt: 1 });
+    first.heads.all.mockResolvedValue([{ key, value: head('first') }]);
+    second.heads.all.mockResolvedValue([{ key, value: head('second') }]);
+    await registry.register('first', first.stores);
+    await registry.register('second', second.stores);
+    await flushPromises();
+    await registry.putHead(key, { ...head('second'), updatedAt: 2 }, ['second'], true);
+    const stored = second.heads.put.mock.calls.map(([, value]) => value as { communities: Array<{ networkId: string }> });
+    expect(stored.length).toBeGreaterThan(0);
+    for (const value of stored) expect(value.communities.map(entry => entry.networkId)).toEqual(['second']);
+    const local = registry.findCachedHead(key) as { communities: Array<{ networkId: string }> };
+    expect(local.communities.map(entry => entry.networkId).sort()).toEqual(['first', 'second']);
+    registry.clear();
+  });
+
+  it('honors a registered merge decision even when its timestamp is older', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { stores } = createStores();
+    registry.registerHeadRecordMerger('community:', (current, candidate) =>
+      current?.versioned ? current : candidate,
+    );
+    await registry.register('network-1', stores);
+    const key = 'community:migration';
+    registry.cacheHeadLocally(key, { updatedAt: 10000 });
+    registry.cacheHeadLocally(key, { versioned: true, updatedAt: 1 });
+    expect(registry.findCachedHead(key)).toEqual({ versioned: true, updatedAt: 1 });
+    registry.clear();
+  });
+
+  it('does not expose a persisted head rejected by its registered merger', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    registry.registerHeadRecordMerger('community:', () => undefined);
+    await registry.register('network-1', stores);
+    heads.get.mockResolvedValue({ invalid: true });
+    await expect(registry.findPersistedHead('community:invalid')).resolves.toBeUndefined();
+    registry.clear();
+  });
+
+  it('reconstructs mergeable heads from concurrent ancestors hidden by the keyvalue index', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    const key = 'community:history';
+    const first = { members: ['owner', 'alice'] };
+    const second = { members: ['owner', 'bob'] };
+    const ancestor: OrbitDBEntry = {
+      hash: 'first',
+      next: [],
+      payload: { key, value: first },
+    };
+    const latest: OrbitDBEntry = {
+      hash: 'second',
+      next: ['first'],
+      payload: { key, value: second },
+    };
+    heads.all.mockResolvedValue([{ key, value: second }]);
+    heads.log = {
+      heads: jest.fn(async () => [latest]),
+      get: async (hash) => (hash === 'first' ? ancestor : undefined),
+    };
+    registry.registerHeadRecordMerger('community:', (current, candidate) => ({
+      members: [
+        ...new Set([
+          ...((current?.members as string[]) ?? []),
+          ...(candidate.members as string[]),
+        ]),
+      ].sort(),
+    }));
+
+    await registry.register('network-1', stores);
+
+    await expect(registry.findHead(key)).resolves.toEqual({
+      members: ['alice', 'bob', 'owner'],
+    });
+    registry.clear();
+  });
+
   it('replays call history for each new subscriber without resetting existing subscribers', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { calls, stores } = createStores();
