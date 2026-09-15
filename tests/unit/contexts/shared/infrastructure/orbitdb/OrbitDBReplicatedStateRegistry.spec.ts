@@ -218,6 +218,20 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
+  it('honors a registered merge decision even when its timestamp is older', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { stores } = createStores();
+    registry.registerHeadRecordMerger('community:', (current, candidate) =>
+      current?.versioned ? current : candidate,
+    );
+    await registry.register('network-1', stores);
+    const key = 'community:migration';
+    registry.cacheHeadLocally(key, { updatedAt: 10000 });
+    registry.cacheHeadLocally(key, { versioned: true, updatedAt: 1 });
+    expect(registry.findCachedHead(key)).toEqual({ versioned: true, updatedAt: 1 });
+    registry.clear();
+  });
+
   it('does not expose a persisted head rejected by its registered merger', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { heads, stores } = createStores();

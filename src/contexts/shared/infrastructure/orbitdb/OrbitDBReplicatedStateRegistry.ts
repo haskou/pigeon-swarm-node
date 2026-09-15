@@ -668,7 +668,9 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (!candidate) return undefined;
     const accepted =
-      !current || this.isNewerOrEqualDocument(current, candidate);
+      !current ||
+      this.isMergeableHeadKey(key) ||
+      this.isNewerOrEqualDocument(current, candidate);
 
     if (accepted) {
       cache.set(key, candidate);
@@ -734,7 +736,9 @@ export default class OrbitDBReplicatedStateRegistry {
 
         const merged = this.mergeHeadRecord(key, current, candidate);
 
-        return merged && this.isNewerOrEqualDocument(current, merged)
+        return merged &&
+          (this.isMergeableHeadKey(key) ||
+            this.isNewerOrEqualDocument(current, merged))
           ? merged
           : current;
       },
@@ -1202,7 +1206,9 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (!candidate) return undefined;
 
-    return !current || this.isNewerOrEqualDocument(current, candidate)
+    return !current ||
+      this.isMergeableHeadKey(key) ||
+      this.isNewerOrEqualDocument(current, candidate)
       ? candidate
       : undefined;
   }
