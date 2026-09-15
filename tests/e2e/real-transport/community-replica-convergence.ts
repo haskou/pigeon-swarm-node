@@ -184,9 +184,21 @@ async function connect(replicas: Replica[]): Promise<void> {
         .getMultiaddrs()
         .find((value) => value.toString().startsWith('/ip4/127.0.0.1/tcp/'));
       assert.ok(address, 'Each fixture peer must listen only on loopback');
-      await replicas[index].helia.libp2p.dial(
-        await heliaRuntimeAdapter.createMultiaddr(address.toString()),
-      );
+      const target = await heliaRuntimeAdapter.createMultiaddr(address.toString());
+      let lastError: unknown;
+      try {
+        await until('fixture peers reconnect after connection shutdown', async () => {
+          try {
+            await replicas[index].helia.libp2p.dial(target);
+            return true;
+          } catch (error) {
+            lastError = error;
+            return false;
+          }
+        });
+      } catch {
+        throw new Error(`Fixture reconnection failed: ${String(lastError)}`);
+      }
     }
 }
 
@@ -384,8 +396,11 @@ async function main(): Promise<void> {
   restarted.registry!.clear();
   await restarted.orbitdb!.stop();
   restarted.orbitdb = undefined;
+  stage = 'opening persisted OrbitDB stores';
   await open(restarted);
+  stage = 'cold community reconstruction before reconnect';
   await converged(expected, [restarted]);
+  stage = 'reconnecting restarted replica';
   await synchronization(true, [restarted]);
   await connect(nodes);
   await converged(expected);
