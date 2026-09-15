@@ -66,6 +66,26 @@ export default class OrbitDBCommunityReplicaProjection {
     };
   }
 
+  private scopedIndex(
+    networkId: string,
+    record: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const communities = this.documents(record).filter(
+      (document) => document.networkId === networkId,
+    );
+
+    if (communities.length === 0) return undefined;
+
+    return {
+      communities,
+      id: record.id,
+      identityId: record.identityId,
+      memberId: record.memberId,
+      networkId,
+      updatedAt: record.updatedAt,
+    };
+  }
+
   public register(): void {
     this.registry.registerHeadRecordMerger(
       'community:',
@@ -75,10 +95,12 @@ export default class OrbitDBCommunityReplicaProjection {
 
         return this.merger.merge(previous, candidate);
       },
+      (networkId, value) => (value.networkId === networkId ? value : undefined),
     );
     this.registry.registerHeadRecordMerger(
       'community-member-index:',
       (current, candidate) => this.mergeIndex(current, candidate),
+      (networkId, value) => this.scopedIndex(networkId, value),
     );
   }
 }

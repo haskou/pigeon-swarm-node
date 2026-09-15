@@ -75,7 +75,11 @@ function canonical(community: Community): unknown {
   return value;
 }
 
-async function open(replica: Replica): Promise<void> {
+async function open(
+  replica: Replica,
+  scopedNetworkId = networkId,
+  registry = new OrbitDBReplicatedStateRegistry(),
+): Promise<void> {
   replica.orbitdb = await orbitDBRuntimeAdapter.createOrbitDB({
     directory: path.join(root, replica.name, 'orbitdb'),
     id: replica.name,
@@ -84,13 +88,13 @@ async function open(replica: Replica): Promise<void> {
   const AccessController =
     await orbitDBRuntimeAdapter.createPrivateNetworkAccessController();
   replica.stores = {
-    communities: await replica.orbitdb.open(`${networkId}/communities`, {
+    communities: await replica.orbitdb.open(`${scopedNetworkId}/communities`, {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
       type: 'documents',
       sync: false,
     }),
-    heads: await replica.orbitdb.open(`${networkId}/heads`, {
+    heads: await replica.orbitdb.open(`${scopedNetworkId}/heads`, {
       AccessController,
       type: 'keyvalue',
       sync: false,
@@ -98,7 +102,7 @@ async function open(replica: Replica): Promise<void> {
   };
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
-  replica.registry = new OrbitDBReplicatedStateRegistry();
+  replica.registry = registry;
   replica.repository = new OrbitDBCommunityRepository(
     replica.registry,
     mapper,
@@ -109,7 +113,7 @@ async function open(replica: Replica): Promise<void> {
     ),
   );
   await replica.registry.register(
-    networkId,
+    scopedNetworkId,
     replica.stores as unknown as OrbitDBPrivateNetworkStores,
   );
 }
@@ -183,18 +187,23 @@ async function connect(replicas: Replica[]): Promise<void> {
         .getMultiaddrs()
         .find((value) => value.toString().startsWith('/ip4/127.0.0.1/tcp/'));
       assert.ok(address, 'Each fixture peer must listen only on loopback');
-      const target = await heliaRuntimeAdapter.createMultiaddr(address.toString());
+      const target = await heliaRuntimeAdapter.createMultiaddr(
+        address.toString(),
+      );
       let lastError: unknown;
       try {
-        await until('fixture peers reconnect after connection shutdown', async () => {
-          try {
-            await replicas[index].helia.libp2p.dial(target);
-            return true;
-          } catch (error) {
-            lastError = error;
-            return false;
-          }
-        });
+        await until(
+          'fixture peers reconnect after connection shutdown',
+          async () => {
+            try {
+              await replicas[index].helia.libp2p.dial(target);
+              return true;
+            } catch (error) {
+              lastError = error;
+              return false;
+            }
+          },
+        );
       } catch {
         throw new Error(`Fixture reconnection failed: ${String(lastError)}`);
       }
@@ -403,6 +412,169 @@ async function main(): Promise<void> {
   await synchronization(true, [restarted]);
   await connect(nodes);
   await converged(expected);
+  stage = 'two private networks sharing one backend registry';
+  const secondNetworkId = randomUUID();
+  const secondKey = new PrivateKey(
+    generateKeyPairSync('ed25519')
+      .privateKey.export({ format: 'pem', type: 'pkcs8' })
+      .toString(),
+  );
+  const fourth: Replica = {
+    name: 'separate-network',
+    helia: await HeliaIPFS.createPrivateHeliaCore(
+      {
+        storageLocation: path.join(root, 'separate-network', 'ipfs'),
+        listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
+        localPeerDiscoveryEnabled: false,
+        publicRelayDiscoveryEnabled: false,
+        distributedHashTableEnabled: false,
+        contentRoutingEnabled: false,
+        manualRelayMultiaddrs: [],
+      },
+      secondKey,
+      secondNetworkId,
+    ),
+  };
+  nodes.push(fourth);
+  await open(fourth, secondNetworkId, nodes[0].registry!);
+  const separate = Community.fromPrimitives({
+    ...base.toPrimitives(),
+    id: randomUUID(),
+    networkId: secondNetworkId,
+    name: 'Separate private community',
+    description: 'Only members of the second network may receive this profile',
+  });
+  await save(fourth, separate);
+  const indexKey = `community-member-index:${owner.valueOf()}`;
+  const scopedStores = [
+    ...nodes.slice(0, 3).map((node) => ({
+      store: node.stores!.heads,
+      expected,
+      forbidden: separate,
+    })),
+    { store: fourth.stores!.heads, expected: separate, forbidden: expected },
+  ];
+  const assertPersistedIsolation = async (): Promise<void> => {
+    for (const scoped of scopedStores) {
+      await until('actual scoped member index persisted', async () => {
+        const record = (await scoped.store.get!(indexKey)) as
+          { communities?: Array<{ id: string }> } | undefined;
+        return Boolean(
+          record?.communities?.some(
+            (community) => community.id === scoped.expected.getId().valueOf(),
+          ),
+        );
+      });
+      const record = (await scoped.store.get!(indexKey)) as {
+        communities: Array<Record<string, unknown>>;
+      };
+      assert.equal(
+        record.communities.length,
+        1,
+        'A persisted member index must contain only its own network community',
+      );
+      assert.deepEqual(
+        canonical(mapper.toDomain(record.communities[0] as never)),
+        canonical(scoped.expected),
+      );
+      const serialized = JSON.stringify(record);
+      assert.ok(
+        !serialized.includes(scoped.forbidden.getId().valueOf()),
+        'Foreign community ID leaked into persisted member index',
+      );
+      assert.ok(
+        !serialized.includes(scoped.forbidden.getNetworkId().valueOf()),
+        'Foreign network ID leaked into persisted member index',
+      );
+      assert.ok(
+        !serialized.includes(scoped.forbidden.toPrimitives().description),
+        'Foreign profile leaked into persisted member index',
+      );
+      const log = scoped.store.log!;
+      const pending = await log.heads();
+      const visited = new Set<string>();
+      let indexRecords = 0;
+      while (pending.length > 0) {
+        const entry = pending.pop()!;
+        assert.ok(entry.hash, 'Persisted history entry must have a hash');
+        if (visited.has(entry.hash)) continue;
+        visited.add(entry.hash);
+        if (entry.payload?.key?.startsWith('community-member-index:')) {
+          const historical = entry.payload.value as {
+            communities?: Array<{ networkId: string }>;
+          };
+          assert.ok(Array.isArray(historical.communities));
+          for (const community of historical.communities)
+            assert.equal(
+              community.networkId,
+              scoped.expected.getNetworkId().valueOf(),
+              'Foreign community persisted in reachable member-index history',
+            );
+          indexRecords += 1;
+        }
+        for (const hash of entry.next ?? []) {
+          if (visited.has(hash)) continue;
+          const ancestor = await log.get!(hash);
+          assert.ok(ancestor, 'Persisted history must be fully reachable');
+          pending.push(ancestor);
+        }
+      }
+      assert.ok(
+        indexRecords > 0,
+        'Actual member-index history must be audited',
+      );
+    }
+  };
+  const assertCombinedLocalQuery = async (
+    repository: OrbitDBCommunityRepository,
+  ): Promise<void> => {
+    await until('local combined community query', async () => {
+      const communities = await repository.findByMember(owner);
+      return (
+        communities.length === 2 &&
+        [expected, separate].every((value) =>
+          communities.some((community) =>
+            isDeepStrictEqual(canonical(community), canonical(value)),
+          ),
+        )
+      );
+    });
+  };
+  await assertCombinedLocalQuery(fourth.repository!);
+  await assertPersistedIsolation();
+  stage = 'reconstructing two network indexes from actual persisted stores';
+  const reconstructedRegistry = new OrbitDBReplicatedStateRegistry();
+  const reconstructedRepository = new OrbitDBCommunityRepository(
+    reconstructedRegistry,
+    mapper,
+    new OrbitDBCommunityReplicaMerger(),
+    new OrbitDBCommunityReplicaProjection(
+      reconstructedRegistry,
+      new OrbitDBCommunityReplicaMerger(),
+    ),
+  );
+  try {
+    await reconstructedRegistry.register(
+      networkId,
+      nodes[0].stores as unknown as OrbitDBPrivateNetworkStores,
+    );
+    await reconstructedRegistry.register(
+      secondNetworkId,
+      fourth.stores as unknown as OrbitDBPrivateNetworkStores,
+    );
+    await assertCombinedLocalQuery(reconstructedRepository);
+    await assertPersistedIsolation();
+    assert.equal(
+      fourth.helia.libp2p.getConnections().length,
+      0,
+      'Separate private network must not connect to the first network',
+    );
+  } finally {
+    reconstructedRegistry.clear();
+  }
+  console.log(
+    'PASS private network isolation: four real Helia/OrbitDB instances, one shared two-network registry, scoped persisted member indexes and reachable history, cold combined query.',
+  );
   console.log(
     'PASS community convergence: three real private Helia/OrbitDB instances; partitioned additions and profile; delayed replica; explicit removal; repeated synchronization; fresh registry/store reload. One process, independent storage and caches; no external NAT claim.',
   );

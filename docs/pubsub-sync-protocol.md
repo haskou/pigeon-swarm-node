@@ -276,8 +276,12 @@ The same merge runs before head-cache and member-index replacement. During cold
 hydration and head reconciliation, the registry replays reachable head-log ancestors
 for registered community keys: the key-value index alone hides overwritten values.
 It persists a combined head when that content differs from the current persisted
-head. Replay yields between batches and fails if an ancestor is missing; it does not
-mark an incomplete reconstruction as warm. Historical replay is proportional to the
+head. Reconciliation uses the source network's cached head, and every community
+head write is scoped to its destination network. A local member-index query may
+combine communities from several networks, but each persisted index contains only
+communities belonging to that network. This does not erase previously replicated
+or IPFS history. Replay yields between batches and fails if an ancestor is missing;
+it does not mark an incomplete reconstruction as warm. Historical replay is proportional to the
 reachable log, and tombstones remain stored. Safe checkpointing and coordinated
 compaction are future work; deleting these markers is unsafe.
 
@@ -308,7 +312,11 @@ It partitions store synchronization and closes connections, authors independent
 changes, reconnects peers, delays a third replica, checks explicit removal against a
 stale edit, verifies a fresh persisted marker crosses a repeated reconnection, and
 reopens a store with a fresh registry. Assertions compare complete community content
-and member-index results. Fixtures own and remove their temporary data. The check runs
+and member-index results. A fourth instance uses a separate private network and key
+while sharing the backend registry. The fixture checks every reachable member-index
+log entry for foreign-network content and reconstructs both networks from persisted
+stores, preserving combined local queries without cross-network writes. Fixtures own
+and remove their temporary data. The check runs
 in `test:ci`; unit regressions additionally exercise three-write permutations, stale
 grants, role/channel deletion, legacy replay and malformed metadata. Loopback transport
 does not validate external NAT traversal or calls.

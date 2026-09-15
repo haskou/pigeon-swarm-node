@@ -8,6 +8,7 @@ import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
 import { OrbitDBEntry } from './OrbitDBEntry';
 import OrbitDBHeadHistoryReader from './OrbitDBHeadHistoryReader';
 import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
+import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
 import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
@@ -119,6 +120,8 @@ export default class OrbitDBReplicatedStateRegistry {
     string,
     OrbitDBHeadRecordMerger
   >();
+
+  private readonly headRecordScopes = new Map<string, OrbitDBHeadRecordScope>();
 
   private readonly headWriteQueues = new Map<string, Promise<void>>();
 
@@ -693,12 +696,50 @@ export default class OrbitDBReplicatedStateRegistry {
     return heads;
   }
 
+  private scopedHeadRecord(
+    networkId: string,
+    key: string,
+    value: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const prefix = [...this.headRecordScopes.keys()].find((candidate) =>
+      key.startsWith(candidate),
+    );
+
+    if (prefix === undefined) return value;
+    try {
+      return this.headRecordScopes.get(prefix)!(networkId, value);
+    } catch {
+      Kernel.logger.warn?.('Rejected incompatible network-scoped head');
+
+      return undefined;
+    }
+  }
+
+  private async persistNetworkHead(
+    networkId: string,
+    stores: OrbitDBPrivateNetworkStores,
+    key: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
+    const scoped = this.scopedHeadRecord(networkId, key, value);
+
+    if (!scoped) return;
+    await stores.heads.put?.(key, scoped);
+    this.cacheReplicatedHead(networkId, key, scoped);
+    this.markPersistedHeadKey(networkId, key);
+    await this.persistHeadCache(networkId, key, scoped);
+  }
+
   private cacheReplicatedHead(
     networkId: string,
     key: string,
     value: Record<string, unknown>,
   ): Record<string, unknown> | undefined {
-    return this.cacheHeadIn(this.replicatedHeads(networkId), key, value);
+    const scoped = this.scopedHeadRecord(networkId, key, value);
+
+    return scoped
+      ? this.cacheHeadIn(this.replicatedHeads(networkId), key, scoped)
+      : undefined;
   }
 
   private cacheProjectedHead(
@@ -856,7 +897,7 @@ export default class OrbitDBReplicatedStateRegistry {
         persistedAllHeads;
 
       const { key, value } = records[index];
-      const merged = key ? this.cachedHead(key) : undefined;
+      const merged = key ? this.replicatedHeads(networkId).get(key) : undefined;
 
       if (key && merged) this.persistMergedHead(networkId, key, value, merged);
       await this.yieldAfterHydrationBatch(index);
@@ -1500,8 +1541,12 @@ export default class OrbitDBReplicatedStateRegistry {
   public registerHeadRecordMerger(
     prefix: string,
     merger: OrbitDBHeadRecordMerger,
+    scope?: OrbitDBHeadRecordScope,
   ): void {
     this.headRecordMergers.set(prefix, merger);
+
+    if (scope) this.headRecordScopes.set(prefix, scope);
+    else this.headRecordScopes.delete(prefix);
   }
 
   public async register(
@@ -1791,12 +1836,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
       await Promise.all(
         this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
-          async ({ networkId, stores }) => {
-            await stores.heads.put?.(key, cachedValue);
-            this.cacheReplicatedHead(networkId, key, cachedValue);
-            this.markPersistedHeadKey(networkId, key);
-            await this.persistHeadCache(networkId, key, cachedValue);
-          },
+          ({ networkId, stores }) =>
+            this.persistNetworkHead(networkId, stores, key, cachedValue),
         ),
       );
 
