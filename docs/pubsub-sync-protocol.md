@@ -223,3 +223,87 @@ the intended recipient and publishes `calls.v1.signal.acknowledged`:
 Acknowledgements are internal node-to-node events and are not forwarded to
 frontend WebSockets. If an acknowledgement is lost, the next signal retry
 causes the frontend to acknowledge the same `signalId` again.
+
+
+## Community replica convergence
+
+Community documents carry optional `replicaState: { version: 1, entries }` metadata.
+Entries are keyed by the canonical JSON encoding of `[field, elementId]`; scalar
+profile fields use an empty element ID. Each entry carries a safe integer revision,
+a removal marker and its value. The existing community document and member-index
+heads carry this state on the same private-network OrbitDB stores. This change does
+not introduce a second transport, a public discovery topic, or a new recipient set.
+
+A repository-loaded aggregate retains its own baseline. A save derives changes
+against that baseline, increments only changed registers, and then combines the
+locally authored state with the latest replica. Unseen changes do not become causal
+predecessors of a local edit. Reusing an aggregate for another save preserves its
+local view as the next baseline, so remote additions are not mistaken for removals.
+Existing aggregates must be loaded through the repository before being updated.
+Message, edition, reaction and deletion consumers resolve the current community
+first; an event snapshot bootstraps only an absent community and does not replace
+an existing one.
+
+Conflict rules:
+
+- Different profile fields and different collection elements combine independently.
+  The same scalar, role or channel uses the higher element revision, then canonical
+  value ordering for equal revisions. Simultaneous edits to different properties of
+  the **same role or channel** are a conflict; they do not merge property by property.
+- Member additions are independent. Removal wins an equal-revision membership
+  conflict; readmission requires observing the removed register before adding again.
+  Each admission has a distinct token. Role assignments remain bound to the admission
+  observed or authored by their editor and cannot transfer to an unseen readmission.
+- Concurrent equal-revision role assignments for the same admission intersect their
+  role sets. Higher revisions replace earlier assignments. References to missing
+  members or roles are excluded from the materialized view.
+- Bans have their own registers and suppress membership and assignments while active.
+  Removing a ban exposes the membership register again; it does not create a new
+  admission. Removing membership and removing a ban are separate operations.
+- Role and channel removal is terminal for that UUID, including against a later stale
+  rename. Recreating one requires a new UUID. Channel visibility references to deleted
+  roles are removed; an empty visibility list remains empty.
+- Community deletion is terminal between versioned documents. Timestamps remain
+  informational and never decide element conflicts. Community ID, network, owner and
+  creation time must match before two documents can combine.
+
+The same merge runs before head-cache and member-index replacement. During cold
+hydration and head reconciliation, the registry replays reachable head-log ancestors
+for registered community keys: the key-value index alone hides overwritten values.
+It persists a combined head when that content differs from the current persisted
+head. Replay yields between batches and fails if an ancestor is missing; it does not
+mark an incomplete reconstruction as warm. Historical replay is proportional to the
+reachable log, and tombstones remain stored. Safe checkpointing and coordinated
+compaction are future work; deleting these markers is unsafe.
+
+### Upgrade and trust boundaries
+
+Old snapshots remain readable. The first edited snapshot gains version 1 metadata;
+thereafter an unversioned snapshot cannot replace versioned state. Unversioned pairs
+retain deterministic whole-document selection and do not gain concurrency guarantees.
+Upgrade all writers in a private network together before resuming writes. A rolling
+mixed-version deployment is **not** a supported concurrent-write configuration: late
+legacy changes, including legacy deletion, are ignored after migration. Preserve the
+existing stores when upgrading; no destructive migration is performed automatically.
+
+Structural validation rejects unsupported versions, malformed paths, invalid revision
+counters and incompatible register values. It is not authentication. A node with write
+access can still forge plausible values or revisions. Deterministic conflict resolution
+does not prove who authorized a grant, ban, deletion or profile change. Durable
+operation authorization and revocation enforcement remain tracked in
+[haskou/pigeon-swarm-node#288](https://github.com/haskou/pigeon-swarm-node/issues/288).
+The current stores still reveal community metadata to their readers; this work neither
+establishes E2EE nor hides the social graph from an authorized or compromised node.
+
+### Verification
+
+`yarn test:integration:community-convergence` uses three real private Helia/OrbitDB
+instances with separate peer identities, directories and registries, in one process.
+It partitions store synchronization and closes connections, authors independent
+changes, reconnects peers, delays a third replica, checks explicit removal against a
+stale edit, verifies a fresh persisted marker crosses a repeated reconnection, and
+reopens a store with a fresh registry. Assertions compare complete community content
+and member-index results. Fixtures own and remove their temporary data. The check runs
+in `test:ci`; unit regressions additionally exercise three-write permutations, stale
+grants, role/channel deletion, legacy replay and malformed metadata. Loopback transport
+does not validate external NAT traversal or calls.

@@ -1,4 +1,5 @@
 import { OrbitDBCommunityMemberRoleDocument } from './OrbitDBCommunityMemberRoleDocument';
+import { OrbitDBCommunityReplicaState } from './OrbitDBCommunityReplicaState';
 import { OrbitDBCommunityRoleDocument } from './OrbitDBCommunityRoleDocument';
 import { OrbitDBCommunityTextChannelDocument } from './OrbitDBCommunityTextChannelDocument';
 import { OrbitDBCommunityVoiceChannelDocument } from './OrbitDBCommunityVoiceChannelDocument';
@@ -20,6 +21,7 @@ export interface OrbitDBCommunityDocument extends Record<string, unknown> {
   networkId: string;
   ownerIdentityId: string;
   roles?: OrbitDBCommunityRoleDocument[];
+  replicaState?: OrbitDBCommunityReplicaState;
   textChannels: OrbitDBCommunityTextChannelDocument[];
   updatedAt?: number;
   visibility: string;

@@ -7,20 +7,32 @@ import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityMapper from './mappers/OrbitDBCommunityMapper';
+import OrbitDBCommunityReplicaMerger from './OrbitDBCommunityReplicaMerger';
+import OrbitDBCommunityReplicaProjection from './OrbitDBCommunityReplicaProjection';
 
 export default class OrbitDBCommunityRepository extends CommunityRepository {
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
+  private readonly aggregateBaselines = new WeakMap<
+    Community,
+    OrbitDBCommunityDocument
+  >();
+
   private readonly communityIndex: OrbitDBHeadIndex<OrbitDBCommunityDocument>;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityMapper,
+    private readonly replicaMerger: OrbitDBCommunityReplicaMerger,
+    private readonly projection: OrbitDBCommunityReplicaProjection,
   ) {
     super();
+    this.projection.register();
     this.communityIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'communities',
       documentFromRecord: (record) =>
-        this.isDocument(record) ? record : undefined,
+        this.isStoredDocument(record) ? record : undefined,
+      merge: (current, candidate) =>
+        this.replicaMerger.merge(current, candidate),
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
@@ -176,28 +188,37 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   private toFreshDocument(community: Community): OrbitDBCommunityDocument {
-    const currentHead = this.registry.findCachedHead(
+    const head = this.registry.findCachedHead(
       this.communityHeadKey(community.getId().valueOf()),
     );
-    const nextUpdatedAt =
-      typeof currentHead?.updatedAt === 'number'
-        ? currentHead.updatedAt + 1
-        : 0;
 
-    return {
-      ...this.mapper.toDocument(community),
-      updatedAt: Math.max(Date.now(), nextUpdatedAt),
-    };
+    return this.replicaMerger.nextDocument(
+      this.mapper.toDocument(community),
+      this.aggregateBaselines.get(community),
+      head && this.isStoredDocument(head) ? head : undefined,
+      Date.now(),
+    );
+  }
+
+  private toDomain(document: OrbitDBCommunityDocument): Community {
+    const community = this.mapper.toDomain(document);
+    this.aggregateBaselines.set(
+      community,
+      structuredClone({ ...document, ...this.mapper.toDocument(community) }),
+    );
+
+    return community;
   }
 
   public async delete(community: Community): Promise<void> {
-    const document = this.toFreshDocument(community);
-
-    const deletedDocument = {
-      ...document,
-      deleted: true,
-      deletedAt: Date.now(),
-    };
+    const head = this.registry.findCachedHead(
+      this.communityHeadKey(community.getId().valueOf()),
+    );
+    const deletedDocument = this.replicaMerger.tombstone(
+      this.mapper.toDocument(community),
+      head && this.isStoredDocument(head) ? head : undefined,
+      Date.now(),
+    );
 
     await this.registry.replicateDocumentInBackground(
       'communities',
@@ -212,7 +233,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const head = await this.findHead(id);
 
     if (head) {
-      return this.isDocument(head) ? this.mapper.toDomain(head) : undefined;
+      return this.isDocument(head) ? this.toDomain(head) : undefined;
     }
 
     return undefined;
@@ -237,7 +258,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     });
 
     return Promise.resolve(
-      documents.slice(0, 50).map((document) => this.mapper.toDomain(document)),
+      documents.slice(0, 50).map((document) => this.toDomain(document)),
     );
   }
 
@@ -257,19 +278,27 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
           this.isDocument(document) &&
           document.memberIds.includes(identityId.valueOf()),
       )
-      .map((document) => this.mapper.toDomain(document));
+      .map((document) => this.toDomain(document));
   }
 
   public async findSyncable(): Promise<Community[]> {
     return Promise.resolve(
       this.cachedCommunityDocuments().map((document) =>
-        this.mapper.toDomain(document),
+        this.toDomain(document),
       ),
     );
   }
 
   public async save(community: Community): Promise<void> {
     const document = this.toFreshDocument(community);
+    this.registry.cacheHeadLocally(
+      this.communityHeadKey(document.id),
+      document,
+    );
+    this.aggregateBaselines.set(
+      community,
+      structuredClone({ ...document, ...this.mapper.toDocument(community) }),
+    );
 
     await this.registry.replicateDocumentInBackground('communities', document, [
       document.networkId,

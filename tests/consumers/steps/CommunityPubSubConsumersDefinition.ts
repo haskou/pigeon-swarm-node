@@ -7,6 +7,7 @@ import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/commu
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { PrimitiveOf } from '@haskou/value-objects';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
@@ -29,8 +30,17 @@ class FakeCommunityReactionRepository {
 }
 
 class FakeCommunityRepository {
-  public async save(): Promise<void> {
-    return undefined;
+  public saved: Community[] = [];
+
+  constructor(private community: Community) {}
+
+  public async findById(id: CommunityId): Promise<Community | undefined> {
+    return this.community.isIdentifiedBy(id) ? this.community : undefined;
+  }
+
+  public async save(community: Community): Promise<void> {
+    this.saved.push(community);
+    this.community = community;
   }
 }
 
@@ -50,11 +60,15 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   private readonly reactionCreatedAt = 1778513696020;
 
   private reactionRepository = new FakeCommunityReactionRepository();
+  private communityRepository?: FakeCommunityRepository;
+  private expectedCommunity?: PrimitiveOf<Community>;
 
   @before()
   public async reset(): Promise<void> {
     await this.resetConsumerTestContext();
     this.reactionRepository = new FakeCommunityReactionRepository();
+    this.communityRepository = undefined;
+    this.expectedCommunity = undefined;
   }
 
   private communityPrimitives(): PrimitiveOf<Community> {
@@ -101,6 +115,26 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     };
   }
 
+  private canonicalCommunityRepository(): FakeCommunityRepository {
+    const community = Community.fromPrimitives({
+      ...this.communityPrimitives(),
+      name: 'Updated community profile',
+      description: 'A newer description than the event snapshot',
+      discoverable: false,
+    });
+    this.expectedCommunity = community.toPrimitives();
+    this.communityRepository = new FakeCommunityRepository(community);
+
+    return this.communityRepository;
+  }
+
+  private assertCanonicalCommunityPreserved(): void {
+    expect(this.communityRepository?.saved).to.have.length(1);
+    expect(this.communityRepository?.saved[0].toPrimitives()).to.deep.equal(
+      this.expectedCommunity,
+    );
+  }
+
   private reactionAttributes() {
     return {
       authorIdentityId: this.ownerIdentityId(),
@@ -118,7 +152,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async addedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenAdded(
       this.eventConsumer(),
-      new FakeCommunityRepository() as unknown as CommunityRepository,
+      this.canonicalCommunityRepository() as unknown as CommunityRepository,
       new FakeCommunityMessageRepository() as unknown as CommunityChannelMessageRepository,
       this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
@@ -137,7 +171,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async removedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenRemoved(
       this.eventConsumer(),
-      new FakeCommunityRepository() as unknown as CommunityRepository,
+      this.canonicalCommunityRepository() as unknown as CommunityRepository,
       new FakeCommunityMessageRepository() as unknown as CommunityChannelMessageRepository,
       this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
@@ -155,6 +189,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     const reaction = this.reactionRepository.saved.at(-1);
 
     expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
+    this.assertCanonicalCommunityPreserved();
   }
 
   @then('the community message reaction repository should delete that reaction')
@@ -162,5 +197,6 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     const reaction = this.reactionRepository.deleted.at(-1);
 
     expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
+    this.assertCanonicalCommunityPreserved();
   }
 }

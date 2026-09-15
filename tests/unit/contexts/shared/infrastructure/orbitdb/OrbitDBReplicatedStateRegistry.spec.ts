@@ -218,6 +218,54 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
+  it('does not expose a persisted head rejected by its registered merger', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    registry.registerHeadRecordMerger('community:', () => undefined);
+    await registry.register('network-1', stores);
+    heads.get.mockResolvedValue({ invalid: true });
+    await expect(registry.findPersistedHead('community:invalid')).resolves.toBeUndefined();
+    registry.clear();
+  });
+
+  it('reconstructs mergeable heads from concurrent ancestors hidden by the keyvalue index', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    const key = 'community:history';
+    const first = { members: ['owner', 'alice'] };
+    const second = { members: ['owner', 'bob'] };
+    const ancestor: OrbitDBEntry = {
+      hash: 'first',
+      next: [],
+      payload: { key, value: first },
+    };
+    const latest: OrbitDBEntry = {
+      hash: 'second',
+      next: ['first'],
+      payload: { key, value: second },
+    };
+    heads.all.mockResolvedValue([{ key, value: second }]);
+    heads.log = {
+      heads: jest.fn(async () => [latest]),
+      get: async (hash) => (hash === 'first' ? ancestor : undefined),
+    };
+    registry.registerHeadRecordMerger('community:', (current, candidate) => ({
+      members: [
+        ...new Set([
+          ...((current?.members as string[]) ?? []),
+          ...(candidate.members as string[]),
+        ]),
+      ].sort(),
+    }));
+
+    await registry.register('network-1', stores);
+
+    await expect(registry.findHead(key)).resolves.toEqual({
+      members: ['alice', 'bob', 'owner'],
+    });
+    registry.clear();
+  });
+
   it('replays call history for each new subscriber without resetting existing subscribers', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { calls, stores } = createStores();

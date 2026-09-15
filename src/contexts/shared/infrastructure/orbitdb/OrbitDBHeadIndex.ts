@@ -36,6 +36,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     private readonly options: OrbitDBHeadIndexOptions<TDocument>,
   ) {
     this.deduplicator = new OrbitDBDocumentDeduplicator({
+      merge: this.options.merge,
       recordId: (document) => this.options.recordId(document),
       shouldReplace: this.options.shouldReplace,
     });
@@ -251,6 +252,24 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     return next;
   }
 
+  private mergeRecord(
+    current: Record<string, unknown> | undefined,
+    record: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const currentDocument = current && this.options.documentFromRecord(current);
+    const nextDocument = this.options.documentFromRecord(record);
+
+    if (currentDocument && nextDocument && this.options.merge) {
+      return Object.fromEntries(
+        Object.entries(this.options.merge(currentDocument, nextDocument)),
+      );
+    } else if (!current || this.shouldReplaceRecord(current, record)) {
+      return record;
+    }
+
+    return current;
+  }
+
   public recordsFromHead(
     head: Record<string, unknown> | undefined,
   ): Record<string, unknown>[] {
@@ -341,9 +360,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
 
     const current = merged.get(recordId);
 
-    if (!current || this.shouldReplaceRecord(current, record)) {
-      merged.set(recordId, record);
-    }
+    merged.set(recordId, this.mergeRecord(current, record));
 
     return [...merged.values()];
   }

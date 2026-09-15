@@ -57,7 +57,10 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
       return;
     }
 
-    const community = Community.fromPrimitives(communityAttributes);
+    const community =
+      (await this.communityRepository.findById(
+        new CommunityId(communityAttributes.id),
+      )) ?? Community.fromPrimitives(communityAttributes);
     const communityId = new CommunityId(event.attributes.communityId);
     const channelId = new CommunityChannelId(event.attributes.channelId);
     const messageId = new CommunityChannelMessageId(event.attributes.messageId);

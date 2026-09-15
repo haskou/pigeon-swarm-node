@@ -1,3 +1,6 @@
+import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
+import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
+import { generateKeyPairSync } from 'node:crypto';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -51,11 +54,46 @@ describe('OrbitDBCommunityRepository', () => {
     repository = new OrbitDBCommunityRepository(
       registry,
       new OrbitDBCommunityMapper(),
+      new OrbitDBCommunityReplicaMerger(),
+      new OrbitDBCommunityReplicaProjection(
+        registry,
+        new OrbitDBCommunityReplicaMerger(),
+      ),
     );
   });
 
   afterEach(() => {
     registry.clear();
+  });
+
+  it('preserves independent additions from separately loaded aggregates', async () => {
+    await repository.save(Community.fromPrimitives(communityPrimitives()));
+    await flushBackgroundTasks();
+    const first = await repository.findById(new CommunityId('community-1'));
+    const second = await repository.findById(new CommunityId('community-1'));
+    const alice = new IdentityId(
+      generateKeyPairSync('ed25519')
+        .publicKey.export({ format: 'pem', type: 'spki' })
+        .toString(),
+    );
+    const bob = new IdentityId(
+      generateKeyPairSync('ed25519')
+        .publicKey.export({ format: 'pem', type: 'spki' })
+        .toString(),
+    );
+    first!.addMember(identityMother.id, alice);
+    second!.addMember(identityMother.id, bob);
+    await repository.save(first!);
+    await repository.save(second!);
+    await flushBackgroundTasks();
+    const result = await repository.findById(new CommunityId('community-1'));
+    expect(result!.toPrimitives().memberIds).toEqual(
+      expect.arrayContaining([
+        identityMother.id.valueOf(),
+        alice.valueOf(),
+        bob.valueOf(),
+      ]),
+    );
   });
 
   it('should save and find communities from OrbitDB replicated documents', async () => {
