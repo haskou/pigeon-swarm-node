@@ -4,6 +4,7 @@ import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import { OrbitDBCommunityReplicaAssignment } from './documents/OrbitDBCommunityReplicaAssignment';
 import { OrbitDBCommunityReplicaRegister } from './documents/OrbitDBCommunityReplicaRegister';
 import { OrbitDBCommunityReplicaState } from './documents/OrbitDBCommunityReplicaState';
+import { OrbitDBCommunityReplicaWrite } from './documents/OrbitDBCommunityReplicaWrite';
 
 export default class OrbitDBCommunityReplicaMerger {
   private readonly profileFields = [
@@ -585,6 +586,21 @@ export default class OrbitDBCommunityReplicaMerger {
       entries,
       version: 1,
     });
+  }
+
+  public prepareWrite(
+    next: OrbitDBCommunityDocument,
+    baseline: OrbitDBCommunityDocument | undefined,
+    previous: OrbitDBCommunityDocument | undefined,
+    now: number,
+  ): OrbitDBCommunityReplicaWrite {
+    this.validateUpdate(next, baseline, previous);
+    const authored = this.nextDocument(next, baseline, baseline, now);
+
+    return {
+      baseline: authored,
+      document: previous ? this.merge(previous, authored) : authored,
+    };
   }
 
   public nextDocument(

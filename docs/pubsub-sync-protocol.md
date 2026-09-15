@@ -238,7 +238,9 @@ A repository-loaded aggregate retains its own baseline. A save derives changes
 against that baseline, increments only changed registers, and then combines the
 locally authored state with the latest replica. Unseen changes do not become causal
 predecessors of a local edit. Reusing an aggregate for another save preserves its
-local view as the next baseline, so remote additions are not mistaken for removals.
+local view and only its observed/authored revisions as the next baseline, so remote
+additions are not mistaken for removals and an unrelated save cannot promote an
+unseen revocation into the next local grant's causal history.
 Existing aggregates must be loaded through the repository before being updated.
 Message, edition, reaction and deletion consumers resolve the current community
 first; an event snapshot bootstraps only an absent community and does not replace

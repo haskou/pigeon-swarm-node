@@ -192,12 +192,19 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       this.communityHeadKey(community.getId().valueOf()),
     );
 
-    return this.replicaMerger.nextDocument(
-      this.mapper.toDocument(community),
+    const local = this.mapper.toDocument(community);
+    const write = this.replicaMerger.prepareWrite(
+      local,
       this.aggregateBaselines.get(community),
       head && this.isStoredDocument(head) ? head : undefined,
       Date.now(),
     );
+    this.aggregateBaselines.set(
+      community,
+      structuredClone({ ...write.baseline, ...local }),
+    );
+
+    return write.document;
   }
 
   private toDomain(document: OrbitDBCommunityDocument): Community {
@@ -295,11 +302,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       this.communityHeadKey(document.id),
       document,
     );
-    this.aggregateBaselines.set(
-      community,
-      structuredClone({ ...document, ...this.mapper.toDocument(community) }),
-    );
-
     await this.registry.replicateDocumentInBackground('communities', document, [
       document.networkId,
     ]);
