@@ -57,10 +57,10 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
       return;
     }
 
-    const community =
-      (await this.communityRepository.findById(
-        new CommunityId(communityAttributes.id),
-      )) ?? Community.fromPrimitives(communityAttributes);
+    const canonical = await this.communityRepository.findById(
+      new CommunityId(communityAttributes.id),
+    );
+    const community = Community.fromPrimitives(communityAttributes);
     const communityId = new CommunityId(event.attributes.communityId);
     const channelId = new CommunityChannelId(event.attributes.channelId);
     const messageId = new CommunityChannelMessageId(event.attributes.messageId);
@@ -83,6 +83,6 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
     );
 
     await this.reactionRepository.save(reaction);
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(canonical ?? community);
   }
 }

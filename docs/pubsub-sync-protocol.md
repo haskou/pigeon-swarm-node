@@ -242,9 +242,12 @@ local view and only its observed/authored revisions as the next baseline, so rem
 additions are not mistaken for removals and an unrelated save cannot promote an
 unseen revocation into the next local grant's causal history.
 Existing aggregates must be loaded through the repository before being updated.
-Message, edition, reaction and deletion consumers resolve the current community
-first; an event snapshot bootstraps only an absent community and does not replace
-an existing one.
+Message, edition, reaction and deletion consumers preserve their existing
+event-snapshot validation semantics, including delayed events. Persistence uses the
+repository-loaded current community when present; an event snapshot bootstraps only
+an absent community and does not replace an existing one. Authenticating historical
+membership and permissions requires the operation authorization work in #288; an
+event snapshot alone is not evidence of authority.
 
 Conflict rules:
 

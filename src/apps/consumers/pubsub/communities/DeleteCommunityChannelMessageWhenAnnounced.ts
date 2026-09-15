@@ -71,7 +71,8 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       return;
     }
 
-    const community = await this.resolveCommunity(event.attributes.community);
+    const canonical = await this.resolveCommunity(event.attributes.community);
+    const community = Community.fromPrimitives(event.attributes.community);
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
     );
@@ -122,6 +123,6 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       channelId,
       targetMessageId,
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(canonical);
   }
 }

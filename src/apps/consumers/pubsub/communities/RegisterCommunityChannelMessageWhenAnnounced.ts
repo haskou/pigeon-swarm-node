@@ -48,17 +48,17 @@ export default class RegisterCommunityMessageWhenAnnounced extends Consumer {
       return;
     }
 
-    const community =
-      (await this.communityRepository.findById(
-        new CommunityId(event.attributes.community.id),
-      )) ?? Community.fromPrimitives(event.attributes.community);
+    const canonical = await this.communityRepository.findById(
+      new CommunityId(event.attributes.community.id),
+    );
+    const community = Community.fromPrimitives(event.attributes.community);
     const message = await this.messageRegistrar.registerSent(
       community,
       event.attributes.message,
     );
 
     if (message) {
-      await this.communityRepository.save(community);
+      await this.communityRepository.save(canonical ?? community);
     }
   }
 }

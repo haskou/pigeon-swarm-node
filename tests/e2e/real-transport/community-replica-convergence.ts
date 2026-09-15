@@ -146,7 +146,6 @@ async function exchanged(replicas: Replica[]): Promise<void> {
       const signatures = await Promise.all(
         replicas.map(async (replica) => {
           const store = replica.stores![storeName];
-          if (!store.peers?.size) return undefined;
           return (await store.log!.heads())
             .map((entry) => entry.hash)
             .sort()
