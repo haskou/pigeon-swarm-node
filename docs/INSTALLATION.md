@@ -261,13 +261,13 @@ The endpoint uses `iceTransportPolicy=all` by default.
 ### Dependency compatibility patches
 
 `yarn` runs four idempotent compatibility patches from `postinstall`. They
-modify installed dependency files only; application source remains independent
-of those implementation details.
+modify installed dependency files. The network-store shutdown adapter also uses
+the OrbitDB replication-cancellation operation installed by its patch.
 
 | Script | Dependency behavior corrected | Why it remains enabled |
 | --- | --- | --- |
 | `patch-helia-bitswap-limited-connections.js` | Makes Bitswap reuse an existing circuit connection and allow its queues, dials and topology notifications on limited relay connections. | A private node must be able to exchange UnixFS blocks through `/p2p-circuit` without opening a second stream that the relay rejects. |
-| `patch-orbitdb-limited-connections.js` | Lets OrbitDB fetch blocks from already-connected peers and exchange heads through limited relay connections. | OrbitDB replication must work for nodes that can only reach each other through a circuit relay. |
+| `patch-orbitdb-limited-connections.js` | Lets OrbitDB fetch blocks from already-connected peers, exchange heads through limited relay connections, and cancel replication reads separately from local writes. | Replication must work through circuit relays, and network reconfiguration must preserve accepted local writes while cancelling stalled remote joins. |
 | `patch-libp2p-kad-dht-routing-table.js` | Replaces recursive Kademlia routing-table traversal with an iterative traversal that ignores already-visited buckets. | Public IPFS still uses Kademlia for content routing. The patch prevents a malformed or cyclic routing table from monopolizing the Node main thread. Private IPFS and private-relay discovery do not run Kademlia. |
 | `patch-libp2p-progress-dispatch.js` | Deduplicates each progress event across the complete graph of joined libp2p queue jobs. | `@libp2p/utils@7.2.4` prevents direct re-entry into one job, but branching Kademlia dial graphs can still deliver one event exponentially and monopolize the Node main thread. The workaround extends the upstream fix from [libp2p/js-libp2p#3485](https://github.com/libp2p/js-libp2p/pull/3485) until the full graph case is fixed upstream. |
 
@@ -276,6 +276,19 @@ shape without already containing the expected correction. Treat that failure as
 a dependency-review signal: inspect the new implementation, update the patch
 and its test, or remove the patch only after verifying that upstream has fixed
 the behavior. Do not bypass the failure by making the script silently succeed.
+
+During network replacement, synchronization stops first and the log cancels only
+reads belonging to remote joins. Local append reads and block persistence retain
+their normal storage signal. OrbitDB then drains the database and log queues
+before closing storage. The cancelled log is retired; reopening creates a fresh
+replication controller.
+
+`yarn test:integration:network-reconfiguration` exercises real OrbitDB databases
+and on-disk Level indexes with a controlled IPFS blockstore. It covers a missing
+ancestor, a local write queued behind an incoming sync operation, and a local
+block write already in progress. Each scenario reopens the same network stores
+and checks both the existing and newly accepted document. This is a shutdown
+and persistence regression, not a public NAT or media-connectivity test.
 
 ### Important note about `IPFS_STORAGE_PATH=memory`
 
