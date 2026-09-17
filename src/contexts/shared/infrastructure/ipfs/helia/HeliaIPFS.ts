@@ -1137,11 +1137,20 @@ export abstract class HeliaIPFS implements IPFSConnection {
         throw new Error('No public IPFS peers available for DHT provide.');
       }
 
+      let providerAnnounced = false;
       await this.heliaCore.libp2p.contentRouting.provide(cid, {
+        onProgress: (event) => {
+          if (
+            event.type === 'kad-dht:query:peer-response' &&
+            event.detail?.messageName === 'ADD_PROVIDER'
+          ) {
+            providerAnnounced = true;
+          }
+        },
         signal: routingAbort.signal,
       });
 
-      return true;
+      return providerAnnounced;
     } catch (error: unknown) {
       Kernel.logger.debug?.(
         `DHT provider publication skipped for key="${key}": ${String(error)}`,
