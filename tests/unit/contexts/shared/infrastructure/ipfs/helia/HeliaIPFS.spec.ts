@@ -79,10 +79,21 @@ describe('HeliaIPFS', () => {
     expect(log).toHaveBeenCalledTimes(1);
   });
 
-  it('publishes relay providers through libp2p content routing only', async () => {
+  it.each([
+    ['no routing progress', [], false],
+    ['closest-peer response only', ['FIND_NODE'], false],
+    ['provider announcement sent', ['ADD_PROVIDER'], true],
+  ])('validates relay publication: %s', async (_name, messages, expected) => {
     const parsedCid = {};
     const contentRouting = {
-      provide: jest.fn().mockResolvedValue(undefined),
+      provide: jest.fn().mockImplementation(async (_cid, options) => {
+        for (const messageName of messages) {
+          options.onProgress?.({
+            type: 'kad-dht:query:peer-response',
+            detail: { messageName },
+          });
+        }
+      }),
     };
     const heliaRouting = {
       provide: jest.fn().mockResolvedValue(undefined),
@@ -104,7 +115,7 @@ describe('HeliaIPFS', () => {
       .spyOn(heliaRuntimeAdapter, 'createRawSha256Cid')
       .mockResolvedValue(parsedCid as never);
 
-    await expect(ipfs.provideRecord('private-relay-key')).resolves.toBe(true);
+    await expect(ipfs.provideRecord('private-relay-key')).resolves.toBe(expected);
 
     expect(contentRouting.provide).toHaveBeenCalledWith(
       parsedCid,
