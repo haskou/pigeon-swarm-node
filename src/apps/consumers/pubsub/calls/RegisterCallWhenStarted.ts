@@ -60,6 +60,9 @@ export default class RegisterCallWhenStarted extends Consumer {
           attributes.participants as PrimitiveOf<Call>['participants'],
         scope: attributes.scope as PrimitiveOf<Call>['scope'],
         status: String(attributes.status),
+        ...(attributes.sessionEpoch === undefined
+          ? {}
+          : { sessionEpoch: Number(attributes.sessionEpoch) }),
       }),
     );
   }

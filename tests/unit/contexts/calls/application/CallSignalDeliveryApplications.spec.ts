@@ -1,3 +1,4 @@
+import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
 import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/acknowledge-signal/messages/CallSignalAcknowledgeMessage';
 import CallSignalDeliveryExpirationRegistrar from '@app/contexts/calls/application/expire-signal-deliveries/CallSignalDeliveryExpirationRegistrar';
@@ -196,6 +197,7 @@ describe('Call signal delivery applications', () => {
       deliveryRepository,
       eventPublisher,
       nodeRepository,
+      mock<CallAccessAuthorizer>(),
     );
 
     const delivery = await sender.send(

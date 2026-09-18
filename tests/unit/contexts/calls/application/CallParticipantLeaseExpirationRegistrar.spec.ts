@@ -1,3 +1,4 @@
+import LocalRealtimeEventPublisher from '@app/shared/infrastructure/websocket/LocalRealtimeEventPublisher';
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
@@ -23,10 +24,12 @@ describe('CallParticipantLeaseExpirationRegistrar', () => {
       lease(remoteNodeId),
     ]);
     nodeRepository.loadLocalNodeId.mockResolvedValue(localNodeId);
+    const localPublisher = mock<LocalRealtimeEventPublisher>();
     const registrar = new CallParticipantLeaseExpirationRegistrar(
       repository,
       eventPublisher,
       nodeRepository,
+      localPublisher,
     );
 
     await registrar.expire();
@@ -34,6 +37,8 @@ describe('CallParticipantLeaseExpirationRegistrar', () => {
     expect(repository.save).toHaveBeenCalledTimes(2);
     expect(repository.purgeDisconnectedBefore).toHaveBeenCalledTimes(1);
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(localPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(localPublisher.publish.mock.calls[0][0].at(-1)?.attributes.ownerNodeId).toBe(remoteNodeId.valueOf());
   });
 });
 

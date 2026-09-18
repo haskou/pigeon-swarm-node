@@ -21,5 +21,6 @@ export interface OrbitDBCallDocument extends Record<string, unknown> {
     type: string;
   };
   status: string;
+  sessionEpoch?: number;
   updatedAt?: number;
 }

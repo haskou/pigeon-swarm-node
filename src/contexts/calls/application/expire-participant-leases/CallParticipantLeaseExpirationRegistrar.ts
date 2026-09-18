@@ -1,5 +1,6 @@
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import LocalRealtimeEventPublisher from '@app/shared/infrastructure/websocket/LocalRealtimeEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 
 import CallParticipantLeaseRepository from '../../domain/repositories/CallParticipantLeaseRepository';
@@ -12,6 +13,7 @@ export default class CallParticipantLeaseExpirationRegistrar {
     private readonly repository: CallParticipantLeaseRepository,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly nodeRepository: NodeRepository,
+    private readonly localPublisher: LocalRealtimeEventPublisher,
   ) {}
 
   public async expire(): Promise<void> {
@@ -33,7 +35,7 @@ export default class CallParticipantLeaseExpirationRegistrar {
       if (lease.belongsToNode(localNodeId)) {
         await this.eventPublisher.publish(lease.pullDomainEvents());
       } else {
-        lease.pullDomainEvents();
+        this.localPublisher.publish(lease.pullDomainEvents());
       }
     }
 

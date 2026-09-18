@@ -5,6 +5,7 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { Timestamp } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -196,6 +197,7 @@ export default class OrbitDBCallProjection {
 
       this.documents.set(document.id, merged);
       this.index(merged);
+      webSocketEventHub.publishCallSnapshot(merged.id, merged.participantIds);
     }
 
     if (persistRepair) this.scheduleRepair(merged, incoming);

@@ -1743,6 +1743,12 @@ export default class Definitions {
     ).expire();
   }
 
+  @then('the current call has no live participants')
+  public theCurrentCallHasNoLiveParticipants(): void {
+    expect(this.response.data.participants).to.deep.equal([]);
+    expect(this.response.data.participantIds).to.deep.equal([]);
+  }
+
   @then('the current voice channel has {int} connected identities')
   public theCurrentVoiceChannelHasConnectedIdentities(count: number): void {
     const channels = this.response.data.channels;

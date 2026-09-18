@@ -1,3 +1,4 @@
+import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseReleaser from '@app/contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser';
 import CallParticipantHeartbeatRecorder from '@app/contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder';
 import { CallParticipantHeartbeatRecordMessage } from '@app/contexts/calls/application/record-participant-heartbeat/messages/CallParticipantHeartbeatRecordMessage';
@@ -39,6 +40,7 @@ describe('call participant lease application services', () => {
       callRepository,
       leaseRenewer,
       eventPublisher,
+      mock<CallAccessAuthorizer>(),
     );
 
     await recorder.record(

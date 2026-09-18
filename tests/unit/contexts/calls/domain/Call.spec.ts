@@ -1,3 +1,5 @@
+import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
+import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallEndedEvent } from '@app/contexts/calls/domain/events/CallEndedEvent';
@@ -216,7 +218,43 @@ describe('Call', () => {
       { identityId: creator.valueOf(), status: 'joined' },
       { identityId: recipient.valueOf(), status: 'left' },
     ]);
+    expect(call.toPrimitives().status).toBe('ended');
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallParticipantLeftEvent);
+  });
+
+  it('keeps a community session reusable after participants leave', () => {
+    const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
+    call.joinOrAdd(recipient);
+    call.leave(creator);
+    expect(call.isActive()).toBe(true);
+    call.leave(recipient);
+    expect(call.isActive()).toBe(true);
+    expect(() => call.joinOrAdd(creator)).not.toThrow();
+  });
+
+  it('preserves a remote join that races with the last locally known departure', () => {
+    const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
+    const remote = Call.fromPrimitives(call.toPrimitives());
+    remote.joinOrAdd(recipient);
+    call.leave(creator);
+    const mapper = new OrbitDBCallMapper();
+    const merger = new OrbitDBCallDocumentMerger();
+    for (const pair of [[call, remote], [remote, call]]) {
+      const merged = mapper.toDomain(merger.merge(mapper.toDocument(pair[0]), mapper.toDocument(pair[1])));
+      expect(merged.isActive()).toBe(true);
+      expect(() => merged.assertParticipantCanHeartbeat(recipient)).not.toThrow();
+      expect(merged.hasJoinedParticipant(creator)).toBe(false);
+    }
+  });
+
+  it('keeps a group conversation active when other participants remain', () => {
+    const third = new IdentityId('MCowBQYDK2VwAyEAoZUOXZj5HZm3Tb5CEojEXtNLxBIHkE2s28l/FsBICaU=');
+    const call = Call.start(creator, networkId, scope, [recipient, third]);
+    call.join(recipient);
+    call.join(third);
+    call.leave(recipient);
+    expect(call.isActive()).toBe(true);
+    expect(call.getJoinedParticipantIds()).toHaveLength(2);
   });
 
   it('clears a previous departure when a community participant rejoins', () => {

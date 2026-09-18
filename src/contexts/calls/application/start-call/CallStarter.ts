@@ -2,6 +2,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
+import { CallSessionEpoch } from '../../domain/value-objects/CallSessionEpoch';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import CallScopeResolver from './CallScopeResolver';
 import CommunityChannelCallStartCoordinator from './CommunityChannelCallStartCoordinator';
@@ -17,24 +18,30 @@ export default class CallStarter {
     private readonly communityChannelStartCoordinator: CommunityChannelCallStartCoordinator,
   ) {}
 
-  private async findActiveCommunityChannelCall(
-    message: CallStartMessage,
-  ): Promise<Call | undefined> {
-    if (!message.scopeType.isCommunityChannel()) {
-      return undefined;
-    }
-
-    return this.repository.findActiveByCommunityChannel(
-      message.getCommunityId(),
-      message.getCommunityChannelId(),
+  private nextSessionEpoch(previousCalls: Call[]): CallSessionEpoch {
+    const latest = previousCalls.reduce(
+      (epoch, call) => Math.max(epoch, call.getSessionEpoch()?.valueOf() ?? 0),
+      0,
     );
+
+    return new CallSessionEpoch(latest + 1);
   }
 
   private async startResolved(
     message: CallStartMessage,
     resolvedScope: ResolvedCallScope,
   ): Promise<Call> {
-    const activeCall = await this.findActiveCommunityChannelCall(message);
+    const previousCalls = message.scopeType.isCommunityChannel()
+      ? await this.repository.findByCommunityChannel(
+          message.getCommunityId(),
+          message.getCommunityChannelId(),
+        )
+      : [];
+    const activeCall = previousCalls
+      .filter((call) => call.isActive())
+      .sort((left, right) =>
+        left.getId().valueOf().localeCompare(right.getId().valueOf()),
+      )[0];
 
     if (activeCall) {
       activeCall.joinOrAdd(message.requesterIdentityId);
@@ -59,6 +66,9 @@ export default class CallStarter {
       resolvedScope.networkId,
       resolvedScope.scope,
       participantIds,
+      message.scopeType.isCommunityChannel()
+        ? this.nextSessionEpoch(previousCalls)
+        : undefined,
     );
 
     await this.repository.save(call);

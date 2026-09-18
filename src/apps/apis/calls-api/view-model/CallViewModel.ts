@@ -1,74 +1,66 @@
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
-import { CallParticipantStatus } from '@app/contexts/calls/domain/value-objects/CallParticipantStatus';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-import { CallParticipantMediaConnectionResource } from '../resources/CallParticipantMediaConnectionResource';
 import { CallResource } from '../resources/CallResource';
 
 export class CallViewModel {
   constructor(
     private readonly call: Call,
     private readonly leases: CallParticipantLease[],
+    private readonly authorizedParticipants: IdentityId[],
   ) {}
-
-  private participantConnection(identityId: string): {
-    connected: boolean;
-    lastHeartbeatAt?: number;
-    mediaConnections: CallParticipantMediaConnectionResource[];
-  } {
-    const participantIdentityId = new IdentityId(identityId);
-    const connectedLeases = this.leases.filter(
-      (lease) =>
-        this.call.isActive() &&
-        lease.belongsToCall(this.call.getId()) &&
-        lease.belongsTo(participantIdentityId) &&
-        lease.isConnected(),
-    );
-    const latestLease = connectedLeases.reduce<
-      CallParticipantLease | undefined
-    >((latest, lease) => {
-      if (
-        !latest ||
-        lease.getLastHeartbeatAt().isAfter(latest.getLastHeartbeatAt())
-      ) {
-        return lease;
-      }
-
-      return latest;
-    }, undefined);
-
-    return {
-      connected: connectedLeases.length > 0,
-      ...(latestLease
-        ? { lastHeartbeatAt: latestLease.getLastHeartbeatAt().valueOf() }
-        : {}),
-      mediaConnections:
-        latestLease?.getMediaConnections().map((mediaConnection) => ({
-          ...mediaConnection.toPrimitives(),
-          usesRelay: mediaConnection.usesRelay(),
-        })) ?? [],
-    };
-  }
 
   public toResource(): CallResource {
     const primitives = this.call.toPrimitives();
+    const participants = this.call
+      .getActiveParticipants()
+      .flatMap((participant) => {
+        if (
+          !this.authorizedParticipants.some((identityId) =>
+            identityId.isEqual(participant.getIdentityId()),
+          )
+        )
+          return [];
+
+        const connected =
+          this.call.isActive() &&
+          this.leases.some(
+            (lease) =>
+              lease.belongsToCall(this.call.getId()) &&
+              lease.belongsTo(participant.getIdentityId()) &&
+              lease.isConnected(),
+          );
+
+        if (!connected && !participant.isRinging()) return [];
+
+        return [
+          {
+            connected,
+            identityId: participant.getIdentityId().valueOf(),
+            mediaConnections: [] as never[],
+            status: connected ? 'joined' : 'ringing',
+          },
+        ];
+      });
 
     return {
-      ...primitives,
-      participants: primitives.participants.map((participant) => {
-        const connection = this.participantConnection(participant.identityId);
-        const participantStatus = new CallParticipantStatus(participant.status);
-
-        return {
-          ...participant,
-          ...connection,
-          status:
-            connection.connected && participantStatus.isRinging()
-              ? CallParticipantStatus.JOINED.valueOf()
-              : participant.status,
-        };
-      }),
+      id: primitives.id,
+      networkId: primitives.networkId,
+      scope: primitives.scope,
+      status: primitives.status,
+      ...(this.call.getScope().isConversation()
+        ? {
+            createdAt: primitives.createdAt,
+            creatorIdentityId: primitives.creatorIdentityId,
+            ...(primitives.endedAt ? { endedAt: primitives.endedAt } : {}),
+            ...(primitives.endedByIdentityId
+              ? { endedByIdentityId: primitives.endedByIdentityId }
+              : {}),
+          }
+        : {}),
+      participantIds: participants.map((participant) => participant.identityId),
+      participants,
     };
   }
 }

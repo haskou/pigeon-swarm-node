@@ -1,3 +1,6 @@
+import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
@@ -28,6 +31,9 @@ describe('WebSocketClientMessageHandler', () => {
       communityRepository,
       heartbeatRecorder,
       signalAcknowledger,
+      mock<CallRepository>(),
+      mock<CallParticipantLeaseRepository>(),
+      mock<CallAccessAuthorizer>(),
     );
   });
 

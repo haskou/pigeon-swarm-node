@@ -58,6 +58,14 @@ export class CallScope {
     return this.type.isCommunityChannel();
   }
 
+  public getConversationId(): ConversationId | undefined {
+    return this.conversationId;
+  }
+
+  public getCommunityId(): CommunityId | undefined {
+    return this.communityId;
+  }
+
   public getCommunityChannelId(): CommunityChannelId | undefined {
     return this.channelId;
   }

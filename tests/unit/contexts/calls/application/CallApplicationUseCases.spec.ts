@@ -1,3 +1,6 @@
+import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallEnder from '@app/contexts/calls/application/end-call/CallEnder';
 import { CallEndMessage } from '@app/contexts/calls/application/end-call/messages/CallEndMessage';
 import ActiveCallsFinder from '@app/contexts/calls/application/find-active-calls/ActiveCallsFinder';
@@ -28,6 +31,8 @@ const participantIdentityId =
   'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
 
 describe('Call application use cases', () => {
+  const authorizer = mock<CallAccessAuthorizer>();
+  beforeEach(() => { authorizer.canAccess.mockResolvedValue(true); });
   it('ActiveCallsFinder delegates the participant lookup', async () => {
     const repository = mock<CallRepository>();
     const calls = [mock<Call>()];
@@ -35,23 +40,24 @@ describe('Call application use cases', () => {
     repository.findActiveByParticipant.mockResolvedValue(calls);
 
     await expect(
-      new ActiveCallsFinder(repository).find(
+      new ActiveCallsFinder(repository, authorizer).find(
         new ActiveCallsFindMessage(participantIdentityId),
       ),
-    ).resolves.toBe(calls);
+    ).resolves.toEqual(calls);
   });
 
   it('CallHistoryFinder delegates the participant history lookup', async () => {
     const repository = mock<CallRepository>();
     const calls = [mock<Call>()];
 
+    calls[0].getScope.mockReturnValue(CallScope.conversation(new ConversationId("conversation-1")));
     repository.findByParticipant.mockResolvedValue(calls);
 
     await expect(
-      new CallHistoryFinder(repository).find(
+      new CallHistoryFinder(repository, authorizer).find(
         new CallHistoryFindMessage(participantIdentityId),
       ),
-    ).resolves.toBe(calls);
+    ).resolves.toEqual(calls);
   });
 
   it('CallFinder returns a call visible to the requester', async () => {
@@ -62,7 +68,7 @@ describe('Call application use cases', () => {
     call.hasParticipant.mockReturnValue(true);
 
     await expect(
-      new CallFinder(repository).find(
+      new CallFinder(repository, authorizer).find(
         new CallFindMessage(callId, participantIdentityId),
       ),
     ).resolves.toBe(call);
@@ -76,10 +82,32 @@ describe('Call application use cases', () => {
     call.hasParticipant.mockReturnValue(false);
 
     await expect(
-      new CallFinder(repository).find(
+      new CallFinder(repository, authorizer).find(
         new CallFindMessage(callId, participantIdentityId),
       ),
     ).rejects.toBeInstanceOf(CallNotFoundError);
+  });
+
+  it('rejects a historical participant after current scope access is revoked', async () => {
+    const repository = mock<CallRepository>();
+    const access = mock<CallAccessAuthorizer>();
+    const call = mock<Call>();
+    repository.findById.mockResolvedValue(call);
+    repository.findActiveByParticipant.mockResolvedValue([call]);
+    repository.findByParticipant.mockResolvedValue([call]);
+    call.hasParticipant.mockReturnValue(true);
+    access.assertAccess.mockRejectedValue(new CallNotFoundError());
+    access.canAccess.mockResolvedValue(false);
+
+    await expect(new CallFinder(repository, access).find(new CallFindMessage(callId, participantIdentityId))).rejects.toBeInstanceOf(CallNotFoundError);
+    await expect(new ActiveCallsFinder(repository, access).find(new ActiveCallsFindMessage(participantIdentityId))).resolves.toEqual([]);
+    await expect(new CallHistoryFinder(repository, access).find(new CallHistoryFindMessage(participantIdentityId))).resolves.toEqual([]);
+    const events = mock<DomainEventPublisher>();
+    const leases = mock<CallParticipantLeaseRenewer>();
+    await expect(new CallJoiner(repository, events, leases, access).join(new CallJoinMessage(callId, participantIdentityId))).rejects.toBeInstanceOf(CallNotFoundError);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(leases.renew).not.toHaveBeenCalled();
+    expect(events.publish).not.toHaveBeenCalled();
   });
 
   it('CallParticipantLeaseFinder delegates all requested call ids', async () => {
@@ -108,7 +136,7 @@ describe('Call application use cases', () => {
     call.pullDomainEvents.mockReturnValue(events);
 
     await expect(
-      new CallEnder(repository, eventPublisher).end(
+      new CallEnder(repository, eventPublisher, authorizer).end(
         new CallEndMessage(callId, participantIdentityId),
       ),
     ).resolves.toBe(call);
@@ -130,7 +158,7 @@ describe('Call application use cases', () => {
     leaseRenewer.renew.mockResolvedValue(lease);
 
     await expect(
-      new CallJoiner(repository, eventPublisher, leaseRenewer).join(
+      new CallJoiner(repository, eventPublisher, leaseRenewer, authorizer).join(
         new CallJoinMessage(callId, participantIdentityId),
       ),
     ).resolves.toBe(call);
@@ -153,7 +181,7 @@ describe('Call application use cases', () => {
     leaseReleaser.release.mockResolvedValue([lease]);
 
     await expect(
-      new CallLeaver(repository, eventPublisher, leaseReleaser).leave(
+      new CallLeaver(repository, eventPublisher, leaseReleaser, authorizer).leave(
         new CallLeaveMessage(callId, participantIdentityId),
       ),
     ).resolves.toBe(call);
@@ -165,7 +193,7 @@ describe('Call application use cases', () => {
 
   it.each([
     ['CallEnder', (repository: CallRepository) =>
-      new CallEnder(repository, mock<DomainEventPublisher>()).end(
+      new CallEnder(repository, mock<DomainEventPublisher>(), authorizer).end(
         new CallEndMessage(callId, participantIdentityId),
       )],
     ['CallJoiner', (repository: CallRepository) =>
@@ -173,12 +201,14 @@ describe('Call application use cases', () => {
         repository,
         mock<DomainEventPublisher>(),
         mock<CallParticipantLeaseRenewer>(),
+        authorizer,
       ).join(new CallJoinMessage(callId, participantIdentityId))],
     ['CallLeaver', (repository: CallRepository) =>
       new CallLeaver(
         repository,
         mock<DomainEventPublisher>(),
         mock<CallParticipantLeaseReleaser>(),
+        authorizer,
       ).leave(new CallLeaveMessage(callId, participantIdentityId))],
   ])('%s rejects a missing call', async (_name, run) => {
     const repository = mock<CallRepository>();

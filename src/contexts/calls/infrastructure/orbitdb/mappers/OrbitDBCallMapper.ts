@@ -17,6 +17,9 @@ export default class OrbitDBCallMapper {
       participants: primitives.participants,
       scope: primitives.scope,
       status: primitives.status,
+      ...(primitives.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: primitives.sessionEpoch }),
       updatedAt: Date.now(),
     };
   }
@@ -33,6 +36,9 @@ export default class OrbitDBCallMapper {
       participants: document.participants,
       scope: document.scope,
       status: document.status,
+      ...(document.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: document.sessionEpoch }),
     });
   }
 
