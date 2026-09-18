@@ -21,6 +21,7 @@ import { CallParticipantLeftEvent } from './events/CallParticipantLeftEvent';
 import { CallParticipantMissedEvent } from './events/CallParticipantMissedEvent';
 import { CallStartedEvent } from './events/CallStartedEvent';
 import { CallId } from './value-objects/CallId';
+import { CallSessionEpoch } from './value-objects/CallSessionEpoch';
 import { CallSignalId } from './value-objects/CallSignalId';
 import { CallSignalType } from './value-objects/CallSignalType';
 import { CallStatus } from './value-objects/CallStatus';
@@ -31,6 +32,7 @@ export class Call extends AggregateRoot {
     networkId: NetworkId,
     scope: CallScope,
     participantIds: IdentityId[],
+    sessionEpoch?: CallSessionEpoch,
   ): Call {
     const participants = [
       CallParticipant.joined(creatorIdentityId),
@@ -39,12 +41,20 @@ export class Call extends AggregateRoot {
         .map((participant) => CallParticipant.ringing(participant)),
     ];
     const call = new Call(
-      CallId.generate(),
+      sessionEpoch && scope.isCommunityChannel()
+        ? CallId.communitySession(
+            networkId,
+            scope.getCommunityId()!,
+            scope.getCommunityChannelId()!,
+            sessionEpoch,
+          )
+        : CallId.generate(),
       networkId,
       scope,
       creatorIdentityId,
       participants,
       CallLifecycle.active(),
+      sessionEpoch,
     );
 
     call.record(call.createStartedEvent());
@@ -67,6 +77,9 @@ export class Call extends AggregateRoot {
         primitives.endedAt ? new Timestamp(primitives.endedAt) : undefined,
         primitives.endedByIdentityId,
       ),
+      primitives.sessionEpoch === undefined
+        ? undefined
+        : new CallSessionEpoch(primitives.sessionEpoch),
     );
   }
 
@@ -77,6 +90,7 @@ export class Call extends AggregateRoot {
     private readonly creatorIdentityId: IdentityId,
     private readonly participants: CallParticipant[],
     private readonly lifecycle: CallLifecycle,
+    private readonly sessionEpoch?: CallSessionEpoch,
   ) {
     super();
   }
@@ -106,6 +120,9 @@ export class Call extends AggregateRoot {
       participants: primitives.participants,
       scope: primitives.scope,
       status: primitives.status,
+      ...(primitives.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: primitives.sessionEpoch }),
     };
   }
 
@@ -268,6 +285,10 @@ export class Call extends AggregateRoot {
     );
   }
 
+  public getSessionEpoch(): CallSessionEpoch | undefined {
+    return this.sessionEpoch;
+  }
+
   public getScope(): CallScope {
     return this.scope;
   }
@@ -373,6 +394,9 @@ export class Call extends AggregateRoot {
       participants,
       scope: this.scope.toPrimitives(),
       status: this.lifecycle.getStatus().valueOf(),
+      ...(this.sessionEpoch
+        ? { sessionEpoch: this.sessionEpoch.valueOf() }
+        : {}),
     };
   }
 }

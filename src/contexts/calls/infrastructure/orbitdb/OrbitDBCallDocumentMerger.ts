@@ -103,6 +103,17 @@ export default class OrbitDBCallDocumentMerger {
 
     return {
       ...base,
+      ...(documents.some((document) => document.sessionEpoch !== undefined)
+        ? {
+            sessionEpoch: Math.max(
+              ...documents.map((document) => document.sessionEpoch ?? 0),
+            ),
+          }
+        : {}),
+      createdAt: Math.min(...documents.map((document) => document.createdAt)),
+      creatorIdentityId: documents
+        .map((document) => document.creatorIdentityId)
+        .sort()[0],
       participantIds: [
         ...new Set(documents.flatMap((document) => document.participantIds)),
       ].sort(),

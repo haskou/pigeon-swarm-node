@@ -40,10 +40,25 @@ try {
     const page = await context.newPage();
     pages.push(page);
     page.setDefaultTimeout(45000);
-    const observation = { gets: [], heartbeats: [], snapshots: [], errors: [] };
+    const observation = {
+      gets: [],
+      heartbeats: [],
+      snapshots: [],
+      errors: [],
+      starts: [],
+    };
     observations.push(observation);
     page.on('response', async (response) => {
       const pathname = new URL(response.url()).pathname;
+      if (
+        response.request().method() === 'POST' &&
+        /^\/calls\/?$/.test(pathname) &&
+        response.ok()
+      ) {
+        const call = await response.json();
+        observation.starts.push(call);
+        console.log('START ' + index + ' ' + call.id);
+      }
       if (
         response.request().method() === 'GET' &&
         /^\/calls\/[^/]+\/?$/.test(pathname)
@@ -142,13 +157,20 @@ try {
       );
   };
   setStage('join voice');
-  for (const page of pages) {
-    await page
-      .getByRole('button', { name: 'Privacy browser community', exact: true })
-      .click();
-    await join(page);
-  }
+  await Promise.all(
+    pages.map((page) =>
+      page
+        .getByRole('button', { name: 'Privacy browser community', exact: true })
+        .click(),
+    ),
+  );
+  await Promise.all(pages.map(join));
   await presence(2);
+  assert.equal(
+    observations[0].starts[0].id,
+    observations[1].starts[0].id,
+    'Both nodes must select the same fresh session',
+  );
   setStage('stable membership');
   await pause(3000);
   const boundaries = observations.map((o) => ({
@@ -201,6 +223,23 @@ try {
   );
 } catch (error) {
   console.error('FAIL browser stage ' + stage);
+  console.error(
+    JSON.stringify(
+      observations.map((entry) => ({
+        starts: entry.starts.map((call) => call.id),
+        lastSnapshots: entry.snapshots
+          .slice(-3)
+          .map((call) => ({
+            id: call.id,
+            participantCount: call.participants.length,
+          })),
+        heartbeatStatuses: entry.heartbeats.map(
+          (heartbeat) => heartbeat.status,
+        ),
+        errors: entry.errors,
+      })),
+    ),
+  );
   console.error(error);
   for (const [index, page] of pages.entries()) {
     console.error(

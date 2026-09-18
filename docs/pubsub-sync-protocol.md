@@ -348,3 +348,13 @@ necessary for delayed replication, so community session rotation and durable
 metadata retention still require the storage protocol migration in #33. Existing replicated history and copies held by peers cannot be
 made confidential retroactively by filtering HTTP or WebSocket fields. See the
 storage migration and metadata issues for stronger storage guarantees.
+
+Community call documents carry a positive `sessionEpoch` for new sessions.
+Concurrent starts derive one UUID from the private network, community, channel
+and epoch; they do not select a random ID independently. Start/reuse decisions
+use one scope-history snapshot. After explicit termination the next epoch is
+one greater than the largest known epoch, independent of clock order. Existing
+active legacy IDs remain usable. A replica missing newer history may select an
+older epoch, which remains subject to its replicated termination; this is not
+consensus or automatic reconciliation of legacy duplicate sessions. The epoch
+stays in node-to-node records and is not added to the browser live contract.

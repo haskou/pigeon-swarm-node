@@ -62,6 +62,26 @@ describe('OrbitDBCallDocumentMerger', () => {
     expect(merger.merge(ended, active).status).toBe(status);
   });
 
+  it('preserves the session epoch when an older node omits it from a newer update', () => {
+    const current = { ...document([], 10), sessionEpoch: 3 };
+    const legacy = document([], 20);
+    expect(merger.merge(current, legacy).sessionEpoch).toBe(3);
+    expect(merger.merge(legacy, current).sessionEpoch).toBe(3);
+  });
+
+  it('selects immutable session fields independently of accumulated update timestamps', () => {
+    const a = { ...document([], 1), status: 'ended', endedAt: 10, creatorIdentityId: 'z', createdAt: 1 };
+    const b = { ...document([], 100), creatorIdentityId: 'c', createdAt: 2 };
+    const c = { ...document([], 50), status: 'ended', endedAt: 10, creatorIdentityId: 'b', createdAt: 3 };
+    const expected = merger.merge(merger.merge(a, b), c);
+    for (const order of [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]]) {
+      const result = order.reduce((current, incoming) => merger.merge(current, incoming), undefined as OrbitDBCallDocument | undefined);
+      expect(result).toEqual(expected);
+    }
+    expect(expected.creatorIdentityId).toBe('b');
+    expect(expected.createdAt).toBe(1);
+  });
+
   it('converges across three versions, duplicates and every delivery order', () => {
     const a = document(
       [{ identityId: 'a', status: 'joined', joinedAt: 20 }],

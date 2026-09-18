@@ -20,6 +20,7 @@ import {
 
 type LiveCall = {
   id: string;
+  status: string;
   participants: Array<{
     identityId: string;
     connected: boolean;
@@ -252,37 +253,35 @@ async function main(): Promise<void> {
       communityId: community.id,
       scopeType: 'community_channel',
     };
-    let call: LiveCall | undefined;
     await waitFor(async () => {
-      try {
-        call = await request<LiveCall>(
-          nodes[0],
-          'POST',
-          '/calls/',
-          scope,
-          identities[0],
-        );
-
-        return true;
-      } catch {
-        return false;
-      }
-    }, 'community membership replication');
-    assert.ok(call);
-    const callId = call.id;
+      const replicated = await request<{
+        voiceChannels: Array<{ id: string }>;
+      }>(
+        nodes[1],
+        'GET',
+        `/communities/${community.id}`,
+        undefined,
+        identities[1],
+      );
+      return replicated.voiceChannels.some(
+        (candidate) => candidate.id === channel.id,
+      );
+    }, 'voice channel replication');
     const streams = await Promise.all(
       nodes.map((node, index) => socket(node, identities[index])),
     );
     sockets.push(...streams.map((stream) => stream.ws));
-    await waitFor(async () => {
-      try {
-        await request(nodes[1], 'POST', '/calls/', scope, identities[1]);
-
-        return true;
-      } catch {
-        return false;
-      }
-    }, 'remote call join');
+    const started = await Promise.all(
+      nodes.map((node, index) =>
+        request<LiveCall>(node, 'POST', '/calls/', scope, identities[index]),
+      ),
+    );
+    assert.equal(
+      started[0].id,
+      started[1].id,
+      'Concurrent fresh starts must select one channel session',
+    );
+    let callId = started[0].id;
     const converge = async (expected: string[]): Promise<void> => {
       await waitFor(async () => {
         const snapshots = await Promise.all(
@@ -369,6 +368,41 @@ async function main(): Promise<void> {
     await Promise.all(
       nodes.map((node, index) => heartbeat(node, identities[index], callId)),
     );
+    await converge(identities.map((identity) => identity.id));
+    const previousCallId = callId;
+    await request(
+      nodes[0],
+      'DELETE',
+      `/calls/${callId}`,
+      undefined,
+      identities[0],
+    );
+    await waitFor(async () => {
+      const ended = await request<LiveCall>(
+        nodes[1],
+        'GET',
+        `/calls/${callId}`,
+        undefined,
+        identities[1],
+      );
+      return ended.status === 'ended';
+    }, 'explicit session termination replication');
+    const restarted = await Promise.all(
+      nodes.map((node, index) =>
+        request<LiveCall>(node, 'POST', '/calls/', scope, identities[index]),
+      ),
+    );
+    assert.equal(
+      restarted[0].id,
+      restarted[1].id,
+      'Concurrent restarts must select the same next session',
+    );
+    assert.notEqual(
+      restarted[0].id,
+      previousCallId,
+      'An ended session must not be resurrected',
+    );
+    callId = restarted[0].id;
     await converge(identities.map((identity) => identity.id));
     streams[0].ws.close();
     const reconnected = await socket(nodes[0], identities[0]);

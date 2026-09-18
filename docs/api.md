@@ -417,6 +417,11 @@ Legacy notifications without a snapshot use one outstanding fetch per call,
 coalesced and limited to one start per second. Stable heartbeats do not trigger
 full-call GETs. ICE negotiation and actual audio remain separate from presence.
 
+Community starts for the same known session use a shared, scoped identifier
+across nodes. Explicit termination advances a persisted session epoch on the
+next start; clock differences do not determine that epoch. Existing active
+legacy sessions remain usable.
+
 ### Presence retention
 
 Runtime leases are memory-only. A lease expires after five seconds without a
