@@ -113,7 +113,9 @@ type HttpRequestError = Error & {
   };
 };
 
-const ROOT = path.resolve(__dirname, '../../..');
+const ROOT = path.resolve(
+  process.env.PIGEON_TEST_SOURCE_ROOT || path.resolve(__dirname, '../../..'),
+);
 const TMP_ROOT = path.join(ROOT, '.tmp', 'two-real-node-gossipsub-e2e');
 const NODE_COMMAND = process.execPath;
 const NODE_ARGS = [
@@ -1159,7 +1161,23 @@ async function waitFor(
   throw new Error(`Timed out waiting for ${label}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
+
+export {
+  buildNodeRuntime,
+  startNode,
+  stopNode,
+  addPrivateNetwork,
+  publishIdentity,
+  signHeaders,
+  signRequest,
+  request,
+  waitFor,
+  NETWORK_ID,
+};
+export type { NodeRuntime, IdentityFixture };

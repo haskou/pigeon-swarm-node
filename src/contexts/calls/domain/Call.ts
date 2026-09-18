@@ -197,12 +197,27 @@ export class Call extends AggregateRoot {
     }
 
     participant.leave();
+
+    if (
+      this.scope.isConversation() &&
+      (this.participants.length === 2 ||
+        !this.participants.some((candidate) => candidate.isJoined()))
+    ) {
+      this.lifecycle.end(identityId.valueOf());
+    }
+
     this.record(
       new CallParticipantLeftEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
         leftIdentityId: identityId.valueOf(),
       }),
     );
+
+    if (!this.isActive()) {
+      this.record(
+        new CallEndedEvent(this.id.valueOf(), this.baseEventAttributes()),
+      );
+    }
   }
 
   public end(identityId: IdentityId): void {
@@ -253,6 +268,10 @@ export class Call extends AggregateRoot {
     );
   }
 
+  public getScope(): CallScope {
+    return this.scope;
+  }
+
   public getId(): CallId {
     return this.id;
   }
@@ -263,6 +282,14 @@ export class Call extends AggregateRoot {
 
   public getCommunityChannelId(): CommunityChannelId | undefined {
     return this.scope.getCommunityChannelId();
+  }
+
+  public getActiveParticipants(): CallParticipant[] {
+    return this.isActive()
+      ? this.participants.filter((participant) =>
+          participant.isActiveReceiver(),
+        )
+      : [];
   }
 
   public getJoinedParticipantIds(): IdentityId[] {

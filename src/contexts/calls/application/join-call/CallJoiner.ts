@@ -3,6 +3,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
+import CallAccessAuthorizer from '../authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import { CallJoinMessage } from './messages/CallJoinMessage';
 
@@ -11,6 +12,7 @@ export default class CallJoiner {
     private readonly repository: CallRepository,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly leaseRenewer: CallParticipantLeaseRenewer,
+    private readonly accessAuthorizer: CallAccessAuthorizer,
   ) {}
 
   public async join(message: CallJoinMessage): Promise<Call> {
@@ -19,6 +21,11 @@ export default class CallJoiner {
     if (!call) {
       throw new CallNotFoundError();
     }
+
+    await this.accessAuthorizer.assertAccess(
+      call,
+      message.participantIdentityId,
+    );
 
     call.join(message.participantIdentityId);
 

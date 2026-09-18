@@ -167,9 +167,10 @@ they contain no heartbeat timestamp.
 
 Media connection reports are replaced on every participant heartbeat. They
 describe the selected ICE path observed by the browser for each remote
-participant. A report change is forwarded to participant WebSockets; identical
-heartbeat snapshots remain node-to-node only. Reports are cleared when the
-lease disconnects and are never persisted in OrbitDB/IPFS.
+participant. Reports remain node-to-node only; browser live snapshots omit
+ICE diagnostics, lease ownership and heartbeat timestamps. Only presence
+changes trigger browser snapshots. Reports are cleared when the lease
+disconnects and are never persisted in OrbitDB/IPFS.
 
 ## Call signal delivery
 
@@ -320,3 +321,30 @@ and remove their temporary data. The check runs
 in `test:ci`; unit regressions additionally exercise three-write permutations, stale
 grants, role/channel deletion, legacy replay and malformed metadata. Loopback transport
 does not validate external NAT traversal or calls.
+
+## Live call projection boundary
+
+Node-to-node lifecycle documents retain merge tombstones; runtime leases stay
+in memory (five-second timeout, sixty-second disconnected retention). WebSocket
+clients do not receive these raw documents or lease attributes. They receive
+`callId`, `liveCallRevision` and a minimal `liveCall` projection, filtered by
+current conversation/community/channel access at delivery time. Browser event
+aggregate IDs identify the call, never the composite participant/owner lease. The revision
+is local to the connected server; clients reset tracking after reconnect.
+Signal delivery retains only recipient/sender, signal payload/type/id, attempt
+and expiry timing; it omits the historical participant list and owning-node ID.
+
+Projection changes emit local snapshot notifications after OrbitDB state is
+merged. Applying a remote lease compares the local before/after connection
+state so an unchanged owner heartbeat can restore a locally expired peer.
+These notifications are not replicated domain events and do not amplify gossip.
+Local expiry of a remote lease likewise updates only local sockets. Unchanged
+heartbeats and media-only changes do not trigger roster delivery.
+
+Explicitly ending a community call retires its session; the next session starts
+a new roster. Merely leaving does not globally terminate a channel: a local
+roster can lag behind a concurrent remote join. Participant tombstones remain
+necessary for delayed replication, so community session rotation and durable
+metadata retention still require the storage protocol migration in #33. Existing replicated history and copies held by peers cannot be
+made confidential retroactively by filtering HTTP or WebSocket fields. See the
+storage migration and metadata issues for stronger storage guarantees.

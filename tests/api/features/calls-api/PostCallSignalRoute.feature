@@ -29,4 +29,4 @@ Feature: Send call signal
     And I sign the current call signal request
     When I POST a signal to the current call
     Then response code is equal to 409
-    And response body should contain "CallParticipantNotFoundError"
+    And response body should contain "CallNotFoundError"

@@ -16,4 +16,4 @@ Feature: Leave call participant
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status | missed |
-    And response body should contain "declined"
+    And response body should contain "missed"

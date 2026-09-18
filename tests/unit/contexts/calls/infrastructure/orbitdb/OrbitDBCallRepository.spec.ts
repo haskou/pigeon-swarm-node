@@ -1,3 +1,4 @@
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/documents/OrbitDBCallDocument';
@@ -271,6 +272,33 @@ describe('OrbitDBCallRepository', () => {
     await expect(repository.findById(new CallId(callId))).resolves.toEqual(
       expect.objectContaining({ getId: expect.any(Function) }),
     );
+  });
+
+  it('notifies live clients when a replicated participant arrives after its lease', async () => {
+    const notify = jest.spyOn(webSocketEventHub, 'publishCallSnapshot');
+    const initial = document();
+    calls.emitUpdate(initial);
+    await flushBackgroundTasks();
+    notify.mockClear();
+
+    const joined = {
+      ...document('active', 1_780_000_005_000),
+      participants: initial.participants.map((participant) => ({
+        ...participant,
+        joinedAt: 1_780_000_005_000,
+        status: 'joined',
+      })),
+    };
+    calls.emitUpdate(joined);
+    await flushBackgroundTasks();
+
+    expect(notify).toHaveBeenCalledWith(callId, joined.participantIds);
+    expect(notify).toHaveBeenCalledTimes(1);
+    calls.emitUpdate(joined);
+    calls.emitUpdate(initial);
+    await flushBackgroundTasks();
+    expect(notify).toHaveBeenCalledTimes(1);
+    notify.mockRestore();
   });
 
   it('ignores stale replicated documents', async () => {
