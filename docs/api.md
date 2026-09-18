@@ -410,6 +410,9 @@ server, not an OrbitDB revision or cross-node clock. Reset revision tracking on
 each connection acknowledgement; reject older/duplicate revisions per call.
 Load the call list on initial connection/reconnect, preserving any newer
 WebSocket snapshots received while the recovery request was outstanding.
+Recovery makes at most three attempts with one- and two-second delays, deduplicates
+pending requests and discards responses from an earlier connection generation.
+Malformed snapshots trigger bounded per-call recovery; stale revisions do not.
 Legacy notifications without a snapshot use one outstanding fetch per call,
 coalesced and limited to one start per second. Stable heartbeats do not trigger
 full-call GETs. ICE negotiation and actual audio remain separate from presence.

@@ -1,3 +1,4 @@
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
@@ -54,6 +55,24 @@ async function flush() {
 }
 
 describe('live call privacy', () => {
+  it('retains the conversation ender without exposing a community session ender', () => {
+    const direct = Call.start(
+      creator,
+      network,
+      CallScope.conversation(new ConversationId('conversation-1')),
+      [other],
+    );
+    direct.end(creator);
+    const directResource = new CallViewModel(direct, [], []).toResource();
+    expect(directResource.endedByIdentityId).toBe(creator.valueOf());
+    expect(directResource.endedAt).toEqual(expect.any(Number));
+    const communityCall = startCall();
+    communityCall.end(creator);
+    expect(
+      new CallViewModel(communityCall, [], []).toResource(),
+    ).not.toHaveProperty('endedByIdentityId');
+  });
+
   it('exposes only current presence, without departed identities, session history or transport diagnostics', () => {
     const call = startCall();
     call.joinOrAdd(other);

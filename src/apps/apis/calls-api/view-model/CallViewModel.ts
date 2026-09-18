@@ -54,6 +54,9 @@ export class CallViewModel {
             createdAt: primitives.createdAt,
             creatorIdentityId: primitives.creatorIdentityId,
             ...(primitives.endedAt ? { endedAt: primitives.endedAt } : {}),
+            ...(primitives.endedByIdentityId
+              ? { endedByIdentityId: primitives.endedByIdentityId }
+              : {}),
           }
         : {}),
       participantIds: participants.map((participant) => participant.identityId),
