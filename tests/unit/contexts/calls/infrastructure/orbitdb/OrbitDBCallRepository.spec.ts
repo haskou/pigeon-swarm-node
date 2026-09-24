@@ -1,3 +1,8 @@
+import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
+import InMemoryCallParticipantLeaseRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/documents/OrbitDBCallDocument';
@@ -73,6 +78,7 @@ describe('OrbitDBCallRepository', () => {
   let projection: OrbitDBCallProjection;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCallRepository;
+  let leases: InMemoryCallParticipantLeaseRepository;
 
   function communityCall(status: 'active' | 'ended' = 'active'): Call {
     return Call.fromPrimitives({
@@ -126,10 +132,12 @@ describe('OrbitDBCallRepository', () => {
       new OrbitDBCallDocumentMerger(),
       new OrbitDBCallDocumentReplicator(registry),
     );
+    leases = new InMemoryCallParticipantLeaseRepository();
     repository = new OrbitDBCallRepository(
       new OrbitDBCallMapper(),
       new OrbitDBCallDocumentReplicator(registry),
       projection,
+      leases,
     );
     await projection.start();
   }
@@ -207,6 +215,7 @@ describe('OrbitDBCallRepository', () => {
       new OrbitDBCallMapper(),
       new OrbitDBCallDocumentReplicator(registry),
       unstartedProjection,
+      new InMemoryCallParticipantLeaseRepository(),
     );
 
     await expect(
@@ -236,10 +245,10 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toBeDefined();
     await expect(
       repository.findByParticipant(new IdentityId(participantIdentityId)),
-    ).resolves.toHaveLength(1);
+    ).resolves.toHaveLength(0);
     await expect(
       repository.findTimedOutRingingCalls(new Timestamp(1_780_000_000_000)),
-    ).resolves.toHaveLength(1);
+    ).resolves.toHaveLength(0);
 
     await repository.save(communityCall('ended'));
 
@@ -273,6 +282,33 @@ describe('OrbitDBCallRepository', () => {
     );
   });
 
+  it('notifies live clients when a replicated participant arrives after its lease', async () => {
+    const notify = jest.spyOn(webSocketEventHub, 'publishCallSnapshot');
+    const initial = document();
+    calls.emitUpdate(initial);
+    await flushBackgroundTasks();
+    notify.mockClear();
+
+    const joined = {
+      ...document('active', 1_780_000_005_000),
+      participants: initial.participants.map((participant) => ({
+        ...participant,
+        joinedAt: 1_780_000_005_000,
+        status: 'joined',
+      })),
+    };
+    calls.emitUpdate(joined);
+    await flushBackgroundTasks();
+
+    expect(notify).toHaveBeenCalledWith(callId);
+    expect(notify).toHaveBeenCalledTimes(1);
+    calls.emitUpdate(joined);
+    calls.emitUpdate(initial);
+    await flushBackgroundTasks();
+    expect(notify).toHaveBeenCalledTimes(1);
+    notify.mockRestore();
+  });
+
   it('ignores stale replicated documents', async () => {
     calls.emitUpdate(document('ended', 1_780_000_005_000));
     calls.emitUpdate(document('active', 1_780_000_000_000));
@@ -284,7 +320,7 @@ describe('OrbitDBCallRepository', () => {
   });
 
   it.each(['forward', 'reverse'] as const)(
-    'preserves both participants latest rejoins from competing snapshots in %s order',
+    'does not restore community participation from competing legacy snapshots in %s order',
     async (order) => {
       const creatorRejoined = {
         identityId: creatorIdentityId,
@@ -336,14 +372,30 @@ describe('OrbitDBCallRepository', () => {
       for (const identityId of [creatorIdentityId, participantIdentityId]) {
         expect(() =>
           call!.assertParticipantCanHeartbeat(new IdentityId(identityId)),
-        ).not.toThrow();
+        ).toThrow();
       }
-      expect(call!.toPrimitives().participants).toEqual([
-        creatorRejoined,
-        participantRejoined,
-      ]);
+      expect(call!.toPrimitives().participants).toEqual([]);
     },
   );
+
+  it('derives community membership only from expiring runtime grants', async () => {
+    await repository.save(communityCall());
+    const participant = new IdentityId(participantIdentityId);
+    const lease = CallParticipantLease.connect(new CallId(callId), participant,
+      new NodeId('550e8400-e29b-41d4-a716-446655440003'), new NetworkId(networkId), [participant]);
+    await leases.save(lease);
+    await expect(repository.findActiveByParticipant(participant)).resolves.toHaveLength(1);
+    expect((await repository.findById(new CallId(callId)))!.hasJoinedParticipant(participant)).toBe(true);
+    lease.disconnect();
+    await leases.save(lease);
+    expect((await repository.findById(new CallId(callId)))!.hasJoinedParticipant(participant)).toBe(true);
+    lease.leave();
+    await leases.save(lease);
+    expect((await repository.findById(new CallId(callId)))!.hasJoinedParticipant(participant)).toBe(false);
+    await expect(repository.findActiveByParticipant(participant)).resolves.toEqual([]);
+    const raw = new OrbitDBCallMapper().toDocument(communityCall());
+    expect(JSON.stringify(raw)).not.toContain(participantIdentityId);
+  });
 
   it('registers gossip replicas for immediate reads without persistence', async () => {
     await repository.registerReplica(communityCall());

@@ -1,8 +1,12 @@
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import { CallParticipantLeaseWasUpdatedEvent } from '@app/contexts/calls/domain/events/CallParticipantLeaseWasUpdatedEvent';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
+import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
@@ -72,25 +76,58 @@ export default class RegisterCallParticipantLeaseWhenUpdated extends Consumer {
       }));
   }
 
+  private leaseFrom(event: DomainEvent): CallParticipantLease {
+    return CallParticipantLease.fromPrimitives({
+      callId: String(event.attributes.callId),
+      lastHeartbeatAt: Number(event.attributes.lastHeartbeatAt),
+      ...(typeof event.attributes.lastRenewedAt === 'number'
+        ? { lastRenewedAt: event.attributes.lastRenewedAt }
+        : {}),
+      ...(typeof event.attributes.leftAt === 'number'
+        ? { leftAt: event.attributes.leftAt }
+        : {}),
+      mediaConnections: this.mediaConnectionsFrom(
+        event.attributes.mediaConnections,
+      ),
+      networkId: String(event.attributes.networkId),
+      ownerNodeId: String(event.attributes.ownerNodeId),
+      participantIdentityId: String(event.attributes.participantIdentityId),
+      participantIds: Array.isArray(event.attributes.participantIds)
+        ? event.attributes.participantIds.filter(
+            (participantId): participantId is string =>
+              typeof participantId === 'string',
+          )
+        : [],
+      status: String(event.attributes.status),
+    });
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
-    await this.repository.save(
-      CallParticipantLease.fromPrimitives({
-        callId: String(event.attributes.callId),
-        lastHeartbeatAt: Number(event.attributes.lastHeartbeatAt),
-        mediaConnections: this.mediaConnectionsFrom(
-          event.attributes.mediaConnections,
-        ),
-        networkId: String(event.attributes.networkId),
-        ownerNodeId: String(event.attributes.ownerNodeId),
-        participantIdentityId: String(event.attributes.participantIdentityId),
-        participantIds: Array.isArray(event.attributes.participantIds)
-          ? event.attributes.participantIds.filter(
-              (participantId): participantId is string =>
-                typeof participantId === 'string',
-            )
-          : [],
-        status: String(event.attributes.status),
-      }),
+    const lease = this.leaseFrom(event);
+
+    if (!lease.isWithinRetention()) return;
+
+    const callId = new CallId(String(event.attributes.callId));
+    const before = await this.repository.findByCallIds([callId]);
+    const previous = before.find((candidate) =>
+      candidate.belongsTo(
+        new IdentityId(String(event.attributes.participantIdentityId)),
+        new NodeId(String(event.attributes.ownerNodeId)),
+      ),
     );
+    await this.repository.save(lease);
+    const after = await this.repository.findByCallIds([callId]);
+    const current = after.find((candidate) =>
+      candidate.belongsTo(
+        new IdentityId(String(event.attributes.participantIdentityId)),
+        new NodeId(String(event.attributes.ownerNodeId)),
+      ),
+    );
+
+    if (
+      (previous?.isConnected() ?? false) !== (current?.isConnected() ?? false)
+    ) {
+      webSocketEventHub.publishCallSnapshot(callId.valueOf());
+    }
   }
 }

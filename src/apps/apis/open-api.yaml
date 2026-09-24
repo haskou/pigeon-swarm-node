@@ -62,6 +62,13 @@ paths:
         Heartbeat messages are not signed because the WebSocket upgrade already
         authenticated the connection.
 
+        Call presence notifications contain `attributes.callId`, a minimal
+        `attributes.liveCall` snapshot and `attributes.liveCallRevision`.
+        Apply snapshots directly; reset revision tracking on reconnect and load
+        the initial/recovery call list. Current scope permissions are checked
+        on every call delivery. Stable heartbeat renewals are not forwarded.
+        The heartbeat HTTP endpoint returns 204 without a roster.
+
         After successfully applying a `calls.v1.signal.sent` domain event,
         clients must send
         `{ "type": "call_signal_ack", "signalId": "<signalId>" }`.

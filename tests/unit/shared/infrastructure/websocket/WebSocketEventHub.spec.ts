@@ -1,3 +1,7 @@
+import { Call } from '@app/contexts/calls/domain/Call';
+import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
@@ -492,6 +496,7 @@ describe('WebSocketEventHub', () => {
     const recipientClient = buildClient();
     const otherParticipantClient = buildClient();
     const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
       participantIds: [
         senderIdentityId.valueOf(),
         recipientIdentityId.valueOf(),
@@ -509,14 +514,13 @@ describe('WebSocketEventHub', () => {
     hub.register(otherParticipantIdentityId, otherParticipantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
-    expect(recipientClient.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        event: JSON.parse(event.decode()),
-        type: 'domain_event',
-      }),
-    );
+    expect(JSON.parse((recipientClient.send as jest.Mock).mock.calls[0][0])).toMatchObject({
+      event: { type: event.eventName() }, type: 'domain_event',
+    });
     expect(senderClient.send).not.toHaveBeenCalled();
     expect(otherParticipantClient.send).not.toHaveBeenCalled();
   });
@@ -526,6 +530,7 @@ describe('WebSocketEventHub', () => {
     const participantIdentityId = await generateIdentityId();
     const participantClient = buildClient();
     const event = new TestDomainEvent('call-lease-id', {
+      callId: 'call-id',
       connectionChanged: true,
       participantIds: [participantIdentityId.valueOf()],
       status: 'disconnected',
@@ -537,14 +542,13 @@ describe('WebSocketEventHub', () => {
     hub.register(participantIdentityId, participantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
-    expect(participantClient.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        event: JSON.parse(event.decode()),
-        type: 'domain_event',
-      }),
-    );
+    expect(JSON.parse((participantClient.send as jest.Mock).mock.calls[0][0])).toMatchObject({
+      event: { type: event.eventName() }, type: 'domain_event',
+    });
   });
 
   it('does not send unchanged call lease heartbeat renewals to clients', async () => {
@@ -552,6 +556,7 @@ describe('WebSocketEventHub', () => {
     const participantIdentityId = await generateIdentityId();
     const participantClient = buildClient();
     const event = new TestDomainEvent('call-lease-id', {
+      callId: 'call-id',
       connectionChanged: false,
       participantIds: [participantIdentityId.valueOf()],
       status: 'connected',
@@ -563,16 +568,19 @@ describe('WebSocketEventHub', () => {
     hub.register(participantIdentityId, participantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
     expect(participantClient.send).not.toHaveBeenCalled();
   });
 
-  it('sends call media connection changes to call participants', async () => {
+  it('does not disclose media diagnostics through call lease events', async () => {
     const hub = new WebSocketEventHub();
     const participantIdentityId = await generateIdentityId();
     const participantClient = buildClient();
     const event = new TestDomainEvent('call-lease-id', {
+      callId: 'call-id',
       connectionChanged: false,
       mediaConnectionsChanged: true,
       participantIds: [participantIdentityId.valueOf()],
@@ -585,14 +593,11 @@ describe('WebSocketEventHub', () => {
     hub.register(participantIdentityId, participantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
-    expect(participantClient.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        event: JSON.parse(event.decode()),
-        type: 'domain_event',
-      }),
-    );
+    expect(participantClient.send).not.toHaveBeenCalled();
   });
 
   it('sends call participant roster changes to call participants', async () => {
@@ -600,6 +605,7 @@ describe('WebSocketEventHub', () => {
     const participantIdentityId = await generateIdentityId();
     const participantClient = buildClient();
     const event = new TestDomainEvent('call-lease-id', {
+      callId: 'call-id',
       connectionChanged: false,
       mediaConnectionsChanged: false,
       participantIds: [participantIdentityId.valueOf()],
@@ -613,14 +619,13 @@ describe('WebSocketEventHub', () => {
     hub.register(participantIdentityId, participantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
-    expect(participantClient.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        event: JSON.parse(event.decode()),
-        type: 'domain_event',
-      }),
-    );
+    expect(JSON.parse((participantClient.send as jest.Mock).mock.calls[0][0])).toMatchObject({
+      event: { type: event.eventName() }, type: 'domain_event',
+    });
   });
 
   it('does not forward internal signal acknowledgements to clients', async () => {
@@ -630,6 +635,7 @@ describe('WebSocketEventHub', () => {
     const senderClient = buildClient();
     const recipientClient = buildClient();
     const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
       recipientIdentityId: recipientIdentityId.valueOf(),
       senderIdentityId: senderIdentityId.valueOf(),
       signalId: '68da3440-c60e-4fe3-b86a-2b8931ea345f',
@@ -642,7 +648,9 @@ describe('WebSocketEventHub', () => {
     hub.register(recipientIdentityId, recipientClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
     expect(senderClient.send).not.toHaveBeenCalled();
     expect(recipientClient.send).not.toHaveBeenCalled();
@@ -668,7 +676,9 @@ describe('WebSocketEventHub', () => {
     hub.register(participantIdentityId, participantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
     const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
       .map(([message]) => JSON.parse(message as string));
@@ -736,7 +746,9 @@ describe('WebSocketEventHub', () => {
     hub.register(missedIdentityId, missedClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
     const realtimeMessages = (creatorClient.send as jest.Mock).mock.calls.map(
       ([message]) => JSON.parse(message as string),
@@ -788,7 +800,9 @@ describe('WebSocketEventHub', () => {
     hub.register(participantIdentityId, participantClient);
     jest.clearAllMocks();
 
+    authorizeCallAudience(hub);
     hub.publish([event]);
+    await flushPromises();
 
     const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
       .map(([message]) => JSON.parse(message as string));
@@ -909,4 +923,14 @@ async function flushPromises(): Promise<void> {
   await new Promise<void>((resolve) => {
     setImmediate(resolve);
   });
+}
+
+function authorizeCallAudience(hub: WebSocketEventHub): void {
+  const handler = buildClientMessageHandler();
+  handler.findCallAudience = jest.fn().mockImplementation(async (_callId: string, recipientIds: string[]) => {
+    const creator = new IdentityId(recipientIds.at(-1) ?? 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=');
+    const call = Call.start(creator, new NetworkId('550e8400-e29b-41d4-a716-446655440000'), CallScope.conversation(new ConversationId('conversation-1')), recipientIds.map((identityId) => new IdentityId(identityId)));
+    return { call, leases: [], participants: call.getParticipantIds(), recipientIds };
+  });
+  hub.setClientMessageHandler(handler);
 }

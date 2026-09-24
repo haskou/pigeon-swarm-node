@@ -45,10 +45,10 @@ function snapshot(
             },
     ),
     scope: {
-      channelId: 'channel-1',
-      communityId: 'community-1',
-      conversationId: undefined,
-      type: 'community_channel',
+      channelId: undefined,
+      communityId: undefined,
+      conversationId: 'conversation-1',
+      type: 'conversation',
     },
     status: 'active',
     updatedAt,
@@ -169,6 +169,30 @@ async function main(): Promise<void> {
     } while (Date.now() < deadline);
     assertBothJoined(persisted);
 
+    const communityCallId = '550e8400-e29b-41d4-a716-446655440099';
+    const legacyCommunity: OrbitDBCallDocument = {
+      ...first,
+      id: communityCallId,
+      scope: { type: 'community_channel', communityId: 'community-1', channelId: 'channel-1', conversationId: undefined },
+    };
+    await stores.calls.put!(JSON.parse(JSON.stringify(legacyCommunity)));
+    const communityProjection = await project(stores);
+    const projectedCommunity = await communityProjection.findById(new CallId(communityCallId));
+    assert.ok(projectedCommunity);
+    assert.deepEqual(projectedCommunity.participants, []);
+    assert.deepEqual(projectedCommunity.participantIds, []);
+    assert.equal(projectedCommunity.creatorIdentityId, undefined);
+    const repairDeadline = Date.now() + 2000;
+    let communityRecord: OrbitDBCallDocument | undefined;
+    do {
+      const record = await stores.calls.get!(communityCallId) as { value: OrbitDBCallDocument } | undefined;
+      communityRecord = record?.value;
+      if (communityRecord?.participantIds.length === 0 && !communityRecord.creatorIdentityId) break;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    } while (Date.now() < repairDeadline);
+    assert.ok(communityRecord);
+    for (const id of [creatorIdentityId, participantIdentityId]) assert.ok(!JSON.stringify(communityRecord).includes(id));
+
     await stores.stop();
     stores = await OrbitDBPrivateNetworkStores.open(network);
     const headsBeforeReplay = await stores.calls.log!.heads();
@@ -177,10 +201,13 @@ async function main(): Promise<void> {
     assert.deepEqual(await stores.calls.log!.heads(), headsBeforeReplay, 'Re-registering repaired history must not append another repair');
     const reopened = await project(stores);
     assertBothJoined(await reopened.findById(new CallId(callId)));
+    const reopenedCommunity = await reopened.findById(new CallId(communityCallId));
+    assert.deepEqual(reopenedCommunity?.participants, []);
+    assert.deepEqual(reopenedCommunity?.participantIds, []);
     await new Promise<void>((resolve) => setTimeout(resolve, 100));
     assert.deepEqual(await stores.calls.log!.heads(), headsBeforeReplay, 'Reopening repaired history must not append another repair');
     console.log(
-      'PASS: ancestor rejoin recovered, repaired document persisted, and fresh reopen retained both joined participants',
+      'PASS: conversation rejoins retained after reopen; community attribution repaired and not restored',
     );
   } finally {
     await stores?.stop();

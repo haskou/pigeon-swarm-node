@@ -5,7 +5,6 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostCallBody } from '../bodies/PostCallBody';
-import { CallViewModel } from '../view-model/CallViewModel';
 import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
@@ -29,10 +28,9 @@ export class PostCallRoute extends CallRouteSupport {
         body.invitedParticipantIds,
       ),
     );
-    const leases = await this.findParticipantLeases([call]);
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CallViewModel(call, leases).toResource());
+      .send(await this.presentCall(call));
   }
 }

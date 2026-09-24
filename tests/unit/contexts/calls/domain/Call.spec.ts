@@ -1,3 +1,5 @@
+import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
+import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallEndedEvent } from '@app/contexts/calls/domain/events/CallEndedEvent';
@@ -14,6 +16,8 @@ import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSig
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
+import { GroupConversationName } from '@app/contexts/conversations/domain/value-objects/GroupConversationName';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -210,13 +214,81 @@ describe('Call', () => {
     call.pullDomainEvents();
     call.join(recipient);
     call.pullDomainEvents();
-    call.leave(recipient);
+    call.leave(recipient, true);
 
     expect(call.toPrimitives().participants).toMatchObject([
       { identityId: creator.valueOf(), status: 'joined' },
       { identityId: recipient.valueOf(), status: 'left' },
     ]);
+    expect(call.toPrimitives().status).toBe('ended');
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallParticipantLeftEvent);
+  });
+
+  it('keeps a community session reusable after participants leave', () => {
+    const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
+    call.joinOrAdd(recipient);
+    call.leave(creator);
+    expect(call.isActive()).toBe(true);
+    call.leave(recipient);
+    expect(call.isActive()).toBe(true);
+    expect(() => call.joinOrAdd(creator)).not.toThrow();
+  });
+
+  it('does not end a community session when a remote join races with local departure', () => {
+    const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
+    const remote = Call.fromPrimitives(call.toPrimitives());
+    remote.joinOrAdd(recipient);
+    call.leave(creator);
+    const mapper = new OrbitDBCallMapper();
+    const merger = new OrbitDBCallDocumentMerger();
+    for (const pair of [[call, remote], [remote, call]]) {
+      const merged = mapper.toDomain(merger.merge(mapper.toDocument(pair[0]), mapper.toDocument(pair[1])));
+      expect(merged.isActive()).toBe(true);
+      expect(merged.getParticipantIds()).toEqual([]);
+      expect(merged.hasJoinedParticipant(creator)).toBe(false);
+    }
+  });
+
+  it('keeps a two-member group call active until the last joined participant leaves', () => {
+    const conversation = GroupConversation.create(
+      new GroupConversationName('Two-member group'),
+      [creator, recipient],
+      networkId,
+    );
+    const call = Call.start(
+      creator,
+      networkId,
+      CallScope.conversation(conversation.getId()),
+      [recipient],
+    );
+    call.join(recipient);
+    call.pullDomainEvents();
+
+    call.leave(recipient);
+
+    expect(call.isActive()).toBe(true);
+    expect(call.getJoinedParticipantIds()).toEqual([creator]);
+    expect(call.pullDomainEvents()).toEqual([
+      expect.any(CallParticipantLeftEvent),
+    ]);
+
+    call.leave(creator);
+
+    expect(call.isActive()).toBe(false);
+    expect(call.pullDomainEvents()).toEqual([
+      expect.any(CallParticipantLeftEvent),
+      expect.any(CallEndedEvent),
+    ]);
+  });
+
+  it('keeps a group conversation active when other participants remain', () => {
+    const third = new IdentityId('MCowBQYDK2VwAyEAoZUOXZj5HZm3Tb5CEojEXtNLxBIHkE2s28l/FsBICaU=');
+    const call = Call.start(creator, networkId, scope, [recipient, third]);
+    call.join(recipient);
+    call.join(third);
+    call.leave(recipient);
+    expect(call.isActive()).toBe(true);
+    expect(call.getJoinedParticipantIds()).toHaveLength(2);
   });
 
   it('clears a previous departure when a community participant rejoins', () => {

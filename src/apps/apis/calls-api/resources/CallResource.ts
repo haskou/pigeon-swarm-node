@@ -1,8 +1,8 @@
 import { CallParticipantMediaConnectionResource } from './CallParticipantMediaConnectionResource';
 
 export interface CallResource {
-  createdAt: number;
-  creatorIdentityId: string;
+  createdAt?: number;
+  creatorIdentityId?: string;
   endedAt?: number;
   endedByIdentityId?: string;
   id: string;

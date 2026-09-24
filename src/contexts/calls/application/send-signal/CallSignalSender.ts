@@ -6,6 +6,7 @@ import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallSignalDeliveryRepository from '../../domain/repositories/CallSignalDeliveryRepository';
 import { CallSignalId } from '../../domain/value-objects/CallSignalId';
+import CallAccessAuthorizer from '../authorize-call/CallAccessAuthorizer';
 import { CallSignalSendMessage } from './messages/CallSignalSendMessage';
 
 export default class CallSignalSender {
@@ -14,6 +15,7 @@ export default class CallSignalSender {
     private readonly deliveryRepository: CallSignalDeliveryRepository,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly nodeRepository: NodeRepository,
+    private readonly accessAuthorizer: CallAccessAuthorizer,
   ) {}
 
   public async send(
@@ -25,6 +27,10 @@ export default class CallSignalSender {
     if (!call) {
       throw new CallNotFoundError();
     }
+
+    await this.accessAuthorizer.assertAccess(call, message.senderIdentityId);
+
+    await this.accessAuthorizer.assertAccess(call, message.recipientIdentityId);
 
     await onCallFound?.();
 

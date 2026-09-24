@@ -43,6 +43,15 @@ describe('InMemoryCallParticipantLeaseRepository', () => {
     await expect(repository.findByCallIds([callId])).resolves.toHaveLength(0);
   });
 
+  it.each([true, false])('explicit leave dominates an equal-time timeout in either order (%s)', async (leftFirst) => {
+    const repository = new InMemoryCallParticipantLeaseRepository();
+    const expired = lease(firstNodeId, 100);
+    expired.disconnect(new Timestamp(200));
+    const left = CallParticipantLease.fromPrimitives({ ...expired.toPrimitives(), leftAt: 200 });
+    for (const update of leftFirst ? [left, expired] : [expired, left]) await repository.save(update);
+    expect((await repository.findByCallIds([callId]))[0].toPrimitives().leftAt).toBe(200);
+  });
+
   function lease(nodeId: NodeId, heartbeatAt: number): CallParticipantLease {
     return CallParticipantLease.connect(
       callId,

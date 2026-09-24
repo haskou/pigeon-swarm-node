@@ -1,8 +1,11 @@
+import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { randomUUID } from 'node:crypto';
 import { RawData, WebSocket } from 'ws';
 
+import { CallRealtimeAudience } from './CallRealtimeAudience';
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
 import { WebSocketClientMessage } from './WebSocketClientMessage';
 import WebSocketClientMessageHandler from './WebSocketClientMessageHandler';
@@ -42,6 +45,10 @@ export class WebSocketEventHub {
     new ConversationCallEventRealtimeMapper();
 
   private clientMessageHandler?: WebSocketClientMessageHandler;
+
+  private liveCallRevision = 0;
+
+  private readonly pendingCalls = new Map<string, Promise<void>>();
 
   private readonly clients = new Map<string, Set<WebSocket>>();
 
@@ -130,7 +137,6 @@ export class WebSocketEventHub {
 
     return ![
       event.attributes.connectionChanged,
-      event.attributes.mediaConnectionsChanged,
       event.attributes.participantsChanged,
     ].includes(true);
   }
@@ -497,6 +503,155 @@ export class WebSocketEventHub {
     }
   }
 
+  private async refreshCallsAfterScopeChange(
+    event: DomainEvent,
+  ): Promise<void> {
+    if (
+      ![
+        'communities.v1.community.was_updated',
+        'communities.v1.member.was_left',
+        'communities.v1.member.was_added',
+        'communities.v1.channel.was_deleted',
+      ].includes(event.eventName())
+    )
+      return;
+    const communityId =
+      typeof event.attributes.communityId === 'string'
+        ? event.attributes.communityId
+        : event.aggregateId;
+    const calls =
+      (await this.clientMessageHandler?.findActiveCommunityCalls(
+        communityId,
+      )) ?? [];
+    for (const call of calls) {
+      this.publishCallSnapshot(call.getId().valueOf());
+    }
+  }
+
+  private enqueueCallDelivery(
+    callId: string,
+    deliver: () => Promise<void>,
+  ): void {
+    const previous = this.pendingCalls.get(callId) ?? Promise.resolve();
+    const pending = previous
+      .then(deliver)
+      .catch(() => {
+        Kernel.logger?.error('WebSocket call fanout failed');
+      })
+      .finally(() => {
+        if (this.pendingCalls.get(callId) === pending)
+          this.pendingCalls.delete(callId);
+      });
+
+    this.pendingCalls.set(callId, pending);
+  }
+
+  private canDeliverCallSignal(
+    event: DomainEvent,
+    audience: CallRealtimeAudience,
+    recipients: string[],
+  ): boolean {
+    if (!this.isCallSignalEvent(event)) return true;
+    const sender = event.attributes.senderIdentityId;
+
+    return (
+      typeof sender === 'string' &&
+      audience.recipientIds.includes(sender) &&
+      audience.call.isActive() &&
+      audience.call.hasJoinedParticipant(new IdentityId(sender)) &&
+      audience.call
+        .getActiveParticipants()
+        .some((participant) =>
+          recipients.includes(participant.getIdentityId().valueOf()),
+        )
+    );
+  }
+
+  private callAuthorizationCandidates(
+    event: DomainEvent,
+    candidates: string[],
+  ): string[] {
+    if (!this.isCallSignalEvent(event)) return candidates;
+    const sender = event.attributes.senderIdentityId;
+
+    return typeof sender === 'string'
+      ? [...new Set([...candidates, sender])]
+      : candidates;
+  }
+
+  private callEventCandidates(event: DomainEvent): string[] {
+    if (!this.isCallSignalEvent(event)) return [...this.clients.keys()];
+
+    return [...this.getEventRecipients(event)].filter((identityId) =>
+      this.clients.has(identityId),
+    );
+  }
+
+  private enqueueCallEvent(event: DomainEvent): void {
+    if (this.shouldSuppressCallParticipantLeaseEvent(event)) return;
+
+    const callId = event.attributes.callId;
+
+    if (typeof callId !== 'string') return;
+
+    this.enqueueCallDelivery(callId, async () => {
+      const candidates = this.callEventCandidates(event);
+
+      if (candidates.length === 0) return;
+      const checks = this.callAuthorizationCandidates(event, candidates);
+      const audience = await this.clientMessageHandler?.findCallAudience(
+        callId,
+        checks,
+      );
+
+      if (!audience) return;
+      const recipients = audience.recipientIds.filter((identityId) =>
+        candidates.includes(identityId),
+      );
+
+      if (recipients.length === 0) return;
+
+      if (!this.canDeliverCallSignal(event, audience, recipients)) return;
+
+      const decoded = JSON.parse(event.decode());
+      const attributes = this.isCallSignalEvent(event)
+        ? Object.fromEntries(
+            [
+              'attempt',
+              'callId',
+              'expiresAt',
+              'payload',
+              'recipientIdentityId',
+              'senderIdentityId',
+              'sentAt',
+              'signalId',
+              'signalType',
+            ].map((key) => [key, event.attributes[key]]),
+          )
+        : {
+            callId,
+            liveCall: new CallViewModel(
+              audience.call,
+              audience.leases,
+              audience.participants,
+            ).toResource(),
+            liveCallRevision: ++this.liveCallRevision,
+          };
+      this.sendToRecipients(recipients, {
+        event: { ...decoded, aggregate_id: callId, attributes },
+        type: 'domain_event',
+      });
+      for (const timelineEvent of this.conversationCallEventMapper.toEvents(
+        event,
+      )) {
+        this.sendToRecipients(recipients, {
+          event: timelineEvent,
+          type: 'domain_event',
+        });
+      }
+    });
+  }
+
   public clear(): void {
     this.clients.clear();
   }
@@ -522,9 +677,46 @@ export class WebSocketEventHub {
     }
   }
 
+  public publishCallSnapshot(callId: string): void {
+    this.enqueueCallDelivery(callId, async () => {
+      const candidates = [...this.clients.keys()];
+
+      if (candidates.length === 0) return;
+      const audience = await this.clientMessageHandler?.findCallAudience(
+        callId,
+        candidates,
+      );
+
+      if (!audience || audience.recipientIds.length === 0) return;
+      this.sendToRecipients(audience.recipientIds, {
+        event: {
+          aggregate_id: callId,
+          attributes: {
+            callId,
+            liveCall: new CallViewModel(
+              audience.call,
+              audience.leases,
+              audience.participants,
+            ).toResource(),
+            liveCallRevision: ++this.liveCallRevision,
+          },
+          event_id: randomUUID(),
+          occurred_on: Date.now(),
+          type: 'calls.v1.call.snapshot_changed',
+        },
+        type: 'domain_event',
+      });
+    });
+  }
+
   public publish(events: DomainEvent[]): void {
     for (const event of events) {
       if (this.isCallSignalAcknowledgementEvent(event)) {
+        continue;
+      }
+
+      if (event.eventName().startsWith('calls.')) {
+        this.enqueueCallEvent(event);
         continue;
       }
 
@@ -534,6 +726,9 @@ export class WebSocketEventHub {
       };
 
       this.broadcast(event, domainEventMessage);
+      void this.refreshCallsAfterScopeChange(event).catch(() => {
+        Kernel.logger?.error('WebSocket call scope refresh failed');
+      });
       this.relayIdentityUpdateToRelatedRecipients(
         event,
         domainEventMessage,

@@ -5,6 +5,7 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { Timestamp } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -44,7 +45,6 @@ export default class OrbitDBCallProjection {
     return (
       typeof document.id === 'string' &&
       typeof document.createdAt === 'number' &&
-      typeof document.creatorIdentityId === 'string' &&
       typeof document.networkId === 'string'
     );
   }
@@ -63,7 +63,11 @@ export default class OrbitDBCallProjection {
     document: Record<string, unknown>,
   ): document is OrbitDBCallDocument {
     return (
-      this.hasCallIdentityFields(document) && this.hasCallStateFields(document)
+      this.hasCallIdentityFields(document) &&
+      this.hasCallStateFields(document) &&
+      ((document.scope as OrbitDBCallDocument['scope']).type ===
+        'community_channel' ||
+        typeof document.creatorIdentityId === 'string')
     );
   }
 
@@ -196,9 +200,10 @@ export default class OrbitDBCallProjection {
 
       this.documents.set(document.id, merged);
       this.index(merged);
+      webSocketEventHub.publishCallSnapshot(merged.id);
     }
 
-    if (persistRepair) this.scheduleRepair(merged, incoming);
+    if (persistRepair) this.scheduleRepair(merged, document);
   }
 
   private stageRecord(
@@ -210,7 +215,7 @@ export default class OrbitDBCallProjection {
       replay.documents.get(document.id) ?? this.documents.get(document.id);
 
     replay.documents.set(document.id, this.merger.merge(current, incoming));
-    replay.incoming.set(document.id, incoming);
+    replay.incoming.set(document.id, document);
   }
 
   private finishHistoryReplay(scope: object, success: boolean): void {
@@ -314,6 +319,16 @@ export default class OrbitDBCallProjection {
               participant.identityId === participantId.valueOf() &&
               ['joined', 'ringing'].includes(participant.status),
           ),
+      ),
+    );
+  }
+
+  public findActiveCommunityCalls(): Promise<OrbitDBCallDocument[]> {
+    this.assertReady();
+
+    return Promise.resolve(
+      this.documentsByIds(this.activeCallIds).filter(
+        (document) => document.scope.type === 'community_channel',
       ),
     );
   }

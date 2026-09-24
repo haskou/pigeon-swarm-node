@@ -8,15 +8,26 @@ export default class OrbitDBCallMapper {
 
     return {
       createdAt: primitives.createdAt,
-      creatorIdentityId: primitives.creatorIdentityId,
+      ...(call.getScope().isConversation()
+        ? {
+            creatorIdentityId: primitives.creatorIdentityId,
+            endedByIdentityId: primitives.endedByIdentityId,
+          }
+        : {}),
       endedAt: primitives.endedAt,
-      endedByIdentityId: primitives.endedByIdentityId,
       id: primitives.id,
       networkId: primitives.networkId,
-      participantIds: primitives.participantIds,
-      participants: primitives.participants,
+      participantIds: call.getScope().isCommunityChannel()
+        ? []
+        : primitives.participantIds,
+      participants: call.getScope().isCommunityChannel()
+        ? []
+        : primitives.participants,
       scope: primitives.scope,
       status: primitives.status,
+      ...(primitives.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: primitives.sessionEpoch }),
       updatedAt: Date.now(),
     };
   }
@@ -29,10 +40,19 @@ export default class OrbitDBCallMapper {
       endedByIdentityId: document.endedByIdentityId,
       id: document.id,
       networkId: document.networkId,
-      participantIds: document.participantIds,
-      participants: document.participants,
+      participantIds:
+        document.scope.type === 'community_channel'
+          ? []
+          : document.participantIds,
+      participants:
+        document.scope.type === 'community_channel'
+          ? []
+          : document.participants,
       scope: document.scope,
       status: document.status,
+      ...(document.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: document.sessionEpoch }),
     });
   }
 

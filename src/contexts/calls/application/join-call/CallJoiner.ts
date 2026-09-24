@@ -3,6 +3,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
+import CallAccessAuthorizer from '../authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import { CallJoinMessage } from './messages/CallJoinMessage';
 
@@ -11,6 +12,7 @@ export default class CallJoiner {
     private readonly repository: CallRepository,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly leaseRenewer: CallParticipantLeaseRenewer,
+    private readonly accessAuthorizer: CallAccessAuthorizer,
   ) {}
 
   public async join(message: CallJoinMessage): Promise<Call> {
@@ -20,7 +22,16 @@ export default class CallJoiner {
       throw new CallNotFoundError();
     }
 
-    call.join(message.participantIdentityId);
+    await this.accessAuthorizer.assertAccess(
+      call,
+      message.participantIdentityId,
+    );
+
+    if (call.getScope().isCommunityChannel()) {
+      call.joinOrAdd(message.participantIdentityId);
+    } else {
+      call.join(message.participantIdentityId);
+    }
 
     await this.repository.save(call);
     const lease = await this.leaseRenewer.renew(

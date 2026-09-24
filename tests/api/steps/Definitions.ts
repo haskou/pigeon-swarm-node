@@ -1592,8 +1592,20 @@ export default class Definitions {
 
   @given('I have created a group conversation')
   public async iHaveCreatedAGroupConversation(): Promise<void> {
+    await this.createGroupConversation(3);
+  }
+
+  @given('I have created a two-member group conversation')
+  public async iHaveCreatedATwoMemberGroupConversation(): Promise<void> {
+    await this.createGroupConversation(2);
+  }
+
+  private async createGroupConversation(participantCount: number): Promise<void> {
     await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
     await this.iSetAGroupConversationBodyForNewParticipants();
+    const body = JSON.parse(this.body || '{}');
+    body.participantIds = body.participantIds.slice(0, participantCount);
+    this.body = JSON.stringify(body);
     await this.iSignTheCurrentOneToOneConversationRequest();
 
     this.response = await this.restClient.post(
@@ -1743,6 +1755,12 @@ export default class Definitions {
     ).expire();
   }
 
+  @then('the current call has no live participants')
+  public theCurrentCallHasNoLiveParticipants(): void {
+    expect(this.response.data.participants).to.deep.equal([]);
+    expect(this.response.data.participantIds).to.deep.equal([]);
+  }
+
   @then('the current voice channel has {int} connected identities')
   public theCurrentVoiceChannelHasConnectedIdentities(count: number): void {
     const channels = this.response.data.channels;
@@ -1834,6 +1852,19 @@ export default class Definitions {
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current call heartbeat request')
+  public async iSignTheCurrentCallHeartbeatRequest(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    this.body = JSON.stringify({ mediaConnections: [] });
+    await this.signCurrentRequest(
+      'POST',
+      `/calls/${this.callId}/participants/me/heartbeat`,
     );
   }
 

@@ -12,6 +12,9 @@ import { CallId } from './value-objects/CallId';
 import { CallParticipantConnectionStatus } from './value-objects/CallParticipantConnectionStatus';
 
 export class CallParticipantLease extends AggregateRoot {
+  public static readonly RETENTION_MS = 60000;
+
+  public static readonly CLOCK_SKEW_MS = 5000;
   public static connect(
     callId: CallId,
     participantIdentityId: IdentityId,
@@ -58,6 +61,12 @@ export class CallParticipantLease extends AggregateRoot {
       primitives.mediaConnections.map((connection) =>
         CallParticipantMediaConnection.fromPrimitives(connection),
       ),
+      primitives.leftAt === undefined
+        ? undefined
+        : new Timestamp(primitives.leftAt),
+      primitives.lastRenewedAt === undefined
+        ? undefined
+        : new Timestamp(primitives.lastRenewedAt),
     );
   }
 
@@ -67,8 +76,11 @@ export class CallParticipantLease extends AggregateRoot {
     private status: CallParticipantConnectionStatus,
     private lastHeartbeatAt: Timestamp,
     private mediaConnections: CallParticipantMediaConnection[],
+    private leftAt?: Timestamp,
+    private lastRenewedAt?: Timestamp,
   ) {
     super();
+    this.lastRenewedAt ??= status.isConnected() ? lastHeartbeatAt : undefined;
   }
 
   private aggregateId(): string {
@@ -133,7 +145,7 @@ export class CallParticipantLease extends AggregateRoot {
       return false;
     }
 
-    this.route = this.route.includingParticipants(participantIds);
+    this.route = this.route.withParticipants(participantIds);
 
     return true;
   }
@@ -150,6 +162,17 @@ export class CallParticipantLease extends AggregateRoot {
     this.mediaConnections = [...mediaConnections];
 
     return true;
+  }
+
+  private isRecent(timestamp: Timestamp, now: Timestamp): boolean {
+    return (
+      timestamp.isAfter(
+        now.addMilliseconds(-CallParticipantLease.RETENTION_MS),
+      ) &&
+      timestamp.isBeforeOrEqual(
+        now.addMilliseconds(CallParticipantLease.CLOCK_SKEW_MS),
+      )
+    );
   }
 
   public belongsTo(
@@ -185,6 +208,41 @@ export class CallParticipantLease extends AggregateRoot {
     return true;
   }
 
+  public leave(now: Timestamp = Timestamp.now()): boolean {
+    if (this.leftAt) return false;
+
+    const transitionAt = now.isAfter(this.lastHeartbeatAt)
+      ? now
+      : this.lastHeartbeatAt.addMilliseconds(1);
+    this.leftAt = transitionAt;
+
+    if (!this.disconnect(transitionAt)) {
+      this.lastHeartbeatAt = transitionAt;
+      this.recordUpdated(true, false);
+    }
+
+    return true;
+  }
+
+  public hasParticipationGrant(): boolean {
+    const now = Timestamp.now();
+
+    return (
+      this.leftAt === undefined &&
+      this.lastRenewedAt !== undefined &&
+      this.isWithinRetention(now) &&
+      this.isRecent(this.lastRenewedAt, now)
+    );
+  }
+
+  public isWithinRetention(now: Timestamp = Timestamp.now()): boolean {
+    return this.isRecent(this.lastHeartbeatAt, now);
+  }
+
+  public getParticipantIdentityId(): IdentityId {
+    return this.participantIdentityId;
+  }
+
   public getLastHeartbeatAt(): Timestamp {
     return this.lastHeartbeatAt;
   }
@@ -210,11 +268,13 @@ export class CallParticipantLease extends AggregateRoot {
     now: Timestamp = Timestamp.now(),
   ): void {
     const connectionChanged = !this.status.isConnected();
+    this.leftAt = undefined;
     const participantsChanged = this.synchronizeParticipants(participantIds);
     const mediaConnectionsChanged =
       this.replaceMediaConnections(mediaConnections);
 
     this.status = CallParticipantConnectionStatus.CONNECTED;
+    this.lastRenewedAt = now;
     this.lastHeartbeatAt = now;
     this.recordUpdated(
       connectionChanged,
@@ -227,6 +287,10 @@ export class CallParticipantLease extends AggregateRoot {
     return {
       ...this.route.toPrimitives(),
       lastHeartbeatAt: this.lastHeartbeatAt.valueOf(),
+      ...(this.lastRenewedAt
+        ? { lastRenewedAt: this.lastRenewedAt.valueOf() }
+        : {}),
+      ...(this.leftAt ? { leftAt: this.leftAt.valueOf() } : {}),
       mediaConnections: this.mediaConnections.map((connection) =>
         connection.toPrimitives(),
       ),

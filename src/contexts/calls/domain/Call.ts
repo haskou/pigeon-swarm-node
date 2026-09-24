@@ -21,6 +21,7 @@ import { CallParticipantLeftEvent } from './events/CallParticipantLeftEvent';
 import { CallParticipantMissedEvent } from './events/CallParticipantMissedEvent';
 import { CallStartedEvent } from './events/CallStartedEvent';
 import { CallId } from './value-objects/CallId';
+import { CallSessionEpoch } from './value-objects/CallSessionEpoch';
 import { CallSignalId } from './value-objects/CallSignalId';
 import { CallSignalType } from './value-objects/CallSignalType';
 import { CallStatus } from './value-objects/CallStatus';
@@ -31,6 +32,7 @@ export class Call extends AggregateRoot {
     networkId: NetworkId,
     scope: CallScope,
     participantIds: IdentityId[],
+    sessionEpoch?: CallSessionEpoch,
   ): Call {
     const participants = [
       CallParticipant.joined(creatorIdentityId),
@@ -39,12 +41,20 @@ export class Call extends AggregateRoot {
         .map((participant) => CallParticipant.ringing(participant)),
     ];
     const call = new Call(
-      CallId.generate(),
+      sessionEpoch && scope.isCommunityChannel()
+        ? CallId.communitySession(
+            networkId,
+            scope.getCommunityId()!,
+            scope.getCommunityChannelId()!,
+            sessionEpoch,
+          )
+        : CallId.generate(),
       networkId,
       scope,
-      creatorIdentityId,
+      scope.isConversation() ? creatorIdentityId : undefined,
       participants,
       CallLifecycle.active(),
+      sessionEpoch,
     );
 
     call.record(call.createStartedEvent());
@@ -57,7 +67,9 @@ export class Call extends AggregateRoot {
       new CallId(primitives.id),
       new NetworkId(primitives.networkId),
       CallScope.fromPrimitives(primitives.scope),
-      new IdentityId(primitives.creatorIdentityId),
+      primitives.scope.type === 'conversation'
+        ? new IdentityId(primitives.creatorIdentityId!)
+        : undefined,
       primitives.participants.map((participant) =>
         CallParticipant.fromPrimitives(participant),
       ),
@@ -67,6 +79,9 @@ export class Call extends AggregateRoot {
         primitives.endedAt ? new Timestamp(primitives.endedAt) : undefined,
         primitives.endedByIdentityId,
       ),
+      primitives.sessionEpoch === undefined
+        ? undefined
+        : new CallSessionEpoch(primitives.sessionEpoch),
     );
   }
 
@@ -74,9 +89,10 @@ export class Call extends AggregateRoot {
     private readonly id: CallId,
     private readonly networkId: NetworkId,
     private readonly scope: CallScope,
-    private readonly creatorIdentityId: IdentityId,
+    private readonly creatorIdentityId: IdentityId | undefined,
     private readonly participants: CallParticipant[],
     private readonly lifecycle: CallLifecycle,
+    private readonly sessionEpoch?: CallSessionEpoch,
   ) {
     super();
   }
@@ -88,7 +104,7 @@ export class Call extends AggregateRoot {
   private createStartedEvent(): CallStartedEvent {
     return new CallStartedEvent(this.id.valueOf(), {
       ...this.baseEventAttributes(),
-      creatorIdentityId: this.creatorIdentityId.valueOf(),
+      creatorIdentityId: this.creatorIdentityId?.valueOf(),
     });
   }
 
@@ -102,17 +118,24 @@ export class Call extends AggregateRoot {
       endedAt: primitives.endedAt,
       endedByIdentityId: primitives.endedByIdentityId,
       networkId: primitives.networkId,
-      participantIds: primitives.participantIds,
-      participants: primitives.participants,
+      participantIds: this.scope.isCommunityChannel()
+        ? []
+        : primitives.participantIds,
+      participants: this.scope.isCommunityChannel()
+        ? []
+        : primitives.participants,
       scope: primitives.scope,
       status: primitives.status,
+      ...(primitives.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: primitives.sessionEpoch }),
     };
   }
 
   private endIfNoReceiversRemain(): void {
     const hasReceiver = this.participants.some(
       (participant) =>
-        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
+        participant.getIdentityId().isNotEqual(this.creatorIdentityId!) &&
         participant.canReceiveSignal(),
     );
 
@@ -136,7 +159,7 @@ export class Call extends AggregateRoot {
   private hasActiveReceiver(): boolean {
     return this.participants.some(
       (participant) =>
-        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
+        participant.getIdentityId().isNotEqual(this.creatorIdentityId!) &&
         participant.isActiveReceiver(),
     );
   }
@@ -177,7 +200,7 @@ export class Call extends AggregateRoot {
     );
   }
 
-  public leave(identityId: IdentityId): void {
+  public leave(identityId: IdentityId, endOnDeparture = false): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
@@ -197,12 +220,27 @@ export class Call extends AggregateRoot {
     }
 
     participant.leave();
+
+    if (
+      this.scope.isConversation() &&
+      (endOnDeparture ||
+        !this.participants.some((candidate) => candidate.isJoined()))
+    ) {
+      this.lifecycle.end(identityId.valueOf());
+    }
+
     this.record(
       new CallParticipantLeftEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
         leftIdentityId: identityId.valueOf(),
       }),
     );
+
+    if (!this.isActive()) {
+      this.record(
+        new CallEndedEvent(this.id.valueOf(), this.baseEventAttributes()),
+      );
+    }
   }
 
   public end(identityId: IdentityId): void {
@@ -253,6 +291,24 @@ export class Call extends AggregateRoot {
     );
   }
 
+  public restoreCommunityParticipants(identityIds: IdentityId[]): void {
+    if (!this.scope.isCommunityChannel()) return;
+
+    this.participants.splice(
+      0,
+      this.participants.length,
+      ...identityIds.map((identityId) => CallParticipant.joined(identityId)),
+    );
+  }
+
+  public getSessionEpoch(): CallSessionEpoch | undefined {
+    return this.sessionEpoch;
+  }
+
+  public getScope(): CallScope {
+    return this.scope;
+  }
+
   public getId(): CallId {
     return this.id;
   }
@@ -263,6 +319,14 @@ export class Call extends AggregateRoot {
 
   public getCommunityChannelId(): CommunityChannelId | undefined {
     return this.scope.getCommunityChannelId();
+  }
+
+  public getActiveParticipants(): CallParticipant[] {
+    return this.isActive()
+      ? this.participants.filter((participant) =>
+          participant.isActiveReceiver(),
+        )
+      : [];
   }
 
   public getJoinedParticipantIds(): IdentityId[] {
@@ -337,7 +401,7 @@ export class Call extends AggregateRoot {
 
     return {
       createdAt: this.lifecycle.getCreatedAt().valueOf(),
-      creatorIdentityId: this.creatorIdentityId.valueOf(),
+      creatorIdentityId: this.creatorIdentityId?.valueOf(),
       endedAt: this.lifecycle.getEndedAt()?.valueOf(),
       endedByIdentityId: this.lifecycle.getEndedByIdentityId(),
       id: this.id.valueOf(),
@@ -346,6 +410,9 @@ export class Call extends AggregateRoot {
       participants,
       scope: this.scope.toPrimitives(),
       status: this.lifecycle.getStatus().valueOf(),
+      ...(this.sessionEpoch
+        ? { sessionEpoch: this.sessionEpoch.valueOf() }
+        : {}),
     };
   }
 }

@@ -1,6 +1,6 @@
 export interface OrbitDBCallDocument extends Record<string, unknown> {
   createdAt: number;
-  creatorIdentityId: string;
+  creatorIdentityId?: string;
   endedAt?: number;
   endedByIdentityId?: string;
   id: string;
@@ -21,5 +21,6 @@ export interface OrbitDBCallDocument extends Record<string, unknown> {
     type: string;
   };
   status: string;
+  sessionEpoch?: number;
   updatedAt?: number;
 }

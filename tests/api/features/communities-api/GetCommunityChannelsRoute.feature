@@ -88,10 +88,7 @@ Feature: Get community channels API
     And I sign the current call request
     And I GET the current call
     Then response code is equal to 200
-    And response data should match partially
-      """
-      {"participants": [{"status": "joined", "connected": false}]}
-      """
+    And the current call has no live participants
     And I sign the current community channels request
     When I GET channels from the current community
     Then response code is equal to 200

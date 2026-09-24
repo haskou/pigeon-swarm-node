@@ -47,7 +47,8 @@ export default class InMemoryCallParticipantLeaseRepository extends CallParticip
       current &&
       (current.lastHeartbeatAt > primitives.lastHeartbeatAt ||
         (current.lastHeartbeatAt === primitives.lastHeartbeatAt &&
-          current.status === 'disconnected'))
+          current.status === 'disconnected' &&
+          (current.leftAt !== undefined || primitives.leftAt === undefined)))
     ) {
       return Promise.resolve();
     }
@@ -55,6 +56,25 @@ export default class InMemoryCallParticipantLeaseRepository extends CallParticip
     this.leases.set(key, primitives);
 
     return Promise.resolve();
+  }
+
+  public async renewIfParticipating(
+    lease: CallParticipantLease,
+  ): Promise<boolean> {
+    const current = this.leases.get(this.key(lease.toPrimitives()));
+
+    if (
+      !current ||
+      !CallParticipantLease.fromPrimitives(current).hasParticipationGrant()
+    )
+      return false;
+
+    await this.save(lease);
+
+    return (
+      this.leases.get(this.key(lease.toPrimitives()))?.lastHeartbeatAt ===
+      lease.getLastHeartbeatAt().valueOf()
+    );
   }
 
   public purgeDisconnectedBefore(threshold: Timestamp): Promise<void> {

@@ -32,11 +32,12 @@ package "calls" {
       -id: CallId
       -networkId: NetworkId
       -scope: CallScope
-      -creatorIdentityId: IdentityId
+      -creatorIdentityId?: IdentityId
       -participants: CallParticipant[]
       -lifecycle: CallLifecycle
       +join(identityId: IdentityId): void
-      +leave(identityId: IdentityId): void
+      +restoreCommunityParticipants(identityIds: IdentityId[]): void
+      +leave(identityId: IdentityId, endOnDeparture: boolean = false): void
       +end(identityId: IdentityId): void
       +sendSignal(signalId: CallSignalId, ownerNodeId: NodeId, senderIdentityId: IdentityId, recipientIdentityId: IdentityId, signalType: CallSignalType, payload: unknown): CallSignalDelivery
       +markTimedOut(timeout: Timestamp): IdentityId[]
@@ -62,9 +63,13 @@ package "calls" {
       -route: CallParticipantLeaseRoute
       -status: CallParticipantConnectionStatus
       -lastHeartbeatAt: Timestamp
+      -lastRenewedAt?: Timestamp
+      -leftAt?: Timestamp
       -mediaConnections: CallParticipantMediaConnection[]
       +renew(mediaConnections: CallParticipantMediaConnection[]): void
       +disconnect(): boolean
+      +leave(): boolean
+      +hasParticipationGrant(): boolean
     }
 
     class CallParticipantLeaseRoute {
@@ -118,6 +123,7 @@ package "calls" {
       +findByCallIds(callIds: CallId[]): Promise<CallParticipantLease[]>
       +findPotentiallyExpired(threshold: Timestamp): Promise<CallParticipantLease[]>
       +save(lease: CallParticipantLease): Promise<void>
+      +renewIfParticipating(lease: CallParticipantLease): Promise<boolean>
     }
 
     interface CallSignalDeliveryRepository {
@@ -151,7 +157,8 @@ package "calls" {
   }
 
   note right of Call
-    Calls are persisted in OrbitDB replicated state.
+    Community sessions persist lifecycle and scope only.
+    Conversation calls retain participant history in OrbitDB.
     Participant heartbeat leases remain in memory and replicate through gossip.
     They do not publish media or signalling payloads to IPFS.
     Frontend uses these records to drive ringing,
@@ -165,6 +172,7 @@ package "calls/infrastructure" {
   class InMemoryCallSignalDeliveryRepository
 
   OrbitDBCallRepository ..|> CallRepository
+  OrbitDBCallRepository --> CallParticipantLeaseRepository : hydrates community presence
   InMemoryCallParticipantLeaseRepository ..|> CallParticipantLeaseRepository
   InMemoryCallSignalDeliveryRepository ..|> CallSignalDeliveryRepository
 }

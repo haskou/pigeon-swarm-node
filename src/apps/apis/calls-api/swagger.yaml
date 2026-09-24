@@ -46,12 +46,13 @@ paths:
     get:
       tags:
         - calls
-      summary: Get one active or ended call by id
+      summary: Get a minimal live snapshot by id
+      description: Current conversation membership or voice-channel access is checked on every request. Past call participation alone does not grant access. Currently authorized community members may read a live snapshot without joining. Community snapshots omit creator and session timestamps; departed and disconnected participants are omitted.
       parameters:
         - $ref: '#/components/parameters/CallId'
       responses:
         '200':
-          description: Call found for the authenticated participant.
+          description: Call found for the currently authorized identity.
           content:
             application/json:
               schema:
@@ -88,14 +89,15 @@ paths:
     get:
       tags:
         - calls
-      summary: List call history for the authenticated identity
+      summary: List conversation call history for the authenticated identity
+      description: Requires current conversation membership. Community voice-channel histories are not exposed.
       responses:
         '200':
-          description: Active and finished calls for the authenticated identity.
+          description: Conversation call history for a currently authorized participant.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CallsResource'
+                $ref: '#/components/schemas/CallHistoryResource'
   /calls/{callId}/participants:
     post:
       tags:
@@ -129,7 +131,7 @@ paths:
       tags:
         - calls
       summary: Refresh the authenticated participant heartbeat
-      description: Joined participants should call this endpoint while media is active. The response exposes runtime connected and lastHeartbeatAt fields; heartbeat state is not persisted in OrbitDB.
+      description: Joined participants renew their lease while media is active. Current scope access is rechecked. Community calls require an unexpired participation grant on this node; explicit leave or lost runtime state requires an explicit join. Returns no roster or diagnostics; runtime heartbeat state is not persisted in OrbitDB.
       parameters:
         - $ref: '#/components/parameters/CallId'
       requestBody:
@@ -139,12 +141,10 @@ paths:
             schema:
               $ref: '#/components/schemas/PostCallParticipantHeartbeatBody'
       responses:
-        '200':
-          description: Participant heartbeat recorded.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CallResource'
+        '204':
+          description: Participant heartbeat recorded. No response body.
+        '409':
+          description: Call is inactive, inaccessible, or the community participation grant is missing or expired.
   /calls/{callId}/signals:
     post:
       tags:
@@ -274,12 +274,10 @@ components:
       required:
         - id
         - networkId
-        - creatorIdentityId
         - participantIds
         - participants
         - scope
         - status
-        - createdAt
       properties:
         id:
           type: string
@@ -289,6 +287,7 @@ components:
           format: uuid
         creatorIdentityId:
           type: string
+          description: Conversation caller only; omitted for community voice channels.
         participantIds:
           type: array
           items:
@@ -307,6 +306,10 @@ components:
             $ref: '#/components/schemas/CallParticipant'
         createdAt:
           type: number
+          description: Conversation lifecycle only; omitted for community voice channels.
+        endedByIdentityId:
+          type: string
+          description: Present only for ended conversation calls.
         endedAt:
           type: number
           nullable: true
@@ -392,33 +395,77 @@ components:
           format: uuid
     CallParticipant:
       type: object
-      required:
-        - connected
-        - identityId
-        - mediaConnections
-        - status
+      additionalProperties: false
+      required: [connected, identityId, mediaConnections, status]
       properties:
         connected:
           type: boolean
-          description: Whether at least one replicated runtime lease for this participant is active.
+          description: A current runtime lease exists for this authorized participant.
         identityId:
           type: string
         status:
           type: string
-          enum:
-            - ringing
-            - joined
-            - left
-            - declined
-            - missed
-        joinedAt:
-          type: number
-        lastHeartbeatAt:
-          type: number
+          enum: [ringing, joined]
         mediaConnections:
           type: array
+          maxItems: 0
           items:
-            $ref: '#/components/schemas/CallParticipantMediaConnection'
+            type: object
+          description: Empty compatibility field. Transport diagnostics are not disclosed.
+    CallHistoryResource:
+      type: object
+      required: [calls]
+      properties:
+        calls:
+          type: array
+          items:
+            type: object
+            required: [id, networkId, creatorIdentityId, createdAt, scope, status, participantIds, participants]
+            properties:
+              id:
+                type: string
+              networkId:
+                type: string
+              creatorIdentityId:
+                type: string
+              createdAt:
+                type: number
+              endedAt:
+                type: number
+              endedByIdentityId:
+                type: string
+              scope:
+                $ref: '#/components/schemas/CallScope'
+              status:
+                type: string
+                enum: [active, ended, missed]
+              participantIds:
+                type: array
+                items:
+                  type: string
+              participants:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistoricalCallParticipant'
+    HistoricalCallParticipant:
+      type: object
+      required: [identityId, status, connected, mediaConnections]
+      properties:
+        identityId:
+          type: string
+        status:
+          type: string
+          enum: [ringing, joined, left, declined, missed]
+        connected:
+          type: boolean
+          enum: [false]
+        mediaConnections:
+          type: array
+          maxItems: 0
+          items:
+            type: object
+        joinedAt:
+          type: number
         leftAt:
           type: number
         declinedAt:

@@ -299,8 +299,8 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
-- deliver call lifecycle events only to call participants when the event
-  carries `participantIds`
+- deliver conversation call snapshots only to currently authorized participants;
+  community call snapshots go to clients with current voice-channel access
 - deliver call signals only to `recipientIdentityId`
 - deliver node-wide events, such as heartbeat/peer updates, to all
   authenticated WebSocket clients on the local node
@@ -320,16 +320,16 @@ Event contracts used by frontend:
 | `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                       |
 | `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
 | `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
-| `calls.v1.call.started`                               | call id           | `callId`, `networkId`, `scope`, `participantIds`, `creatorIdentityId`, `status`                                      |
-| `calls.v1.participant.joined`                         | call id           | `callId`, `networkId`, `scope`, `participantIds`, `joinedIdentityId`, `status`                                       |
-| `calls.v1.participant.left`                           | call id           | `callId`, `networkId`, `scope`, `participantIds`, `leftIdentityId`, `status`                                         |
-| `calls.v1.participant.declined`                       | call id           | `callId`, `networkId`, `scope`, `participantIds`, `declinedIdentityId`, `status`                                     |
-| `calls.v1.participant.missed`                         | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityId`, `status`                                       |
-| `calls.v1.call.ended`                                 | call id           | `callId`, `networkId`, `scope`, `participantIds`, `endedByIdentityId`, `status`                                      |
-| `calls.v1.call.missed`                                | call id           | `callId`, `networkId`, `scope`, `participantIds`, `missedIdentityIds`, `status`                                      |
-| `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `networkId`, `ownerNodeId`, `participantIds`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
-| `calls.v1.signal.acknowledged`                        | call id           | `signalId`, `callId`, `networkId`, `ownerNodeId`, `senderIdentityId`, `recipientIdentityId`, `acknowledgedAt` |
-| `calls.v1.participant_lease.was_updated`              | call lease id     | `callId`, `networkId`, `participantIds`, `participantIdentityId`, `ownerNodeId`, `connectionChanged`, `mediaConnectionsChanged`, `participantsChanged`, `mediaConnections`, `status` |
+| `calls.v1.call.snapshot_changed`                     | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.call.started`                               | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.participant.joined`                         | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.participant.left`                           | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.participant.declined`                       | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.participant.missed`                         | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.call.ended`                                 | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.call.missed`                                | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
+| `calls.v1.participant_lease.was_updated`              | call id     | `callId`, `liveCallRevision`, `liveCall` |
 | `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
 | `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
 | `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
@@ -363,8 +363,8 @@ For `conversations.v1.messages.were_read`, use `event.aggregate_id` as
 `conversationId` and refresh the conversation unread counters if needed.
 
 For call lifecycle and signalling events, use `event.aggregate_id` as
-`callId`. For `calls.v1.participant_lease.was_updated`, the aggregate id
-identifies one node-owned lease; use `event.attributes.callId` instead. Calls
+`callId`. Browser notifications for `calls.v1.participant_lease.was_updated`
+also use the call ID; composite node-owned lease IDs remain internal. Calls
 are signalling only: audio/video media is negotiated by frontend with WebRTC.
 The backend stores active call state and routes lifecycle/signalling events to
 the authenticated participants.
@@ -380,7 +380,7 @@ community voice channel. All endpoints require signed request authentication.
 GET /calls
 ```
 
-Returns active calls where the authenticated identity is a participant.
+Returns active calls associated with the authenticated identity, filtered by current conversation membership or voice-channel permissions. Former participation does not preserve access.
 
 ### List call history
 
@@ -388,8 +388,7 @@ Returns active calls where the authenticated identity is a participant.
 GET /calls/history
 ```
 
-Returns active and finished calls where the authenticated identity is a
-participant. Use this for call history UI.
+Returns active and finished conversation calls where the authenticated identity participated and still has conversation access. Historical participant states and lifecycle timestamps are available only through this history contract. Community voice-channel histories are excluded.
 
 ### Get call
 
@@ -397,9 +396,52 @@ participant. Use this for call history UI.
 GET /calls/{callId}
 ```
 
-Returns a single call when the authenticated identity is a participant.
-Frontend can use this after any `calls.v1.*` WebSocket event where
-`event.aggregate_id` is the call id.
+Returns a minimal snapshot after checking current scope access. `participantIds`
+and `participants` contain only authorized connected participants and current
+ringing invitees. Departed/expired participants, join/leave timestamps, heartbeat
+timestamps and remote transport diagnostics are omitted. `mediaConnections` is
+an empty compatibility array. Community snapshots omit `creatorIdentityId`,
+`createdAt`, `endedAt` and `endedByIdentityId`; conversation snapshots retain the
+caller and lifecycle times needed for incoming-call and ended-call UI.
+A community member with current channel access can inspect its live snapshot
+without having joined. Conversation reads additionally require call participation.
+
+Apply `event.attributes.liveCall` directly from call WebSocket notifications.
+`liveCallRevision` is a monotonically increasing counter from the connected
+server, not an OrbitDB revision or cross-node clock. Reset revision tracking on
+each connection acknowledgement; reject older/duplicate revisions per call.
+Load the call list on initial connection/reconnect, preserving any newer
+WebSocket snapshots received while the recovery request was outstanding.
+Recovery makes at most three attempts with one- and two-second delays, deduplicates
+pending requests and discards responses from an earlier connection generation.
+Malformed snapshots trigger bounded per-call recovery; stale revisions do not.
+Legacy notifications without a snapshot use one outstanding fetch per call,
+coalesced and limited to one start per second. Stable heartbeats do not trigger
+full-call GETs. ICE negotiation and actual audio remain separate from presence.
+
+Community starts for the same known session use a shared, scoped identifier
+across nodes. Explicit termination advances a persisted session epoch on the
+next start; clock differences do not determine that epoch. Existing active
+legacy sessions remain usable.
+
+### Presence retention
+
+Runtime leases are memory-only. A lease expires after five seconds without a
+heartbeat, checked by the scheduled expiration pass; disconnected entries are
+purged after sixty seconds. Local expiry updates local clients but is never
+republished as a claim by the remote owner. Only the owner publishes its own
+disconnection. Stable heartbeat traffic remains necessary between nodes.
+
+Community sessions retire only on an explicit end operation. A local final
+departure cannot safely prove that no concurrent remote join exists. Lifecycle
+participant tombstones are retained for deterministic merging of delayed and out-of-order OrbitDB
+updates. Abruptly disconnected participants are absent from live snapshots even
+while a lifecycle tombstone remains. Conversation history is a separate,
+currently authorized use case. These changes do not erase existing OrbitDB/IPFS
+log entries, backups, or copies held by another node; replicated lifecycle data
+still requires the storage migration and metadata work tracked separately.
+An API omission is not cryptographic deletion or protection from a malicious
+node that already holds the replicated records.
 
 ### Get ICE servers
 
@@ -608,19 +650,26 @@ Implemented:
 - heartbeat renews an in-memory lease owned by the node serving that client and
   replicates it through `calls.v1.participant_lease.was_updated`
 - heartbeat never writes the call document or its indexes to OrbitDB
-- `participants[].connected` is true while at least one replicated lease for
-  that identity remains active; `lastHeartbeatAt` is runtime-only
-- `participants[].mediaConnections` reports the latest selected ICE path for
-  each remote participant, including candidate types, TURN URL/protocol when
-  available and the derived `usesRelay` flag
+- heartbeat returns HTTP 204 with no roster or diagnostics; it rechecks current scope access
+- community heartbeats require a current grant on the serving node. Explicit
+  leave, lost runtime state, or sixty seconds without a real renewal requires an
+  explicit join; a heartbeat cannot silently rejoin or borrow another node's grant
+- conversation heartbeats can recreate a runtime lease for a persisted joined participant
+- live `participants[].connected` is true while an authorized identity has a live lease
+- heartbeat timestamps and remote ICE reports stay out of the live HTTP/WebSocket contract
 - remote nodes expire stale lease copies locally, while only the owner node may
   announce its lease as disconnected
-- WebSocket clients receive lease events when `connectionChanged`,
-  `mediaConnectionsChanged` or `participantsChanged` is true; unchanged
-  heartbeat renewals are not forwarded to frontend clients
-- after a lease connection event, refetch `GET /calls/{callId}` to obtain the
-  aggregated `connected` and `lastHeartbeatAt` participant projection
-- leaving removes the authenticated identity from the active call
+- WebSocket clients receive minimal snapshots on membership/connection changes; unchanged heartbeat renewals and media-only reports are not forwarded
+- actual local lease transitions also notify clients, including recovery after a locally expired remote lease; owner-supplied change flags are not sufficient
+- OrbitDB call projection changes notify clients after projection, so lease-before-document delivery cannot leave a stale roster
+- community membership/permission changes refresh live snapshots for remaining authorized recipients; every delivery rechecks scope access
+- leaving removes the authenticated identity from the active snapshot
+- leaving a one-to-one conversation ends its call; leaving a group (including a two-member group) or community call does not terminate other participants
+- explicit community call termination retires its call ID
+- community session documents do not persist participant identities, creator or
+  ender attribution. Runtime participation expires and legacy rosters cannot
+  restore it after restart. Existing immutable history is not erased; see
+  [the synchronization contract](pubsub-sync-protocol.md) for retention limits
 - deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
 - leaves emit `calls.v1.participant.left`
