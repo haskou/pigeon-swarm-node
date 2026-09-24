@@ -1,6 +1,6 @@
 export interface OrbitDBCallDocument extends Record<string, unknown> {
   createdAt: number;
-  creatorIdentityId: string;
+  creatorIdentityId?: string;
   endedAt?: number;
   endedByIdentityId?: string;
   id: string;

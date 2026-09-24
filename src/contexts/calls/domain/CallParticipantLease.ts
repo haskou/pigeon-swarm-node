@@ -12,6 +12,9 @@ import { CallId } from './value-objects/CallId';
 import { CallParticipantConnectionStatus } from './value-objects/CallParticipantConnectionStatus';
 
 export class CallParticipantLease extends AggregateRoot {
+  public static readonly RETENTION_MS = 60000;
+
+  public static readonly CLOCK_SKEW_MS = 5000;
   public static connect(
     callId: CallId,
     participantIdentityId: IdentityId,
@@ -58,6 +61,12 @@ export class CallParticipantLease extends AggregateRoot {
       primitives.mediaConnections.map((connection) =>
         CallParticipantMediaConnection.fromPrimitives(connection),
       ),
+      primitives.leftAt === undefined
+        ? undefined
+        : new Timestamp(primitives.leftAt),
+      primitives.lastRenewedAt === undefined
+        ? undefined
+        : new Timestamp(primitives.lastRenewedAt),
     );
   }
 
@@ -67,8 +76,11 @@ export class CallParticipantLease extends AggregateRoot {
     private status: CallParticipantConnectionStatus,
     private lastHeartbeatAt: Timestamp,
     private mediaConnections: CallParticipantMediaConnection[],
+    private leftAt?: Timestamp,
+    private lastRenewedAt?: Timestamp,
   ) {
     super();
+    this.lastRenewedAt ??= status.isConnected() ? lastHeartbeatAt : undefined;
   }
 
   private aggregateId(): string {
@@ -133,7 +145,7 @@ export class CallParticipantLease extends AggregateRoot {
       return false;
     }
 
-    this.route = this.route.includingParticipants(participantIds);
+    this.route = this.route.withParticipants(participantIds);
 
     return true;
   }
@@ -185,6 +197,48 @@ export class CallParticipantLease extends AggregateRoot {
     return true;
   }
 
+  public leave(now: Timestamp = Timestamp.now()): boolean {
+    if (this.leftAt) return false;
+
+    const transitionAt = new Timestamp(
+      Math.max(now.valueOf(), this.lastHeartbeatAt.valueOf() + 1),
+    );
+    this.leftAt = transitionAt;
+
+    if (!this.disconnect(transitionAt)) {
+      this.lastHeartbeatAt = transitionAt;
+      this.recordUpdated(true, false);
+    }
+
+    return true;
+  }
+
+  public hasParticipationGrant(): boolean {
+    const renewedAt = this.lastRenewedAt?.valueOf();
+
+    if (renewedAt === undefined) return false;
+
+    return (
+      this.leftAt === undefined &&
+      this.isWithinRetention() &&
+      renewedAt > Date.now() - CallParticipantLease.RETENTION_MS &&
+      renewedAt <= Date.now() + CallParticipantLease.CLOCK_SKEW_MS
+    );
+  }
+
+  public isWithinRetention(now: number = Date.now()): boolean {
+    const heartbeat = this.lastHeartbeatAt.valueOf();
+
+    return (
+      heartbeat > now - CallParticipantLease.RETENTION_MS &&
+      heartbeat <= now + CallParticipantLease.CLOCK_SKEW_MS
+    );
+  }
+
+  public getParticipantIdentityId(): IdentityId {
+    return this.participantIdentityId;
+  }
+
   public getLastHeartbeatAt(): Timestamp {
     return this.lastHeartbeatAt;
   }
@@ -210,11 +264,13 @@ export class CallParticipantLease extends AggregateRoot {
     now: Timestamp = Timestamp.now(),
   ): void {
     const connectionChanged = !this.status.isConnected();
+    this.leftAt = undefined;
     const participantsChanged = this.synchronizeParticipants(participantIds);
     const mediaConnectionsChanged =
       this.replaceMediaConnections(mediaConnections);
 
     this.status = CallParticipantConnectionStatus.CONNECTED;
+    this.lastRenewedAt = now;
     this.lastHeartbeatAt = now;
     this.recordUpdated(
       connectionChanged,
@@ -227,6 +283,10 @@ export class CallParticipantLease extends AggregateRoot {
     return {
       ...this.route.toPrimitives(),
       lastHeartbeatAt: this.lastHeartbeatAt.valueOf(),
+      ...(this.lastRenewedAt
+        ? { lastRenewedAt: this.lastRenewedAt.valueOf() }
+        : {}),
+      ...(this.leftAt ? { leftAt: this.leftAt.valueOf() } : {}),
       mediaConnections: this.mediaConnections.map((connection) =>
         connection.toPrimitives(),
       ),

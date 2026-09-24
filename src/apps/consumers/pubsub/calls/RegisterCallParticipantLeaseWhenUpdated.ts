@@ -76,10 +76,16 @@ export default class RegisterCallParticipantLeaseWhenUpdated extends Consumer {
       }));
   }
 
-  public async handler(event: DomainEvent): Promise<void> {
-    const lease = CallParticipantLease.fromPrimitives({
+  private leaseFrom(event: DomainEvent): CallParticipantLease {
+    return CallParticipantLease.fromPrimitives({
       callId: String(event.attributes.callId),
       lastHeartbeatAt: Number(event.attributes.lastHeartbeatAt),
+      ...(typeof event.attributes.lastRenewedAt === 'number'
+        ? { lastRenewedAt: event.attributes.lastRenewedAt }
+        : {}),
+      ...(typeof event.attributes.leftAt === 'number'
+        ? { leftAt: event.attributes.leftAt }
+        : {}),
       mediaConnections: this.mediaConnectionsFrom(
         event.attributes.mediaConnections,
       ),
@@ -94,6 +100,13 @@ export default class RegisterCallParticipantLeaseWhenUpdated extends Consumer {
         : [],
       status: String(event.attributes.status),
     });
+  }
+
+  public async handler(event: DomainEvent): Promise<void> {
+    const lease = this.leaseFrom(event);
+
+    if (!lease.isWithinRetention()) return;
+
     const callId = new CallId(String(event.attributes.callId));
     const before = await this.repository.findByCallIds([callId]);
     const previous = before.find((candidate) =>
@@ -114,10 +127,7 @@ export default class RegisterCallParticipantLeaseWhenUpdated extends Consumer {
     if (
       (previous?.isConnected() ?? false) !== (current?.isConnected() ?? false)
     ) {
-      webSocketEventHub.publishCallSnapshot(
-        callId.valueOf(),
-        lease.toPrimitives().participantIds,
-      );
+      webSocketEventHub.publishCallSnapshot(callId.valueOf());
     }
   }
 }

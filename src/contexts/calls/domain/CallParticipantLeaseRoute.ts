@@ -27,8 +27,11 @@ export class CallParticipantLeaseRoute {
   }
 
   public includesAllParticipants(participantIds: IdentityId[]): boolean {
-    return participantIds.every((participantId) =>
-      this.hasParticipant(participantId),
+    return (
+      this.participantIds.length === participantIds.length &&
+      participantIds.every((participantId) =>
+        this.hasParticipant(participantId),
+      )
     );
   }
 
@@ -40,22 +43,18 @@ export class CallParticipantLeaseRoute {
     ].join(':');
   }
 
-  public includingParticipants(
+  public withParticipants(
     participantIds: IdentityId[],
   ): CallParticipantLeaseRoute {
-    const additionalParticipantIds = participantIds.filter(
-      (participantId, index) =>
-        !this.hasParticipant(participantId) &&
-        participantIds.findIndex((candidate) =>
-          candidate.isEqual(participantId),
-        ) === index,
-    );
-
     return new CallParticipantLeaseRoute(
       this.callId,
       this.ownerNodeId,
       this.networkId,
-      [...this.participantIds, ...additionalParticipantIds],
+      participantIds.filter(
+        (id, index) =>
+          participantIds.findIndex((candidate) => candidate.isEqual(id)) ===
+          index,
+      ),
     );
   }
 

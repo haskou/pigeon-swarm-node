@@ -234,7 +234,7 @@ describe('Call', () => {
     expect(() => call.joinOrAdd(creator)).not.toThrow();
   });
 
-  it('preserves a remote join that races with the last locally known departure', () => {
+  it('does not end a community session when a remote join races with local departure', () => {
     const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
     const remote = Call.fromPrimitives(call.toPrimitives());
     remote.joinOrAdd(recipient);
@@ -244,7 +244,7 @@ describe('Call', () => {
     for (const pair of [[call, remote], [remote, call]]) {
       const merged = mapper.toDomain(merger.merge(mapper.toDocument(pair[0]), mapper.toDocument(pair[1])));
       expect(merged.isActive()).toBe(true);
-      expect(() => merged.assertParticipantCanHeartbeat(recipient)).not.toThrow();
+      expect(merged.getParticipantIds()).toEqual([]);
       expect(merged.hasJoinedParticipant(creator)).toBe(false);
     }
   });

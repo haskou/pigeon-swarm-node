@@ -90,6 +90,7 @@ The event attributes are:
   "status": "available",
   "customMessage": "Building the swarm",
   "lastHeartbeatAt": 1770000000000,
+  "lastRenewedAt": 1770000000000,
   "lastActivityAt": 1770000000000,
   "updatedAt": 1770000000000,
   "networkIds": ["<networkId>"]
@@ -102,7 +103,7 @@ absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
 
 ## Durable call state convergence
 
-Call snapshots in the private network's OrbitDB `calls` store merge each
+Conversation call snapshots in the private network's OrbitDB `calls` store merge each
 participant independently. A later snapshot for one participant cannot overwrite
 another participant's newer join or departure. Participant revisions use the
 latest join, leave, decline or missed timestamp. Equal timestamps use a stable
@@ -126,6 +127,13 @@ gossip-only projection updates do not schedule another repair. Reopening the sto
 therefore retains the recovered participant state. No additional pubsub event or
 heartbeat field is introduced by this repair.
 
+Community voice documents retain only session lifecycle and scope. Participant
+arrays are empty, and creator/ender identities are omitted. Runtime participation
+is hydrated from unexpired in-memory leases. Legacy community participant fields
+are stripped before projection and canonical repair; replaying old history cannot
+restore a participation grant. This rewrites current documents, not immutable
+blocks or copies already held by peers.
+
 ## Call participant leases
 
 `calls.v1.participant_lease.was_updated` replicates ephemeral call membership
@@ -136,8 +144,27 @@ node.
 
 Every heartbeat publishes a connected snapshot. After the timeout, all nodes
 remove their stale local copy, but only the owner publishes the disconnected
-snapshot. Durable call documents retain call lifecycle and participant history;
-they contain no heartbeat timestamp.
+snapshot. Conversation documents retain lifecycle and participant history;
+community documents retain lifecycle only. Neither stores heartbeat timestamps.
+
+Community participation expires sixty seconds after the last real join or
+heartbeat (`lastRenewedAt`), independent of timeout transition timestamps.
+An explicit departure sets `leftAt` and invalidates that owner's participation
+immediately. A heartbeat cannot undo a departure, even when another node still
+holds a grant for the same identity; re-entry requires an explicit join. Losing
+runtime state on restart requires explicit re-entry on that serving node. A fresh
+lease from another owner restores remote presence only; it does not authorize
+heartbeat on the restarted node. A conversation heartbeat can recreate its runtime lease from
+persisted joined state.
+
+Incoming leases older than sixty seconds or more than five seconds ahead of the
+local clock are rejected, including after tombstone cleanup. Equal-time explicit
+leave wins over timeout and connected updates. Routing participant lists are
+replaced on renewal rather than accumulated. Nodes must keep their clocks in sync. Legacy connected events use their heartbeat
+time as the renewal time; legacy disconnected events without `lastRenewedAt`
+cannot restore a participation grant.
+These are retention and freshness checks, not protection against a malicious
+network member forging new lease events.
 
 ```json
 {
@@ -161,6 +188,7 @@ they contain no heartbeat timestamp.
   "ownerNodeId": "550e8400-e29b-41d4-a716-446655440012",
   "networkId": "550e8400-e29b-41d4-a716-446655440011",
   "lastHeartbeatAt": 1770000000000,
+  "lastRenewedAt": 1770000000000,
   "status": "connected"
 }
 ```
@@ -324,7 +352,7 @@ does not validate external NAT traversal or calls.
 
 ## Live call projection boundary
 
-Node-to-node lifecycle documents retain merge tombstones; runtime leases stay
+Conversation lifecycle documents retain merge tombstones; runtime leases stay
 in memory (five-second timeout, sixty-second disconnected retention). WebSocket
 clients do not receive these raw documents or lease attributes. They receive
 `callId`, `liveCallRevision` and a minimal `liveCall` projection, filtered by
@@ -343,11 +371,12 @@ heartbeats and media-only changes do not trigger roster delivery.
 
 Explicitly ending a community call retires its session; the next session starts
 a new roster. Merely leaving does not globally terminate a channel: a local
-roster can lag behind a concurrent remote join. Participant tombstones remain
-necessary for delayed replication, so community session rotation and durable
-metadata retention still require the storage protocol migration in #33. Existing replicated history and copies held by peers cannot be
-made confidential retroactively by filtering HTTP or WebSocket fields. See the
-storage migration and metadata issues for stronger storage guarantees.
+roster can lag behind a concurrent remote join. Community participant tombstones
+are bounded runtime state and are not written to the reusable session document.
+Existing replicated history and copies held by peers cannot be made confidential
+retroactively. Current peers still observe transient participation gossip and
+session scope; this protocol does not provide traffic-analysis resistance or
+hide participation from an actively logging node.
 
 Community call documents carry a positive `sessionEpoch` for new sessions.
 Concurrent starts derive one UUID from the private network, community, channel

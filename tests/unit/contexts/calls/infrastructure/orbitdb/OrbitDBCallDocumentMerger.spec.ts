@@ -15,10 +15,10 @@ function document(
     participantIds: participants.map((participant) => participant.identityId),
     participants,
     scope: {
-      type: 'community_channel',
-      communityId: 'community',
-      channelId: 'voice',
-      conversationId: undefined,
+      type: 'conversation',
+      communityId: undefined,
+      channelId: undefined,
+      conversationId: 'conversation',
     },
     status: 'active',
     updatedAt,
@@ -117,4 +117,20 @@ describe('OrbitDBCallDocumentMerger', () => {
       expected.participants.map((participant) => participant.status),
     ).toEqual(['joined', 'joined']);
   });
+  it('strips community participant attribution in both legacy replay orders', () => {
+    const legacy: OrbitDBCallDocument = { ...document([{ identityId: 'a', status: 'joined', joinedAt: 20 }]), scope: { type: 'community_channel', communityId: 'community', channelId: 'voice', conversationId: undefined } };
+    const current = { ...legacy, status: 'ended', endedAt: 40, endedByIdentityId: 'a', sessionEpoch: 2 };
+    for (const order of [[legacy, current], [current, legacy]]) {
+      const merged = merger.merge(order[0], order[1]);
+      expect(merged.participantIds).toEqual([]);
+      expect(merged.participants).toEqual([]);
+      expect(merged).not.toHaveProperty('creatorIdentityId');
+      expect(merged).not.toHaveProperty('endedByIdentityId');
+      expect(merged).toMatchObject({ status: 'ended', sessionEpoch: 2 });
+      expect(merger.merge(merged, legacy)).toEqual(merged);
+      const stored = JSON.parse(JSON.stringify(merged));
+      expect(merger.merge(undefined, stored)).toEqual(stored);
+    }
+  });
+
 });

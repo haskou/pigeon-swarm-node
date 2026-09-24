@@ -23,7 +23,7 @@ export default class CallParticipantLeaseReleaser {
     const released: CallParticipantLease[] = [];
 
     for (const lease of ownedLeases) {
-      if (!lease.disconnect()) {
+      if (!lease.leave()) {
         continue;
       }
 

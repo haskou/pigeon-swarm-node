@@ -66,6 +66,7 @@ describe('Call application use cases', () => {
   it('CallFinder returns a call visible to the requester', async () => {
     const repository = mock<CallRepository>();
     const call = mock<Call>();
+    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
 
     repository.findById.mockResolvedValue(call);
     call.hasParticipant.mockReturnValue(true);
@@ -80,6 +81,7 @@ describe('Call application use cases', () => {
   it('CallFinder hides calls from non-participants', async () => {
     const repository = mock<CallRepository>();
     const call = mock<Call>();
+    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
 
     repository.findById.mockResolvedValue(call);
     call.hasParticipant.mockReturnValue(false);
@@ -95,6 +97,7 @@ describe('Call application use cases', () => {
     const repository = mock<CallRepository>();
     const access = mock<CallAccessAuthorizer>();
     const call = mock<Call>();
+    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
     repository.findById.mockResolvedValue(call);
     repository.findActiveByParticipant.mockResolvedValue([call]);
     repository.findByParticipant.mockResolvedValue([call]);
@@ -133,6 +136,7 @@ describe('Call application use cases', () => {
     const repository = mock<CallRepository>();
     const eventPublisher = mock<DomainEventPublisher>();
     const call = mock<Call>();
+    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
     const events = [mock<DomainEvent>()];
 
     repository.findById.mockResolvedValue(call);
@@ -153,6 +157,7 @@ describe('Call application use cases', () => {
     const eventPublisher = mock<DomainEventPublisher>();
     const leaseRenewer = mock<CallParticipantLeaseRenewer>();
     const call = mock<Call>();
+    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
     const lease = mock<CallParticipantLease>();
 
     repository.findById.mockResolvedValue(call);
@@ -176,6 +181,7 @@ describe('Call application use cases', () => {
     const eventPublisher = mock<DomainEventPublisher>();
     const leaseReleaser = mock<CallParticipantLeaseReleaser>();
     const call = mock<Call>();
+    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
     const lease = mock<CallParticipantLease>();
 
     repository.findById.mockResolvedValue(call);

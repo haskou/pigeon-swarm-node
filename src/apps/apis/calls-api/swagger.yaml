@@ -47,12 +47,12 @@ paths:
       tags:
         - calls
       summary: Get a minimal live snapshot by id
-      description: Current conversation membership or voice-channel access is checked on every request. Past call participation alone does not grant access. Community snapshots omit creator and session timestamps; departed and disconnected participants are omitted.
+      description: Current conversation membership or voice-channel access is checked on every request. Past call participation alone does not grant access. Currently authorized community members may read a live snapshot without joining. Community snapshots omit creator and session timestamps; departed and disconnected participants are omitted.
       parameters:
         - $ref: '#/components/parameters/CallId'
       responses:
         '200':
-          description: Call found for the authenticated participant.
+          description: Call found for the currently authorized identity.
           content:
             application/json:
               schema:
@@ -131,7 +131,7 @@ paths:
       tags:
         - calls
       summary: Refresh the authenticated participant heartbeat
-      description: Joined participants renew their lease while media is active. Current scope access is rechecked. Returns no roster or diagnostics; runtime heartbeat state is not persisted in OrbitDB.
+      description: Joined participants renew their lease while media is active. Current scope access is rechecked. Community calls require an unexpired participation grant on this node; explicit leave or lost runtime state requires an explicit join. Returns no roster or diagnostics; runtime heartbeat state is not persisted in OrbitDB.
       parameters:
         - $ref: '#/components/parameters/CallId'
       requestBody:
@@ -143,6 +143,8 @@ paths:
       responses:
         '204':
           description: Participant heartbeat recorded. No response body.
+        '409':
+          description: Call is inactive, inaccessible, or the community participation grant is missing or expired.
   /calls/{callId}/signals:
     post:
       tags:

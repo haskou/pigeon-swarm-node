@@ -13,7 +13,11 @@ export default class CallFinder {
   public async find(message: CallFindMessage): Promise<Call> {
     const call = await this.repository.findById(message.callId);
 
-    if (!call || !call.hasParticipant(message.requesterIdentityId)) {
+    if (
+      !call ||
+      (call.getScope().isConversation() &&
+        !call.hasParticipant(message.requesterIdentityId))
+    ) {
       throw new CallNotFoundError();
     }
 

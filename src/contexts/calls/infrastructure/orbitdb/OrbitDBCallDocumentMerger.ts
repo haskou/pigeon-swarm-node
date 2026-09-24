@@ -93,6 +93,29 @@ export default class OrbitDBCallDocumentMerger {
     );
   }
 
+  private withoutCommunityParticipation(
+    document: OrbitDBCallDocument,
+  ): OrbitDBCallDocument {
+    if (document.scope.type !== 'community_channel') return document;
+
+    return {
+      createdAt: document.createdAt,
+      id: document.id,
+      networkId: document.networkId,
+      scope: document.scope,
+      status: document.status,
+      ...(document.endedAt === undefined ? {} : { endedAt: document.endedAt }),
+      ...(document.updatedAt === undefined
+        ? {}
+        : { updatedAt: document.updatedAt }),
+      ...(document.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: document.sessionEpoch }),
+      participantIds: [],
+      participants: [],
+    };
+  }
+
   public merge(
     current: OrbitDBCallDocument | undefined,
     incoming: OrbitDBCallDocument,
@@ -101,7 +124,7 @@ export default class OrbitDBCallDocumentMerger {
       current && this.compareCalls(current, incoming) > 0 ? current : incoming;
     const documents = current ? [current, incoming] : [incoming];
 
-    return {
+    return this.withoutCommunityParticipation({
       ...base,
       ...(documents.some((document) => document.sessionEpoch !== undefined)
         ? {
@@ -121,6 +144,6 @@ export default class OrbitDBCallDocumentMerger {
       updatedAt: Math.max(
         ...documents.map((document) => this.updatedAt(document)),
       ),
-    };
+    });
   }
 }

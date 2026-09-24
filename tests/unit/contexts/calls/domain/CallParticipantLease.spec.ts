@@ -22,6 +22,30 @@ describe('CallParticipantLease', () => {
   const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440011');
   const nodeId = new NodeId('550e8400-e29b-41d4-a716-446655440012');
 
+  it('does not revive an expired participation grant when a delayed scheduler disconnects it', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      const lease = CallParticipantLease.connect(callId, identityId, nodeId, networkId, [identityId]);
+      expect(lease.hasParticipationGrant()).toBe(true);
+      clock.mockReturnValue(121000);
+      expect(lease.hasParticipationGrant()).toBe(false);
+      lease.disconnect();
+      expect(lease.hasParticipationGrant()).toBe(false);
+      expect(CallParticipantLease.fromPrimitives(lease.toPrimitives()).hasParticipationGrant()).toBe(false);
+      lease.renew([identityId]);
+      expect(lease.hasParticipationGrant()).toBe(true);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('does not infer a participation grant from a legacy timeout without a renewal timestamp', () => {
+    const lease = CallParticipantLease.connect(callId, identityId, nodeId, networkId, [identityId]);
+    const { lastRenewedAt: _, ...legacy } = lease.toPrimitives();
+    expect(CallParticipantLease.fromPrimitives(legacy).hasParticipationGrant()).toBe(true);
+    expect(CallParticipantLease.fromPrimitives({ ...legacy, status: 'disconnected' }).hasParticipationGrant()).toBe(false);
+  });
+
   it('publishes every renewal even while connection status is unchanged', () => {
     const lease = CallParticipantLease.connect(
       callId,
@@ -124,7 +148,7 @@ describe('CallParticipantLease', () => {
     });
   });
 
-  it('preserves participants when renewed from an older call snapshot', () => {
+  it('replaces the routing roster instead of accumulating departed participants', () => {
     const mediaConnection =
       CallParticipantMediaConnection.fromPrimitives({
         remoteIdentityId: remoteIdentityId.valueOf(),
@@ -143,12 +167,9 @@ describe('CallParticipantLease', () => {
     lease.pullDomainEvents();
     lease.renew([identityId], [], new Timestamp(200));
 
-    expect(lease.toPrimitives().participantIds).toEqual([
-      identityId.valueOf(),
-      remoteIdentityId.valueOf(),
-    ]);
+    expect(lease.toPrimitives().participantIds).toEqual([identityId.valueOf()]);
     expect(lease.pullDomainEvents()[0].attributes).toMatchObject({
-      participantsChanged: false,
+      participantsChanged: true,
     });
 
     expect(() =>
@@ -157,7 +178,7 @@ describe('CallParticipantLease', () => {
         [mediaConnection],
         new Timestamp(300),
       ),
-    ).not.toThrow();
+    ).toThrow();
   });
 
   it('rejects media reports targeting self or duplicate participants', () => {

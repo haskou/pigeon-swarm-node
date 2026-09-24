@@ -299,8 +299,8 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
-- deliver call lifecycle events only to call participants when the event
-  carries `participantIds`
+- deliver conversation call snapshots only to currently authorized participants;
+  community call snapshots go to clients with current voice-channel access
 - deliver call signals only to `recipientIdentityId`
 - deliver node-wide events, such as heartbeat/peer updates, to all
   authenticated WebSocket clients on the local node
@@ -363,8 +363,8 @@ For `conversations.v1.messages.were_read`, use `event.aggregate_id` as
 `conversationId` and refresh the conversation unread counters if needed.
 
 For call lifecycle and signalling events, use `event.aggregate_id` as
-`callId`. For `calls.v1.participant_lease.was_updated`, the aggregate id
-identifies one node-owned lease; use `event.attributes.callId` instead. Calls
+`callId`. Browser notifications for `calls.v1.participant_lease.was_updated`
+also use the call ID; composite node-owned lease IDs remain internal. Calls
 are signalling only: audio/video media is negotiated by frontend with WebRTC.
 The backend stores active call state and routes lifecycle/signalling events to
 the authenticated participants.
@@ -403,6 +403,8 @@ timestamps and remote transport diagnostics are omitted. `mediaConnections` is
 an empty compatibility array. Community snapshots omit `creatorIdentityId`,
 `createdAt`, `endedAt` and `endedByIdentityId`; conversation snapshots retain the
 caller and lifecycle times needed for incoming-call and ended-call UI.
+A community member with current channel access can inspect its live snapshot
+without having joined. Conversation reads additionally require call participation.
 
 Apply `event.attributes.liveCall` directly from call WebSocket notifications.
 `liveCallRevision` is a monotonically increasing counter from the connected
@@ -649,6 +651,10 @@ Implemented:
   replicates it through `calls.v1.participant_lease.was_updated`
 - heartbeat never writes the call document or its indexes to OrbitDB
 - heartbeat returns HTTP 204 with no roster or diagnostics; it rechecks current scope access
+- community heartbeats require a current grant on the serving node. Explicit
+  leave, lost runtime state, or sixty seconds without a real renewal requires an
+  explicit join; a heartbeat cannot silently rejoin or borrow another node's grant
+- conversation heartbeats can recreate a runtime lease for a persisted joined participant
 - live `participants[].connected` is true while an authorized identity has a live lease
 - heartbeat timestamps and remote ICE reports stay out of the live HTTP/WebSocket contract
 - remote nodes expire stale lease copies locally, while only the owner node may
@@ -658,8 +664,12 @@ Implemented:
 - OrbitDB call projection changes notify clients after projection, so lease-before-document delivery cannot leave a stale roster
 - community membership/permission changes refresh live snapshots for remaining authorized recipients; every delivery rechecks scope access
 - leaving removes the authenticated identity from the active snapshot
-- leaving a one-to-one conversation ends its call; leaving a group conversation (including a two-member group) or community call does not terminate other participants
-- explicit community call termination retires its call ID; automatic session rotation and durable metadata retention require the storage protocol migration in haskou/pigeon-swarm#33
+- leaving a one-to-one conversation ends its call; leaving a group (including a two-member group) or community call does not terminate other participants
+- explicit community call termination retires its call ID
+- community session documents do not persist participant identities, creator or
+  ender attribution. Runtime participation expires and legacy rosters cannot
+  restore it after restart. Existing immutable history is not erased; see
+  [the synchronization contract](pubsub-sync-protocol.md) for retention limits
 - deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
 - leaves emit `calls.v1.participant.left`

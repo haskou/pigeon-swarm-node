@@ -20,7 +20,7 @@ export default class CallParticipantHeartbeatRecorder {
   ): Promise<Call> {
     const call = await this.callRepository.findById(message.callId);
 
-    if (!call) {
+    if (!call || !call.isActive()) {
       throw new CallNotFoundError();
     }
 
@@ -29,12 +29,24 @@ export default class CallParticipantHeartbeatRecorder {
       message.participantIdentityId,
     );
 
+    if (
+      call.getScope().isCommunityChannel() &&
+      !call.hasJoinedParticipant(message.participantIdentityId)
+    ) {
+      throw new CallNotFoundError();
+    }
     call.assertParticipantCanHeartbeat(message.participantIdentityId);
-    const lease = await this.leaseRenewer.renew(
-      call,
-      message.participantIdentityId,
-      message.mediaConnections,
-    );
+    const lease = call.getScope().isCommunityChannel()
+      ? await this.leaseRenewer.renewExisting(
+          call,
+          message.participantIdentityId,
+          message.mediaConnections,
+        )
+      : await this.leaseRenewer.renew(
+          call,
+          message.participantIdentityId,
+          message.mediaConnections,
+        );
     await this.eventPublisher.publish(lease.pullDomainEvents());
 
     return call;

@@ -10,6 +10,18 @@ yarn test:integration:call-privacy
 
 This exercises real signatures, HTTP authorization, persistent WebSocket connections and node-to-node replication. It checks minimal live snapshots, concurrent participation changes, lease expiration and recovery, reconnects, and denial after community membership is revoked. It is included in `test:ci`.
 
+## Persistence and restart
+
+```sh
+yarn test:integration:call-history
+```
+
+This uses a real OrbitDB store and reopens its projection. Conversation history
+must retain merged participant transitions. Legacy community records must be
+repaired without participant attribution and must not restore membership after
+reopen. Unit regressions additionally cover stale lease replay, explicit leave
+racing with heartbeat, and timeout processing after a scheduler pause.
+
 ## Browser integration across both projects
 
 The UI checkout must have its normal dependencies and a Playwright Chromium browser already available. This command does not install either.

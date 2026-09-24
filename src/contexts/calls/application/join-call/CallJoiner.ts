@@ -27,7 +27,11 @@ export default class CallJoiner {
       message.participantIdentityId,
     );
 
-    call.join(message.participantIdentityId);
+    if (call.getScope().isCommunityChannel()) {
+      call.joinOrAdd(message.participantIdentityId);
+    } else {
+      call.join(message.participantIdentityId);
+    }
 
     await this.repository.save(call);
     const lease = await this.leaseRenewer.renew(

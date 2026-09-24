@@ -52,8 +52,10 @@ export default class WebSocketClientMessageHandler {
 
     if (!call) return undefined;
 
-    const participantsWithClients = candidates.filter((identityId) =>
-      call.hasParticipant(new IdentityId(identityId)),
+    const participantsWithClients = candidates.filter(
+      (identityId) =>
+        call.getScope().isCommunityChannel() ||
+        call.hasParticipant(new IdentityId(identityId)),
     );
     const visibility = await Promise.all(
       participantsWithClients.map((identityId) =>

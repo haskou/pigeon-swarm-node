@@ -14,5 +14,9 @@ export default abstract class CallParticipantLeaseRepository {
 
   public abstract purgeDisconnectedBefore(threshold: Timestamp): Promise<void>;
 
+  public abstract renewIfParticipating(
+    lease: CallParticipantLease,
+  ): Promise<boolean>;
+
   public abstract save(lease: CallParticipantLease): Promise<void>;
 }

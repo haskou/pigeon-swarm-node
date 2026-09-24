@@ -2252,18 +2252,6 @@ services:
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fYXV0aG9yaXplLWNhbGxfX0NhbGxBY2Nlc3NBdXRob3JpemVyX19DYWxsQWNjZXNzQXV0aG9yaXplcg==
     abstract: false
     parent: null
-  X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNhbGxSZXBvc2l0b3J5X19PcmJpdERCQ2FsbFJlcG9zaXRvcnk=:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
-    arguments:
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fbWFwcGVyc19fT3JiaXREQkNhbGxNYXBwZXJfX09yYml0REJDYWxsTWFwcGVy
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNhbGxEb2N1bWVudFJlcGxpY2F0b3JfX09yYml0REJDYWxsRG9jdW1lbnRSZXBsaWNhdG9y
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNhbGxQcm9qZWN0aW9uX19PcmJpdERCQ2FsbFByb2plY3Rpb24=
-    abstract: false
-    parent: >-
-      X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ2FsbFJlcG9zaXRvcnlfX0NhbGxSZXBvc2l0b3J5
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NvbW11bml0aWVzX19hcHBsaWNhdGlvbl9fYWNjZXB0LWludml0ZV9fQ29tbXVuaXR5SW52aXRlQWNjZXB0ZXJfX0NvbW11bml0eUludml0ZUFjY2VwdGVy:
     class: /contexts/communities/application/accept-invite/CommunityInviteAccepter
     arguments:
@@ -2882,6 +2870,20 @@ services:
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fc3RhcnQtY2FsbF9fQ29tbXVuaXR5Q2hhbm5lbENhbGxTdGFydENvb3JkaW5hdG9yX19Db21tdW5pdHlDaGFubmVsQ2FsbFN0YXJ0Q29vcmRpbmF0b3I=
     abstract: false
     parent: null
+  X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNhbGxSZXBvc2l0b3J5X19PcmJpdERCQ2FsbFJlcG9zaXRvcnk=:
+    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
+    arguments:
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fbWFwcGVyc19fT3JiaXREQkNhbGxNYXBwZXJfX09yYml0REJDYWxsTWFwcGVy
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNhbGxEb2N1bWVudFJlcGxpY2F0b3JfX09yYml0REJDYWxsRG9jdW1lbnRSZXBsaWNhdG9y
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19pbmZyYXN0cnVjdHVyZV9fb3JiaXRkYl9fT3JiaXREQkNhbGxQcm9qZWN0aW9uX19PcmJpdERCQ2FsbFByb2plY3Rpb24=
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZXBvc2l0b3J5X19DYWxsUGFydGljaXBhbnRMZWFzZVJlcG9zaXRvcnk=
+    abstract: false
+    parent: >-
+      X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ2FsbFJlcG9zaXRvcnlfX0NhbGxSZXBvc2l0b3J5
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NvbW11bml0aWVzX19hcHBsaWNhdGlvbl9fZGVsZXRlLWNoYW5uZWwtbWVzc2FnZV9fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VEZWxldGVyX19Db21tdW5pdHlDaGFubmVsTWVzc2FnZURlbGV0ZXI=:
     class: >-
       /contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter

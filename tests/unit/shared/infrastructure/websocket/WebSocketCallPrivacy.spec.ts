@@ -222,6 +222,10 @@ describe('live call privacy', () => {
         .toString('base64'),
     );
     const outsiderClient = socket();
+    const community = (await communities.findById(new CommunityId('community-1')))!;
+    jest.mocked(community.authorizeVoiceChannelCall).mockImplementation((identityId) => {
+      if (identityId.isEqual(outsider)) throw new Error('Not a member');
+    });
     hub.register(outsider, outsiderClient);
     (client.send as jest.Mock).mockClear();
     (outsiderClient.send as jest.Mock).mockClear();

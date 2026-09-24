@@ -524,10 +524,7 @@ export class WebSocketEventHub {
         communityId,
       )) ?? [];
     for (const call of calls) {
-      this.publishCallSnapshot(
-        call.getId().valueOf(),
-        call.getParticipantIds().map((identityId) => identityId.valueOf()),
-      );
+      this.publishCallSnapshot(call.getId().valueOf());
     }
   }
 
@@ -680,11 +677,9 @@ export class WebSocketEventHub {
     }
   }
 
-  public publishCallSnapshot(callId: string, participantIds: string[]): void {
+  public publishCallSnapshot(callId: string): void {
     this.enqueueCallDelivery(callId, async () => {
-      const candidates = participantIds.filter((identityId) =>
-        this.clients.has(identityId),
-      );
+      const candidates = [...this.clients.keys()];
 
       if (candidates.length === 0) return;
       const audience = await this.clientMessageHandler?.findCallAudience(
