@@ -14,6 +14,13 @@ export default class CallParticipantLeaseRenewer {
     private readonly nodeRepository: NodeRepository,
   ) {}
 
+  private nextHeartbeatAt(lease: CallParticipantLease): Timestamp {
+    const now = Timestamp.now();
+    const previous = lease.getLastHeartbeatAt();
+
+    return now.isAfter(previous) ? now : previous.addMilliseconds(1);
+  }
+
   private async update(
     call: Call,
     participantIdentityId: IdentityId,
@@ -43,9 +50,7 @@ export default class CallParticipantLeaseRenewer {
       lease.renew(
         call.getParticipantIds(),
         mediaConnections,
-        new Timestamp(
-          Math.max(Date.now(), existing.getLastHeartbeatAt().valueOf() + 1),
-        ),
+        this.nextHeartbeatAt(existing),
       );
     }
 

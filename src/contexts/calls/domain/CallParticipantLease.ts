@@ -164,6 +164,17 @@ export class CallParticipantLease extends AggregateRoot {
     return true;
   }
 
+  private isRecent(timestamp: Timestamp, now: Timestamp): boolean {
+    return (
+      timestamp.isAfter(
+        now.addMilliseconds(-CallParticipantLease.RETENTION_MS),
+      ) &&
+      timestamp.isBeforeOrEqual(
+        now.addMilliseconds(CallParticipantLease.CLOCK_SKEW_MS),
+      )
+    );
+  }
+
   public belongsTo(
     participantIdentityId: IdentityId,
     ownerNodeId?: NodeId,
@@ -200,9 +211,9 @@ export class CallParticipantLease extends AggregateRoot {
   public leave(now: Timestamp = Timestamp.now()): boolean {
     if (this.leftAt) return false;
 
-    const transitionAt = new Timestamp(
-      Math.max(now.valueOf(), this.lastHeartbeatAt.valueOf() + 1),
-    );
+    const transitionAt = now.isAfter(this.lastHeartbeatAt)
+      ? now
+      : this.lastHeartbeatAt.addMilliseconds(1);
     this.leftAt = transitionAt;
 
     if (!this.disconnect(transitionAt)) {
@@ -214,25 +225,18 @@ export class CallParticipantLease extends AggregateRoot {
   }
 
   public hasParticipationGrant(): boolean {
-    const renewedAt = this.lastRenewedAt?.valueOf();
-
-    if (renewedAt === undefined) return false;
+    const now = Timestamp.now();
 
     return (
       this.leftAt === undefined &&
-      this.isWithinRetention() &&
-      renewedAt > Date.now() - CallParticipantLease.RETENTION_MS &&
-      renewedAt <= Date.now() + CallParticipantLease.CLOCK_SKEW_MS
+      this.lastRenewedAt !== undefined &&
+      this.isWithinRetention(now) &&
+      this.isRecent(this.lastRenewedAt, now)
     );
   }
 
-  public isWithinRetention(now: number = Date.now()): boolean {
-    const heartbeat = this.lastHeartbeatAt.valueOf();
-
-    return (
-      heartbeat > now - CallParticipantLease.RETENTION_MS &&
-      heartbeat <= now + CallParticipantLease.CLOCK_SKEW_MS
-    );
+  public isWithinRetention(now: Timestamp = Timestamp.now()): boolean {
+    return this.isRecent(this.lastHeartbeatAt, now);
   }
 
   public getParticipantIdentityId(): IdentityId {
