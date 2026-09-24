@@ -19,6 +19,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { mock } from 'jest-mock-extended';
+import { generateKeyPairSync } from 'node:crypto';
 import { WebSocket } from 'ws';
 
 const creator = new IdentityId(
@@ -172,6 +173,67 @@ describe('live call privacy', () => {
     hub.publish([started]);
     await flush();
     expect(client.send).not.toHaveBeenCalled();
+  });
+
+  it('delivers an expired lease snapshot to participants who joined after the lease roster was captured', async () => {
+    const call = startCall();
+    const lease = CallParticipantLease.connect(
+      call.getId(),
+      creator,
+      node,
+      network,
+      call.getParticipantIds(),
+    );
+    lease.pullDomainEvents();
+    call.joinOrAdd(other);
+    const calls = mock<CallRepository>();
+    calls.findById.mockResolvedValue(call);
+    const conversations = mock<ConversationRepository>();
+    const communities = mock<CommunityRepository>();
+    communities.findById.mockResolvedValue(mock<Community>());
+    const leases = new InMemoryCallParticipantLeaseRepository();
+    await leases.save(lease);
+    await leases.save(
+      CallParticipantLease.connect(
+        call.getId(),
+        other,
+        node,
+        network,
+        call.getParticipantIds(),
+      ),
+    );
+    const hub = new WebSocketEventHub();
+    hub.setClientMessageHandler(
+      new WebSocketClientMessageHandler(
+        conversations,
+        communities,
+        mock<IdentityPresenceHeartbeatRecorder>(),
+        mock<CallSignalAcknowledger>(),
+        calls,
+        leases,
+        new CallAccessAuthorizer(conversations, communities),
+      ),
+    );
+    const client = socket();
+    hub.register(other, client);
+    const outsider = new IdentityId(
+      generateKeyPairSync('ed25519')
+        .publicKey.export({ type: 'spki', format: 'der' })
+        .toString('base64'),
+    );
+    const outsiderClient = socket();
+    hub.register(outsider, outsiderClient);
+    (client.send as jest.Mock).mockClear();
+    (outsiderClient.send as jest.Mock).mockClear();
+    lease.disconnect();
+    await leases.save(lease);
+    hub.publish(lease.pullDomainEvents());
+    await flush();
+    expect(client.send).toHaveBeenCalledTimes(1);
+    const resource = JSON.parse((client.send as jest.Mock).mock.calls[0][0])
+      .event.attributes.liveCall;
+    expect(resource.participantIds).toEqual([other.valueOf()]);
+    expect(outsiderClient.send).not.toHaveBeenCalled();
   });
 
   it('fails closed when the authorization handler is unavailable', async () => {

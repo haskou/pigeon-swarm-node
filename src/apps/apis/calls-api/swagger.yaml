@@ -305,6 +305,9 @@ components:
         createdAt:
           type: number
           description: Conversation lifecycle only; omitted for community voice channels.
+        endedByIdentityId:
+          type: string
+          description: Present only for ended conversation calls.
         endedAt:
           type: number
           nullable: true

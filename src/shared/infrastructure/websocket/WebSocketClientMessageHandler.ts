@@ -52,12 +52,15 @@ export default class WebSocketClientMessageHandler {
 
     if (!call) return undefined;
 
+    const participantsWithClients = candidates.filter((identityId) =>
+      call.hasParticipant(new IdentityId(identityId)),
+    );
     const visibility = await Promise.all(
-      candidates.map((identityId) =>
+      participantsWithClients.map((identityId) =>
         this.callAccess.canAccess(call, new IdentityId(identityId)),
       ),
     );
-    const recipientIds = candidates.filter(
+    const recipientIds = participantsWithClients.filter(
       (_identityId, index) => visibility[index],
     );
     const leases =

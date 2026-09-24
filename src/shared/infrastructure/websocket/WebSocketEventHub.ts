@@ -582,6 +582,14 @@ export class WebSocketEventHub {
       : candidates;
   }
 
+  private callEventCandidates(event: DomainEvent): string[] {
+    if (!this.isCallSignalEvent(event)) return [...this.clients.keys()];
+
+    return [...this.getEventRecipients(event)].filter((identityId) =>
+      this.clients.has(identityId),
+    );
+  }
+
   private enqueueCallEvent(event: DomainEvent): void {
     if (this.shouldSuppressCallParticipantLeaseEvent(event)) return;
 
@@ -590,9 +598,7 @@ export class WebSocketEventHub {
     if (typeof callId !== 'string') return;
 
     this.enqueueCallDelivery(callId, async () => {
-      const candidates = [...this.getEventRecipients(event)].filter(
-        (identityId) => this.clients.has(identityId),
-      );
+      const candidates = this.callEventCandidates(event);
 
       if (candidates.length === 0) return;
       const checks = this.callAuthorizationCandidates(event, candidates);
