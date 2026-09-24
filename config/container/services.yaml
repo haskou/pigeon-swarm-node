@@ -2238,19 +2238,6 @@ services:
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fYXV0aG9yaXplLWNhbGxfX0NhbGxBY2Nlc3NBdXRob3JpemVyX19DYWxsQWNjZXNzQXV0aG9yaXplcg==
     abstract: false
     parent: null
-  X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fbGVhdmUtY2FsbF9fQ2FsbExlYXZlcl9fQ2FsbExlYXZlcg==:
-    class: /contexts/calls/application/leave-call/CallLeaver
-    arguments:
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ2FsbFJlcG9zaXRvcnlfX0NhbGxSZXBvc2l0b3J5
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fbWVzc2FnZUJ1c19fRG9tYWluRXZlbnRQdWJsaXNoZXJfX0RvbWFpbkV2ZW50UHVibGlzaGVy
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fcmVsZWFzZS1wYXJ0aWNpcGFudC1sZWFzZV9fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZWxlYXNlcl9fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZWxlYXNlcg==
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fYXV0aG9yaXplLWNhbGxfX0NhbGxBY2Nlc3NBdXRob3JpemVyX19DYWxsQWNjZXNzQXV0aG9yaXplcg==
-    abstract: false
-    parent: null
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fcmVjb3JkLXBhcnRpY2lwYW50LWhlYXJ0YmVhdF9fQ2FsbFBhcnRpY2lwYW50SGVhcnRiZWF0UmVjb3JkZXJfX0NhbGxQYXJ0aWNpcGFudEhlYXJ0YmVhdFJlY29yZGVy:
     class: >-
       /contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder
@@ -2848,6 +2835,21 @@ services:
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NvbW11bml0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29tbXVuaXR5Q2hhbm5lbE1lc3NhZ2VSZXBvc2l0b3J5X19Db21tdW5pdHlDaGFubmVsTWVzc2FnZVJlcG9zaXRvcnk=
       - >-
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NvbW11bml0aWVzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ29tbXVuaXR5TWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeV9fQ29tbXVuaXR5TWVzc2FnZVJlYWN0aW9uUmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fbGVhdmUtY2FsbF9fQ2FsbExlYXZlcl9fQ2FsbExlYXZlcg==:
+    class: /contexts/calls/application/leave-call/CallLeaver
+    arguments:
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19kb21haW5fX3JlcG9zaXRvcmllc19fQ2FsbFJlcG9zaXRvcnlfX0NhbGxSZXBvc2l0b3J5
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fbWVzc2FnZUJ1c19fRG9tYWluRXZlbnRQdWJsaXNoZXJfX0RvbWFpbkV2ZW50UHVibGlzaGVy
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fcmVsZWFzZS1wYXJ0aWNpcGFudC1sZWFzZV9fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZWxlYXNlcl9fQ2FsbFBhcnRpY2lwYW50TGVhc2VSZWxlYXNlcg==
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fYXV0aG9yaXplLWNhbGxfX0NhbGxBY2Nlc3NBdXRob3JpemVyX19DYWxsQWNjZXNzQXV0aG9yaXplcg==
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NvbnZlcnNhdGlvbnNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19Db252ZXJzYXRpb25SZXBvc2l0b3J5X19Db252ZXJzYXRpb25SZXBvc2l0b3J5
     abstract: false
     parent: null
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2NhbGxzX19hcHBsaWNhdGlvbl9fc2VuZC1zaWduYWxfX0NhbGxTaWduYWxTZW5kZXJfX0NhbGxTaWduYWxTZW5kZXI=:

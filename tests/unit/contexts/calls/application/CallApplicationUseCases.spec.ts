@@ -1,3 +1,6 @@
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
@@ -179,11 +182,21 @@ describe('Call application use cases', () => {
     call.pullDomainEvents.mockReturnValue([]);
     lease.pullDomainEvents.mockReturnValue([]);
     leaseReleaser.release.mockResolvedValue([lease]);
+    call.getScope.mockReturnValue(
+      CallScope.communityChannel(
+        new CommunityId('community'),
+        new CommunityChannelId('voice'),
+      ),
+    );
 
     await expect(
-      new CallLeaver(repository, eventPublisher, leaseReleaser, authorizer).leave(
-        new CallLeaveMessage(callId, participantIdentityId),
-      ),
+      new CallLeaver(
+        repository,
+        eventPublisher,
+        leaseReleaser,
+        authorizer,
+        mock<ConversationRepository>(),
+      ).leave(new CallLeaveMessage(callId, participantIdentityId)),
     ).resolves.toBe(call);
     expect(call.leave).toHaveBeenCalledTimes(1);
     expect(repository.save).toHaveBeenCalledWith(call);
@@ -209,6 +222,7 @@ describe('Call application use cases', () => {
         mock<DomainEventPublisher>(),
         mock<CallParticipantLeaseReleaser>(),
         authorizer,
+        mock<ConversationRepository>(),
       ).leave(new CallLeaveMessage(callId, participantIdentityId))],
   ])('%s rejects a missing call', async (_name, run) => {
     const repository = mock<CallRepository>();

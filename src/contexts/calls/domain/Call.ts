@@ -194,7 +194,7 @@ export class Call extends AggregateRoot {
     );
   }
 
-  public leave(identityId: IdentityId): void {
+  public leave(identityId: IdentityId, endOnDeparture = false): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
@@ -217,7 +217,7 @@ export class Call extends AggregateRoot {
 
     if (
       this.scope.isConversation() &&
-      (this.participants.length === 2 ||
+      (endOnDeparture ||
         !this.participants.some((candidate) => candidate.isJoined()))
     ) {
       this.lifecycle.end(identityId.valueOf());

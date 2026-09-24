@@ -16,6 +16,8 @@ import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSig
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
+import { GroupConversationName } from '@app/contexts/conversations/domain/value-objects/GroupConversationName';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -212,7 +214,7 @@ describe('Call', () => {
     call.pullDomainEvents();
     call.join(recipient);
     call.pullDomainEvents();
-    call.leave(recipient);
+    call.leave(recipient, true);
 
     expect(call.toPrimitives().participants).toMatchObject([
       { identityId: creator.valueOf(), status: 'joined' },
@@ -245,6 +247,38 @@ describe('Call', () => {
       expect(() => merged.assertParticipantCanHeartbeat(recipient)).not.toThrow();
       expect(merged.hasJoinedParticipant(creator)).toBe(false);
     }
+  });
+
+  it('keeps a two-member group call active until the last joined participant leaves', () => {
+    const conversation = GroupConversation.create(
+      new GroupConversationName('Two-member group'),
+      [creator, recipient],
+      networkId,
+    );
+    const call = Call.start(
+      creator,
+      networkId,
+      CallScope.conversation(conversation.getId()),
+      [recipient],
+    );
+    call.join(recipient);
+    call.pullDomainEvents();
+
+    call.leave(recipient);
+
+    expect(call.isActive()).toBe(true);
+    expect(call.getJoinedParticipantIds()).toEqual([creator]);
+    expect(call.pullDomainEvents()).toEqual([
+      expect.any(CallParticipantLeftEvent),
+    ]);
+
+    call.leave(creator);
+
+    expect(call.isActive()).toBe(false);
+    expect(call.pullDomainEvents()).toEqual([
+      expect.any(CallParticipantLeftEvent),
+      expect.any(CallEndedEvent),
+    ]);
   });
 
   it('keeps a group conversation active when other participants remain', () => {

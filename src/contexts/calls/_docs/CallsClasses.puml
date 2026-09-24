@@ -36,7 +36,7 @@ package "calls" {
       -participants: CallParticipant[]
       -lifecycle: CallLifecycle
       +join(identityId: IdentityId): void
-      +leave(identityId: IdentityId): void
+      +leave(identityId: IdentityId, endOnDeparture: boolean = false): void
       +end(identityId: IdentityId): void
       +sendSignal(signalId: CallSignalId, ownerNodeId: NodeId, senderIdentityId: IdentityId, recipientIdentityId: IdentityId, signalType: CallSignalType, payload: unknown): CallSignalDelivery
       +markTimedOut(timeout: Timestamp): IdentityId[]

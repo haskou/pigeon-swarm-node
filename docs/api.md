@@ -658,7 +658,7 @@ Implemented:
 - OrbitDB call projection changes notify clients after projection, so lease-before-document delivery cannot leave a stale roster
 - community membership/permission changes refresh live snapshots for remaining authorized recipients; every delivery rechecks scope access
 - leaving removes the authenticated identity from the active snapshot
-- leaving a two-person conversation ends its call; leaving a group or community call does not terminate other participants
+- leaving a one-to-one conversation ends its call; leaving a group conversation (including a two-member group) or community call does not terminate other participants
 - explicit community call termination retires its call ID; automatic session rotation and durable metadata retention require the storage protocol migration in haskou/pigeon-swarm#33
 - deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
