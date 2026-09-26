@@ -1981,6 +1981,85 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
+  it('rolls back an exact projection when durable replacement fails', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const key = 'replacement-test:conversation-failure';
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.putHead(
+      key,
+      { id: key, reactions: [{ id: 'reaction-1' }], updatedAt: 1 },
+      ['network-1'],
+    );
+    firstNetwork.heads.put.mockRejectedValueOnce(new Error('write failed'));
+
+    await expect(
+      registry.putHeadExactly(
+        key,
+        { id: key, reactions: [], updatedAt: 2 },
+        ['network-1'],
+      ),
+    ).rejects.toThrow('write failed');
+    expect(registry.findCachedHead(key)).toEqual({
+      id: key,
+      reactions: [{ id: 'reaction-1' }],
+      updatedAt: 1,
+    });
+  });
+
+  it('preserves a newer exact projection when an older queued write fails', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const key = 'replacement-test:conversation-queued';
+    let failOlderWrite!: () => void;
+    let finishNewerWrite!: () => void;
+    let newerWriteStarted!: () => void;
+    const olderWriteReleased = new Promise<void>((resolve) => {
+      failOlderWrite = resolve;
+    });
+    const newerWriteReleased = new Promise<void>((resolve) => {
+      finishNewerWrite = resolve;
+    });
+    const newerWriteEntered = new Promise<void>((resolve) => {
+      newerWriteStarted = resolve;
+    });
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.put
+      .mockImplementationOnce(async () => {
+        await olderWriteReleased;
+        throw new Error('older write failed');
+      })
+      .mockImplementationOnce(async () => {
+        newerWriteStarted();
+        await newerWriteReleased;
+
+        return key;
+      });
+    const olderReplacement = registry.putHeadExactly(
+      key,
+      { id: key, generation: 1 },
+      ['network-1'],
+    );
+    const olderFailure = expect(olderReplacement).rejects.toThrow(
+      'older write failed',
+    );
+    const newerReplacement = registry.putHeadExactly(
+      key,
+      { id: key, generation: 2 },
+      ['network-1'],
+    );
+
+    expect(registry.findCachedHead(key)).toEqual({ id: key, generation: 2 });
+    failOlderWrite();
+    await olderFailure;
+    await newerWriteEntered;
+    expect(registry.findCachedHead(key)).toEqual({ id: key, generation: 2 });
+    finishNewerWrite();
+    await newerReplacement;
+  });
+
   it('bootstraps document projections from canonical stores', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

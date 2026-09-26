@@ -1871,19 +1871,21 @@ export default class OrbitDBReplicatedStateRegistry {
     const projectedHead = this.cacheProjectedHead(key, cachedValue);
 
     await this.enqueueHeadWrite(key, async () => {
-      const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
-        cachedValue,
-        networkIds,
-      );
+      try {
+        const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
+          cachedValue,
+          networkIds,
+        );
 
-      await Promise.all(
-        this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
-          ({ networkId, stores }) =>
-            this.persistNetworkHead(networkId, stores, key, cachedValue),
-        ),
-      );
-
-      this.removeProjectedHead(key, projectedHead);
+        await Promise.all(
+          this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+            ({ networkId, stores }) =>
+              this.persistNetworkHead(networkId, stores, key, cachedValue),
+          ),
+        );
+      } finally {
+        this.removeProjectedHead(key, projectedHead);
+      }
     });
   }
 
@@ -1897,19 +1899,21 @@ export default class OrbitDBReplicatedStateRegistry {
     const projectedHead = this.cacheExactProjectedHead(key, cleanValue);
 
     await this.enqueueHeadWrite(key, async () => {
-      const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
-        cleanValue,
-        networkIds,
-      );
+      try {
+        const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
+          cleanValue,
+          networkIds,
+        );
 
-      await Promise.all(
-        this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
-          ({ networkId, stores }) =>
-            this.persistNetworkHead(networkId, stores, key, cleanValue, true),
-        ),
-      );
-
-      this.removeProjectedHead(key, projectedHead);
+        await Promise.all(
+          this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+            ({ networkId, stores }) =>
+              this.persistNetworkHead(networkId, stores, key, cleanValue, true),
+          ),
+        );
+      } finally {
+        this.removeProjectedHead(key, projectedHead);
+      }
     });
   }
 }
