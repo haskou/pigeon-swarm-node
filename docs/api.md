@@ -4444,7 +4444,7 @@ submits the complete signed operation to
 `POST /private-authorization/challenges`. The node verifies the operation
 signature against its local checkpoint before returning the exact one-use
 freshness request. The request expires after ten seconds of local monotonic
-time and is invalidated by every verification attempt.
+time and is consumed only after a valid proof is successfully verified.
 
 Submit the signed operation, signed freshness proof and, for commits or device
 revocation, the participant-encrypted control frame to

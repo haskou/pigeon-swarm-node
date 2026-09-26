@@ -54,9 +54,10 @@ export default class PrivateOperationAcceptor {
 
     if (receipt.digest === value.digest) return true;
 
-    await this.authorizer.authorizeHistorical(
+    await this.authorizer.authorizeReceiptConflict(
       message.signedOperationJson,
       routed,
+      PrivateControlOperation.fromPrimitives(receipt),
     );
     await this.unitOfWork.quarantine(value.scopeId);
     throw new PrivateAuthorizationConflictError();

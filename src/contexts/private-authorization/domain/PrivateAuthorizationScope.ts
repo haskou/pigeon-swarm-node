@@ -15,6 +15,8 @@ import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizat
 
 export class PrivateAuthorizationScope extends AggregateRoot {
   private static readonly MAX_ACCEPTED_BYTES = 4 * 1024 * 1024;
+  private static readonly MAX_DEPENDENCY_RETAINED_BYTES = 3 * 1024 * 1024;
+  private static readonly MAX_DEPENDENCY_RETAINED_OPERATIONS = 96;
   private static readonly MAX_ACCEPTED_BYTES_PER_AUTHOR = 512 * 1024;
   private static readonly MAX_ACCEPTED_OPERATIONS = 128;
   private static readonly MAX_ACCEPTED_OPERATIONS_PER_AUTHOR = 8;
@@ -91,22 +93,49 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     return bytes;
   }
 
+  private dependencyIds(
+    pendingOperations: PrivateControlOperation[],
+  ): Set<string> {
+    const dependencyIds = new Set<string>();
+
+    for (const pending of pendingOperations) {
+      const value = pending.toPrimitives();
+
+      for (const id of value.previousOperationIds) dependencyIds.add(id);
+
+      if (value.proposalOperationId) {
+        dependencyIds.add(value.proposalOperationId);
+      }
+    }
+
+    return dependencyIds;
+  }
+
+  private assertDependencyRetentionCapacity(
+    acceptedOperations: PrivateControlOperation[],
+    dependencyIds: Set<string>,
+  ): void {
+    const retained = acceptedOperations.filter((operation) =>
+      dependencyIds.has(operation.toPrimitives().id),
+    );
+
+    assert(
+      retained.length <=
+        PrivateAuthorizationScope.MAX_DEPENDENCY_RETAINED_OPERATIONS &&
+        this.operationBytes(retained) <=
+          PrivateAuthorizationScope.MAX_DEPENDENCY_RETAINED_BYTES,
+      new PrivateAcceptedCapacityExceededError(),
+    );
+  }
+
   private retainedAccepted(
     acceptedOperations: PrivateControlOperation[],
     pendingOperations: PrivateControlOperation[],
     checkpoint: PrivateAuthorizationCheckpoint,
   ): PrivateControlOperation[] {
     const revision = checkpoint.toPrimitives().revision;
-    const dependencyIds = new Set(
-      pendingOperations.flatMap((pending) => {
-        const value = pending.toPrimitives();
-
-        return [
-          ...value.previousOperationIds,
-          ...(value.proposalOperationId ? [value.proposalOperationId] : []),
-        ];
-      }),
-    );
+    const dependencyIds = this.dependencyIds(pendingOperations);
+    this.assertDependencyRetentionCapacity(acceptedOperations, dependencyIds);
     const requiredIds = new Set(
       acceptedOperations
         .filter((operation) => {
@@ -347,6 +376,11 @@ export class PrivateAuthorizationScope extends AggregateRoot {
         PrivateAuthorizationScope.MAX_PENDING_OPERATIONS_PER_AUTHOR &&
       this.operationBytes(byAuthor) + candidate.byteSize <=
         PrivateAuthorizationScope.MAX_PENDING_BYTES_PER_AUTHOR;
+
+    this.assertDependencyRetentionCapacity(
+      this.acceptedOperations,
+      this.dependencyIds([...this.pendingOperations, operation]),
+    );
 
     assert(
       withinGlobalCapacity && withinAuthorCapacity,

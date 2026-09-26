@@ -34,12 +34,11 @@ export default class PrivateOperationAuthorizer {
     signedOperationJson: string,
     routed: PrivateControlOperation,
     scope: PrivateAuthorizationScope,
+    expectedAuthor: PrivateAuthorizationDeviceKey,
   ): {
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
   } {
-    const expectedAuthor = routed.getAuthorDeviceKey();
-
     try {
       const canonical = this.operationVerifier.verify(
         signedOperationJson,
@@ -48,8 +47,9 @@ export default class PrivateOperationAuthorizer {
       const operation = this.contract.decode(canonical);
 
       assert(
-        operation.toPrimitives().scopeId ===
-          scope.getCheckpoint().getScopeId().valueOf(),
+        operation.isAuthoredBy(expectedAuthor) &&
+          operation.toPrimitives().scopeId ===
+            scope.getCheckpoint().getScopeId().valueOf(),
         new InvalidPrivateAuthorizationError(),
       );
 
@@ -78,7 +78,12 @@ export default class PrivateOperationAuthorizer {
       new InvalidPrivateAuthorizationError(),
     );
 
-    return this.verify(signedOperationJson, routed, scope);
+    return this.verify(
+      signedOperationJson,
+      routed,
+      scope,
+      routed.getAuthorDeviceKey(),
+    );
   }
 
   public async authorizeHistorical(
@@ -96,7 +101,32 @@ export default class PrivateOperationAuthorizer {
       new InvalidPrivateAuthorizationError(),
     );
 
-    return this.verify(signedOperationJson, routed, scope);
+    return this.verify(
+      signedOperationJson,
+      routed,
+      scope,
+      routed.getAuthorDeviceKey(),
+    );
+  }
+
+  public async authorizeReceiptConflict(
+    signedOperationJson: string,
+    routed: PrivateControlOperation,
+    receipt: PrivateControlOperation,
+  ): Promise<void> {
+    assert(
+      receipt.hasSameIdentityAs(routed) &&
+        receipt.isAuthoredBy(routed.getAuthorDeviceKey()),
+      new InvalidPrivateAuthorizationError(),
+    );
+    const scope = await this.scopeFor(routed);
+
+    this.verify(
+      signedOperationJson,
+      routed,
+      scope,
+      receipt.getAuthorDeviceKey(),
+    );
   }
 
   public assertAuthoredBy(

@@ -492,6 +492,109 @@ describe('PrivateAuthorizationScope', () => {
     ).toEqual(['future']);
   });
 
+  it('reserves accepted slots for checkpoint progress when pending dependencies pin history', () => {
+    const acceptedOperations = Array.from({ length: 128 }, (_value, index) =>
+      operation({
+        byteSize: 1,
+        digest: `accepted-${index}`,
+        id: `accepted-${index}`,
+      }).toPrimitives(),
+    );
+    const scope = PrivateAuthorizationScope.fromPrimitives({
+      acceptedOperations,
+      checkpoint: genesis().toPrimitives(),
+      genesisHash: 'genesis-hash',
+      ownerDeviceKey: ownerKey,
+      pendingOperations: [],
+      status: 'active',
+    });
+
+    for (let batch = 0; batch < 3; batch++) {
+      expect(
+        scope.acceptProposal(
+          operation({
+            authorizationRevision: 1,
+            byteSize: 1,
+            digest: `pending-${batch}`,
+            id: `pending-${batch}`,
+            previousOperationIds: acceptedOperations
+              .slice(batch * 32, (batch + 1) * 32)
+              .map(({ id }) => id),
+          }),
+        ),
+      ).toBe('pending');
+    }
+
+    expect(() =>
+      scope.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'pending-overflow',
+          id: 'pending-overflow',
+          previousOperationIds: acceptedOperations
+            .slice(96)
+            .map(({ id }) => id),
+        }),
+      ),
+    ).toThrow(PrivateAcceptedCapacityExceededError);
+    expect(
+      scope.revokeDevice(
+        operation({
+          byteSize: 1,
+          digest: 'progress',
+          id: 'progress',
+          kind: 'device.revoke',
+          mutation: { deviceKey: memberKey, type: 'device.revoke' },
+        }),
+        successor(),
+      ),
+    ).toBe('accepted');
+  });
+
+  it('reserves accepted bytes for checkpoint progress when dependencies pin history', () => {
+    const acceptedOperations = Array.from({ length: 4 }, (_value, index) =>
+      operation({
+        byteSize: 1024 * 1024,
+        digest: `accepted-bytes-${index}`,
+        id: `accepted-bytes-${index}`,
+      }).toPrimitives(),
+    );
+    const scope = PrivateAuthorizationScope.fromPrimitives({
+      acceptedOperations,
+      checkpoint: genesis().toPrimitives(),
+      genesisHash: 'genesis-hash',
+      ownerDeviceKey: ownerKey,
+      pendingOperations: [],
+      status: 'active',
+    });
+
+    expect(
+      scope.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'pinned-bytes',
+          id: 'pinned-bytes',
+          previousOperationIds: acceptedOperations
+            .slice(0, 3)
+            .map(({ id }) => id),
+        }),
+      ),
+    ).toBe('pending');
+    expect(() =>
+      scope.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'pinned-byte-overflow',
+          id: 'pinned-byte-overflow',
+          previousOperationIds: [acceptedOperations[3].id],
+        }),
+      ),
+    ).toThrow(PrivateAcceptedCapacityExceededError);
+  });
+
   it('enforces both pending queue bounds without acknowledging overflow', () => {
     const countBound = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
     for (let index = 0; index < 128; index++) {

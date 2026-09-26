@@ -308,6 +308,35 @@ describe('PrivateOperationAcceptor', () => {
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 
+  it('verifies a retained receipt conflict after its author leaves key history', async () => {
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const activeKey = encoded(32, 10);
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      revokedDeviceKeys: [],
+    });
+    const conflicting = JSON.parse(signed());
+    conflicting.payload.change.targetIdentityId = 'different-member';
+    const conflictingJson = JSON.stringify(conflicting);
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
+    );
+    repository.findReceipt.mockResolvedValue(receipt);
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(conflictingJson, 'proof'),
+      ),
+    ).rejects.toThrow('Private authorization conflict');
+    expect(verifier.verify).toHaveBeenCalledWith(conflictingJson, authorKey);
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+  });
+
   it('does not freeze a receipt conflict claimed by an unknown author', async () => {
     const receipt = new PrivateControlOperationContract()
       .decode(signed())

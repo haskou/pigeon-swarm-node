@@ -20,6 +20,15 @@ export class PrivateControlOperation {
     return new PrivateAuthorizationDeviceKey(this.primitives.authorDeviceKey);
   }
 
+  public hasSameIdentityAs(operation: PrivateControlOperation): boolean {
+    const candidate = operation.toPrimitives();
+
+    return (
+      this.primitives.id === candidate.id &&
+      this.primitives.scopeId === candidate.scopeId
+    );
+  }
+
   public toPrimitives(): PrivateControlOperationPrimitives {
     return {
       ...this.primitives,
