@@ -29,4 +29,21 @@ export default class LegacyIdentityDeviceBinding extends PrivateIdentityBinding 
       throw new InvalidPrivateAuthorizationError();
     }
   }
+
+  public identityIdFor(deviceKey: string): string {
+    try {
+      const raw = Buffer.from(deviceKey, 'base64url');
+
+      if (raw.length !== 32 || raw.toString('base64url') !== deviceKey) {
+        throw new InvalidPrivateAuthorizationError();
+      }
+
+      return Buffer.concat([
+        LegacyIdentityDeviceBinding.ED25519_SPKI_PREFIX,
+        raw,
+      ]).toString('base64');
+    } catch {
+      throw new InvalidPrivateAuthorizationError();
+    }
+  }
 }

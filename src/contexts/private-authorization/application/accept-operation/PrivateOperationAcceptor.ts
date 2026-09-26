@@ -144,7 +144,7 @@ export default class PrivateOperationAcceptor {
       (await this.repository.findProjection(value.scopeId)) ?? {};
     const projection = await this.mutations.apply(
       currentCheckpoint,
-      value.mutation,
+      operation,
       currentProjection,
     );
 

@@ -14,10 +14,14 @@ import CallParticipantLeaseRepository from '../contexts/calls/domain/repositorie
 import CallSignalDeliveryRepository from '../contexts/calls/domain/repositories/CallSignalDeliveryRepository';
 import InMemoryCallParticipantLeaseRepository from '../contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
 import InMemoryCallSignalDeliveryRepository from '../contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
+import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
+import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
+import { PrivateAuthorizationRepository } from '../contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import LocalPrivateAuthorizationRepository from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
@@ -163,6 +167,14 @@ export default class PigeonApplication {
         {
           token: IdentityPresenceRepository,
           useClass: InMemoryIdentityPresenceRepository,
+        },
+        {
+          token: PrivateAuthorizationRepository,
+          useClass: LocalPrivateAuthorizationRepository,
+        },
+        {
+          token: CommunityRepository,
+          useClass: CommunityRepositoryRouter,
         },
       ],
     });

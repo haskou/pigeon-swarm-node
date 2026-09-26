@@ -1,10 +1,10 @@
 import { PrivateAuthorizationCheckpoint } from '../../domain/PrivateAuthorizationCheckpoint';
-import { PrivateControlOperationPrimitives } from '../../domain/PrivateControlOperationPrimitives';
+import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
 
 export abstract class PrivateControlMutationAuthorizer {
   public abstract apply(
     checkpoint: PrivateAuthorizationCheckpoint,
-    mutation: PrivateControlOperationPrimitives['mutation'],
+    operation: PrivateControlOperation,
     projection: Record<string, unknown>,
   ): Promise<Record<string, unknown>>;
 }

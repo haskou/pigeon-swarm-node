@@ -14,6 +14,7 @@ describe('LegacyIdentityDeviceBinding', () => {
     const jwk = createPublicKey(publicKey).export({ format: 'jwk' });
 
     expect(binding.bind(spki)).toBe(jwk.x);
+    expect(binding.identityIdFor(jwk.x)).toBe(spki);
   });
 
   it.each([
@@ -34,5 +35,11 @@ describe('LegacyIdentityDeviceBinding', () => {
       expect(String(error)).toBe('InvalidPrivateAuthorizationError: Invalid private authorization');
       expect(String(error)).not.toContain(spki);
     }
+  });
+
+  it('rejects malformed raw device keys without exposing them', () => {
+    expect(() => binding.identityIdFor('not-a-device-key')).toThrow(
+      InvalidPrivateAuthorizationError,
+    );
   });
 });
