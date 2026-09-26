@@ -63,6 +63,7 @@ import { WebSocketRealtimeServer } from '../shared/infrastructure/websocket/WebS
 import { ApiSwaggerRegistrar } from './apis/ApiSwaggerRegistrar';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
+import PigeonPrivateAuthorizationScopeProvisioner from './services/PigeonPrivateAuthorizationScopeProvisioner';
 
 export default class PigeonApplication {
   private readonly logger = new WinstonLogger();
@@ -234,13 +235,7 @@ export default class PigeonApplication {
         },
         {
           token: PrivateAuthorizationScopeProvisioner,
-          useFactory: (services) =>
-            new PrivateAuthorizationScopeProvisioner(
-              services.getService(PrivateGenesisAuthenticator),
-              services.getService(PrivateGenesisProjectionAuthorizer),
-              services.getService(PrivateIdentityBinding),
-              services.getService(PrivateOperationUnitOfWork),
-            ),
+          useClass: PigeonPrivateAuthorizationScopeProvisioner,
         },
         {
           token: CommunityRepository,

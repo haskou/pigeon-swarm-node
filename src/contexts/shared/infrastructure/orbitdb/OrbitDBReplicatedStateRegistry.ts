@@ -6,7 +6,7 @@ import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
 import { OrbitDBEntry } from './OrbitDBEntry';
-import OrbitDBHeadHistoryReader from './OrbitDBHeadHistoryReader';
+import { OrbitDBHeadHistoryReader } from './OrbitDBHeadHistoryReader';
 import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
 import { OrbitDBHeadRepairPublisher } from './OrbitDBHeadRepairPublisher';
