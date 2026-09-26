@@ -5,6 +5,10 @@ import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/d
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import LocalPrivateOperationUnitOfWork from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
+import {
+  privateAuthorizationLocalId,
+  PrivateAuthorizationLocalNamespaces,
+} from '@app/contexts/private-authorization/infrastructure/local-db/PrivateAuthorizationLocalNamespaces';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import * as fs from 'fs/promises';
@@ -172,6 +176,97 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         (pending) => pending.toPrimitives().id,
       ),
     ).toEqual(['future']);
+  });
+
+  it('atomically removes durable records retired by history compaction', async () => {
+    const proposals = Array.from({ length: 40 }, (_value, index) =>
+      PrivateControlOperation.fromPrimitives({
+        ...operation('membership.propose').toPrimitives(),
+        byteSize: 1,
+        digest: `proposal-digest-${index}`,
+        id: `proposal-${index}`,
+      }),
+    );
+    const oldest = proposals[0].toPrimitives();
+    await repository.saveScope(
+      PrivateAuthorizationScope.fromPrimitives({
+        acceptedOperations: proposals.map((proposal) =>
+          proposal.toPrimitives(),
+        ),
+        checkpoint: checkpoint().toPrimitives(),
+        genesisHash: 'genesis',
+        pendingOperations: [],
+        status: 'active',
+      }),
+    );
+    await repository.saveReceipt('scope', proposals[0]);
+    await repository.saveReservation(
+      'scope',
+      'retired-parent',
+      'retired-child',
+    );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.replay,
+      privateAuthorizationLocalId('scope', 'retired-replay'),
+      { operationId: oldest.id },
+    );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.outbox,
+      privateAuthorizationLocalId('scope', oldest.id),
+      { eventName: 'retired', operationId: oldest.id, payload: {} },
+    );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      privateAuthorizationLocalId('scope', 'retired-parent'),
+      { childHeadHash: 'retired-child', operationId: oldest.id },
+    );
+    const revocation = operation();
+    const nextScope = PrivateAuthorizationScope.fromPrimitives({
+      acceptedOperations: proposals.map((proposal) => proposal.toPrimitives()),
+      checkpoint: checkpoint().toPrimitives(),
+      genesisHash: 'genesis',
+      pendingOperations: [],
+      status: 'active',
+    });
+    nextScope.revokeDevice(
+      revocation,
+      PrivateAuthorizationCheckpoint.fromPrimitives({
+        ...checkpoint(1, 'head-1').toPrimitives(),
+        admittedDeviceKeys: ['owner'],
+        revokedDeviceKeys: ['device'],
+      }),
+    );
+    const compactingAcceptance: PrivateOperationAcceptance = {
+      ...acceptance(),
+      clearPendingOperationIds: [revocation.toPrimitives().id],
+      outbox: {
+        eventName: 'private_authorization.v1.control_operation.was_accepted',
+        id: revocation.toPrimitives().id,
+        payload: {},
+      },
+      receipt: revocation,
+      replayMarkerId: 'current-replay',
+      scope: nextScope,
+    };
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        compactingAcceptance,
+      ),
+    ).resolves.toBe('committed');
+
+    await expect(
+      repository.findReceipt('scope', oldest.id),
+    ).resolves.toBeUndefined();
+    await expect(
+      repository.hasReplayMarker('scope', 'retired-replay'),
+    ).resolves.toBe(false);
+    await expect(
+      repository.findReservation('scope', 'retired-parent'),
+    ).resolves.toBeUndefined();
+    await expect(repository.findOutbox('scope')).resolves.toHaveLength(1);
   });
 
   it('commits a proposal without advancing the authorization checkpoint', async () => {

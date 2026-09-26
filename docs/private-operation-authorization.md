@@ -229,7 +229,7 @@ one process from overwriting each other.
 
 One acceptance batch contains:
 
-- the immutable operation receipt: operation ID, canonical digest, kind, revision
+- the retained operation receipt: operation ID, canonical digest, kind, revision
   and causal IDs, plus the normalized private control mutation required for
   deterministic replay;
 - the accepted checkpoint and protected MLS state when changed;
@@ -244,7 +244,7 @@ mutation contain the private roster and roles needed by that participant runtime
 but never enter a global index or an unencrypted backup.
 
 A crash before the batch commits leaves every record unchanged. A crash after the
-batch commits leaves a durable private outbox item, and the immutable receipt
+batch commits leaves a durable private outbox item, and the retained receipt
 prevents another domain transition. This change does not connect that outbox to a
 shared broker. A future attached-client transport may drain it without publishing
 it to shared pubsub. A projection can never overwrite the authorization ledger.
@@ -257,6 +257,17 @@ Pending input is not acknowledged as application success. The encrypted sender
 retains the frame, obtains a new one-use challenge after supplying missing causal
 state, and retries the same signed operation. The node then promotes the identical
 pending operation and removes it atomically when acceptance commits.
+
+Accepted control history is also bounded per scope. The aggregate retains at
+most 128 operations or 4 MiB, including every operation from the current
+authorization revision and every accepted predecessor still required by pending
+work. After a checkpoint advances, it additionally keeps up to 32 of the most
+recent historical operations while capacity permits. An acceptance that would
+make required history exceed either bound fails closed. Compaction deletes the
+corresponding receipts, replay markers, sequencer reservations and outbox records
+in the same local database batch, so restart does not restore unbounded records.
+Frames outside the retained history are stale under the current checkpoint and
+must be resynchronized instead of being replayed as current operations.
 
 `retryable()` exposes currently satisfiable pending operations in deterministic
 operation-ID order. Transport retention and rejoin deadlines belong to the opaque
@@ -272,7 +283,7 @@ A removal or device revocation becomes effective when its verified control head
 is committed locally. From that point, operations signed by the removed credential
 at the old revision are rejected or quarantined as historical recovery material;
 their claimed timestamp cannot make them current. Operations already committed
-before the new head remain part of history.
+before the new head remain part of the bounded recent history.
 
 A participant that has not observed the new head may temporarily accept an
 operation valid under its last verified checkpoint. Freshness proofs reduce that
@@ -352,7 +363,8 @@ failing test at the narrowest owning boundary.
 - replay is idempotent only for the same digest;
 - revocation and administrator changes take effect at the committed head;
 - conflicting children freeze the scope; and
-- queue limits and deterministic retry order are enforced.
+- pending and accepted-history limits, durable compaction and deterministic retry
+  order are enforced.
 
 ### Application and adapter tests
 

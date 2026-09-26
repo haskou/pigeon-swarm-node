@@ -53,6 +53,10 @@ note right of PrivateAuthorizationScope
   A pinned local checkpoint is authoritative.
   Conflicting genesis or operation digests
   freeze the scope instead of merging.
+  Current and causally required accepted
+  operations are bounded by count and bytes.
+  Checkpoint advances retain a small recent
+  history and retire linked durable records.
 end note
 
 @enduml

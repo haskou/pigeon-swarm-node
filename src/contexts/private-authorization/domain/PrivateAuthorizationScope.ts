@@ -1,6 +1,7 @@
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
+import { PrivateAcceptedCapacityExceededError } from './errors/PrivateAcceptedCapacityExceededError';
 import { PrivateAuthorizationConflictError } from './errors/PrivateAuthorizationConflictError';
 import { PrivatePendingCapacityExceededError } from './errors/PrivatePendingCapacityExceededError';
 import { PrivateAuthorizationScopeWasFrozenEvent } from './events/PrivateAuthorizationScopeWasFrozenEvent';
@@ -11,6 +12,9 @@ import { PrivateAuthorizationScopePrimitives } from './PrivateAuthorizationScope
 import { PrivateControlOperation } from './PrivateControlOperation';
 
 export class PrivateAuthorizationScope extends AggregateRoot {
+  private static readonly MAX_ACCEPTED_BYTES = 4 * 1024 * 1024;
+  private static readonly MAX_ACCEPTED_OPERATIONS = 128;
+  private static readonly MAX_HISTORICAL_OPERATIONS = 32;
   private static readonly MAX_PENDING_BYTES = 1024 * 1024;
   private static readonly MAX_PENDING_OPERATIONS = 128;
 
@@ -58,19 +62,118 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     private readonly pendingOperations: PrivateControlOperation[],
   ) {
     super();
+    this.compactAccepted();
   }
 
-  private accept(
+  private acceptedBytes(operations: PrivateControlOperation[]): number {
+    return operations.reduce(
+      (total, operation) => total + operation.toPrimitives().byteSize,
+      0,
+    );
+  }
+
+  private retainedAccepted(
+    acceptedOperations: PrivateControlOperation[],
+    pendingOperations: PrivateControlOperation[],
+    checkpoint: PrivateAuthorizationCheckpoint,
+  ): PrivateControlOperation[] {
+    const revision = checkpoint.toPrimitives().revision;
+    const dependencyIds = new Set(
+      pendingOperations.flatMap((pending) => {
+        const value = pending.toPrimitives();
+
+        return [
+          ...value.previousOperationIds,
+          ...(value.proposalOperationId ? [value.proposalOperationId] : []),
+        ];
+      }),
+    );
+    const requiredIds = new Set(
+      acceptedOperations
+        .filter((operation) => {
+          const value = operation.toPrimitives();
+
+          return (
+            value.authorizationRevision === revision ||
+            dependencyIds.has(value.id)
+          );
+        })
+        .map((operation) => operation.toPrimitives().id),
+    );
+    const required = acceptedOperations.filter((operation) =>
+      requiredIds.has(operation.toPrimitives().id),
+    );
+
+    if (
+      required.length > PrivateAuthorizationScope.MAX_ACCEPTED_OPERATIONS ||
+      this.acceptedBytes(required) >
+        PrivateAuthorizationScope.MAX_ACCEPTED_BYTES
+    ) {
+      throw new PrivateAcceptedCapacityExceededError();
+    }
+
+    const retainedIds = new Set(requiredIds);
+    let retainedBytes = this.acceptedBytes(required);
+    let historicalCount = 0;
+
+    for (let index = acceptedOperations.length - 1; index >= 0; index -= 1) {
+      const operation = acceptedOperations[index];
+      const value = operation.toPrimitives();
+
+      if (retainedIds.has(value.id)) continue;
+
+      if (
+        historicalCount >=
+          PrivateAuthorizationScope.MAX_HISTORICAL_OPERATIONS ||
+        retainedIds.size >= PrivateAuthorizationScope.MAX_ACCEPTED_OPERATIONS ||
+        retainedBytes + value.byteSize >
+          PrivateAuthorizationScope.MAX_ACCEPTED_BYTES
+      ) {
+        continue;
+      }
+
+      retainedIds.add(value.id);
+      retainedBytes += value.byteSize;
+      historicalCount += 1;
+    }
+
+    return acceptedOperations.filter((operation) =>
+      retainedIds.has(operation.toPrimitives().id),
+    );
+  }
+
+  private compactAccepted(): void {
+    const pending = this.pendingOperations.filter(
+      (operation) => !this.isPermanentlyInvalidPending(operation),
+    );
+    const retained = this.retainedAccepted(
+      this.acceptedOperations,
+      pending,
+      this.checkpoint,
+    );
+    this.acceptedOperations.splice(
+      0,
+      this.acceptedOperations.length,
+      ...retained,
+    );
+  }
+
+  private assertAcceptedCapacity(
     operation: PrivateControlOperation,
-    expectedKind: string,
-  ): 'accepted' | 'duplicate' | 'pending' {
-    const assessment = this.assess(operation, expectedKind);
+    checkpoint: PrivateAuthorizationCheckpoint = this.checkpoint,
+  ): void {
+    const operationId = operation.toPrimitives().id;
+    const pending = this.pendingOperations.filter(
+      (candidate) =>
+        candidate.toPrimitives().id !== operationId &&
+        !this.isPermanentlyInvalidPending(candidate, checkpoint),
+    );
 
-    if (assessment !== 'ready') return assessment;
-
-    this.acceptNow(operation);
-
-    return 'accepted';
+    this.retainedAccepted(
+      [...this.acceptedOperations, operation],
+      pending,
+      checkpoint,
+    );
   }
 
   private assertOperation(
@@ -129,9 +232,10 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
   private isPermanentlyInvalidPending(
     operation: PrivateControlOperation,
+    authorizationCheckpoint: PrivateAuthorizationCheckpoint = this.checkpoint,
   ): boolean {
     const value = operation.toPrimitives();
-    const checkpoint = this.checkpoint.toPrimitives();
+    const checkpoint = authorizationCheckpoint.toPrimitives();
 
     return (
       value.authorizationRevision < checkpoint.revision ||
@@ -254,7 +358,14 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   public acceptProposal(
     operation: PrivateControlOperation,
   ): 'accepted' | 'duplicate' | 'pending' {
-    return this.accept(operation, 'membership.propose');
+    const assessment = this.assess(operation, 'membership.propose');
+
+    if (assessment !== 'ready') return assessment;
+    this.assertAcceptedCapacity(operation);
+    this.acceptNow(operation);
+    this.compactAccepted();
+
+    return 'accepted';
   }
 
   public commitTransition(
@@ -286,9 +397,11 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     }
 
     this.assertSuccessor(candidate);
+    this.assertAcceptedCapacity(operation, candidate);
     this.acceptNow(operation);
     this.checkpoint = candidate;
     this.prunePending();
+    this.compactAccepted();
 
     return 'accepted';
   }
@@ -318,9 +431,11 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     }
 
     this.assertSuccessor(candidate);
+    this.assertAcceptedCapacity(operation, candidate);
     this.acceptNow(operation);
     this.checkpoint = candidate;
     this.prunePending();
+    this.compactAccepted();
 
     return 'accepted';
   }

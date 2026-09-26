@@ -71,10 +71,82 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     );
   }
 
-  private acceptanceOperations(
+  private async retiredRecordOperations(
+    scopeId: string,
+    retiredOperationIds: string[],
+    acceptance: PrivateOperationAcceptance,
+  ): Promise<EmbeddedLocalDatabaseOperation[]> {
+    if (retiredOperationIds.length === 0) return [];
+    const retired = new Set(retiredOperationIds);
+    const prefix = `${scopeId}:`;
+    const linkedNamespaces = [
+      PrivateAuthorizationLocalNamespaces.outbox,
+      PrivateAuthorizationLocalNamespaces.replay,
+      PrivateAuthorizationLocalNamespaces.reservations,
+    ];
+    const linkedDocuments = await Promise.all(
+      linkedNamespaces.map(async (namespace) => ({
+        documents: await this.database.find(
+          namespace,
+          (document) =>
+            typeof document._id === 'string' &&
+            document._id.startsWith(prefix) &&
+            typeof document.operationId === 'string' &&
+            retired.has(document.operationId),
+        ),
+        namespace,
+      })),
+    );
+    const operations: EmbeddedLocalDatabaseOperation[] =
+      retiredOperationIds.map((operationId) => ({
+        id: privateAuthorizationLocalId(scopeId, operationId),
+        namespace: PrivateAuthorizationLocalNamespaces.receipts,
+        type: 'del',
+      }));
+
+    for (const { documents, namespace } of linkedDocuments) {
+      operations.push(
+        ...documents
+          .map((document) => document._id)
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => ({ id, namespace, type: 'del' as const })),
+      );
+    }
+
+    if (retired.has(acceptance.receipt.toPrimitives().id)) {
+      operations.push(
+        {
+          id: privateAuthorizationLocalId(scopeId, acceptance.replayMarkerId),
+          namespace: PrivateAuthorizationLocalNamespaces.replay,
+          type: 'del',
+        },
+        {
+          id: privateAuthorizationLocalId(scopeId, acceptance.outbox.id),
+          namespace: PrivateAuthorizationLocalNamespaces.outbox,
+          type: 'del',
+        },
+      );
+
+      if (acceptance.reservation) {
+        operations.push({
+          id: privateAuthorizationLocalId(
+            scopeId,
+            acceptance.reservation.parentHeadHash,
+          ),
+          namespace: PrivateAuthorizationLocalNamespaces.reservations,
+          type: 'del',
+        });
+      }
+    }
+
+    return operations;
+  }
+
+  private async acceptanceOperations(
     scopeId: string,
     acceptance: PrivateOperationAcceptance,
-  ): EmbeddedLocalDatabaseOperation[] {
+    retiredOperationIds: string[],
+  ): Promise<EmbeddedLocalDatabaseOperation[]> {
     const scope = acceptance.scope.toPrimitives();
     const receipt = acceptance.receipt.toPrimitives();
     const operations: EmbeddedLocalDatabaseOperation[] = [
@@ -97,7 +169,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         type: 'put',
       },
       {
-        document: {},
+        document: { operationId: receipt.id },
         id: privateAuthorizationLocalId(scopeId, acceptance.replayMarkerId),
         namespace: PrivateAuthorizationLocalNamespaces.replay,
         type: 'put',
@@ -105,6 +177,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       {
         document: {
           eventName: acceptance.outbox.eventName,
+          operationId: receipt.id,
           payload: acceptance.outbox.payload,
         },
         id: privateAuthorizationLocalId(scopeId, acceptance.outbox.id),
@@ -124,7 +197,10 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
     if (acceptance.reservation) {
       operations.push({
-        document: { childHeadHash: acceptance.reservation.childHeadHash },
+        document: {
+          childHeadHash: acceptance.reservation.childHeadHash,
+          operationId: receipt.id,
+        },
         id: privateAuthorizationLocalId(
           scopeId,
           acceptance.reservation.parentHeadHash,
@@ -146,6 +222,13 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         namespace: PrivateAuthorizationLocalNamespaces.pending,
         type: 'del' as const,
       })),
+    );
+    operations.push(
+      ...(await this.retiredRecordOperations(
+        scopeId,
+        retiredOperationIds,
+        acceptance,
+      )),
     );
 
     return operations;
@@ -181,13 +264,30 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     }
 
     if (!currentScope) return 'stale';
+    const acceptedBefore = new Set(
+      currentScope
+        .toPrimitives()
+        .acceptedOperations.map((operation) => operation.id),
+    );
     const rebasedAcceptance = await this.rebasePersistingQuarantine(
       currentScope,
       acceptance,
     );
+    const retained = new Set(
+      rebasedAcceptance.scope
+        .toPrimitives()
+        .acceptedOperations.map((operation) => operation.id),
+    );
+    const retiredOperationIds = [
+      ...new Set([...acceptedBefore, receipt.id]),
+    ].filter((operationId) => !retained.has(operationId));
 
     await this.database.commit(
-      this.acceptanceOperations(scopeId, rebasedAcceptance),
+      await this.acceptanceOperations(
+        scopeId,
+        rebasedAcceptance,
+        retiredOperationIds,
+      ),
     );
 
     return 'committed';
