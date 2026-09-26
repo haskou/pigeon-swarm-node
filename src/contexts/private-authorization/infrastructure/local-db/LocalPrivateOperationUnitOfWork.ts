@@ -556,8 +556,10 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): Promise<'committed' | 'duplicate'> {
     const scopeId = genesis.scope.toPrimitives().checkpoint.scopeId;
 
-    return this.storageCoordinator.exclusively(scopeId, () =>
-      this.exclusively(scopeId, () => this.commitGenesisExclusively(genesis)),
+    return this.exclusively(scopeId, () =>
+      this.storageCoordinator.exclusively(scopeId, () =>
+        this.commitGenesisExclusively(genesis),
+      ),
     );
   }
 
