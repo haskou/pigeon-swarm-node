@@ -585,6 +585,9 @@ Community --> Timestamp
 CommunityTextChannel --> Timestamp
 
 package "communities/infrastructure" {
+  class CommunityRepositoryRouter
+  class LocalPrivateCommunityRepository
+  class PrivateCommunityPublicStorageGuard
   class OrbitDBCommunityRepository
   class OrbitDBCommunityDocument
   class OrbitDBCommunityChannelMessageRepository
@@ -598,7 +601,14 @@ package "communities/infrastructure" {
   class OrbitDBCommunityModerationLogRepository
   class OrbitDBCommunityModerationLogDocument
 
-  OrbitDBCommunityRepository ..|> CommunityRepository
+  CommunityRepositoryRouter ..|> CommunityRepository
+  CommunityRepositoryRouter --> OrbitDBCommunityRepository : public
+  CommunityRepositoryRouter --> LocalPrivateCommunityRepository : protected
+  CommunityRepositoryRouter --> PrivateAuthorizationRepository : classify scope
+  LocalPrivateCommunityRepository --> PrivateAuthorizationRepository : projection
+  OrbitDBCommunityRepository --> PrivateCommunityPublicStorageGuard
+  PrivateCommunityPublicStorageGuard --> PrivateAuthorizationRepository
+  PrivateCommunityPublicStorageGuard --> PrivateAuthorizationStorageCoordinator
   OrbitDBCommunityRepository --> OrbitDBCommunityDocument
   OrbitDBCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
   OrbitDBCommunityChannelMessageRepository --> OrbitDBCommunityChannelMessageDocument
@@ -610,6 +620,11 @@ package "communities/infrastructure" {
   OrbitDBCommunityMembershipRequestRepository --> OrbitDBCommunityMembershipRequestDocument
   OrbitDBCommunityModerationLogRepository ..|> CommunityModerationLogRepository
   OrbitDBCommunityModerationLogRepository --> OrbitDBCommunityModerationLogDocument
+}
+
+package "private-authorization" {
+  interface PrivateAuthorizationRepository
+  class PrivateAuthorizationStorageCoordinator
 }
 
 package "communities-api" {

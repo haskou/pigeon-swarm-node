@@ -28,7 +28,17 @@ package "notification-settings/application" {
 }
 
 package "notification-settings/infrastructure" {
+  class NotificationScopeSettingsRepositoryRouter
+  class LocalNotificationScopeSettingsRepository
   class OrbitDBNotificationScopeSettingsRepository
+}
+
+package "communities/infrastructure" {
+  class PrivateCommunityPublicStorageGuard
+}
+
+package "private-authorization/domain" {
+  interface PrivateAuthorizationRepository
 }
 
 NotificationScopeSettings *-- NotificationScopeSettingsPreferences
@@ -46,7 +56,12 @@ NotificationSettingsUpdater ..> NotificationSettingsUpdateMessage
 NotificationSettingsUpdater ..> NotificationScopeSettingsRepository
 NotificationSettingsResetter ..> NotificationSettingsResetMessage
 NotificationSettingsResetter ..> NotificationScopeSettingsRepository
-OrbitDBNotificationScopeSettingsRepository ..|> NotificationScopeSettingsRepository
+NotificationScopeSettingsRepositoryRouter ..|> NotificationScopeSettingsRepository
+NotificationScopeSettingsRepositoryRouter --> OrbitDBNotificationScopeSettingsRepository : public
+NotificationScopeSettingsRepositoryRouter --> LocalNotificationScopeSettingsRepository : protected
+NotificationScopeSettingsRepositoryRouter --> PrivateCommunityPublicStorageGuard : classify scope
+LocalNotificationScopeSettingsRepository --> NotificationScopeSettings
 OrbitDBNotificationScopeSettingsRepository ..> NotificationScopeSettings
+PrivateCommunityPublicStorageGuard --> PrivateAuthorizationRepository
 
 @enduml

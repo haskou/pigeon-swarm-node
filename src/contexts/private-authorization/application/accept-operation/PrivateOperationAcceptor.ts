@@ -36,6 +36,7 @@ export default class PrivateOperationAcceptor {
     routed: PrivateControlOperation = this.contract.decode(
       message.signedOperationJson,
     ),
+    admission: 'active' | 'historical' = 'active',
   ): Promise<{
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
@@ -45,14 +46,15 @@ export default class PrivateOperationAcceptor {
 
     if (!scope) throw new InvalidPrivateAuthorizationError();
     const checkpoint = scope.toPrimitives().checkpoint;
-    const expectedAuthor = checkpoint.admittedDeviceKeys.find(
+    const eligibleDeviceKeys =
+      admission === 'historical'
+        ? [...checkpoint.admittedDeviceKeys, ...checkpoint.revokedDeviceKeys]
+        : checkpoint.admittedDeviceKeys;
+    const expectedAuthor = eligibleDeviceKeys.find(
       (key) => key === routedValue.authorDeviceKey,
     );
 
-    if (
-      !expectedAuthor ||
-      checkpoint.revokedDeviceKeys.includes(expectedAuthor)
-    ) {
+    if (!expectedAuthor) {
       throw new InvalidPrivateAuthorizationError();
     }
 
@@ -86,13 +88,20 @@ export default class PrivateOperationAcceptor {
     throw new PrivateAuthorizationConflictError();
   }
 
-  private async hasIdenticalReceipt(
-    operation: PrivateControlOperation,
+  private async hasReceipt(
+    message: PrivateOperationAcceptMessage,
+    routed: PrivateControlOperation,
   ): Promise<boolean> {
-    const value = operation.toPrimitives();
+    const value = routed.toPrimitives();
     const receipt = await this.repository.findReceipt(value.scopeId, value.id);
 
-    return receipt?.digest === value.digest;
+    if (!receipt) return false;
+
+    if (receipt.digest === value.digest) return true;
+
+    await this.verifiedOperation(message, routed, 'historical');
+    await this.unitOfWork.quarantine(value.scopeId);
+    throw new PrivateAuthorizationConflictError();
   }
 
   private async transition(
@@ -245,7 +254,7 @@ export default class PrivateOperationAcceptor {
   ): Promise<PrivateOperationAcceptanceResult> {
     const routed = this.contract.decode(message.signedOperationJson);
 
-    return (await this.hasIdenticalReceipt(routed))
+    return (await this.hasReceipt(message, routed))
       ? { status: 'duplicate' }
       : this.acceptNewOperation(message, routed);
   }

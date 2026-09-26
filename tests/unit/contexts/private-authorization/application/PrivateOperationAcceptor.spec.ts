@@ -236,6 +236,57 @@ describe('PrivateOperationAcceptor', () => {
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 
+  it('freezes a conflicting receipt signed before its author was revoked', async () => {
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const activeKey = encoded(32, 10);
+    const revokedCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      revokedDeviceKeys: [authorKey],
+    });
+    const conflicting = JSON.parse(signed());
+    conflicting.payload.change.targetIdentityId = 'different-member';
+    const conflictingJson = JSON.stringify(conflicting);
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(revokedCheckpoint, 'genesis'),
+    );
+    repository.findReceipt.mockResolvedValue(receipt);
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(conflictingJson, 'proof'),
+      ),
+    ).rejects.toThrow('Private authorization conflict');
+    expect(verifier.verify).toHaveBeenCalledWith(conflictingJson, authorKey);
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+    expect(freshness.verify).not.toHaveBeenCalled();
+  });
+
+  it('does not freeze a receipt conflict claimed by an unknown author', async () => {
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const attacker = signed({
+      authorDeviceKey: encoded(32, 9),
+      payload: {
+        change: { targetIdentityId: 'different-member', type: 'member.ban' },
+        parentHeadHash: headHash,
+        proposalId,
+      },
+    });
+    repository.findReceipt.mockResolvedValue(receipt);
+
+    await expect(
+      acceptor.accept(new PrivateOperationAcceptMessage(attacker, 'proof')),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+  });
+
   it('rejects a replay identifier carrying a different signed digest', async () => {
     const receipt = new PrivateControlOperationContract()
       .decode(signed())
