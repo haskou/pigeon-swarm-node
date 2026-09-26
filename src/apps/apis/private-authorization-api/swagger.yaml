@@ -7,19 +7,111 @@ paths:
     post:
       tags: [private-authorization]
       summary: Issue a one-use freshness challenge for a verified operation
+      description: The returned canonical JSON must be signed exactly as supplied and used once within ten seconds.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPrivateAuthorizationChallengeBody'
       responses:
         '200':
           description: Exact canonical challenge request to sign
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationChallengeResource'
         '409':
           description: Invalid private authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationError'
   /private-authorization/operations:
     post:
       tags: [private-authorization]
       summary: Accept a signed private control operation
+      description: A control frame is required for membership commits and device revocations. Its byte fields use canonical unpadded base64url.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPrivateAuthorizationOperationBody'
       responses:
         '200':
           description: Operation accepted or already committed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [accepted, duplicate]
         '202':
           description: Valid operation retained pending causal dependencies
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [pending]
         '409':
           description: Invalid private authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationError'
+components:
+  schemas:
+    PostPrivateAuthorizationChallengeBody:
+      type: object
+      required: [signedOperationJson]
+      properties:
+        signedOperationJson:
+          type: string
+          maxLength: 262144
+    PrivateControlFrameBody:
+      type: object
+      required: [encryptedMlsState, mlsMessage, signedTransitionJson]
+      properties:
+        encryptedMlsState:
+          type: string
+          maxLength: 1398102
+        mlsMessage:
+          type: string
+          maxLength: 349526
+        signedTransitionJson:
+          type: string
+          maxLength: 262144
+    PostPrivateAuthorizationOperationBody:
+      type: object
+      required: [signedFreshnessProofJson, signedOperationJson]
+      properties:
+        controlFrame:
+          $ref: '#/components/schemas/PrivateControlFrameBody'
+        signedFreshnessProofJson:
+          type: string
+          maxLength: 262144
+        signedOperationJson:
+          type: string
+          maxLength: 262144
+    PrivateAuthorizationChallengeResource:
+      type: object
+      required: [challenge]
+      properties:
+        challenge:
+          type: string
+    PrivateAuthorizationError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

@@ -5,6 +5,8 @@ import CommunityRepositoryRouter from '@app/contexts/communities/infrastructure/
 import LocalPrivateCommunityRepository from '@app/contexts/communities/infrastructure/local-db/LocalPrivateCommunityRepository';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { generateKeyPairSync } from 'node:crypto';
 
 describe('CommunityRepositoryRouter', () => {
   const id = new CommunityId('protected');
@@ -22,7 +24,10 @@ describe('CommunityRepositoryRouter', () => {
       findSyncable: jest.fn().mockResolvedValue([]),
       save: jest.fn(),
     } as unknown as jest.Mocked<OrbitDBCommunityRepository>;
-    privateRepository = { findById: jest.fn() } as unknown as jest.Mocked<LocalPrivateCommunityRepository>;
+    privateRepository = {
+      findById: jest.fn(),
+      findByMember: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<LocalPrivateCommunityRepository>;
     authorizationRepository = {
       findScope: jest.fn().mockResolvedValue({}),
     } as unknown as jest.Mocked<PrivateAuthorizationRepository>;
@@ -84,4 +89,38 @@ describe('CommunityRepositoryRouter', () => {
       publicCommunity,
     ]);
   });
+
+  it('combines public and private member communities with private precedence', async () => {
+    const identityId = validIdentityId();
+    const protectedCollision = { getId: () => id } as Community;
+    const privateCommunity = { getId: () => id } as Community;
+    const publicCommunity = {
+      getId: () => new CommunityId('public'),
+    } as Community;
+    publicRepository.findByMember.mockResolvedValue([
+      protectedCollision,
+      publicCommunity,
+    ]);
+    privateRepository.findByMember.mockResolvedValue([privateCommunity]);
+    authorizationRepository.findScope.mockImplementation(async (scopeId) =>
+      scopeId === id.valueOf() ? ({} as never) : undefined,
+    );
+
+    await expect(router.findByMember(identityId)).resolves.toEqual([
+      publicCommunity,
+      privateCommunity,
+    ]);
+    expect(privateRepository.findByMember).toHaveBeenCalledWith(identityId);
+  });
 });
+
+function validIdentityId(): IdentityId {
+  return new IdentityId(
+    generateKeyPairSync('ed25519')
+      .publicKey.export({
+        format: 'pem',
+        type: 'spki',
+      })
+      .toString(),
+  );
+}

@@ -127,6 +127,34 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     );
   }
 
+  private isPermanentlyInvalidPending(
+    operation: PrivateControlOperation,
+  ): boolean {
+    const value = operation.toPrimitives();
+    const checkpoint = this.checkpoint.toPrimitives();
+
+    return (
+      value.authorizationRevision < checkpoint.revision ||
+      !checkpoint.admittedDeviceKeys.includes(value.authorDeviceKey) ||
+      checkpoint.revokedDeviceKeys.includes(value.authorDeviceKey) ||
+      (value.kind === 'membership.propose' &&
+        value.authorizationRevision === checkpoint.revision &&
+        value.control?.parentHeadHash !== checkpoint.headHash)
+    );
+  }
+
+  private prunePending(): void {
+    for (
+      let index = this.pendingOperations.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      if (this.isPermanentlyInvalidPending(this.pendingOperations[index])) {
+        this.pendingOperations.splice(index, 1);
+      }
+    }
+  }
+
   private enqueue(operation: PrivateControlOperation): void {
     const duplicate = this.pendingOperations.find(
       (pending) => pending.toPrimitives().id === operation.toPrimitives().id,
@@ -260,6 +288,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     this.assertSuccessor(candidate);
     this.acceptNow(operation);
     this.checkpoint = candidate;
+    this.prunePending();
 
     return 'accepted';
   }
@@ -291,6 +320,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     this.assertSuccessor(candidate);
     this.acceptNow(operation);
     this.checkpoint = candidate;
+    this.prunePending();
 
     return 'accepted';
   }
@@ -303,6 +333,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
     if (duplicate === 'duplicate') return duplicate;
     this.assertActive();
+    this.prunePending();
     this.assertOperation(operation, expectedKind);
 
     if (duplicate === 'pending' && !this.isPending(operation)) {

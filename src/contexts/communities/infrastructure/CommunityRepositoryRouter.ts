@@ -57,9 +57,27 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
   }
 
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
-    return this.removeProtected(
-      await this.publicRepository.findByMember(identityId),
+    const [unfilteredPublicCommunities, privateCommunities] = await Promise.all(
+      [
+        this.publicRepository.findByMember(identityId),
+        this.privateRepository.findByMember(identityId),
+      ],
     );
+    const publicCommunities = await this.removeProtected(
+      unfilteredPublicCommunities,
+    );
+    const communities = new Map(
+      publicCommunities.map((community) => [
+        community.getId().valueOf(),
+        community,
+      ]),
+    );
+
+    for (const community of privateCommunities) {
+      communities.set(community.getId().valueOf(), community);
+    }
+
+    return [...communities.values()];
   }
 
   public async findSyncable(): Promise<Community[]> {

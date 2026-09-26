@@ -85,6 +85,12 @@ describe('ApiSwaggerFactory', () => {
         "$ref: './presence-api/swagger.yaml#/paths/~1presence~1'",
       );
       expect(spec).toContain(
+        "$ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1challenges'",
+      );
+      expect(spec).toContain(
+        "$ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1operations'",
+      );
+      expect(spec).toContain(
         "$ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'",
       );
       expect(spec).toContain(

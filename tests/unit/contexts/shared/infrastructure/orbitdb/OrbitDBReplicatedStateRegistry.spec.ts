@@ -1923,6 +1923,64 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     ]);
   });
 
+  it('replaces collection heads in projected, replicated and durable caches', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+    const key = 'replacement-test:conversation-1';
+    let finishWrite!: () => void;
+    const pendingWrite = new Promise<void>(resolve => {
+      finishWrite = resolve;
+    });
+
+    registry.registerHeadRecordMerger('replacement-test:', (current, candidate) => ({
+      ...candidate,
+      reactions: [
+        ...((current?.reactions as Record<string, unknown>[] | undefined) ?? []),
+        ...((candidate.reactions as Record<string, unknown>[] | undefined) ?? []),
+      ],
+    }));
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.putHead(
+      key,
+      {
+        id: key,
+        reactions: [{ id: 'reaction-1', updatedAt: 1 }],
+        updatedAt: 1,
+      },
+      ['network-1'],
+    );
+    firstNetwork.heads.put.mockImplementationOnce(async () => {
+      await pendingWrite;
+
+      return key;
+    });
+
+    const replacement = registry.putHeadExactly(
+      key,
+      { id: key, reactions: [], updatedAt: 2 },
+      ['network-1'],
+    );
+    await Promise.resolve();
+
+    expect(registry.findCachedHead(key)).toEqual({
+      id: key,
+      reactions: [],
+      updatedAt: 2,
+    });
+    finishWrite();
+    await replacement;
+    expect(registry.findCachedHead(key)).toEqual({
+      id: key,
+      reactions: [],
+      updatedAt: 2,
+    });
+    await expect(headCache.findByNetworkId('network-1')).resolves.toContainEqual({
+      key,
+      value: { id: key, reactions: [], updatedAt: 2 },
+    });
+  });
+
   it('bootstraps document projections from canonical stores', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

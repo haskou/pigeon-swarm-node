@@ -164,6 +164,15 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
     const currentScope = await this.repository.findScope(scopeId);
     const currentCheckpoint = currentScope?.toPrimitives().checkpoint;
+    const acceptedScopeId = acceptance.scope.toPrimitives().checkpoint.scopeId;
+
+    if ([acceptedScopeId, receipt.scopeId].some((id) => id !== scopeId)) {
+      throw new Error('Invalid private authorization');
+    }
+
+    if (currentScope) {
+      await this.assertReservationCompatible(scopeId, currentScope, acceptance);
+    }
 
     if (
       !this.matchesExpected(currentCheckpoint, expectedCheckpoint, acceptance)
@@ -173,16 +182,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
     if (!currentScope) return 'stale';
     const rebasedAcceptance = this.rebaseAcceptance(currentScope, acceptance);
-    const acceptedScopeId =
-      rebasedAcceptance.scope.toPrimitives().checkpoint.scopeId;
-
-    if ([acceptedScopeId, receipt.scopeId].some((id) => id !== scopeId)) {
-      throw new Error('Invalid private authorization');
-    }
-
-    if (!(await this.reservationMatches(scopeId, rebasedAcceptance))) {
-      return 'stale';
-    }
 
     await this.database.commit(
       this.acceptanceOperations(scopeId, rebasedAcceptance),
@@ -197,6 +196,11 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     >,
     acceptance: PrivateOperationAcceptance,
   ): PrivateOperationAcceptance {
+    const pendingBefore = new Set(
+      currentScope
+        .toPrimitives()
+        .pendingOperations.map((pending) => pending.id),
+    );
     const operation = acceptance.receipt.toPrimitives();
     const candidate = PrivateAuthorizationCheckpoint.fromPrimitives(
       acceptance.scope.toPrimitives().checkpoint,
@@ -212,7 +216,50 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       throw new Error('Invalid private authorization');
     }
 
-    return { ...acceptance, scope: currentScope };
+    const pendingAfter = new Set(
+      currentScope
+        .toPrimitives()
+        .pendingOperations.map((pending) => pending.id),
+    );
+    const removedPendingIds = [...pendingBefore].filter(
+      (id) => !pendingAfter.has(id),
+    );
+
+    return {
+      ...acceptance,
+      clearPendingOperationIds: [
+        ...new Set([
+          ...acceptance.clearPendingOperationIds,
+          ...removedPendingIds,
+        ]),
+      ],
+      scope: currentScope,
+    };
+  }
+
+  private async assertReservationCompatible(
+    scopeId: string,
+    scope: NonNullable<
+      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
+    >,
+    acceptance: PrivateOperationAcceptance,
+  ): Promise<void> {
+    if (!acceptance.reservation) return;
+    const reservedChild = await this.repository.findReservation(
+      scopeId,
+      acceptance.reservation.parentHeadHash,
+    );
+
+    if (
+      !reservedChild ||
+      reservedChild === acceptance.reservation.childHeadHash
+    ) {
+      return;
+    }
+
+    scope.quarantine();
+    await this.repository.saveScope(scope);
+    throw new PrivateAuthorizationConflictError();
   }
 
   private async isCommitted(
@@ -249,21 +296,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       current.headHash === expected.headHash &&
       current.revision === expected.revision &&
       this.isExpected(acceptance, expected)
-    );
-  }
-
-  private async reservationMatches(
-    scopeId: string,
-    acceptance: PrivateOperationAcceptance,
-  ): Promise<boolean> {
-    if (!acceptance.reservation) return true;
-    const reservedChild = await this.repository.findReservation(
-      scopeId,
-      acceptance.reservation.parentHeadHash,
-    );
-
-    return (
-      !reservedChild || reservedChild === acceptance.reservation.childHeadHash
     );
   }
 
@@ -350,7 +382,17 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         parentHeadHash,
       );
 
-      if (existing) return existing === childHeadHash ? 'same' : 'conflict';
+      if (existing) {
+        if (existing === childHeadHash) return 'same';
+        const scope = await this.repository.findScope(scopeId);
+
+        if (scope) {
+          scope.quarantine();
+          await this.repository.saveScope(scope);
+        }
+
+        return 'conflict';
+      }
 
       await this.repository.saveReservation(
         scopeId,

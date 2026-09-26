@@ -179,6 +179,18 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     }
   }
 
+  public async findScopeIds(): Promise<string[]> {
+    const documents = await this.database.find(
+      PrivateAuthorizationLocalNamespaces.scopes,
+      () => true,
+    );
+
+    return documents
+      .map((document) => document._id)
+      .filter((scopeId): scopeId is string => typeof scopeId === 'string')
+      .sort((left, right) => left.localeCompare(right));
+  }
+
   public async hasReplayMarker(
     scopeId: string,
     markerId: string,

@@ -218,6 +218,78 @@ describe('PrivateAuthorizationScope', () => {
     ).toThrow(InvalidPrivateAuthorizationError);
   });
 
+  it('prunes obsolete pending operations after a checkpoint transition', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+    scope.acceptProposal(
+      operation({
+        authorDeviceKey: memberKey,
+        authorizationRevision: 1,
+        digest: 'revoked-pending',
+        id: 'revoked-pending',
+      }),
+    );
+    scope.acceptProposal(
+      operation({
+        authorizationRevision: 1,
+        control: { parentHeadHash: 'wrong-head' },
+        digest: 'wrong-parent',
+        id: 'wrong-parent',
+      }),
+    );
+    scope.acceptProposal(
+      operation({
+        authorizationRevision: 2,
+        control: { parentHeadHash: 'head-1' },
+        digest: 'future',
+        id: 'future',
+      }),
+    );
+
+    expect(
+      scope.revokeDevice(
+        operation({
+          digest: 'digest-revoke',
+          id: 'revoke',
+          kind: 'device.revoke',
+          mutation: { deviceKey: memberKey, type: 'device.revoke' },
+        }),
+        successor(),
+      ),
+    ).toBe('accepted');
+    expect(scope.toPrimitives().pendingOperations.map(({ id }) => id)).toEqual([
+      'future',
+    ]);
+  });
+
+  it('prunes obsolete pending operations before enforcing capacity', () => {
+    const scope = PrivateAuthorizationScope.fromPrimitives({
+      acceptedOperations: [],
+      checkpoint: genesis().toPrimitives(),
+      genesisHash: 'genesis-hash',
+      pendingOperations: Array.from({ length: 128 }, (_value, index) =>
+        operation({
+          authorizationRevision: -1,
+          byteSize: 1,
+          digest: `obsolete-${index}`,
+          id: `obsolete-${index}`,
+        }).toPrimitives(),
+      ),
+      status: 'active',
+    });
+
+    expect(
+      scope.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'new-pending',
+          id: 'new-pending',
+        }),
+      ),
+    ).toBe('pending');
+    expect(scope.toPrimitives().pendingOperations).toHaveLength(1);
+  });
+
   it('rejects revocation when the candidate still admits the device', () => {
     const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
     const revocation = operation({

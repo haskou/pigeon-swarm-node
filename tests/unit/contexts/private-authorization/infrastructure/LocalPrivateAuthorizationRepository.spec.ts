@@ -87,6 +87,19 @@ describe('LocalPrivateAuthorizationRepository', () => {
     await expect(restarted.findPending('scope')).resolves.toHaveLength(2);
   });
 
+  it('enumerates only persisted protected scope identifiers', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+    await repository.saveScope(
+      PrivateAuthorizationScope.pin(checkpoint(), 'genesis'),
+    );
+    await repository.saveProjection('orphan', { id: 'orphan' });
+
+    await expect(repository.findScopeIds()).resolves.toEqual(['scope']);
+  });
+
   it('keeps receipts, reservations and projections scoped by opaque keys', async () => {
     const repository = new LocalPrivateAuthorizationRepository(
       database,

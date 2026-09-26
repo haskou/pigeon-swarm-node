@@ -125,6 +125,55 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     await expect(repository.findOutbox('scope')).resolves.toHaveLength(1);
   });
 
+  it('atomically removes pending operations invalidated by a checkpoint', async () => {
+    await repository.savePending(
+      'scope',
+      PrivateControlOperation.fromPrimitives({
+        ...operation('membership.propose').toPrimitives(),
+        authorizationRevision: -1,
+        digest: 'stale-digest',
+        id: 'stale',
+      }),
+    );
+    await repository.savePending(
+      'scope',
+      PrivateControlOperation.fromPrimitives({
+        ...operation('membership.propose').toPrimitives(),
+        authorDeviceKey: 'device',
+        authorizationRevision: 1,
+        digest: 'revoked-digest',
+        id: 'revoked',
+      }),
+    );
+    await repository.savePending(
+      'scope',
+      PrivateControlOperation.fromPrimitives({
+        ...operation('membership.propose').toPrimitives(),
+        authorizationRevision: 2,
+        control: { parentHeadHash: 'head-1' },
+        digest: 'future-digest',
+        id: 'future',
+      }),
+    );
+
+    await unitOfWork.commitAcceptance(
+      'scope',
+      { headHash: 'head-0', revision: 0 },
+      acceptance(),
+    );
+
+    await expect(repository.findPending('scope')).resolves.toEqual([
+      expect.objectContaining({
+        toPrimitives: expect.any(Function),
+      }),
+    ]);
+    expect(
+      (await repository.findPending('scope')).map(
+        (pending) => pending.toPrimitives().id,
+      ),
+    ).toEqual(['future']);
+  });
+
   it('commits a proposal without advancing the authorization checkpoint', async () => {
     const proposal = operation('membership.propose');
     const accepted = acceptance();
@@ -320,26 +369,62 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).toMatchObject({ headHash: 'head-1', revision: 1 });
   });
 
-  it('rejects stale checkpoints and a different child reservation', async () => {
+  it('durably freezes a scope when another child was reserved for the parent', async () => {
     await repository.saveReservation('scope', 'head-0', 'other-head');
 
-    await expect(
-      unitOfWork.commitAcceptance(
-        'scope',
-        { headHash: 'old', revision: 0 },
-        acceptance(),
-      ),
-    ).resolves.toBe('stale');
     await expect(
       unitOfWork.commitAcceptance(
         'scope',
         { headHash: 'head-0', revision: 0 },
         acceptance(),
       ),
-    ).resolves.toBe('stale');
+    ).rejects.toBeInstanceOf(PrivateAuthorizationConflictError);
     await expect(
       repository.findReceipt('scope', 'operation'),
     ).resolves.toBeUndefined();
+    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      'frozen',
+    );
+  });
+
+  it('freezes a sibling arriving after the winning child advanced the checkpoint', async () => {
+    await unitOfWork.commitAcceptance(
+      'scope',
+      { headHash: 'head-0', revision: 0 },
+      acceptance(),
+    );
+    const sibling = acceptance();
+    sibling.receipt = PrivateControlOperation.fromPrimitives({
+      ...operation().toPrimitives(),
+      digest: 'sibling-digest',
+      id: 'sibling',
+    });
+    sibling.scope = PrivateAuthorizationScope.fromPrimitives({
+      ...sibling.scope.toPrimitives(),
+      acceptedOperations: [sibling.receipt.toPrimitives()],
+      checkpoint: {
+        ...sibling.scope.toPrimitives().checkpoint,
+        headHash: 'head-2',
+      },
+    });
+    sibling.reservation = {
+      childHeadHash: 'head-2',
+      parentHeadHash: 'head-0',
+    };
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        sibling,
+      ),
+    ).rejects.toBeInstanceOf(PrivateAuthorizationConflictError);
+    expect((await repository.findScope('scope'))?.toPrimitives()).toMatchObject(
+      {
+        checkpoint: { headHash: 'head-1' },
+        status: 'frozen',
+      },
+    );
   });
 
   it('serializes concurrent compare-and-swap acceptance per scope', async () => {

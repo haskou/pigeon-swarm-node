@@ -73,6 +73,7 @@ describe('PrivateOperationAcceptor', () => {
       findReceipt: jest.fn(),
       findReservation: jest.fn(),
       findScope: jest.fn().mockResolvedValue(scope()),
+      findScopeIds: jest.fn(),
       hasReplayMarker: jest.fn(),
       savePending: jest.fn(),
       saveProjection: jest.fn(),

@@ -33,6 +33,8 @@ export abstract class PrivateAuthorizationRepository {
     scopeId: string,
   ): Promise<PrivateAuthorizationScope | undefined>;
 
+  public abstract findScopeIds(): Promise<string[]>;
+
   public abstract hasReplayMarker(
     scopeId: string,
     markerId: string,
