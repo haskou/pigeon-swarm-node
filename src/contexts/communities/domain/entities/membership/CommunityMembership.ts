@@ -80,6 +80,14 @@ export class CommunityMembership {
     return this.members.length > 0;
   }
 
+  public hasOnlyMember(identityId: IdentityId): boolean {
+    return this.members.length === 1 && this.members[0].isEqual(identityId);
+  }
+
+  public hasBannedMembers(): boolean {
+    return this.bannedMembers.length > 0;
+  }
+
   public isBanned(identityId: IdentityId): boolean {
     return this.bannedMembers.some((member) => member.isEqual(identityId));
   }

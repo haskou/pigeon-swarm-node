@@ -29,11 +29,10 @@ export class PostPrivateAuthorizationScopeRoute extends PrivateAuthorizationRout
         body.projection,
       ),
     );
-    const status =
-      result.status === 'accepted'
-        ? HttpRouteStatusEnum.CREATED
-        : HttpRouteStatusEnum.OK;
+    const status = result.isAccepted()
+      ? HttpRouteStatusEnum.CREATED
+      : HttpRouteStatusEnum.OK;
 
-    return response.status(status).send(result);
+    return response.status(status).send({ status: result.valueOf() });
   }
 }

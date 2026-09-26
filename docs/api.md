@@ -4431,6 +4431,13 @@ polls reject new votes.
 
 ## Private operation authorization
 
+Create a protected scope with `POST /private-authorization/scopes`. The signed
+request identity must own the submitted private community projection. The body
+contains the owner-signed genesis, its protected MLS state and an owner-only,
+non-discoverable private community projection. The node verifies and commits
+all three atomically. An identical retry returns `duplicate`; conflicting
+genesis data is rejected.
+
 Protected communities reject the legacy mutation routes. A signed client first
 submits the complete signed operation to
 `POST /private-authorization/challenges`. The node verifies the operation

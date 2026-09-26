@@ -495,6 +495,7 @@ describe('PrivateAuthorizationScope', () => {
       expect(
         countBound.acceptProposal(
           operation({
+            authorDeviceKey: index < 64 ? ownerKey : memberKey,
             authorizationRevision: 1,
             byteSize: 1,
             digest: `digest-${index}`,
@@ -519,9 +520,20 @@ describe('PrivateAuthorizationScope', () => {
       byteBound.acceptProposal(
         operation({
           authorizationRevision: 1,
-          byteSize: 1024 * 1024,
-          digest: 'full-bytes',
-          id: 'full-bytes',
+          byteSize: 512 * 1024,
+          digest: 'owner-bytes',
+          id: 'owner-bytes',
+        }),
+      ),
+    ).toBe('pending');
+    expect(
+      byteBound.acceptProposal(
+        operation({
+          authorDeviceKey: memberKey,
+          authorizationRevision: 1,
+          byteSize: 512 * 1024,
+          digest: 'member-bytes',
+          id: 'member-bytes',
         }),
       ),
     ).toBe('pending');
@@ -535,6 +547,78 @@ describe('PrivateAuthorizationScope', () => {
         }),
       ),
     ).toThrow(PrivatePendingCapacityExceededError);
+  });
+
+  it('reserves pending capacity for another admitted author', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+
+    for (let index = 0; index < 96; index++) {
+      expect(
+        scope.acceptProposal(
+          operation({
+            authorizationRevision: 1,
+            byteSize: 1,
+            digest: `owner-digest-${index}`,
+            id: `owner-pending-${index}`,
+          }),
+        ),
+      ).toBe('pending');
+    }
+
+    expect(() =>
+      scope.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'owner-overflow',
+          id: 'owner-overflow',
+        }),
+      ),
+    ).toThrow(PrivatePendingCapacityExceededError);
+    expect(
+      scope.acceptProposal(
+        operation({
+          authorDeviceKey: memberKey,
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'member-pending',
+          id: 'member-pending',
+        }),
+      ),
+    ).toBe('pending');
+
+    const byteBound = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+    expect(
+      byteBound.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 768 * 1024,
+          digest: 'owner-byte-capacity',
+          id: 'owner-byte-capacity',
+        }),
+      ),
+    ).toBe('pending');
+    expect(() =>
+      byteBound.acceptProposal(
+        operation({
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'owner-byte-overflow',
+          id: 'owner-byte-overflow',
+        }),
+      ),
+    ).toThrow(PrivatePendingCapacityExceededError);
+    expect(
+      byteBound.acceptProposal(
+        operation({
+          authorDeviceKey: memberKey,
+          authorizationRevision: 1,
+          byteSize: 1,
+          digest: 'member-byte-capacity',
+          id: 'member-byte-capacity',
+        }),
+      ),
+    ).toBe('pending');
   });
 
   it('hydrates without inventing domain events', () => {

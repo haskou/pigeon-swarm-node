@@ -15,6 +15,7 @@ import CallSignalDeliveryRepository from '../contexts/calls/domain/repositories/
 import InMemoryCallParticipantLeaseRepository from '../contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
 import InMemoryCallSignalDeliveryRepository from '../contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
 import PrivateCommunityControlApplier from '../contexts/communities/application/apply-private-control/PrivateCommunityControlApplier';
+import PrivateCommunityGenesisAuthorizer from '../contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer';
 import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
@@ -29,10 +30,14 @@ import { PrivateFreshnessGate } from '../contexts/private-authorization/applicat
 import { PrivateOperationAuthenticator } from '../contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator';
 import { PrivateOperationDecoder } from '../contexts/private-authorization/application/accept-operation/PrivateOperationDecoder';
 import { PrivateOperationUnitOfWork } from '../contexts/private-authorization/application/PrivateOperationUnitOfWork';
+import PrivateAuthorizationScopeProvisioner from '../contexts/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisioner';
+import { PrivateGenesisAuthenticator } from '../contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator';
+import { PrivateGenesisProjectionAuthorizer } from '../contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer';
 import { PrivateAuthorizationRepository } from '../contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { PrivateIdentityBinding } from '../contexts/private-authorization/domain/services/PrivateIdentityBinding';
 import PrivateControlOperationContract from '../contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
 import LegacyIdentityDeviceBinding from '../contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import PrivateGenesisVerifier from '../contexts/private-authorization/infrastructure/crypto/PrivateGenesisVerifier';
 import PrivateOperationVerifier from '../contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
 import VerifiedPrivateControlTransitionProcessor from '../contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
 import InMemoryPrivateFreshnessGate from '../contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
@@ -218,6 +223,24 @@ export default class PigeonApplication {
         {
           token: PrivateControlMutationAuthorizer,
           useClass: PrivateCommunityControlApplier,
+        },
+        {
+          token: PrivateGenesisAuthenticator,
+          useClass: PrivateGenesisVerifier,
+        },
+        {
+          token: PrivateGenesisProjectionAuthorizer,
+          useClass: PrivateCommunityGenesisAuthorizer,
+        },
+        {
+          token: PrivateAuthorizationScopeProvisioner,
+          useFactory: (services) =>
+            new PrivateAuthorizationScopeProvisioner(
+              services.getService(PrivateGenesisAuthenticator),
+              services.getService(PrivateGenesisProjectionAuthorizer),
+              services.getService(PrivateIdentityBinding),
+              services.getService(PrivateOperationUnitOfWork),
+            ),
         },
         {
           token: CommunityRepository,

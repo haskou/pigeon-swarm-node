@@ -1,5 +1,7 @@
 import PrivateCommunityGenesisAuthorizer from '@app/contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { generateKeyPairSync } from 'crypto';
 
 describe('PrivateCommunityGenesisAuthorizer', () => {
@@ -26,11 +28,13 @@ describe('PrivateCommunityGenesisAuthorizer', () => {
     voiceChannels: [],
   });
   const authorizer = new PrivateCommunityGenesisAuthorizer();
+  const scopeId = new PrivateAuthorizationScopeId('scope');
+  const owner = new IdentityId(ownerIdentityId);
 
   it('normalizes a private owner-only genesis projection', () => {
-    expect(
-      authorizer.authorize('scope', ownerIdentityId, projection()),
-    ).toEqual(projection());
+    expect(authorizer.authorize(scopeId, owner, projection())).toEqual(
+      projection(),
+    );
   });
 
   it.each([
@@ -42,7 +46,7 @@ describe('PrivateCommunityGenesisAuthorizer', () => {
     ['automatic joins enabled', { autoJoinEnabled: true }],
   ])('rejects %s', (_label, change) => {
     expect(() =>
-      authorizer.authorize('scope', ownerIdentityId, {
+      authorizer.authorize(scopeId, owner, {
         ...projection(),
         ...change,
       }),

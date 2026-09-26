@@ -728,6 +728,21 @@ export class Community extends AggregateRoot {
     return this.ownerIdentityId.isEqual(identityId);
   }
 
+  public isPrivateGenesisFor(
+    communityId: CommunityId,
+    ownerIdentityId: IdentityId,
+  ): boolean {
+    return (
+      this.isIdentifiedBy(communityId) &&
+      this.isOwner(ownerIdentityId) &&
+      this.membership.hasOnlyMember(ownerIdentityId) &&
+      !this.membership.hasBannedMembers() &&
+      this.settings.isPrivate() &&
+      !this.settings.isDiscoverable() &&
+      !this.settings.isAutoJoinEnabled()
+    );
+  }
+
   public hasMembers(): boolean {
     return this.membership.hasMembers();
   }

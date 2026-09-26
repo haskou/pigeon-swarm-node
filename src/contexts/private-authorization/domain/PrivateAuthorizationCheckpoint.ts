@@ -1,5 +1,6 @@
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpointPrimitives } from './PrivateAuthorizationCheckpointPrimitives';
+import { PrivateAuthorizationScopeId } from './value-objects/PrivateAuthorizationScopeId';
 
 export class PrivateAuthorizationCheckpoint {
   private static readonly MAX_REVOKED_DEVICE_KEYS = 128;
@@ -101,6 +102,10 @@ export class PrivateAuthorizationCheckpoint {
       revoked.size > PrivateAuthorizationCheckpoint.MAX_REVOKED_DEVICE_KEYS ||
       revoked.has('')
     );
+  }
+
+  public getScopeId(): PrivateAuthorizationScopeId {
+    return new PrivateAuthorizationScopeId(this.primitives.scopeId);
   }
 
   public toPrimitives(): PrivateAuthorizationCheckpointPrimitives {

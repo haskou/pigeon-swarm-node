@@ -2,13 +2,19 @@ import { PrivateAuthorizationGenesis } from '@app/contexts/private-authorization
 import PrivateAuthorizationScopeProvisioner from '@app/contexts/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisioner';
 import { PrivateGenesisAuthenticator } from '@app/contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator';
 import { PrivateGenesisProjectionAuthorizer } from '@app/contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer';
+import { PrivateAuthorizationScopeProvisionStatus } from '@app/contexts/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisionStatus';
 import { PrivateAuthorizationScopeProvisionMessage } from '@app/contexts/private-authorization/application/provision-scope/messages/PrivateAuthorizationScopeProvisionMessage';
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { generateKeyPairSync } from 'crypto';
 import { mock } from 'jest-mock-extended';
 
 describe('PrivateAuthorizationScopeProvisioner', () => {
+  const ownerIdentityId = generateKeyPairSync('ed25519')
+    .publicKey.export({ format: 'der', type: 'spki' })
+    .toString('base64');
   const checkpoint = PrivateAuthorizationCheckpoint.genesis({
     admittedDeviceKeys: ['owner-device'],
     authorityKeys: ['owner-device'],
@@ -21,7 +27,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     checkpoint,
     genesisHash: 'genesis-hash',
   };
-  const projection = { id: 'scope', ownerIdentityId: 'owner-identity' };
+  const projection = { id: 'scope', ownerIdentityId };
   const authenticator = mock<PrivateGenesisAuthenticator>();
   const projectionAuthorizer = mock<PrivateGenesisProjectionAuthorizer>();
   const identityBinding = mock<PrivateIdentityBinding>();
@@ -45,21 +51,21 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     await expect(
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
-          'owner-identity',
+          ownerIdentityId,
           'signed-genesis',
           'protected-state',
           projection,
         ),
       ),
-    ).resolves.toEqual({ status: 'accepted' });
+    ).resolves.toEqual(PrivateAuthorizationScopeProvisionStatus.ACCEPTED);
     expect(authenticator.verify).toHaveBeenCalledWith(
       'signed-genesis',
       'owner-device',
       'protected-state',
     );
     expect(projectionAuthorizer.authorize).toHaveBeenCalledWith(
-      'scope',
-      'owner-identity',
+      checkpoint.getScopeId(),
+      new IdentityId(ownerIdentityId),
       projection,
     );
     expect(unitOfWork.commitGenesis).toHaveBeenCalledWith({
@@ -75,13 +81,13 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     await expect(
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
-          'owner-identity',
+          ownerIdentityId,
           'signed-genesis',
           'protected-state',
           projection,
         ),
       ),
-    ).resolves.toEqual({ status: 'duplicate' });
+    ).resolves.toEqual(PrivateAuthorizationScopeProvisionStatus.DUPLICATE);
   });
 
   it('does not persist a projection that fails authorization', async () => {
@@ -92,7 +98,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     await expect(
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
-          'owner-identity',
+          ownerIdentityId,
           'signed-genesis',
           'protected-state',
           projection,

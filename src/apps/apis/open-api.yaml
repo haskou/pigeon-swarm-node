@@ -20,6 +20,8 @@ tags:
   - name: push
   - name: realtime
 paths:
+  /private-authorization/scopes:
+    $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1scopes'
   /private-authorization/challenges:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1challenges'
   /private-authorization/operations:

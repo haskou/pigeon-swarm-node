@@ -171,6 +171,49 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).resolves.toBe('protected-genesis-state');
   });
 
+  it('does not share scope queues between independent node databases', async () => {
+    const secondDatabasePath = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'pigeon-private-uow-second-'),
+    );
+    process.env.PIGEON_LOCAL_DB_PATH = secondDatabasePath;
+    const secondDatabase = new EmbeddedLocalDatabase();
+    process.env.PIGEON_LOCAL_DB_PATH = databasePath;
+    const secondCoordinator = new PrivateAuthorizationStorageCoordinator();
+    const secondRepository = new LocalPrivateAuthorizationRepository(
+      secondDatabase,
+      secondCoordinator,
+    );
+    const secondUnitOfWork = new LocalPrivateOperationUnitOfWork(
+      secondDatabase,
+      secondRepository,
+      secondCoordinator,
+    );
+    const originalCommit = database.commit.bind(database);
+    let releaseFirst!: () => void;
+    let firstEntered!: () => void;
+    const firstReleased = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const firstStarted = new Promise<void>((resolve) => {
+      firstEntered = resolve;
+    });
+    jest.spyOn(database, 'commit').mockImplementationOnce(async (operations) => {
+      firstEntered();
+      await firstReleased;
+      await originalCommit(operations);
+    });
+
+    const first = unitOfWork.commitGenesis(genesis('shared-scope'));
+    await firstStarted;
+    await expect(
+      secondUnitOfWork.commitGenesis(genesis('shared-scope')),
+    ).resolves.toBe('committed');
+    releaseFirst();
+    await expect(first).resolves.toBe('committed');
+    await secondDatabase.close();
+    await fs.rm(secondDatabasePath, { force: true, recursive: true });
+  });
+
   it('waits for an in-flight public write before protecting its scope', async () => {
     const findScope = jest.spyOn(repository, 'findScope');
     let releasePublicWrite!: () => void;

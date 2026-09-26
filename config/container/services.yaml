@@ -1,23 +1,4 @@
 services:
-  private_community_genesis_authorizer:
-    class: >-
-      /contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer
-    arguments: []
-    abstract: false
-    parent: null
-  private_authorization_scope_provisioner:
-    class: >-
-      /contexts/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisioner
-    arguments:
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX3ByaXZhdGUtYXV0aG9yaXphdGlvbl9faW5mcmFzdHJ1Y3R1cmVfX2NyeXB0b19fUHJpdmF0ZUdlbmVzaXNWZXJpZmllcl9fUHJpdmF0ZUdlbmVzaXNWZXJpZmllcg==
-      - '@private_community_genesis_authorizer'
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX3ByaXZhdGUtYXV0aG9yaXphdGlvbl9faW5mcmFzdHJ1Y3R1cmVfX2NyeXB0b19fTGVnYWN5SWRlbnRpdHlEZXZpY2VCaW5kaW5nX19MZWdhY3lJZGVudGl0eURldmljZUJpbmRpbmc=
-      - >-
-        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX3ByaXZhdGUtYXV0aG9yaXphdGlvbl9faW5mcmFzdHJ1Y3R1cmVfX2xvY2FsLWRiX19Mb2NhbFByaXZhdGVPcGVyYXRpb25Vbml0T2ZXb3JrX19Mb2NhbFByaXZhdGVPcGVyYXRpb25Vbml0T2ZXb3Jr
-    abstract: false
-    parent: null
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fYXBwc19fUGlnZW9uQXBwbGljYXRpb25fX1BpZ2VvbkFwcGxpY2F0aW9u:
     class: /apps/PigeonApplication
     arguments: []

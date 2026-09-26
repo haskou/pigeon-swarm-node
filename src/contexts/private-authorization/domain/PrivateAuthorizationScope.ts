@@ -1,4 +1,5 @@
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
+import { assert } from '@haskou/value-objects';
 
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAcceptedCapacityExceededError } from './errors/PrivateAcceptedCapacityExceededError';
@@ -20,7 +21,9 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   private static readonly MAX_NON_AUTHORITY_ACCEPTED_OPERATIONS = 96;
   private static readonly MAX_HISTORICAL_OPERATIONS = 32;
   private static readonly MAX_PENDING_BYTES = 1024 * 1024;
+  private static readonly MAX_PENDING_BYTES_PER_AUTHOR = 768 * 1024;
   private static readonly MAX_PENDING_OPERATIONS = 128;
+  private static readonly MAX_PENDING_OPERATIONS_PER_AUTHOR = 96;
 
   public static pin(
     checkpoint: PrivateAuthorizationCheckpoint,
@@ -69,11 +72,14 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     this.compactAccepted();
   }
 
-  private acceptedBytes(operations: PrivateControlOperation[]): number {
-    return operations.reduce(
-      (total, operation) => total + operation.toPrimitives().byteSize,
-      0,
-    );
+  private operationBytes(operations: PrivateControlOperation[]): number {
+    let bytes = 0;
+
+    for (const operation of operations) {
+      bytes += operation.toPrimitives().byteSize;
+    }
+
+    return bytes;
   }
 
   private retainedAccepted(
@@ -110,14 +116,14 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
     if (
       required.length > PrivateAuthorizationScope.MAX_ACCEPTED_OPERATIONS ||
-      this.acceptedBytes(required) >
+      this.operationBytes(required) >
         PrivateAuthorizationScope.MAX_ACCEPTED_BYTES
     ) {
       throw new PrivateAcceptedCapacityExceededError();
     }
 
     const retainedIds = new Set(requiredIds);
-    let retainedBytes = this.acceptedBytes(required);
+    let retainedBytes = this.operationBytes(required);
     let historicalCount = 0;
 
     for (let index = acceptedOperations.length - 1; index >= 0; index -= 1) {
@@ -188,7 +194,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
       if (
         byAuthor.length >=
           PrivateAuthorizationScope.MAX_ACCEPTED_OPERATIONS_PER_AUTHOR ||
-        this.acceptedBytes(byAuthor) + value.byteSize >
+        this.operationBytes(byAuthor) + value.byteSize >
           PrivateAuthorizationScope.MAX_ACCEPTED_BYTES_PER_AUTHOR
       ) {
         throw new PrivateAcceptedCapacityExceededError();
@@ -206,7 +212,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
         if (
           nonAuthority.length >=
             PrivateAuthorizationScope.MAX_NON_AUTHORITY_ACCEPTED_OPERATIONS ||
-          this.acceptedBytes(nonAuthority) + value.byteSize >
+          this.operationBytes(nonAuthority) + value.byteSize >
             PrivateAuthorizationScope.MAX_NON_AUTHORITY_ACCEPTED_BYTES
         ) {
           throw new PrivateAcceptedCapacityExceededError();
@@ -305,31 +311,38 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   }
 
   private enqueue(operation: PrivateControlOperation): void {
+    const candidate = operation.toPrimitives();
     const duplicate = this.pendingOperations.find(
-      (pending) => pending.toPrimitives().id === operation.toPrimitives().id,
+      (pending) => pending.toPrimitives().id === candidate.id,
     );
 
     if (duplicate) {
-      if (duplicate.toPrimitives().digest !== operation.toPrimitives().digest) {
+      if (duplicate.toPrimitives().digest !== candidate.digest) {
         this.freeze();
       }
 
       return;
     }
 
-    const byteSize = this.pendingOperations.reduce(
-      (total, pending) => total + pending.toPrimitives().byteSize,
-      0,
+    const byAuthor = this.pendingOperations.filter(
+      (pending) =>
+        pending.toPrimitives().authorDeviceKey === candidate.authorDeviceKey,
     );
+    const withinGlobalCapacity =
+      this.pendingOperations.length <
+        PrivateAuthorizationScope.MAX_PENDING_OPERATIONS &&
+      this.operationBytes(this.pendingOperations) + candidate.byteSize <=
+        PrivateAuthorizationScope.MAX_PENDING_BYTES;
+    const withinAuthorCapacity =
+      byAuthor.length <
+        PrivateAuthorizationScope.MAX_PENDING_OPERATIONS_PER_AUTHOR &&
+      this.operationBytes(byAuthor) + candidate.byteSize <=
+        PrivateAuthorizationScope.MAX_PENDING_BYTES_PER_AUTHOR;
 
-    if (
-      this.pendingOperations.length >=
-        PrivateAuthorizationScope.MAX_PENDING_OPERATIONS ||
-      byteSize + operation.toPrimitives().byteSize >
-        PrivateAuthorizationScope.MAX_PENDING_BYTES
-    ) {
-      throw new PrivatePendingCapacityExceededError();
-    }
+    assert(
+      withinGlobalCapacity && withinAuthorCapacity,
+      new PrivatePendingCapacityExceededError(),
+    );
 
     this.pendingOperations.push(operation);
   }

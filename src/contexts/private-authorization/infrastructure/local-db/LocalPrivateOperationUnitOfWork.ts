@@ -17,7 +17,10 @@ import {
 } from './PrivateAuthorizationLocalNamespaces';
 
 export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUnitOfWork {
-  private static readonly scopeQueues = new Map<string, Promise<void>>();
+  private static readonly scopeQueuesByDatabase = new WeakMap<
+    EmbeddedLocalDatabase,
+    Map<string, Promise<void>>
+  >();
 
   public constructor(
     private readonly database: EmbeddedLocalDatabase,
@@ -27,28 +30,42 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     super();
   }
 
+  private getScopeQueues(): Map<string, Promise<void>> {
+    const current = LocalPrivateOperationUnitOfWork.scopeQueuesByDatabase.get(
+      this.database,
+    );
+
+    if (current) return current;
+    const created = new Map<string, Promise<void>>();
+    LocalPrivateOperationUnitOfWork.scopeQueuesByDatabase.set(
+      this.database,
+      created,
+    );
+
+    return created;
+  }
+
   private async exclusively<T>(
     scopeId: string,
     action: () => Promise<T>,
   ): Promise<T> {
-    const previous =
-      LocalPrivateOperationUnitOfWork.scopeQueues.get(scopeId) ??
-      Promise.resolve();
-    let release: () => void;
+    const queues = this.getScopeQueues();
+    const previous = queues.get(scopeId) ?? Promise.resolve();
+    let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
     const tail = previous.then(() => gate);
-    LocalPrivateOperationUnitOfWork.scopeQueues.set(scopeId, tail);
+    queues.set(scopeId, tail);
     await previous;
 
     try {
       return await action();
     } finally {
-      release!();
+      release();
 
-      if (LocalPrivateOperationUnitOfWork.scopeQueues.get(scopeId) === tail) {
-        LocalPrivateOperationUnitOfWork.scopeQueues.delete(scopeId);
+      if (queues.get(scopeId) === tail) {
+        queues.delete(scopeId);
       }
     }
   }

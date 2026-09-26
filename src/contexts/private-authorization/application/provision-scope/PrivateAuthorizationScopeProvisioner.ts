@@ -2,6 +2,7 @@ import { PrivateAuthorizationScope } from '../../domain/PrivateAuthorizationScop
 import { PrivateIdentityBinding } from '../../domain/services/PrivateIdentityBinding';
 import { PrivateOperationUnitOfWork } from '../PrivateOperationUnitOfWork';
 import { PrivateAuthorizationScopeProvisionMessage } from './messages/PrivateAuthorizationScopeProvisionMessage';
+import { PrivateAuthorizationScopeProvisionStatus } from './PrivateAuthorizationScopeProvisionStatus';
 import { PrivateGenesisAuthenticator } from './PrivateGenesisAuthenticator';
 import { PrivateGenesisProjectionAuthorizer } from './PrivateGenesisProjectionAuthorizer';
 
@@ -15,18 +16,17 @@ export default class PrivateAuthorizationScopeProvisioner {
 
   public async provision(
     message: PrivateAuthorizationScopeProvisionMessage,
-  ): Promise<{ status: 'accepted' | 'duplicate' }> {
+  ): Promise<PrivateAuthorizationScopeProvisionStatus> {
     const ownerDeviceKey = this.identityBinding.bind(
-      message.authenticatedIdentityId,
+      message.authenticatedIdentityId.valueOf(),
     );
     const genesis = this.genesisAuthenticator.verify(
       message.signedGenesisJson,
       ownerDeviceKey,
       message.protectedMlsState,
     );
-    const scopeId = genesis.checkpoint.toPrimitives().scopeId;
     const projection = this.projectionAuthorizer.authorize(
-      scopeId,
+      genesis.checkpoint.getScopeId(),
       message.authenticatedIdentityId,
       message.projection,
     );
@@ -39,6 +39,8 @@ export default class PrivateAuthorizationScopeProvisioner {
       ),
     });
 
-    return { status: result === 'committed' ? 'accepted' : 'duplicate' };
+    return result === 'committed'
+      ? PrivateAuthorizationScopeProvisionStatus.ACCEPTED
+      : PrivateAuthorizationScopeProvisionStatus.DUPLICATE;
   }
 }
