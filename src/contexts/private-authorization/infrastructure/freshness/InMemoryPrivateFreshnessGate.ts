@@ -8,6 +8,8 @@ import { performance } from 'perf_hooks';
 import PrivateFreshnessVerifier from '../crypto/PrivateFreshnessVerifier';
 
 interface OutstandingChallenge {
+  expectedHeadHash: string;
+  expectedRevision: number;
   issuedAt: number;
   nonce: string;
   requestJson: string;
@@ -15,8 +17,12 @@ interface OutstandingChallenge {
 
 export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
   private static readonly MAX_AGE_MILLISECONDS = 10_000;
-  private static readonly MAX_OUTSTANDING_CHALLENGES = 1024;
-  private static readonly challenges = new Map<string, OutstandingChallenge>();
+  private static readonly MAX_OUTSTANDING_CHALLENGES_PER_PRINCIPAL = 64;
+  private static readonly MAX_OUTSTANDING_CHALLENGES_PER_SCOPE = 1024;
+  private static readonly challenges = new Map<
+    string,
+    Map<string, Map<string, OutstandingChallenge>>
+  >();
 
   public constructor(
     private readonly verifier: PrivateFreshnessVerifier,
@@ -27,18 +33,107 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     super();
   }
 
-  private key(scopeId: string, digest: string): string {
-    return `${scopeId}:${digest}`;
+  private removeExpiredChallenges(
+    challenges: Map<string, OutstandingChallenge>,
+    now: number,
+  ): void {
+    for (const [digest, challenge] of challenges) {
+      if (this.isExpired(challenge, now)) challenges.delete(digest);
+    }
   }
 
   private removeExpired(now: number): void {
-    for (const [key, challenge] of InMemoryPrivateFreshnessGate.challenges) {
-      if (
-        now - challenge.issuedAt >
-        InMemoryPrivateFreshnessGate.MAX_AGE_MILLISECONDS
-      ) {
-        InMemoryPrivateFreshnessGate.challenges.delete(key);
+    for (const [scopeId, scope] of InMemoryPrivateFreshnessGate.challenges) {
+      for (const [authorDeviceKey, challenges] of scope) {
+        this.removeExpiredChallenges(challenges, now);
+
+        if (challenges.size === 0) {
+          scope.delete(authorDeviceKey);
+        }
       }
+
+      if (scope.size === 0) {
+        InMemoryPrivateFreshnessGate.challenges.delete(scopeId);
+      }
+    }
+  }
+
+  private scopeSize(
+    scope: Map<string, Map<string, OutstandingChallenge>>,
+  ): number {
+    return [...scope.values()].reduce(
+      (total, challenges) => total + challenges.size,
+      0,
+    );
+  }
+
+  private isExpired(challenge: OutstandingChallenge, now: number): boolean {
+    return (
+      now - challenge.issuedAt >
+      InMemoryPrivateFreshnessGate.MAX_AGE_MILLISECONDS
+    );
+  }
+
+  private matchesCheckpoint(
+    challenge: OutstandingChallenge,
+    checkpoint: ReturnType<PrivateAuthorizationCheckpoint['toPrimitives']>,
+  ): boolean {
+    return (
+      challenge.expectedHeadHash === checkpoint.headHash &&
+      challenge.expectedRevision === checkpoint.revision
+    );
+  }
+
+  private assertAdmitted(
+    checkpoint: ReturnType<PrivateAuthorizationCheckpoint['toPrimitives']>,
+    operation: ReturnType<PrivateControlOperation['toPrimitives']>,
+  ): void {
+    if (
+      operation.scopeId !== checkpoint.scopeId ||
+      !checkpoint.admittedDeviceKeys.includes(operation.authorDeviceKey) ||
+      checkpoint.revokedDeviceKeys.includes(operation.authorDeviceKey)
+    ) {
+      throw new InvalidPrivateAuthorizationError();
+    }
+  }
+
+  private takeChallenge(
+    scopeId: string,
+    authorDeviceKey: string,
+    digest: string,
+  ): OutstandingChallenge | undefined {
+    const scope = InMemoryPrivateFreshnessGate.challenges.get(scopeId);
+    const challenges = scope?.get(authorDeviceKey);
+    const challenge = challenges?.get(digest);
+    challenges?.delete(digest);
+    this.removeEmptyStores(scopeId, authorDeviceKey, scope, challenges);
+
+    return challenge;
+  }
+
+  private removeEmptyStores(
+    scopeId: string,
+    authorDeviceKey: string,
+    scope: Map<string, Map<string, OutstandingChallenge>> | undefined,
+    challenges: Map<string, OutstandingChallenge> | undefined,
+  ): void {
+    if (challenges?.size === 0) scope?.delete(authorDeviceKey);
+
+    if (scope?.size === 0) {
+      InMemoryPrivateFreshnessGate.challenges.delete(scopeId);
+    }
+  }
+
+  private assertChallenge(
+    challenge: OutstandingChallenge | undefined,
+    checkpoint: ReturnType<PrivateAuthorizationCheckpoint['toPrimitives']>,
+  ): asserts challenge is OutstandingChallenge {
+    if (
+      !challenge ||
+      this.isExpired(challenge, this.now()) ||
+      !this.matchesCheckpoint(challenge, checkpoint)
+    ) {
+      throw new InvalidPrivateAuthorizationError();
     }
   }
 
@@ -49,17 +144,13 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
   ): { replayMarkerId: string } {
     const trusted = checkpoint.toPrimitives();
     const candidate = operation.toPrimitives();
-    const key = this.key(trusted.scopeId, candidate.digest);
-    const challenge = InMemoryPrivateFreshnessGate.challenges.get(key);
-    InMemoryPrivateFreshnessGate.challenges.delete(key);
-
-    if (
-      !challenge ||
-      this.now() - challenge.issuedAt >
-        InMemoryPrivateFreshnessGate.MAX_AGE_MILLISECONDS
-    ) {
-      throw new InvalidPrivateAuthorizationError();
-    }
+    const challenge = this.takeChallenge(
+      trusted.scopeId,
+      candidate.authorDeviceKey,
+      candidate.digest,
+    );
+    this.assertChallenge(challenge, trusted);
+    this.assertAdmitted(trusted, candidate);
     this.verifier.verify(
       signedProofJson,
       trusted.freshnessAuthorityKey,
@@ -69,6 +160,34 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     return { replayMarkerId: challenge.nonce };
   }
 
+  private assertCapacity(
+    scope: Map<string, Map<string, OutstandingChallenge>> | undefined,
+    challenges: Map<string, OutstandingChallenge> | undefined,
+  ): void {
+    if (
+      (challenges?.size ?? 0) >=
+        InMemoryPrivateFreshnessGate.MAX_OUTSTANDING_CHALLENGES_PER_PRINCIPAL ||
+      (scope ? this.scopeSize(scope) : 0) >=
+        InMemoryPrivateFreshnessGate.MAX_OUTSTANDING_CHALLENGES_PER_SCOPE
+    ) {
+      throw new InvalidPrivateAuthorizationError();
+    }
+  }
+
+  private challengeStore(
+    scopeId: string,
+    authorDeviceKey: string,
+  ): Map<string, OutstandingChallenge> {
+    let scope = InMemoryPrivateFreshnessGate.challenges.get(scopeId);
+    scope ??= new Map<string, Map<string, OutstandingChallenge>>();
+    let challenges = scope.get(authorDeviceKey);
+    challenges ??= new Map<string, OutstandingChallenge>();
+    scope.set(authorDeviceKey, challenges);
+    InMemoryPrivateFreshnessGate.challenges.set(scopeId, scope);
+
+    return challenges;
+  }
+
   public issue(
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
@@ -76,20 +195,23 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     const trusted = checkpoint.toPrimitives();
     const candidate = operation.toPrimitives();
 
-    if (candidate.scopeId !== trusted.scopeId) {
-      throw new InvalidPrivateAuthorizationError();
-    }
+    this.assertAdmitted(trusted, candidate);
     const now = this.now();
     this.removeExpired(now);
-    const key = this.key(trusted.scopeId, candidate.digest);
+    const scope = InMemoryPrivateFreshnessGate.challenges.get(trusted.scopeId);
+    let challenges = scope?.get(candidate.authorDeviceKey);
+    const existing = challenges?.get(candidate.digest);
 
-    if (
-      !InMemoryPrivateFreshnessGate.challenges.has(key) &&
-      InMemoryPrivateFreshnessGate.challenges.size >=
-        InMemoryPrivateFreshnessGate.MAX_OUTSTANDING_CHALLENGES
-    ) {
-      throw new InvalidPrivateAuthorizationError();
+    if (existing && this.matchesCheckpoint(existing, trusted)) {
+      return existing.requestJson;
     }
+
+    if (existing) challenges?.delete(candidate.digest);
+    this.assertCapacity(scope, challenges);
+    challenges = this.challengeStore(
+      trusted.scopeId,
+      candidate.authorDeviceKey,
+    );
     const nonce = this.nonce();
     const requestJson = JSON.stringify({
       batchCommitment: candidate.digest,
@@ -99,7 +221,9 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
       scopeId: trusted.scopeId,
       version: 1,
     });
-    InMemoryPrivateFreshnessGate.challenges.set(key, {
+    challenges.set(candidate.digest, {
+      expectedHeadHash: trusted.headHash,
+      expectedRevision: trusted.revision,
       issuedAt: now,
       nonce,
       requestJson,
